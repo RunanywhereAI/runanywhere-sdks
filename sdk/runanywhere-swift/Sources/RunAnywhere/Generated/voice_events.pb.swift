@@ -8,7 +8,7 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere v2 IDL — streaming events emitted by the VoiceAgent solution.
+// RunAnywhere IDL — streaming events emitted by the VoiceAgent solution.
 //
 // Every frontend binds to this schema via its native proto3 codegen
 // (swift-protobuf, Wire, protobuf.dart, ts-proto). There is NO hand-written
@@ -26,12 +26,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RAVoicePipelineComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVoicePipelineComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case agent // = 1
@@ -97,7 +97,7 @@ public enum RAVoicePipelineComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RATokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RATokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -145,7 +145,7 @@ public enum RATokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case pcmF32Le // = 1
@@ -183,7 +183,7 @@ public enum RAAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAInterruptReason: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAInterruptReason: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case userBargeIn // = 1
@@ -229,7 +229,7 @@ public enum RAInterruptReason: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case idle // = 1
@@ -303,7 +303,7 @@ public enum RAPipelineState: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RASpeechTurnDetectionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASpeechTurnDetectionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case turnStarted // = 1
@@ -349,7 +349,7 @@ public enum RASpeechTurnDetectionEventKind: SwiftProtobuf.Enum, Swift.CaseIterab
 
 }
 
-public enum RATurnLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RATurnLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -418,7 +418,7 @@ public enum RATurnLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// ---------------------------------------------------------------------------
 /// Sum type emitted on the output edge of the VoiceAgent pipeline.
 /// ---------------------------------------------------------------------------
-public struct RAVoiceEvent: @unchecked Sendable {
+public nonisolated struct RAVoiceEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -522,7 +522,7 @@ public struct RAVoiceEvent: @unchecked Sendable {
     set {_uniqueStorage()._payload = .metrics(newValue)}
   }
 
-  /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+  /// Voice agent lifecycle events. Mirror Swift VoiceSessionError /
   /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
   /// signals consumed by the cross-platform VoiceAgent extensions
   /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
@@ -640,7 +640,7 @@ public struct RAVoiceEvent: @unchecked Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   /// Exactly one of the following is populated on every event.
-  public enum OneOf_Payload: Equatable, Sendable {
+  public nonisolated enum OneOf_Payload: Equatable, Sendable {
     case userSaid(RAUserSaidEvent)
     case assistantToken(RAAssistantTokenEvent)
     case audio(RAAudioFrameEvent)
@@ -649,7 +649,7 @@ public struct RAVoiceEvent: @unchecked Sendable {
     case state(RAStateChangeEvent)
     case error(RAErrorEvent)
     case metrics(RAMetricsEvent)
-    /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+    /// Voice agent lifecycle events. Mirror Swift VoiceSessionError /
     /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
     /// signals consumed by the cross-platform VoiceAgent extensions
     /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
@@ -675,7 +675,7 @@ public struct RAVoiceEvent: @unchecked Sendable {
 }
 
 /// User speech finalized by STT (is_final=false → partial hypothesis).
-public struct RAUserSaidEvent: Sendable {
+public nonisolated struct RAUserSaidEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -702,7 +702,7 @@ public struct RAUserSaidEvent: Sendable {
 
 /// Single token decoded by the LLM. is_final=true on the last token of a
 /// response (end-of-stream marker).
-public struct RAAssistantTokenEvent: Sendable {
+public nonisolated struct RAAssistantTokenEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -726,7 +726,7 @@ public struct RAAssistantTokenEvent: Sendable {
 
 /// A chunk of synthesized PCM audio, ready for the sink. The frontend is
 /// expected to copy the bytes out; the C ABI does NOT retain ownership.
-public struct RAAudioFrameEvent: Sendable {
+public nonisolated struct RAAudioFrameEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -756,9 +756,9 @@ public struct RAAudioFrameEvent: Sendable {
 
 /// Voice Activity Detection output. Frontends usually do not need this —
 /// exposed for debugging and custom UIs (waveform highlighting, etc.).
-/// IDL-18: `type` uses the canonical VADStreamEventKind enum from
+/// `type` uses the canonical VADStreamEventKind enum from
 /// vad_options.proto (the hand-rolled VADEventType was deleted).
-public struct RAVADEvent: Sendable {
+public nonisolated struct RAVADEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -784,7 +784,7 @@ public struct RAVADEvent: Sendable {
 
 /// Assistant playback was interrupted by a barge-in. The reason distinguishes
 /// user barge-in from app-initiated cancel.
-public struct RAInterruptedEvent: Sendable {
+public nonisolated struct RAInterruptedEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -799,7 +799,7 @@ public struct RAInterruptedEvent: Sendable {
 }
 
 /// Pipeline lifecycle state. Ordered — callers can compare numerically.
-public struct RAStateChangeEvent: Sendable {
+public nonisolated struct RAStateChangeEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -815,7 +815,7 @@ public struct RAStateChangeEvent: Sendable {
 
 /// Terminal or recoverable error in the pipeline. Frontends map these to
 /// their native error types.
-public struct RAErrorEvent: Sendable {
+public nonisolated struct RAErrorEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -840,7 +840,7 @@ public struct RAErrorEvent: Sendable {
 }
 
 /// Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop.
-public struct RAMetricsEvent: Sendable {
+public nonisolated struct RAMetricsEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -862,7 +862,7 @@ public struct RAMetricsEvent: Sendable {
   /// dashboards without re-computing the threshold themselves.
   public var isOverBudget: Bool = false
 
-  /// v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+  /// Monotonic producer-side timestamp in nanoseconds. Set by the
   /// producer (C++ dispatcher) at event-emit time; read by consumers
   /// (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
   /// latency without relying on wall-clock sync. Encoded as int64 so
@@ -883,7 +883,7 @@ public struct RAMetricsEvent: Sendable {
   public init() {}
 }
 
-public struct RAAudioLevelEvent: Sendable {
+public nonisolated struct RAAudioLevelEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -901,7 +901,7 @@ public struct RAAudioLevelEvent: Sendable {
   public init() {}
 }
 
-public struct RAComponentProgressEvent: Sendable {
+public nonisolated struct RAComponentProgressEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -924,12 +924,12 @@ public struct RAComponentProgressEvent: Sendable {
 /// `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
 /// `VoiceAgentComponentStates`.
 ///
-/// IDL-04: The former `ComponentLoadState` enum was consolidated into the
+/// The former `ComponentLoadState` enum was consolidated into the
 /// canonical richer `ComponentLifecycleState` (component_types.proto). Where
 /// the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
 /// component is ready to use", callers now use
 /// `COMPONENT_LIFECYCLE_STATE_READY`.
-public struct RAVoiceAgentComponentStates: Sendable {
+public nonisolated struct RAVoiceAgentComponentStates: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -969,7 +969,7 @@ public struct RAVoiceAgentComponentStates: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAVoiceSessionError: Sendable {
+public nonisolated struct RAVoiceSessionError: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -998,7 +998,7 @@ public struct RAVoiceSessionError: Sendable {
   fileprivate var _failedComponent: String? = nil
 }
 
-public struct RASessionStartedEvent: Sendable {
+public nonisolated struct RASessionStartedEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1010,7 +1010,7 @@ public struct RASessionStartedEvent: Sendable {
   public init() {}
 }
 
-public struct RASessionStoppedEvent: Sendable {
+public nonisolated struct RASessionStoppedEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1024,7 +1024,7 @@ public struct RASessionStoppedEvent: Sendable {
   public init() {}
 }
 
-public struct RAAgentResponseStartedEvent: Sendable {
+public nonisolated struct RAAgentResponseStartedEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1036,7 +1036,7 @@ public struct RAAgentResponseStartedEvent: Sendable {
   public init() {}
 }
 
-public struct RAAgentResponseCompletedEvent: Sendable {
+public nonisolated struct RAAgentResponseCompletedEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1050,7 +1050,7 @@ public struct RAAgentResponseCompletedEvent: Sendable {
   public init() {}
 }
 
-public struct RASpeechTurnDetectionEvent: Sendable {
+public nonisolated struct RASpeechTurnDetectionEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1074,7 +1074,7 @@ public struct RASpeechTurnDetectionEvent: Sendable {
   public init() {}
 }
 
-public struct RATurnLifecycleEvent: Sendable {
+public nonisolated struct RATurnLifecycleEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1100,7 +1100,7 @@ public struct RATurnLifecycleEvent: Sendable {
   public init() {}
 }
 
-public struct RAWakeWordDetectedEvent: Sendable {
+public nonisolated struct RAWakeWordDetectedEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1124,37 +1124,37 @@ public struct RAWakeWordDetectedEvent: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAVoicePipelineComponent: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoicePipelineComponent: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_PIPELINE_COMPONENT_UNSPECIFIED\0\u{1}VOICE_PIPELINE_COMPONENT_AGENT\0\u{1}VOICE_PIPELINE_COMPONENT_STT\0\u{1}VOICE_PIPELINE_COMPONENT_ASR\0\u{1}VOICE_PIPELINE_COMPONENT_TTS\0\u{1}VOICE_PIPELINE_COMPONENT_VAD\0\u{1}VOICE_PIPELINE_COMPONENT_STD\0\u{1}VOICE_PIPELINE_COMPONENT_LLM\0\u{1}VOICE_PIPELINE_COMPONENT_AUDIO\0\u{1}VOICE_PIPELINE_COMPONENT_WAKEWORD\0")
 }
 
-extension RATokenKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATokenKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOKEN_KIND_UNSPECIFIED\0\u{1}TOKEN_KIND_ANSWER\0\u{1}TOKEN_KIND_THOUGHT\0\u{1}TOKEN_KIND_TOOL_CALL\0")
 }
 
-extension RAAudioEncoding: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAudioEncoding: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUDIO_ENCODING_UNSPECIFIED\0\u{1}AUDIO_ENCODING_PCM_F32_LE\0\u{1}AUDIO_ENCODING_PCM_S16_LE\0")
 }
 
-extension RAInterruptReason: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAInterruptReason: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INTERRUPT_REASON_UNSPECIFIED\0\u{1}INTERRUPT_REASON_USER_BARGE_IN\0\u{1}INTERRUPT_REASON_APP_STOP\0\u{1}INTERRUPT_REASON_AUDIO_ROUTE_CHANGE\0\u{1}INTERRUPT_REASON_TIMEOUT\0")
 }
 
-extension RAPipelineState: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPipelineState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PIPELINE_STATE_UNSPECIFIED\0\u{1}PIPELINE_STATE_IDLE\0\u{1}PIPELINE_STATE_LISTENING\0\u{1}PIPELINE_STATE_THINKING\0\u{1}PIPELINE_STATE_SPEAKING\0\u{1}PIPELINE_STATE_STOPPED\0\u{1}PIPELINE_STATE_WAITING_WAKEWORD\0\u{1}PIPELINE_STATE_PROCESSING_SPEECH\0\u{1}PIPELINE_STATE_GENERATING_RESPONSE\0\u{1}PIPELINE_STATE_PLAYING_TTS\0\u{1}PIPELINE_STATE_COOLDOWN\0\u{1}PIPELINE_STATE_ERROR\0")
 }
 
-extension RASpeechTurnDetectionEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASpeechTurnDetectionEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED\0\u{1}SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS\0")
 }
 
-extension RATurnLifecycleEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATurnLifecycleEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TURN_LIFECYCLE_EVENT_KIND_UNSPECIFIED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_STARTED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL\0\u{1}TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_COMPLETED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_CANCELLED\0\u{1}TURN_LIFECYCLE_EVENT_KIND_FAILED\0")
 }
 
-extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}category\0\u{1}severity\0\u{1}component\0\u{4}\u{5}user_said\0\u{3}assistant_token\0\u{1}audio\0\u{1}vad\0\u{1}interrupted\0\u{1}state\0\u{1}error\0\u{1}metrics\0\u{3}component_state_changed\0\u{3}session_error\0\u{3}session_started\0\u{3}session_stopped\0\u{3}agent_response_started\0\u{3}agent_response_completed\0\u{3}speech_turn_detection\0\u{3}turn_lifecycle\0\u{3}wakeword_detected\0\u{3}audio_level\0\u{3}component_progress\0\u{4}\u{2}session_id\0\u{3}turn_id\0\u{3}request_id\0\u{1}metadata\0")
 
@@ -1609,7 +1609,7 @@ extension RAVoiceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAUserSaidEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAUserSaidEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UserSaidEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}confidence\0\u{3}audio_start_us\0\u{3}audio_end_us\0\u{3}language_code\0\u{3}segment_index\0")
 
@@ -1669,7 +1669,7 @@ extension RAUserSaidEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RAAssistantTokenEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAssistantTokenEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AssistantTokenEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0")
 
@@ -1724,7 +1724,7 @@ extension RAAssistantTokenEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AudioFrameEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pcm\0\u{3}sample_rate_hz\0\u{1}channels\0\u{1}encoding\0\u{3}is_final\0\u{3}chunk_index\0\u{3}duration_ms\0")
 
@@ -1784,7 +1784,7 @@ extension RAAudioFrameEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{3}frame_offset_us\0\u{1}confidence\0\u{3}is_speech\0\u{3}speech_duration_ms\0\u{3}silence_duration_ms\0\u{3}noise_floor_db\0")
 
@@ -1844,7 +1844,7 @@ extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension RAInterruptedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAInterruptedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".InterruptedEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}reason\0\u{1}detail\0")
 
@@ -1879,7 +1879,7 @@ extension RAInterruptedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAStateChangeEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStateChangeEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StateChangeEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}previous\0\u{1}current\0")
 
@@ -1914,7 +1914,7 @@ extension RAStateChangeEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAErrorEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAErrorEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ErrorEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}message\0\u{1}component\0\u{3}is_recoverable\0\u{1}operation\0\u{3}details_json\0")
 
@@ -1969,7 +1969,7 @@ extension RAErrorEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".MetricsEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_final_ms\0\u{3}llm_first_token_ms\0\u{3}tts_first_audio_ms\0\u{3}end_to_end_ms\0\u{3}tokens_generated\0\u{3}audio_samples_played\0\u{3}is_over_budget\0\u{3}created_at_ns\0\u{3}vad_first_speech_ms\0\u{3}stt_first_partial_ms\0\u{3}llm_total_ms\0\u{3}tts_total_ms\0")
 
@@ -2054,7 +2054,7 @@ extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RAAudioLevelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAudioLevelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AudioLevelEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rms\0\u{1}peak\0\u{3}noise_floor_db\0\u{3}is_speech\0")
 
@@ -2099,7 +2099,7 @@ extension RAAudioLevelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAComponentProgressEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentProgressEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentProgressEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{1}operation\0\u{1}progress\0\u{1}message\0")
 
@@ -2144,7 +2144,7 @@ extension RAComponentProgressEvent: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAVoiceAgentComponentStates: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentComponentStates: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComponentStates"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_state\0\u{3}llm_state\0\u{3}tts_state\0\u{3}vad_state\0\u{1}ready\0\u{3}any_loading\0\u{3}wakeword_state\0\u{3}error_message\0")
 
@@ -2213,7 +2213,7 @@ extension RAVoiceAgentComponentStates: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAVoiceSessionError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceSessionError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceSessionError"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}message\0\u{3}failed_component\0\u{3}c_abi_code\0\u{1}recoverable\0")
 
@@ -2267,7 +2267,7 @@ extension RAVoiceSessionError: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RASessionStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASessionStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SessionStartedEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0")
 
@@ -2297,7 +2297,7 @@ extension RASessionStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RASessionStoppedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASessionStoppedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SessionStoppedEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{1}reason\0")
 
@@ -2332,7 +2332,7 @@ extension RASessionStoppedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAAgentResponseStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAgentResponseStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AgentResponseStartedEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}turn_id\0")
 
@@ -2362,7 +2362,7 @@ extension RAAgentResponseStartedEvent: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAAgentResponseCompletedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAgentResponseCompletedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AgentResponseCompletedEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}turn_id\0\u{3}response_duration_ms\0")
 
@@ -2397,7 +2397,7 @@ extension RAAgentResponseCompletedEvent: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension RASpeechTurnDetectionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASpeechTurnDetectionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SpeechTurnDetectionEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}speaker_id\0\u{3}turn_start_us\0\u{3}turn_end_us\0\u{1}confidence\0\u{3}speech_duration_ms\0\u{3}silence_duration_ms\0")
 
@@ -2457,7 +2457,7 @@ extension RASpeechTurnDetectionEvent: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RATurnLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATurnLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TurnLifecycleEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}turn_id\0\u{3}session_id\0\u{1}transcript\0\u{1}response\0\u{1}error\0\u{3}started_at_ms\0\u{3}completed_at_ms\0")
 
@@ -2522,7 +2522,7 @@ extension RATurnLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAWakeWordDetectedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAWakeWordDetectedEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WakeWordDetectedEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}wake_word\0\u{1}confidence\0\u{3}timestamp_ms\0\u{3}model_id\0\u{3}model_index\0\u{3}duration_ms\0")
 

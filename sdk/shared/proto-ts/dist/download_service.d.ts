@@ -26,6 +26,34 @@ export declare enum DownloadState {
 }
 export declare function downloadStateFromJSON(object: any): DownloadState;
 export declare function downloadStateToJSON(object: DownloadState): string;
+/**
+ * HTTP transport download status — numeric values MUST match
+ * rac_http_download_status_t (RAC_HTTP_DL_*) in
+ * sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+ * rac_http_download_execute returns this int directly through the C ABI;
+ * every SDK consumes the proto-generated enum so a new RAC_HTTP_DL_* value
+ * added in commons fails compilation across all bindings until the enum is
+ * extended here. OK = 0 mirrors the C ABI's success sentinel (no separate
+ * UNSPECIFIED needed — success is the proto3 zero default).
+ */
+export declare enum HttpDownloadStatus {
+    HTTP_DOWNLOAD_STATUS_OK = 0,
+    HTTP_DOWNLOAD_STATUS_NETWORK_ERROR = 1,
+    HTTP_DOWNLOAD_STATUS_FILE_ERROR = 2,
+    HTTP_DOWNLOAD_STATUS_INSUFFICIENT_STORAGE = 3,
+    HTTP_DOWNLOAD_STATUS_INVALID_URL = 4,
+    HTTP_DOWNLOAD_STATUS_CHECKSUM_FAILED = 5,
+    HTTP_DOWNLOAD_STATUS_CANCELLED = 6,
+    HTTP_DOWNLOAD_STATUS_SERVER_ERROR = 7,
+    HTTP_DOWNLOAD_STATUS_TIMEOUT = 8,
+    HTTP_DOWNLOAD_STATUS_NETWORK_UNAVAILABLE = 9,
+    HTTP_DOWNLOAD_STATUS_DNS_ERROR = 10,
+    HTTP_DOWNLOAD_STATUS_SSL_ERROR = 11,
+    HTTP_DOWNLOAD_STATUS_UNKNOWN = 99,
+    UNRECOGNIZED = -1
+}
+export declare function httpDownloadStatusFromJSON(object: any): HttpDownloadStatus;
+export declare function httpDownloadStatusToJSON(object: HttpDownloadStatus): string;
 export interface DownloadSubscribeRequest {
     modelId: string;
     taskId: string;

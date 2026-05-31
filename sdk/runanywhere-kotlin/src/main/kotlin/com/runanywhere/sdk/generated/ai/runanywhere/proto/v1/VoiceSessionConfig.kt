@@ -32,7 +32,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: Voice session behavior configuration.
+ * Voice session behavior configuration.
  *
  * Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
  * Controls runtime behavior of the voice agent's session loop — silence

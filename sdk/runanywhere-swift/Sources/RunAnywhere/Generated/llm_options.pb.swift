@@ -10,8 +10,7 @@
 
 // RunAnywhere v2 IDL — LLM generation options + result.
 //
-// Phase 3 of v2 IDL Exhaustiveness migration. These two messages were
-// hand-rolled in 5 SDKs:
+// These two messages were hand-rolled in 5 SDKs:
 //   - Swift  Public/Extensions/LLM/LLMTypes.swift (LLMGenerationOptions, LLMGenerationResult)
 //   - Kotlin commonMain/.../LLMOptions.kt
 //   - Dart   lib/public/types/llm_options.dart
@@ -33,12 +32,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RALLMGenerationState: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RALLMGenerationState: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case queued // = 1
@@ -100,7 +99,7 @@ public enum RALLMGenerationState: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Routing destination for a generation (Web SDK ExecutionTarget in
 /// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
 /// ---------------------------------------------------------------------------
-public enum RAExecutionTarget: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAExecutionTarget: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case onDevice // = 1
@@ -151,7 +150,7 @@ public enum RAExecutionTarget: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
 /// represents optional reference fields explicitly via `optional` keyword).
 /// ---------------------------------------------------------------------------
-public struct RALLMGenerationOptions: @unchecked Sendable {
+public nonisolated struct RALLMGenerationOptions: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -353,7 +352,7 @@ public struct RALLMGenerationOptions: @unchecked Sendable {
 /// LLMGenerationResult plus the fields RN/Web carry that Swift derives from
 /// the rac_llm_stream_result_t C struct.
 /// ---------------------------------------------------------------------------
-public struct RALLMGenerationResult: @unchecked Sendable {
+public nonisolated struct RALLMGenerationResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -550,7 +549,7 @@ public struct RALLMGenerationResult: @unchecked Sendable {
 
 /// Request envelope for one non-streaming LLM generation call. This is the
 /// proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
-public struct RALLMGenerationRequest: Sendable {
+public nonisolated struct RALLMGenerationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -591,7 +590,7 @@ public struct RALLMGenerationRequest: Sendable {
   fileprivate var _conversationID: String? = nil
 }
 
-public struct RALLMGenerationStatus: Sendable {
+public nonisolated struct RALLMGenerationStatus: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -641,7 +640,7 @@ public struct RALLMGenerationStatus: Sendable {
 /// LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
 /// — this is the "load the model" knob set, not the per-call sampling knobs.
 /// ---------------------------------------------------------------------------
-public struct RALLMConfiguration: Sendable {
+public nonisolated struct RALLMConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -704,7 +703,7 @@ public struct RALLMConfiguration: Sendable {
 /// Carried alongside a prompt as a "soft" override of LLMConfiguration
 /// defaults when the engine has no explicit LLMGenerationOptions to use.
 /// ---------------------------------------------------------------------------
-public struct RAGenerationHints: Sendable {
+public nonisolated struct RAGenerationHints: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -737,7 +736,7 @@ public struct RAGenerationHints: Sendable {
 /// Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
 /// once per token in streaming mode.
 /// ---------------------------------------------------------------------------
-public struct RAStreamToken: Sendable {
+public nonisolated struct RAStreamToken: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -761,7 +760,7 @@ public struct RAStreamToken: Sendable {
 /// PerformanceMetrics in types/models.ts:57). Higher-level summary that
 /// rolls up the timing fields scattered across LLMGenerationResult.
 /// ---------------------------------------------------------------------------
-public struct RAPerformanceMetrics: Sendable {
+public nonisolated struct RAPerformanceMetrics: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -788,17 +787,17 @@ public struct RAPerformanceMetrics: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RALLMGenerationState: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMGenerationState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_GENERATION_STATE_UNSPECIFIED\0\u{1}LLM_GENERATION_STATE_QUEUED\0\u{1}LLM_GENERATION_STATE_PREFILLING\0\u{1}LLM_GENERATION_STATE_DECODING\0\u{1}LLM_GENERATION_STATE_TOOL_CALLING\0\u{1}LLM_GENERATION_STATE_COMPLETED\0\u{1}LLM_GENERATION_STATE_CANCELLED\0\u{1}LLM_GENERATION_STATE_FAILED\0")
 }
 
-extension RAExecutionTarget: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAExecutionTarget: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EXECUTION_TARGET_UNSPECIFIED\0\u{1}EXECUTION_TARGET_ON_DEVICE\0\u{1}EXECUTION_TARGET_CLOUD\0\u{1}EXECUTION_TARGET_AUTO\0")
 }
 
-extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}thinking_pattern\0\u{3}execution_target\0\u{3}structured_output\0\u{3}enable_real_time_tracking\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}repeat_last_n\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{3}tool_calling\0")
 
@@ -1029,7 +1028,7 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}input_tokens\0\u{3}tokens_generated\0\u{3}model_used\0\u{3}generation_time_ms\0\u{3}ttft_ms\0\u{3}tokens_per_second\0\u{1}framework\0\u{3}finish_reason\0\u{3}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0")
 
@@ -1260,7 +1259,7 @@ extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RALLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}model_id\0\u{1}prompt\0\u{1}options\0\u{3}context_chunks\0\u{1}metadata\0\u{3}conversation_id\0")
 
@@ -1324,7 +1323,7 @@ extension RALLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RALLMGenerationStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMGenerationStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationStatus"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}state\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{1}progress\0\u{3}elapsed_ms\0\u{1}message\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1398,7 +1397,7 @@ extension RALLMGenerationStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RALLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RALLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}context_length\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{1}streaming\0\u{3}model_id\0\u{3}preferred_framework\0")
 
@@ -1462,7 +1461,7 @@ extension RALLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAGenerationHints: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAGenerationHints: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GenerationHints"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_role\0")
 
@@ -1506,7 +1505,7 @@ extension RAGenerationHints: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAStreamToken: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStreamToken: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StreamToken"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}timestamp_ms\0\u{1}index\0")
 
@@ -1546,7 +1545,7 @@ extension RAStreamToken: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RAPerformanceMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPerformanceMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PerformanceMetrics"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}latency_ms\0\u{3}memory_bytes\0\u{3}throughput_tokens_per_sec\0\u{3}prompt_tokens\0\u{3}completion_tokens\0")
 

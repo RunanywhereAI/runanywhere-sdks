@@ -31,14 +31,14 @@ struct ChatMessage: Identifiable, Equatable {
     var content: String
     let timestamp: Date
     var isStreaming: Bool
-
+    
     /// Who sent this message
     enum MessageRole: Equatable {
         case user
         case assistant
         case system
     }
-
+    
     init(
         id: UUID = UUID(),
         role: MessageRole,
@@ -64,29 +64,29 @@ struct ChatMessage: Identifiable, Equatable {
 // =============================================================================
 struct MessageBubble: View {
     let message: ChatMessage
-
+    
     @Environment(\.colorScheme) var colorScheme
     @State private var showTimestamp = false
     @State private var appeared = false
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Computed Properties
     // -------------------------------------------------------------------------
-
+    
     private var isUser: Bool {
         message.role == .user
     }
-
+    
     private var bubbleColor: Color {
         if isUser {
             return .aiPrimary
         } else {
-            return colorScheme == .dark
-                ? Color(white: 0.2)
+            return colorScheme == .dark 
+                ? Color(white: 0.2) 
                 : Color(white: 0.95)
         }
     }
-
+    
     private var textColor: Color {
         if isUser {
             return .white
@@ -94,19 +94,19 @@ struct MessageBubble: View {
             return colorScheme == .dark ? .white : .primary
         }
     }
-
+    
     private var alignment: HorizontalAlignment {
         isUser ? .trailing : .leading
     }
-
+    
     private var bubbleAlignment: Alignment {
         isUser ? .trailing : .leading
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Body
     // -------------------------------------------------------------------------
-
+    
     var body: some View {
         VStack(alignment: alignment, spacing: AISpacing.xs) {
             // Role indicator
@@ -119,7 +119,7 @@ struct MessageBubble: View {
                         .font(.aiCaption)
                         .foregroundStyle(.secondary)
                 }
-
+                
                 if isUser {
                     Text("You")
                         .font(.aiCaption)
@@ -129,11 +129,11 @@ struct MessageBubble: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
+            
             // Message bubble
             HStack {
                 if isUser { Spacer(minLength: 60) }
-
+                
                 VStack(alignment: .leading, spacing: AISpacing.xs) {
                     // Message content
                     if message.content.isEmpty && message.isStreaming {
@@ -144,7 +144,7 @@ struct MessageBubble: View {
                             .font(.aiBody)
                             .foregroundStyle(textColor)
                             .textSelection(.enabled)
-
+                        
                         // Streaming indicator
                         if message.isStreaming {
                             HStack(spacing: AISpacing.xs) {
@@ -168,10 +168,10 @@ struct MessageBubble: View {
                         Label("Copy", systemImage: "doc.on.doc")
                     }
                 }
-
+                
                 if !isUser { Spacer(minLength: 60) }
             }
-
+            
             // Timestamp (shown on tap)
             if showTimestamp {
                 Text(formattedTimestamp)
@@ -194,17 +194,17 @@ struct MessageBubble: View {
             }
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Helper Methods
     // -------------------------------------------------------------------------
-
+    
     private var formattedTimestamp: String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: message.timestamp)
     }
-
+    
     private func copyMessage() {
         UIPasteboard.general.string = message.content
     }
@@ -217,7 +217,7 @@ struct MessageBubble: View {
 // =============================================================================
 struct TypingIndicator: View {
     @State private var animating = false
-
+    
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<3) { index in
@@ -249,10 +249,10 @@ struct MessageInputField: View {
     let placeholder: String
     let isLoading: Bool
     let onSend: () -> Void
-
+    
     @FocusState private var isFocused: Bool
     @Environment(\.colorScheme) var colorScheme
-
+    
     var body: some View {
         HStack(spacing: AISpacing.sm) {
             // Text input
@@ -263,8 +263,8 @@ struct MessageInputField: View {
                 .padding(.vertical, AISpacing.sm)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(colorScheme == .dark
-                              ? Color(white: 0.15)
+                        .fill(colorScheme == .dark 
+                              ? Color(white: 0.15) 
                               : Color(white: 0.95))
                 )
                 .focused($isFocused)
@@ -273,16 +273,16 @@ struct MessageInputField: View {
                         onSend()
                     }
                 }
-
+            
             // Send button
             Button(action: onSend) {
                 ZStack {
                     Circle()
-                        .fill(text.isEmpty || isLoading
-                              ? Color.secondary.opacity(0.3)
+                        .fill(text.isEmpty || isLoading 
+                              ? Color.secondary.opacity(0.3) 
                               : Color.aiPrimary)
                         .frame(width: 40, height: 40)
-
+                    
                     if isLoading {
                         ProgressView()
                             .tint(.white)
@@ -316,33 +316,33 @@ struct EmptyChatView: View {
     let subtitle: String
     let suggestions: [String]
     let onSuggestionTap: (String) -> Void
-
+    
     var body: some View {
         VStack(spacing: AISpacing.lg) {
             // Icon
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
-
+            
             // Title
             Text(title)
                 .font(.aiHeading)
                 .foregroundStyle(.primary)
-
+            
             // Subtitle
             Text(subtitle)
                 .font(.aiBody)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
-
+            
             // Suggestions
             if !suggestions.isEmpty {
                 VStack(spacing: AISpacing.sm) {
                     Text("Try asking:")
                         .font(.aiCaption)
                         .foregroundStyle(.tertiary)
-
+                    
                     VStack(spacing: AISpacing.sm) {
                         ForEach(suggestions, id: \.self) { suggestion in
                             Button(action: { onSuggestionTap(suggestion) }) {
@@ -377,12 +377,12 @@ struct EmptyChatView: View {
             role: .user,
             content: "Hello! Can you explain what on-device AI means?"
         ))
-
+        
         MessageBubble(message: ChatMessage(
             role: .assistant,
             content: "On-device AI means all the AI processing happens locally on your device, rather than being sent to cloud servers. This provides better privacy and works offline!"
         ))
-
+        
         MessageBubble(message: ChatMessage(
             role: .assistant,
             content: "",

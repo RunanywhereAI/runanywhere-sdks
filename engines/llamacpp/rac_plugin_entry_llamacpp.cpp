@@ -18,11 +18,15 @@
  * `rac_plugin_entry_llamacpp` symbol lookup.
  */
 
+#include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+
+#include <cstddef>
+#include <mutex>
 
 extern "C" {
 
@@ -34,17 +38,57 @@ extern const rac_vlm_service_ops_t g_llamacpp_vlm_ops;
 rac_result_t rac_llamacpp_cpu_runtime_register(void);
 void rac_llamacpp_cpu_runtime_unregister(void);
 
+}  // extern "C"
+
+namespace {
+
+std::mutex g_llamacpp_runtime_mutex;
+std::size_t g_llamacpp_runtime_refcount = 0;
+
+void retain_llamacpp_cpu_runtime() {
+    std::lock_guard<std::mutex> lock(g_llamacpp_runtime_mutex);
+    if (g_llamacpp_runtime_refcount == 0) {
+        rac_result_t rc = rac_llamacpp_cpu_runtime_register();
+        if (rc != RAC_SUCCESS) {
+            return;
+        }
+    }
+    ++g_llamacpp_runtime_refcount;
+}
+
+void release_llamacpp_cpu_runtime() {
+    std::lock_guard<std::mutex> lock(g_llamacpp_runtime_mutex);
+    if (g_llamacpp_runtime_refcount == 0) {
+        return;
+    }
+    --g_llamacpp_runtime_refcount;
+    if (g_llamacpp_runtime_refcount == 0) {
+        rac_llamacpp_cpu_runtime_unregister();
+    }
+}
+
+}  // namespace
+
+extern "C" {
+
 /* Declares which runtimes + model formats this plugin serves so the
  * EngineRouter can score it against the caller's preferred_runtime and model
- * format. Apple-only / desktop-only entries are gated at the array level. */
+ * format. Each GPU runtime is gated on the matching ggml backend macro that
+ * llama.cpp's CMake actually defines for this build — advertising a runtime
+ * the linked llama.cpp was not compiled with would turn the router into a
+ * liar (preferred_runtime=CUDA on a CPU-only Linux build would still match
+ * llamacpp and either silently fall back to CPU or fail at first decode).
+ * Cf. get_device_type() in llamacpp_backend.cpp which checks the same
+ * macros. */
 static const rac_runtime_id_t k_llamacpp_runtimes[] = {
     RAC_RUNTIME_CPU,
-#if defined(__APPLE__)
+#if defined(GGML_USE_METAL)
     RAC_RUNTIME_METAL,
 #endif
-#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
-    /* Linux / Windows desktop builds may have CUDA. */
+#if defined(GGML_USE_CUDA)
     RAC_RUNTIME_CUDA,
+#endif
+#if defined(GGML_USE_VULKAN)
     RAC_RUNTIME_VULKAN,
 #endif
 };
@@ -72,11 +116,9 @@ static const rac_engine_manifest_t k_llamacpp_manifest = {
     .priority = 100,
     .capability_flags = 0,
     .primitives = k_llamacpp_primitives,
-    .primitives_count =
-        sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
+    .primitives_count = sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
     .runtimes = k_llamacpp_runtimes,
-    .runtimes_count =
-        sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
+    .runtimes_count = sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
     .formats = k_llamacpp_formats,
     .formats_count = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
     .reserved_0 = 0,
@@ -84,7 +126,9 @@ static const rac_engine_manifest_t k_llamacpp_manifest = {
 };
 
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
-static void llamacpp_on_unload(void) { rac_llamacpp_cpu_runtime_unregister(); }
+static void llamacpp_on_unload(void) {
+    release_llamacpp_cpu_runtime();
+}
 
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_manifest),
@@ -114,64 +158,19 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(llamacpp) {
-  const rac_engine_vtable_t *vt = rac_engine_entry_with_manifest(
-      &k_llamacpp_manifest, &g_llamacpp_engine_vtable);
-  if (vt != nullptr) {
-    (void)rac_llamacpp_cpu_runtime_register();
-  }
-  return vt;
+    const rac_engine_vtable_t* vt =
+        rac_engine_entry_with_manifest(&k_llamacpp_manifest, &g_llamacpp_engine_vtable);
+    if (vt != nullptr) {
+        retain_llamacpp_cpu_runtime();
+    }
+    return vt;
 }
 
-/* Legacy alias kept for older rac_commons builds that still pin VLM loads to
- * the pre-unification engine name "llamacpp_vlm". Same ops vtable, distinct
- * manifest name so rac_plugin_route(no_fallback + pin) succeeds. */
-static const rac_engine_manifest_t k_llamacpp_vlm_legacy_manifest = {
-    .name = "llamacpp_vlm",
-    .display_name = "llama.cpp VLM (legacy alias)",
-    .version = nullptr,
-    .package_owner = "runanywhere",
-    .package_name = "runanywhere_llamacpp",
-    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
-    .priority = 100,
-    .capability_flags = 0,
-    .primitives = k_llamacpp_primitives,
-    .primitives_count =
-        sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
-    .runtimes = k_llamacpp_runtimes,
-    .runtimes_count =
-        sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
-    .formats = k_llamacpp_formats,
-    .formats_count = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
-    .reserved_0 = 0,
-    .reserved_1 = 0,
-};
+/* The legacy "llamacpp_vlm" plugin alias was removed: the unified
+ * "llamacpp" plugin already serves both LLM and VLM primitives, and the
+ * commons router normalizes any pre-unification "llamacpp_vlm" pin to
+ * "llamacpp" before scoring (see sdk/runanywhere-commons/src/router/
+ * rac_route.cpp normalize_legacy_engine_pin). Registering the alias as a
+ * second plugin only added registry noise. */
 
-static const rac_engine_vtable_t g_llamacpp_vlm_legacy_vtable = {
-    RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_vlm_legacy_manifest),
-    nullptr,
-    llamacpp_on_unload,
-    &g_llamacpp_ops,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    &g_llamacpp_vlm_ops,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-};
-
-RAC_PLUGIN_ENTRY_DEF(llamacpp_vlm) {
-  return rac_engine_entry_with_manifest(&k_llamacpp_vlm_legacy_manifest,
-                                        &g_llamacpp_vlm_legacy_vtable);
-}
-
-} // extern "C"
+}  // extern "C"

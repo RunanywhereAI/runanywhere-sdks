@@ -20,14 +20,12 @@
 /// import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 ///
 /// // Register the module (matches Swift: LlamaCPP.register())
-/// await LlamaCpp.register();
+/// LlamaCpp.register();
 ///
 /// // Register models through RunAnywhere.models.
 /// // The commons registry/router owns framework selection and routing.
 /// ```
 library;
-
-import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -103,7 +101,7 @@ class LlamaCpp implements RunAnywhereModule {
   /// LlamaCPP service provider with the C++ commons layer.
   ///
   /// Safe to call multiple times - subsequent calls are no-ops.
-  static Future<void> register({int priority = 100}) async {
+  static void register({int priority = 100}) {
     if (_isRegistered) {
       _logger.debug('LlamaCpp already registered');
       return;
@@ -176,6 +174,6 @@ class LlamaCpp implements RunAnywhereModule {
   /// Enable auto-registration for this module.
   /// Call this method to trigger C++ backend registration.
   static void autoRegister() {
-    unawaited(register());
+    register();
   }
 }

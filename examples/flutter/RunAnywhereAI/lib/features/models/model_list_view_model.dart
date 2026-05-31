@@ -57,7 +57,7 @@ class ModelListViewModel extends ChangeNotifier {
           '✅ Loaded ${_availableModels.length} models from SDK registry');
       for (final model in _availableModels) {
         debugPrint(
-            '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework.displayName}] downloaded: ${model.isDownloaded}');
+            '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework.displayName}] ready: ${model.isReadyOnDevice}');
       }
     } catch (e) {
       debugPrint('❌ Failed to load models from SDK: $e');

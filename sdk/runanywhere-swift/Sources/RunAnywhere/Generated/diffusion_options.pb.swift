@@ -47,7 +47,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -60,7 +60,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   Web     DiffusionTypes.ts:23        (TextToImage / ImageToImage / Inpainting)
 ///   C ABI   rac_diffusion_types.h:59    (RAC_DIFFUSION_MODE_*)
 /// ---------------------------------------------------------------------------
-public enum RADiffusionMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADiffusionMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case textToImage // = 1
@@ -132,7 +132,7 @@ public enum RADiffusionMode: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///     fall back to DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS (the recommended
 ///     default).
 /// ---------------------------------------------------------------------------
-public enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -230,7 +230,7 @@ public enum RADiffusionScheduler: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   Web    DiffusionTypes.ts:14        (numeric SD_1_5 / SD_2_1 / SDXL / SDXL_Turbo / SDXS / LCM)
 ///   C ABI  rac_diffusion_types.h:47    (RAC_DIFFUSION_MODEL_*)
 /// ---------------------------------------------------------------------------
-public enum RADiffusionModelVariant: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADiffusionModelVariant: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case sd15 // = 1
@@ -297,7 +297,7 @@ public enum RADiffusionModelVariant: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   Web    — n/a (the llamacpp Web package doesn't expose tokenizer source)
 ///   C ABI  rac_diffusion_types.h:79    (RAC_DIFFUSION_TOKENIZER_SD_1_5 / SD_2_X / SDXL / CUSTOM)
 /// ---------------------------------------------------------------------------
-public enum RADiffusionTokenizerSourceKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADiffusionTokenizerSourceKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -351,7 +351,7 @@ public enum RADiffusionTokenizerSourceKind: SwiftProtobuf.Enum, Swift.CaseIterab
 
 }
 
-public enum RADiffusionStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADiffusionStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -406,7 +406,7 @@ public enum RADiffusionStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// meaningful when kind == CUSTOM and points at a directory URL containing
 /// vocab.json + merges.txt (the SDK appends those filenames itself).
 /// ---------------------------------------------------------------------------
-public struct RADiffusionTokenizerSource: Sendable {
+public nonisolated struct RADiffusionTokenizerSource: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -456,7 +456,7 @@ public struct RADiffusionTokenizerSource: Sendable {
 /// `reduceMemory == true` should set this to the backend's documented
 /// reduced-memory threshold; `reduceMemory == false` ⇒ 0.
 /// ---------------------------------------------------------------------------
-public struct RADiffusionConfiguration: Sendable {
+public nonisolated struct RADiffusionConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -521,7 +521,7 @@ public struct RADiffusionConfiguration: Sendable {
 /// Canonical load-model wrapper used by SDKs that require a single argument
 /// for diffusion model lifecycle calls.
 /// ---------------------------------------------------------------------------
-public struct RADiffusionConfig: Sendable {
+public nonisolated struct RADiffusionConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -568,7 +568,7 @@ public struct RADiffusionConfig: Sendable {
 ///                                                DiffusionProgress
 ///                                                streaming semantics
 /// ---------------------------------------------------------------------------
-public struct RADiffusionGenerationOptions: @unchecked Sendable {
+public nonisolated struct RADiffusionGenerationOptions: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -716,7 +716,7 @@ public struct RADiffusionGenerationOptions: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RADiffusionGenerationRequest: Sendable {
+public nonisolated struct RADiffusionGenerationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -759,7 +759,7 @@ public struct RADiffusionGenerationRequest: Sendable {
 ///   Web    DiffusionTypes.ts:69        (callback signature, not a struct)
 ///   C ABI  rac_diffusion_types.h:279   (rac_diffusion_progress_t)
 /// ---------------------------------------------------------------------------
-public struct RADiffusionProgress: Sendable {
+public nonisolated struct RADiffusionProgress: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -830,7 +830,7 @@ public struct RADiffusionProgress: Sendable {
 /// caller sent UNSPECIFIED); it lets clients log which sampler the engine
 /// chose.
 /// ---------------------------------------------------------------------------
-public struct RADiffusionResult: Sendable {
+public nonisolated struct RADiffusionResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -919,7 +919,7 @@ public struct RADiffusionResult: Sendable {
 /// shared cap and document that asymmetric caps would need a future
 /// `max_width_px` / `max_height_px` split).
 /// ---------------------------------------------------------------------------
-public struct RADiffusionCapabilities: Sendable {
+public nonisolated struct RADiffusionCapabilities: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -970,7 +970,7 @@ public struct RADiffusionCapabilities: Sendable {
   fileprivate var _currentModel: String? = nil
 }
 
-public struct RADiffusionStreamEvent: @unchecked Sendable {
+public nonisolated struct RADiffusionStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1034,7 +1034,7 @@ public struct RADiffusionStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RADiffusionServiceState: @unchecked Sendable {
+public nonisolated struct RADiffusionServiceState: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1099,29 +1099,29 @@ public struct RADiffusionServiceState: @unchecked Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RADiffusionMode: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_MODE_UNSPECIFIED\0\u{1}DIFFUSION_MODE_TEXT_TO_IMAGE\0\u{1}DIFFUSION_MODE_IMAGE_TO_IMAGE\0\u{1}DIFFUSION_MODE_INPAINTING\0")
 }
 
-extension RADiffusionScheduler: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionScheduler: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_SCHEDULER_UNSPECIFIED\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS\0\u{1}DIFFUSION_SCHEDULER_DDIM\0\u{1}DIFFUSION_SCHEDULER_DDPM\0\u{1}DIFFUSION_SCHEDULER_EULER\0\u{1}DIFFUSION_SCHEDULER_EULER_A\0\u{1}DIFFUSION_SCHEDULER_PNDM\0\u{1}DIFFUSION_SCHEDULER_LMS\0\u{1}DIFFUSION_SCHEDULER_LCM\0\u{1}DIFFUSION_SCHEDULER_DPMPP_2M_SDE\0")
 }
 
-extension RADiffusionModelVariant: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionModelVariant: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_MODEL_VARIANT_UNSPECIFIED\0\u{1}DIFFUSION_MODEL_VARIANT_SD_1_5\0\u{1}DIFFUSION_MODEL_VARIANT_SD_2_1\0\u{1}DIFFUSION_MODEL_VARIANT_SDXL\0\u{1}DIFFUSION_MODEL_VARIANT_SDXL_TURBO\0\u{1}DIFFUSION_MODEL_VARIANT_SDXS\0\u{1}DIFFUSION_MODEL_VARIANT_LCM\0")
 }
 
-extension RADiffusionTokenizerSourceKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionTokenizerSourceKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM\0")
 }
 
-extension RADiffusionStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}DIFFUSION_STREAM_EVENT_KIND_STARTED\0\u{1}DIFFUSION_STREAM_EVENT_KIND_PROGRESS\0\u{1}DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE\0\u{1}DIFFUSION_STREAM_EVENT_KIND_COMPLETED\0\u{1}DIFFUSION_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionTokenizerSource"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}custom_path\0\u{3}auto_download\0")
 
@@ -1165,7 +1165,7 @@ extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_variant\0\u{3}tokenizer_source\0\u{3}enable_safety_checker\0\u{3}max_memory_mb\0\u{3}model_id\0\u{3}preferred_framework\0\u{3}reduce_memory\0")
 
@@ -1229,7 +1229,7 @@ extension RADiffusionConfiguration: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RADiffusionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_path\0\u{3}model_id\0\u{3}model_name\0\u{1}configuration\0")
 
@@ -1278,7 +1278,7 @@ extension RADiffusionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionGenerationOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{3}num_inference_steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0\u{3}input_image\0\u{3}mask_image\0\u{3}denoise_strength\0\u{3}report_intermediate_images\0\u{3}progress_stride\0\u{3}input_image_width\0\u{3}input_image_height\0\u{3}input_image_media_type\0\u{3}mask_image_media_type\0\u{3}batch_size\0\u{3}return_latents\0")
 
@@ -1481,7 +1481,7 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RADiffusionGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionGenerationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}options\0\u{3}model_id\0\u{1}metadata\0")
 
@@ -1530,7 +1530,7 @@ extension RADiffusionGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionProgress"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}progress_percent\0\u{3}current_step\0\u{3}total_steps\0\u{1}stage\0\u{3}intermediate_image_data\0\u{3}intermediate_image_width\0\u{3}intermediate_image_height\0\u{3}timestamp_ms\0\u{3}eta_ms\0\u{3}intermediate_image_media_type\0")
 
@@ -1609,7 +1609,7 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}image_data\0\u{1}width\0\u{1}height\0\u{3}seed_used\0\u{3}total_time_ms\0\u{3}safety_flag\0\u{3}used_scheduler\0\u{3}error_message\0\u{3}error_code\0\u{3}image_media_type\0\u{3}batch_images\0\u{3}images_generated\0")
 
@@ -1698,7 +1698,7 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionCapabilities"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}supported_variants\0\u{3}supported_schedulers\0\u{3}max_resolution_px\0\u{3}supported_modes\0\u{3}max_width_px\0\u{3}max_height_px\0\u{3}supports_intermediate_images\0\u{3}supports_safety_checker\0\u{3}is_ready\0\u{3}current_model\0\u{3}safety_checker_enabled\0\u{3}supports_batch_generation\0\u{3}supported_output_media_types\0")
 
@@ -1792,7 +1792,7 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RADiffusionStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}progress\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1911,7 +1911,7 @@ extension RADiffusionStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RADiffusionServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiffusionServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{1}capabilities\0\u{3}is_generating\0\u{3}active_request_id\0\u{3}error_message\0\u{3}error_code\0")
 

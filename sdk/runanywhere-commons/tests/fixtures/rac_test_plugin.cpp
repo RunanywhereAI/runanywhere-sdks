@@ -1,6 +1,6 @@
 /**
  * @file rac_test_plugin.cpp
- * @brief Minimal test-fixture plugin used by GAP 03 loader tests.
+ * @brief Minimal test-fixture plugin used by loader tests.
  *
  * Compiled into TWO shared libraries:
  *   - librunanywhere_test_plugin.so    (good ABI, accepted by registry)

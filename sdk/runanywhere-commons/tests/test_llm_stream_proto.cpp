@@ -1,6 +1,6 @@
 /**
  * @file test_llm_stream_proto.cpp
- * @brief Unit tests for the v2 close-out Phase G-2 LLM proto-byte stream
+ * @brief Unit tests for the LLM proto-byte stream
  *        ABI in rac_llm_stream.cpp.
  *
  * Scenarios:
@@ -183,7 +183,7 @@ int test_unregister_stops_dispatch() {
     return 0;
 }
 
-// BUG-STREAMING-003: max-token exhaust must emit finish_reason="length"
+// Max-token exhaust must emit finish_reason="length"
 // (matches OpenAI chat.completions contract).
 int test_finish_reason_length_on_max_tokens() {
     reset_capture();

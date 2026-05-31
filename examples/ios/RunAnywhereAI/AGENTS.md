@@ -52,7 +52,7 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 - **Views** are pure SwiftUI with no business logic
 - **ViewModels** are `@MainActor @Observable` (or `@MainActor ObservableObject`) classes owning all state and SDK calls
 - **Models** are `Codable` value types (`Message`, `Conversation`, `MessageAnalytics`, `BenchmarkTypes`, etc.)
-- **Services** are singletons for cross-feature concerns (`ConversationStore`, `ModelManager`, `KeychainService`, `DeviceInfoService`)
+- **Services** are singletons for cross-feature concerns (`ConversationStore`, `KeychainService`, `DeviceInfoService`)
 
 ### Navigation Structure
 5-tab `TabView` in `ContentView.swift`:
@@ -72,7 +72,7 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 
 ### Dependency Injection
 Three layers:
-1. **Environment objects** from `RunAnywhereAIApp`: `ModelManager`, `FlowSessionManager`
+1. **Environment objects** from `RunAnywhereAIApp`: `FlowSessionManager`
 2. **Singleton services**: `ConversationStore.shared`, `SettingsViewModel.shared`, `ModelListViewModel.shared`, `KeychainService.shared`
 3. **SDK static API**: all AI calls go through the `RunAnywhere.*` namespace
 
@@ -113,8 +113,7 @@ RunAnywhereAI/
 │   └── Services/
 │       ├── ConversationStore.swift     # Conversation persistence (JSON files in Documents/)
 │       ├── DeviceInfoService.swift     # Hardware info (chip, memory, Neural Engine)
-│       ├── KeychainService.swift       # Keychain wrapper for API credentials
-│       └── ModelManager.swift          # Thin ObservableObject facade over SDK model APIs
+│       └── KeychainService.swift       # Keychain wrapper for API credentials
 ├── Features/
 │   ├── Chat/                           # LLM chat interface (7 ViewModel files + 4 model files + 5 view files)
 │   ├── Voice/                          # STT, TTS, VAD, VoiceAgent (11 files)

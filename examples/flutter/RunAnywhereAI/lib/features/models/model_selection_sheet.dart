@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -45,9 +44,9 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     }).toList();
 
     // Sort: built-in models first (Foundation Models / System TTS), then
-    // downloaded, then not downloaded. `isDownloaded` already collapses
-    // built-in + on-disk readiness into a single check (see
-    // ExampleModelInfoView.isDownloaded in model_types.dart).
+    // downloaded, then not downloaded. On-disk readiness is `localPath`; the
+    // built-in cases are handled explicitly below (see
+    // ExampleModelInfoView.isReadyOnDevice in model_types.dart).
     int priorityFor(ModelInfo m) {
       if (m.preferredFramework ==
               LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
@@ -257,14 +256,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
               model: model,
               isSelected: _selectedModel?.id == model.id,
               isLoading: _isLoadingModel,
-              onDownloadCompleted: () async {
-                await _viewModel.loadModels();
-              },
               onSelectModel: () async {
                 await _selectAndLoadModel(model);
-              },
-              onModelUpdated: () async {
-                await _viewModel.loadModels();
               },
             );
           }),
@@ -391,7 +384,12 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     // category-aware load path (e.g. SYSTEM_TTS -> RunAnywhere.tts.loadVoice
     // in ModelListViewModel.loadModel). Other frameworks still require a
     // downloaded artifact before we attempt to load them.
-    if (!model.isDownloaded) {
+    //
+    // Gate on `isReadyOnDevice` (localPath + built-in), NOT the proto
+    // `isDownloaded` field — the C++ registry sets localPath on download but
+    // leaves the proto flag false, so `model.isDownloaded` would always be
+    // false here and silently no-op the load.
+    if (!model.isReadyOnDevice) {
       return; // Model not downloaded yet
     }
 
@@ -453,33 +451,66 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 }
 
 /// Flat model row for the selection sheet (matches iOS FlatModelRow)
-class _FlatModelRow extends StatefulWidget {
+class _FlatModelRow extends StatelessWidget {
   final ModelInfo model;
   final bool isSelected;
   final bool isLoading;
-  final VoidCallback onDownloadCompleted;
   final VoidCallback onSelectModel;
-  final VoidCallback? onModelUpdated;
 
   const _FlatModelRow({
     required this.model,
     required this.isSelected,
     required this.isLoading,
-    required this.onDownloadCompleted,
     required this.onSelectModel,
-    this.onModelUpdated,
   });
 
   @override
-  State<_FlatModelRow> createState() => _FlatModelRowState();
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ModelListViewModel.shared,
+      builder: (context, _) {
+        final vm = ModelListViewModel.shared;
+        final isDownloading = vm.isDownloading(model.id);
+        final downloadProgress = vm.downloadProgress[model.id] ?? 0.0;
+        return _FlatModelRowContent(
+          model: model,
+          isSelected: isSelected,
+          isLoading: isLoading,
+          isDownloading: isDownloading,
+          downloadProgress: downloadProgress,
+          onSelectModel: onSelectModel,
+          onDownload: () {
+            unawaited(
+              ModelListViewModel.shared.downloadModel(model, (_) {}),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
-class _FlatModelRowState extends State<_FlatModelRow> {
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
+class _FlatModelRowContent extends StatelessWidget {
+  final ModelInfo model;
+  final bool isSelected;
+  final bool isLoading;
+  final bool isDownloading;
+  final double downloadProgress;
+  final VoidCallback onSelectModel;
+  final VoidCallback onDownload;
+
+  const _FlatModelRowContent({
+    required this.model,
+    required this.isSelected,
+    required this.isLoading,
+    required this.isDownloading,
+    required this.downloadProgress,
+    required this.onSelectModel,
+    required this.onDownload,
+  });
 
   Color get _frameworkColor {
-    final framework = widget.model.preferredFramework;
+    final framework = model.preferredFramework;
     switch (framework) {
       case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return AppColors.primaryBlue;
@@ -495,7 +526,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   String get _frameworkName {
-    final framework = widget.model.preferredFramework;
+    final framework = model.preferredFramework;
     switch (framework) {
       case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return 'Fast';
@@ -511,20 +542,20 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   bool get _isBuiltIn =>
-      widget.model.preferredFramework ==
+      model.preferredFramework ==
           LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-      widget.model.preferredFramework ==
+      model.preferredFramework ==
           LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
 
   IconData get _statusIcon {
-    if (_isBuiltIn || widget.model.localPath.isNotEmpty) {
+    if (_isBuiltIn || model.localPath.isNotEmpty) {
       return Icons.check_circle;
     }
     return Icons.download;
   }
 
   Color get _statusColor {
-    if (_isBuiltIn || widget.model.localPath.isNotEmpty) {
+    if (_isBuiltIn || model.localPath.isNotEmpty) {
       return AppColors.statusGreen;
     }
     return AppColors.primaryBlue;
@@ -533,7 +564,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   String get _statusText {
     if (_isBuiltIn) {
       return 'Built-in';
-    } else if (widget.model.localPath.isNotEmpty) {
+    } else if (model.localPath.isNotEmpty) {
       return 'Ready';
     } else {
       return 'Download';
@@ -543,7 +574,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   @override
   Widget build(BuildContext context) {
     return Opacity(
-      opacity: widget.isLoading && !widget.isSelected ? 0.6 : 1.0,
+      opacity: isLoading && !isSelected ? 0.6 : 1.0,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.large,
@@ -560,7 +591,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
                     children: [
                       Flexible(
                         child: Text(
-                          widget.model.name,
+                          model.name,
                           style: AppTypography.subheadline(context).copyWith(
                             fontWeight: FontWeight.w500,
                           ),
@@ -593,8 +624,8 @@ class _FlatModelRowState extends State<_FlatModelRow> {
                   Row(
                     children: [
                       // Size badge
-                      if (widget.model.memoryRequired != null &&
-                          widget.model.memoryRequired! > 0) ...[
+                      if (model.memoryRequired != null &&
+                          model.memoryRequired! > 0) ...[
                         Icon(
                           Icons.memory,
                           size: 12,
@@ -602,7 +633,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          widget.model.memoryRequired!.formattedFileSize,
+                          model.memoryRequired!.formattedFileSize,
                           style: AppTypography.caption2(context).copyWith(
                             color: AppColors.textSecondary(context),
                           ),
@@ -610,20 +641,20 @@ class _FlatModelRowState extends State<_FlatModelRow> {
                         const SizedBox(width: AppSpacing.smallMedium),
                       ],
                       // Status indicator
-                      if (_isDownloading) ...[
+                      if (isDownloading) ...[
                         SizedBox(
                           width: 12,
                           height: 12,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            value: _downloadProgress > 0
-                                ? _downloadProgress
+                            value: downloadProgress > 0
+                                ? downloadProgress
                                 : null,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.xSmall),
                         Text(
-                          '${(_downloadProgress * 100).toInt()}%',
+                          '${(downloadProgress * 100).toInt()}%',
                           style: AppTypography.caption2(context).copyWith(
                             color: AppColors.textSecondary(context),
                           ),
@@ -643,7 +674,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
                         ),
                       ],
                       // Thinking support indicator
-                      if (widget.model.supportsThinking) ...[
+                      if (model.supportsThinking) ...[
                         const SizedBox(width: AppSpacing.smallMedium),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -694,8 +725,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     // .foundationModels and .systemTts as `isBuiltIn`.
     if (_isBuiltIn) {
       return ElevatedButton(
-        onPressed:
-            widget.isLoading || widget.isSelected ? null : widget.onSelectModel,
+        onPressed: isLoading || isSelected ? null : onSelectModel,
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.mediumLarge,
@@ -706,9 +736,9 @@ class _FlatModelRowState extends State<_FlatModelRow> {
       );
     }
 
-    if (widget.model.localPath.isEmpty) {
+    if (model.localPath.isEmpty) {
       // Model needs to be downloaded
-      if (_isDownloading) {
+      if (isDownloading) {
         return const SizedBox(
           width: 24,
           height: 24,
@@ -716,7 +746,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
         );
       }
       return OutlinedButton.icon(
-        onPressed: widget.isLoading ? null : _downloadModel,
+        onPressed: isLoading ? null : onDownload,
         icon: const Icon(Icons.download, size: 16),
         label: const Text('Get'),
         style: OutlinedButton.styleFrom(
@@ -730,8 +760,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
 
     // Model is downloaded - ready to use
     return ElevatedButton(
-      onPressed:
-          widget.isLoading || widget.isSelected ? null : widget.onSelectModel,
+      onPressed: isLoading || isSelected ? null : onSelectModel,
       style: ElevatedButton.styleFrom(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.mediumLarge,
@@ -740,79 +769,6 @@ class _FlatModelRowState extends State<_FlatModelRow> {
       ),
       child: const Text('Use'),
     );
-  }
-
-  Future<void> _downloadModel() async {
-    // Synchronous in-flight guard: a user can double-tap the Get button
-    // before the first setState lands in the widget tree, which previously
-    // dispatched two "Starting download" calls into the SDK. Reading
-    // _isDownloading here debounces the second tap before any async work.
-    if (_isDownloading) {
-      debugPrint(
-          '⚠️ Download already in flight for ${widget.model.name} — ignoring tap');
-      return;
-    }
-
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
-    try {
-      debugPrint('📥 Starting download for model: ${widget.model.name}');
-
-      final sdkModels = await sdk.RunAnywhere.models.available();
-      final sdkModel = sdkModels.firstWhere(
-        (sdk.ModelInfo m) => m.id == widget.model.id,
-        orElse: () =>
-            throw Exception('Model not found in registry: ${widget.model.id}'),
-      );
-
-      final downloadProgress = sdk.RunAnywhere.downloads.start(sdkModel.id);
-
-      // Listen to real download progress
-      await for (final progress in downloadProgress) {
-        if (!mounted) return;
-
-        final totalBytes = progress.totalBytes.toInt();
-        final progressValue = totalBytes > 0
-            ? progress.bytesDownloaded.toInt() / totalBytes
-            : progress.stageProgress.toDouble();
-
-        setState(() {
-          _downloadProgress = progressValue;
-        });
-
-        // Check if completed or failed
-        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-          debugPrint('✅ Download completed for model: ${widget.model.name}');
-          break;
-        } else if (progress.stage ==
-                sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
-            progress.errorMessage.isNotEmpty) {
-          debugPrint('❌ Download failed for model: ${widget.model.name}');
-          throw Exception('Download failed: ${progress.errorMessage}');
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _isDownloading = false;
-      });
-      widget.onDownloadCompleted();
-    } catch (e) {
-      debugPrint('❌ Download error: $e');
-      if (!mounted) return;
-      setState(() {
-        _isDownloading = false;
-        _downloadProgress = 0.0;
-      });
-
-      // Show error to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
-      );
-    }
   }
 }
 

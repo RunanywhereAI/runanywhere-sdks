@@ -32,21 +32,6 @@ RAC_API rac_result_t rac_backend_rag_register(void);
  */
 RAC_API rac_result_t rac_backend_rag_unregister(void);
 
-/**
- * @brief Merge an inbound runanywhere.v1.RAGConfiguration over canonical
- *        defaults and return the resolved configuration (P2-T14).
- *
- * Commons-owned port of Swift's `RARAGConfiguration.defaults()`. Numeric/bool
- * fields treat proto zero as "use default"; non-zero values override. Strings
- * pass through verbatim. Empty inbound bytes (NULL/0) yield pure defaults.
- *
- * out_RARAGConfiguration receives serialized runanywhere.v1.RAGConfiguration
- * bytes; caller MUST release with rac_proto_buffer_free().
- */
-RAC_API rac_result_t rac_rag_request_with_defaults_proto(
-    const uint8_t* in_request_bytes, size_t in_size,
-    rac_proto_buffer_t* out_RARAGConfiguration);
-
 #ifdef __cplusplus
 }
 #endif

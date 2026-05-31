@@ -2,8 +2,6 @@
 # RunAnywhere SDKs — Root CMake project
 # =============================================================================
 #
-# GAP 07 Phase 1 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # This is the SINGLE entry point for native builds across the monorepo.
 # Subdirectories:
 #   - sdk/runanywhere-commons/ — the C++ runtime library (rac_commons)
@@ -13,19 +11,19 @@
 #                                a `rac_engine_vtable_t` at
 #                                `RAC_PLUGIN_API_VERSION=3u` via
 #                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
-#                                `rac_plugin_entry` symbol (GAP 02 + GAP 06).
-#   - tools/plugin-loader-smoke/ — CLI smoke test for the GAP 03 loader
+#                                `rac_plugin_entry` symbol.
+#   - tools/plugin-loader-smoke/ — CLI smoke test for the plugin loader
 #
 # Common builds:
 #   cmake --preset macos-release && cmake --build --preset macos-release
-#   cmake --preset linux-release-asan && cmake --build --preset linux-release-asan
+#   cmake --preset linux-asan       && cmake --build --preset linux-asan
 #   cmake --preset android-arm64    && cmake --build --preset android-arm64
 #   cmake --preset ios-device       && cmake --build --preset ios-device
 #   cmake --preset wasm             && cmake --build --preset wasm
 #
 # Per-language SDKs (Swift / Kotlin / Flutter / RN / Web) consume the artifacts
 # this build produces — they do NOT call this CMake directly. The wrapper
-# scripts under scripts/build-core-{android,xcframework,wasm}.sh wire the
+# scripts under scripts/build/build-core-{android,xcframework,wasm}.sh wire the
 # preset output into the right SDK directory layout.
 # =============================================================================
 
@@ -46,7 +44,7 @@ project(runanywhere
     HOMEPAGE_URL "https://github.com/RunanywhereAI/runanywhere-sdks"
 )
 
-# GAP 06 T5.3: enable Objective-C++ at the root project level so
+# Enable Objective-C++ at the root project level so
 # engines/diffusion-coreml/*.mm (and any future Apple-framework
 # bridge TU) compile correctly. `enable_language` inside a subdirectory
 # doesn't populate the CMAKE_OBJCXX_* toolchain variables the build
@@ -71,7 +69,7 @@ option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Mode
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 
-# Plugin loading mode (GAP 03)
+# Plugin loading mode
 # RAC_STATIC_PLUGINS:
 #   ON  → engine TUs are linked into rac_commons; iOS/WASM force this.
 #   OFF → engines build as standalone librunanywhere_<name>.so/.dylib/.dll
@@ -80,7 +78,7 @@ option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
 # so subdirectory consumers see the final value.
 option(RAC_STATIC_PLUGINS "Link engine plugins statically into rac_commons (forced ON on iOS/WASM)" OFF)
 
-# Sanitizers (GAP 07 Phase 3)
+# Sanitizers
 set(RAC_SANITIZER "" CACHE STRING "Enable a sanitizer: '', 'asan', 'tsan', 'ubsan'")
 set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
 
@@ -160,15 +158,15 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
-    "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs after the GAP 06 reorg
+    "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs
 )
 
-# These four helpers ship in subsequent phases of GAP 07; the includes are
-# tolerant so this CMakeLists works incrementally as the helpers land.
-include(platform   OPTIONAL)   # rac_detect_platform()  — Phase 3
-include(sanitizers OPTIONAL)   # rac_apply_sanitizer()  — Phase 3
-include(plugins    OPTIONAL)   # rac_add_engine_plugin() / rac_force_load() — Phase 4
-include(protobuf   OPTIONAL)   # rac_protobuf_generate() — Phase 5
+# Shared cmake/ helper modules. The includes are OPTIONAL so a missing
+# helper degrades gracefully rather than failing configure.
+include(platform   OPTIONAL)   # rac_detect_platform()
+include(sanitizers OPTIONAL)   # rac_apply_sanitizer()
+include(plugins    OPTIONAL)   # rac_add_engine_plugin() / rac_force_load()
+include(protobuf   OPTIONAL)   # rac_protobuf_generate()
 
 if(COMMAND rac_detect_platform)
     rac_detect_platform()
@@ -200,7 +198,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/idl/CMakeLists.txt")
     add_subdirectory(idl)
 endif()
 
-# runtimes/ — L1 compute-runtime plugins (T4.1). Mirrors engines/ but scoped
+# runtimes/ — L1 compute-runtime plugins. Mirrors engines/ but scoped
 # to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
 # is always folded into rac_commons; adapter runtimes are linked by their
 # owning engines.
@@ -250,7 +248,7 @@ if(EMSCRIPTEN
     add_subdirectory(sdk/runanywhere-web/wasm)
 endif()
 
-# Smoke test for the plugin loader (GAP 03). Only built when explicitly
+# Smoke test for the plugin loader. Only built when explicitly
 # requested so headless CI nodes don't pay the build cost.
 if(RAC_BUILD_PLUGIN_SMOKE
    AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin-loader-smoke/CMakeLists.txt")
@@ -288,6 +286,132 @@ if(RAC_BUILD_TESTS)
         add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
     endif()
 
+    # commons-010: sherpa plugin-entry smoke test. Mirrors the genie wiring
+    # block above for the same reason — rac_backend_sherpa is built by engines/
+    # which is configured after sdk/runanywhere-commons/, so the target does
+    # not exist when commons/tests/CMakeLists.txt runs.
+    if(RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa AND NOT TARGET test_plugin_entry_sherpa)
+        add_executable(test_plugin_entry_sherpa
+            sdk/runanywhere-commons/tests/test_plugin_entry_sherpa.cpp)
+        target_include_directories(test_plugin_entry_sherpa PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_sherpa PRIVATE
+            rac_commons
+            rac_backend_sherpa
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_sherpa PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_sherpa PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_sherpa PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_sherpa PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_sherpa_tests COMMAND test_plugin_entry_sherpa)
+    endif()
+
+    # commons-012: whispercpp plugin-entry smoke test. Same wiring rationale as
+    # sherpa above — rac_backend_whispercpp is built by engines/ which is
+    # configured after sdk/runanywhere-commons/, so the target does not exist
+    # when commons/tests/CMakeLists.txt runs. whispercpp is the second STT
+    # engine (priority 80) that competes with sherpa (priority 90) for
+    # TRANSCRIBE routing; this smoke test guards that priority literal and the
+    # STT-only ops-slot population.
+    if(RAC_BACKEND_WHISPERCPP AND TARGET rac_backend_whispercpp
+       AND NOT TARGET test_plugin_entry_whispercpp)
+        add_executable(test_plugin_entry_whispercpp
+            sdk/runanywhere-commons/tests/test_plugin_entry_whispercpp.cpp)
+        target_include_directories(test_plugin_entry_whispercpp PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_whispercpp PRIVATE
+            rac_commons
+            rac_backend_whispercpp
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_whispercpp PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_whispercpp PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_whispercpp PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_whispercpp PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_whispercpp_tests COMMAND test_plugin_entry_whispercpp)
+    endif()
+
+    # commons-013: whisperkit_coreml plugin-entry smoke test. Same wiring
+    # rationale as the sherpa / whispercpp blocks above —
+    # rac_backend_whisperkit_coreml is built by engines/ which is configured
+    # after sdk/runanywhere-commons/. Locks the manifest's RAC_RUNTIME_ANE
+    # advertisement that test_engine_capability_honesty.cpp's
+    # ANEHintSelectsWhisperKit tiebreak relies on. Apple-only because the
+    # backend itself is Apple-only.
+    if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML AND TARGET rac_backend_whisperkit_coreml
+       AND NOT TARGET test_plugin_entry_whisperkit_coreml)
+        add_executable(test_plugin_entry_whisperkit_coreml
+            sdk/runanywhere-commons/tests/test_plugin_entry_whisperkit_coreml.cpp)
+        target_include_directories(test_plugin_entry_whisperkit_coreml PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE
+            rac_commons
+            rac_backend_whisperkit_coreml
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_whisperkit_coreml PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_whisperkit_coreml PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_whisperkit_coreml_tests
+                 COMMAND test_plugin_entry_whisperkit_coreml)
+    endif()
+
+    # commons-009: metalrt plugin-entry smoke test. Apple-gated (the engine is
+    # Apple-only — engines/metalrt/CMakeLists.txt forces RAC_BACKEND_METALRT=OFF
+    # on non-Apple hosts). MetalRT is an OBJECT library folded into rac_commons
+    # (see the `target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)`
+    # block earlier in this file), so the test only needs to link rac_commons —
+    # rac_plugin_entry_metalrt() resolves from the same archive. Wired here
+    # (not in commons/tests/CMakeLists.txt) for the same ordering reason as
+    # sherpa / whispercpp / whisperkit_coreml / genie: engines/ is configured
+    # after sdk/runanywhere-commons/. Guards the highest-priority Apple engine
+    # (priority=120, four primitives: LLM/STT/TTS/VLM) against silent vtable
+    # drift that would otherwise surface only at first-inference time.
+    if(APPLE AND RAC_BACKEND_METALRT AND TARGET rac_backend_metalrt
+       AND NOT TARGET test_plugin_entry_metalrt)
+        add_executable(test_plugin_entry_metalrt
+            sdk/runanywhere-commons/tests/test_plugin_entry_metalrt.cpp)
+        target_include_directories(test_plugin_entry_metalrt PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_metalrt PRIVATE rac_commons)
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_metalrt PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_metalrt PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_metalrt PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_metalrt PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_metalrt_tests COMMAND test_plugin_entry_metalrt)
+    endif()
+
     if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
        AND TARGET rac_backend_diffusion_coreml
        AND NOT TARGET test_diffusion_coreml_generate)
@@ -315,7 +439,42 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
-    # GAP 09 / v2 close-out Phase 4 — cross-SDK parity test harness.
+    # commons-008: diffusion-coreml plugin-entry smoke test. Same wiring
+    # rationale as the whisperkit_coreml / metalrt blocks above —
+    # rac_backend_diffusion_coreml is built by engines/ which is configured
+    # after sdk/runanywhere-commons/. diffusion-coreml is the sole
+    # RAC_PRIMITIVE_DIFFUSION provider, so this locks the manifest's COREML
+    # runtime/format + diffusion_ops slot that the EngineRouter routes against;
+    # test_diffusion_coreml_generate.cpp only exercises the backend directly and
+    # bypasses the plugin-entry/vtable path. Apple-only because the backend is.
+    if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
+       AND TARGET rac_backend_diffusion_coreml
+       AND NOT TARGET test_plugin_entry_diffusion_coreml)
+        add_executable(test_plugin_entry_diffusion_coreml
+            sdk/runanywhere-commons/tests/test_plugin_entry_diffusion_coreml.cpp)
+        target_include_directories(test_plugin_entry_diffusion_coreml PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+        )
+        target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE
+            rac_commons
+            rac_backend_diffusion_coreml
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_diffusion_coreml PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_diffusion_coreml_tests
+                 COMMAND test_plugin_entry_diffusion_coreml)
+    endif()
+
+    # Cross-SDK parity test harness.
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/streaming/CMakeLists.txt")
         add_subdirectory(tests/streaming)
     endif()
@@ -325,13 +484,26 @@ endif()
 # Configuration summary (matches the commons summary block for consistency)
 # =============================================================================
 
+# Resolve genex-free strings: message() runs at configure time and prints
+# generator expressions literally, so compute the mode labels with if().
+if(RAC_BUILD_SHARED)
+    set(_rac_build_mode "SHARED")
+else()
+    set(_rac_build_mode "STATIC")
+endif()
+if(RAC_STATIC_PLUGINS)
+    set(_rac_plugin_mode "STATIC (linked into commons)")
+else()
+    set(_rac_plugin_mode "SHARED (dlopen-loaded)")
+endif()
+
 message(STATUS "")
 message(STATUS "============================================")
 message(STATUS "RunAnywhere SDKs — root CMake configured")
 message(STATUS "============================================")
 message(STATUS "Version          : ${RAC_VERSION}")
-message(STATUS "Build mode       : $<IF:$<BOOL:${RAC_BUILD_SHARED}>,SHARED,STATIC>")
-message(STATUS "Plugin mode      : $<IF:$<BOOL:${RAC_STATIC_PLUGINS}>,STATIC (linked into commons),SHARED (dlopen-loaded)>")
+message(STATUS "Build mode       : ${_rac_build_mode}")
+message(STATUS "Plugin mode      : ${_rac_plugin_mode}")
 message(STATUS "Sanitizer        : ${RAC_SANITIZER}")
 message(STATUS "Tests            : ${RAC_BUILD_TESTS}")
 message(STATUS "Server (HTTP)    : ${RAC_BUILD_SERVER}")

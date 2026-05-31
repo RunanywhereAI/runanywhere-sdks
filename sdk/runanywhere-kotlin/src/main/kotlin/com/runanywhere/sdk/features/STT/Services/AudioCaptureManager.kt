@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
-class AudioCaptureManager constructor() {
+class AudioCaptureManager {
     private val logger = SDKLogger("AudioCapture")
 
     private val recordingFlag = AtomicBoolean(false)

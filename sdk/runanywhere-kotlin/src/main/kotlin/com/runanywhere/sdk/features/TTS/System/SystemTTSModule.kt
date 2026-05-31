@@ -14,7 +14,6 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
-import com.runanywhere.sdk.public.RunAnywhereModule
 import com.runanywhere.sdk.public.extensions.registerModelInternal
 import com.runanywhere.sdk.public.types.RAModelInfo
 
@@ -28,15 +27,16 @@ import com.runanywhere.sdk.public.types.RAModelInfo
  * inline. Mirrors iOS's `SystemTTS` namespace + platform backend
  * registration in `CppBridge+Platform.swift`.
  */
-object SystemTTSModule : RunAnywhereModule {
+object SystemTTSModule {
     private val logger = SDKLogger.tts
 
     /** Stable registry id for the built-in Android system TTS engine. */
     const val MODEL_ID: String = "system-tts"
 
-    override val moduleName: String = "SystemTTS"
+    /** Human-readable module name (SystemTTS). */
+    const val moduleName: String = "SystemTTS"
 
-    override suspend fun register() {
+    suspend fun register() {
         logger.info("Registering System TTS as a built-in registry entry")
         registerModelInternal(
             RAModelInfo(
@@ -51,7 +51,7 @@ object SystemTTSModule : RunAnywhereModule {
         )
     }
 
-    override suspend fun unregister() {
+    suspend fun unregister() {
         // Registry does not currently support entry removal; the C++
         // platform TTS callbacks remain wired through SDK shutdown.
         logger.debug("SystemTTSModule.unregister() is a no-op (registry has no remove API)")

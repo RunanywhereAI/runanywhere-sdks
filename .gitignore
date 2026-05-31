@@ -5,6 +5,8 @@
 ## Build generated
 build/
 build-*/
+# scripts/build/ holds tracked native-build scripts (not CMake output) — keep it tracked
+!scripts/build/
 DerivedData/
 CMakeFiles/
 CMakeCache.txt
@@ -98,6 +100,8 @@ verification/
 .idea/shelf
 .idea/ChatHistory*.xml
 .idea/discord.xml
+.idea/editor.xml
+.idea/deviceManager.xml
 
 # Generated files
 .idea/caches/
@@ -127,6 +131,8 @@ verification/
 .idea/deploymentTargetSelector.xml
 .idea/kotlinc.xml
 .idea/migrations.xml
+.idea/inspectionProfiles/
+.idea/runConfigurations.xml
 
 # Local gradle properties (machine-specific)
 gradle.properties

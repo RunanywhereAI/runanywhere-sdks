@@ -3,9 +3,7 @@
  * @brief Dynamic plugin loader — `dlopen` path for desktop / Android / Linux /
  *        Windows hosts that are NOT statically linking plugins.
  *
- * GAP 03 Phase 1 — see v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md.
- *
- * Layered on top of the GAP 02 plugin registry (`rac_plugin_register`,
+ * Layered on top of the plugin registry (`rac_plugin_register`,
  * `rac_plugin_find`). The loader's job is purely to resolve a shared library
  * file into a `const rac_engine_vtable_t*` and hand it to the registry —
  * the registry still owns ABI validation, capability_check, and dedup.
@@ -76,7 +74,7 @@ RAC_API rac_result_t rac_registry_load_plugin(const char* path);
  *
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER, RAC_ERROR_NOT_FOUND, or
  *         RAC_ERROR_PLUGIN_BUSY (when reference-counted sessions still hold
- *         the plugin — wired in GAP 04+).
+ *         the plugin).
  *
  * Thread-safe.
  */

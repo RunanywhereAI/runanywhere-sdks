@@ -64,6 +64,7 @@ final class LLMViewModel {
     var lifecycleCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    private var isViewModelInitialized = false
 
     // MARK: - Internal Accessors for Extensions
 
@@ -159,18 +160,29 @@ final class LLMViewModel {
     // MARK: - Initialization
 
     init() {
-        // Don't create conversation yet - wait until first message is sent
-        currentConversation = nil
+        // Sync model state immediately from shared state to avoid the race condition
+        // where the model was loaded before this ViewModel was created.
+        if let currentModel = ModelListViewModel.shared.currentModel {
+            isModelLoaded = true
+            loadedModelName = currentModel.name
+            loadedModelSupportsThinking = currentModel.supportsThinking
+            selectedFramework = currentModel.framework
+        }
+    }
 
-        // Listen for model loaded notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(modelLoaded(_:)),
-            name: Notification.Name("ModelLoaded"),
-            object: nil
-        )
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
-        // Listen for conversation selection
+    /// Subscribes to SDK events and applies initial settings.
+    /// Idempotent — safe to call from View's `.task { }`.
+    func initialize() async {
+        guard !isViewModelInitialized else { return }
+        isViewModelInitialized = true
+
+        // Conversation selection is purely intra-app state with no SDK event
+        // counterpart, so it stays on NotificationCenter. Model lifecycle flows
+        // through the SDK event bus (subscribeToModelLifecycle) instead.
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(conversationSelected(_:)),
@@ -178,37 +190,17 @@ final class LLMViewModel {
             object: nil
         )
 
-        // Sync model state immediately from shared state to avoid race condition
-        // where the model was loaded before this ViewModel was initialized
-        // (i.e. the "ModelLoaded" notification was missed).
-        if let currentModel = ModelListViewModel.shared.currentModel {
-            isModelLoaded = true
-            loadedModelName = currentModel.name
-            loadedModelSupportsThinking = currentModel.supportsThinking
-            selectedFramework = currentModel.framework
+        subscribeToModelLifecycle()
+
+        // Reconcile against the SDK's authoritative model snapshot in case a
+        // model was loaded before this ViewModel subscribed.
+        await checkModelStatusFromSDK()
+
+        if isModelLoaded {
+            addSystemMessage()
         }
 
-        // Defer state-modifying operations to avoid "Publishing changes within view updates" warning
-        // These are deferred because init() may be called during view body evaluation
-        Task { @MainActor in
-            // Small delay to ensure view is fully initialized
-            try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
-
-            // Subscribe to SDK events
-            self.subscribeToModelLifecycle()
-
-            // Add system message if model is already loaded
-            if self.isModelLoaded {
-                self.addSystemMessage()
-            }
-
-            // Ensure settings are applied
-            await self.ensureSettingsAreApplied()
-        }
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+        await ensureSettingsAreApplied()
     }
 
     // MARK: - Public Methods
@@ -270,41 +262,6 @@ final class LLMViewModel {
         }
 
         await finalizeGeneration(at: messageIndex)
-    }
-
-    // Formats the current conversation as a ChatML string for instruction-tuned models
-    // (LFM2, Qwen, and any other model using the im_start/im_end template).
-    // Reads `messages`, which already contains the latest user turn and a trailing
-    // empty assistant placeholder added by prepareMessagesForSending(); the placeholder
-    // is excluded — we close with <|im_start|>assistant to trigger generation.
-    private func buildChatMLPrompt(systemPrompt: String?) -> String {
-        var parts: [String] = []
-        if let system = systemPrompt, !system.isEmpty {
-            parts.append("<|im_start|>system\n\(system)<|im_end|>")
-        }
-        // Drop the trailing empty assistant placeholder.
-        let conversationMessages = messages.dropLast()
-        let isThinkingModel = loadedModelSupportsThinking
-        let thinkingDisablePrefix: String = {
-            guard isThinkingModel else { return "" }
-            return SettingsViewModel.shared.thinkingModeEnabled ? "" : "/no_think\n"
-        }()
-        for (index, msg) in conversationMessages.enumerated() {
-            switch msg.role {
-            case .system:
-                break   // System prompt is included above via the options parameter
-            case .user:
-                let isLast = index == conversationMessages.index(before: conversationMessages.endIndex)
-                let content = isLast ? (thinkingDisablePrefix + msg.content) : msg.content
-                parts.append("<|im_start|>user\n\(content)<|im_end|>")
-            case .assistant:
-                if !msg.content.isEmpty {
-                    parts.append("<|im_start|>assistant\n\(msg.content)<|im_end|>")
-                }
-            }
-        }
-        parts.append("<|im_start|>assistant")
-        return parts.joined(separator: "\n")
     }
 
     private func performGeneration(
@@ -712,32 +669,6 @@ final class LLMViewModel {
             SystemPrompt: \(savedSystemPrompt ?? "nil")
             """
         )
-    }
-
-    @objc
-    private func modelLoaded(_ notification: Notification) {
-        Task {
-            if let model = notification.object as? RAModelInfo {
-                // All LLM backends expose streaming via the canonical
-                // generateStream entry; the SDK no longer publishes a
-                // per-model capability flag.
-                await MainActor.run {
-                    self.isModelLoaded = true
-                    self.loadedModelName = model.name
-                    self.loadedModelSupportsThinking = model.supportsThinking
-                    self.selectedFramework = model.framework
-                    self.modelSupportsStreaming = true
-
-                    if self.messages.first?.role == .system {
-                        self.messages.removeFirst()
-                    }
-                    self.addSystemMessage()
-                    Task { await self.refreshAvailableAdapters() }
-                }
-            } else {
-                await self.checkModelStatus()
-            }
-        }
     }
 
     @objc

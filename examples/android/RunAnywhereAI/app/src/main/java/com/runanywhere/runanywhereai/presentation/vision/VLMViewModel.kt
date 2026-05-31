@@ -20,11 +20,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.SDKEvent
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
-import com.runanywhere.sdk.public.extensions.fromBitmap
+import com.runanywhere.sdk.public.extensions.fromRawRGB
 import com.runanywhere.sdk.public.extensions.processImageStream
-import com.runanywhere.sdk.public.types.RASDKEvent
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.Dispatchers
@@ -108,7 +108,7 @@ class VLMViewModel(
         try {
             val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_VLM)
             val isLoaded =
-                snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                snapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     snapshot.model_id.isNotEmpty()
             _uiState.update { it.copy(isModelLoaded = isLoaded) }
             Timber.d("VLM model loaded: $isLoaded")
@@ -201,10 +201,10 @@ class VLMViewModel(
      * needs no equivalent step. This brings Android into parity with that
      * behavior.
      *
-     * Stride safety: we then route through `VLMImage.Companion.fromBitmap`,
-     * which uses `Bitmap.getPixels()` — Android handles `rowStride` /
-     * `pixelStride` internally so the resulting RGB buffer is tightly packed
-     * (KOT-VLM-001).
+     * Stride safety: we then extract pixels via `Bitmap.getPixels()` —
+     * Android handles `rowStride` / `pixelStride` internally so the resulting
+     * RGB buffer is tightly packed (3 bytes/pixel, no padding), matching the
+     * raw-RGB layout the iOS path feeds to `RAVLMImage.fromRawRGB` (KOT-VLM-001).
      */
     private fun captureFrame(imageProxy: ImageProxy) {
         try {
@@ -212,8 +212,7 @@ class VLMViewModel(
             val rotation = imageProxy.imageInfo.rotationDegrees
             val bitmap = if (rotation == 0) raw else rotateBitmap(raw, rotation)
 
-            val image = RAVLMImage.fromBitmap(bitmap)
-            val rgb = image.raw_rgb?.toByteArray() ?: return
+            val rgb = bitmapToRawRgb(bitmap)
 
             synchronized(frameLock) {
                 currentFrameRgb = rgb
@@ -241,6 +240,29 @@ class VLMViewModel(
     ): Bitmap {
         val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
         return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+    }
+
+    /**
+     * Extract tightly-packed raw RGB bytes (3 bytes/pixel, no row padding) from a
+     * [Bitmap]. `Bitmap.getPixels()` normalizes any internal stride, so the output
+     * matches the `VLM_IMAGE_FORMAT_RAW_RGB` layout consumed by
+     * [RAVLMImage.fromRawRGB] / the raw-RGB [RAVLMImage] constructor — parity with
+     * the iOS camera path which converts CVPixelBuffer/CGImage to raw RGB.
+     */
+    private fun bitmapToRawRgb(bitmap: Bitmap): ByteArray {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        val rgb = ByteArray(width * height * 3)
+        var o = 0
+        for (pixel in pixels) {
+            rgb[o++] = ((pixel shr 16) and 0xFF).toByte() // R
+            rgb[o++] = ((pixel shr 8) and 0xFF).toByte() // G
+            rgb[o++] = (pixel and 0xFF).toByte() // B
+        }
+        return rgb
     }
 
     // DESCRIBE - Mirrors iOS describeCurrentFrame / describeImage
@@ -457,7 +479,7 @@ class VLMViewModel(
 
     fun cancelGeneration() {
         try {
-            RunAnywhere.cancelVLMGeneration()
+            viewModelScope.launch { RunAnywhere.cancelVLMGeneration() }
             generationJob?.cancel()
             _uiState.update { it.copy(isProcessing = false) }
             Timber.d("VLM generation cancelled")
@@ -496,7 +518,7 @@ class VLMViewModel(
 
     private fun applyVlmStreamEvent(
         currentText: String,
-        event: RASDKEvent,
+        event: SDKEvent,
     ): String {
         val generation = event.generation ?: return currentText
         return when {

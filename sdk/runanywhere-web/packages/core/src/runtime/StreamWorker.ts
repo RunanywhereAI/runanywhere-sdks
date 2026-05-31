@@ -106,12 +106,16 @@ export interface StreamWorkerModule {
   addFunction(fn: (...args: number[]) => number | void, signature: string): number;
   removeFunction(ptr: number): void;
 
+  _rac_proto_buffer_init?(bufferPtr: number): void;
+  _rac_proto_buffer_free?(bufferPtr: number): void;
+  _rac_wasm_sizeof_proto_buffer?(): number;
+
   _rac_llm_generate_stream_proto?(
     requestBytes: number,
     requestSize: number,
     callbackPtr: number,
     userData: number,
-  ): number;
+  ): number | Promise<number>;
   _rac_llm_cancel_proto?(outEvent: number): number;
 
   _rac_stt_component_transcribe_stream_proto?(
@@ -122,7 +126,7 @@ export interface StreamWorkerModule {
     optionsSize: number,
     callbackPtr: number,
     userData: number,
-  ): number;
+  ): number | Promise<number>;
 
   _rac_tts_component_synthesize_stream_proto?(
     handle: number,
@@ -131,7 +135,7 @@ export interface StreamWorkerModule {
     optionsSize: number,
     callbackPtr: number,
     userData: number,
-  ): number;
+  ): number | Promise<number>;
 
   _rac_vlm_process_stream_proto?(
     handle: number,
@@ -142,7 +146,7 @@ export interface StreamWorkerModule {
     callbackPtr: number,
     userData: number,
     outResult: number,
-  ): number;
+  ): number | Promise<number>;
   _rac_vlm_cancel_proto?(handle: number): number;
 }
 
@@ -194,9 +198,11 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
    * any export becomes Asyncify-style interruptible.
    *
    * `handle` is captured for VLM, which cancels per-instance via
-   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation is global
-   * (`_rac_llm_cancel_proto(0)`), and STT/TTS have no cancel ABI yet —
-   * those entries are removed silently when `done` is posted.
+   * `_rac_vlm_cancel_proto(handle)`. LLM cancellation requires a valid
+   * `rac_proto_buffer_t*` output pointer — passing 0 (null) returns
+   * `RAC_ERROR_NULL_POINTER` before the engine cancel ever runs.
+   * STT/TTS have no cancel ABI yet — those entries are removed silently
+   * when `done` is posted.
    */
   type InFlightModality =
     | { kind: 'stream.llm.generate' }
@@ -275,7 +281,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
   const runWithCallback = (
     requestId: string,
     callbackReturnsBool: boolean,
-    invoke: (callbackPtr: number) => number,
+    invoke: (callbackPtr: number) => number | Promise<number>,
   ): void => {
     const moduleRef = ensureModule();
     if (!moduleRef) {
@@ -288,22 +294,24 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
       return;
     }
     const callbackPtr = installCallback(moduleRef, requestId, callbackReturnsBool);
-    let returnCode = 0;
-    try {
-      returnCode = invoke(callbackPtr);
-    } catch (err) {
-      postError(`stream export threw: ${(err as Error).message}`, requestId);
-      returnCode = -902;
-    } finally {
-      moduleRef.removeFunction(callbackPtr);
-      // Prune per-request bookkeeping. Once `done` is posted no further
-      // callbacks can arrive for this requestId, so retaining it in the
-      // `cancelled` set or the `inflight` map is dead weight that grows
-      // unbounded over the worker's lifetime. See pass2-syn-091.
-      inflight.delete(requestId);
-      cancelled.delete(requestId);
-    }
-    scope.postMessage({ type: 'done', requestId, returnCode });
+    void (async (): Promise<void> => {
+      let returnCode = 0;
+      try {
+        returnCode = await invoke(callbackPtr);
+      } catch (err) {
+        postError(`stream export threw: ${(err as Error).message}`, requestId);
+        returnCode = -902;
+      } finally {
+        moduleRef.removeFunction(callbackPtr);
+        // Prune per-request bookkeeping. Once `done` is posted no further
+        // callbacks can arrive for this requestId, so retaining it in the
+        // `cancelled` set or the `inflight` map is dead weight that grows
+        // unbounded over the worker's lifetime. See pass2-syn-091.
+        inflight.delete(requestId);
+        cancelled.delete(requestId);
+      }
+      scope.postMessage({ type: 'done', requestId, returnCode });
+    })();
   };
 
   scope.onmessage = (ev: MessageEvent<WorkerRequest>): void => {
@@ -338,9 +346,27 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         const modality = inflight.get(msg.requestId);
         if (modality && mod) {
           switch (modality.kind) {
-            case 'stream.llm.generate':
-              mod._rac_llm_cancel_proto?.(0);
+            case 'stream.llm.generate': {
+              if (
+                mod._rac_llm_cancel_proto &&
+                mod._rac_wasm_sizeof_proto_buffer &&
+                mod._rac_proto_buffer_init &&
+                mod._rac_proto_buffer_free
+              ) {
+                const sz = mod._rac_wasm_sizeof_proto_buffer();
+                const bufPtr = mod._malloc(Math.max(sz, 1));
+                if (bufPtr) {
+                  try {
+                    mod._rac_proto_buffer_init(bufPtr);
+                    mod._rac_llm_cancel_proto(bufPtr);
+                  } finally {
+                    mod._rac_proto_buffer_free(bufPtr);
+                    mod._free(bufPtr);
+                  }
+                }
+              }
               break;
+            }
             case 'stream.vlm.process':
               mod._rac_vlm_cancel_proto?.(modality.handle);
               break;

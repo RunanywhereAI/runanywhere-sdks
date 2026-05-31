@@ -241,7 +241,7 @@ fun VLMScreen(
                     val snapshot =
                         RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_VLM)
                     val isLoaded =
-                        snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                        snapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                             snapshot.model_id.isNotEmpty()
                     if (isLoaded) {
                         viewModel.onModelLoaded(modelName = model.name)

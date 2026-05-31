@@ -47,12 +47,19 @@ public extension RunAnywhere {
     /// `RASTTPartialResult` events. Each partial result carries an
     /// incremental transcript and an `isFinal` flag; the stream closes after
     /// the final event or on error.
+    ///
+    /// Chunks are accumulated into a single buffer and forwarded to the
+    /// underlying `CppBridge.STT.transcribeStream` exactly once after the
+    /// input source closes. Bridge errors are surfaced as a terminal partial
+    /// with `isFinal = true` and `text` carrying a non-empty `"STT stream
+    /// failed: …"` payload, matching the shape `ProtoStreamContext` emits
+    /// when the native producer fails.
     static func transcribeStream(
         audio: AsyncStream<Data>,
         options: RASTTOptions = .defaults()
     ) -> AsyncStream<RASTTPartialResult> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 guard isInitialized else {
                     continuation.finish()
                     return
@@ -64,25 +71,45 @@ public extension RunAnywhere {
                     continuation.finish()
                     return
                 }
+
+                var accumulated = Data()
                 for await chunk in audio {
                     if Task.isCancelled { break }
-                    var request = RASTTTranscriptionRequest()
-                    var audioSource = RASTTAudioSource()
-                    audioSource.audioData = chunk
-                    request.audio = audioSource
-                    request.options = options
-                    guard let partials = try? await CppBridge.STT.shared.transcribeStream(request) else {
-                        continue
-                    }
+                    accumulated.append(chunk)
+                }
+
+                if Task.isCancelled {
+                    continuation.finish()
+                    return
+                }
+
+                var request = RASTTTranscriptionRequest()
+                var audioSource = RASTTAudioSource()
+                audioSource.audioData = accumulated
+                request.audio = audioSource
+                request.options = options
+
+                do {
+                    let partials = try await CppBridge.STT.shared.transcribeStream(request)
                     for await partial in partials {
+                        if Task.isCancelled { break }
                         continuation.yield(partial)
                     }
+                } catch {
+                    var failure = RASTTPartialResult()
+                    failure.isFinal = true
+                    failure.text = "STT stream failed: \(error)"
+                    continuation.yield(failure)
+                    continuation.finish()
+                    return
                 }
+
                 var finalPartial = RASTTPartialResult()
                 finalPartial.isFinal = true
                 continuation.yield(finalPartial)
                 continuation.finish()
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 }

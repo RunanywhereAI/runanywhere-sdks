@@ -53,14 +53,6 @@ class _ContentViewState extends State<ContentView> {
           setState(() {
             _selectedTab = index;
           });
-          // E2E harness log markers (tab navigation)
-          if (index == 0) {
-            debugPrint('Document loaded successfully');
-          } else if (index == 1) {
-            debugPrint('VLM streaming completed');
-          } else if (index == 3) {
-            debugPrint('Speech generation complete');
-          }
         },
         // B-FL-2-001 (P3 batch): shorten "Transcribe" → "STT" so it fits
         // alongside the other six labels without wrapping.

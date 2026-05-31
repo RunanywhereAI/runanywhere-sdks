@@ -66,6 +66,7 @@ public:
 
   std::shared_ptr<Promise<bool>> initialize(const std::string& configJson) override;
   std::shared_ptr<Promise<bool>> completeServicesInitialization() override;
+  std::shared_ptr<Promise<bool>> retryHTTPSetupProto() override;
   std::shared_ptr<Promise<void>> destroy() override;
   std::shared_ptr<Promise<bool>> isInitialized() override;
 
@@ -115,6 +116,8 @@ public:
     const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> registerModelProto(
     const std::shared_ptr<ArrayBuffer>& modelInfoBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> registerModelFromUrlProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<bool>> updateModelProto(
     const std::shared_ptr<ArrayBuffer>& modelInfoBytes) override;
   std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) override;

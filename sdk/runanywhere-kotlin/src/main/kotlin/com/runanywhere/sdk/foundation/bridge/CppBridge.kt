@@ -14,9 +14,11 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
@@ -30,7 +32,6 @@ import com.runanywhere.sdk.infrastructure.logging.SentryDestination
 import com.runanywhere.sdk.infrastructure.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
-import com.runanywhere.sdk.public.configuration.cEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -141,7 +142,7 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
-            // F3 fix: initialize the native auth manager with a secure-storage
+            // Initialize the native auth manager with a secure-storage
             // vtable backed by the platform adapter secureGet/secureSet/
             // secureDelete callbacks. Must happen AFTER the adapter is
             // registered (the JNI-side vtable delegates to it) and BEFORE any
@@ -149,7 +150,7 @@ object CppBridge {
             // restart because rac_auth_save_tokens / rac_auth_clear are no-ops.
             CppBridgeAuth.initialize()
 
-            // v2 close-out Phase H4: install the OkHttp HTTP transport BEFORE
+            // Install the OkHttp HTTP transport BEFORE
             // any network I/O happens (device registration, model assignment
             // fetch, telemetry, auth all go through rac_http_request_*). The
             // adapter gives us the Android system trust store + proxy +
@@ -291,49 +292,42 @@ object CppBridge {
     }
 
     /**
-     * Initialize SDK configuration with version, platform, and auth info.
+     * Initialize SDK configuration (Phase 1 core init) through the canonical
+     * commons C ABI `rac_sdk_init_phase1_proto`.
      *
-     * This sets up the C++ rac_sdk_config which is used by device registration
-     * to include the correct sdk_version (instead of "unknown").
+     * Drives validation (`rac_validate_api_key` / `rac_validate_base_url`),
+     * persists the api_key/base_url through secure storage, and runs
+     * `rac_state_initialize` — replacing the legacy `racSdkInit` struct ABI.
+     * The validation contract now runs on Android exactly like iOS, so a
+     * malformed apiKey/baseURL is rejected (throws [SDKException]) instead of
+     * silently booting.
      *
-     * Mirrors Swift SDK's rac_sdk_init() call in CppBridge+State.swift
+     * Mirrors Swift's `CppBridge.SdkInit.phase1(...)` call in RunAnywhere.swift.
      *
      * @param environment SDK environment
      * @param apiKey API key for authentication (required for production/staging)
      * @param baseURL Backend API base URL (required for production/staging)
      */
     private fun initializeSdkConfig(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
-        try {
-            val deviceId = CppBridgeDevice.getDeviceIdCallback()
-            val platform = SDKConstants.SDK_PLATFORM
-            val sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION
-
-            logger.info("Initializing SDK config: version=$sdkVersion, platform=$platform, env=$environment")
-            if (!apiKey.isNullOrEmpty()) {
-                logger.info("API key provided: ${apiKey.take(10)}...")
-            }
-            if (!baseURL.isNullOrEmpty()) {
-                logger.info("Base URL: $baseURL")
-            }
-
-            val result =
-                RunAnywhereBridge.racSdkInit(
-                    environment = environment.cEnvironment,
-                    deviceId = deviceId.ifEmpty { null },
-                    platform = platform,
-                    sdkVersion = sdkVersion,
-                    apiKey = apiKey,
-                    baseUrl = baseURL,
-                )
-
-            if (result == 0) {
-                logger.info("✅ SDK config initialized with version: $sdkVersion")
-            } else {
-                logger.warn("SDK config init returned: $result")
-            }
-        } catch (e: Exception) {
-            logger.error("Failed to initialize SDK config: ${e.message}")
+        val deviceId = CppBridgeDevice.getDeviceIdCallback()
+        logger.info("Initializing SDK config (phase 1): env=$environment")
+        if (!apiKey.isNullOrEmpty()) {
+            logger.info("API key provided: ${apiKey.take(10)}...")
         }
+        if (!baseURL.isNullOrEmpty()) {
+            logger.info("Base URL: $baseURL")
+        }
+
+        val result =
+            CppBridgeSdkInit.phase1(
+                environment = environment,
+                apiKey = apiKey.orEmpty(),
+                baseURL = baseURL.orEmpty(),
+                deviceId = deviceId,
+            )
+        logger.info(
+            "✅ SDK config initialized (phase 1): linkedModels=${result.linked_models_count}",
+        )
     }
 
     /**
@@ -567,6 +561,17 @@ object CppBridge {
                 CppBridgeSDKEvents.emitDeviceRegistrationFailed(e.message ?: "Unknown error")
             }
 
+            // Step 5 (deferred from C++): filesystem-backed model discovery.
+            // Mirrors Swift `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
+            // in `_performServicesInitialization` (sdk_init.cpp file header: deferred
+            // to platform SDKs). Phase-2 model assignments may have linked new models;
+            // without this call they won't surface in modelRegistry.list() until the
+            // next manual hydrate triggered by a UI action.
+            val discoveryResult = CppBridgeModelRegistry.discoverDownloadedModels()
+            if (discoveryResult.linked_count > 0) {
+                logger.info("Discovered ${discoveryResult.linked_count} downloaded models on startup")
+            }
+
             synchronized(lock) {
                 CppBridgeState.servicesInitialized = true
                 CppBridgeState.servicesInitializing = false
@@ -668,7 +673,7 @@ object CppBridge {
             CppBridgeTelemetry.unregister()
             CppBridgeSDKEvents.unregister()
 
-            // v2 close-out Phase H4: release the OkHttp transport before the
+            // Release the OkHttp transport before the
             // platform adapter, so any final rac_http_request_* inside shutdown
             // (e.g. telemetry flush) still has a working HTTP path.
             unregisterOkHttpTransport()

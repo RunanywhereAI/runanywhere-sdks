@@ -30,7 +30,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * Wave D-7 helper-level proto requests for voice-agent sub-components.
+ * Helper-level proto requests for voice-agent sub-components.
  */
 public class VoiceAgentTranscribeProtoRequest(
   @field:WireField(

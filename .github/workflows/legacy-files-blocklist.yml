@@ -8,6 +8,9 @@ on:
       - master
       - feat/v2-architecture
 
+permissions:
+  contents: read
+
 jobs:
   legacy-files-blocklist:
     runs-on: ubuntu-latest

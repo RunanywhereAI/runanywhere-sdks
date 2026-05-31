@@ -80,29 +80,21 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::registerBackend() {
     isRegistered_ = true;
 
 #if RAC_RN_HAS_SHERPA_REGISTRATION
+    // rac_backend_sherpa_register() installs BOTH the module record and the
+    // unified plugin vtable in one call, so it and rac_plugin_register(entry)
+    // are alternatives, not a chain. Mirror Flutter onnx_bindings.dart and
+    // Swift ONNX.registerSherpaPlugin(): the wrapper symbol is exported
+    // alongside this header, so call it once and stop. A failure here is a
+    // genuine install failure, not something a redundant rac_plugin_register
+    // could recover.
     rac_result_t sherpaResult = rac_backend_sherpa_register();
     if (isRegistrationSuccess(sherpaResult)) {
-      isSherpaModuleRegistered_ = true;
-
-      const rac_engine_vtable_t* sherpaVtable = rac_plugin_entry_sherpa();
-      if (sherpaVtable == nullptr) {
-        RAC_LOG_WARNING(LOG_CATEGORY, "Sherpa plugin entry returned null; Sherpa STT/TTS/VAD will not route");
-      } else {
-        rac_result_t pluginResult = rac_plugin_register(sherpaVtable);
-        if (isRegistrationSuccess(pluginResult)) {
-          isSherpaRegistered_ = true;
-          RAC_LOG_INFO(LOG_CATEGORY, "Sherpa engine plugin registered explicitly (STT + TTS + VAD)");
-        } else {
-          RAC_LOG_WARNING(
-            LOG_CATEGORY,
-            "Sherpa plugin registration failed with code: %d; Sherpa STT/TTS/VAD will not route",
-            pluginResult);
-        }
-      }
+      isSherpaRegistered_ = true;
+      RAC_LOG_INFO(LOG_CATEGORY, "Sherpa engine plugin registered (STT + TTS + VAD)");
     } else {
       RAC_LOG_WARNING(
         LOG_CATEGORY,
-        "Sherpa backend registration failed with code: %d; Sherpa STT/TTS/VAD may not route",
+        "Sherpa backend registration failed with code: %d; Sherpa STT/TTS/VAD will not route",
         sherpaResult);
     }
 #else
@@ -122,10 +114,9 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereONNX::unregisterBackend() {
     RAC_LOG_INFO(LOG_CATEGORY, "Unregistering ONNX backend...");
 
 #if RAC_RN_HAS_SHERPA_REGISTRATION
-    if (isSherpaModuleRegistered_ || isSherpaRegistered_) {
+    if (isSherpaRegistered_) {
       rac_result_t sherpaResult = rac_backend_sherpa_unregister();
       if (sherpaResult == RAC_SUCCESS || sherpaResult == RAC_ERROR_MODULE_NOT_FOUND) {
-        isSherpaModuleRegistered_ = false;
         isSherpaRegistered_ = false;
         RAC_LOG_INFO(LOG_CATEGORY, "Sherpa backend unregistered");
       } else {

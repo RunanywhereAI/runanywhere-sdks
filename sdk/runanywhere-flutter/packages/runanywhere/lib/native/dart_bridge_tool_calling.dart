@@ -32,7 +32,7 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 /// Thin C ABI bridge for tool-calling parse / format / validate and the
-/// Wave D-4 session state machine.
+/// session state machine.
 class DartBridgeToolCalling {
   DartBridgeToolCalling._();
 
@@ -216,7 +216,7 @@ class DartBridgeToolCalling {
     }
   }
 
-  /// pass2-syn-007: cancel an in-flight session. Safe to call from any
+  /// Cancel an in-flight session. Safe to call from any
   /// isolate; the native side latches the cancel and asks the in-flight
   /// LifecycleLlmRef to abort. Idempotent for unknown handles. Returns
   /// false when the cancel ABI is not exported by the loaded libcommons.
@@ -264,11 +264,22 @@ class ToolCallingSessionHandle {
     if (_closed) return;
     _closed = true;
     DartBridgeToolCalling.shared.destroySession(sessionHandle);
+    // Teardown ordering: (1) destroy the session above so commons stops
+    // accepting new dispatches into this NativeCallable, (2) quiesce so the
+    // dispatcher returns from any in-flight callback whose `user_data` slot
+    // was snapshotted under the commons mutex before the destroy landed
+    // (see `rac_tool_calling.h:642` + `tool_calling_session.cpp:841`),
+    // (3) close the NativeCallable backing that `user_data`. Skipping the
+    // quiesce step lets the dispatcher invoke the trampoline after Dart frees
+    // the user_data pointer (UAF). Mirrors the same ordering used by every
+    // other Flutter stream wrapper (LLM/STT/TTS/VLM/voice-agent) and Swift's
+    // `HandleStreamAdapter.tearDown()`.
+    RacNative.bindings.rac_tool_calling_session_proto_quiesce?.call();
     _nativeCb.close();
     await _events.close();
   }
 
-  /// pass2-syn-007: cancel the in-flight native loop. Distinct from [close]:
+  /// Cancel the in-flight native loop. Distinct from [close]:
   /// cancel interrupts the underlying LLM generate from another isolate,
   /// while [close] tears the session down. The recommended pattern is to
   /// wire this into a `StreamSubscription.onCancel`, fanning consumer-side

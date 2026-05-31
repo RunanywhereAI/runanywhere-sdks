@@ -11,10 +11,9 @@ import kotlinx.coroutines.sync.withLock
 // =============================================================================
 //
 // The canonical LogLevel is the public API enum defined in
-// RunAnywhere+Logging.kt. Values: NONE(0), ERROR(1), WARNING(2), INFO(3),
-// DEBUG(4), VERBOSE(5). Ordered from "no logs" to "all logs", i.e. higher
-// value = more verbose. Filtering semantics: log iff `level.value <=
-// minLogLevel.value` AND minLogLevel != NONE.
+// RunAnywhereLogging.kt. Values: DEBUG(0), INFO(1), WARNING(2), ERROR(3),
+// FAULT(4). Ordered by severity, larger value = more severe (matches Swift).
+// Filtering semantics: log iff `level.value >= minLogLevel.value`.
 
 // =============================================================================
 // LOG ENTRY
@@ -284,12 +283,11 @@ object Logging {
     ) {
         val config = _configuration
 
-        // Check if level meets minimum threshold. Public LogLevel values are
-        // inverse to severity: NONE(0) = no logs, VERBOSE(5) = all logs.
-        // A log is emitted iff its value is <= the configured threshold,
-        // and the threshold is not NONE.
-        if (config.minLogLevel == LogLevel.NONE) return
-        if (level.value > config.minLogLevel.value) return
+        // Check if level meets minimum threshold. Public LogLevel values
+        // match Swift severity: DEBUG(0) = least severe, FAULT(4) = most
+        // severe. A log is emitted iff its severity is at least the
+        // configured threshold (mirrors Swift `level >= config.minLogLevel`).
+        if (level.value < config.minLogLevel.value) return
 
         // Check if any logging is enabled
         if (!config.enableLocalLogging && !config.enableRemoteLogging && _destinations.isEmpty()) return
@@ -382,12 +380,11 @@ object Logging {
     private fun printToConsole(entry: LogEntry) {
         val levelIndicator =
             when (entry.level) {
-                LogLevel.NONE -> return
-                LogLevel.VERBOSE -> "[VERBOSE]"
                 LogLevel.DEBUG -> "[DEBUG]"
                 LogLevel.INFO -> "[INFO]"
                 LogLevel.WARNING -> "[WARN]"
                 LogLevel.ERROR -> "[ERROR]"
+                LogLevel.FAULT -> "[FAULT]"
             }
 
         val output =
@@ -491,14 +488,15 @@ class SDKLogger(
     // =============================================================================
 
     /**
-     * Log a trace-level message (routed to VERBOSE in the public enum).
+     * Log a trace-level message (routed to DEBUG in the canonical enum —
+     * Swift parity exposes no separate VERBOSE level).
      */
     fun trace(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.VERBOSE,
+            level = LogLevel.DEBUG,
             category = category,
             message = message,
             metadata = metadata,
@@ -586,8 +584,8 @@ class SDKLogger(
     }
 
     /**
-     * Log a fault-level message (critical system errors). Routed to ERROR
-     * in the consolidated public enum — FAULT has no distinct level.
+     * Log a fault-level message (critical system errors). Mirrors Swift's
+     * top severity (`LogLevel.fault`).
      */
     fun fault(
         message: String,
@@ -606,7 +604,7 @@ class SDKLogger(
             }
 
         Logging.log(
-            level = LogLevel.ERROR,
+            level = LogLevel.FAULT,
             category = category,
             message = message,
             metadata = faultMetadata,

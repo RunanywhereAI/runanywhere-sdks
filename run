@@ -63,7 +63,7 @@ ${C_BOLD}UTILITIES${C_RESET}
   ${C_CMD}lint${C_RESET}                         Run linters across all SDKs
   ${C_CMD}format${C_RESET}                       Run formatters across all SDKs
   ${C_CMD}codegen${C_RESET}                      Generate code from idl/
-  ${C_CMD}sync-versions${C_RESET}                Propagate version pins via scripts/sync-versions.sh
+  ${C_CMD}sync-versions${C_RESET}                Propagate version pins via scripts/release/sync-versions.sh
   ${C_CMD}help${C_RESET}                         Show this help
 
 ${C_BOLD}EXAMPLES${C_RESET}
@@ -92,10 +92,10 @@ require_macos() {
 
 cmd_sdk_commons() {
     case "${1:-}" in
-        build-android) bash scripts/build-core-android.sh ;;
-        build-ios)     require_macos; bash scripts/build-core-xcframework.sh ;;
-        build-wasm)    bash scripts/build-core-wasm.sh ;;
-        build-linux)   cmake --preset=linux-x86_64 && cmake --build build/linux-x86_64 ;;
+        build-android) bash scripts/build/build-core-android.sh ;;
+        build-ios)     require_macos; bash sdk/runanywhere-swift/scripts/build-core-xcframework.sh ;;
+        build-wasm)    bash sdk/runanywhere-web/scripts/build-core-wasm.sh ;;
+        build-linux)   cmake --preset=linux-release && cmake --build --preset=linux-release ;;
         clean)         rm -rf build/android-* build/ios-* build/wasm-* build/linux-* ;;
         *)             bad_subcommand "sdk commons" "${1:-}" ;;
     esac
@@ -233,15 +233,15 @@ cmd_format() {
 
 case "${1:-help}" in
     help|-h|--help)     show_help ;;
-    doctor)             shift; bash scripts/doctor.sh "$@" ;;
-    setup)              shift; bash scripts/setup.sh "$@" ;;
+    doctor)             shift; bash scripts/setup/doctor.sh "$@" ;;
+    setup)              shift; bash scripts/setup/setup.sh "$@" ;;
     sdk)                shift; cmd_sdk "$@" ;;
     example)            shift; cmd_example "$@" ;;
     clean)              cmd_clean ;;
     lint)               cmd_lint ;;
     format)             cmd_format ;;
     codegen)            bash idl/codegen/generate_kotlin.sh ;;
-    sync-versions)      bash scripts/sync-versions.sh ;;
+    sync-versions)      bash scripts/release/sync-versions.sh ;;
     *)
         echo "error: unknown command: $1" >&2
         echo "run './run help' for usage" >&2

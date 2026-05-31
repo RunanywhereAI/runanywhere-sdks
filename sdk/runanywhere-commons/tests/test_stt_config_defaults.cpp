@@ -1,6 +1,6 @@
 /**
  * @file test_stt_config_defaults.cpp
- * @brief Parity tests for rac_stt_configuration_defaults_proto (P2-T14).
+ * @brief Parity tests for rac_stt_configuration_defaults_proto.
  *
  * Verifies the canonical STTConfiguration defaults emitted by commons match
  * Swift's `RASTTConfiguration.defaults()`

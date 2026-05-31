@@ -252,7 +252,7 @@ public class GenerationEvent(
   public val thinking_text: String = "",
   /**
    * For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-   * Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+   * Enables totalTokens = input_tokens + tokens_used analytics
    * from the event stream alone.
    */
   @field:WireField(

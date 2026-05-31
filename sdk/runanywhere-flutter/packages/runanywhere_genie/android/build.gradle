@@ -38,7 +38,7 @@ android {
     compileSdk 34
 
     // Use NDK for native library support
-    // v3.1: NDK pin hoisted to root gradle.properties (racFlutterNdkVersion). Fallback keeps the previous value if root prop missing.
+    // NDK pin hoisted to root gradle.properties (racFlutterNdkVersion). Fallback keeps the previous value if root prop missing.
     ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.0.12077973"
 
     defaultConfig {

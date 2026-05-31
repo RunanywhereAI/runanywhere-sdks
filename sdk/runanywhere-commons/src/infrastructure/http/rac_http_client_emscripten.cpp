@@ -2,7 +2,7 @@
  * @file rac_http_client_emscripten.cpp
  * @brief Emscripten Fetch-backed HTTP transport adapter.
  *
- * v2 close-out Phase H7 refactor: the Web implementation registers
+ * The Web implementation registers
  * itself through the platform HTTP transport vtable declared in
  * `include/rac/infrastructure/http/rac_http_transport.h`.
  *
@@ -12,7 +12,7 @@
  * pattern used by the Swift URLSession / Kotlin OkHttp / Flutter
  * dart:io / RN fetch adapters.
  *
- * The actual emscripten_fetch() logic below is unchanged from B03 —
+ * The actual emscripten_fetch() logic below is unchanged —
  * only the wiring is different. See `rac_http_transport.h` for the
  * ownership / threading contract every adapter must satisfy:
  *   - callbacks can be invoked from any thread (we block on
@@ -56,6 +56,7 @@
  *     `..._get_response_headers`.
  */
 
+#include "rac_http_transport_ref.h"
 #include "rac_http_upsert_mode.h"
 
 #include <chrono>
@@ -223,8 +224,9 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
     out->elapsed_ms = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count());
 
-    // Effective URL after redirects — not natively reported, fall back to the request URL.
-    out->redirected_url = strdup(req->url);
+    // emscripten_fetch_t does not expose the effective post-redirect URL, so
+    // redirected_url stays NULL (already zeroed by the caller) per the C ABI:
+    // it must be non-NULL only when a real 3xx hop occurred.
 
     // Headers.
     size_t hdrs_len = emscripten_fetch_get_response_headers_length(fetch);
@@ -283,7 +285,7 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
 }
 
 // =============================================================================
-// Transport vtable ops (v2 close-out Phase H7)
+// Transport vtable ops
 //
 // These are the thin shims the transport router in
 // `rac_http_transport.cpp` calls into. Signature matches
@@ -333,7 +335,7 @@ const rac_http_transport_ops_t kEmscriptenOps = {
 };
 
 // =============================================================================
-// JS-side adapter (Stage 3d)
+// JS-side adapter
 //
 // Instead of the C++ calling `emscripten_fetch` (which then calls JS
 // `fetch()` under the hood — one extra hop + ASYNCIFY requirement), the
@@ -429,7 +431,7 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
 }
 
 // =============================================================================
-// JS-side registration (Stage 3d). Takes three function-table indices
+// JS-side registration. Takes three function-table indices
 // (obtained from `Module.addFunction(fn, sig)` on the JS side) that match
 // `rac_http_transport_ops_t.request_send` / `_stream` / `_resume`. Any of
 // them may be null — the corresponding op uses the Emscripten Fetch
@@ -499,10 +501,6 @@ struct rac_http_client {
 // with RAC_ERROR_FEATURE_NOT_AVAILABLE.
 // =============================================================================
 
-namespace rac_internal {
-bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_user_data);
-}
-
 namespace {
 
 /// Mirror of `PreparedRequest` in `rac_http_client_default.cpp` — see
@@ -545,43 +543,39 @@ PreparedRequest prepare_request(const rac_http_request_t* req) {
 }
 
 rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* out_resp) {
-    const rac_http_transport_ops_t* ops = nullptr;
-    void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_send == nullptr) {
+    rac_internal::TransportRef transport;
+    if (!transport || transport.ops()->request_send == nullptr) {
         return emscripten_request_send(/*user_data=*/nullptr, &prepared.effective_request,
                                        out_resp);
     }
-    return ops->request_send(ud, &prepared.effective_request, out_resp);
+    return transport.ops()->request_send(transport.user_data(), &prepared.effective_request,
+                                         out_resp);
 }
 
 rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
                              void* user_data, rac_http_response_t* out_resp_meta) {
-    const rac_http_transport_ops_t* ops = nullptr;
-    void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_stream == nullptr) {
+    rac_internal::TransportRef transport;
+    if (!transport || transport.ops()->request_stream == nullptr) {
         return emscripten_request_stream(/*user_data=*/nullptr, &prepared.effective_request, cb,
                                          user_data, out_resp_meta);
     }
-    return ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
+    return transport.ops()->request_stream(transport.user_data(), &prepared.effective_request, cb,
+                                           user_data, out_resp_meta);
 }
 
 rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
                              rac_http_body_chunk_fn cb, void* user_data,
                              rac_http_response_t* out_resp_meta) {
-    const rac_http_transport_ops_t* ops = nullptr;
-    void* ud = nullptr;
     PreparedRequest prepared = prepare_request(req);
-    if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
-        ops->request_resume == nullptr) {
+    rac_internal::TransportRef transport;
+    if (!transport || transport.ops()->request_resume == nullptr) {
         return emscripten_request_resume(/*user_data=*/nullptr, &prepared.effective_request,
                                          resume_from_byte, cb, user_data, out_resp_meta);
     }
-    return ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb, user_data,
-                               out_resp_meta);
+    return transport.ops()->request_resume(transport.user_data(), &prepared.effective_request,
+                                           resume_from_byte, cb, user_data, out_resp_meta);
 }
 
 }  // namespace
@@ -634,32 +628,8 @@ extern "C" rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_
     return dispatch_resume(req, resume_from_byte, cb, user_data, out_resp_meta);
 }
 
-extern "C" void rac_http_response_free(rac_http_response_t* resp) {
-    if (!resp) {
-        return;
-    }
-    if (resp->body_bytes) {
-        std::free(resp->body_bytes);
-        resp->body_bytes = nullptr;
-    }
-    resp->body_len = 0;
-    if (resp->headers) {
-        for (size_t i = 0; i < resp->header_count; ++i) {
-            if (resp->headers[i].name) {
-                std::free(const_cast<char*>(resp->headers[i].name));
-            }
-            if (resp->headers[i].value) {
-                std::free(const_cast<char*>(resp->headers[i].value));
-            }
-        }
-        std::free(resp->headers);
-        resp->headers = nullptr;
-    }
-    resp->header_count = 0;
-    if (resp->redirected_url) {
-        std::free(resp->redirected_url);
-        resp->redirected_url = nullptr;
-    }
-    resp->status = 0;
-    resp->elapsed_ms = 0;
-}
+// `rac_http_response_free` lives in
+// src/infrastructure/http/rac_http_response.cpp (compiled on every
+// target). The default and emscripten clients allocate the response
+// fields with std::malloc / strdup so the shared TU can free them
+// directly.

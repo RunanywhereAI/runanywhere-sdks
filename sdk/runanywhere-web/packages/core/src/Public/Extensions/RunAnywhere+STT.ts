@@ -31,7 +31,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   getSpeechProvider,
   hasSpeechProviderSTT,
@@ -182,6 +182,7 @@ function callCreate(module: STTComponentModule): number {
       throw SDKException.fromRACResult(
         rc,
         `rac_stt_component_create failed with code ${rc}`,
+        { module, logger },
       );
     }
     const handle = bridge.readU32(outPtr);
@@ -223,6 +224,7 @@ function callLoadModel(
       throw SDKException.fromRACResult(
         rc,
         `rac_stt_component_load_model failed with code ${rc}`,
+        { module, logger },
       );
     }
   } finally {
@@ -354,8 +356,8 @@ export async function transcribe(
   let modelId = options?.modelId;
   let modelName: string | undefined;
 
-  if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({
+  if (!modelPath && WebModelLifecycle.supportsNativeLifecycle()) {
+    const current = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       includeModelMetadata: true,
     });

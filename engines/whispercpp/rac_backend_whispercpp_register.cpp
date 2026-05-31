@@ -11,6 +11,7 @@
 #include <cstring>
 #include <vector>
 
+#include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -23,106 +24,123 @@
 
 namespace {
 
-const char *LOG_CAT = "WhisperCPP";
+const char* LOG_CAT = "WhisperCPP";
 
 /**
  * Convert Int16 PCM audio to Float32 normalized to [-1.0, 1.0].
+ *
+ * Thin wrapper around commons `rac::audio::rac_audio_pcm16_to_float32` to
+ * keep the vtable trampoline ergonomic (returns owned vector). The actual
+ * sample scaling lives in include/rac/audio/rac_audio_convert.h so every
+ * STT engine shares the same Int16->Float32 contract.
  */
-static std::vector<float> convert_int16_to_float32(const void *int16_data,
-                                                   size_t byte_count) {
-  const int16_t *samples = static_cast<const int16_t *>(int16_data);
-  size_t num_samples = byte_count / sizeof(int16_t);
+static std::vector<float> convert_int16_to_float32(const void* int16_data, size_t byte_count) {
+    const int16_t* samples = static_cast<const int16_t*>(int16_data);
+    size_t num_samples = byte_count / sizeof(int16_t);
 
-  std::vector<float> float_samples(num_samples);
-  for (size_t i = 0; i < num_samples; ++i) {
-    float_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
-  }
-
-  return float_samples;
+    std::vector<float> float_samples(num_samples);
+    rac::audio::rac_audio_pcm16_to_float32(samples, num_samples, float_samples.data());
+    return float_samples;
 }
 
 // Initialize
-static rac_result_t whispercpp_stt_vtable_initialize(void *impl,
-                                                     const char *model_path) {
-  (void)impl;
-  (void)model_path;
-  return RAC_SUCCESS;
+static rac_result_t whispercpp_stt_vtable_initialize(void* impl, const char* model_path) {
+    (void)impl;
+    (void)model_path;
+    return RAC_SUCCESS;
 }
 
 // Transcribe
-static rac_result_t whispercpp_stt_vtable_transcribe(
-    void *impl, const void *audio_data, size_t audio_size,
-    const rac_stt_options_t *options, rac_stt_result_t *out_result) {
-  if (!audio_data || audio_size == 0 || !out_result) {
-    return RAC_ERROR_INVALID_ARGUMENT;
-  }
-  std::vector<float> float_samples =
-      convert_int16_to_float32(audio_data, audio_size);
-  return rac_stt_whispercpp_transcribe(
-      impl, float_samples.data(), float_samples.size(), options, out_result);
+static rac_result_t whispercpp_stt_vtable_transcribe(void* impl, const void* audio_data,
+                                                     size_t audio_size,
+                                                     const rac_stt_options_t* options,
+                                                     rac_stt_result_t* out_result) {
+    if (!audio_data || audio_size == 0 || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
+    return rac_stt_whispercpp_transcribe(impl, float_samples.data(), float_samples.size(), options,
+                                         out_result);
 }
 
 // Get info
-static rac_result_t whispercpp_stt_vtable_get_info(void *impl,
-                                                   rac_stt_info_t *out_info) {
-  if (!out_info)
-    return RAC_ERROR_NULL_POINTER;
+static rac_result_t whispercpp_stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
 
-  out_info->is_ready = rac_stt_whispercpp_is_ready(impl);
-  out_info->supports_streaming = RAC_FALSE; // WhisperCPP streaming is limited
-  out_info->current_model = nullptr;
+    out_info->is_ready = rac_stt_whispercpp_is_ready(impl);
+    out_info->supports_streaming = RAC_FALSE;  // WhisperCPP streaming is limited
+    out_info->current_model = nullptr;
 
-  return RAC_SUCCESS;
+    return RAC_SUCCESS;
 }
 
 // Cleanup
-static rac_result_t whispercpp_stt_vtable_cleanup(void *impl) {
-  (void)impl;
-  return RAC_SUCCESS;
+static rac_result_t whispercpp_stt_vtable_cleanup(void* impl) {
+    (void)impl;
+    return RAC_SUCCESS;
 }
 
 // Destroy
-static void whispercpp_stt_vtable_destroy(void *impl) {
-  if (impl) {
-    rac_stt_whispercpp_destroy(impl);
-  }
+static void whispercpp_stt_vtable_destroy(void* impl) {
+    if (impl) {
+        rac_stt_whispercpp_destroy(impl);
+    }
 }
 
 // v3 Phase B4: whispercpp STT `create` adapter. Called by commons
 // rac_stt_create() via rac_plugin_route (whisper-ggml priority is
 // encoded in g_whispercpp_engine_vtable.metadata.priority in
 // rac_plugin_entry_whispercpp.cpp; model-format gating via metadata.formats).
-static rac_result_t whispercpp_stt_create_impl(const char *model_id,
-                                               const char * /*config_json*/,
-                                               void **out_impl) {
-  if (!model_id || !out_impl)
-    return RAC_ERROR_NULL_POINTER;
-  *out_impl = nullptr;
-  RAC_LOG_INFO(LOG_CAT, "whispercpp_stt_create_impl: model=%s", model_id);
-  rac_handle_t backend_handle = nullptr;
-  rac_result_t rc =
-      rac_stt_whispercpp_create(model_id, nullptr, &backend_handle);
-  if (rc != RAC_SUCCESS) {
-    RAC_LOG_ERROR(LOG_CAT, "rac_stt_whispercpp_create failed: %d", rc);
-    return rc;
-  }
-  *out_impl = backend_handle;
-  return RAC_SUCCESS;
+static rac_result_t whispercpp_stt_create_impl(const char* model_id, const char* /*config_json*/,
+                                               void** out_impl) {
+    if (!model_id || !out_impl)
+        return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "whispercpp_stt_create_impl: model=%s", model_id);
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_stt_whispercpp_create(model_id, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_stt_whispercpp_create failed: %d", rc);
+        return rc;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
 }
 
-static rac_result_t whispercpp_stt_vtable_get_languages(void *impl,
-                                                        char **out_json) {
-  return rac_stt_whispercpp_get_languages(impl, out_json);
+static rac_result_t whispercpp_stt_vtable_get_languages(void* impl, char** out_json) {
+    return rac_stt_whispercpp_get_languages(impl, out_json);
 }
 
-static rac_result_t whispercpp_stt_vtable_detect_language(
-    void *impl, const void *audio_data, size_t audio_size,
-    const rac_stt_options_t *options, char **out_language) {
-  return rac_stt_whispercpp_detect_language(impl, audio_data, audio_size,
-                                            options, out_language);
+static rac_result_t whispercpp_stt_vtable_detect_language(void* impl, const void* audio_data,
+                                                          size_t audio_size,
+                                                          const rac_stt_options_t* options,
+                                                          char** out_language) {
+    return rac_stt_whispercpp_detect_language(impl, audio_data, audio_size, options, out_language);
 }
 
-const rac_stt_service_ops_t g_whispercpp_stt_ops = {
+// =============================================================================
+// MODULE IDENTITY
+// =============================================================================
+
+const char* const MODULE_ID = "whispercpp";
+
+// v3 Phase B4: legacy rac_service_request_t factories removed. Model-file
+// gating lives in g_whispercpp_engine_vtable.metadata.formats; backend
+// priority (50, lower than ONNX 100) lives in metadata.priority.
+
+bool g_registered = false;
+
+}  // namespace
+
+// MF-02: keep external C linkage so rac_plugin_entry_whispercpp.cpp's
+// `extern const rac_stt_service_ops_t g_whispercpp_stt_ops` declaration is
+// satisfied by a matching external-linkage definition. Defining this struct
+// inside the anonymous namespace gave it internal linkage, contradicting the
+// `extern` declaration in the plugin-entry TU. Match the pattern used by
+// llamacpp / sherpa / onnx / whisperkit_coreml (see
+// rac_backend_whisperkit_coreml_register.cpp:200).
+extern "C" const rac_stt_service_ops_t g_whispercpp_stt_ops = {
     .initialize = whispercpp_stt_vtable_initialize,
     .transcribe = whispercpp_stt_vtable_transcribe,
     // Streaming STT not supported by whisper.cpp backend; commons returns
@@ -137,20 +155,6 @@ const rac_stt_service_ops_t g_whispercpp_stt_ops = {
 };
 
 // =============================================================================
-// MODULE IDENTITY
-// =============================================================================
-
-const char *const MODULE_ID = "whispercpp";
-
-// v3 Phase B4: legacy rac_service_request_t factories removed. Model-file
-// gating lives in g_whispercpp_engine_vtable.metadata.formats; backend
-// priority (50, lower than ONNX 100) lives in metadata.priority.
-
-bool g_registered = false;
-
-} // namespace
-
-// =============================================================================
 // REGISTRATION API
 // =============================================================================
 
@@ -158,65 +162,63 @@ extern "C" {
 
 // Forward-declare the plugin entry function defined in
 // rac_plugin_entry_whispercpp.cpp (via RAC_PLUGIN_ENTRY_DEF(whispercpp)).
-const rac_engine_vtable_t *rac_plugin_entry_whispercpp(void);
+const rac_engine_vtable_t* rac_plugin_entry_whispercpp(void);
 
 rac_result_t rac_backend_whispercpp_register(void) {
-  if (g_registered) {
-    return RAC_ERROR_MODULE_ALREADY_REGISTERED;
-  }
-
-  rac_module_info_t module_info = {};
-  module_info.id = MODULE_ID;
-  module_info.name = "WhisperCPP";
-  module_info.version = "1.0.0";
-  module_info.description =
-      "STT backend using whisper.cpp for GGML Whisper models";
-
-  rac_capability_t capabilities[] = {RAC_CAPABILITY_STT};
-  module_info.capabilities = capabilities;
-  module_info.num_capabilities = 1;
-
-  rac_result_t result = rac_module_register(&module_info);
-  if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-    return result;
-  }
-
-  // Register the unified plugin vtable so rac_plugin_route(RAC_PRIMITIVE_
-  // TRANSCRIBE) can find whispercpp's STT ops. Phase B4 dropped this call
-  // but no replacement constructor landed — without it the plugin is
-  // invisible to the router even when librac_backend_whispercpp.so is
-  // loaded and rac_backend_whispercpp_register() is called.
-  const rac_engine_vtable_t *vt = rac_plugin_entry_whispercpp();
-  if (vt != nullptr) {
-    rac_result_t plugin_rc = rac_plugin_register(vt);
-    if (plugin_rc != RAC_SUCCESS &&
-        plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-      RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+    if (g_registered) {
+        return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
-  }
 
-  g_registered = true;
-  RAC_LOG_INFO(LOG_CAT, "WhisperCPP backend registered (module + plugin)");
-  return RAC_SUCCESS;
+    rac_module_info_t module_info = {};
+    module_info.id = MODULE_ID;
+    module_info.name = "WhisperCPP";
+    module_info.version = "1.0.0";
+    module_info.description = "STT backend using whisper.cpp for GGML Whisper models";
+
+    rac_capability_t capabilities[] = {RAC_CAPABILITY_STT};
+    module_info.capabilities = capabilities;
+    module_info.num_capabilities = 1;
+
+    rac_result_t result = rac_module_register(&module_info);
+    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        return result;
+    }
+
+    // Register the unified plugin vtable so rac_plugin_route(RAC_PRIMITIVE_
+    // TRANSCRIBE) can find whispercpp's STT ops. Phase B4 dropped this call
+    // but no replacement constructor landed — without it the plugin is
+    // invisible to the router even when librac_backend_whispercpp.so is
+    // loaded and rac_backend_whispercpp_register() is called.
+    const rac_engine_vtable_t* vt = rac_plugin_entry_whispercpp();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        }
+    }
+
+    g_registered = true;
+    RAC_LOG_INFO(LOG_CAT, "WhisperCPP backend registered (module + plugin)");
+    return RAC_SUCCESS;
 }
 
 rac_result_t rac_backend_whispercpp_unregister(void) {
-  if (!g_registered) {
-    return RAC_ERROR_MODULE_NOT_FOUND;
-  }
+    if (!g_registered) {
+        return RAC_ERROR_MODULE_NOT_FOUND;
+    }
 
-  // Tear down the unified plugin route before the legacy module entry.
-  // Service routing (rac_stt_service.cpp:108-127) dispatches from the
-  // plugin registry, so skipping this leaves the whispercpp STT vtable
-  // selectable for RAC_PRIMITIVE_TRANSCRIBE after the host believes the
-  // backend has been torn down (see engine-others-004). RAC_ERROR_NOT_FOUND
-  // is tolerated for hosts that never called rac_plugin_register (older
-  // bootstrap paths or partial registration).
-  rac_plugin_unregister("whispercpp");
-  rac_module_unregister(MODULE_ID);
+    // Tear down the unified plugin route before the legacy module entry.
+    // Service routing (rac_stt_service.cpp:108-127) dispatches from the
+    // plugin registry, so skipping this leaves the whispercpp STT vtable
+    // selectable for RAC_PRIMITIVE_TRANSCRIBE after the host believes the
+    // backend has been torn down (see engine-others-004). RAC_ERROR_NOT_FOUND
+    // is tolerated for hosts that never called rac_plugin_register (older
+    // bootstrap paths or partial registration).
+    rac_plugin_unregister("whispercpp");
+    rac_module_unregister(MODULE_ID);
 
-  g_registered = false;
-  return RAC_SUCCESS;
+    g_registered = false;
+    return RAC_SUCCESS;
 }
 
-} // extern "C"
+}  // extern "C"

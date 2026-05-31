@@ -25,6 +25,7 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// Minimal response container, platform-agnostic.
@@ -407,13 +408,13 @@ class HTTPClientAdapter {
     required Map<String, String>? extra,
     required bool requiresAuth,
   }) async {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-SDK-Client': 'RunAnywhereFlutterSDK',
-      'X-SDK-Version': SDKConstants.version,
-      'X-Platform': SDKConstants.platform,
-    };
+    // flutter-core-006: pull canonical SDK headers from commons via FFI
+    // (`rac_http_default_headers`) so every SDK ships the same
+    // X-SDK-Client / X-SDK-Version / Content-Type / Accept set. X-Platform
+    // is intentionally not in the commons list (it is platform-specific) so
+    // we apply it here.
+    final headers = _commonsDefaultHeaders();
+    headers['X-Platform'] = SDKConstants.platform;
 
     if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       if (_supabaseKey.isNotEmpty) {
@@ -451,6 +452,48 @@ class HTTPClientAdapter {
 
     if (extra != null) headers.addAll(extra);
     return headers;
+  }
+
+  /// Snapshot of commons' canonical `rac_http_default_headers` list.
+  ///
+  /// Falls back to the hard-coded set when the symbol is unavailable in the
+  /// loaded RACommons binary so older bundled artifacts still link. The
+  /// returned map is mutable; callers append `X-Platform` and per-request
+  /// overlays.
+  Map<String, String> _commonsDefaultHeaders() {
+    final fallback = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-SDK-Client': 'RunAnywhereSDK',
+      'X-SDK-Version': SDKConstants.version,
+    };
+    final defaultHeadersFn = RacNative.bindings.rac_http_default_headers;
+    if (defaultHeadersFn == null) {
+      return fallback;
+    }
+    final kvsOut = calloc<ffi.Pointer<RacHttpHeaderKv>>();
+    final countOut = calloc<ffi.Size>();
+    try {
+      final rc = defaultHeadersFn(kvsOut, countOut);
+      if (rc != RacResultCode.success) {
+        return fallback;
+      }
+      final kvs = kvsOut.value;
+      if (kvs == ffi.nullptr) {
+        return fallback;
+      }
+      final count = countOut.value;
+      final headers = <String, String>{};
+      for (var i = 0; i < count; i++) {
+        final kv = (kvs + i).ref;
+        if (kv.name == ffi.nullptr || kv.value == ffi.nullptr) continue;
+        headers[kv.name.toDartString()] = kv.value.toDartString();
+      }
+      return headers.isEmpty ? fallback : headers;
+    } finally {
+      calloc.free(kvsOut);
+      calloc.free(countOut);
+    }
   }
 
   Uint8List? _encodeBody(Object? body) {

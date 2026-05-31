@@ -2,9 +2,7 @@
  * @file rac_plugin_entry_whispercpp.cpp
  * @brief Unified-ABI entry point for whisper.cpp STT backend.
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
- * CPP-04: declarative manifest publishes package ownership, availability and
+ * Declarative manifest publishes package ownership, availability and
  * the served primitive set alongside the routing metadata.
  */
 
@@ -22,7 +20,9 @@ extern const rac_stt_service_ops_t g_whispercpp_stt_ops;
  * binary is loaded the whisper.cpp library was linked in, so the primitives
  * are always dispatchable. Return RAC_SUCCESS to signal "available".
  */
-static rac_result_t whispercpp_capability_check(void) { return RAC_SUCCESS; }
+static rac_result_t whispercpp_capability_check(void) {
+    return RAC_SUCCESS;
+}
 
 static const rac_runtime_id_t k_whispercpp_runtimes[] = {
     RAC_RUNTIME_CPU,
@@ -50,14 +50,11 @@ static const rac_engine_manifest_t k_whispercpp_manifest = {
     .priority = 80,
     .capability_flags = 0,
     .primitives = k_whispercpp_primitives,
-    .primitives_count =
-        sizeof(k_whispercpp_primitives) / sizeof(k_whispercpp_primitives[0]),
+    .primitives_count = sizeof(k_whispercpp_primitives) / sizeof(k_whispercpp_primitives[0]),
     .runtimes = k_whispercpp_runtimes,
-    .runtimes_count =
-        sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
+    .runtimes_count = sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
     .formats = k_whispercpp_formats,
-    .formats_count =
-        sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
+    .formats_count = sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
     .reserved_0 = 0,
     .reserved_1 = 0,
 };
@@ -89,8 +86,7 @@ static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(whispercpp) {
-  return rac_engine_entry_with_manifest(&k_whispercpp_manifest,
-                                        &g_whispercpp_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_whispercpp_manifest, &g_whispercpp_engine_vtable);
 }
 
-} // extern "C"
+}  // extern "C"

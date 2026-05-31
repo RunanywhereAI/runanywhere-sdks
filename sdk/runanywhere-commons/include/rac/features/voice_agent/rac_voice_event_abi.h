@@ -2,8 +2,6 @@
  * @file rac_voice_event_abi.h
  * @brief Proto-encoded VoiceEvent callback ABI for the voice agent.
  *
- * GAP 09 Phase 15 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
- *
  * This is the second event-delivery path on the voice agent, alongside the
  * existing struct callback (`rac_voice_agent_event_callback_fn` declared in
  * `rac_voice_agent.h`). Frontends that consume the IDL-generated
@@ -19,9 +17,9 @@
  *     using the codegen'd type. Saves ~150 LOC per SDK.
  *
  * Stability:
- *   - This header is GAP 09 NEW. The struct path is unchanged. Both
+ *   - This header is new. The struct path is unchanged. Both
  *     callbacks may be set on the same handle; both fire per event. No
- *     contention with the GAP 02 plugin ABI version.
+ *     contention with the plugin ABI version.
  *   - RAC_ABI_VERSION (declared below) bumped to 2 by this header so
  *     consumers can detect runtime support.
  *
@@ -45,7 +43,7 @@ extern "C" {
 #endif
 
 /**
- * @brief RAC C ABI version. Bumped from 1 to 2 by GAP 09 to advertise the
+ * @brief RAC C ABI version. Bumped from 1 to 2 to advertise the
  *        proto-byte event ABI. Distinct from `RAC_PLUGIN_API_VERSION` which
  *        gates the engine plugin vtable layout.
  */
@@ -73,8 +71,10 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
 /**
  * @brief Register a proto-byte event callback on a voice agent handle.
  *
- * Coexists with the struct callback registered via the existing
- * `rac_voice_agent_set_event_callback()` API. Both fire on every event.
+ * Coexists with the per-call struct callback passed to
+ * `rac_voice_agent_process_stream(..., rac_voice_agent_event_callback_fn,
+ * void* user_data)` (declared in `rac_voice_agent.h`). Both fire on every
+ * event when both are installed.
  *
  * @param handle     Voice agent handle obtained from rac_voice_agent_create().
  * @param callback   Proto-byte event callback function. Pass NULL to clear.
@@ -91,6 +91,29 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
 RAC_API rac_result_t rac_voice_agent_set_proto_callback(
     rac_voice_agent_handle_t handle, rac_voice_agent_proto_event_callback_fn callback,
     void* user_data);
+
+/**
+ * @brief Spin-wait until every in-flight voice-agent proto-byte event
+ *        dispatch has returned.
+ *
+ * Mirrors `rac_llm_proto_quiesce` / `rac_vlm_proto_quiesce` / `rac_vad_proto_quiesce`.
+ * Callers freeing the `user_data` passed into
+ * `rac_voice_agent_set_proto_callback`, or tearing down the voice agent
+ * altogether, MUST follow the sequence:
+ *
+ *   (a) `rac_voice_agent_set_proto_callback(handle, NULL, NULL)` — clears
+ *       the slot atomically so no NEW dispatches will fire;
+ *   (b) `rac_voice_agent_proto_quiesce()` — spin-waits until every in-flight
+ *       slot.fn() invocation has returned;
+ *   (c) free @p user_data.
+ *
+ * Without (b), a concurrent `dispatch_proto_event` / `dispatch_proto_voice_event`
+ * thread that copied the slot before (a) ran can still be inside `slot.fn()`
+ * with a stale `user_data` pointer when the caller frees it.
+ *
+ * Safe to call from any thread; non-blocking when no dispatch is active.
+ */
+RAC_API void rac_voice_agent_proto_quiesce(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

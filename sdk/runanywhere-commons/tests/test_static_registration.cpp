@@ -3,8 +3,6 @@
  * @brief Verifies that RAC_STATIC_PLUGIN_REGISTER schedules registration
  *        before main() and survives compile-time dead-code analysis.
  *
- * GAP 03 Phase 6.
- *
  * Scenario:
  *   * The fixture below uses RAC_STATIC_PLUGIN_REGISTER(test_static).
  *   * `g_test_static_vtable` is exposed via a private rac_plugin_entry_test_static
@@ -32,16 +30,16 @@ extern "C" {
 
 static const rac_engine_vtable_t g_test_static_vtable = {
     /* metadata */ {
-        .abi_version = RAC_PLUGIN_API_VERSION,
-        .name = "test_static",
-        .display_name = "GAP 03 static-register fixture",
-        .engine_version = "0.0.0",
-        .priority = 1,
-        .capability_flags = 0,
-        .runtimes = nullptr,
-        .runtimes_count = 0,
-        .formats = nullptr,
-        .formats_count = 0,
+        /* abi_version      */ RAC_PLUGIN_API_VERSION,
+        /* name             */ "test_static",
+        /* display_name     */ "GAP 03 static-register fixture",
+        /* engine_version   */ "0.0.0",
+        /* priority         */ 1,
+        /* capability_flags */ 0,
+        /* runtimes         */ nullptr,
+        /* runtimes_count   */ 0,
+        /* formats          */ nullptr,
+        /* formats_count    */ 0,
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,

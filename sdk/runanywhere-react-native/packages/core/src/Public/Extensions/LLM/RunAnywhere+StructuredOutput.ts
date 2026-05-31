@@ -23,6 +23,7 @@ import {
 } from '@runanywhere/proto-ts/llm_options';
 import {
   type JSONSchema,
+  JSONSchema as JSONSchemaCodec,
   StructuredOutputOptions,
   StructuredOutputResult,
   StructuredOutputParseRequest,
@@ -34,6 +35,9 @@ import {
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { generate as generateText } from './RunAnywhere+TextGeneration';
+
+// Re-export the wire types consumers need to discriminate the stream.
+export { StructuredOutputStreamEvent, StructuredOutputStreamEventKind };
 
 // ============================================================================
 // Types re-exported for callers
@@ -102,23 +106,50 @@ async function callNativeProto(
   }
 }
 
-function stringToBytes(text: string): Uint8Array {
-  const buf = new ArrayBuffer(text.length);
-  const view = new Uint8Array(buf);
-  for (let i = 0; i < text.length; i++) view[i] = text.charCodeAt(i);
-  return view;
+/**
+ * Canonical JSON Schema text consumed by the commons structured-output C ABI.
+ *
+ * Delegates to `rac_structured_output_schema_to_json_proto` so every
+ * SDK shares the same byte-exact, key-sorted, compact serializer. Returns
+ * `"{}"` on any serialization or bridge failure, mirroring Swift
+ * `RAJSONSchema.jsonSchemaString`.
+ */
+async function jsonSchemaStringForSchema(schema: JSONSchema): Promise<string> {
+  try {
+    const schemaBytes = encodeProtoMessage(schema, JSONSchemaCodec);
+    const responseBytes = await callNativeProto(
+      'structuredOutputSchemaToJsonProto',
+      schemaBytes,
+      'structuredOutputSchemaToJson'
+    );
+    if (responseBytes.byteLength === 0) {
+      return '{}';
+    }
+    const TextDecoderCtor = globalThis.TextDecoder;
+    if (typeof TextDecoderCtor === 'function') {
+      return new TextDecoderCtor('utf-8').decode(responseBytes);
+    }
+    let result = '';
+    for (let i = 0; i < responseBytes.byteLength; i++) {
+      result += String.fromCharCode(responseBytes[i]!);
+    }
+    return result || '{}';
+  } catch {
+    return '{}';
+  }
 }
 
-function structuredOutputOptionsForSchema(
+async function structuredOutputOptionsForSchema(
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): StructuredOutputOptions {
+): Promise<StructuredOutputOptions> {
+  const jsonSchema =
+    options?.jsonSchema ?? (await jsonSchemaStringForSchema(schema));
   return StructuredOutputOptions.fromPartial({
     ...options,
     schema: options?.schema ?? schema,
     includeSchemaInPrompt: options?.includeSchemaInPrompt ?? true,
-    jsonSchema:
-      options?.jsonSchema ?? schema.rawJson ?? JSON.stringify(schema),
+    jsonSchema,
   });
 }
 
@@ -127,15 +158,15 @@ function nextStructuredOutputRequestId(): string {
   return `rn-structured-${Date.now()}-${requestCounter}`;
 }
 
-function encodeStructuredOutputRequest(
+async function encodeStructuredOutputRequest(
   prompt: string,
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): ArrayBuffer {
+): Promise<ArrayBuffer> {
   const request = StructuredOutputRequest.fromPartial({
     requestId: nextStructuredOutputRequestId(),
     prompt,
-    options: structuredOutputOptionsForSchema(schema, options),
+    options: await structuredOutputOptionsForSchema(schema, options),
     metadata: {},
   });
   return encodeProtoMessage(request, StructuredOutputRequest);
@@ -154,7 +185,7 @@ export async function generateStructured<T = unknown>(
   logger.debug('Generating structured output...');
   const responseBytes = await callNativeProto(
     'structuredOutputGenerateProto',
-    encodeStructuredOutputRequest(prompt, schema, options),
+    await encodeStructuredOutputRequest(prompt, schema, options),
     'structuredOutputGenerate'
   );
   return StructuredOutputResult.decode(responseBytes);
@@ -201,21 +232,24 @@ export async function generateWithStructuredOutput(
 /**
  * Generate structured output with streaming support.
  *
- * Returns an `AsyncIterable<StructuredOutputResult>` that emits one item per
- * streaming token's accumulated JSON, finishing with the final parsed result
- * when the stream ends.
+ * Returns an `AsyncIterable<StructuredOutputStreamEvent>` that yields one
+ * proto event per native callback (TOKEN per generated token, optional
+ * PARTIAL_JSON / VALIDATION events, terminated by COMPLETED with the final
+ * `result` or ERROR with `errorMessage`). Consumers discriminate on the
+ * `kind` field, mirroring Swift's `AsyncThrowingStream<RAStructuredOutputStreamEvent, Error>`
+ * and Kotlin's `Flow<StructuredOutputStreamEvent>`.
  *
  * Matches Swift SDK: `RunAnywhere.generateStructuredStream(_:content:options:)`
- * and the canonical cross-SDK spec §3 return type.
+ * (sdk/runanywhere-swift/.../RunAnywhere+StructuredOutput.swift:58) and the
+ * canonical cross-SDK spec §3.
  */
 export function generateStructuredStream(
   prompt: string,
   schema: JSONSchema,
   options?: StructuredOutputOptions
-): AsyncIterable<StructuredOutputResult> {
-  const requestBytes = encodeStructuredOutputRequest(prompt, schema, options);
-
-  async function* resultGenerator(): AsyncGenerator<StructuredOutputResult> {
+): AsyncIterable<StructuredOutputStreamEvent> {
+  async function* resultGenerator(): AsyncGenerator<StructuredOutputStreamEvent> {
+    const requestBytes = await encodeStructuredOutputRequest(prompt, schema, options);
     if (!isNativeModuleAvailable()) {
       throw SDKException.nativeModuleUnavailable();
     }
@@ -228,25 +262,25 @@ export function generateStructuredStream(
       );
     }
 
-    const queue: StructuredOutputResult[] = [];
+    const queue: StructuredOutputStreamEvent[] = [];
     let done = false;
     let streamError: Error | null = null;
-    let resolver: ((value: IteratorResult<StructuredOutputResult>) => void) | null = null;
+    let resolver: ((value: IteratorResult<StructuredOutputStreamEvent>) => void) | null = null;
 
     const finish = (): void => {
       done = true;
       if (resolver) {
-        resolver({ value: undefined as unknown as StructuredOutputResult, done: true });
+        resolver({ value: undefined as unknown as StructuredOutputStreamEvent, done: true });
         resolver = null;
       }
     };
 
-    const push = (result: StructuredOutputResult): void => {
+    const push = (event: StructuredOutputStreamEvent): void => {
       if (resolver) {
-        resolver({ value: result, done: false });
+        resolver({ value: event, done: false });
         resolver = null;
       } else {
-        queue.push(result);
+        queue.push(event);
       }
     };
 
@@ -256,29 +290,20 @@ export function generateStructuredStream(
     ) => Promise<void>).call(native, requestBytes, (eventBytes: ArrayBuffer) => {
       try {
         const event = StructuredOutputStreamEvent.decode(arrayBufferToBytes(eventBytes));
-        if (event.errorMessage) {
-          streamError = SDKException.generationFailedWith(event.errorMessage);
-        }
-        if (event.result) {
-          push(event.result);
-        } else if (
-          event.kind ===
-          StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON
-        ) {
-          push(
-            StructuredOutputResult.fromPartial({
-              parsedJson: stringToBytes(event.partialJson ?? ''),
-              validation: event.validation,
-              rawText: event.partialJson ?? '',
-            })
-          );
-        }
+        push(event);
         if (
           event.kind ===
             StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED ||
           event.kind ===
             StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR
         ) {
+          if (
+            event.kind ===
+              StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR &&
+            event.errorMessage
+          ) {
+            streamError = SDKException.generationFailedWith(event.errorMessage);
+          }
           finish();
         }
       } catch (error) {
@@ -295,7 +320,7 @@ export function generateStructuredStream(
       if (queue.length > 0) {
         yield queue.shift()!;
       } else if (!done) {
-        const next = await new Promise<IteratorResult<StructuredOutputResult>>((resolve) => {
+        const next = await new Promise<IteratorResult<StructuredOutputStreamEvent>>((resolve) => {
           resolver = resolve;
         });
         if (next.done) break;
@@ -323,7 +348,7 @@ export async function extractStructuredOutput(
     options: StructuredOutputOptions.fromPartial({
       schema,
       includeSchemaInPrompt: true,
-      jsonSchema: schema.rawJson || undefined,
+      jsonSchema: await jsonSchemaStringForSchema(schema),
     }),
   });
   const responseBytes = await callNativeProto(

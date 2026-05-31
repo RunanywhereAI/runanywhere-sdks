@@ -20,13 +20,13 @@
 #      - Configure fails hard if the engine is claimed-available but missing,
 #        consistent with how llamacpp/onnx handle missing deps.
 
-# v3.1.2: MetalRT is an OBJECT library (folded into rac_commons), which
+# MetalRT is an OBJECT library (folded into rac_commons), which
 # doesn't fit the rac_add_engine_plugin() macro's STATIC/SHARED branching.
 # We keep the hand-rolled add_library(... OBJECT) but emit the engine
 # metadata via GLOBAL properties directly (matching what the macro records
 # for the other engines).
 
-# T5.4: per-engine build toggle owned locally. Apple-only — force OFF
+# Per-engine build toggle owned locally. Apple-only — force OFF
 # elsewhere so non-Apple builds don't accidentally enable it.
 if(APPLE)
     option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
@@ -67,7 +67,7 @@ target_include_directories(rac_backend_metalrt PRIVATE
 
 target_compile_definitions(rac_backend_metalrt PRIVATE RAC_METALRT_BUILDING)
 
-# v3.1.2: tooling metadata for `cmake -t graphviz/json` parity with
+# Tooling metadata for `cmake -t graphviz/json` parity with
 # rac_add_engine_plugin()-managed engines.
 set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_ENGINES metalrt)
 set_property(GLOBAL APPEND PROPERTY RAC_ENGINE_metalrt_RUNTIMES METAL ANE)

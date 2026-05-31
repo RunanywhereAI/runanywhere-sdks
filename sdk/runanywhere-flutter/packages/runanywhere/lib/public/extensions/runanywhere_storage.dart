@@ -61,7 +61,7 @@ class RunAnywhereStorage {
     final saved =
         await DartBridgeModelRegistry.instance.registerModelFromUrl(request);
     if (saved == null) {
-      throw SDKException.storageError(
+      throw SDKException.processingFailed(
         'rac_register_model_from_url_proto unavailable',
       );
     }
@@ -316,7 +316,7 @@ class RunAnywhereStorage {
   // ===========================================================================
 
   /// Low-level download stream. Emits proto-generated `DownloadProgress`
-  /// events driven by the C++ `rac_download_orchestrate` state machine.
+  /// events driven by the C++ `rac_download_start_proto` state machine.
   /// Mirrors Swift's `downloadModel(_:onProgress:)`.
   static Stream<DownloadProgress> downloadModel(String modelId) =>
       RunAnywhereDownloads.shared.start(modelId);

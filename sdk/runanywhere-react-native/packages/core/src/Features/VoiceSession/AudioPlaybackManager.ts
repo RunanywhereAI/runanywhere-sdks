@@ -23,7 +23,6 @@ function getSound() {
   if (Platform.OS === 'ios') return null;
   if (!Sound) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       Sound = require('react-native-sound').default;
       Sound.setCategory('Playback');
     } catch {
@@ -167,7 +166,6 @@ async function createWavFromPCMFloat32(
   audioBase64: string,
   sampleRate: number
 ): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const RNFS = require('react-native-fs');
 
   const binaryString = atob(audioBase64);

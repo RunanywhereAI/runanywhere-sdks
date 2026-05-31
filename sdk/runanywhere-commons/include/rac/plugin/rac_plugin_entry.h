@@ -2,8 +2,6 @@
  * @file rac_plugin_entry.h
  * @brief Plugin entry-point declaration + registration macros.
  *
- * GAP 02 Phase 7 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * A plugin is a collection of static or dynamic library symbols that, when
  * the host calls `rac_plugin_entry_<name>()`, returns a pointer to a filled
  * `rac_engine_vtable_t`. The registry takes ownership of the returned
@@ -48,10 +46,10 @@ extern "C" {
  * Do NOT bump for additive metadata (new flags in `capability_flags`).
  *
  * Version history:
- *   1u (GAP 02) — initial release. 8 primitive slots + 10 reserved slots.
+ *   1u — initial release. 8 primitive slots + 10 reserved slots.
  *                 Metadata = abi_version, name, display_name, engine_version,
  *                 priority, capability_flags, reserved_0, reserved_1.
- *   2u (GAP 04) — replaced metadata.reserved_0/_1 (8 bytes total) with the
+ *   2u — replaced metadata.reserved_0/_1 (8 bytes total) with the
  *                 routing extension: runtimes[] + runtimes_count +
  *                 formats[] + formats_count (48 bytes total). Plugins built
  *                 against v1 will be rejected at register time with
@@ -71,6 +69,17 @@ extern "C" {
  *                 new `create` slot is unreachable otherwise. `rac_capability_t`
  *                 is RETAINED for `rac_module_info_t.capabilities` and
  *                 `rac_modules_for_capability`.
+ *                 NOTE: `rac_service_register_provider` /
+ *                 `rac_service_unregister_provider` remain as no-op
+ *                 deprecation shims (log a WARN, return RAC_SUCCESS) in
+ *                 `src/plugin/rac_plugin_registry.cpp` to keep older Genie
+ *                 .so / Flutter pre-v3 plugin binaries dlopenable.
+ *                 The associated *types* / *fn typedefs /
+ *                 `rac_service_create` / `rac_service_list_providers` are
+ *                 gone for good; new code MUST use `rac_plugin_register` /
+ *                 `rac_plugin_unregister`. The shims can be deleted once
+ *                 every shipped Genie / RN / Flutter binary has been
+ *                 rebuilt against v3.
  */
 #define RAC_PLUGIN_API_VERSION 3u
 
@@ -149,7 +158,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *        - macOS / iOS:   `-Wl,-force_load,libplugin.a`
  *        - GNU / Android: `-Wl,--whole-archive libplugin.a -Wl,--no-whole-archive`
  *        - MSVC:          add `/INCLUDE:_g_rac_plugin_autoreg_<name>` per plugin
- *      `cmake/plugins.cmake` (introduced in GAP 07) wraps these into a single
+ *      `cmake/plugins.cmake` wraps these into a single
  *      `rac_force_load(plugin_target)` helper.
  *
  * ## Init ordering
@@ -174,10 +183,18 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 #define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
 #endif
 
+/* The `Registrar()` ctor below is marked `noexcept` because it runs during
+ * pre-main() static initialization — an escaping exception would call
+ * std::terminate before any logger / crash reporter is wired up. This is safe
+ * by construction: `rac_plugin_register` itself is declared noexcept (see
+ * RAC_PLUGIN_REGISTRY_NOEXCEPT below) and internally coerces std::bad_alloc /
+ * throwing capability_check callbacks into structured rac_result_t codes. */
 #define RAC_STATIC_PLUGIN_REGISTER(name)                                                          \
     namespace rac_plugin_autoreg_##name {                                                         \
         struct Registrar {                                                                        \
-            Registrar() noexcept { (void)::rac_plugin_register(::rac_plugin_entry_##name()); }    \
+            Registrar() noexcept {                                                                \
+                (void)::rac_plugin_register(::rac_plugin_entry_##name());                         \
+            }                                                                                     \
         };                                                                                        \
         /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
          * still has to ask the linker not to drop the .o file (see header                        \
@@ -196,7 +213,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 #endif
 
 /* ===========================================================================
- * Boilerplate "create" adapter helper (DUP-03)
+ * Boilerplate "create" adapter helper
  *
  * Most backends' per-primitive `create` op is a 7-line forward onto the
  * engine's native `rac_<primitive>_<name>_create(model_id, nullptr, &handle)`
@@ -259,6 +276,21 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  * Registry operations (implemented in src/plugin/rac_plugin_registry.cpp)
  * =========================================================================== */
 
+/* All registry functions below are noexcept under C++ linkage: they cross
+ * the C ABI into Swift / Kotlin (JNI) / Dart (FFI) / Hermes (NitroModules)
+ * / WASM. Propagating a C++ exception out of an extern "C" function is
+ * undefined behavior per ISO C++ [except.handle]/9. Internally each
+ * implementation wraps allocator-throwing operations + third-party
+ * callbacks in try/catch and coerces failures to RAC_ERROR_OUT_OF_MEMORY /
+ * RAC_ERROR_PLUGIN_LOAD_FAILED / RAC_ERROR_INTERNAL. The noexcept
+ * specifier is conditionally compiled so plain C consumers see the C
+ * signatures unchanged. */
+#ifdef __cplusplus
+#define RAC_PLUGIN_REGISTRY_NOEXCEPT noexcept
+#else
+#define RAC_PLUGIN_REGISTRY_NOEXCEPT
+#endif
+
 /**
  * @brief Register a plugin vtable. Performs ABI validation + capability check
  *        + dedup by `metadata.name`.
@@ -269,12 +301,12 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Thread-safe.
  */
-rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable);
+rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Unregister a plugin by name. No-op if the name is not registered.
  */
-rac_result_t rac_plugin_unregister(const char* name);
+rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the highest-priority plugin that serves `primitive`, or NULL
@@ -283,7 +315,7 @@ rac_result_t rac_plugin_unregister(const char* name);
  * Thread-safe. The returned pointer is valid for the remaining lifetime of
  * the registry (i.e. until `rac_plugin_unregister` is called for this name).
  */
-const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
+const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Iterate all plugins registered for `primitive`, in descending
@@ -294,13 +326,13 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
  */
 RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
                                      const rac_engine_vtable_t** out_plugins, size_t max,
-                                     size_t* out_count);
+                                     size_t* out_count) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Total number of registered plugins (across all primitives,
  *        counting each plugin once).
  */
-size_t rac_plugin_count(void);
+size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 #ifdef __cplusplus
 }

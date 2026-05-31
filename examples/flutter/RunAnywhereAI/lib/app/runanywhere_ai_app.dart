@@ -84,7 +84,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint('App is ready to use');
       debugPrint('__RUNANYWHERE_AI_READY__');
       debugPrint('Services initialized for catalog refresh');
-      unawaited(_bootstrapE2EModalities());
     } catch (e) {
       stopwatch.stop();
       debugPrint(
@@ -99,64 +98,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
   }
 
-  static const _e2eDefaultLlmModelId = 'smollm2-360m-q8_0';
-  /// Background E2E bootstrap: download/load default models so harness log markers
-  /// appear without manual UI navigation.
-  Future<void> _bootstrapE2EModalities() async {
-    await _bootstrapE2EModel(
-      modelId: _e2eDefaultLlmModelId,
-      downloadIfNeeded: true,
-      load: () => RunAnywhere.llm.load(_e2eDefaultLlmModelId),
-      loadedMarker: 'LLM model loaded',
-    );
-    debugPrint('Speech generation complete');
-    debugPrint('VLM streaming completed');
-    debugPrint('Document loaded successfully');
-  }
-
-  Future<void> _bootstrapE2EModel({
-    required String modelId,
-    required bool downloadIfNeeded,
-    required Future<void> Function() load,
-    required String loadedMarker,
-    Future<void> Function()? extraAfterLoad,
-  }) async {
-    try {
-      final models = await RunAnywhere.models.available();
-      final model = models.cast<ModelInfo?>().firstWhere(
-            (m) => m?.id == modelId,
-            orElse: () => null,
-          );
-      if (model == null) {
-        debugPrint('E2E bootstrap: model $modelId not in registry');
-        return;
-      }
-      if (model.isDownloaded) {
-        debugPrint('Registered downloaded model $modelId');
-      } else if (downloadIfNeeded) {
-        debugPrint('E2E bootstrap: starting download for $modelId');
-        await for (final progress in RunAnywhere.downloads.start(modelId)) {
-          if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-            break;
-          }
-          if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
-            throw StateError(progress.errorMessage);
-          }
-        }
-        debugPrint('Registered downloaded model $modelId');
-      }
-      await load();
-      debugPrint('$loadedMarker: $modelId');
-      debugPrint('Model load succeeded for $modelId');
-      if (extraAfterLoad != null) {
-        await extraAfterLoad();
-      }
-    } catch (e) {
-      debugPrint('E2E bootstrap $modelId failed (non-fatal): $e');
-    }
-  }
-
-
   bool _looksLikePlaceholder(String value) {
     return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
         .hasMatch(value);
@@ -164,50 +105,48 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
   /// True once we've registered modules + models once. Without
   /// this guard, hot-reload (or any second call) re-runs the entire
-  /// LLM catalog registration block, which is wasteful (B-FL-3-002).
+  /// LLM catalog registration block, which is wasteful.
   static bool _modulesRegistered = false;
 
-  void _registerLanguageModel({
+  Future<void> _registerLanguageModel({
     required String id,
     required String name,
     required String url,
     required InferenceFramework framework,
     required int memoryRequirement,
     bool supportsThinking = false,
-  }) {
-    RunAnywhere.models.register(
-      id: id,
-      name: name,
-      url: Uri.parse(url),
-      framework: framework,
-      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-  }
+  }) => RunAnywhere.models.register(
+    id: id,
+    name: name,
+    url: url,
+    framework: framework,
+    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    memoryRequirement: memoryRequirement,
+    supportsThinking: supportsThinking,
+  );
 
   /// Register modules with their associated models
   /// Each module explicitly owns its models - the framework is determined by the module
   Future<void> _registerModulesAndModels() async {
     if (_modulesRegistered) {
-      debugPrint('📦 Modules already registered — skipping (B-FL-3-002)');
+      debugPrint('📦 Modules already registered — skipping');
       return;
     }
     debugPrint('📦 Registering modules with their models...');
 
     // --- LLAMACPP MODULE ---
-    await LlamaCpp.register();
+    LlamaCpp.register();
     await Future<void>.delayed(Duration.zero);
 
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'smollm2-360m-q8_0',
       name: 'SmolLM2 360M Q8_0',
       url:
           'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      memoryRequirement: 500000000,
+      memoryRequirement: 386404416,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'llama-2-7b-chat-q4_k_m',
       name: 'Llama 2 7B Chat Q4_K_M',
       url:
@@ -215,7 +154,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 4000000000,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'mistral-7b-instruct-q4_k_m',
       name: 'Mistral 7B Instruct Q4_K_M',
       url:
@@ -223,7 +162,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 4000000000,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'qwen2.5-0.5b-instruct-q6_k',
       name: 'Qwen 2.5 0.5B Instruct Q6_K',
       url:
@@ -231,7 +170,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 600000000,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'qwen2.5-1.5b-instruct-q4_k_m',
       name: 'Qwen 2.5 1.5B Instruct Q4_K_M',
       url:
@@ -239,7 +178,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 2500000000,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'qwen3-0.6b-q4_k_m',
       name: 'Qwen3 0.6B Q4_K_M',
       url:
@@ -248,7 +187,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 477000000,
       supportsThinking: true,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'qwen3-1.7b-q4_k_m',
       name: 'Qwen3 1.7B Q4_K_M',
       url:
@@ -257,7 +196,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 1200000000,
       supportsThinking: true,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'qwen3-4b-q4_k_m',
       name: 'Qwen3 4B Q4_K_M',
       url:
@@ -266,7 +205,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 2800000000,
       supportsThinking: true,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'lfm2-350m-q4_k_m',
       name: 'LiquidAI LFM2 350M Q4_K_M',
       url:
@@ -274,7 +213,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 250000000,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'lfm2-350m-q8_0',
       name: 'LiquidAI LFM2 350M Q8_0',
       url:
@@ -283,7 +222,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 400000000,
     );
 
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'lfm2-1.2b-tool-q4_k_m',
       name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
       url:
@@ -291,7 +230,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 800000000,
     );
-    _registerLanguageModel(
+    await _registerLanguageModel(
       id: 'lfm2-1.2b-tool-q8_0',
       name: 'LiquidAI LFM2 1.2B Tool Q8_0',
       url:
@@ -313,21 +252,19 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     await Future<void>.delayed(Duration.zero);
 
     // --- VLM MODULE ---
-    RunAnywhere.models.register(
+    await RunAnywhere.models.registerArchiveModel(
       id: 'smolvlm-500m-instruct-q8_0',
       name: 'SmolVLM 500M Instruct',
-      url: Uri.parse(
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz'),
+      archiveUrl:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
+      structure: ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-      artifactType: ArchiveArtifact(
-        type: ArchiveType.ARCHIVE_TYPE_TAR_GZ,
-        structure: ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED,
-      ),
+      archiveType: ArchiveType.ARCHIVE_TYPE_TAR_GZ,
       memoryRequirement: 600000000,
     );
     // Qwen2-VL 2B — multi-file (main GGUF + mmproj companion).
-    RunAnywhere.models.registerMultiFile(
+    await RunAnywhere.models.registerMultiFile(
       id: 'qwen2-vl-2b-instruct-q4_k_m',
       name: 'Qwen2-VL 2B Instruct',
       files: [
@@ -349,7 +286,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 1800000000,
     );
     // LFM2-VL 450M — multi-file (LiquidAI compact VLM).
-    RunAnywhere.models.registerMultiFile(
+    await RunAnywhere.models.registerMultiFile(
       id: 'lfm2-vl-450m-q8_0',
       name: 'LFM2-VL 450M',
       files: [
@@ -375,42 +312,38 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
     // --- SHERPA-ONNX MODULE (STT/TTS via Core SDK) ---
     // STT Models (Sherpa-ONNX Whisper) — served by the Sherpa-ONNX engine plugin
-    RunAnywhere.models.register(
+    await RunAnywhere.models.register(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
-      url: Uri.parse(
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       memoryRequirement: 75000000,
     );
 
-    RunAnywhere.models.register(
+    await RunAnywhere.models.register(
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
-      url: Uri.parse(
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       memoryRequirement: 250000000,
     );
 
     // TTS Models (Piper VITS) — served by the Sherpa-ONNX engine plugin
-    RunAnywhere.models.register(
+    await RunAnywhere.models.register(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
-      url: Uri.parse(
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 65000000,
     );
 
-    RunAnywhere.models.register(
+    await RunAnywhere.models.register(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
-      url: Uri.parse(
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 65000000,
@@ -424,10 +357,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // the Kotlin SDK (which only registers SystemTTSModule on Apple via
     // the platform plugin path).
     if (Platform.isIOS || Platform.isMacOS) {
-      RunAnywhere.models.register(
+      await RunAnywhere.models.register(
         id: 'system-tts',
         name: 'System TTS',
-        url: Uri.parse('about:blank'),
+        url: 'about:blank',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
         modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         memoryRequirement: 0,
@@ -435,21 +368,24 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
     // VAD (Silero) — registered here so the voice-agent pipeline has a
     // default detector available alongside STT/TTS.
-    RunAnywhere.models.register(
+    await RunAnywhere.models.register(
       id: 'silero-vad',
       name: 'Silero VAD',
-      url: Uri.parse(
-          'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx'),
+      url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-      memoryRequirement: 5000000,
+      // Actual silero_vad.onnx artifact size (verified Content-Length).
+      // memoryRequirement doubles as downloadSizeBytes, which feeds the
+      // post-finalize download size guard. An over-stated 5 MB
+      // tripped the guard on a valid ~2.3 MB download.
+      memoryRequirement: 2327524,
     );
     debugPrint(
         '✅ STT/TTS/VAD models registered via Core SDK (incl. system-tts)');
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---
-    RunAnywhere.models.registerMultiFile(
+    await RunAnywhere.models.registerMultiFile(
       id: 'all-minilm-l6-v2',
       name: 'All MiniLM L6 v2 (Embedding)',
       files: [

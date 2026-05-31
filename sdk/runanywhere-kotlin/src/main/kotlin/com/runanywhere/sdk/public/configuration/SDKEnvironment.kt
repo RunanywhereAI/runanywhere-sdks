@@ -18,7 +18,6 @@ package com.runanywhere.sdk.public.configuration
 
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEnvironment
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.public.extensions.LogLevel
 
 /**
  * SDK environment mode — determines how data is handled.
@@ -54,53 +53,6 @@ val SDKEnvironment.cEnvironment: Int
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> 0
         }
 
-// ════════════════════════════════════════════════════════════════════════════
-// Behaviour helpers — mirror Swift `RASDKEnvironment` extensions in
-// sdk/runanywhere-swift/Sources/RunAnywhere/Public/Configuration/SDKEnvironment.swift.
-//
-// Pure-Kotlin helpers replicate the C++ predicates exactly (see
-// runanywhere-commons/src/infrastructure/network/environment.cpp). The two
-// helpers explicitly listed in the audit as "(delegate to JNI)" route through
-// `expect/actual` shims that call the B1 thunks (`racEnvRequiresAuth`,
-// `racEnvRequiresBackendUrl`) — when the native lib is not yet loaded the
-// shims fall back to the same C++ semantics so SDKException construction in
-// unit tests stays deterministic.
-// ════════════════════════════════════════════════════════════════════════════
-
-/** Whether this is the production environment. */
-val SDKEnvironment.isProduction: Boolean
-    get() = this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-
-/** Whether this is a testing (development or staging) environment. */
-val SDKEnvironment.isTesting: Boolean
-    get() =
-        this == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
-            this == SDKEnvironment.SDK_ENVIRONMENT_STAGING
-
-/**
- * Whether this environment requires a valid backend URL. Delegates to the
- * C++ `rac_env_requires_backend_url` predicate via the
- * `racEnvRequiresBackendUrl` JNI thunk.
- */
-val SDKEnvironment.requiresBackendURL: Boolean
-    get() = sdkEnvironmentRequiresBackendURL(this)
-
-/** Whether this environment should emit telemetry (production only). */
-val SDKEnvironment.shouldSendTelemetry: Boolean
-    get() = this == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-
-/** Whether this environment should sync with the backend (non-development). */
-val SDKEnvironment.shouldSyncWithBackend: Boolean
-    get() = this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-
-/**
- * Whether this environment requires API authentication. Delegates to the
- * C++ `rac_env_requires_auth` predicate via the `racEnvRequiresAuth` JNI
- * thunk.
- */
-val SDKEnvironment.requiresAuthentication: Boolean
-    get() = sdkEnvironmentRequiresAuthentication(this)
-
 /** Human-readable description, matching Swift's `description` string. */
 val SDKEnvironment.description: String
     get() =
@@ -110,26 +62,6 @@ val SDKEnvironment.description: String
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> "Production Environment"
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "Unspecified Environment"
         }
-
-/**
- * Default logging verbosity for this environment. Mirrors Swift's
- * `defaultLogLevel` switch (development=DEBUG, staging=INFO,
- * production=WARNING).
- */
-val SDKEnvironment.defaultLogLevel: LogLevel
-    get() =
-        when (this) {
-            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
-            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.INFO
-        }
-
-// ════════════════════════════════════════════════════════════════════════════
-// expect/actual shims — bridge commonMain to JNI thunks living in
-// jvmAndroidMain. Conservative fallbacks (env != DEVELOPMENT) mirror the C++
-// implementation so behaviour is consistent before the native library loads.
-// ════════════════════════════════════════════════════════════════════════════
 
 // ════════════════════════════════════════════════════════════════════════════
 // SDKInitParams — mirrors Swift's `SDKInitParams` struct (3 constructors +
@@ -242,12 +174,6 @@ data class SDKInitParams(
         }
     }
 }
-
-internal fun sdkEnvironmentRequiresAuthentication(env: SDKEnvironment): Boolean =
-    CppBridgeEnvironment.requiresAuth(env)
-
-internal fun sdkEnvironmentRequiresBackendURL(env: SDKEnvironment): Boolean =
-    CppBridgeEnvironment.requiresBackendURL(env)
 
 internal fun sdkInitParamsValidateApiKey(key: String, env: SDKEnvironment): Boolean =
     CppBridgeEnvironment.validateAPIKey(key = key, env = env)

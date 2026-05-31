@@ -19,9 +19,11 @@
  * loader, identical to the engine-plugin mechanism).
  *
  * ABI v2 providers expose a `rac_runtime_vtable_v2_t` extension through
- * `rac_runtime_vtable_t::reserved_slot_0`. The remaining v1 slots are kept
- * in the struct layout while existing in-tree callers migrate, but the
- * registry validates ABI v2 as the canonical path.
+ * `rac_runtime_vtable_t::reserved_slot_0`. The v1-shaped op slots
+ * (`run_session`, `alloc_buffer`, …) remain in the struct layout for
+ * binary stability, but the registry now accepts ABI v2 only — v1-only
+ * plugins (i.e. plugins that omit the `reserved_slot_0` v2 extension) are
+ * hard-rejected with `RAC_ERROR_ABI_VERSION_MISMATCH`.
  */
 
 #ifndef RAC_PLUGIN_RUNTIME_VTABLE_H
@@ -61,6 +63,15 @@ extern "C" {
 #define RAC_RUNTIME_ABI_VERSION_V1 1u
 #define RAC_RUNTIME_ABI_VERSION_V2 2u
 #define RAC_RUNTIME_ABI_VERSION RAC_RUNTIME_ABI_VERSION_V2
+/**
+ * Lowest ABI version the registry will accept. Today MIN == current —
+ * `rac_runtime_register` requires exact equality with `RAC_RUNTIME_ABI_VERSION`
+ * and rejects v1-only plugins (no `reserved_slot_0` extension) with
+ * `RAC_ERROR_ABI_VERSION_MISMATCH`. The macro is kept distinct so a future
+ * release that adds a true compatibility shim can widen the accepted range
+ * (e.g. `[MIN, RAC_RUNTIME_ABI_VERSION]`) without renaming the constant the
+ * registry already logs in mismatch diagnostics.
+ */
 #define RAC_RUNTIME_ABI_VERSION_MIN RAC_RUNTIME_ABI_VERSION_V2
 
 /* ===========================================================================
@@ -460,7 +471,22 @@ rac_runtime_vtable_get_v2(const rac_runtime_vtable_t* vtable) {
 
 typedef const rac_runtime_vtable_t* (*rac_runtime_entry_fn)(void);
 
-#define RAC_RUNTIME_ENTRY_DECL(name) const rac_runtime_vtable_t* rac_runtime_entry_##name(void)
+/**
+ * @brief Declare a runtime entry point in a public header.
+ *
+ * The entry symbol is annotated with `RAC_API` (= default ELF/Mach-O
+ * visibility, dllexport on Windows) for parity with `RAC_PLUGIN_ENTRY_DECL`.
+ * `rac_runtime_load` → `dlsym(handle, "rac_runtime_entry_<name>")` MUST be
+ * able to find this symbol regardless of how the host runtime library was
+ * linked — notably, even when a SHARED carrier sets visibility=hidden
+ * globally and the real definition lives in a sibling static archive.
+ * Without an explicit annotation at declaration time, loadability depends
+ * on transitive default visibility of the host runtime target — a brittle
+ * invariant that a future visibility tightening would silently break
+ * (mirrors pass2-syn-062 for engine plugins).
+ */
+#define RAC_RUNTIME_ENTRY_DECL(name) \
+    RAC_API const rac_runtime_vtable_t* rac_runtime_entry_##name(void)
 
 #define RAC_RUNTIME_ENTRY_DEF(name) RAC_RUNTIME_ENTRY_DECL(name)
 

@@ -18,6 +18,16 @@ std::shared_ptr<ArrayBuffer> emptyHardwareProtoBuffer() {
     return ArrayBuffer::allocate(0);
 }
 
+// NOTE: commons exposes only the int-based `rac_hardware_set_accelerator_preference(int)`
+// ABI — there is no `rac_hardware_set_accelerator_preference_proto` byte-passthrough yet.
+// Until commons adds that ABI, this bridge decodes the JS-side proto bytes locally to
+// extract the preference int, then delegates to the int ABI. The codec below is limited
+// to the two fields of HardwareAcceleratorPreferenceRequest / HardwareAcceleratorPreferenceResult
+// and is functionally correct (unknown fields are skipped per proto3 rules; bytes are
+// snapshotted into the async lambda so there is no UAF). This is intentional divergence
+// from the commons proto-byte pass-through pattern used by every other bridge; adding the
+// commons proto ABI is tracked as a separate future enhancement.
+
 // Decode a single proto varint starting at `cursor`. Returns false on malformed
 // input or buffer overrun. Matches the wire format used by
 // runanywhere.v1.HardwareAcceleratorPreferenceRequest.preference (enum).

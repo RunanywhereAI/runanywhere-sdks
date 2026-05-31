@@ -1,8 +1,8 @@
 /**
  * @file test_engine_router.cpp
- * @brief 6 deterministic scoring scenarios for the GAP 04 EngineRouter.
+ * @brief 6 deterministic scoring scenarios for the EngineRouter.
  *
- * Required by v2_gap_specs/GAP_04_ENGINE_ROUTER.md Success Criteria:
+ * Success criteria:
  *   1. PrefersHardwareAcceleratedOnAppleSilicon — Metal plugin beats CPU plugin by ≥30.
  *   2. ANEHintSelectsWhisperKit — preferred_runtime = ANE returns whisperkit_coreml over onnx.
  *   3. PinnedEngineHardWins — pinned_engine returns it even against higher-scoring rivals.
@@ -356,7 +356,7 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         const rac_runtime_id_t coreml_rts[] = {RAC_RUNTIME_COREML, RAC_RUNTIME_ANE};
-        auto diffusion = make_vt("diffusion-coreml", 100, coreml_rts, 2, nullptr, 0);
+        auto diffusion = make_vt("diffusion_coreml", 100, coreml_rts, 2, nullptr, 0);
         diffusion.diffusion_ops =
             reinterpret_cast<const struct rac_diffusion_service_ops*>(&k_sentinel);
         diffusion.llm_ops = nullptr;
@@ -378,7 +378,7 @@ int main() {
         CHECK(stt_result.vtable == nullptr,
               "(10) WhisperKit rejects when CoreML runtime is not registered");
 
-        rac_plugin_unregister("diffusion-coreml");
+        rac_plugin_unregister("diffusion_coreml");
         rac_plugin_unregister("whisperkit_coreml");
     }
 
@@ -395,7 +395,7 @@ int main() {
         rac_plugin_unregister("c_abi_smoke");
     }
 
-    /* --- (CPP-05) Runtime availability gating ---------------------------- */
+    /* --- Runtime availability gating ---------------------------- */
     /*
      * Hard-reject contract: when an engine declares one or more L1 runtimes
      * and NONE of them are registered with the runtime registry, the router
@@ -405,7 +405,7 @@ int main() {
      * distinguish a runtime-mismatch from "no plugin registered at all".
      */
 
-    /* (CPP-05.1) Engine declares Metal-only; only CPU is registered → reject */
+    /* Engine declares Metal-only; only CPU is registered → reject */
     {
         rac::router::HardwareProfile prof{};
         rac::router::EngineRouter router(prof);
@@ -418,19 +418,19 @@ int main() {
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         auto result = router.route(req);
         CHECK(result.vtable == nullptr,
-              "(CPP-05.1) Metal-only engine rejected when Metal runtime not registered");
-        CHECK(!result.rejection_reason.empty(), "(CPP-05.1) router populates rejection_reason");
+              "Metal-only engine rejected when Metal runtime not registered");
+        CHECK(!result.rejection_reason.empty(), "router populates rejection_reason");
 
         const rac_engine_vtable_t* out = nullptr;
         rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &out);
         CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
-              "(CPP-05.1) rac_plugin_route surfaces RAC_ERROR_RUNTIME_UNAVAILABLE");
-        CHECK(out == nullptr, "(CPP-05.1) rac_plugin_route leaves out_vtable NULL on runtime miss");
+              "rac_plugin_route surfaces RAC_ERROR_RUNTIME_UNAVAILABLE");
+        CHECK(out == nullptr, "rac_plugin_route leaves out_vtable NULL on runtime miss");
 
         rac_plugin_unregister("metal_only_engine");
     }
 
-    /* (CPP-05.2) Engine declares Metal+CPU; only CPU registered → accepted */
+    /* Engine declares Metal+CPU; only CPU registered → accepted */
     {
         rac::router::HardwareProfile prof{};
         rac::router::EngineRouter router(prof);
@@ -444,20 +444,20 @@ int main() {
          * declares both, so a single-match (CPU) is enough to pass the
          * runtime-availability filter. */
         CHECK(rac_runtime_is_registered(RAC_RUNTIME_CPU) == 1,
-              "(CPP-05.2) CPU runtime is registered via bootstrap");
+              "CPU runtime is registered via bootstrap");
         CHECK(rac_runtime_is_registered(RAC_RUNTIME_METAL) == 0,
-              "(CPP-05.2) Metal runtime is not registered");
+              "Metal runtime is not registered");
 
         rac::router::RouteRequest req;
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         auto result = router.route(req);
         CHECK(result.vtable == &v,
-              "(CPP-05.2) engine accepted when at least one declared runtime is registered");
+              "engine accepted when at least one declared runtime is registered");
 
         rac_plugin_unregister("multi_runtime_engine");
     }
 
-    /* (CPP-05.3) Engine declares no runtimes → priority-only scoring */
+    /* Engine declares no runtimes → priority-only scoring */
     {
         rac::router::HardwareProfile prof{};
         rac::router::EngineRouter router(prof);
@@ -474,16 +474,16 @@ int main() {
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         auto result = router.route(req);
         CHECK(result.vtable == &v_hi,
-              "(CPP-05.3) legacy NULL-runtime engines bypass runtime check, "
+              "legacy NULL-runtime engines bypass runtime check, "
               "highest-priority wins");
         CHECK(result.score == 90,
-              "(CPP-05.3) legacy engines score on priority alone (no runtime bonus)");
+              "legacy engines score on priority alone (no runtime bonus)");
 
         rac_plugin_unregister("legacy_lo");
         rac_plugin_unregister("legacy_hi");
     }
 
-    /* (CPP-05.4) Two engines compete: CoreML-only (unavailable) vs CPU
+    /* Two engines compete: CoreML-only (unavailable) vs CPU
      *            (available). Even when CoreML engine has higher priority,
      *            the CPU one wins because the router hard-rejects engines
      *            whose runtimes aren't registered. */
@@ -500,13 +500,13 @@ int main() {
         rac_plugin_register(&v_cpu);
 
         CHECK(rac_runtime_is_registered(RAC_RUNTIME_COREML) == 0,
-              "(CPP-05.4) CoreML runtime is not registered on this host");
+              "CoreML runtime is not registered on this host");
 
         rac::router::RouteRequest req;
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         auto result = router.route(req);
         CHECK(result.vtable == &v_cpu,
-              "(CPP-05.4) CPU engine wins over higher-priority CoreML engine "
+              "CPU engine wins over higher-priority CoreML engine "
               "when CoreML is unavailable");
 
         /* Confirm the rejection scoring keeps the CoreML engine out of the
@@ -519,13 +519,13 @@ int main() {
             }
         }
         CHECK(saw_coreml_rejected,
-              "(CPP-05.4) CoreML engine appears in route_all() with reject score");
+              "CoreML engine appears in route_all() with reject score");
 
         rac_plugin_unregister("coreml_high_prio");
         rac_plugin_unregister("cpu_low_prio");
     }
 
-    /* (CPP-05.5) When the only LLM-serving plugin's runtimes are unavailable
+    /* When the only LLM-serving plugin's runtimes are unavailable
      *            the C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE. A second
      *            engine that serves a different primitive (STT) does not
      *            interfere because it is filed under a different bucket. */
@@ -546,37 +546,47 @@ int main() {
         const rac_engine_vtable_t* out = nullptr;
         rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &out);
         CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
-              "(CPP-05.5) C ABI returns RAC_ERROR_RUNTIME_UNAVAILABLE when "
+              "C ABI returns RAC_ERROR_RUNTIME_UNAVAILABLE when "
               "all LLM candidates are runtime-rejected");
-        CHECK(out == nullptr, "(CPP-05.5) C ABI leaves out_vtable NULL on runtime rejection");
+        CHECK(out == nullptr, "C ABI leaves out_vtable NULL on runtime rejection");
 
         rac_plugin_unregister("cuda_only_engine");
         rac_plugin_unregister("stt_only_engine");
     }
 
-    /* (CPP-05.6) rac_runtime_is_registered alias matches rac_runtime_is_available */
+    /* rac_runtime_is_registered alias matches rac_runtime_is_available */
     {
         /* CPU is bootstrapped lazily on first registry touch — calling either
          * accessor triggers the bootstrap, so both must agree afterwards. */
         int avail = rac_runtime_is_available(RAC_RUNTIME_CPU);
         int reg = rac_runtime_is_registered(RAC_RUNTIME_CPU);
         CHECK(avail == reg,
-              "(CPP-05.6) rac_runtime_is_registered mirrors rac_runtime_is_available");
-        CHECK(reg == 1, "(CPP-05.6) CPU runtime is registered after bootstrap");
+              "rac_runtime_is_registered mirrors rac_runtime_is_available");
+        CHECK(reg == 1, "CPU runtime is registered after bootstrap");
 
         /* An obviously-not-registered id should report 0 from both. */
         CHECK(rac_runtime_is_registered(RAC_RUNTIME_CUDA) == 0,
-              "(CPP-05.6) unregistered CUDA reports 0");
+              "unregistered CUDA reports 0");
         CHECK(rac_runtime_is_available(RAC_RUNTIME_CUDA) == 0,
-              "(CPP-05.6) unregistered CUDA reports 0 from available alias too");
+              "unregistered CUDA reports 0 from available alias too");
     }
 
-    /* (CPP-05.7) Pinned engine whose declared runtimes are all unregistered
+    /* Pinned engine whose declared runtimes are all unregistered
      *            must still be hard-rejected — pinning is not an escape hatch
      *            from the runtime-unavailable contract. Covers both the
      *            EngineRouter::route path and the rac_plugin_route C ABI with
      *            no_fallback=true so model_lifecycle's framework-pinned loads
-     *            cannot select a non-executable engine. */
+     *            cannot select a non-executable engine.
+     *
+     *            Also register a second LLM-serving engine that does NOT match
+     *            the pin name. Pre-fix the router
+     *            would emit RAC_ERROR_NOT_FOUND because the non-pin engine's
+     *            pin-mismatch rejection set `any_other_reject=true` and the
+     *            runtime-unavailable branch only fired when EVERY rejection
+     *            was a runtime-reject. Post-fix the pinned engine's own
+     *            runtime-rejection takes precedence over the pin-mismatch
+     *            noise, so the C ABI must still surface
+     *            RAC_ERROR_RUNTIME_UNAVAILABLE. */
     {
         rac::router::HardwareProfile prof{};
         rac::router::EngineRouter router(prof);
@@ -586,7 +596,7 @@ int main() {
         rac_plugin_register(&v_pin);
 
         CHECK(rac_runtime_is_registered(RAC_RUNTIME_CUDA) == 0,
-              "(CPP-05.7) CUDA runtime is not registered on this host");
+              "CUDA runtime is not registered on this host");
 
         rac::router::RouteRequest req;
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
@@ -594,19 +604,32 @@ int main() {
         req.no_fallback = true;
         auto result = router.route(req);
         CHECK(result.vtable == nullptr,
-              "(CPP-05.7) pinned engine with unregistered declared runtime is rejected");
+              "pinned engine with unregistered declared runtime is rejected");
 
         rac_routing_hints_t hints = {};
         hints.preferred_engine_name = "cuda_pinned_engine";
         hints.no_fallback = 1;
         const rac_engine_vtable_t* out = nullptr;
-        rac_result_t rc =
-            rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out);
+        rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out);
         CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
-              "(CPP-05.7) C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE for pinned "
+              "C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE for pinned "
               "engine when its declared runtime is unregistered");
         CHECK(out == nullptr,
-              "(CPP-05.7) C ABI leaves out_vtable NULL on pinned runtime rejection");
+              "C ABI leaves out_vtable NULL on pinned runtime rejection");
+
+        /* Introduce a second LLM-serving engine that doesn't
+         * match the pin name. Without the fix, the pin-mismatch rejection
+         * would set `any_other_reject = true` and demote the failure to
+         * NOT_FOUND. */
+        auto v_other = make_vt("other_llm_engine", 10, nullptr, 0, nullptr, 0);
+        rac_plugin_register(&v_other);
+        const rac_engine_vtable_t* out2 = nullptr;
+        rac_result_t rc2 = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, &hints, &out2);
+        CHECK(rc2 == RAC_ERROR_RUNTIME_UNAVAILABLE,
+              "pinned engine's runtime-rejection wins over "
+              "non-pin candidates' pin-mismatch rejection");
+        CHECK(out2 == nullptr, "C ABI still leaves out_vtable NULL");
+        rac_plugin_unregister("other_llm_engine");
 
         rac_plugin_unregister("cuda_pinned_engine");
     }
@@ -646,7 +669,7 @@ int main() {
         rac_plugin_unregister("genie");
     }
 
-    /* --- (CPP-15) Accelerator preference steers GPU vs CPU winner --------- *
+    /* --- Accelerator preference steers GPU vs CPU winner --------- *
      * Two engines serve the same primitive with identical priority but
      * distinct declared runtimes (one Metal-only, one CPU-only). When the
      * process-wide accelerator preference is set to GPU via the public C
@@ -675,35 +698,35 @@ int main() {
 
         /* ACCELERATION_PREFERENCE_GPU (proto value 3) — GPU engine wins. */
         CHECK(rac_hardware_set_accelerator_preference(3) == RAC_SUCCESS,
-              "(CPP-15) setter accepts ACCELERATION_PREFERENCE_GPU");
+              "setter accepts ACCELERATION_PREFERENCE_GPU");
         auto gpu_result = router.route(req);
         CHECK(gpu_result.vtable == &v_gpu,
-              "(CPP-15) GPU preference selects Metal-declaring engine");
+              "GPU preference selects Metal-declaring engine");
         CHECK(gpu_result.score > v_cpu.metadata.priority + 40,
-              "(CPP-15) GPU-preferred score exceeds CPU engine's base + runtime weight");
+              "GPU-preferred score exceeds CPU engine's base + runtime weight");
 
         /* ACCELERATION_PREFERENCE_CPU (proto value 2) — CPU engine wins. */
         CHECK(rac_hardware_set_accelerator_preference(2) == RAC_SUCCESS,
-              "(CPP-15) setter accepts ACCELERATION_PREFERENCE_CPU");
+              "setter accepts ACCELERATION_PREFERENCE_CPU");
         auto cpu_result = router.route(req);
-        CHECK(cpu_result.vtable == &v_cpu, "(CPP-15) CPU preference selects CPU-declaring engine");
+        CHECK(cpu_result.vtable == &v_cpu, "CPU preference selects CPU-declaring engine");
         CHECK(cpu_result.score > v_gpu.metadata.priority + 40,
-              "(CPP-15) CPU-preferred score exceeds GPU engine's base + runtime weight");
+              "CPU-preferred score exceeds GPU engine's base + runtime weight");
 
         /* Reset to AUTO (proto value 1) so later tests in the process run
          * with no preference steering. Tied scores fall back to the
          * deterministic tiebreak (priority desc → name asc → "cpu_engine"). */
         CHECK(rac_hardware_set_accelerator_preference(1) == RAC_SUCCESS,
-              "(CPP-15) setter accepts ACCELERATION_PREFERENCE_AUTO (reset)");
+              "setter accepts ACCELERATION_PREFERENCE_AUTO (reset)");
         auto tie_result = router.route(req);
         CHECK(tie_result.vtable == &v_cpu,
-              "(CPP-15) AUTO preference leaves scoring to priority+tiebreak");
+              "AUTO preference leaves scoring to priority+tiebreak");
 
         /* Out-of-range preference rejected (validator clamps to 0..3). */
         CHECK(rac_hardware_set_accelerator_preference(-1) == RAC_ERROR_INVALID_ARGUMENT,
-              "(CPP-15) setter rejects negative preference");
+              "setter rejects negative preference");
         CHECK(rac_hardware_set_accelerator_preference(99) == RAC_ERROR_INVALID_ARGUMENT,
-              "(CPP-15) setter rejects out-of-range preference");
+              "setter rejects out-of-range preference");
 
         /* Leave the global preference at UNSPECIFIED=0 so we don't leak
          * state into any future router-test binary invocation. */

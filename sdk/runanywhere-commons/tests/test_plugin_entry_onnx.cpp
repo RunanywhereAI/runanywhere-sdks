@@ -1,8 +1,6 @@
 /**
  * @file test_plugin_entry_onnx.cpp
  * @brief Verifies the ONNX Runtime plugin entry point owns embeddings only.
- *
- * GAP 02 Phase 10.
  */
 
 #include <cstdio>

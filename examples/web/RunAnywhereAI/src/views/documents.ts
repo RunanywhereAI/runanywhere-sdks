@@ -11,8 +11,8 @@ import {
   type RAGDocumentSummary,
   type RAGSearchResult,
 } from '@runanywhere/web';
-import { ONNX } from '@runanywhere/web-onnx';
 import { ensureCatalogRegistered } from '../components/model-selection';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 const TOP_K = 3;
@@ -26,10 +26,9 @@ let isBusy = false;
 
 export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   container = el;
-  // RAG requires the embedding + LLM models to be registered in the catalog
-  // (so ensureRAGReady can resolve their download URLs). Other tabs trigger
-  // this implicitly via their toolbar pickers; Docs has its own UI, so we
-  // call it explicitly on mount.
+  // Register the model catalog so the SDK's model registry has entries for
+  // the embedding and LLM models used by RAG. Other tabs trigger this
+  // implicitly via their toolbar pickers; Docs has its own UI.
   ensureCatalogRegistered();
   container.innerHTML = `
     <div class="toolbar">
@@ -110,9 +109,6 @@ async function ingestFile(file: File): Promise<void> {
   const docId = createDocumentId();
 
   setStatus(`Indexing ${file.name}...`);
-  // ensureRAGReady() pre-downloads the embedding + LLM models so the
-  // native ingest path has resolved local paths. A failure here is a
-  // genuine ingest-time problem (vector store, embedding inference, etc).
   await RunAnywhere.ragIngest(text, JSON.stringify({
     docId,
     docName: file.name,
@@ -243,24 +239,34 @@ async function renderDocList(): Promise<void> {
   }
 
   const canRemoveDocuments = RunAnywhere.rag.capabilities().documentRemoval;
-  listEl.innerHTML = documents.map((doc) => `
-    <li class="docs-item" data-id="${escapeHtml(doc.id)}">
-      <div>
-        <div class="docs-item-title">${escapeHtml(doc.name)}</div>
-        <div class="docs-item-meta">${doc.chunkCount} chunk${doc.chunkCount === 1 ? '' : 's'}</div>
-      </div>
-      ${canRemoveDocuments ? `<button class="btn btn-icon docs-item-delete" data-id="${escapeHtml(doc.id)}" aria-label="Remove">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
-      </button>` : ''}
-    </li>
-  `).join('');
+  listEl.innerHTML = '';
+  for (const doc of documents) {
+    const li = document.createElement('li');
+    li.className = 'docs-item';
+    li.dataset.id = doc.id;
 
-  listEl.querySelectorAll<HTMLElement>('.docs-item-delete').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      if (id) void removeDocument(id);
-    });
-  });
+    const infoDiv = document.createElement('div');
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'docs-item-title';
+    titleDiv.textContent = doc.name;
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'docs-item-meta';
+    metaDiv.textContent = `${doc.chunkCount} chunk${doc.chunkCount === 1 ? '' : 's'}`;
+    infoDiv.appendChild(titleDiv);
+    infoDiv.appendChild(metaDiv);
+    li.appendChild(infoDiv);
+
+    if (canRemoveDocuments) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-icon docs-item-delete';
+      btn.setAttribute('aria-label', 'Remove');
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>';
+      btn.addEventListener('click', () => { void removeDocument(doc.id); });
+      li.appendChild(btn);
+    }
+
+    listEl.appendChild(li);
+  }
 }
 
 function setStatus(msg: string): void {
@@ -278,34 +284,19 @@ const RAG_LLM_MODEL_ID = 'smollm2-360m-q8_0';
 
 async function ensureRAGReady(): Promise<boolean> {
   try {
-    await ONNX.register();
-  } catch (err) {
-    setStatus(`ONNX register failed: ${formatError(err)}`);
-    return false;
-  }
-
-  const availability = RunAnywhere.rag.availability();
-  if (availability.available) return true;
-
-  if (availability.source === 'wasm-exports') {
-    try {
-      setStatus('Initializing RAG pipeline...');
-      await RunAnywhere.rag.createPipeline(
-        RunAnywhere.rag.defaultConfiguration({
-          embeddingModelId: RAG_EMBEDDING_MODEL_ID,
-          llmModelId: RAG_LLM_MODEL_ID,
-        }),
-      );
-      setStatus('RAG ready.');
-      return true;
-    } catch (err) {
-      setStatus(`RAG init failed: ${formatError(err)}. Download the embedding model (all-minilm-l6-v2) and an LLM (smollm2-360m-q8_0) from the Storage tab first.`);
+    const availability = await RunAnywhere.rag.ensureReady({
+      embeddingModelId: RAG_EMBEDDING_MODEL_ID,
+      llmModelId: RAG_LLM_MODEL_ID,
+    });
+    if (!availability.available) {
+      setStatus(availability.reason);
       return false;
     }
+    return true;
+  } catch (err) {
+    setStatus(`RAG init failed: ${formatError(err)}`);
+    return false;
   }
-
-  setStatus(availability.reason);
-  return false;
 }
 
 function formatAnswer(text: string, sources: RAGSearchResult[]): string {
@@ -323,8 +314,4 @@ function createDocumentId(): string {
     return crypto.randomUUID();
   }
   return Math.random().toString(36).slice(2);
-}
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

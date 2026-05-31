@@ -1,6 +1,6 @@
 // RunAnywhere IDL — model lifecycle service.
 //
-// CPP-02. Formalizes the C ABI in
+// Formalizes the C ABI in
 // sdk/runanywhere-commons/include/rac/core/rac_model_lifecycle.h as a
 // gRPC-style service definition. Request/result messages already exist in
 // model_types.proto (load/unload/current) and sdk_events.proto (component

@@ -49,7 +49,7 @@ typedef RacModuleListDart = int Function(
 );
 
 // =============================================================================
-// v3.0.0 (C1): legacy rac_service_{register_provider,create,...} typedefs
+// Legacy rac_service_{register_provider,create,...} typedefs
 // DELETED. New code uses rac_plugin_{register,route,list} via
 // RacBindings in lib/core/native/rac_native.dart.
 // =============================================================================

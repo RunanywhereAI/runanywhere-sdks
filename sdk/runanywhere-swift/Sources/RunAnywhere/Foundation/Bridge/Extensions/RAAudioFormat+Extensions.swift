@@ -7,10 +7,10 @@
 //  🟢 BRIDGE: Maps to C++ rac_audio_format_enum_t
 //  C++ Source: include/rac/features/stt/rac_stt_types.h
 //
-//  GAP 01 Phase 2: `AudioFormat` is now a typealias for the proto3-generated
-//  `RAAudioFormat` (idl/model_types.proto). The hand-written enum has been
-//  removed; this extension preserves Codable conformance for JSON wire
-//  compatibility.
+//  `RAAudioFormat` is the proto3-generated enum (idl/model_types.proto);
+//  call sites reference it directly (no `AudioFormat` typealias is exported).
+//  This extension preserves Codable conformance for JSON wire compatibility
+//  with payloads that pre-date the proto canonical string form.
 //
 
 

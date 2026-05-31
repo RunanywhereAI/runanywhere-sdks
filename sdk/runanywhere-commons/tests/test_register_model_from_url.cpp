@@ -1,9 +1,9 @@
 /**
  * @file test_register_model_from_url.cpp
- * @brief Parity tests for rac_register_model_from_url_proto (P2-T6).
+ * @brief Parity tests for rac_register_model_from_url_proto.
  *
  * Exercises the canonical "register a model from a URL" entry point — the
- * single-call composition of rac_model_info_make_proto (P2-T4) and the
+ * single-call composition of rac_model_info_make_proto and the
  * existing registry persistence path. Verifies that the returned ModelInfo
  * round-trips through rac_model_registry_get_proto by id.
  *
@@ -282,6 +282,174 @@ int test_invalid_input_bytes() {
     return 0;
 }
 
+// Empty input (size==0) parses to a default-zeroed request with an empty url.
+// That must be rejected rather than persisting a phantom model keyed by the
+// empty-string id (commons-121).
+int test_empty_input_rejected() {
+    install_noop_adapter();
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_register_model_from_url_proto(nullptr, 0, &out);
+    ASSERT_EQ(rc, RAC_ERROR_INVALID_ARGUMENT);
+    rac_proto_buffer_free(&out);
+
+    // The empty-string id must not have leaked into the registry.
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    ASSERT_TRUE(registry != nullptr);
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t get_rc = rac_model_registry_get_proto(registry, "", &bytes, &size);
+    ASSERT_EQ(get_rc, RAC_ERROR_NOT_FOUND);
+    if (bytes) {
+        rac_model_registry_proto_free(bytes);
+    }
+
+    clear_adapter();
+    return 0;
+}
+
+// An explicitly empty url in a non-empty request is rejected the same way.
+int test_empty_url_rejected() {
+    install_noop_adapter();
+
+    RegisterArgs args;
+    args.url = "";
+    args.name = "Phantom";
+
+    runanywhere::v1::ModelInfo saved;
+    ASSERT_TRUE(!register_proto(args, &saved));
+
+    clear_adapter();
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Regression: merge-not-replace on re-registration (commons-014).
+//
+// When the catalog seed re-runs on app launch, registerModel() must NOT
+// clobber the download-completion state set on a prior launch. Previously
+// the Android example carried a `existingRegistryIds()` skip-pass to paper
+// over this; the fix moves the merge into commons so all SDKs benefit and
+// the example workaround can be deleted.
+// ---------------------------------------------------------------------------
+int test_re_register_preserves_download_state() {
+    install_noop_adapter();
+
+    // First register: simulates a fresh catalog seed.
+    RegisterArgs args;
+    args.url = "https://example.test/preserve-llama.Q4_K_M.gguf";
+    args.name = "Preserve Test";
+
+    runanywhere::v1::ModelInfo first;
+    ASSERT_TRUE(register_proto(args, &first));
+    ASSERT_TRUE(!first.is_downloaded());
+    ASSERT_TRUE(first.local_path().empty());
+
+    // Simulate the post-download self-heal: mark is_downloaded + local_path
+    // + checksum_sha256 via the canonical update path.
+    {
+        runanywhere::v1::ModelInfo mutated = first;
+        mutated.set_local_path("/tmp/preserve-llama.Q4_K_M.gguf");
+        mutated.set_is_downloaded(true);
+        mutated.set_is_available(true);
+        mutated.set_checksum_sha256(
+            "abc123def4567890abc123def4567890abc123def4567890abc123def4567890");
+        mutated.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        std::string mutated_bytes;
+        ASSERT_TRUE(mutated.SerializeToString(&mutated_bytes));
+        rac_model_registry_handle_t registry = rac_get_model_registry();
+        ASSERT_TRUE(registry != nullptr);
+        rac_result_t update_rc = rac_model_registry_update_proto(
+            registry, reinterpret_cast<const uint8_t*>(mutated_bytes.data()), mutated_bytes.size());
+        ASSERT_EQ(update_rc, RAC_SUCCESS);
+    }
+
+    // Sanity check the mutation landed.
+    runanywhere::v1::ModelInfo after_update;
+    ASSERT_TRUE(read_back_by_id(first.id(), &after_update));
+    ASSERT_TRUE(after_update.is_downloaded());
+    ASSERT_EQ(after_update.local_path(), std::string("/tmp/preserve-llama.Q4_K_M.gguf"));
+    ASSERT_EQ(after_update.checksum_sha256(),
+              std::string("abc123def4567890abc123def4567890abc123def4567890abc123def4567890"));
+
+    // Second register: same URL/name (re-seed). Without the merge fix this
+    // would reset is_downloaded=false, clear local_path, and drop the
+    // checksum. With the fix all three survive.
+    runanywhere::v1::ModelInfo re_registered;
+    ASSERT_TRUE(register_proto(args, &re_registered));
+    ASSERT_EQ(re_registered.id(), first.id());
+    ASSERT_TRUE(re_registered.is_downloaded());
+    ASSERT_EQ(re_registered.local_path(), std::string("/tmp/preserve-llama.Q4_K_M.gguf"));
+    ASSERT_EQ(re_registered.checksum_sha256(),
+              std::string("abc123def4567890abc123def4567890abc123def4567890abc123def4567890"));
+
+    // Round-trip via registry get — same invariants.
+    runanywhere::v1::ModelInfo retrieved;
+    ASSERT_TRUE(read_back_by_id(first.id(), &retrieved));
+    ASSERT_TRUE(retrieved.is_downloaded());
+    ASSERT_EQ(retrieved.local_path(), std::string("/tmp/preserve-llama.Q4_K_M.gguf"));
+    ASSERT_EQ(retrieved.checksum_sha256(),
+              std::string("abc123def4567890abc123def4567890abc123def4567890abc123def4567890"));
+
+    remove_by_id(first.id());
+    clear_adapter();
+    return 0;
+}
+
+// Override path: when the caller explicitly sets a runtime field, the
+// existing value must NOT be preserved (the explicit set wins).
+int test_re_register_allows_explicit_override() {
+    install_noop_adapter();
+
+    RegisterArgs args;
+    args.url = "https://example.test/override-llama.Q4_K_M.gguf";
+    args.name = "Override Test";
+
+    runanywhere::v1::ModelInfo first;
+    ASSERT_TRUE(register_proto(args, &first));
+
+    // Stamp a local_path.
+    {
+        runanywhere::v1::ModelInfo mutated = first;
+        mutated.set_local_path("/tmp/old-path.gguf");
+        mutated.set_is_downloaded(true);
+        std::string mutated_bytes;
+        ASSERT_TRUE(mutated.SerializeToString(&mutated_bytes));
+        rac_model_registry_handle_t registry = rac_get_model_registry();
+        ASSERT_TRUE(registry != nullptr);
+        ASSERT_EQ(rac_model_registry_update_proto(
+                      registry, reinterpret_cast<const uint8_t*>(mutated_bytes.data()),
+                      mutated_bytes.size()),
+                  RAC_SUCCESS);
+    }
+
+    // Caller-driven explicit reset via the lower-level register_proto path
+    // (the canonical re-set escape hatch — populate the fields you want to
+    // overwrite on the inbound ModelInfo).
+    {
+        runanywhere::v1::ModelInfo replacement = first;
+        replacement.set_local_path("");
+        replacement.set_is_downloaded(false);
+        replacement.set_is_available(false);
+        replacement.set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+        std::string bytes;
+        ASSERT_TRUE(replacement.SerializeToString(&bytes));
+        rac_model_registry_handle_t registry = rac_get_model_registry();
+        ASSERT_EQ(rac_model_registry_register_proto(
+                      registry, reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size()),
+                  RAC_SUCCESS);
+    }
+
+    runanywhere::v1::ModelInfo retrieved;
+    ASSERT_TRUE(read_back_by_id(first.id(), &retrieved));
+    ASSERT_TRUE(!retrieved.is_downloaded());
+    ASSERT_TRUE(retrieved.local_path().empty());
+
+    remove_by_id(first.id());
+    clear_adapter();
+    return 0;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
@@ -301,6 +469,10 @@ int main(int /*argc*/, char** /*argv*/) {
         {"register_with_source_override", test_register_with_source_override},
         {"null_out_pointer", test_null_out_pointer},
         {"invalid_input_bytes", test_invalid_input_bytes},
+        {"empty_input_rejected", test_empty_input_rejected},
+        {"empty_url_rejected", test_empty_url_rejected},
+        {"re_register_preserves_download_state", test_re_register_preserves_download_state},
+        {"re_register_allows_explicit_override", test_re_register_allows_explicit_override},
     };
 
     int failures = 0;

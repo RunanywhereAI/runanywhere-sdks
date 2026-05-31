@@ -66,12 +66,8 @@ class Genie implements RunAnywhereModule {
 
   /// Qualcomm Genie native backend version (single source of truth).
   ///
-  /// Used by:
-  /// - Android `binary_config.gradle` (`genieVersion = '0.3.0'`) for release URL.
-  /// - iOS `GeniePlugin.swift` `getBackendVersion` method-channel handshake.
-  ///
-  /// Native code should read this value via the `runanywhere_genie` method
-  /// channel `getNativeBackendVersion` rather than hard-coding it.
+  /// Used by Android `binary_config.gradle` (`genieVersion = '0.3.0'`) for
+  /// release URL resolution.
   static const String genieNativeVersion = '0.3.0';
 
   // ============================================================================

@@ -252,7 +252,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   }
 
   Future<void> _generateStream(StructuredOutputExample example) async {
-    // Wave 2: streaming returns Stream<LLMStreamEvent>; structured-output
+    // Streaming returns Stream<LLMStreamEvent>; structured-output
     // parsing happens on the accumulated text after the terminal event.
     final eventStream = sdk.RunAnywhere.llm.generateStream(
       _promptController.text,

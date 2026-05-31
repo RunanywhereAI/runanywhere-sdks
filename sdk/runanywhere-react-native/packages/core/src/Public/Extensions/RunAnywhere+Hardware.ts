@@ -17,7 +17,6 @@ import {
   HardwareProfileResult as HardwareProfileResultCodec,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
-import { NPUChip } from '@runanywhere/proto-ts/storage_types';
 import { isNativeModuleAvailable, requireNativeModule } from '../../native';
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { arrayBufferToBytes } from '../../services/ProtoBytes';
@@ -28,7 +27,6 @@ export type {
   HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
 export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
-export { NPUChip } from '@runanywhere/proto-ts/storage_types';
 
 /** Snapshot the current hardware profile via `rac_hardware_profile_get`. */
 export async function getProfile(): Promise<HardwareProfileResult> {
@@ -48,116 +46,6 @@ export async function getProfile(): Promise<HardwareProfileResult> {
   return HardwareProfileResultCodec.decode(arrayBufferToBytes(buffer));
 }
 
-/** Chip / SoC name reported by the native hardware profile. */
-export async function getChip(): Promise<string> {
-  return (await getProfile()).profile?.chip ?? '';
-}
-
-/**
- * Map a free-form chip / SoC name to the structured `NPUChip` vendor enum.
- *
- * Used by `getNPUChip()` to resolve the NPU family for backend URL selection
- * and runtime backend wiring. Vendor groupings mirror `idl/storage_types.proto`.
- */
-export function mapChipStringToNPUChip(chip: string): NPUChip {
-  const lower = chip.trim().toLowerCase();
-  if (lower.length === 0) return NPUChip.NPU_CHIP_UNSPECIFIED;
-
-  if (
-    lower.includes('apple') ||
-    /\ba(?:[1-9]|1[0-9])\b/.test(lower) ||
-    /\bm[1-9]\b/.test(lower)
-  ) {
-    return NPUChip.NPU_CHIP_APPLE_NEURAL_ENGINE;
-  }
-
-  if (
-    lower.includes('snapdragon') ||
-    lower.includes('qualcomm') ||
-    lower.includes('hexagon') ||
-    lower.startsWith('sdm') ||
-    lower.startsWith('sm8') ||
-    lower.startsWith('sm7') ||
-    lower.startsWith('sm6') ||
-    lower.startsWith('msm')
-  ) {
-    return NPUChip.NPU_CHIP_QUALCOMM_HEXAGON;
-  }
-
-  if (
-    lower.includes('mediatek') ||
-    lower.includes('dimensity') ||
-    lower.includes('helio') ||
-    lower.startsWith('mt6') ||
-    lower.startsWith('mt8')
-  ) {
-    return NPUChip.NPU_CHIP_MEDIATEK_APU;
-  }
-
-  if (
-    lower.includes('tensor') ||
-    lower.includes('pixel') ||
-    lower.startsWith('gs1') ||
-    lower.startsWith('gs2') ||
-    lower.startsWith('gs3')
-  ) {
-    return NPUChip.NPU_CHIP_GOOGLE_TPU;
-  }
-
-  if (
-    lower.includes('intel') ||
-    lower.includes('core ultra') ||
-    lower.includes('meteor lake') ||
-    lower.includes('lunar lake') ||
-    lower.includes('arrow lake')
-  ) {
-    return NPUChip.NPU_CHIP_INTEL_NPU;
-  }
-
-  if (
-    lower.includes('exynos') ||
-    lower.startsWith('s5e') ||
-    lower.includes('samsung') ||
-    lower.includes('kirin') ||
-    lower.includes('hisilicon')
-  ) {
-    return NPUChip.NPU_CHIP_OTHER;
-  }
-
-  return NPUChip.NPU_CHIP_UNSPECIFIED;
-}
-
-/**
- * Resolve the NPU chipset enum for the current device.
- *
- * Mirrors Swift's `NPUChipDetector` behaviour: consume the chip string from
- * `rac_hardware_profile_get`, then map to the vendor family. Falls back to
- * `NPUChip.NPU_CHIP_OTHER` when the platform reports a neural engine but the
- * chip string is unrecognised.
- */
-export async function getNPUChip(): Promise<NPUChip> {
-  const result = await getProfile();
-  const chip = result.profile?.chip ?? '';
-  const mapped = mapChipStringToNPUChip(chip);
-
-  if (mapped !== NPUChip.NPU_CHIP_UNSPECIFIED) return mapped;
-  if (result.profile?.hasNeuralEngine === true) return NPUChip.NPU_CHIP_OTHER;
-  if (result.profile && result.profile.hasNeuralEngine === false) {
-    return NPUChip.NPU_CHIP_NONE;
-  }
-  return NPUChip.NPU_CHIP_UNSPECIFIED;
-}
-
-/** Whether the current device has a dedicated neural engine / NPU. */
-export async function hasNeuralEngine(): Promise<boolean> {
-  return (await getProfile()).profile?.hasNeuralEngine ?? false;
-}
-
-/** Recommended acceleration mode label (`"ane"`, `"npu"`, `"gpu"`, `"cpu"`). */
-export async function accelerationMode(): Promise<string> {
-  return (await getProfile()).profile?.accelerationMode ?? 'cpu';
-}
-
 /** All accelerators reported by the native hardware profile. */
 export async function getAccelerators(): Promise<AcceleratorInfo[]> {
   return (await getProfile()).accelerators ?? [];
@@ -165,48 +53,40 @@ export async function getAccelerators(): Promise<AcceleratorInfo[]> {
 
 /**
  * Set the preferred accelerator for subsequent inference routing via
- * `rac_hardware_set_accelerator_preference`. Returns `true` on success and
- * `false` when commons rejects the request (unsupported enum, stale binary).
+ * `rac_hardware_set_accelerator_preference`. Throws `SDKException` when the
+ * native bridge or commons rejects the request.
  */
 export async function setAcceleratorPreference(
   preference: AccelerationPreference
-): Promise<boolean> {
-  if (
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_AUTO &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_NPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_GPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_CPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_METAL &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN
-  ) {
-    return false;
+): Promise<void> {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  const native = requireNativeModule();
+  if (typeof native.setAcceleratorPreferenceProto !== 'function') {
+    throw SDKException.notImplemented(
+      'hardware.setAcceleratorPreference requires native setAcceleratorPreferenceProto'
+    );
   }
 
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  if (typeof native.setAcceleratorPreferenceProto !== 'function') return false;
-
-  try {
-    const responseBuffer = await native.setAcceleratorPreferenceProto(
-      encodeProtoMessage({ preference }, HardwareAcceleratorPreferenceRequest)
+  const responseBuffer = await native.setAcceleratorPreferenceProto(
+    encodeProtoMessage({ preference }, HardwareAcceleratorPreferenceRequest)
+  );
+  if (responseBuffer.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('setAcceleratorPreferenceProto');
+  }
+  const result = HardwareAcceleratorPreferenceResult.decode(
+    arrayBufferToBytes(responseBuffer)
+  );
+  if (result.success !== true) {
+    throw SDKException.unknown(
+      result.errorMessage || 'Failed to set accelerator preference'
     );
-    if (responseBuffer.byteLength === 0) return false;
-    const result = HardwareAcceleratorPreferenceResult.decode(
-      arrayBufferToBytes(responseBuffer)
-    );
-    return result.success === true;
-  } catch {
-    return false;
   }
 }
 
 export const Hardware = {
   getProfile,
-  getChip,
-  getNPUChip,
-  hasNeuralEngine,
-  accelerationMode,
   getAccelerators,
   setAcceleratorPreference,
 };

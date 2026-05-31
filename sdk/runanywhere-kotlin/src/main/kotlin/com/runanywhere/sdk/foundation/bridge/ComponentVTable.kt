@@ -15,7 +15,7 @@
  * a composite (STT + LLM + TTS + VAD) and create() is async. VoiceAgent
  * keeps its own bespoke scaffold (mirrors Swift's exception).
  *
- * Kotlin SDK W2-1 mirror of Swift's
+ * Kotlin SDK mirror of Swift's
  * `Sources/RunAnywhere/Foundation/Bridge/ComponentVTable.swift`.
  * Design (Option A): expect/class with a companion object that
  * exposes the 5 modality instances (`llm`, `stt`, `tts`, `vad`, `vlm`).
@@ -51,8 +51,12 @@ public class ComponentVTable internal constructor(
      * snapshot reports `COMPONENT_LIFECYCLE_STATE_READY` (the only state
      * indicating an active, usable, loaded asset). Falls back to
      * `false` if the snapshot is unavailable, matching Swift's
-     * `rac_*_component_is_loaded` semantics.
+     * `rac_*_component_is_loaded` semantics. `handle` is part of the
+     * vtable contract (parity with Swift's `rac_*_component_is_loaded`
+     * C ABI) but the proto-canonical readiness check routes through
+     * the lifecycle snapshot, which is keyed by component.
      */
+    @Suppress("UnusedParameter")
     public fun isLoaded(handle: Long): Boolean {
         val snapshot: ComponentLifecycleSnapshot =
             CppBridgeModelLifecycle.snapshot(component) ?: return false
@@ -63,7 +67,11 @@ public class ComponentVTable internal constructor(
      * Cleanup via the canonical proto unload path. Best-effort —
      * mirrors Swift where `rac_*_component_cleanup` errors are
      * intentionally discarded (the cleanup is fire-and-forget).
+     * `handle` is part of the vtable contract (parity with Swift's
+     * `rac_*_component_cleanup` C ABI) but the unload routes through
+     * the lifecycle, which is keyed by component.
      */
+    @Suppress("UnusedParameter")
     public fun cleanup(handle: Long) {
         CppBridgeModelLifecycle.unload(
             ModelUnloadRequest(unload_all = true),
@@ -108,8 +116,7 @@ public class ComponentVTable internal constructor(
                 component = SDKComponent.SDK_COMPONENT_VLM,
                 // VLM in the Kotlin SDK never owns a bare component handle
                 // (load+create are fused at the proto service layer).
-                // Mirrors Swift Wave 7 / T23 note: the slot is kept for
-                // shape uniformity but is dead in practice.
+                // The slot is kept for shape uniformity but is dead in practice.
                 createFn = { 0L },
                 destroyFn = { handle -> RunAnywhereBridge.racVlmDestroy(handle) },
                 // Slot kept for shape uniformity.
@@ -121,18 +128,18 @@ public class ComponentVTable internal constructor(
          * through the canonical `rac_model_lifecycle_load_proto`. The
          * registry resolves path/framework/category from the
          * `model_id`, so callers only need to supply the id here.
-         * Returns RAC_SUCCESS on success or RAC_ERROR_OPERATION_FAILED
+         * Returns RAC_SUCCESS on success or RAC_ERROR_MODEL_LOAD_FAILED
          * otherwise.
          */
         private fun loadViaLifecycle(modelId: String): Int {
             val result =
                 CppBridgeModelLifecycle.load(
                     ModelLoadRequest(model_id = modelId),
-                ) ?: return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+                ) ?: return RunAnywhereBridge.RAC_ERROR_MODEL_LOAD_FAILED
             return if (result.success) {
                 RunAnywhereBridge.RAC_SUCCESS
             } else {
-                RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
+                RunAnywhereBridge.RAC_ERROR_MODEL_LOAD_FAILED
             }
         }
     }

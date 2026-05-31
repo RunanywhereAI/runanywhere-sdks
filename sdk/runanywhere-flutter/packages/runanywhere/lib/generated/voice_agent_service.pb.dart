@@ -145,7 +145,7 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: One-shot voice-turn result.
+/// One-shot voice-turn result.
 ///
 /// Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
 /// `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
@@ -567,7 +567,7 @@ class VoiceAgentTurnRequest extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Voice session behavior configuration.
+/// Voice session behavior configuration.
 ///
 /// Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
 /// Controls runtime behavior of the voice agent's session loop — silence
@@ -739,7 +739,7 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Audio pipeline state-manager configuration.
+/// Audio pipeline state-manager configuration.
 ///
 /// Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
 /// to prevent microphone/TTS feedback loops.
@@ -824,7 +824,7 @@ class AudioPipelineConfig extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Aggregated voice-agent compose configuration.
+/// Aggregated voice-agent compose configuration.
 ///
 /// Mirrors the C ABI `rac_voice_agent_config_t` and Swift
 /// `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
@@ -1192,7 +1192,7 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   void clearDefaultLanguageCode() => $_clearField(23);
 }
 
-/// Wave D-7 helper-level proto requests for voice-agent sub-components.
+/// Helper-level proto requests for voice-agent sub-components.
 class VoiceAgentTranscribeProtoRequest extends $pb.GeneratedMessage {
   factory VoiceAgentTranscribeProtoRequest({
     $core.List<$core.int>? audioData,

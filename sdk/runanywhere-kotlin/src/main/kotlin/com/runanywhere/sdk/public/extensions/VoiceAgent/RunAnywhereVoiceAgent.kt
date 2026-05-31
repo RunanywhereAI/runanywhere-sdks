@@ -11,8 +11,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.VoiceAgentConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
@@ -62,58 +64,77 @@ private fun getMissingComponents(): List<String> {
     return missing
 }
 
-suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
+/**
+ * Default Silero VAD model id seeded by every example app's catalog.
+ * Exposed so callers do not hard-code the string when invoking
+ * [ensureDefaultVAD]. Mirrors Swift `RunAnywhere.defaultVADModelID`.
+ */
+val RunAnywhere.defaultVADModelID: String
+    get() = "silero-vad"
+
+/**
+ * Ensure a VAD model is loaded in the canonical lifecycle before a voice
+ * agent session starts. When no VAD model is currently registered for
+ * [ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION], attempts to
+ * load the catalogued default ([defaultVADModelID], Silero) so the voice
+ * agent's speech-start / speech-end events fire. The energy-based
+ * fallback does not produce the lifecycle events the voice-agent
+ * orchestrator listens for, so without a VAD lifecycle load the session
+ * stays silent after init.
+ *
+ * Idempotent: returns `true` immediately when a VAD model is already
+ * loaded. Logs (but does not throw) when the optional auto-load fails;
+ * callers may inspect the return value to decide whether to surface a
+ * warning. Mirrors Swift `ensureDefaultVAD(modelID:)`.
+ *
+ * @param modelID VAD model id to auto-load when none is current. When
+ *   `null`, falls back to [defaultVADModelID].
+ * @return `true` when a VAD model is loaded after the call; `false`
+ *   when no VAD model is loaded (auto-load failed or skipped).
+ */
+suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
+    if (!isInitialized) return false
+
+    val currentRequest =
+        CurrentModelRequest(
+            category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        )
+    val snapshot = CppBridgeModelLifecycle.currentModel(currentRequest)
+    if (snapshot != null && snapshot.found && snapshot.model_id.isNotEmpty()) {
+        return true
+    }
+
+    val targetID = modelID ?: defaultVADModelID
+    if (targetID.isEmpty()) return false
+
+    voiceAgentLogger.info("Auto-loading default VAD '$targetID' for voice-agent session")
+
+    val loadRequest =
+        ModelLoadRequest(
+            model_id = targetID,
+            category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        )
+    val result = CppBridgeModelLifecycle.load(loadRequest)
+    if (result == null || !result.success) {
+        val errorMessage = result?.error_message.orEmpty()
+        voiceAgentLogger.warning(
+            "Default VAD '$targetID' auto-load failed: $errorMessage — voice agent will use energy fallback",
+        )
+        return false
+    }
+    return true
+}
+
+suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceAgentInitialized = false
-    // pass3-syn-030 / pass3-syn-025: prefer the caller-supplied tts_voice_id
-    // (added to VoiceAgentConfig in idl/solutions.proto) over the legacy
-    // tts_model_id fallback. Multi-voice TTS engines (Piper, eSpeak-NG,
-    // Sherpa-ONNX-TTS multi-voice) need a distinct voice id; single-voice
-    // engines pass empty tts_voice_id and the fallback uses tts_model_id.
-    //
-    // Until the generated VoiceAgentConfig is regenerated with the new
-    // tts_voice_id field, the access goes through a reflective lookup so
-    // this code compiles against both the pre- and post-codegen shapes.
-    val resolvedTtsVoiceId = resolveTtsVoiceId(config)
-    val composeConfig =
-        RAVoiceAgentComposeConfig(
-            stt_model_id = config.stt_model_id.takeIf { it.isNotBlank() },
-            llm_model_id = config.llm_model_id.takeIf { it.isNotBlank() },
-            tts_voice_id = resolvedTtsVoiceId,
-            vad_sample_rate = config.sample_rate_hz,
-        )
     val states =
         CppBridgeVoiceAgent.initialize(
             CppBridgeVoiceAgent.getRawHandle(),
-            composeConfig,
+            config,
         )
     voiceAgentInitialized = states.ready
-    voiceAgentLogger.info("Voice agent initialized from VoiceAgentConfig: ready=${states.ready}")
-}
-
-/**
- * pass3-syn-030: resolves the TTS voice id for a [VoiceAgentConfig], preferring
- * the new `tts_voice_id` field added in pass3-syn-025 over the legacy
- * `tts_model_id` fallback.
- *
- * Uses reflection so this compiles regardless of whether the Wire-generated
- * proto has been regenerated to include `tts_voice_id`. Once the codegen
- * lands the field, this helper can be inlined to a direct accessor:
- *
- *     val resolved = config.tts_voice_id.takeIf { it.isNotBlank() }
- *         ?: config.tts_model_id.takeIf { it.isNotBlank() }
- */
-private fun resolveTtsVoiceId(config: VoiceAgentConfig): String? {
-    val newField =
-        try {
-            val getter =
-                config::class.java.methods
-                    .firstOrNull { it.name == "getTts_voice_id" || it.name == "getTtsVoiceId" }
-            (getter?.invoke(config) as? String)?.takeIf { it.isNotBlank() }
-        } catch (_: Throwable) {
-            null
-        }
-    return newField ?: config.tts_model_id.takeIf { it.isNotBlank() }
+    voiceAgentLogger.info("Voice agent initialized from RAVoiceAgentComposeConfig: ready=${states.ready}")
 }
 
 suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
@@ -121,16 +142,59 @@ suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentSta
     return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
 }
 
-suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
+/**
+ * Initialize the voice agent from currently-loaded STT / LLM / TTS models.
+ *
+ * Mirrors Swift `initializeVoiceAgentWithLoadedModels(ttsVoiceID:ensureVAD:)`.
+ *
+ * When [ensureVAD] is `true` (default), the SDK guarantees that a VAD
+ * model is loaded into the canonical lifecycle before initialization
+ * runs via [ensureDefaultVAD]. Without this the session would silently
+ * fall back to the energy-based detector and the C++ voice agent's
+ * speech-start / speech-end lifecycle events would not fire. Set to
+ * `false` only if the caller has already loaded an explicit VAD model
+ * (or knows the energy fallback is acceptable for the deployment).
+ *
+ * The [ttsVoiceId] parameter is the voice id **within** the loaded TTS
+ * model, NOT the model id. For single-voice engines, leaving it `null`
+ * (the default) lets the engine pick its default voice. For multi-voice
+ * engines (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice), the caller
+ * must supply the desired voice id explicitly; reusing the TTS model id
+ * here produces invalid voice selection for multi-voice models (see
+ * Swift comment at `RunAnywhere+VoiceAgent.swift:162-171`).
+ */
+suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
+    ttsVoiceId: String? = null,
+    ensureVAD: Boolean = true,
+) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+
+    if (ensureVAD) {
+        ensureDefaultVAD()
+    }
+
     if (voiceAgentInitialized && areAllComponentsLoaded()) return
     if (!areAllComponentsLoaded()) {
         val missing = getMissingComponents()
         throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
     }
-    CppBridgeVoiceAgent.getHandle()
-    voiceAgentInitialized = true
-    voiceAgentLogger.info("VoiceAgent initialized successfully")
+
+    val sttSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_STT)
+    val llmSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_LLM)
+
+    val composeConfig =
+        RAVoiceAgentComposeConfig(
+            stt_model_id = sttSnap?.model_id?.takeIf { it.isNotBlank() },
+            llm_model_id = llmSnap?.model_id?.takeIf { it.isNotBlank() },
+            tts_voice_id = ttsVoiceId?.takeIf { it.isNotBlank() },
+        )
+
+    val handle = CppBridgeVoiceAgent.getHandle()
+    val states = CppBridgeVoiceAgent.initialize(handle, composeConfig)
+    voiceAgentInitialized = states.ready
+    voiceAgentLogger.info(
+        "VoiceAgent initialized from loaded models (ttsVoiceId=${ttsVoiceId ?: "<default>"}, ready=${states.ready})",
+    )
 }
 
 suspend fun RunAnywhere.cleanupVoiceAgent() {

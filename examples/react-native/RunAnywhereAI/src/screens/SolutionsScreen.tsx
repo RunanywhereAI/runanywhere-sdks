@@ -1,61 +1,18 @@
 /**
- * SolutionsScreen — Wave 3 Step 3.3 (G-E6) demo for
- * `RunAnywhere.solutions.run({ yaml })`.
+ * SolutionsScreen — demo for `RunAnywhere.solutions.run({ yaml })`.
  *
  * Two buttons run the canonical voice_agent.yaml + rag.yaml solutions
  * shipped at sdk/runanywhere-commons/examples/solutions/. The YAMLs are
- * embedded inline as string constants (no asset-bundling churn). Each
- * lifecycle transition is appended to a simple scrolling log.
+ * synced from the commons sources via `scripts/sync-solutions-yamls.js`
+ * (runs on postinstall + before typecheck), so this screen never embeds
+ * a hand-edited YAML literal. Each lifecycle transition is appended to a
+ * simple scrolling log.
  */
 import React, { useState, useCallback } from 'react';
 import { View, Text, Button, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RunAnywhere } from '@runanywhere/core';
-
-// Use model IDs that the React Native example actually registers in App.tsx;
-// the placeholder IDs from sdk/runanywhere-commons/examples/solutions/*.yaml
-// (whisper-base, kokoro, silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3,
-// qwen3-4b-q4_k_m) are not seeded in any example catalog, so handing them
-// to RunAnywhere.solutions.run produces a "model not found in registry"
-// failure as soon as the operators load. rerank_model_id is omitted because
-// no example app seeds a reranker model.
-const VOICE_AGENT_YAML = `voice_agent:
-  llm_model_id: "smollm2-360m-q8_0"
-  stt_model_id: "sherpa-onnx-whisper-tiny.en"
-  tts_model_id: "vits-piper-en_US-lessac-medium"
-  vad_model_id: "silero-vad"
-
-  sample_rate_hz: 16000
-  chunk_ms: 20
-  audio_source: "microphone"
-
-  enable_barge_in: true
-  barge_in_threshold_ms: 200
-
-  system_prompt: "You are a helpful voice assistant. Keep answers concise."
-  max_context_tokens: 4096
-  temperature: 0.7
-
-  emit_partials: true
-  emit_thoughts: false
-`;
-
-const RAG_YAML = `rag:
-  embed_model_id: "all-minilm-l6-v2"
-  llm_model_id: "smollm2-360m-q8_0"
-
-  vector_store: "usearch"
-  vector_store_path: "/tmp/ra-rag.usearch"
-
-  retrieve_k: 24
-  rerank_top: 6
-
-  bm25_k1: 1.2
-  bm25_b: 0.75
-  rrf_k: 60
-
-  prompt_template: "Use the context below to answer.\\n\\nContext:\\n{{context}}\\n\\nQuestion: {{query}}"
-`;
+import { VOICE_AGENT_YAML, RAG_YAML } from '../generated/solutionsYaml';
 
 export const SolutionsScreen: React.FC = () => {
   const [log, setLog] = useState<string[]>([]);

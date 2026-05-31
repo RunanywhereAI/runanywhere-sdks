@@ -35,7 +35,10 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "jest --config jest.config.js",
+    "test:watch": "jest --config jest.config.js --watch",
     "nitrogen": "nitrogen && node scripts/fix-nitrogen-output.js",
+    "prepack": "mkdir -p ios/URLSessionHttpTransport && cp -f ../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
     "prepublishOnly": "npm run typecheck && node scripts/fix-nitrogen-output.js"
   },
   "keywords": [
@@ -54,12 +57,12 @@
     "protobufjs": "^7.5.8"
   },
   "peerDependencies": {
-    "react": ">=18.0.0",
-    "react-native": ">=0.74.0",
+    "react": "19.0.0",
+    "react-native": "0.83.1",
     "react-native-blob-util": ">=0.19.0",
     "react-native-device-info": ">=11.0.0",
     "react-native-fs": ">=2.20.0",
-    "react-native-nitro-modules": ">=0.33.9"
+    "react-native-nitro-modules": "^0.33.9"
   },
   "peerDependenciesMeta": {
     "react-native-blob-util": {
@@ -73,9 +76,12 @@
     }
   },
   "devDependencies": {
+    "@types/jest": "^29.5.12",
     "@types/react": "~19.2.14",
-    "nitrogen": "^0.35.7",
-    "react-native-nitro-modules": "^0.35.7",
+    "jest": "^29.7.0",
+    "nitrogen": "^0.34.1",
+    "react-native-nitro-modules": "^0.33.9",
+    "ts-jest": "^29.1.2",
     "typescript": "^5.9.3"
   },
   "create-react-native-library": {

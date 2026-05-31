@@ -18,7 +18,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 import type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import { SDKException } from '../../Foundation/SDKException';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
 export interface VisionLanguageProvider {
   readonly isInitialized: boolean;
@@ -55,11 +55,11 @@ export const VisionLanguage = {
 
   async loadCurrentModel(): Promise<void> {
     const current =
-      ModelLifecycle.currentModel({
+      WebModelLifecycle.currentModel({
         category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         includeModelMetadata: true,
       }) ??
-      ModelLifecycle.currentModel({ includeModelMetadata: true });
+      WebModelLifecycle.currentModel({ includeModelMetadata: true });
 
     if (!current?.modelId) {
       throw SDKException.componentNotReady(

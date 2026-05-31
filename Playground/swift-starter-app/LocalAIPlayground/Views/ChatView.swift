@@ -45,42 +45,42 @@ struct ChatView: View {
     // -------------------------------------------------------------------------
     // MARK: - Environment & State Properties
     // -------------------------------------------------------------------------
-
+    
     /// Model service for checking LLM state and loading
     @EnvironmentObject var modelService: ModelService
-
+    
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
-
+    
     /// List of messages in the conversation
     @State private var messages: [ChatMessage] = []
-
+    
     /// Current text in the input field
     @State private var inputText = ""
-
+    
     /// Whether the AI is currently generating a response
     @State private var isGenerating = false
-
+    
     /// Current response being streamed
     @State private var currentResponse = ""
-
+    
     /// Task for streaming generation (so we can cancel it)
     @State private var streamingTask: Task<Void, Never>?
-
+    
     /// Focus state for the input field
     @FocusState private var isInputFocused: Bool
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Body
     // -------------------------------------------------------------------------
-
+    
     var body: some View {
         NavigationStack {
             ZStack {
                 // Background
                 (colorScheme == .dark ? Color(white: 0.05) : Color(white: 0.98))
                     .ignoresSafeArea()
-
+                
                 // Check if model is loaded
                 if !modelService.isLLMLoaded {
                     // Show model loader
@@ -99,7 +99,7 @@ struct ChatView: View {
                         dismiss()
                     }
                 }
-
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     if !messages.isEmpty {
                         Button(action: clearChat) {
@@ -113,15 +113,15 @@ struct ChatView: View {
             streamingTask?.cancel()
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Model Loader Overlay
     // -------------------------------------------------------------------------
-
+    
     private var modelLoaderOverlay: some View {
         VStack(spacing: AISpacing.xl) {
             Spacer()
-
+            
             ModelLoaderView(
                 modelName: "LiquidAI LFM2 350M",
                 modelDescription: "Compact on-device language model optimized for mobile inference with Q4_K_M quantization.",
@@ -139,23 +139,23 @@ struct ChatView: View {
                 }
             )
             .padding(.horizontal)
-
+            
             // Info text
             VStack(spacing: AISpacing.sm) {
                 Text("First-time setup")
                     .font(.aiHeadingSmall)
-
+                
                 Text("The model will be downloaded once and cached locally for future use.")
                     .font(.aiBodySmall)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal, AISpacing.xl)
-
+            
             Spacer()
         }
     }
-
+    
     /// Converts ModelService state to ModelState for the loader view
     private var modelLoaderState: ModelState {
         if modelService.isLLMLoaded {
@@ -168,11 +168,11 @@ struct ChatView: View {
             return .notLoaded
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - Chat Interface
     // -------------------------------------------------------------------------
-
+    
     private var chatInterface: some View {
         VStack(spacing: 0) {
             // Messages list
@@ -201,7 +201,7 @@ struct ChatView: View {
                                 MessageBubble(message: message)
                                     .id(message.id)
                             }
-
+                            
                             // Streaming message
                             if isGenerating {
                                 MessageBubble(message: ChatMessage(
@@ -222,7 +222,7 @@ struct ChatView: View {
                     scrollToBottom(proxy: proxy)
                 }
             }
-
+            
             // Input field
             MessageInputField(
                 text: $inputText,
@@ -232,7 +232,7 @@ struct ChatView: View {
             )
         }
     }
-
+    
     private func scrollToBottom(proxy: ScrollViewProxy) {
         withAnimation(.easeOut(duration: 0.2)) {
             if isGenerating {
@@ -242,34 +242,34 @@ struct ChatView: View {
             }
         }
     }
-
+    
     // =========================================================================
     // MARK: - Message Sending & Generation
     // =========================================================================
-
+    
     /// Sends the current input as a user message and generates a response.
     // -------------------------------------------------------------------------
     private func sendMessage() {
         let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !userText.isEmpty && !isGenerating else { return }
-
+        
         // Add user message
         let userMessage = ChatMessage(role: .user, content: userText)
         messages.append(userMessage)
-
+        
         // Clear input
         inputText = ""
         isInputFocused = false
-
+        
         // Start generation
         isGenerating = true
         currentResponse = ""
-
+        
         streamingTask = Task {
             await generateResponse(to: userText)
         }
     }
-
+    
     /// Generates an AI response to the given prompt using streaming.
     ///
     /// ## RunAnywhere SDK Usage
@@ -298,7 +298,7 @@ struct ChatView: View {
                 maxTokens: 256,
                 temperature: 0.8
             )
-
+            
             // -----------------------------------------------------------------
             // Start Streaming Generation
             // -----------------------------------------------------------------
@@ -310,23 +310,23 @@ struct ChatView: View {
                 prompt,
                 options: options
             )
-
+            
             // -----------------------------------------------------------------
             // Process Streaming Tokens
             // -----------------------------------------------------------------
             for try await token in result.stream {
                 guard !Task.isCancelled else { break }
-
+                
                 await MainActor.run {
                     currentResponse += token
                 }
             }
-
+            
             // -----------------------------------------------------------------
             // Get Final Metrics
             // -----------------------------------------------------------------
             let metrics = try await result.result.value
-
+            
             await MainActor.run {
                 if !Task.isCancelled {
                     // Add assistant message with metrics
@@ -335,14 +335,14 @@ struct ChatView: View {
                         content: currentResponse
                     )
                     messages.append(aiMessage)
-
+                    
                     print("✅ Generation: \(metrics.tokensUsed) tokens at \(String(format: "%.1f", metrics.tokensPerSecond)) tok/s")
                 }
-
+                
                 isGenerating = false
                 currentResponse = ""
             }
-
+            
         } catch {
             await MainActor.run {
                 // Add error message
@@ -351,15 +351,15 @@ struct ChatView: View {
                     content: "Error: \(error.localizedDescription)"
                 )
                 messages.append(errorMessage)
-
+                
                 isGenerating = false
                 currentResponse = ""
             }
-
+            
             print("❌ Generation failed: \(error)")
         }
     }
-
+    
     /// Clears all messages from the conversation.
     // -------------------------------------------------------------------------
     private func clearChat() {

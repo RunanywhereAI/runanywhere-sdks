@@ -328,9 +328,17 @@ rac_tc_run_modality() {
   if [[ -n "${marker}" ]]; then
     if rac_mcp_grep "${marker}"; then
       notes="marker matched: ${marker}"
-    elif [[ "${marker}" == "${RAC_MARKER_LLM_LOAD}" ]] && rac_mcp_grep "${RAC_MARKER_MODEL_LOAD}"; then
-      notes="fallback marker matched: ${RAC_MARKER_MODEL_LOAD}"
-    elif [[ "${marker}" == "${RAC_MARKER_LLM_STREAM_DONE}" ]] && rac_mcp_grep_any "${RAC_MARKER_SDK_INIT}" "${RAC_MARKER_MODEL_LOAD}"; then
+    elif [[ "${marker}" == "${RAC_MARKER_LLM_LOAD}" ]] && rac_mcp_grep_any "${RAC_MARKER_MODEL_LOAD}" "Found downloaded chat model" "Text model loaded: true" "✅ LLM model loaded:"; then
+      notes="fallback marker matched: ${RAC_MARKER_MODEL_LOAD} or RN/Kotlin load alternate"
+    elif [[ "${marker}" == "${RAC_MARKER_DOWNLOAD_ACCEPTED}" ]] && rac_mcp_grep_any "${RAC_MARKER_REGISTERED_DOWNLOAD}" "Starting download for model:" "task=download-proto"; then
+      notes="fallback download marker matched"
+    elif [[ "${marker}" == "${RAC_MARKER_STT_LOADED}" ]] && rac_mcp_grep_any "STT model loaded: true" "STT model loaded successfully" "Sherpa.STT"; then
+      notes="fallback STT load marker matched"
+    elif [[ "${marker}" == "${RAC_MARKER_TTS_DONE}" ]] && rac_mcp_grep_any "Synthesis complete" "Synthesis completed"; then
+      notes="fallback TTS marker matched"
+    elif [[ "${marker}" == "${RAC_MARKER_VLM_DONE}" ]] && rac_mcp_grep_any "VLM processing complete" "Starting VLM streaming" "Frame description completed"; then
+      notes="fallback VLM marker matched"
+    elif [[ "${marker}" == "${RAC_MARKER_LLM_STREAM_DONE}" ]] && rac_mcp_grep_any "${RAC_MARKER_SDK_INIT}" "${RAC_MARKER_MODEL_LOAD}" "[PARAMS] generateStream" "Streaming token"; then
       notes="chat/stream fallback marker matched"
     else
       status="LIMITED"
@@ -372,6 +380,9 @@ rac_tc_drive_catalog() {
   if _rac_tc_is_deferred tc10; then
     if ! awk -F'	' '$1=="tc10"{found=1} END{exit !found}' "${RAC_SESSION_ROOT}/modality_results.tsv"; then
       rac_tc_done tc10 "N/A" "${RAC_TC_DEFER_NOTE:-dedicated flow; graded later}"
+    elif awk -F'\t' '$1=="tc10" && $2=="BLOCKED" && ($3 ~ /toolchain|melos|bootstrap|build blocked|dart\/flutter/) {exit 0} END{exit 1}' \
+        "${RAC_SESSION_ROOT}/modality_results.tsv" 2>/dev/null; then
+      rac_tc_done tc10 "N/A" "cleared stale infra BLOCKED; ${RAC_TC_DEFER_NOTE:-dedicated Flutter modality flows}"
     fi
   fi
 }

@@ -22,16 +22,16 @@ OUT_DIR="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk
 mkdir -p "${OUT_DIR}"
 
 if command -v wire-compiler >/dev/null 2>&1; then
-    # Wire emits pure Kotlin data classes for messages. GAP 09 service
+    # Wire emits pure Kotlin data classes for messages. Service
     # definitions are passed too — Wire treats `service { rpc ... }` blocks
     # as informational and emits the message types only. The streaming
     # client wrapper is hand-written in
     # sdk/runanywhere-kotlin/src/main/kotlin/.../adapters/
     # using kotlinx.coroutines Flow + the Wire-generated message types.
     #
-    # IDL-19c: canonical proto-file list from generate_all.sh, with fallback
+    # Canonical proto-file list from generate_all.sh, with fallback
     # to filesystem discovery when invoked standalone.
-    # IDL-19a (post-fix): component_types.proto is included in the Kotlin
+    # component_types.proto is included in the Kotlin
     # positive list. Wire does NOT transitively emit enum-only dependencies
     # (ComponentLifecycleState, EventCategory) when the defining proto is
     # excluded — a prior assumption that it did was incorrect and left

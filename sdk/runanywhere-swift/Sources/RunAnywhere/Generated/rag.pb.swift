@@ -64,12 +64,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-public enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case retrievalStarted // = 1
@@ -126,13 +126,13 @@ public enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// ---------------------------------------------------------------------------
 /// RAGConfiguration — low-level pipeline config.
 ///
-/// As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+/// This message carries *model ids*, not filesystem paths.
 /// The commons RAG session ABI (rac_rag_session_create_proto) is responsible
 /// for resolving those ids to on-disk paths through the canonical model
 /// registry. SDK callers MUST register the embedding / LLM / reranker models
 /// first and pass only their ids here.
 /// ---------------------------------------------------------------------------
-public struct RARAGConfiguration: Sendable {
+public nonisolated struct RARAGConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -147,23 +147,74 @@ public struct RARAGConfiguration: Sendable {
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-  public var embeddingDimension: Int32 = 0
+  /// Optional so callers can distinguish "unset" (commons stamps the
+  /// canonical default) from explicit zero / explicit override.
+  public var embeddingDimension: Int32 {
+    get {_embeddingDimension ?? 0}
+    set {_embeddingDimension = newValue}
+  }
+  /// Returns true if `embeddingDimension` has been explicitly set.
+  public var hasEmbeddingDimension: Bool {self._embeddingDimension != nil}
+  /// Clears the value of `embeddingDimension`. Subsequent reads from it will return its default value.
+  public mutating func clearEmbeddingDimension() {self._embeddingDimension = nil}
 
   /// Number of top chunks to retrieve per query.
-  public var topK: Int32 = 0
+  /// Optional so callers can distinguish "unset" from an explicit value.
+  public var topK: Int32 {
+    get {_topK ?? 0}
+    set {_topK = newValue}
+  }
+  /// Returns true if `topK` has been explicitly set.
+  public var hasTopK: Bool {self._topK != nil}
+  /// Clears the value of `topK`. Subsequent reads from it will return its default value.
+  public mutating func clearTopK() {self._topK = nil}
 
   /// Minimum cosine similarity threshold (0.0–1.0). Chunks below this
   /// score are discarded before being passed to the LLM as context.
-  public var similarityThreshold: Float = 0
+  /// Optional so callers can distinguish "unset" from explicit 0.0
+  /// (accept-everything) without losing the canonical default.
+  public var similarityThreshold: Float {
+    get {_similarityThreshold ?? 0}
+    set {_similarityThreshold = newValue}
+  }
+  /// Returns true if `similarityThreshold` has been explicitly set.
+  public var hasSimilarityThreshold: Bool {self._similarityThreshold != nil}
+  /// Clears the value of `similarityThreshold`. Subsequent reads from it will return its default value.
+  public mutating func clearSimilarityThreshold() {self._similarityThreshold = nil}
 
   /// Tokens per chunk when splitting documents during ingestion.
-  public var chunkSize: Int32 = 0
+  /// Optional so callers can distinguish "unset" from an explicit value.
+  public var chunkSize: Int32 {
+    get {_chunkSize ?? 0}
+    set {_chunkSize = newValue}
+  }
+  /// Returns true if `chunkSize` has been explicitly set.
+  public var hasChunkSize: Bool {self._chunkSize != nil}
+  /// Clears the value of `chunkSize`. Subsequent reads from it will return its default value.
+  public mutating func clearChunkSize() {self._chunkSize = nil}
 
   /// Overlap tokens between consecutive chunks. Must be < chunk_size.
-  public var chunkOverlap: Int32 = 0
+  /// Optional so callers can explicitly request zero overlap (no overlap)
+  /// without it being silently replaced by the canonical default of 64.
+  public var chunkOverlap: Int32 {
+    get {_chunkOverlap ?? 0}
+    set {_chunkOverlap = newValue}
+  }
+  /// Returns true if `chunkOverlap` has been explicitly set.
+  public var hasChunkOverlap: Bool {self._chunkOverlap != nil}
+  /// Clears the value of `chunkOverlap`. Subsequent reads from it will return its default value.
+  public mutating func clearChunkOverlap() {self._chunkOverlap = nil}
 
   /// Maximum tokens of retrieved context passed to the LLM.
-  public var maxContextTokens: Int32 = 0
+  /// Optional so callers can distinguish "unset" from an explicit value.
+  public var maxContextTokens: Int32 {
+    get {_maxContextTokens ?? 0}
+    set {_maxContextTokens = newValue}
+  }
+  /// Returns true if `maxContextTokens` has been explicitly set.
+  public var hasMaxContextTokens: Bool {self._maxContextTokens != nil}
+  /// Clears the value of `maxContextTokens`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxContextTokens() {self._maxContextTokens = nil}
 
   /// Prompt template with `{context}` and `{query}` placeholders.
   public var promptTemplate: String {
@@ -223,6 +274,12 @@ public struct RARAGConfiguration: Sendable {
 
   public init() {}
 
+  fileprivate var _embeddingDimension: Int32? = nil
+  fileprivate var _topK: Int32? = nil
+  fileprivate var _similarityThreshold: Float? = nil
+  fileprivate var _chunkSize: Int32? = nil
+  fileprivate var _chunkOverlap: Int32? = nil
+  fileprivate var _maxContextTokens: Int32? = nil
   fileprivate var _promptTemplate: String? = nil
   fileprivate var _embeddingConfigJson: String? = nil
   fileprivate var _llmConfigJson: String? = nil
@@ -233,7 +290,7 @@ public struct RARAGConfiguration: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGDocument — batch-ingest input item.
 /// ---------------------------------------------------------------------------
-public struct RARAGDocument: Sendable {
+public nonisolated struct RARAGDocument: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -287,7 +344,7 @@ public struct RARAGDocument: Sendable {
   fileprivate var _mediaType: String? = nil
 }
 
-public struct RARAGIngestRequest: Sendable {
+public nonisolated struct RARAGIngestRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -308,7 +365,7 @@ public struct RARAGIngestRequest: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGQueryOptions — per-query sampling and prompt overrides.
 /// ---------------------------------------------------------------------------
-public struct RARAGQueryOptions: Sendable {
+public nonisolated struct RARAGQueryOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -352,7 +409,7 @@ public struct RARAGQueryOptions: Sendable {
   fileprivate var _systemPrompt: String? = nil
 }
 
-public struct RARAGQueryRequest: Sendable {
+public nonisolated struct RARAGQueryRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -380,7 +437,7 @@ public struct RARAGQueryRequest: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGSearchResult — a single retrieved document chunk with similarity score.
 /// ---------------------------------------------------------------------------
-public struct RARAGSearchResult: Sendable {
+public nonisolated struct RARAGSearchResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -428,7 +485,7 @@ public struct RARAGSearchResult: Sendable {
 /// ---------------------------------------------------------------------------
 /// RAGResult — the full result of a RAG query.
 /// ---------------------------------------------------------------------------
-public struct RARAGResult: Sendable {
+public nonisolated struct RARAGResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -485,7 +542,7 @@ public struct RARAGResult: Sendable {
 ///
 /// Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
 /// ---------------------------------------------------------------------------
-public struct RARAGStatistics: Sendable {
+public nonisolated struct RARAGStatistics: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -552,7 +609,7 @@ public struct RARAGStatistics: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RARAGIngestResult: Sendable {
+public nonisolated struct RARAGIngestResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -591,7 +648,7 @@ public struct RARAGIngestResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RARAGStreamEvent: @unchecked Sendable {
+public nonisolated struct RARAGStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -660,7 +717,7 @@ public struct RARAGStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RARAGServiceState: @unchecked Sendable {
+public nonisolated struct RARAGServiceState: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -721,13 +778,13 @@ public struct RARAGServiceState: @unchecked Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RARAGStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0RAG_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED\0\u{1}RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED\0\u{1}RAG_STREAM_EVENT_KIND_CONTEXT_READY\0\u{1}RAG_STREAM_EVENT_KIND_TOKEN\0\u{1}RAG_STREAM_EVENT_KIND_COMPLETED\0\u{1}RAG_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embedding_model_id\0\u{3}llm_model_id\0\u{3}embedding_dimension\0\u{3}top_k\0\u{3}similarity_threshold\0\u{3}chunk_size\0\u{3}chunk_overlap\0\u{3}max_context_tokens\0\u{3}prompt_template\0\u{3}embedding_config_json\0\u{3}llm_config_json\0\u{3}index_path\0\u{3}persist_index\0\u{3}rerank_results\0\u{3}reranker_model_id\0")
 
@@ -739,12 +796,12 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.embeddingModelID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.llmModelID) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.embeddingDimension) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
-      case 5: try { try decoder.decodeSingularFloatField(value: &self.similarityThreshold) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.chunkSize) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self.chunkOverlap) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.maxContextTokens) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self._embeddingDimension) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self._topK) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self._similarityThreshold) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self._chunkSize) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self._chunkOverlap) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self._maxContextTokens) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self._promptTemplate) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._embeddingConfigJson) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._llmConfigJson) }()
@@ -768,24 +825,24 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if !self.llmModelID.isEmpty {
       try visitor.visitSingularStringField(value: self.llmModelID, fieldNumber: 2)
     }
-    if self.embeddingDimension != 0 {
-      try visitor.visitSingularInt32Field(value: self.embeddingDimension, fieldNumber: 3)
-    }
-    if self.topK != 0 {
-      try visitor.visitSingularInt32Field(value: self.topK, fieldNumber: 4)
-    }
-    if self.similarityThreshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.similarityThreshold, fieldNumber: 5)
-    }
-    if self.chunkSize != 0 {
-      try visitor.visitSingularInt32Field(value: self.chunkSize, fieldNumber: 6)
-    }
-    if self.chunkOverlap != 0 {
-      try visitor.visitSingularInt32Field(value: self.chunkOverlap, fieldNumber: 7)
-    }
-    if self.maxContextTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxContextTokens, fieldNumber: 8)
-    }
+    try { if let v = self._embeddingDimension {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._topK {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._similarityThreshold {
+      try visitor.visitSingularFloatField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._chunkSize {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._chunkOverlap {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._maxContextTokens {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 8)
+    } }()
     try { if let v = self._promptTemplate {
       try visitor.visitSingularStringField(value: v, fieldNumber: 9)
     } }()
@@ -813,12 +870,12 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   public static func ==(lhs: RARAGConfiguration, rhs: RARAGConfiguration) -> Bool {
     if lhs.embeddingModelID != rhs.embeddingModelID {return false}
     if lhs.llmModelID != rhs.llmModelID {return false}
-    if lhs.embeddingDimension != rhs.embeddingDimension {return false}
-    if lhs.topK != rhs.topK {return false}
-    if lhs.similarityThreshold != rhs.similarityThreshold {return false}
-    if lhs.chunkSize != rhs.chunkSize {return false}
-    if lhs.chunkOverlap != rhs.chunkOverlap {return false}
-    if lhs.maxContextTokens != rhs.maxContextTokens {return false}
+    if lhs._embeddingDimension != rhs._embeddingDimension {return false}
+    if lhs._topK != rhs._topK {return false}
+    if lhs._similarityThreshold != rhs._similarityThreshold {return false}
+    if lhs._chunkSize != rhs._chunkSize {return false}
+    if lhs._chunkOverlap != rhs._chunkOverlap {return false}
+    if lhs._maxContextTokens != rhs._maxContextTokens {return false}
     if lhs._promptTemplate != rhs._promptTemplate {return false}
     if lhs._embeddingConfigJson != rhs._embeddingConfigJson {return false}
     if lhs._llmConfigJson != rhs._llmConfigJson {return false}
@@ -831,7 +888,7 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{b}metadata_json\0\u{c}\u{3}\u{1}")
 
@@ -895,7 +952,7 @@ extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGIngestRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}documents\0\u{3}replace_existing\0\u{1}metadata\0")
 
@@ -940,7 +997,7 @@ extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0")
 
@@ -1014,7 +1071,7 @@ extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}options\0\u{1}metadata\0")
 
@@ -1058,7 +1115,7 @@ extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{b}metadata_json\0\u{c}\u{6}\u{1}")
 
@@ -1132,7 +1189,7 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}answer\0\u{3}retrieved_chunks\0\u{3}context_used\0\u{3}retrieval_time_ms\0\u{3}generation_time_ms\0\u{3}total_time_ms\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}request_id\0")
 
@@ -1221,7 +1278,7 @@ extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGStatistics"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}indexed_documents\0\u{3}indexed_chunks\0\u{3}total_tokens_indexed\0\u{3}last_updated_ms\0\u{3}index_path\0\u{3}stats_json\0\u{3}vector_store_size_bytes\0\u{3}is_persistent\0\u{3}last_query_ms\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1305,7 +1362,7 @@ extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGIngestResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}documents_ingested\0\u{3}chunks_ingested\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1364,7 +1421,7 @@ extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}chunk\0\u{1}token\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1490,7 +1547,7 @@ extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RARAGServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARAGServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{1}statistics\0\u{3}is_indexing\0\u{3}is_querying\0\u{3}active_request_id\0\u{3}error_message\0\u{3}error_code\0")
 

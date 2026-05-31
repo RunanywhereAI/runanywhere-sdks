@@ -1,6 +1,6 @@
 /**
  * @file rac_device_identity.h
- * @brief Persistent device-identity resolution (P2-T13).
+ * @brief Persistent device-identity resolution.
  *
  * Centralizes the chain that every platform SDK previously reimplemented:
  *   Keychain / EncryptedSharedPreferences / localStorage cache

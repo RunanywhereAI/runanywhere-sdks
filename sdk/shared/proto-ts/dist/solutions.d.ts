@@ -115,7 +115,7 @@ export interface VoiceAgentConfig {
      */
     audioFilePath: string;
     /** Barge-in behavior. */
-    enableBargeIn: boolean;
+    enableBargeIn?: boolean | undefined;
     /** default 200 */
     bargeInThresholdMs: number;
     /** LLM behavior. */

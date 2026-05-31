@@ -221,7 +221,7 @@ ensure_headers() {
 
     # Check version sentinel — re-download if version changed or files missing
     local NEED_ONNX_HEADERS=false
-    if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ]; then
+    if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_ep_c_api.h" ]; then
         NEED_ONNX_HEADERS=true
     elif [ -f "${SHERPA_DIR}/include/.onnx-header-version" ]; then
         local EXISTING_ONNX_VER
@@ -250,6 +250,11 @@ ensure_headers() {
             "${SHERPA_DIR}/include/onnxruntime_cxx_inline.h"
         download_header "${ONNX_HEADER_BASE}/onnxruntime_float16.h" \
             "${SHERPA_DIR}/include/onnxruntime_float16.h"
+        # ORT 1.24.x: onnxruntime_c_api.h includes onnxruntime_ep_c_api.h at EOF.
+        download_header "${ONNX_HEADER_BASE}/onnxruntime_ep_c_api.h" \
+            "${SHERPA_DIR}/include/onnxruntime_ep_c_api.h"
+        download_header "${ONNX_HEADER_BASE}/onnxruntime_ep_device_ep_metadata_keys.h" \
+            "${SHERPA_DIR}/include/onnxruntime_ep_device_ep_metadata_keys.h"
         echo "${ONNX_RT_VERSION}" > "${SHERPA_DIR}/include/.onnx-header-version"
         echo "✅ ONNX Runtime headers installed (v${ONNX_RT_VERSION})"
     fi

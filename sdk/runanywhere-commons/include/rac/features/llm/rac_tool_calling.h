@@ -317,6 +317,66 @@ RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_outpu
  */
 RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
 
+/**
+ * @brief Map a runanywhere.v1.ToolCallFormatName proto enum value to its
+ *        canonical runtime hint string.
+ *
+ * *** SINGLE SOURCE OF TRUTH for the proto-enum -> hint-string mapping. ***
+ *
+ * Every SDK previously hand-rolled this table (Swift's
+ * `RAToolCallingOptions.resolvedFormatName`, Kotlin's `toToolFormatHint`,
+ * etc.), and the tables diverged (e.g. Kotlin emitted "pythonic", which
+ * rac_tool_call_format_from_name does not recognize and silently downgrades).
+ * SDKs must instead pass their generated `ToolCallFormatName` enum's integer
+ * value here and forward the result as `format_hint`. The returned string is
+ * always one of the values rac_tool_call_format_from_name() accepts ("default"
+ * or "lfm2"):
+ *   - TOOL_CALL_FORMAT_NAME_PYTHONIC (4) / TOOL_CALL_FORMAT_NAME_HERMES (6) -> "lfm2"
+ *   - everything else (JSON, XML, NATIVE, OPENAI_FUNCTIONS, UNSPECIFIED, and any
+ *     unknown/future value) -> "default"
+ *
+ * Takes the proto enum as an int32 (not rac_tool_call_format_t) because the C
+ * format enum only models two runtime routes while the proto enum carries
+ * seven naming variants; this keeps the proto enum the canonical input.
+ *
+ * @param format_name runanywhere.v1.ToolCallFormatName enum value as an int32.
+ * @return Static lowercase hint string (do not free).
+ */
+RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_name);
+
+/**
+ * @brief Derive the tool-call format from a serialized RAModelInfo.
+ *
+ * Canonical replacement for per-example heuristics like Swift's
+ * `LLMViewModel.detectToolCallFormat(for:)`, Flutter's
+ * `_detectToolCallFormat()`, Kotlin's `ToolSettingsViewModel.detectToolCallFormat()`,
+ * and the React Native equivalent. Every example was duplicating the same
+ * `name.contains("lfm2") && name.contains("tool")` mapping; this commons-owned
+ * accessor centralizes the rule so SDKs derive the format from `RAModelInfo`
+ * proto bytes and example apps never reach into model-naming conventions.
+ *
+ * Inspection rule (case-insensitive on `name`, `id`, and `description`):
+ *   - LiquidAI LFM2-Tool family (e.g. "LFM2-1.2B-Tool", "LFM2-350M-Tool") →
+ *     RAC_TOOL_FORMAT_LFM2 (Pythonic <|tool_call_start|>...<|tool_call_end|>).
+ *   - Anything else → RAC_TOOL_FORMAT_DEFAULT (JSON-tagged <tool_call>…</tool_call>).
+ *
+ * Empty / NULL model_info_proto_bytes (size==0) is accepted and returns
+ * RAC_TOOL_FORMAT_DEFAULT — examples occasionally call the helper while the
+ * model registry is empty.
+ *
+ * @param model_info_proto_bytes Borrowed runanywhere.v1.ModelInfo bytes (may
+ *                               be NULL when @p size is 0).
+ * @param size                   Byte count of @p model_info_proto_bytes.
+ * @param out_format             Output: derived tool-call format. Must not be
+ *                               NULL. Set to RAC_TOOL_FORMAT_DEFAULT on
+ *                               recoverable failures (empty/invalid bytes).
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER when @p out_format is
+ *         NULL, RAC_ERROR_DECODING_ERROR when the bytes do not parse as
+ *         runanywhere.v1.ModelInfo.
+ */
+RAC_API rac_result_t rac_tool_call_format_from_model_info_proto(
+    const uint8_t* model_info_proto_bytes, size_t size, rac_tool_call_format_t* out_format);
+
 // =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
 // =============================================================================
@@ -511,7 +571,7 @@ rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t succ
                                           char** out_json);
 
 // =============================================================================
-// TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
+// TOOL VALUE JSON BRIDGE - Replaces hand-written per-SDK JSON serializers
 // =============================================================================
 //
 // SDKs treat ToolValue (the recursive JSON-typed carrier defined in
@@ -552,7 +612,7 @@ RAC_API rac_result_t rac_tool_value_from_json_proto(const uint8_t* in_string_byt
                                                     rac_proto_buffer_t* out_tool_value);
 
 // =============================================================================
-// TOOL CALLING SESSION (Wave D-4) - Native orchestration state machine
+// TOOL CALLING SESSION - Native orchestration state machine
 // =============================================================================
 
 typedef void (*rac_tool_calling_session_event_callback_fn)(const uint8_t* event_bytes,
@@ -587,8 +647,29 @@ RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_han
  */
 RAC_API rac_result_t rac_tool_calling_session_cancel_proto(uint64_t session_handle);
 
+/**
+ * @brief Spin-wait until all in-flight tool-calling session event dispatches
+ *        have returned.
+ *
+ * The tool-calling session event dispatcher (drain_and_dispatch) snapshots
+ * (callback, user_data) under the session mutex, releases the lock, then
+ * fires the host callback. A concurrent rac_tool_calling_session_destroy_proto
+ * can race the dispatcher between the unlock and the callback fire, freeing
+ * @c user_data before @c cb(payload, size, ud) executes. This helper
+ * spin-waits on a process-global in-flight counter so destroy paths can
+ * guarantee no callback is mid-flight before returning to the host.
+ *
+ * Mirrors @c rac_llm_proto_quiesce / @c rac_vlm_proto_quiesce /
+ * @c rac_stt_proto_quiesce. Already called internally from
+ * @c rac_tool_calling_session_destroy_proto. Exposed publicly so SDK bridges
+ * tearing down on their own (e.g. SDK-level shutdown that races a still-active
+ * event dispatcher) can coordinate user_data lifetime without re-entering the
+ * destroy path. Safe to call from any thread.
+ */
+RAC_API void rac_tool_calling_session_proto_quiesce(void);
+
 // =============================================================================
-// TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
+// TOOL CALLING RUN LOOP - Single-call native orchestration
 // =============================================================================
 //
 // Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up
@@ -718,31 +799,36 @@ RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_proto(
 typedef void (*rac_tool_calling_run_loop_on_handle_published_cb_t)(uint64_t run_loop_handle,
                                                                    void* user_data);
 
-/*
- * @brief (pass3-syn-028 future ABI) Variant of
- *        rac_tool_calling_run_loop_with_handle_proto that adds a
- *        synchronous handle-publication callback. This signature is
- *        DECLARATION-RESERVED — implementation lands in a follow-up so
- *        SDKs can converge on this shape rather than reinventing per-SDK
- *        handle-publication races (Swift `HandleBox.set` from a different
- *        thread, RN Nitro `onHandle` not exposed, Kotlin
- *        `invokeOnCompletion` disposal timing). The typedef
- *        rac_tool_calling_run_loop_on_handle_published_cb_t above is
- *        already stable so SDK code can type its trampolines today; once
- *        the commons-side implementation lands the function below will be
- *        un-commented and SDKs flip from the pointer-shape to the
- *        callback-shape uniformly. See the @warning block above
- *        rac_tool_calling_run_loop_with_handle_proto for the rationale.
+/**
+ * @brief Variant of rac_tool_calling_run_loop_with_handle_proto that adds a
+ *        synchronous handle-publication callback (pass3-syn-028).
  *
- *        Followup tracker: pass3-syn-028-followup-commons.json
+ * Fires @p on_handle_published(handle, on_handle_user_data) SYNCHRONOUSLY
+ * the moment the cancellable run-loop handle is minted, BEFORE the first
+ * generate iteration runs. This lets SDKs route the handle into a
+ * thread-safe sink (Swift `HandleBox.set`, Kotlin `CompletableDeferred`,
+ * RN JS-thread callback, Flutter `Completer`, Web synchronous capture)
+ * without racing the worker thread that owns the run-loop. The pointer-shape
+ * @p out_run_loop_handle is still populated so legacy hosts that observe
+ * both have a stable contract.
  *
- * RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
- *     const uint8_t* in_request_bytes, size_t in_size,
- *     rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
- *     rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
- *     void* on_handle_user_data, uint64_t* out_run_loop_handle,
- *     rac_proto_buffer_t* out_result);
+ * @param in_request_bytes        Borrowed serialized
+ *                                runanywhere.v1.ToolCallingSessionCreateRequest.
+ * @param in_size                 Size of in_request_bytes.
+ * @param on_execute              Synchronous tool-execute callback.
+ * @param on_execute_user_data    Opaque pointer forwarded to on_execute.
+ * @param on_handle_published     Synchronous handle-publication callback.
+ *                                Pass NULL to use the pointer-shape only.
+ * @param on_handle_user_data     Opaque pointer forwarded to on_handle_published.
+ * @param out_run_loop_handle     Output handle for cancellation. 0 if unavailable.
+ * @param out_result              Owned serialized ToolCallingResult on success.
+ * @return RAC_SUCCESS when out_result carries a serialized result.
  */
+RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
+    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
+    void* on_execute_user_data,
+    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result);
 
 /**
  * @brief Cancel an in-flight tool-calling run loop (pass2-syn-007).

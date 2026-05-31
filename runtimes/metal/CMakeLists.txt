@@ -26,6 +26,3 @@ target_link_libraries(rac_runtime_metal PUBLIC
     "-framework Foundation"
     "-framework Metal"
 )
-
-set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_RUNTIMES metal)
-set_property(GLOBAL APPEND PROPERTY RAC_RUNTIME_metal_DEVICE_CLASS GPU)

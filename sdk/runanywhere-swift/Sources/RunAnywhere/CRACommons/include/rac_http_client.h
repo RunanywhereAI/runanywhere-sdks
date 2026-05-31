@@ -1,6 +1,6 @@
 /**
  * @file rac_http_client.h
- * @brief Native HTTP client C ABI (v2 close-out Phase H).
+ * @brief Native HTTP client C ABI.
  *
  * Opaque handle around a libcurl easy handle (see
  * `src/infrastructure/http/rac_http_client_curl.cpp`). Replaces the
@@ -212,7 +212,7 @@ RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_htt
 RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
 // =============================================================================
-// REQUEST OPTIONS — UPSERT MODE (P2-T10)
+// REQUEST OPTIONS — UPSERT MODE
 // =============================================================================
 
 /**
@@ -230,7 +230,7 @@ RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
                                                       const char* on_conflict_field);
 
 // =============================================================================
-// CANONICAL DEFAULT HEADERS (P2-T11)
+// CANONICAL DEFAULT HEADERS
 // =============================================================================
 
 /**
@@ -251,7 +251,7 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
 // =============================================================================
 // RESULT CODES
 // =============================================================================
-// Phase H consumers only need to check against RAC_SUCCESS; the other
+// Consumers only need to check against RAC_SUCCESS; the other
 // result codes come from rac/core/rac_error.h. For convenience:
 //
 //   RAC_SUCCESS                     — transfer completed (check .status

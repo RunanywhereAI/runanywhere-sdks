@@ -13,8 +13,7 @@
  * 3. Consistent error handling
  * 4. Memory safety with proper cleanup
  *
- * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
- * "Bridge Layer Audit"):
+ * V2 bridge classification:
  *   - Proto-byte JNI thunks (`rac*Proto` family, e.g.
  *     racLlmGenerateProto, racSttComponentTranscribeProto,
  *     racModelLifecycle*Proto, racDownload*Proto, racStorage*Proto,
@@ -25,8 +24,8 @@
  *   - Legacy non-proto component JSON thunks (racLlmComponentGenerate*,
  *     racSttComponent{Transcribe,...}, racVlmComponentProcess*,
  *     racVadComponentGetStatistics, racLoraRegistry*, racHardwareGet*,
- *     racStructuredOutputExtractJson, etc.) were deleted in Wave 1
- *     (CPP-06) once every Kotlin call site migrated to the `*Proto`
+ *     racStructuredOutputExtractJson, etc.) were deleted
+ *     once every Kotlin call site migrated to the `*Proto`
  *     sibling. New non-proto thunks are not accepted.
  *   - Platform adapter callbacks (file manager, archive extraction,
  *     OkHttp transport, secure storage, telemetry batches, model
@@ -37,13 +36,16 @@
 
 #include <jni.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
+#include <exception>
 #include <limits>
 #include <mutex>
+#include <new>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
@@ -59,6 +61,7 @@
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_error_proto.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -90,15 +93,17 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/solutions/rac_solution.h"
-// v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
+// Proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
 #include "rac/features/llm/rac_llm_stream.h"
-// Wave H-5: proto-byte VAD stream ABI for Kotlin's streamVAD Flow.
+// Proto-byte VAD stream ABI for Kotlin's streamVAD Flow.
 #include "rac/features/vad/rac_vad_stream.h"
-// Round-1 CPP fix: hardware ABI, structured output, VAD statistics.
+// Hardware ABI, structured output, VAD statistics.
 #include "rac/core/rac_sdk_state.h"
+#include "rac/features/llm/rac_llm_schema_to_json.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -144,7 +149,11 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 
 static JavaVM* g_jvm = nullptr;
 static jobject g_platform_adapter = nullptr;
-static std::mutex g_adapter_mutex;
+// commons-155: recursive so jni_*_callback can lock around g_platform_adapter
+// reads even when the writer (racSetPlatformAdapter) emits log lines while
+// already holding the lock — `LOGw(...)` in the writer routes through
+// jni_log_callback which now also takes this mutex.
+static std::recursive_mutex g_adapter_mutex;
 
 // Method IDs for platform adapter callbacks (cached)
 static jmethodID g_method_log = nullptr;
@@ -156,6 +165,12 @@ static jmethodID g_method_secure_get = nullptr;
 static jmethodID g_method_secure_set = nullptr;
 static jmethodID g_method_secure_delete = nullptr;
 static jmethodID g_method_now_ms = nullptr;
+// Directory enumeration slots populated by Kotlin adapter so the
+// model-registry refresh path (rescan_local) and rac_model_info_make_proto's
+// is_downloaded probe for multi-file artifacts work on Android the same way
+// they do on Web. See rac_platform_adapter.h for the cross-SDK contract.
+static jmethodID g_method_file_list_directory = nullptr;
+static jmethodID g_method_is_non_empty_directory = nullptr;
 
 // =============================================================================
 // JNI OnLoad/OnUnload
@@ -168,17 +183,45 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     return JNI_VERSION_1_6;
 }
 
+// Forward declarations of the per-listener-map cleanup helpers defined further
+// down the file. JNI_OnUnload calls them so every GlobalRef cached by this TU
+// is released when the JVM unloads the native library (commons-154).
+namespace {
+void rac_jni_release_all_listener_global_refs(JNIEnv* env);
+// commons-057: release the single per-handle GlobalRef this TU caches for an
+// LLM / VAD handle. racLlm/VadComponentDestroy call these so a
+// load->stream->destroy cycle that never hits the explicit unset-callback path
+// does not leak one GlobalRef per cycle (which eventually overflows the JVM
+// global reference table). Defined near the listener maps at the bottom of the
+// TU where the maps are in scope.
+void rac_jni_erase_llm_stream_listener(JNIEnv* env, uintptr_t handle_key);
+void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key);
+}  // namespace
+
 // NOLINTNEXTLINE(misc-unused-parameters): `vm`/`reserved` are part of the JNI ABI.
 JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved) {
     LOGi("JNI_OnUnload: runanywhere_commons_jni unloading");
 
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
-    if (g_platform_adapter != nullptr) {
-        JNIEnv* env = nullptr;
-        if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
-            env->DeleteGlobalRef(g_platform_adapter);
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        env = nullptr;
+    }
+
+    // commons-154: drain every per-handle / per-subscription GlobalRef map so
+    // GlobalRefs are not leaked when the JVM unloads the native library.
+    // Mirrors the g_platform_adapter cleanup below.
+    if (env != nullptr) {
+        rac_jni_release_all_listener_global_refs(env);
+    }
+
+    {
+        std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
+        if (g_platform_adapter != nullptr) {
+            if (env != nullptr) {
+                env->DeleteGlobalRef(g_platform_adapter);
+            }
+            g_platform_adapter = nullptr;
         }
-        g_platform_adapter = nullptr;
     }
     g_jvm = nullptr;
 }
@@ -209,21 +252,36 @@ static JNIEnv* getJNIEnv() {
     return env;
 }
 
-static std::string getCString(JNIEnv* env, jstring str) {
+// commons-056: noexcept by construction — the only throwing call below is the
+// `std::string` ctor which can raise std::bad_alloc on memory-constrained
+// devices. Letting it escape across the JNI vtable boundary is UB per JNI
+// §13.1; we catch and return an empty string instead. Callers that need to
+// distinguish "empty input" from "OOM" must check for the input being null
+// before calling.
+static std::string getCString(JNIEnv* env, jstring str) noexcept {
     if (str == nullptr)
-        return "";
+        return std::string();
     const char* chars = env->GetStringUTFChars(str, nullptr);
     if (chars == nullptr)
-        return "";
-    std::string result(chars);
-    env->ReleaseStringUTFChars(str, chars);
-    return result;
+        return std::string();
+    try {
+        std::string result(chars);
+        env->ReleaseStringUTFChars(str, chars);
+        return result;
+    } catch (...) {
+        env->ReleaseStringUTFChars(str, chars);
+        return std::string();
+    }
 }
 
-static const char* getNullableCString(JNIEnv* env, jstring str, std::string& storage) {
+static const char* getNullableCString(JNIEnv* env, jstring str, std::string& storage) noexcept {
     if (str == nullptr)
         return nullptr;
-    storage = getCString(env, str);
+    try {
+        storage = getCString(env, str);
+    } catch (...) {
+        storage.clear();
+    }
     return storage.c_str();
 }
 
@@ -499,6 +557,21 @@ struct JByteArrayView {
     size_t size() const { return static_cast<size_t>(length); }
 };
 
+// commons-089: callback user-data for the proto-byte stream thunks.
+//
+// Lifetime contract: the streaming `rac_*_stream_proto` /
+// `rac_*_process_turn_proto` C entry points are SYNCHRONOUS — they run the full
+// inference inline and fire `callback` zero or more times BEFORE returning (no
+// `src/features` proto path spawns a worker thread). That makes it safe for
+// racLlmGenerateStreamProto / racSttTranscribeStreamLifecycleProto /
+// racTtsSynthesizeStreamLifecycleProto / racVlmProcessStreamProto /
+// racDiffusionGenerateWithProgressProto / racStructuredOutputGenerateStreamProto
+// / racVoiceAgentProcessTurnProto to stack-allocate this ctx and DeleteGlobalRef
+// the listener immediately after the call returns.
+//
+// The ONLY async case is racToolCallingSessionCreateProto, whose callback fires
+// across later step() calls — it heap-allocates this struct and tracks it in
+// toolCallingCtxMap() until racToolCallingSessionDestroyProto frees it.
 struct ProtoListenerUserData {
     jobject listener;
     const char* operation;
@@ -553,6 +626,19 @@ static jbyteArray makeFeatureUnavailableResult(JNIEnv* env, const char* operatio
     return makeProtoCallResult(env, RAC_ERROR_FEATURE_NOT_AVAILABLE, &result, operation);
 }
 
+// commons-156: a NewStringUTF / NewByteArray failure inside a callback that C++
+// invokes leaves a pending OutOfMemoryError. If it is not cleared before the
+// next JNI call on this thread, ART aborts the subsequent call with a
+// misleading "JNI called with pending exception" error. Callbacks call this
+// right after a `New*` that returned NULL, then bail with their own error code.
+static bool jniClearPendingException(JNIEnv* env) {
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return true;
+    }
+    return false;
+}
+
 // =============================================================================
 // Platform Adapter C Callbacks (called by C++ library)
 // =============================================================================
@@ -568,9 +654,15 @@ static rac_platform_adapter_t g_c_adapter;
 // JNI implementations don't need the user_data hand-off because they retrieve
 // state via JVM globals; the unused parameters are required by the C ABI.
 // NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
+// commons-155: each jni_*_callback takes g_adapter_mutex (now recursive) so a
+// concurrent racSetPlatformAdapter cannot DeleteGlobalRef while we are
+// mid-CallXxxMethod on the same jobject. Recursion permits LOGw inside the
+// writer (which already holds the lock) to re-enter jni_log_callback without
+// deadlocking.
 static void jni_log_callback(rac_log_level_t level, const char* tag, const char* message,
                              void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
         // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
         // since this function IS the platform adapter's log callback). Map the
@@ -617,11 +709,16 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
 
 static rac_bool_t jni_file_exists_callback(const char* path, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_exists == nullptr) {
         return RAC_FALSE;
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        return RAC_FALSE;
+    }
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_exists, jPath);
     env->DeleteLocalRef(jPath);
 
@@ -631,11 +728,18 @@ static rac_bool_t jni_file_exists_callback(const char* path, void* user_data) {
 static rac_result_t jni_file_read_callback(const char* path, void** out_data, size_t* out_size,
                                            void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_read == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        *out_data = nullptr;
+        *out_size = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jbyteArray result = static_cast<jbyteArray>(
         env->CallObjectMethod(g_platform_adapter, g_method_file_read, jPath));
     env->DeleteLocalRef(jPath);
@@ -647,14 +751,18 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
     }
 
     jsize len = env->GetArrayLength(result);
-    *out_data = malloc(len);
-    if (*out_data == nullptr) {
+    // commons-156: malloc(0) is implementation-defined; treat a zero-byte file
+    // as a clean empty read instead of a spurious OOM.
+    *out_data = len > 0 ? malloc(static_cast<size_t>(len)) : nullptr;
+    if (len > 0 && *out_data == nullptr) {
         *out_size = 0;
         env->DeleteLocalRef(result);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     *out_size = static_cast<size_t>(len);
-    env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(*out_data));
+    if (len > 0) {
+        env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(*out_data));
+    }
 
     env->DeleteLocalRef(result);
     return RAC_SUCCESS;
@@ -663,14 +771,29 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
 static rac_result_t jni_file_write_callback(const char* path, const void* data, size_t size,
                                             void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_write == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jbyteArray jData = env->NewByteArray(static_cast<jsize>(size));
-    env->SetByteArrayRegion(jData, 0, static_cast<jsize>(size),
-                            reinterpret_cast<const jbyte*>(data));
+    if (jData == nullptr) {
+        // commons-156: NewByteArray returns NULL on OOM; without this guard the
+        // following SetByteArrayRegion dereferences NULL / raises and leaves a
+        // pending exception for the next JNI call.
+        jniClearPendingException(env);
+        env->DeleteLocalRef(jPath);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    if (size > 0) {
+        env->SetByteArrayRegion(jData, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(data));
+    }
 
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_write, jPath, jData);
 
@@ -682,11 +805,16 @@ static rac_result_t jni_file_write_callback(const char* path, const void* data, 
 
 static rac_result_t jni_file_delete_callback(const char* path, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_delete == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
     jstring jPath = env->NewStringUTF(path ? path : "");
+    if (jPath == nullptr) {
+        jniClearPendingException(env);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_delete, jPath);
     env->DeleteLocalRef(jPath);
 
@@ -695,6 +823,7 @@ static rac_result_t jni_file_delete_callback(const char* path, void* user_data) 
 
 static rac_result_t jni_secure_get_callback(const char* key, char** out_value, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -704,9 +833,13 @@ static rac_result_t jni_secure_get_callback(const char* key, char** out_value, v
         static_cast<jstring>(env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
     env->DeleteLocalRef(jKey);
 
+    // Contract (rac_platform_adapter.h secure_get): MUST return
+    // RAC_ERROR_FILE_NOT_FOUND on a clean key-miss so commons consumers can
+    // discriminate misses from real keychain failures. The Kotlin callback
+    // returns null for the miss case (see CppBridgePlatformAdapter.secureGetCallback).
     if (result == nullptr) {
         *out_value = nullptr;
-        return RAC_ERROR_NOT_FOUND;
+        return RAC_ERROR_FILE_NOT_FOUND;
     }
 
     const char* chars = env->GetStringUTFChars(result, nullptr);
@@ -727,6 +860,7 @@ static rac_result_t jni_secure_get_callback(const char* key, char** out_value, v
 
 static rac_result_t jni_secure_set_callback(const char* key, const char* value, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -743,6 +877,7 @@ static rac_result_t jni_secure_set_callback(const char* key, const char* value, 
 
 static rac_result_t jni_secure_delete_callback(const char* key, void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -756,12 +891,152 @@ static rac_result_t jni_secure_delete_callback(const char* key, void* user_data)
 
 static int64_t jni_now_ms_callback(void* user_data) {
     JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_now_ms == nullptr) {
         // Fallback to system time
         return static_cast<int64_t>(time(nullptr)) * 1000;
     }
 
     return env->CallLongMethod(g_platform_adapter, g_method_now_ms);
+}
+
+// Directory enumeration via java.io.File.listFiles().
+//
+// Two-call semantics (per `rac_file_list_directory_fn`):
+//   1. out_entries == NULL -> write total entry count into *in_out_count,
+//      return RAC_SUCCESS without touching the entries array.
+//   2. out_entries != NULL -> fill up to *in_out_count entries, update
+//      *in_out_count to the number written.
+//
+// Truncation contract (per `rac_directory_entry_t::name`): when a UTF-8 entry
+// name (+NUL) would exceed RAC_DIRECTORY_ENTRY_NAME_MAX the Kotlin callback
+// MUST skip the entry rather than truncate; we mirror that on the JNI side
+// in case the Kotlin layer ever forwards an oversized name (defensive copy
+// uses strncpy with explicit NUL-termination so we never produce a half-name
+// that aliases a different artifact).
+static rac_result_t jni_file_list_directory_callback(const char* dir_path,
+                                                     rac_directory_entry_t* out_entries,
+                                                     size_t* in_out_count, void* user_data) {
+    if (in_out_count == nullptr) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr ||
+        g_method_file_list_directory == nullptr) {
+        return RAC_ERROR_ADAPTER_NOT_SET;
+    }
+
+    jstring jPath = env->NewStringUTF(dir_path ? dir_path : "");
+    jobjectArray result = static_cast<jobjectArray>(env->CallObjectMethod(
+        g_platform_adapter, g_method_file_list_directory, jPath));
+    env->DeleteLocalRef(jPath);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return RAC_ERROR_INTERNAL;
+    }
+    // Kotlin returns null to signal "directory does not exist" per the C ABI
+    // contract; any other error is mapped to a structured Throwable above.
+    if (result == nullptr) {
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+
+    const jsize total = env->GetArrayLength(result);
+
+    // Capacity-query branch: caller wants the entry count.
+    if (out_entries == nullptr) {
+        *in_out_count = static_cast<size_t>(total);
+        env->DeleteLocalRef(result);
+        return RAC_SUCCESS;
+    }
+
+    // Fill branch: write up to *in_out_count entries.
+    const size_t capacity = *in_out_count;
+    const size_t write_count = std::min(capacity, static_cast<size_t>(total));
+
+    for (size_t i = 0; i < write_count; ++i) {
+        jobject entryObj = env->GetObjectArrayElement(result, static_cast<jsize>(i));
+        if (entryObj == nullptr) {
+            // Skip null slots defensively — the Kotlin contract should never
+            // emit them, but treat as a benign skip rather than abort the
+            // whole listing.
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            out_entries[i].is_dir = RAC_FALSE;
+            out_entries[i].size_bytes = 0;
+            continue;
+        }
+
+        // Kotlin RacDirectoryEntry is a data class with `name: String`,
+        // `isDir: Boolean`, `sizeBytes: Long`. Look up the fields once per
+        // entry — class lookup is cheap and the array length is typically
+        // small (model-registry rescan_local on a single artifact dir).
+        jclass entryClass = env->GetObjectClass(entryObj);
+        jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
+        jfieldID isDirField = env->GetFieldID(entryClass, "isDir", "Z");
+        jfieldID sizeField = env->GetFieldID(entryClass, "sizeBytes", "J");
+
+        jstring jName = static_cast<jstring>(env->GetObjectField(entryObj, nameField));
+        jboolean jIsDir = env->GetBooleanField(entryObj, isDirField);
+        jlong jSize = env->GetLongField(entryObj, sizeField);
+
+        const char* nameChars = (jName != nullptr) ? env->GetStringUTFChars(jName, nullptr) : nullptr;
+        if (nameChars != nullptr) {
+            const size_t nameLen = std::strlen(nameChars);
+            if (nameLen + 1 <= RAC_DIRECTORY_ENTRY_NAME_MAX) {
+                std::memcpy(out_entries[i].name, nameChars, nameLen);
+                out_entries[i].name[nameLen] = '\0';
+            } else {
+                // Defensive: Kotlin should already have filtered oversized
+                // entries per the truncation contract. Zero-fill so we
+                // never expose a half-name to commons.
+                std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+            }
+            env->ReleaseStringUTFChars(jName, nameChars);
+        } else {
+            std::memset(out_entries[i].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+        }
+
+        out_entries[i].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
+        out_entries[i].size_bytes = static_cast<int64_t>(jSize);
+
+        if (jName != nullptr) {
+            env->DeleteLocalRef(jName);
+        }
+        env->DeleteLocalRef(entryClass);
+        env->DeleteLocalRef(entryObj);
+    }
+
+    *in_out_count = write_count;
+    env->DeleteLocalRef(result);
+    return RAC_SUCCESS;
+}
+
+// Cheap directory-probe used by rac_model_info_make_proto's
+// is_downloaded gating. Falls back to file_list_directory + entry-count
+// inside commons if NULL; we populate it so multi-file artifacts (mmproj +
+// GGUF pairs, tokenizer + ONNX bundles) get the fast path on Android.
+static rac_bool_t jni_is_non_empty_directory_callback(const char* path, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
+    if (env == nullptr || g_platform_adapter == nullptr ||
+        g_method_is_non_empty_directory == nullptr) {
+        return RAC_FALSE;
+    }
+
+    jstring jPath = env->NewStringUTF(path ? path : "");
+    jboolean result =
+        env->CallBooleanMethod(g_platform_adapter, g_method_is_non_empty_directory, jPath);
+    env->DeleteLocalRef(jPath);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        return RAC_FALSE;
+    }
+    return result ? RAC_TRUE : RAC_FALSE;
 }
 // NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 
@@ -779,7 +1054,7 @@ static int64_t jni_now_ms_callback(void* user_data) {
 //   * Cast jlong handles to opaque pointers via reinterpret_cast — that is
 //     the canonical JNI handle-passing idiom and the only way to round-trip
 //     a native handle through the JVM.
-// Wave D-4 / KOT-08 tool-calling session helpers. These return C++-only types
+// Tool-calling session helpers. These return C++-only types
 // (std::mutex&, std::unordered_map&) so they must have C++ linkage, even though
 // the JNI thunks that call them live in the extern "C" block below.
 namespace {
@@ -792,6 +1067,53 @@ std::unordered_map<uint64_t, ProtoListenerUserData*>& toolCallingCtxMap() {
     return m;
 }
 }  // namespace
+
+// =============================================================================
+// commons-056: JNI exception-safety macros.
+// =============================================================================
+// Per JNI Spec §13.1, a C++ exception that escapes a native method invocation
+// is undefined behavior: ART's exception slot is left in an inconsistent
+// state and subsequent ExceptionCheck calls either silently miss the throw or
+// abort with "JNI DETECTED ERROR IN APPLICATION USE OF JNI". On
+// memory-constrained Android devices `std::string` construction in the
+// helpers below can raise `std::bad_alloc`, so every JNIEXPORT thunk that
+// performs C++ allocations should wrap its body with RAC_JNI_TRY /
+// RAC_JNI_CATCH_*. The catch arms translate std::bad_alloc to
+// RAC_ERROR_OUT_OF_MEMORY and any other std::exception (or unknown type) to
+// RAC_ERROR_INTERNAL, mirroring the contract of the rest of the C ABI.
+//
+// Pure forwarders that only pass primitives through the C ABI do not throw
+// and may remain unwrapped. The helpers `getCString` / `getNullableCString`
+// above are themselves `noexcept`, so simple ID-string thunks that already
+// route through them are protected at the helper layer.
+#define RAC_JNI_TRY try
+#define RAC_JNI_CATCH_RET(ret_on_oom, ret_on_internal)    \
+    catch (const std::bad_alloc& _e) {                    \
+        LOGe("JNI thunk: out of memory (%s)", _e.what()); \
+        return (ret_on_oom);                              \
+    }                                                     \
+    catch (const std::exception& _e) {                    \
+        LOGe("JNI thunk: %s", _e.what());                 \
+        return (ret_on_internal);                         \
+    }                                                     \
+    catch (...) { /* unknown exception type */            \
+        LOGe("JNI thunk: unknown exception");             \
+        return (ret_on_internal);                         \
+    }
+#define RAC_JNI_CATCH_INT()                                       \
+    RAC_JNI_CATCH_RET(static_cast<jint>(RAC_ERROR_OUT_OF_MEMORY), \
+                      static_cast<jint>(RAC_ERROR_INTERNAL))
+#define RAC_JNI_CATCH_PTR() RAC_JNI_CATCH_RET(nullptr, nullptr)
+#define RAC_JNI_CATCH_VOID()                              \
+    catch (const std::bad_alloc& _e) {                    \
+        LOGe("JNI thunk: out of memory (%s)", _e.what()); \
+    }                                                     \
+    catch (const std::exception& _e) {                    \
+        LOGe("JNI thunk: %s", _e.what());                 \
+    }                                                     \
+    catch (...) {                                         \
+        LOGe("JNI thunk: unknown exception");             \
+    }
 
 // NOLINTBEGIN(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
 extern "C" {
@@ -842,7 +1164,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
                                                                                jobject adapter) {
     LOGi("racSetPlatformAdapter called");
 
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
 
     // Clean up previous adapter
     if (g_platform_adapter != nullptr) {
@@ -874,6 +1196,27 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_method_secure_delete =
         env->GetMethodID(adapterClass, "secureDelete", "(Ljava/lang/String;)Z");
     g_method_now_ms = env->GetMethodID(adapterClass, "nowMs", "()J");
+    // Optional Kotlin-side directory probes. Method lookup is
+    // best-effort — older host apps that haven't been recompiled against the
+    // new adapter surface will miss these IDs and commons will fall through
+    // to its NULL-callback branches (rescan_local emits a warning,
+    // is_downloaded for multi-file artifacts reports false). New builds
+    // expose CppBridgePlatformAdapter.fileListDirectory / isNonEmptyDirectory
+    // so the model-registry and is_downloaded paths match the Web/Swift
+    // behaviour documented in rac_platform_adapter.h.
+    g_method_file_list_directory = env->GetMethodID(
+        adapterClass, "fileListDirectory",
+        "(Ljava/lang/String;)[Lcom/runanywhere/sdk/foundation/bridge/extensions/RacDirectoryEntry;");
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_method_file_list_directory = nullptr;
+    }
+    g_method_is_non_empty_directory =
+        env->GetMethodID(adapterClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_method_is_non_empty_directory = nullptr;
+    }
 
     env->DeleteLocalRef(adapterClass);
 
@@ -888,6 +1231,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
     g_c_adapter.secure_set = jni_secure_set_callback;
     g_c_adapter.secure_delete = jni_secure_delete_callback;
     g_c_adapter.now_ms = jni_now_ms_callback;
+    // Populate directory enumeration slots iff the Kotlin
+    // adapter exposed the corresponding methods. get_vendor_id intentionally
+    // remains NULL — Android has no UIDevice.identifierForVendor analog, so
+    // commons synthesizes + persists a UUID via secure_set per the cross-SDK
+    // contract in rac_platform_adapter.h.
+    g_c_adapter.file_list_directory =
+        (g_method_file_list_directory != nullptr) ? jni_file_list_directory_callback : nullptr;
+    g_c_adapter.is_non_empty_directory =
+        (g_method_is_non_empty_directory != nullptr) ? jni_is_non_empty_directory_callback : nullptr;
     g_c_adapter.user_data = nullptr;
 
     LOGi("racSetPlatformAdapter: adapter set successfully");
@@ -897,7 +1249,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 JNIEXPORT jobject JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racGetPlatformAdapter(JNIEnv* env,
                                                                                jclass clazz) {
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     return g_platform_adapter;
 }
 
@@ -933,6 +1285,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLogMetadataShouldRed
         return JNI_FALSE;
     }
     return out != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
+}
+
+// Maps a `rac_result_t` to a serialized SDKError proto via the canonical
+// commons helper, so Kotlin's SDKException routes the rac_result_t -> proto
+// translation through the same single source of truth as Swift
+// (RASDKError+Helpers.swift). Returns the serialized SDKError bytes.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racResultToProtoError(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jint code) {
+    rac_proto_buffer_t buffer = {};
+    rac_proto_buffer_init(&buffer);
+    rac_result_t rc =
+        rac_result_to_proto_error(static_cast<rac_result_t>(code), &buffer);
+    return makeProtoCallResult(env, rc, &buffer, "racResultToProtoError");
 }
 
 // =============================================================================
@@ -982,6 +1349,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentDestroy(
                                                                                 jclass clazz,
                                                                                 jlong handle) {
     if (handle != 0) {
+        // commons-057: drop the cached stream-listener GlobalRef before
+        // destroying the component so an unbalanced setStreamProtoCallback (no
+        // matching unset) cannot leak it past the handle's lifetime.
+        rac_jni_erase_llm_stream_listener(env, static_cast<uintptr_t>(handle));
         rac_llm_component_destroy(reinterpret_cast<rac_handle_t>(handle));
     }
 }
@@ -1024,10 +1395,14 @@ JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentCancel(JNIEnv* env,
                                                                                jclass clazz,
                                                                                jlong handle) {
-    // STT component doesn't have a cancel method, just unload
-    if (handle != 0) {
-        rac_stt_component_unload(reinterpret_cast<rac_handle_t>(handle));
-    }
+    // commons-058: intentional no-op. STT exposes no non-destructive stop/cancel
+    // in the C ABI, and component-handle transcription is synchronous and
+    // lifecycle-owned (rac_stt_transcribe[_stream]_lifecycle_proto), so there is
+    // no in-flight work to interrupt at this layer. The previous
+    // rac_stt_component_unload aliasing destructively evicted the loaded model on
+    // cancel, forcing a full reload on the next transcribe. iOS Swift exposes no
+    // STT cancel at all (CppBridge+STT has only load/unload/destroy).
+    (void)handle;
 }
 
 // =============================================================================
@@ -1059,9 +1434,12 @@ JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentCancel(JNIEnv* env,
                                                                                jclass clazz,
                                                                                jlong handle) {
-    // TTS component doesn't have a cancel method, just unload
+    // commons-058: stop the in-flight synthesis without evicting the loaded
+    // voice. The previous rac_tts_component_unload aliasing destroyed the model
+    // on cancel, forcing a multi-hundred-MB reload on the next synthesize. This
+    // mirrors racVadComponentCancel -> rac_vad_component_stop.
     if (handle != 0) {
-        rac_tts_component_unload(reinterpret_cast<rac_handle_t>(handle));
+        rac_tts_component_stop(reinterpret_cast<rac_handle_t>(handle));
     }
 }
 
@@ -1086,6 +1464,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentDestroy(
                                                                                 jclass clazz,
                                                                                 jlong handle) {
     if (handle != 0) {
+        // commons-057: release both VAD listener GlobalRefs (activity + stream)
+        // for this handle before destroy. Reset intentionally keeps them since
+        // the component is reused after a reset.
+        rac_jni_erase_vad_listeners(env, static_cast<uintptr_t>(handle));
         rac_vad_component_destroy(reinterpret_cast<rac_handle_t>(handle));
     }
 }
@@ -1113,7 +1495,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentReset(JN
 //
 // The legacy struct/JSON pipeline (javaModelInfoToC, modelInfoToJson,
 // racModelRegistrySave / Get / GetAll / GetDownloaded / Remove /
-// UpdateDownloadStatus) was deleted after KOT-CPPBRIDGE-MOVE. Kotlin
+// UpdateDownloadStatus) was deleted. Kotlin
 // has migrated to the `racModelRegistry*Proto` family below.
 // =============================================================================
 
@@ -1276,6 +1658,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh
 }
 
 JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegisterModelFromUrlProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
+    return callProtoBufferFn(env, requestBytes, rac_register_model_from_url_proto,
+                             "racRegisterModelFromUrlProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelFormatFromUrlProto(
     JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
     return callProtoBufferFn(env, requestBytes, rac_model_format_from_url_proto,
@@ -1331,7 +1720,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racComponentLifecycleSn
 //
 // The legacy struct/JSON path (racModelAssignmentSetCallbacks,
 // racModelAssignmentFetch, model_assignment_http_get_callback,
-// g_model_assignment_state) was deleted after KOT-CPPBRIDGE-MOVE. Kotlin
+// g_model_assignment_state) was deleted. Kotlin
 // now uses `racModelRegistryFetchAssignmentsProto` which routes through
 // the canonical platform HTTP adapter registered via
 // `rac_http_transport_register`.
@@ -2424,8 +2813,8 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 //
 // The legacy JSON-stringy family (racToolCallParse, FormatPromptJson,
 // FormatPromptJsonWithFormat, FormatPromptJsonWithFormatName,
-// BuildInitialPrompt, BuildFollowupPrompt, NormalizeJson) was deleted
-// after KOT-CPPBRIDGE-MOVE. Kotlin now calls the proto-byte entries
+// BuildInitialPrompt, BuildFollowupPrompt, NormalizeJson) was deleted.
+// Kotlin now calls the proto-byte entries
 // (`racToolCallParseProto`, `racToolCallFormatPromptProto`,
 // `racToolCallValidateProto`).
 // =============================================================================
@@ -2766,17 +3155,29 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventSubscribe(JN
     if (listener == nullptr) {
         return 0;
     }
-    jobject globalListener = env->NewGlobalRef(listener);
-    uint64_t subscriptionId = rac_sdk_event_subscribe(sdk_event_jni_callback, globalListener);
-    if (subscriptionId == 0) {
-        env->DeleteGlobalRef(globalListener);
-        return 0;
+    RAC_JNI_TRY {
+        jobject globalListener = env->NewGlobalRef(listener);
+        uint64_t subscriptionId = rac_sdk_event_subscribe(sdk_event_jni_callback, globalListener);
+        if (subscriptionId == 0) {
+            env->DeleteGlobalRef(globalListener);
+            return 0;
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
+            // commons-056: map allocation can throw std::bad_alloc on low-mem
+            // devices; the surrounding try/catch translates that to 0 (the
+            // INVALID_SUBSCRIPTION sentinel) and releases the GlobalRef.
+            try {
+                g_sdk_event_listeners[subscriptionId] = globalListener;
+            } catch (...) {
+                rac_sdk_event_unsubscribe(subscriptionId);
+                env->DeleteGlobalRef(globalListener);
+                throw;
+            }
+        }
+        return static_cast<jlong>(subscriptionId);
     }
-    {
-        std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
-        g_sdk_event_listeners[subscriptionId] = globalListener;
-    }
-    return static_cast<jlong>(subscriptionId);
+    RAC_JNI_CATCH_RET(0L, 0L)
 }
 
 JNIEXPORT void JNICALL
@@ -2942,7 +3343,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDownloadProgressPoll
 
 static int auth_storage_store(const char* key, const char* value, void* /*ctx*/) {
     JNIEnv* env = getJNIEnv();
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
         return -1;
     }
@@ -2980,7 +3381,7 @@ static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer
     if (out_value == nullptr || buffer_size == 0)
         return -1;
     JNIEnv* env = getJNIEnv();
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
         return -1;
     }
@@ -3016,7 +3417,7 @@ static int auth_storage_retrieve(const char* key, char* out_value, size_t buffer
 
 static int auth_storage_delete(const char* key, void* /*ctx*/) {
     JNIEnv* env = getJNIEnv();
-    std::lock_guard<std::mutex> lock(g_adapter_mutex);
+    std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
         return -1;
     }
@@ -3163,12 +3564,30 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetValidToken(JN
     if (rc < 0)
         return nullptr;
 
+    // commons-122: guard the JNI allocations and release every local ref so the
+    // hot auth-refresh path cannot exhaust the per-frame local-ref budget or
+    // dereference a NULL class/array if FindClass / NewObjectArray fail.
     jclass strCls = env->FindClass("java/lang/String");
-    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
-    if (token) {
-        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(token));
+    if (strCls == nullptr) {
+        return nullptr;
     }
-    env->SetObjectArrayElement(arr, 1, env->NewStringUTF(needsRefresh ? "true" : "false"));
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+    env->DeleteLocalRef(strCls);
+    if (arr == nullptr) {
+        return nullptr;
+    }
+    if (token != nullptr) {
+        jstring jToken = env->NewStringUTF(token);
+        if (jToken != nullptr) {
+            env->SetObjectArrayElement(arr, 0, jToken);
+            env->DeleteLocalRef(jToken);
+        }
+    }
+    jstring jNeedsRefresh = env->NewStringUTF(needsRefresh ? "true" : "false");
+    if (jNeedsRefresh != nullptr) {
+        env->SetObjectArrayElement(arr, 1, jNeedsRefresh);
+        env->DeleteLocalRef(jNeedsRefresh);
+    }
     return arr;
 }
 
@@ -3192,7 +3611,7 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 // JNI FUNCTIONS - VoiceAgentStreamAdapter (rac_voice_agent_set_proto_callback)
 // =============================================================================
 //
-// v3-readiness Phase A1 / GAP 09 #6. Closes the broken Kotlin streaming path
+// Closes the broken Kotlin streaming path
 // the 3-agent audit flagged: VoiceAgentStreamAdapter.kt declared
 // nativeRegisterCallback / nativeUnregisterCallback with no matching JNI
 // symbols, which would throw UnsatisfiedLinkError at runtime.
@@ -3309,10 +3728,153 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeU
 
     rac_voice_agent_handle_t racHandle =
         reinterpret_cast<rac_voice_agent_handle_t>(static_cast<uintptr_t>(handle));
-    // Clear the C-side slot first so no further callbacks fire.
+    // commons-059 fix: prevent UAF between in-flight `va_stream_trampoline`
+    // and `delete ctx`. The unset clears the slot for FUTURE dispatches but
+    // a concurrent dispatcher that already copied the slot can still be
+    // mid-CallObjectMethod on `ctx->lambda_ref`. Quiesce spin-waits until
+    // every in-flight invocation has returned, mirroring the destroy
+    // ordering documented at rac_voice_event_abi.h:97-118 and applied in
+    // voice_agent.cpp:250.
     rac_voice_agent_set_proto_callback(racHandle, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
 
     auto* ctx = reinterpret_cast<VaStreamCallbackCtx*>(static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)
+        env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls)
+        env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
+// =============================================================================
+//
+// commons-161. Mirrors the VoiceAgentStreamAdapter thunks above so the
+// generic HandleStreamAdapter can fan one C callback slot out to N Kotlin
+// Flow collectors for LLM token streams. Same one-registration-per-handle
+// pattern: each register = one heap-allocated LlmStreamCallbackCtx holding a
+// global ref to the Kotlin Function1<ByteArray, Unit> lambda + the cached
+// Function1.invoke() method ID; the C trampoline resolves JNIEnv* on the fly
+// and forwards proto bytes back to the JVM. The matching Kotlin JniBridge
+// lives at com.runanywhere.sdk.adapters.LLMStreamAdapter$JniBridge — the
+// symbol mangling below ties these thunks to that exact class path.
+//
+// ABI limitation: rac_llm_set_stream_proto_callback has ONE callback slot per
+// LLM handle. Multiple concurrent stream() calls on the same handle REPLACE
+// each other — documented on the Kotlin companion.
+
+namespace {
+
+struct LlmStreamCallbackCtx {
+    jobject lambda_ref;    // Global ref to Kotlin Function1<ByteArray, Unit>
+    jclass function1_cls;  // Global ref to kotlin.jvm.functions.Function1
+    jmethodID invoke_mid;  // Function1.invoke(Object)
+};
+
+void llm_stream_adapter_trampoline(const uint8_t* event_bytes, size_t event_size,
+                                   void* user_data) {
+    if (!user_data || !event_bytes || !g_jvm)
+        return;
+
+    auto* ctx = static_cast<LlmStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env = nullptr;
+    bool needs_detach = false;
+    jint getEnvRc = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        // `void**` cast matches the working GetEnv pattern above and the
+        // host-JDK signature on macOS/Linux; Android NDK's `JNIEnv**` is
+        // binary-compatible.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(jbytes, 0, static_cast<jsize>(event_size),
+                                reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;  // INVALID_CALLBACK_ID on the Kotlin side
+    }
+
+    // 1. Global-ref the lambda so it survives past this thunk.
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef)
+        return 0;
+
+    // 2. Resolve + cache Function1.invoke(Object)
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx = new LlmStreamCallbackCtx{};
+    ctx->lambda_ref = lambdaRef;
+    ctx->function1_cls = function1Cls;
+    ctx->invoke_mid = invokeMid;
+
+    rac_result_t rc = rac_llm_set_stream_proto_callback(
+        handleFromJLong(handle), &llm_stream_adapter_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0)
+        return;
+
+    // commons-161 / commons-059 parity: prevent UAF between an in-flight
+    // `llm_stream_adapter_trampoline` and `delete ctx`. The unset clears the
+    // slot for FUTURE dispatches, but a concurrent dispatcher that already
+    // copied the slot can still be mid-CallObjectMethod on `ctx->lambda_ref`.
+    // Quiesce spin-waits until every in-flight invocation has returned,
+    // mirroring the teardown sequence documented at rac_llm_stream.h:88-93 and
+    // the VoiceAgent unregister thunk above.
+    rac_llm_unset_stream_proto_callback(handleFromJLong(handle));
+    rac_llm_proto_quiesce();
+
+    auto* ctx = reinterpret_cast<LlmStreamCallbackCtx*>(static_cast<uintptr_t>(callbackId));
     if (ctx->lambda_ref)
         env->DeleteGlobalRef(ctx->lambda_ref);
     if (ctx->function1_cls)
@@ -3620,24 +4182,27 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActiv
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
-        auto it = g_vad_proto_listeners.find(key);
-        if (it != g_vad_proto_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_vad_proto_listeners.erase(it);
+    RAC_JNI_TRY {
+        {
+            std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+            auto it = g_vad_proto_listeners.find(key);
+            if (it != g_vad_proto_listeners.end()) {
+                env->DeleteGlobalRef(it->second);
+                g_vad_proto_listeners.erase(it);
+            }
+            if (listener != nullptr) {
+                g_vad_proto_listeners[key] = env->NewGlobalRef(listener);
+            }
         }
-        if (listener != nullptr) {
-            g_vad_proto_listeners[key] = env->NewGlobalRef(listener);
-        }
+        return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
+            handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
     }
-    return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
-        handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
-        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+    RAC_JNI_CATCH_INT()
 }
 
 // =============================================================================
-// VAD STREAM PROTO ABI (rac_vad_stream.h) — Wave H-5
+// VAD STREAM PROTO ABI (rac_vad_stream.h)
 // =============================================================================
 
 static std::mutex g_vad_stream_listener_mutex;
@@ -3670,20 +4235,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetStreamProtoCal
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
-        auto it = g_vad_stream_listeners.find(key);
-        if (it != g_vad_stream_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_vad_stream_listeners.erase(it);
+    RAC_JNI_TRY {
+        {
+            std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+            auto it = g_vad_stream_listeners.find(key);
+            if (it != g_vad_stream_listeners.end()) {
+                env->DeleteGlobalRef(it->second);
+                g_vad_stream_listeners.erase(it);
+            }
+            if (listener != nullptr) {
+                g_vad_stream_listeners[key] = env->NewGlobalRef(listener);
+            }
         }
-        if (listener != nullptr) {
-            g_vad_stream_listeners[key] = env->NewGlobalRef(listener);
-        }
+        return static_cast<jint>(rac_vad_set_stream_proto_callback(
+            handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
     }
-    return static_cast<jint>(rac_vad_set_stream_proto_callback(
-        handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
-        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+    RAC_JNI_CATCH_INT()
 }
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -3860,6 +4428,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatch
     return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchProto");
 }
 
+// Swift-aligned: mirror iOS Swift / Flutter which use
+// rac_embeddings_embed_batch_lifecycle_proto (no handle, lifecycle-only).
+// Resolves the lifecycle-loaded embeddings model internally so embed calls
+// share the same model-load/registry state as LLM/STT/TTS.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsEmbedBatchLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_embeddings_embed_batch_lifecycle_proto(request.u8(), request.size(),
+                                                                 &result);
+    return makeProtoCallResult(env, rc, &result, "racEmbeddingsEmbedBatchLifecycleProto");
+}
+
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEmbeddingsDestroy(JNIEnv* env,
                                                                               jclass clazz,
@@ -3883,6 +4469,42 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionCreateProt
         return 0L;
     rac_handle_t session = nullptr;
     rac_result_t rc = createSession(config.u8(), config.size(), &session);
+    if (RAC_FAILED(rc))
+        return 0L;
+    return reinterpret_cast<jlong>(session);
+}
+
+// commons-123-A: parallel thunk that surfaces the underlying rac_result_t via
+// outRc[0] so the Kotlin caller can build a typed SDKException instead of the
+// opaque "returned 0" message produced by the legacy primitive-jlong thunk.
+// Matches the parity contract Swift's CppBridge.RAG.createPipeline satisfies
+// at sdk/runanywhere-swift/.../ModalityProtoABI+Generated.swift:641-654.
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSessionCreateProtoWithError(
+    JNIEnv* env, jclass clazz, jbyteArray configProto, jintArray outRc) {
+    (void)clazz;
+    auto writeRc = [&](rac_result_t rc) {
+        if (outRc == nullptr)
+            return;
+        if (env->GetArrayLength(outRc) < 1)
+            return;
+        jint tmp = static_cast<jint>(rc);
+        env->SetIntArrayRegion(outRc, 0, 1, &tmp);
+    };
+    JByteArrayView config(env, configProto);
+    if (!config.ok) {
+        writeRc(RAC_ERROR_INVALID_ARGUMENT);
+        return 0L;
+    }
+    using Fn = rac_result_t (*)(const uint8_t*, size_t, rac_handle_t*);
+    Fn createSession = optionalNativeSymbol<Fn>("rac_rag_session_create_proto");
+    if (createSession == nullptr) {
+        writeRc(RAC_ERROR_FEATURE_NOT_AVAILABLE);
+        return 0L;
+    }
+    rac_handle_t session = nullptr;
+    rac_result_t rc = createSession(config.u8(), config.size(), &session);
+    writeRc(rc);
     if (RAC_FAILED(rc))
         return 0L;
     return reinterpret_cast<jlong>(session);
@@ -4141,7 +4763,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegisterProto(
     return makeProtoCallResult(env, rc, &result, "racLoraRegisterProto");
 }
 
-// LoRA catalog proto thunks (gaps/kotlin.md KOT-JNI-ORPHAN). Kotlin
+// LoRA catalog proto thunks. Kotlin
 // `RunAnywhereBridge.racLoraCatalog{List,Query,Get,MarkDownloadCompleted}Proto`
 // declared `external fun` for these but no JNI thunks existed, causing
 // `UnsatisfiedLinkError` on the first LoRA catalog access from
@@ -4212,7 +4834,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCatalogMarkDownl
     return makeProtoCallResult(env, rc, &result, "racLoraCatalogMarkDownloadCompletedProto");
 }
 
-// Plugin registry thunks (gaps/kotlin.md KOT-JNI-ORPHAN). Kotlin
+// Plugin registry thunks. Kotlin
 // `RunAnywhere+PluginLoader.jvmAndroid.kt` calls these at module
 // registration time (PluginInfo.apiVersion, .count, .load, .unload,
 // .registeredNames), but no JNI thunks existed, causing UnsatisfiedLinkError.
@@ -4286,7 +4908,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryGetRegistere
 }
 
 // =============================================================================
-// Voice Agent Handle API (v3.1 P3.2: Android sample needs a voice agent
+// Voice Agent Handle API (Android sample needs a voice agent
 // handle to feed VoiceAgentStreamAdapter. Mirrors Swift's
 // CppBridge.VoiceAgent.shared.getHandle() pattern.)
 // =============================================================================
@@ -4382,7 +5004,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessVoi
     return makeProtoCallResult(env, rc, &result, "racVoiceAgentProcessVoiceTurnProto");
 }
 
-// Wave D-7 / KOT-11: full-session voice-agent turn ABI. Accepts the full
+// Full-session voice-agent turn ABI. Accepts the full
 // VoiceAgentTurnRequest bytes (request_id, session_id, session_config,
 // metadata, audio_data + encoding) and emits a canonical VoiceEvent stream
 // via the registered listener.
@@ -4433,7 +5055,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentSynthesize
 }
 
 // =============================================================================
-// Wave D-4 / KOT-08: Tool-calling session ABI (native orchestration loop).
+// Tool-calling session ABI (native orchestration loop).
 // =============================================================================
 //
 // Commons owns the full generate → parse → validate → execute → loop
@@ -4447,28 +5069,40 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCr
     if (!request.ok || listener == nullptr)
         return 0L;
 
-    // The listener lives for the entire session lifetime. Kotlin side is
-    // responsible for calling racToolCallingSessionDestroyProto to release
-    // this global ref — see below.
-    jobject globalListener = env->NewGlobalRef(listener);
-    auto* ctx = new ProtoListenerUserData{.listener = globalListener,
-                                          .operation = "racToolCallingSessionCreateProto"};
+    RAC_JNI_TRY {
+        // The listener lives for the entire session lifetime. Kotlin side is
+        // responsible for calling racToolCallingSessionDestroyProto to release
+        // this global ref — see below.
+        jobject globalListener = env->NewGlobalRef(listener);
+        auto* ctx = new ProtoListenerUserData{.listener = globalListener,
+                                              .operation = "racToolCallingSessionCreateProto"};
 
-    uint64_t sessionHandle = 0;
-    rac_result_t rc = rac_tool_calling_session_create_proto(
-        request.u8(), request.size(),
-        reinterpret_cast<rac_tool_calling_session_event_callback_fn>(proto_void_callback), ctx,
-        &sessionHandle);
-    if (rc != RAC_SUCCESS || sessionHandle == 0) {
-        env->DeleteGlobalRef(globalListener);
-        delete ctx;
-        return 0L;
+        uint64_t sessionHandle = 0;
+        rac_result_t rc = rac_tool_calling_session_create_proto(
+            request.u8(), request.size(),
+            reinterpret_cast<rac_tool_calling_session_event_callback_fn>(proto_void_callback), ctx,
+            &sessionHandle);
+        if (rc != RAC_SUCCESS || sessionHandle == 0) {
+            env->DeleteGlobalRef(globalListener);
+            delete ctx;
+            return 0L;
+        }
+        {
+            std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
+            // commons-056: map allocation can throw bad_alloc; unwind the
+            // already-registered session so we don't leak a dangling ctx.
+            try {
+                toolCallingCtxMap()[sessionHandle] = ctx;
+            } catch (...) {
+                rac_tool_calling_session_destroy_proto(sessionHandle);
+                env->DeleteGlobalRef(globalListener);
+                delete ctx;
+                throw;
+            }
+        }
+        return static_cast<jlong>(sessionHandle);
     }
-    {
-        std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
-        toolCallingCtxMap()[sessionHandle] = ctx;
-    }
-    return static_cast<jlong>(sessionHandle);
+    RAC_JNI_CATCH_RET(0L, 0L)
 }
 
 JNIEXPORT jint JNICALL
@@ -4524,10 +5158,169 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCa
 }
 
 // =============================================================================
+// Tool-calling run loop — single-call native orchestration.
+// =============================================================================
+//
+// Mirrors Swift's RunAnywhere+ToolCalling.swift, which drives
+// rac_tool_calling_run_loop_with_handle_proto. Kotlin uses the
+// `_and_cb_proto` variant so the just-minted run-loop handle is published
+// SYNCHRONOUSLY into a Kotlin sink (CompletableDeferred) the moment it is
+// minted — letting a cancel coroutine on a different thread fan a cancel into
+// rac_tool_calling_run_loop_cancel_proto. Both the executor and the
+// handle-publication callbacks fire on the SAME thread that invoked the
+// run-loop (commons runs the loop inline), so capturing the calling JNIEnv in
+// the context struct is safe.
+namespace {
+struct RunLoopExecuteCtx {
+    JNIEnv* env;
+    jobject executor;         // fun interface: executeToolCall([B) -> [B]
+    jobject on_handle;        // fun interface: onHandlePublished(J), may be null
+    const char* operation;
+};
+
+rac_result_t run_loop_execute_trampoline(const uint8_t* in_tool_call_bytes, size_t in_size,
+                                         rac_proto_buffer_t* out_tool_result_bytes,
+                                         void* user_data) {
+    if (out_tool_result_bytes == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_tool_result_bytes);
+    auto* ctx = static_cast<RunLoopExecuteCtx*>(user_data);
+    if (ctx == nullptr || ctx->env == nullptr || ctx->executor == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    JNIEnv* env = ctx->env;
+
+    if (in_size > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    jbyteArray inBytes = env->NewByteArray(static_cast<jsize>(in_size));
+    if (inBytes == nullptr) {
+        env->ExceptionClear();
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    if (in_size > 0 && in_tool_call_bytes != nullptr) {
+        env->SetByteArrayRegion(inBytes, 0, static_cast<jsize>(in_size),
+                                reinterpret_cast<const jbyte*>(in_tool_call_bytes));
+    }
+
+    jclass cls = env->GetObjectClass(ctx->executor);
+    jmethodID method = env->GetMethodID(cls, "executeToolCall", "([B)[B");
+    env->DeleteLocalRef(cls);
+    if (method == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(inBytes);
+        return RAC_ERROR_INTERNAL;
+    }
+    auto resultBytes =
+        static_cast<jbyteArray>(env->CallObjectMethod(ctx->executor, method, inBytes));
+    env->DeleteLocalRef(inBytes);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        if (resultBytes != nullptr) {
+            env->DeleteLocalRef(resultBytes);
+        }
+        return RAC_ERROR_INTERNAL;
+    }
+    if (resultBytes == nullptr) {
+        return RAC_ERROR_INTERNAL;
+    }
+
+    const jsize resultLen = env->GetArrayLength(resultBytes);
+    jbyte* bytes = resultLen > 0 ? env->GetByteArrayElements(resultBytes, nullptr) : nullptr;
+    rac_result_t rc = rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes),
+                                            static_cast<size_t>(resultLen), out_tool_result_bytes);
+    if (bytes != nullptr) {
+        env->ReleaseByteArrayElements(resultBytes, bytes, JNI_ABORT);
+    }
+    env->DeleteLocalRef(resultBytes);
+    return rc;
+}
+
+void run_loop_handle_published_trampoline(uint64_t run_loop_handle, void* user_data) {
+    auto* ctx = static_cast<RunLoopExecuteCtx*>(user_data);
+    if (ctx == nullptr || ctx->env == nullptr || ctx->on_handle == nullptr) {
+        return;
+    }
+    JNIEnv* env = ctx->env;
+    jclass cls = env->GetObjectClass(ctx->on_handle);
+    jmethodID method = env->GetMethodID(cls, "onHandlePublished", "(J)V");
+    env->DeleteLocalRef(cls);
+    if (method == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    env->CallVoidMethod(ctx->on_handle, method, static_cast<jlong>(run_loop_handle));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+}
+}  // namespace
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopWithHandleAndCbProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes, jobject executor, jobject onHandle) {
+    (void)clazz;
+    static const char* operation = "racToolCallingRunLoopWithHandleAndCbProto";
+    JByteArrayView request(env, requestBytes);
+    if (!request.ok || executor == nullptr) {
+        return makeProtoCallResult(env, RAC_ERROR_NULL_POINTER, nullptr, operation);
+    }
+    RAC_JNI_TRY {
+        RunLoopExecuteCtx ctx{.env = env,
+                              .executor = executor,
+                              .on_handle = onHandle,
+                              .operation = operation};
+        uint64_t handle = 0;
+        rac_proto_buffer_t result = {};
+        rac_proto_buffer_init(&result);
+        rac_result_t rc = rac_tool_calling_run_loop_with_handle_and_cb_proto(
+            request.u8(), request.size(), run_loop_execute_trampoline, &ctx,
+            onHandle != nullptr ? run_loop_handle_published_trampoline : nullptr, &ctx, &handle,
+            &result);
+        return makeProtoCallResult(env, rc, &result, operation);
+    }
+    RAC_JNI_CATCH_PTR()
+}
+
+// pass2-syn-007: cancel the in-flight run loop from any thread. Idempotent —
+// a stale/zero handle is a no-op returning RAC_SUCCESS.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopCancelProto(
+    JNIEnv* env, jclass clazz, jlong runLoopHandle) {
+    (void)env;
+    (void)clazz;
+    if (runLoopHandle == 0L)
+        return RAC_SUCCESS;
+    return static_cast<jint>(
+        rac_tool_calling_run_loop_cancel_proto(static_cast<uint64_t>(runLoopHandle)));
+}
+
+// =============================================================================
+// Tool-value JSON bridge (G3) — rac_tool_value_{to,from}_json_proto.
+// Replaces the per-SDK recursive ToolValue<->JSON walk. Mirrors Swift's
+// ToolCallingTypes.swift which loads the same two symbols.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolValueToJsonProto(
+    JNIEnv* env, jclass clazz, jbyteArray toolValueProto) {
+    return callProtoBufferFn(env, toolValueProto, rac_tool_value_to_json_proto,
+                             "racToolValueToJsonProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolValueFromJsonProto(
+    JNIEnv* env, jclass clazz, jbyteArray toolValueJsonProto) {
+    return callProtoBufferFn(env, toolValueJsonProto, rac_tool_value_from_json_proto,
+                             "racToolValueFromJsonProto");
+}
+
+// =============================================================================
 // JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
 // =============================================================================
 //
-// T4.7/T4.8 — proto-byte / YAML driven L5 solution runtime. One-to-one
+// Proto-byte / YAML driven L5 solution runtime. One-to-one
 // mapping over `rac_solution_*`; the Kotlin handle is the C handle cast
 // to jlong. 0 from create_from_* signals failure and the handle was
 // never allocated, so destroy is a no-op for it.
@@ -4648,7 +5441,7 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Native HTTP download (v2 close-out Phase H)
+// JNI FUNCTIONS - Native HTTP download
 // =============================================================================
 //
 // Single synchronous entrypoint that Kotlin's CppBridgeDownload shim calls
@@ -4725,10 +5518,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
         }
     }
 
-    // Route through the internal C++ streaming facade (Stage 2 refactor).
+    // Route through the internal C++ streaming facade.
     // Under the hood this still calls rac_http_download_execute, but
     // going through the facade centralises where libcurl can be swapped
-    // out for the registered platform transport (Stage 5 deletion).
+    // out for the registered platform transport.
     int32_t http_status = 0;
     rac_http_download_status_t status = rac::http::execute_stream(
         req, listener ? jni_download_progress_cb : nullptr, &ctx, &http_status);
@@ -4747,7 +5540,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Native HTTP request/response (v2.1 quick-wins, T3.5)
+// JNI FUNCTIONS - Native HTTP request/response
 // =============================================================================
 //
 // Single blocking entrypoint for buffered HTTP request/response. Wraps
@@ -4884,7 +5677,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
     req.timeout_ms = timeoutMs > 0 ? timeoutMs : 0;
     req.follow_redirects = followRedirects == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
 
-    // Route through the internal C++ HTTP facade (Stage 2 refactor).
+    // Route through the internal C++ HTTP facade.
     // The facade owns the rac_http_client_t lifecycle internally and
     // routes the send through the registered platform transport when
     // one is installed, else falls back to libcurl.
@@ -4977,7 +5770,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDefaultHeaders(J
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Hardware Profile (Task 1 — CPP-blocked G-C6 round-1 fix)
+// JNI FUNCTIONS - Hardware Profile
 // Mirrors Swift's RunAnywhere+Hardware.swift / Kotlin's hardware namespace.
 // =============================================================================
 
@@ -5008,7 +5801,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareProfileGet(J
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Engine Router Capabilities (Wave H-5 / KOT-12)
+// JNI FUNCTIONS - Engine Router Capabilities
 //
 // `rac_router_frameworks_for_capability_proto` consumes a serialized
 // FrameworksForCapabilityRequest and returns a serialized
@@ -5075,6 +5868,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputVali
                              "racStructuredOutputValidateProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputSchemaToJsonProto(
+    JNIEnv* env, jclass clazz, jbyteArray schemaProto) {
+    return callProtoBufferFn(env, schemaProto, rac_structured_output_schema_to_json_proto,
+                             "racStructuredOutputSchemaToJsonProto");
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGenerateStreamProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
@@ -5096,7 +5896,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
 }
 
 // =============================================================================
-// JNI FUNCTIONS - VAD Statistics (Task 3 — CPP-blocked G-C6 round-1 fix)
+// JNI FUNCTIONS - VAD Statistics
 // Swift's setVADStatisticsCallback needs ambientLevel, recentAvg, recentMax.
 // =============================================================================
 
@@ -5110,14 +5910,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
 // =============================================================================
 
 // =============================================================================
-// JNI FUNCTIONS — Swift-alignment Phase 1 (Groups A–I)
+// JNI FUNCTIONS — Swift-alignment
 //
 // Bulk thunk bootstrap added to unblock the Kotlin SDK's Swift-alignment
-// effort. Each thunk is a thin wrapper over the matching rac_* C ABI; see
-// docs/CPP_PROTO_OWNERSHIP.md for the proto-byte default classification.
+// effort. Each thunk is a thin wrapper over the matching rac_* C ABI.
 // =============================================================================
 
-// ---------- Group A: Component metadata getters --------------------------------
+// ---------- Component metadata getters --------------------------------
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareGetAccelerators(JNIEnv* env,
@@ -5241,7 +6040,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentConfigur
     return static_cast<jint>(rac_stt_component_configure(handleFromJLong(handle), &config));
 }
 
-// ---------- Group B: Voice agent composite + lifecycle -------------------------
+// ---------- Voice agent composite + lifecycle -------------------------
 
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreate(JNIEnv* env,
@@ -5272,7 +6071,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCleanup(JN
         rac_voice_agent_cleanup(reinterpret_cast<rac_voice_agent_handle_t>(handle)));
 }
 
-// ---------- Group C: Proto bridges (lifecycle + registry + structured output) --
+// ---------- Proto bridges (lifecycle + registry + structured output) --
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventClearQueue(JNIEnv* env,
@@ -5349,20 +6148,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetStreamProtoCal
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-        auto it = g_llm_stream_proto_listeners.find(key);
-        if (it != g_llm_stream_proto_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_llm_stream_proto_listeners.erase(it);
+    RAC_JNI_TRY {
+        {
+            std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+            auto it = g_llm_stream_proto_listeners.find(key);
+            if (it != g_llm_stream_proto_listeners.end()) {
+                env->DeleteGlobalRef(it->second);
+                g_llm_stream_proto_listeners.erase(it);
+            }
+            if (listener != nullptr) {
+                g_llm_stream_proto_listeners[key] = env->NewGlobalRef(listener);
+            }
         }
-        if (listener != nullptr) {
-            g_llm_stream_proto_listeners[key] = env->NewGlobalRef(listener);
-        }
+        return static_cast<jint>(rac_llm_set_stream_proto_callback(
+            handleFromJLong(handle), listener != nullptr ? llm_stream_proto_trampoline : nullptr,
+            listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
     }
-    return static_cast<jint>(rac_llm_set_stream_proto_callback(
-        handleFromJLong(handle), listener != nullptr ? llm_stream_proto_trampoline : nullptr,
-        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+    RAC_JNI_CATCH_INT()
 }
 
 JNIEXPORT jint JNICALL
@@ -5383,7 +6185,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmUnsetStreamProtoC
     return static_cast<jint>(rac_llm_unset_stream_proto_callback(handleFromJLong(handle)));
 }
 
-// ---------- Group D: SDK state accessors ---------------------------------------
+// ---------- SDK state accessors ---------------------------------------
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateGetEnvironment(JNIEnv* env,
@@ -5446,7 +6248,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceGetOrCreatePer
     return env->NewStringUTF(buf);
 }
 
-// ---------- Group E: Archive enum mappers --------------------------------------
+// ---------- Archive enum mappers --------------------------------------
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeFromProto(JNIEnv* env,
@@ -5493,7 +6295,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveStructureToPr
     return rc == RAC_SUCCESS ? static_cast<jint>(out) : -1;
 }
 
-// ---------- Group F: Model paths -----------------------------------------------
+// ---------- Model paths -----------------------------------------------
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsSetBaseDirectory(
@@ -5609,7 +6411,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsIsModelPat
     return rac_model_paths_is_model_path(p.c_str()) == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
 }
 
-// ---------- Group G: File manager (Swift-aligned aliases) ----------------------
+// Single-file role classifier (model-file-role-classifier family). Delegates to
+// rac_infer_model_file_role so Kotlin shares the commons heuristic. Takes/returns
+// proto ModelCategory / ModelFileRole int values.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferModelFileRole(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jstring filename,
+                                                                               jint modalityProto) {
+    (void)clazz;
+    std::string name = getCString(env, filename);
+    int32_t role = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+    rac_infer_model_file_role(name.c_str(), static_cast<int32_t>(modalityProto), &role);
+    return static_cast<jint>(role);
+}
+
+// ---------- File manager (Swift-aligned aliases) ----------------------
 //
 // These call the rac_file_manager_* C ABI using Swift-aligned naming and a
 // model-id-only (framework-implicit) signature, matching how Swift's
@@ -5742,7 +6559,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerCheckStor
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 
-// ---------- Group H: Environment validation + endpoints ------------------------
+// ---------- Environment validation + endpoints ------------------------
 
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvRequiresAuth(JNIEnv* env,
@@ -5850,7 +6667,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointModelAssignm
     return path != nullptr ? env->NewStringUTF(path) : nullptr;
 }
 
-// ---------- Group I: Model assignment ------------------------------------------
+// ---------- Model assignment ------------------------------------------
 //
 // The full callback-struct wiring lives in the existing
 // nativeModelAssignment* / model_assignment_http_get_callback code path
@@ -5928,8 +6745,260 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetBy
     return empty;
 }
 
+// =============================================================================
+// INFERENCE FRAMEWORK display / analytics / raw tables (web-024).
+// Replaces the hand-written 22-entry switch tables in Kotlin ModelTypes.kt
+// with the canonical commons tables Swift consumes via cWireString. Each
+// thunk takes the proto InferenceFramework int, converts to the C enum via
+// rac_inference_framework_from_proto, then reads the static literal.
+// =============================================================================
+
+namespace {
+rac_inference_framework_t frameworkFromProtoInt(int32_t protoValue) {
+    rac_inference_framework_t out = RAC_FRAMEWORK_UNKNOWN;
+    rac_inference_framework_from_proto(protoValue, &out);
+    return out;
+}
+}  // namespace
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferenceFrameworkDisplayName(
+    JNIEnv* env, jclass clazz, jint frameworkProto) {
+    (void)clazz;
+    const char* out = nullptr;
+    if (rac_inference_framework_display_name(frameworkFromProtoInt(frameworkProto), &out) !=
+            RAC_SUCCESS ||
+        out == nullptr) {
+        return nullptr;
+    }
+    return env->NewStringUTF(out);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferenceFrameworkAnalyticsKey(
+    JNIEnv* env, jclass clazz, jint frameworkProto) {
+    (void)clazz;
+    const char* out = nullptr;
+    if (rac_inference_framework_analytics_key(frameworkFromProtoInt(frameworkProto), &out) !=
+            RAC_SUCCESS ||
+        out == nullptr) {
+        return nullptr;
+    }
+    return env->NewStringUTF(out);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFrameworkRawValue(JNIEnv* env,
+                                                                             jclass clazz,
+                                                                             jint frameworkProto) {
+    (void)clazz;
+    const char* out = rac_framework_raw_value(frameworkFromProtoInt(frameworkProto));
+    return out != nullptr ? env->NewStringUTF(out) : nullptr;
+}
+
+// =============================================================================
+// ARCHIVE TYPE helpers — rac_archive_type_from_path /
+// rac_archive_type_extension. Detection returns the proto ArchiveType int
+// (>=0), or -1 when no archive is detected so the Kotlin caller maps to null.
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeFromPath(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jstring path) {
+    (void)clazz;
+    if (path == nullptr) {
+        return -1;
+    }
+    std::string storage;
+    const char* cPath = getNullableCString(env, path, storage);
+    rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
+    if (rac_archive_type_from_path(cPath, &type) != RAC_TRUE) {
+        return -1;
+    }
+    int32_t protoValue = 0;
+    if (rac_archive_type_to_proto(type, &protoValue) != RAC_SUCCESS) {
+        return -1;
+    }
+    return static_cast<jint>(protoValue);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeExtension(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jint archiveProto) {
+    (void)clazz;
+    rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
+    if (rac_archive_type_from_proto(static_cast<int32_t>(archiveProto), &type) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    const char* out = rac_archive_type_extension(type);
+    return out != nullptr ? env->NewStringUTF(out) : nullptr;
+}
+
+// =============================================================================
+// ARTIFACT expected-files — rac_artifact_expected_files_proto.
+// Resolves the canonical ExpectedModelFiles manifest from a
+// serialized ModelInfo, mirroring Swift's expectedArtifactFiles.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactExpectedFilesProto(
+    JNIEnv* env, jclass clazz, jbyteArray modelInfoProto) {
+    return callProtoBufferFn(env, modelInfoProto, rac_artifact_expected_files_proto,
+                             "racArtifactExpectedFilesProto");
+}
+
+// =============================================================================
+// TWO-PHASE SDK INIT — rac_sdk_init_phase1_proto /
+// rac_sdk_init_phase2_proto / rac_sdk_retry_http_proto. Mirrors Swift's
+// CppBridge.SdkInit. phase1/phase2 take a serialized request and return a
+// serialized SdkInitResult; retryHTTP takes no input.
+// =============================================================================
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkInitPhase1Proto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_sdk_init_phase1_proto, "racSdkInitPhase1Proto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkInitPhase2Proto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    return callProtoBufferFn(env, requestProto, rac_sdk_init_phase2_proto, "racSdkInitPhase2Proto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkRetryHttpProto(JNIEnv* env,
+                                                                             jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_sdk_retry_http_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racSdkRetryHttpProto");
+}
+
 }  // extern "C"
 // NOLINTEND(misc-unused-parameters,readability-implicit-bool-conversion,performance-no-int-to-ptr)
+
+// commons-154: definition of the JNI_OnUnload cleanup helper. Each per-handle
+// listener map and singleton GlobalRef declared above is drained here so the
+// JVM does not leak references when the native library is dlclose'd. Mirrors
+// the g_platform_adapter cleanup pattern already present in JNI_OnUnload.
+namespace {
+void rac_jni_release_all_listener_global_refs(JNIEnv* env) {
+    if (env == nullptr) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_sdk_event_listener_mutex);
+        for (auto& kv : g_sdk_event_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_sdk_event_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_download_proto_listener_mutex);
+        if (g_download_proto_listener != nullptr) {
+            env->DeleteGlobalRef(g_download_proto_listener);
+            g_download_proto_listener = nullptr;
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+        for (auto& kv : g_vad_proto_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_vad_proto_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+        for (auto& kv : g_vad_stream_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_vad_stream_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+        for (auto& kv : g_llm_stream_proto_listeners) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        g_llm_stream_proto_listeners.clear();
+    }
+
+    {
+        std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
+        for (auto& kv : toolCallingCtxMap()) {
+            auto* ctx = kv.second;
+            if (ctx != nullptr) {
+                if (ctx->listener != nullptr) {
+                    env->DeleteGlobalRef(ctx->listener);
+                }
+                delete ctx;
+            }
+        }
+        toolCallingCtxMap().clear();
+    }
+
+    if (g_file_callbacks_obj != nullptr) {
+        env->DeleteGlobalRef(g_file_callbacks_obj);
+        g_file_callbacks_obj = nullptr;
+    }
+}
+
+void rac_jni_erase_llm_stream_listener(JNIEnv* env, uintptr_t handle_key) {
+    if (env == nullptr) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+    auto it = g_llm_stream_proto_listeners.find(handle_key);
+    if (it != g_llm_stream_proto_listeners.end()) {
+        if (it->second != nullptr) {
+            env->DeleteGlobalRef(it->second);
+        }
+        g_llm_stream_proto_listeners.erase(it);
+    }
+}
+
+void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
+    if (env == nullptr) {
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
+        auto it = g_vad_proto_listeners.find(handle_key);
+        if (it != g_vad_proto_listeners.end()) {
+            if (it->second != nullptr) {
+                env->DeleteGlobalRef(it->second);
+            }
+            g_vad_proto_listeners.erase(it);
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+        auto it = g_vad_stream_listeners.find(handle_key);
+        if (it != g_vad_stream_listeners.end()) {
+            if (it->second != nullptr) {
+                env->DeleteGlobalRef(it->second);
+            }
+            g_vad_stream_listeners.erase(it);
+        }
+    }
+}
+}  // namespace
 
 // =============================================================================
 // NOTE: Backend registration functions have been MOVED to their respective

@@ -6,7 +6,7 @@
  * contract types. Mirrors the Swift counterpart at
  * `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes+Artifacts.swift`.
  *
- * The `RA*` typealiases land in workstream L2; for now these helpers operate
+ * The `RA*` typealiases are pending; for now these helpers operate
  * on the Wire-generated proto types directly.
  *
  * NOTE: filesystem-aware checks (`isDownloadedOnDisk`) defer to the proto's
@@ -32,6 +32,8 @@ import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
@@ -54,15 +56,6 @@ val ExpectedModelFiles.isEmptyManifest: Boolean
             optional_patterns.isEmpty() &&
             description.isNullOrEmpty()
 
-private fun ExpectedModelFiles.Companion.fromPatterns(
-    required: List<String>,
-    optional: List<String>,
-): ExpectedModelFiles =
-    ExpectedModelFiles(
-        required_patterns = required,
-        optional_patterns = optional,
-    )
-
 // MARK: - ModelFileDescriptor
 
 /**
@@ -83,6 +76,26 @@ fun ModelFileDescriptor.Companion.create(
         relative_path = url.substringAfterLast('/').takeIf { it.isNotEmpty() } ?: filename,
         destination_path = filename,
     )
+
+/**
+ * Infer the canonical [ModelFileRole] for a single sidecar filename in a
+ * multi-file model. Mirrors Swift's
+ * `RunAnywhere.inferModelFileRole(filename:modality:)` and delegates to the
+ * shared commons classifier `rac_infer_model_file_role`, so the SDK and the
+ * C++ model-paths resolver always agree on which file is the primary model,
+ * the vision projector (`mmproj`), tokenizer, vocabulary, etc.
+ *
+ * @param filename The sidecar's filename (case-insensitive; directory
+ *   components are ignored).
+ * @param modality The model's [ModelCategory]; only
+ *   [ModelCategory.MODEL_CATEGORY_MULTIMODAL] enables the `mmproj` match path.
+ * @return The matching [ModelFileRole], or
+ *   [ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL] when nothing matches.
+ */
+fun RunAnywhere.inferModelFileRole(filename: String, modality: ModelCategory): ModelFileRole {
+    val roleValue = RunAnywhereBridge.racInferModelFileRole(filename, modality.value)
+    return ModelFileRole.fromValue(roleValue) ?: ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+}
 
 /** Returns the descriptor's URL field, or null if it is empty. */
 val ModelFileDescriptor.urlValue: String?
@@ -227,35 +240,20 @@ val RAModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
 
 /**
  * Resolve the [ExpectedModelFiles] manifest the SDK should hand to the
- * downloader, falling back to the artifact's pattern lists when no
- * explicit manifest is set. Mirrors Swift's `expectedArtifactFiles`.
+ * downloader. Mirrors Swift's `expectedArtifactFiles`: a top-level manifest
+ * short-circuits; otherwise the canonical fall-through (artifact-attached
+ * manifest → pattern shorthand → multi-file descriptor seed) is computed by
+ * commons via `rac_artifact_expected_files_proto` so the Kotlin,
+ * Swift, and download-planner views can never drift.
  */
 val RAModelInfo.expectedArtifactFiles: ExpectedModelFiles
     get() {
         expected_files?.let { if (!it.isEmptyManifest) return it }
-        single_file?.let { artifact ->
-            artifact.expected_files?.let { return it }
-            return ExpectedModelFiles.fromPatterns(
-                required = artifact.required_patterns,
-                optional = artifact.optional_patterns,
-            )
-        }
-        archive?.let { artifact ->
-            artifact.expected_files?.let { return it }
-            return ExpectedModelFiles.fromPatterns(
-                required = artifact.required_patterns,
-                optional = artifact.optional_patterns,
-            )
-        }
-        multi_file?.let { artifact ->
-            // Commons download planner only walks
-            // `model.expected_files.files` for multi-file/per-descriptor
-            // downloads. Seed it from the multi-file artifact so the
-            // per-file loop runs and every URL actually downloads.
-            if (artifact.files.isEmpty()) return ExpectedModelFiles.none
-            return ExpectedModelFiles(files = artifact.files)
-        }
-        return ExpectedModelFiles.none
+        val decoded =
+            RunAnywhereBridge
+                .racArtifactExpectedFilesProto(ModelInfo.ADAPTER.encode(this))
+                ?.let { ExpectedModelFiles.ADAPTER.decode(it) }
+        return decoded ?: ExpectedModelFiles.none
     }
 
 /**
@@ -463,27 +461,6 @@ fun ModelInfo.Companion.create(
         is_downloaded = withArtifact.isDownloadedOnDisk,
         is_available = withArtifact.isAvailableForUse,
     )
-}
-
-/**
- * Apply an inferred artifact to a freshly constructed [ModelInfo]. Mirrors
- * Swift's `inferredArtifact(from:format:)` — passes through to single-file
- * when no archive type can be derived, otherwise sets an archive artifact.
- *
- * Public on `ModelInfo.Companion` so external callers (and the registry)
- * can re-derive the artifact when only a URL changes.
- */
-@Suppress("UnusedParameter")
-fun ModelInfo.Companion.inferredArtifact(
-    url: String?,
-    archiveType: ArchiveType? = null,
-): SingleFileArtifact {
-    // Swift returns a `OneOf_Artifact` here; the Kotlin proto exposes a
-    // flat oneof, so the API surface differs. Single-file is the no-op
-    // case (no archive). Archive callers should use
-    // [ModelInfo.applyInferredArtifact] which routes to the correct setter.
-    // Parameters are retained for API parity with Swift's `inferredArtifact(from:format:)`.
-    return SingleFileArtifact()
 }
 
 private fun RAModelInfo.applyInferredArtifact(

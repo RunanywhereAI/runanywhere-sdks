@@ -419,8 +419,7 @@ class VoiceAssistantViewModel(
                     )
                 }
 
-                Timber.i("Voice session started")
-                                Timber.i("Voice session started — events flow from streamVoiceAgent()")
+                Timber.i("Voice session started — events flow from streamVoiceAgent()")
 
                 // Audio capture drives the UI-level visualization only. The
                 // voice-agent C++ pipeline owns its own audio capture and

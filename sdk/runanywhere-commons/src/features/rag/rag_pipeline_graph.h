@@ -2,7 +2,7 @@
  * @file rag_pipeline_graph.h
  * @brief RAG query orchestration as a GraphScheduler-driven DAG.
  *
- * GAP 05 / T4.6 — second real consumer of the streaming graph runtime
+ * Second real consumer of the streaming graph runtime
  * after the unit-test suite. Replaces the old hand-rolled imperative
  * `RAGBackend::query()` step-by-step orchestration with a typed DAG:
  *

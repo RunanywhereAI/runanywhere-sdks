@@ -11,11 +11,7 @@
 
 import type { TabLifecycle } from '../app';
 import { showToast } from '../components/dialogs';
-import {
-  RunAnywhere,
-  InferenceFramework,
-  ModelCategory,
-} from '@runanywhere/web';
+import { RunAnywhere } from '@runanywhere/web';
 import type { ModelInfo } from '@runanywhere/web';
 import {
   ensureCatalogRegistered,
@@ -23,7 +19,13 @@ import {
   openSheet as openModelSheet,
 } from '../components/model-selection';
 import { getCatalog } from '../services/model-catalog';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
+import {
+  formatBytes,
+  formatFramework,
+  modalityEmoji,
+} from '../services/model-display';
 
 let container: HTMLElement;
 let unsubscribeState: (() => void) | null = null;
@@ -189,42 +191,4 @@ function lookupModelInfo(modelId: string): ModelInfo | null {
   } catch {
     return null;
   }
-}
-
-function modalityEmoji(category: ModelCategory): string {
-  switch (category) {
-    case ModelCategory.MODEL_CATEGORY_LANGUAGE: return '&#129302;';
-    case ModelCategory.MODEL_CATEGORY_MULTIMODAL: return '&#128065;';
-    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION: return '&#127908;';
-    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS: return '&#128266;';
-    case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION: return '&#128483;';
-    case ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION: return '&#127912;';
-    case ModelCategory.MODEL_CATEGORY_EMBEDDING: return '&#128279;';
-    default: return '&#9881;&#65039;';
-  }
-}
-
-function formatFramework(framework: InferenceFramework): string {
-  switch (framework) {
-    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP: return 'llama.cpp';
-    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX: return 'ONNX';
-    case InferenceFramework.INFERENCE_FRAMEWORK_COREML: return 'CoreML';
-    case InferenceFramework.INFERENCE_FRAMEWORK_MLX: return 'MLX';
-    default: return 'Unknown';
-  }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
-  if (bytes >= 1_000_000) return `${Math.round(bytes / 1_000_000)} MB`;
-  return `${Math.round(bytes / 1_000)} KB`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

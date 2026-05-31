@@ -68,8 +68,8 @@ declare global {
           profile?: { chip?: string; coreCount?: number; accelerationMode?: string };
           accelerators: Array<{ name: string }>;
         };
-        getChip(): string;
-        accelerationMode: string;
+        getAccelerators(): Array<{ name: string }>;
+        setAcceleratorPreference(preference: number): boolean;
       };
       storage: {
         backend: 'fsAccess' | 'opfs' | 'memory';
@@ -163,10 +163,11 @@ test.describe('Cross-cutting Web SDK proto-byte facades', () => {
         missingExports: sdk.lora.missingExports(),
       };
 
+      const hardwareProfile = sdk.hardware.getProfile();
       const hardware = {
-        profile: sdk.hardware.getProfile(),
-        chip: sdk.hardware.getChip(),
-        accelerationMode: sdk.hardware.accelerationMode,
+        profile: hardwareProfile,
+        chip: hardwareProfile.profile?.chip ?? '',
+        accelerationMode: hardwareProfile.profile?.accelerationMode ?? '',
       };
 
       const storage = {

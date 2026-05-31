@@ -2,9 +2,7 @@
  * @file rac_plugin_entry_sherpa.h
  * @brief Public declaration of the Sherpa-ONNX unified-ABI plugin entry point.
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
- * ENG-SHERPA-03: the sherpa engine previously registered itself via an ELF
+ * The sherpa engine previously registered itself via an ELF
  * `__attribute__((constructor))` emitted at the bottom of
  * rac_plugin_entry_sherpa.cpp. That constructor has been deleted in favor of
  * the explicit-register + static-shim pattern already used by llamacpp and

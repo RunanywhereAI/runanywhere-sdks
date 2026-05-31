@@ -1,6 +1,6 @@
 /**
  * @file rac_http_client.h
- * @brief Platform-routed HTTP client C ABI (v2 close-out Phase H).
+ * @brief Platform-routed HTTP client C ABI.
  *
  * Canonical request/response structs and public entry points for HTTP
  * operations needed by commons. The actual network execution belongs
@@ -71,7 +71,17 @@ typedef struct {
  * download manager. NULL = no checksum check.
  *
  * `timeout_ms == 0` means "no timeout".
- * `follow_redirects == RAC_TRUE` follows 3xx up to 10 hops.
+ *
+ * `follow_redirects` is currently ADVISORY ONLY. Every registered
+ * platform transport (URLSession on Apple, OkHttp on Android, fetch /
+ * XHR on Web, dart:io on Flutter) auto-follows 3xx redirects up to its
+ * default cap regardless of this field. `RAC_FALSE` is reserved for a
+ * future ABI change that wires per-transport no-redirect support
+ * (URLSessionTaskDelegate.willPerformHTTPRedirection,
+ * OkHttpClient.Builder.followRedirects(false), manual XHR Location
+ * chasing). Callers MUST NOT depend on `RAC_FALSE` to inspect 3xx
+ * responses today — set the field for forward-compatibility, but
+ * branch on `redirected_url`/HTTP status to detect redirection.
  */
 typedef struct {
     const char* method;
@@ -84,7 +94,7 @@ typedef struct {
     size_t body_len;
 
     int32_t timeout_ms;
-    rac_bool_t follow_redirects;
+    rac_bool_t follow_redirects;  // advisory only — see field docs above
 
     const char* expected_checksum_hex;
 } rac_http_request_t;
@@ -102,9 +112,13 @@ typedef struct {
  * outer array and the `name`/`value` strings live until the caller
  * invokes `rac_http_response_free(resp)`.
  *
- * `redirected_url` is non-NULL only when the server returned a 3xx
- * and `follow_redirects == RAC_TRUE`; it is the final absolute URL
- * after hops (owned by the response struct).
+ * `redirected_url` is non-NULL only when the platform transport
+ * actually followed one or more 3xx hops; it is the final absolute URL
+ * after hops (owned by the response struct). Because every transport
+ * currently auto-follows redirects (see `follow_redirects` field doc on
+ * `rac_http_request_t`), this is the canonical signal for "the wire URL
+ * differs from the requested URL", regardless of how `follow_redirects`
+ * was set.
  *
  * `elapsed_ms` is total wall-clock time from connect to last byte.
  */
@@ -254,7 +268,7 @@ RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
                                                       const char* on_conflict_field);
 
 // =============================================================================
-// CANONICAL DEFAULT HEADERS (P2-T11)
+// CANONICAL DEFAULT HEADERS
 // =============================================================================
 
 /**
@@ -291,7 +305,7 @@ RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_k
 // =============================================================================
 // RESULT CODES
 // =============================================================================
-// Phase H consumers only need to check against RAC_SUCCESS; the other
+// Consumers only need to check against RAC_SUCCESS; the other
 // result codes come from rac/core/rac_error.h. For convenience:
 //
 //   RAC_SUCCESS                     — transfer completed (check .status

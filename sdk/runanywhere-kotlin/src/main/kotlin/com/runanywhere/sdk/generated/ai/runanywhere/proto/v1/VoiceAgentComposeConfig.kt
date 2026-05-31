@@ -32,7 +32,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: Aggregated voice-agent compose configuration.
+ * Aggregated voice-agent compose configuration.
  *
  * Mirrors the C ABI `rac_voice_agent_config_t` and Swift
  * `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`

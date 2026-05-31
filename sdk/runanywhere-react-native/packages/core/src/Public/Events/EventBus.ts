@@ -109,15 +109,23 @@ export class EventBus {
   }
 
   private dispatch(event: SDKEventMessage): void {
-    for (const listener of this.listeners) {
-      listener(event);
+    for (const listener of Array.from(this.listeners)) {
+      try {
+        listener(event);
+      } catch (e) {
+        console.warn('SDK EventBus listener error:', e);
+      }
     }
     const categoryListeners = this.categoryListeners.get(event.category);
     if (!categoryListeners) {
       return;
     }
-    for (const listener of categoryListeners) {
-      listener(event);
+    for (const listener of Array.from(categoryListeners)) {
+      try {
+        listener(event);
+      } catch (e) {
+        console.warn('SDK EventBus category listener error:', e);
+      }
     }
   }
 

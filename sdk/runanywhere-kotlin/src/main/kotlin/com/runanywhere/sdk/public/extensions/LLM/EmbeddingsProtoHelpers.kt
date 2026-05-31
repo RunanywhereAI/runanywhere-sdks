@@ -13,7 +13,6 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.EmbeddingVector
 import ai.runanywhere.proto.v1.EmbeddingsConfiguration
 import ai.runanywhere.proto.v1.EmbeddingsOptions
-import com.runanywhere.sdk.foundation.errors.SDKException
 import kotlin.math.sqrt
 
 // MARK: - EmbeddingsConfiguration
@@ -34,26 +33,6 @@ fun EmbeddingsConfiguration.Companion.defaults(
         max_sequence_length = maxSequenceLength,
         normalize = normalize,
     )
-
-/**
- * Validate the embeddings component configuration. Throws an
- * [SDKException] mirroring Swift's `validate()` failures.
- */
-fun EmbeddingsConfiguration.validate() {
-    if (model_id.isEmpty()) {
-        throw SDKException.invalidArgument("Embeddings modelID is empty")
-    }
-    if (embedding_dimension <= 0) {
-        throw SDKException.invalidArgument(
-            "Embedding dimension must be > 0 (got $embedding_dimension)",
-        )
-    }
-    if (max_sequence_length <= 0) {
-        throw SDKException.invalidArgument(
-            "Max sequence length must be > 0 (got $max_sequence_length)",
-        )
-    }
-}
 
 // MARK: - EmbeddingsOptions
 

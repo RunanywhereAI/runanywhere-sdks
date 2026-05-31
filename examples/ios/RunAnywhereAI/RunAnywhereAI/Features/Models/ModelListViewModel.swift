@@ -148,14 +148,6 @@ class ModelListViewModel: ObservableObject {
         do {
             try await loadModel(model)
             setCurrentModel(model)
-
-            // Post notification that model was loaded successfully
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: Notification.Name("ModelLoaded"),
-                    object: model
-                )
-            }
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
             // Don't set currentModel if loading failed
@@ -208,48 +200,23 @@ class ModelListViewModel: ObservableObject {
         currentModel = model
     }
 
-    /// Add a custom model from URL
+    /// Add a custom model from URL via the canonical `RunAnywhere.registerModel`
+    /// public API. The SDK composes the proto import request internally via
+    /// `rac_register_model_from_url_proto`; example side only collects user
+    /// input and reloads the registry.
     func addModelFromURL(name: String, url: URL, framework: InferenceFramework, estimatedSize: Int64?) async {
-        // Compose a canonical RAModelImportRequest directly. The shim version
-        // composed this behind a convenience; the example now issues the proto
-        // request inline to stay on the canonical path.
-        var modelInfo = RAModelInfo()
-        modelInfo.id = UUID().uuidString
-        modelInfo.name = name
-        modelInfo.framework = framework
-        modelInfo.memoryRequiredBytes = estimatedSize ?? 0
-        modelInfo.downloadURL = url.absoluteString
-
-        var request = RAModelImportRequest()
-        request.model = modelInfo
-        request.sourcePath = url.absoluteString
-
         do {
-            _ = try await RunAnywhere.importModel(request)
+            _ = try await RunAnywhere.registerModel(
+                name: name,
+                url: url.absoluteString,
+                framework: framework,
+                memoryRequirement: estimatedSize
+            )
         } catch {
-            print("Failed to import model: \(error.localizedDescription)")
+            print("Failed to register model: \(error.localizedDescription)")
         }
 
         // Reload models to include the new one
-        await loadModelsFromRegistry()
-    }
-
-    /// Add an imported model to the list
-    func addImportedModel(_ model: RAModelInfo) async {
-        var request = RAModelImportRequest()
-        request.model = model
-        request.sourcePath = model.localPath
-        request.overwriteExisting = true
-
-        do {
-            let result = try await RunAnywhere.importModel(request)
-            if !result.success {
-                errorMessage = result.errorMessage.isEmpty ? "Failed to import model" : result.errorMessage
-            }
-        } catch {
-            errorMessage = "Failed to import model: \(error.localizedDescription)"
-        }
-
         await loadModelsFromRegistry()
     }
 }

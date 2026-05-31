@@ -51,23 +51,24 @@ function ensureNative() {
 /**
  * Create a RAG pipeline with the given configuration.
  *
- * Matches Swift: `RunAnywhere.ragCreatePipeline(_:)`.
+ * Matches Swift: `RunAnywhere.ragCreatePipeline(_:)` — the config is passed
+ * through to the C++ commons layer verbatim. Numeric RAGConfiguration fields
+ * are proto3 `optional`, so absent fields are honored by commons (which stamps
+ * canonical defaults via the `RAGBackendConfig` in-struct defaults applied in
+ * `build_backend_config`) and explicit zero values (e.g. `chunkOverlap: 0` to
+ * disable overlap) are preserved end-to-end. Callers that want the canonical
+ * defaults can seed the input with the generated `rAGConfigurationDefaults()`
+ * helper from `@runanywhere/proto-ts/convenience/rag_convenience`.
  */
 export async function ragCreatePipeline(
   config: RAGConfiguration
 ): Promise<void> {
   const native = ensureNative();
-  const configWithDefaults = RAGConfigurationMessage.create({
-    ...config,
-    embeddingDimension: config.embeddingDimension ?? 384,
-    topK: config.topK ?? 3,
-    similarityThreshold: config.similarityThreshold ?? 0.12,
-    chunkSize: config.chunkSize ?? 180,
-    chunkOverlap: config.chunkOverlap ?? 30,
-    maxContextTokens: config.maxContextTokens ?? 0,
-  });
   const success = await native.ragCreatePipelineProto(
-    encodeProtoMessage(configWithDefaults, RAGConfigurationMessage)
+    encodeProtoMessage(
+      RAGConfigurationMessage.fromPartial(config),
+      RAGConfigurationMessage
+    )
   );
   if (!success) {
     throw SDKException.generationFailedWith('Failed to create RAG pipeline');
@@ -82,21 +83,45 @@ export async function ragDestroyPipeline(): Promise<void> {
   logger.info('RAG pipeline destroyed');
 }
 
-/** Ingest a document into the RAG pipeline. */
+/**
+ * Ingest a proto document into the RAG pipeline.
+ *
+ * Primary overload — matches Swift: `RunAnywhere.ragIngest(_:)`.
+ * Returns pipeline statistics after ingestion.
+ */
+export async function ragIngest(document: RAGDocument): Promise<RAGStatistics>;
+/**
+ * Ingest a text document into the RAG pipeline (convenience overload).
+ *
+ * Builds a `RAGDocument` proto from the text and optional JSON metadata,
+ * then delegates to the primary overload. Matches Swift:
+ * `RunAnywhere.ragIngest(text:metadataJSON:)`.
+ */
 export async function ragIngest(
   text: string,
   metadataJson?: string
-): Promise<void> {
+): Promise<RAGStatistics>;
+export async function ragIngest(
+  textOrDocument: string | RAGDocument,
+  metadataJson?: string
+): Promise<RAGStatistics> {
   const native = ensureNative();
-  // IDL-13: `metadata_json` proto field was deleted. Best-effort parse
-  // of the legacy JSON into the typed `metadata` map.
-  const metadata = parseMetadata(metadataJson);
-  const document = RAGDocument.create({
-    id: '',
-    text,
-    metadata,
-  });
-  await native.ragIngestProto(encodeProtoMessage(document, RAGDocument));
+  let document: RAGDocument;
+  if (typeof textOrDocument === 'string') {
+    // The `metadata_json` proto field was deleted. Best-effort parse
+    // of the legacy JSON blob into the typed `metadata` map.
+    document = RAGDocument.create({
+      id: '',
+      text: textOrDocument,
+      metadata: parseMetadata(metadataJson),
+    });
+  } else {
+    document = textOrDocument;
+  }
+  const statsBytes = await native.ragIngestProto(
+    encodeProtoMessage(document, RAGDocument)
+  );
+  return decodeRequired(statsBytes, RAGStatisticsMessage.decode, 'ragIngestProto');
 }
 
 function parseMetadata(json?: string): Record<string, string> {
@@ -115,12 +140,35 @@ function parseMetadata(json?: string): Record<string, string> {
   }
 }
 
-/** Add multiple documents in batch. */
+/**
+ * Ingest multiple proto documents in batch.
+ *
+ * Primary overload — matches Swift: `RunAnywhere.ragAddDocumentsBatch(documents:)`.
+ */
+export async function ragAddDocumentsBatch(
+  documents: RAGDocument[]
+): Promise<void>;
+/**
+ * Ingest multiple text documents in batch (convenience overload).
+ *
+ * Builds `RAGDocument` protos from the ad-hoc shapes, then delegates to
+ * the primary overload.
+ */
 export async function ragAddDocumentsBatch(
   documents: Array<{ text: string; metadataJson?: string }>
+): Promise<void>;
+export async function ragAddDocumentsBatch(
+  documents: RAGDocument[] | Array<{ text: string; metadataJson?: string }>
 ): Promise<void> {
-  for (const document of documents) {
-    await ragIngest(document.text, document.metadataJson);
+  for (const doc of documents) {
+    // Distinguish RAGDocument proto (has typed `metadata` map) from the
+    // convenience ad-hoc shape (has `metadataJson` string).
+    if ('metadataJson' in doc) {
+      const adHoc = doc as { text: string; metadataJson?: string };
+      await ragIngest(adHoc.text, adHoc.metadataJson);
+    } else {
+      await ragIngest(doc as RAGDocument);
+    }
   }
 }
 

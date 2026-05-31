@@ -2,15 +2,13 @@
  * @file rac_route.h
  * @brief C ABI wrapper around rac::router::EngineRouter.
  *
- * GAP 04 Phase 12 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- *
  * Frontends written in C, Swift, Kotlin, etc. call `rac_plugin_route()` to
  * pick the best plugin for a primitive without instantiating the C++ router
  * class directly. The wrapper internally uses `HardwareProfile::cached()` so
  * the per-host probe runs once per process.
  *
- * v3.0.0: this is now the ONLY routing API. The legacy `rac_service_create()`
- * / `service_registry.cpp` path was removed in Phase C1. All commons consumers
+ * This is now the ONLY routing API. The legacy `rac_service_create()`
+ * / `service_registry.cpp` path was removed. All commons consumers
  * (rac_llm_create, rac_stt_create, rac_tts_create, rac_vlm_create,
  *  rac_embeddings_create, rac_diffusion_create, vad_component.load_model)
  * go through `rac_plugin_route(primitive, format, hints, &vt)` followed by
@@ -44,11 +42,10 @@ extern "C" {
  *                    (registry-owned, valid until the plugin is unregistered).
  *
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER, RAC_ERROR_NOT_FOUND
- *         (no eligible plugin / pinned name unavailable with no_fallback=1),
- *         RAC_ERROR_RUNTIME_UNAVAILABLE (every candidate was rejected because
- *         its declared L1 runtimes are not registered on this host — e.g.
- *         an engine pinned to CoreML on Android), or
- *         RAC_ERROR_CAPABILITY_NOT_FOUND (registry empty).
+ *         (no eligible plugin / empty registry / pinned name unavailable with
+ *         no_fallback=1), or RAC_ERROR_RUNTIME_UNAVAILABLE (every candidate was
+ *         rejected because its declared L1 runtimes are not registered on this
+ *         host — e.g. an engine pinned to CoreML on Android).
  *
  * Thread-safe. The first call also triggers HardwareProfile::detect();
  * subsequent calls reuse the memoized profile.

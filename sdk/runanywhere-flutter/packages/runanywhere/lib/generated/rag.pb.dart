@@ -25,7 +25,7 @@ export 'rag.pbenum.dart';
 /// ---------------------------------------------------------------------------
 /// RAGConfiguration — low-level pipeline config.
 ///
-/// As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+/// This message carries *model ids*, not filesystem paths.
 /// The commons RAG session ABI (rac_rag_session_create_proto) is responsible
 /// for resolving those ids to on-disk paths through the canonical model
 /// registry. SDK callers MUST register the embedding / LLM / reranker models
@@ -145,6 +145,8 @@ class RAGConfiguration extends $pb.GeneratedMessage {
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
+  /// Optional so callers can distinguish "unset" (commons stamps the
+  /// canonical default) from explicit zero / explicit override.
   @$pb.TagNumber(3)
   $core.int get embeddingDimension => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -155,6 +157,7 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   void clearEmbeddingDimension() => $_clearField(3);
 
   /// Number of top chunks to retrieve per query.
+  /// Optional so callers can distinguish "unset" from an explicit value.
   @$pb.TagNumber(4)
   $core.int get topK => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -166,6 +169,8 @@ class RAGConfiguration extends $pb.GeneratedMessage {
 
   /// Minimum cosine similarity threshold (0.0–1.0). Chunks below this
   /// score are discarded before being passed to the LLM as context.
+  /// Optional so callers can distinguish "unset" from explicit 0.0
+  /// (accept-everything) without losing the canonical default.
   @$pb.TagNumber(5)
   $core.double get similarityThreshold => $_getN(4);
   @$pb.TagNumber(5)
@@ -176,6 +181,7 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   void clearSimilarityThreshold() => $_clearField(5);
 
   /// Tokens per chunk when splitting documents during ingestion.
+  /// Optional so callers can distinguish "unset" from an explicit value.
   @$pb.TagNumber(6)
   $core.int get chunkSize => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -186,6 +192,8 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   void clearChunkSize() => $_clearField(6);
 
   /// Overlap tokens between consecutive chunks. Must be < chunk_size.
+  /// Optional so callers can explicitly request zero overlap (no overlap)
+  /// without it being silently replaced by the canonical default of 64.
   @$pb.TagNumber(7)
   $core.int get chunkOverlap => $_getIZ(6);
   @$pb.TagNumber(7)
@@ -196,6 +204,7 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   void clearChunkOverlap() => $_clearField(7);
 
   /// Maximum tokens of retrieved context passed to the LLM.
+  /// Optional so callers can distinguish "unset" from an explicit value.
   @$pb.TagNumber(8)
   $core.int get maxContextTokens => $_getIZ(7);
   @$pb.TagNumber(8)

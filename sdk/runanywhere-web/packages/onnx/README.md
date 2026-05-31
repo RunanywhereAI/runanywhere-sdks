@@ -1,20 +1,18 @@
 # @runanywhere/web-onnx
 
-Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) backend registration shell for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web).
+Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web).
 
-> **Current blocker:** This package does not publish a standalone speech WASM bundle. It registers against the unified RACommons WASM module, and real STT/TTS/VAD runtime support requires ONNX Runtime and Sherpa-ONNX/Piper/eSpeak WASM static archives to be present under `sdk/runanywhere-commons/third_party/*-wasm` before building. Until `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` exist in the active artifact, these APIs correctly report backend unavailable.
+> **Backend availability:** Real STT/TTS/VAD runtime support requires ONNX Runtime and Sherpa-ONNX WASM static archives to be present under `sdk/runanywhere-commons/third_party/*-wasm` when the `racommons-onnx-sherpa.wasm` artifact this package ships is built. Until `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` exist in that artifact, `ONNX.register()` reports `BackendNotAvailable` and STT/TTS/VAD calls stay unavailable.
 
-> **Peer dependencies:**
-> - Required: [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`
-> - Required for the default WASM artifact: [`@runanywhere/web-llamacpp`](https://www.npmjs.com/package/@runanywhere/web-llamacpp) `>=0.19.13 <1` (declared as an optional peer; see "WASM Files" below for the standalone-artifact alternative)
+> **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`. This package does not depend on `@runanywhere/web-llamacpp` — it owns its own dedicated `racommons-onnx-sherpa.{js,wasm}` artifact.
 
 ## Installation
 
 ```bash
-npm install @runanywhere/web @runanywhere/web-llamacpp @runanywhere/web-onnx
+npm install @runanywhere/web @runanywhere/web-onnx
 ```
 
-`@runanywhere/web-llamacpp` ships the unified RACommons WASM artifact that this package's backend registration shell loads by default. Apps that pre-register `LlamaCPP` (or pass an explicit `wasmUrl` to `ONNX.register()`) can omit it.
+This package ships its own `racommons-onnx-sherpa.{js,wasm}` artifact under `wasm/`. There is no shared WASM module between backends; each per-package WASM is a self-contained Emscripten module.
 
 ## Quick Start
 
@@ -59,12 +57,14 @@ console.log(vad);
 
 ## WASM Files
 
-This package no longer publishes a standalone `wasm/sherpa` bundle. It registers the ONNX backend against the same RACommons WASM module used by the core proto adapters. Build that module with ONNX enabled:
+This package publishes its own dedicated `wasm/racommons-onnx-sherpa.{js,wasm}` artifact. Build it from the web SDK root:
 
 ```bash
 cd sdk/runanywhere-web
-npm run build:wasm -- --llamacpp --onnx
+npm run build:wasm -- --onnx
 ```
+
+The artifact is loaded by `SherpaONNXBridge` via `import.meta.url` from this package's own `wasm/` directory; configure your bundler to serve `wasm/racommons-onnx-sherpa.{js,wasm}` as static assets. See the [main SDK README](https://www.npmjs.com/package/@runanywhere/web) for Vite/Webpack examples.
 
 ## Cross-Origin Isolation
 

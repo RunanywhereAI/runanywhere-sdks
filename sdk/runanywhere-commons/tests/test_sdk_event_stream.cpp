@@ -3,7 +3,11 @@
  * @brief Canonical SDKEvent proto-byte stream tests.
  */
 
+#include <atomic>
+#include <chrono>
 #include <cstdio>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -254,7 +258,7 @@ int main() {
 
     rac_state_shutdown();
 
-    // FLUTTER-AND-PROTO-002 / FLUTTER-IOS-006 regression (CLUSTER-15):
+    // Regression:
     //
     // Async SDK bindings (Flutter Dart `NativeCallable.listener`, React
     // Native NitroModules) cannot safely dereference the pointer that
@@ -310,6 +314,58 @@ int main() {
           "burst drain via rac_sdk_event_poll decodes every event (FIFO contract)");
 
     rac_sdk_event_unsubscribe(burst_sub);
+    rac_sdk_event_clear_queue();
+
+    // Concurrent publish from two threads must not
+    // invalidate the buffer a subscriber callback is reading. Each publish
+    // allocates its own shared_ptr-owned byte buffer; the synchronous
+    // callback pins that buffer via the function-local shared_ptr inside
+    // `rac_sdk_event_publish_proto`, so a torn read can only happen if the
+    // backing storage were aliased (the prior fixed-ring implementation).
+    // This test verifies the no-tear contract with a 1ms sleep inside the
+    // subscriber to widen the window in which a peer thread could race.
+    rac_sdk_event_clear_queue();
+
+    struct ConcurrentCapture {
+        std::mutex mtx;
+        std::atomic<uint64_t> torn{0};
+        std::atomic<uint64_t> observed{0};
+    } concurrent;
+
+    auto concurrent_callback = +[](const uint8_t* bytes, size_t size, void* user_data) {
+        auto* sink = static_cast<ConcurrentCapture*>(user_data);
+        if (size == 0 || bytes == nullptr) {
+            return;
+        }
+        const uint8_t first = bytes[0];
+        std::this_thread::sleep_for(std::chrono::microseconds(50));
+        if (bytes[0] != first) {
+            sink->torn.fetch_add(1, std::memory_order_relaxed);
+        }
+        sink->observed.fetch_add(1, std::memory_order_relaxed);
+    };
+
+    const uint64_t concurrent_sub = rac_sdk_event_subscribe(concurrent_callback, &concurrent);
+    CHECK(concurrent_sub != 0, "concurrent subscription succeeds");
+
+    constexpr int kPerThread = 200;
+    auto producer = [&](const char* op_tag) {
+        for (int i = 0; i < kPerThread; ++i) {
+            rac_sdk_event_publish_failure(RAC_ERROR_INVALID_ARGUMENT, op_tag, "llm", op_tag,
+                                          RAC_FALSE);
+        }
+    };
+    std::thread t1(producer, "concurrentA");
+    std::thread t2(producer, "concurrentB");
+    t1.join();
+    t2.join();
+
+    CHECK(concurrent.observed.load() == static_cast<uint64_t>(kPerThread * 2),
+          "every concurrent publish reaches the subscriber");
+    CHECK(concurrent.torn.load() == 0,
+          "concurrent publishes do not tear the subscriber buffer view");
+
+    rac_sdk_event_unsubscribe(concurrent_sub);
     rac_sdk_event_clear_queue();
 
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

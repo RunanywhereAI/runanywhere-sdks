@@ -225,4 +225,21 @@ class DartBridgeVAD {
         throw ArgumentError('VADProcessRequest.audio.audio_data is required');
     }
   }
+
+  // MARK: - Cleanup
+
+  /// Destroy the VAD component handle and release commons-side resources.
+  /// Mirrors Swift `CppBridge+VAD.destroy()` semantics so
+  /// `DartBridge.shutdown()` releases the same per-modality C++ state Swift
+  /// does (see `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift:184`).
+  void destroy() {
+    if (_handle == null) return;
+    try {
+      NativeFunctions.vadDestroy(_handle!);
+      _handle = null;
+      _logger.debug('VAD component destroyed');
+    } catch (e) {
+      _logger.error('Failed to destroy VAD component: $e');
+    }
+  }
 }

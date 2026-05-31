@@ -43,14 +43,14 @@ extern "C" rac_result_t rac_backend_metalrt_register(void);
 namespace rac_plugin_autoreg_metalrt {
 
 struct Registrar {
-  Registrar() noexcept {
-    // Fire-and-forget. In stub-mode (RAC_METALRT_ENGINE_AVAILABLE=0) the
-    // register function emits a single warning and marks the backend as
-    // registered without installing a route, so subsequent
-    // `loadModel(framework: .metalrt)` surfaces BACKEND_UNAVAILABLE
-    // cleanly. In authorized builds it installs the full vtable.
-    (void)::rac_backend_metalrt_register();
-  }
+    Registrar() noexcept {
+        // Fire-and-forget. In stub-mode (RAC_METALRT_ENGINE_AVAILABLE=0) the
+        // register function emits a single warning and marks the backend as
+        // registered without installing a route, so subsequent
+        // `loadModel(framework: .metalrt)` surfaces BACKEND_UNAVAILABLE
+        // cleanly. In authorized builds it installs the full vtable.
+        (void)::rac_backend_metalrt_register();
+    }
 };
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -58,7 +58,7 @@ __attribute__((used))
 #endif
 static Registrar g_registrar;
 
-} // namespace rac_plugin_autoreg_metalrt
+}  // namespace rac_plugin_autoreg_metalrt
 
 // Force at least one externally-visible symbol per plugin so the linker
 // can be asked to keep the TU by name without `-force_load`. Mirrors the
@@ -66,6 +66,6 @@ static Registrar g_registrar;
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((used))
 #endif
-extern "C" const char *const rac_plugin_static_marker_metalrt = "metalrt";
+extern "C" const char* const rac_plugin_static_marker_metalrt = "metalrt";
 
-#endif // RAC_PLUGIN_MODE_STATIC
+#endif  // RAC_PLUGIN_MODE_STATIC

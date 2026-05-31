@@ -690,8 +690,8 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
 
 # 2. Build native artifacts from runanywhere-commons (from repo root)
-./scripts/build-core-xcframework.sh   # iOS XCFrameworks → build/ios/
-./scripts/build-core-android.sh       # Android .so files → build/android/
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS XCFrameworks → build/ios/
+./scripts/build/build-core-android.sh       # Android .so files → build/android/
 
 # 3. Stage the freshly built natives into the React Native packages
 cd sdk/runanywhere-react-native
@@ -780,8 +780,8 @@ yarn build
 
 ```bash
 # 1. Rebuild native artifacts in the owning layer (repo root)
-./scripts/build-core-xcframework.sh   # iOS
-./scripts/build-core-android.sh       # Android
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS
+./scripts/build/build-core-android.sh       # Android
 
 # 2. Re-stage them into the RN packages
 cd sdk/runanywhere-react-native

@@ -183,6 +183,15 @@ extension CppBridge {
                 }
 
                 continuation.onTermination = { _ in
+                    // commons-072: `rac_download_set_progress_proto_callback`
+                    // and the dispatcher (`emit_progress` in
+                    // commons/src/infrastructure/download/download_orchestrator.cpp)
+                    // both serialize on `progress_sink().mutex`, and the
+                    // dispatcher holds that mutex across the user callback
+                    // invocation. Setting the slot to nil therefore acts as
+                    // a quiesce barrier: it cannot return until any in-flight
+                    // callback (which would dereference `userData`) has
+                    // returned. The subsequent `Unmanaged.release()` is safe.
                     _ = setProgressCallback(nil, nil)
                     Unmanaged<DownloadProtoProgressBox>.fromOpaque(opaque).release()
                 }

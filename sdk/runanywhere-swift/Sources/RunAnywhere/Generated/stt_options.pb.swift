@@ -93,7 +93,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -114,7 +114,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// the codegen-generated `wireString` accessor (see idl/rac_options.proto and
 /// idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
 /// from this annotation; the unspecified case falls back to "" by default.
-public enum RASTTLanguage: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASTTLanguage: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -198,7 +198,7 @@ public enum RASTTLanguage: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RASTTAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASTTAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case pcmS16Le // = 1
@@ -242,7 +242,7 @@ public enum RASTTAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RASTTStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASTTStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -307,7 +307,7 @@ public enum RASTTStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// VAD toggle, audio format). Producers should mirror runtime knobs into
 /// STTOptions when constructing requests.
 /// ---------------------------------------------------------------------------
-public struct RASTTConfiguration: Sendable {
+public nonisolated struct RASTTConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -380,7 +380,7 @@ public struct RASTTConfiguration: Sendable {
 /// preferred_framework) are part of STTConfiguration or implied by
 /// STT_LANGUAGE_AUTO.
 /// ---------------------------------------------------------------------------
-public struct RASTTOptions: Sendable {
+public nonisolated struct RASTTOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -441,7 +441,7 @@ public struct RASTTOptions: Sendable {
   fileprivate var _languageCode: String? = nil
 }
 
-public struct RASTTAudioSource: Sendable {
+public nonisolated struct RASTTAudioSource: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -486,7 +486,7 @@ public struct RASTTAudioSource: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Source: Equatable, Sendable {
+  public nonisolated enum OneOf_Source: Equatable, Sendable {
     case audioData(Data)
     case fileUri(String)
     case adapterHandle(String)
@@ -496,7 +496,7 @@ public struct RASTTAudioSource: Sendable {
   public init() {}
 }
 
-public struct RASTTTranscriptionRequest: @unchecked Sendable {
+public nonisolated struct RASTTTranscriptionRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -548,7 +548,7 @@ public struct RASTTTranscriptionRequest: @unchecked Sendable {
 ///
 /// Canonicalize on int64 *_ms (matches C ABI and Web).
 /// ---------------------------------------------------------------------------
-public struct RAWordTimestamp: Sendable {
+public nonisolated struct RAWordTimestamp: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -590,7 +590,7 @@ public struct RAWordTimestamp: Sendable {
 /// field name is `text`. Per-word breakdown is OPTIONAL (only some backends
 /// emit it for alternatives).
 /// ---------------------------------------------------------------------------
-public struct RATranscriptionAlternative: Sendable {
+public nonisolated struct RATranscriptionAlternative: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -618,7 +618,7 @@ public struct RATranscriptionAlternative: Sendable {
 /// Canonicalize on ms (matches C ABI). real_time_factor is producer-set;
 /// consumers may recompute as processing_time_ms / audio_length_ms.
 /// ---------------------------------------------------------------------------
-public struct RATranscriptionMetadata: Sendable {
+public nonisolated struct RATranscriptionMetadata: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -650,7 +650,7 @@ public struct RATranscriptionMetadata: Sendable {
 ///   - language: detected language. Promoted to STTLanguage enum.
 ///   - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
 /// ---------------------------------------------------------------------------
-public struct RASTTOutput: Sendable {
+public nonisolated struct RASTTOutput: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -731,7 +731,7 @@ public struct RASTTOutput: Sendable {
 /// `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
 /// 0.0 when backend does not provide one.
 /// ---------------------------------------------------------------------------
-public struct RASTTPartialResult: @unchecked Sendable {
+public nonisolated struct RASTTPartialResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -818,7 +818,7 @@ public struct RASTTPartialResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RASTTStreamEvent: @unchecked Sendable {
+public nonisolated struct RASTTStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -882,7 +882,7 @@ public struct RASTTStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RASTTServiceState: Sendable {
+public nonisolated struct RASTTServiceState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -921,7 +921,7 @@ public struct RASTTServiceState: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RASTTLanguageDetectionResult: Sendable {
+public nonisolated struct RASTTLanguageDetectionResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -950,21 +950,21 @@ public struct RASTTLanguageDetectionResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RASTTLanguage: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTLanguage: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_LANGUAGE_UNSPECIFIED\0\u{1}STT_LANGUAGE_AUTO\0\u{1}STT_LANGUAGE_EN\0\u{1}STT_LANGUAGE_ES\0\u{1}STT_LANGUAGE_FR\0\u{1}STT_LANGUAGE_DE\0\u{1}STT_LANGUAGE_ZH\0\u{1}STT_LANGUAGE_JA\0\u{1}STT_LANGUAGE_KO\0\u{1}STT_LANGUAGE_IT\0\u{1}STT_LANGUAGE_PT\0\u{1}STT_LANGUAGE_AR\0\u{1}STT_LANGUAGE_RU\0\u{1}STT_LANGUAGE_HI\0")
 }
 
-extension RASTTAudioEncoding: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTAudioEncoding: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_AUDIO_ENCODING_UNSPECIFIED\0\u{1}STT_AUDIO_ENCODING_PCM_S16_LE\0\u{1}STT_AUDIO_ENCODING_PCM_F32_LE\0\u{1}STT_AUDIO_ENCODING_CONTAINER\0")
 }
 
-extension RASTTStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}STT_STREAM_EVENT_KIND_STARTED\0\u{1}STT_STREAM_EVENT_KIND_PARTIAL\0\u{1}STT_STREAM_EVENT_KIND_FINAL\0\u{1}STT_STREAM_EVENT_KIND_ENDPOINT\0\u{1}STT_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}language\0\u{3}sample_rate\0\u{3}enable_vad\0\u{3}audio_format\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}vocabulary_list\0\u{3}max_alternatives\0\u{3}enable_word_timestamps\0\u{3}preferred_framework\0\u{3}language_code\0")
 
@@ -1053,7 +1053,7 @@ extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}max_speakers\0\u{3}vocabulary_list\0\u{3}enable_word_timestamps\0\u{3}beam_size\0\u{3}language_code\0\u{3}detect_language\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}max_alternatives\0\u{3}chunk_duration_ms\0\u{3}endpoint_silence_ms\0\u{3}suppress_blank\0\u{3}translate_to_english\0")
 
@@ -1162,7 +1162,7 @@ extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RASTTAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTAudioSource"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}file_uri\0\u{3}adapter_handle\0\u{1}encoding\0\u{3}audio_format\0\u{3}sample_rate\0\u{1}channels\0\u{3}bits_per_sample\0\u{3}duration_ms\0")
 
@@ -1261,7 +1261,7 @@ extension RASTTAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RASTTTranscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTTranscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTTranscriptionRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}audio\0\u{1}options\0\u{1}metadata\0")
 
@@ -1352,7 +1352,7 @@ extension RASTTTranscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WordTimestamp"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}word\0\u{3}start_ms\0\u{3}end_ms\0\u{1}confidence\0\u{3}speaker_id\0")
 
@@ -1406,7 +1406,7 @@ extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RATranscriptionAlternative: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATranscriptionAlternative: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TranscriptionAlternative"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}confidence\0\u{1}words\0")
 
@@ -1446,7 +1446,7 @@ extension RATranscriptionAlternative: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RATranscriptionMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATranscriptionMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TranscriptionMetadata"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}processing_time_ms\0\u{3}audio_length_ms\0\u{3}real_time_factor\0")
 
@@ -1491,7 +1491,7 @@ extension RATranscriptionMetadata: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTOutput"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}language\0\u{1}confidence\0\u{1}words\0\u{1}alternatives\0\u{1}metadata\0\u{3}language_code\0\u{3}timestamp_ms\0\u{3}duration_ms\0\u{3}speaker_ids\0\u{3}error_message\0\u{3}error_code\0\u{3}segment_index\0")
 
@@ -1585,7 +1585,7 @@ extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTPartialResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}stability\0\u{1}confidence\0\u{1}language\0\u{3}timestamp_ms\0\u{1}alternatives\0\u{3}language_code\0\u{3}request_id\0\u{3}segment_index\0\u{3}audio_start_ms\0\u{3}audio_end_ms\0\u{3}final_output\0")
 
@@ -1739,7 +1739,7 @@ extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}partial\0\u{3}final_output\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1858,7 +1858,7 @@ extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RASTTServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{3}supports_streaming\0\u{3}supported_language_codes\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1917,7 +1917,7 @@ extension RASTTServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RASTTLanguageDetectionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASTTLanguageDetectionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTLanguageDetectionResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}language_code\0\u{1}confidence\0\u{1}alternatives\0")
 

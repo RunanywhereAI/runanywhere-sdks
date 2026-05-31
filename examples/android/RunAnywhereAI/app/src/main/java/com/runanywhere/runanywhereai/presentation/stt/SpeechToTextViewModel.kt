@@ -8,6 +8,7 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTLanguage
+import ai.runanywhere.proto.v1.STTOptions
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -21,6 +22,8 @@ import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import com.runanywhere.sdk.public.extensions.currentModel
+import com.runanywhere.sdk.public.extensions.defaults
+import com.runanywhere.sdk.public.extensions.fromBcp47
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
@@ -265,7 +268,7 @@ class SpeechToTextViewModel : ViewModel() {
     private suspend fun checkInitialModelState() {
         val sttSnapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_STT)
         val isLoaded =
-            sttSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+            sttSnapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                 sttSnapshot.model_id.isNotEmpty()
         if (isLoaded) {
             val currentSTT =
@@ -779,49 +782,19 @@ class SpeechToTextViewModel : ViewModel() {
     }
 
     /**
-     * Build the iOS-equivalent default `RASTTOptions` (mirrors Swift
-     * `RASTTOptions.defaults()`): English language, punctuation on,
-     * word timestamps on. Falls back to the user-selected language from UI
-     * state when not English.
+     * Default `RASTTOptions` honouring the user-selected language from UI
+     * state. Delegates BCP-47 parsing and option defaults to the SDK
+     * (`STTLanguage.fromBcp47` + `STTOptions.defaults(language:)`) so the
+     * example app does not duplicate the cross-platform mapping table.
      */
     private fun defaultSttOptions(): RASTTOptions {
-        val parsed = sttLanguageFromBcp47(_uiState.value.language)
+        val parsed = STTLanguage.fromBcp47(_uiState.value.language)
         val lang =
             if (parsed == STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
                 STTLanguage.STT_LANGUAGE_EN
             } else {
                 parsed
             }
-        return RASTTOptions(
-            language = lang,
-            enable_punctuation = true,
-            enable_word_timestamps = true,
-        )
-    }
-}
-
-/**
- * Parse a BCP-47 base language string into a proto STTLanguage.
- * Falls back to STT_LANGUAGE_UNSPECIFIED for unrecognized values.
- * Mirrors the iOS reference behavior and the previous
- * `foundation.protoext.sttLanguageFromBcp47` helper semantics.
- */
-private fun sttLanguageFromBcp47(code: String): STTLanguage {
-    val base = code.substringBefore('-').lowercase()
-    return when (base) {
-        "en" -> STTLanguage.STT_LANGUAGE_EN
-        "es" -> STTLanguage.STT_LANGUAGE_ES
-        "fr" -> STTLanguage.STT_LANGUAGE_FR
-        "de" -> STTLanguage.STT_LANGUAGE_DE
-        "zh" -> STTLanguage.STT_LANGUAGE_ZH
-        "ja" -> STTLanguage.STT_LANGUAGE_JA
-        "ko" -> STTLanguage.STT_LANGUAGE_KO
-        "it" -> STTLanguage.STT_LANGUAGE_IT
-        "pt" -> STTLanguage.STT_LANGUAGE_PT
-        "ar" -> STTLanguage.STT_LANGUAGE_AR
-        "ru" -> STTLanguage.STT_LANGUAGE_RU
-        "hi" -> STTLanguage.STT_LANGUAGE_HI
-        "auto" -> STTLanguage.STT_LANGUAGE_AUTO
-        else -> STTLanguage.STT_LANGUAGE_UNSPECIFIED
+        return STTOptions.defaults(language = lang)
     }
 }

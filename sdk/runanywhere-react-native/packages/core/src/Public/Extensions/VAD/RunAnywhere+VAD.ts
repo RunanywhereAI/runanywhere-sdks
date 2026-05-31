@@ -11,6 +11,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
@@ -98,6 +99,11 @@ export async function detectVoiceActivity(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  const native = requireNativeModule();
+  if (!(await native.isInitialized())) {
+    throw SDKException.notInitialized();
+  }
+  await ensureServicesReady();
   return processVAD(audioToArrayBuffer(audio), 16000, options);
 }
 
@@ -125,8 +131,13 @@ async function processVAD(
 
 /** Reset VAD state. */
 export async function resetVAD(): Promise<void> {
-  if (!isNativeModuleAvailable()) return;
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
   const native = requireNativeModule();
+  if (!(await native.isInitialized())) {
+    throw SDKException.notInitialized();
+  }
   await native.resetVAD();
   logger.debug('VAD state reset');
 }

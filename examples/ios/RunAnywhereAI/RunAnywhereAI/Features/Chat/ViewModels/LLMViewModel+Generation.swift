@@ -11,71 +11,42 @@ import RunAnywhere
 extension LLMViewModel {
     // MARK: - Streaming Response Generation
 
-    // swiftlint:disable:next function_body_length
     func generateStreamingResponse(
         prompt: String,
         options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        // v2 close-out Phase G-2: generateStream now returns
-        // AsyncStream<RALLMStreamEvent>. Compute metrics locally from the
-        // event sequence (no separate metrics Task — the terminal event
-        // carries finish_reason and we derive the rest).
-        var fullResponse = ""
-        var tokenCount = 0
-        var firstTokenTime: Date?
-        let startTime = Date()
-        var finishReason = ""
-        var terminalError = ""
-
+        // The SDK's `aggregateStream(prompt:events:onToken:)` consumes the
+        // RALLMStreamEvent sequence, populates the canonical
+        // RALLMGenerationResult (including `framework` resolved from the
+        // currently-loaded LLM model), and invokes `onToken` for live UI
+        // updates. Avoids the synthetic result construction the example used
+        // to do alongside a hardcoded `framework = "llamacpp"` literal.
         let request = Self.makeRequest(prompt: prompt, options: options)
         let eventStream = try await RunAnywhere.generateStream(request)
-        for await event in eventStream {
-            if !event.token.isEmpty {
-                if firstTokenTime == nil { firstTokenTime = Date() }
-                fullResponse += event.token
-                tokenCount += 1
-                let displayText = Self.stripThinkTags(from: fullResponse)
-                updateMessageContent(at: messageIndex, content: displayText)
-                NotificationCenter.default.post(
-                    name: Notification.Name("MessageContentUpdated"),
-                    object: nil
-                )
-            }
-            if event.isFinal {
-                finishReason = event.finishReason
-                terminalError = event.errorMessage
-                break
+        let result = await RunAnywhere.aggregateStream(
+            prompt: prompt,
+            events: eventStream
+        ) { fullResponse in
+            let displayText = Self.stripThinkTags(from: fullResponse)
+            await MainActor.run {
+                // `@Observable` publishes the message mutation; the chat view
+                // auto-scrolls via `.onChange(of: messages.last?.content)`.
+                self.updateMessageContent(at: messageIndex, content: displayText)
             }
         }
 
-        if !terminalError.isEmpty {
+        if !result.errorMessage.isEmpty {
             throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: terminalError
+                NSLocalizedDescriptionKey: result.errorMessage
             ])
         }
 
-        _ = finishReason
-        let totalLatency = Date().timeIntervalSince(startTime) * 1000
-        let ttft = firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
-
-        let modelId = ModelListViewModel.shared.currentModel?.id ?? "unknown"
-        var result = RALLMGenerationResult()
-        result.text = Self.stripThinkTags(from: fullResponse)
-        result.inputTokens = Int32(max(1, prompt.count / 4))
-        result.tokensGenerated = Int32(tokenCount)
-        result.modelUsed = modelId
-        result.generationTimeMs = totalLatency
-        result.framework = "llamacpp"
-        result.tokensPerSecond = totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0
-        if let ttft {
-            result.ttftMs = ttft
-        }
-        result.responseTokens = Int32(tokenCount)
-
+        var finalResult = result
+        finalResult.text = Self.stripThinkTags(from: result.text)
         await updateMessageWithResult(
             at: messageIndex,
-            result: result,
+            result: finalResult,
             prompt: prompt,
             options: options,
             wasInterrupted: false

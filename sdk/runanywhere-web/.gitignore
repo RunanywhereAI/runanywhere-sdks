@@ -33,9 +33,9 @@ Thumbs.db
 .env
 .env.local
 
-# v2 close-out: test build output
+# Test build output
 packages/core/dist-test/
 
-# Playwright browser E2E (Wave E G-11)
+# Playwright browser E2E
 test-results/
 playwright-report/

@@ -2,7 +2,7 @@
 # WhisperCPP Backend - Speech-to-Text via whisper.cpp
 # =============================================================================
 
-# T5.4: per-engine build toggle owned locally.
+# Per-engine build toggle owned locally.
 # Opt-in fallback for Whisper-family models; use sherpa for all other STT.
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 if(NOT RAC_BACKEND_WHISPERCPP)
@@ -98,11 +98,20 @@ endif()
 # =============================================================================
 # WhisperCPP Backend Library
 # =============================================================================
-# v3.1.2: target declaration migrated to rac_add_engine_plugin() macro.
+# Target declaration migrated to rac_add_engine_plugin() macro.
 # whisper.cpp FetchContent + GGML_* platform option setup above stays
 # inline — engine-specific.
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+
+# pass3-syn-134: canonical include path lives under sdk/runanywhere-commons/include.
+# The repo root has no top-level include/ directory; references to
+# ${CMAKE_SOURCE_DIR}/include resolve to a nonexistent path when this engine is
+# built from the monorepo root (CMAKE_SOURCE_DIR = repo root), so the bare
+# `#include "rac_stt_whispercpp.h"` (header lives in include/rac/backends/) fails
+# to resolve. Aligned with engines/whisperkit_coreml + engines/sherpa convention.
+get_filename_component(RAC_COMMONS_ROOT_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 set(WHISPERCPP_BACKEND_SOURCES
     whispercpp_backend.cpp
@@ -148,15 +157,16 @@ elseif(RAC_PLATFORM_WINDOWS)
     message(STATUS "Configuring WhisperCPP backend for Windows")
 endif()
 
-# v3.1.2: TARGET_NAME=rac_backend_whispercpp preserves the historical
+# TARGET_NAME=rac_backend_whispercpp preserves the historical
 # CMake target name; CXX_STANDARD=20 matches the original.
 rac_add_engine_plugin(whispercpp
     TARGET_NAME         rac_backend_whispercpp
     CXX_STANDARD        20
     SOURCES             ${WHISPERCPP_BACKEND_SOURCES}
     LINK_LIBRARIES      ${WHISPERCPP_LINK_LIBS}
-    INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include
-                        ${CMAKE_SOURCE_DIR}/include/rac/backends
+    INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
+                        ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
                         ${whispercpp_SOURCE_DIR}/include
                         ${whispercpp_SOURCE_DIR}/ggml/include
     COMPILE_DEFINITIONS ${WHISPERCPP_COMPILE_DEFS}
@@ -180,7 +190,7 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
 
         target_include_directories(rac_backend_whispercpp_jni PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
-            ${CMAKE_SOURCE_DIR}/include
+            ${RAC_COMMONS_ROOT_DIR}/include
         )
 
         target_link_libraries(rac_backend_whispercpp_jni PRIVATE

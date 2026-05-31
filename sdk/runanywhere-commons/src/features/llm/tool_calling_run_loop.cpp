@@ -1,9 +1,9 @@
 /**
  * @file tool_calling_run_loop.cpp
- * @brief P2-T8: Synchronous, single-call tool-calling loop.
+ * @brief Synchronous, single-call tool-calling loop.
  *
  * Collapses Swift's RunAnywhere+ToolCalling.swift::generateWithTools (~100 LOC)
- * to ~10 LOC. Same logic that the Wave D-4 session API uses, but exposed as a
+ * to ~10 LOC. Same logic that the session API uses, but exposed as a
  * single C ABI call: the host SDK passes in the full request plus a
  * synchronous tool-execute callback, and commons owns the entire
  *   build_prompt -> generate -> parse -> validate -> execute -> follow_up
@@ -19,7 +19,7 @@
  * session API uses), so this honors the same plugin routing, cancel, and
  * refcount semantics.
  *
- * Mirrors tool_calling_session.cpp (Wave D-4) — share the same design but as
+ * Mirrors tool_calling_session.cpp — share the same design but as
  * a synchronous single-call ABI instead of an outer-driven event stream.
  */
 
@@ -358,11 +358,12 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 //      the value into a thread-safe sink (Swift HandleBox, Kotlin
 //      CompletableDeferred, RN JS-thread callback, Flutter Completer, Web
 //      synchronous capture) BEFORE the first generate iteration runs.
-static rac_result_t run_loop_impl(
-    const uint8_t* in_request_bytes, size_t in_size, rac_tool_execute_callback_fn on_execute,
-    void* on_execute_user_data,
-    rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
-    void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result) {
+static rac_result_t
+run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
+              rac_tool_execute_callback_fn on_execute, void* on_execute_user_data,
+              rac_tool_calling_run_loop_on_handle_published_cb_t on_handle_published,
+              void* on_handle_user_data, uint64_t* out_run_loop_handle,
+              rac_proto_buffer_t* out_result) {
     if (!on_execute || !out_result) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -470,15 +471,23 @@ static rac_result_t run_loop_impl(
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
         if (!run_generate_once(ctx, cancel_state.get(), current_prompt, &response, &rc)) {
+            // pass3-syn-021 parity: distinguish cancel from other generate
+            // failures, mirroring run_generate_loop in tool_calling_session.cpp.
+            // A cancel that latched before/during generate surfaces as
+            // RAC_ERROR_CANCELLED with "LLM generation cancelled" so hosts can
+            // branch on error_code instead of message string matching.
+            const bool cancelled = cancel_state->cancel_requested.load(std::memory_order_acquire);
+            const rac_result_t report_rc = cancelled ? RAC_ERROR_CANCELLED : rc;
+            const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
             final_result.set_text(final_text);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
-            final_result.set_error_code(static_cast<int32_t>(rc));
-            final_result.set_error_message("LLM generation failed");
+            final_result.set_error_code(static_cast<int32_t>(report_rc));
+            final_result.set_error_message(msg);
             std::vector<uint8_t> bytes;
             serialize(final_result, &bytes);
             rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
-            return rc;
+            return report_rc;
         }
 
         std::string clean_text;

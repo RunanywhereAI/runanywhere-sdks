@@ -643,7 +643,7 @@ class GenerationEvent extends $pb.GeneratedMessage {
   void clearThinkingText() => $_clearField(23);
 
   /// For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-  /// Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+  /// Enables totalTokens = input_tokens + tokens_used analytics
   /// from the event stream alone.
   @$pb.TagNumber(24)
   $core.int get inputTokens => $_getIZ(23);

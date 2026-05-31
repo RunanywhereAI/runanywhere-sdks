@@ -1,28 +1,22 @@
 # =============================================================================
 # Sherpa-ONNX Backend — STT / TTS / VAD via Sherpa-ONNX prebuilts
 #
-# GAP 06 T5.1 — split out of engines/onnx/. This directory now owns:
+# Split out of engines/onnx/. This directory now owns:
 #   1. Per-platform Sherpa-ONNX prebuilt discovery (previously sprawled across
 #      engines/onnx/CMakeLists.txt lines 52-205).
 #   2. A standalone `rac_backend_sherpa` plugin artifact that exposes a
-#      `"sherpa"` engine in the GAP 02 plugin registry, distinct from
+#      `"sherpa"` engine in the plugin registry, distinct from
 #      `"onnx"`.
-#   3. An IMPORTED `sherpa_onnx` GLOBAL target so `engines/onnx/` (and any
-#      future consumer) can `target_link_libraries(... sherpa_onnx)` without
-#      re-implementing prebuilt discovery.
-#
-# This CMakeLists.txt MUST be added BEFORE engines/onnx so the imported
-# `sherpa_onnx` target exists when onnx's CMake runs (see engines/CMakeLists.txt).
+#   3. An IMPORTED `sherpa_onnx` GLOBAL target so this engine can link
+#      Sherpa-ONNX without re-implementing prebuilt discovery.
 #
 # The runtime source for STT/TTS/VAD and wakeword compatibility lives here;
 # engines/onnx keeps only generic ONNX Runtime services and embeddings.
 # =============================================================================
 
 # =============================================================================
-# TODO(WAVE D-2 follow-up): WASM Sherpa unblock — exact remaining work
+# TODO: WASM Sherpa unblock — exact remaining work
 # =============================================================================
-# See: thoughts/shared/plans/wasm_onnx_unblock.md  (step-by-step plan)
-# See: gaps/gaps/inconsistencies/cpp-layer.md § CPP-WASM-ONNX-UNBLOCK
 #
 # Sherpa-ONNX does NOT publish a prebuilt static archive for WASM.
 # sdk/runanywhere-web/wasm/scripts/build-sherpa-onnx.sh currently builds a
@@ -96,14 +90,13 @@ option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONN
 # Sherpa-ONNX WASM static archives are missing. Drop
 # libsherpa-onnx-c-api.a + deps under
 # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/ to enable.
-# See CPP-13 / WEB-01.
 if(EMSCRIPTEN)
     set(RAC_SHERPA_WASM_RUNTIME_DIR
         "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm")
     if(NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
         message(STATUS "RAC_BACKEND_SHERPA: no WASM Sherpa archive at "
                        "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a; "
-                       "disabling Sherpa backend (see CPP-13 / WEB-01)")
+                       "disabling Sherpa backend")
         set(RAC_BACKEND_SHERPA OFF CACHE BOOL "" FORCE)
     else()
         message(STATUS "RAC_BACKEND_SHERPA: found vendored WASM Sherpa archives; "
@@ -146,8 +139,8 @@ include(FetchONNXRuntime)
 # =============================================================================
 # Sherpa-ONNX prebuilt discovery (moved from engines/onnx/CMakeLists.txt)
 # =============================================================================
-# Declared GLOBAL so engines/onnx and other sibling engines can consume the
-# imported target without re-running discovery logic.
+# Declared GLOBAL so any later sibling engine can consume the imported target
+# without re-running discovery logic.
 
 set(SHERPA_ONNX_AVAILABLE OFF)
 get_filename_component(RUNANYWHERE_COMMONS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
@@ -306,7 +299,7 @@ elseif(RAC_PLATFORM_WINDOWS)
 
 elseif(EMSCRIPTEN)
     # WASM / Emscripten: sherpa-onnx static archives vendored under
-    # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/ (see CPP-13 / WEB-01).
+    # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/.
     # Build recipe lives in the banner at the top of this file. The guard at the
     # engine gate above short-circuits this engine when the archives are absent,
     # so reaching here implies `libsherpa-onnx-c-api.a` exists.
@@ -348,14 +341,6 @@ elseif(EMSCRIPTEN)
     endif()
 endif()
 
-# Expose availability to sibling engines (notably engines/onnx).
-set(RAC_SHERPA_ONNX_AVAILABLE ${SHERPA_ONNX_AVAILABLE} CACHE INTERNAL
-    "Sherpa-ONNX prebuilt discovered (set by engines/sherpa)")
-if(SHERPA_ONNX_AVAILABLE)
-    set(RAC_SHERPA_ONNX_HEADER_PATH "${SHERPA_HEADER_PATH}" CACHE INTERNAL
-        "Sherpa-ONNX include directory (set by engines/sherpa)")
-endif()
-
 # =============================================================================
 # Sherpa Plugin Library
 # =============================================================================
@@ -366,7 +351,7 @@ endif()
 #   - staging scripts (build-core-android.sh, build-core-xcframework.sh)
 #     and downstream SDK gradle/swift packaging can pick it up as a peer
 #     of librac_backend_onnx.so;
-#   - the GAP 02 plugin registry gains a "sherpa" engine name that future
+#   - the plugin registry gains a "sherpa" engine name that future
 #     router hints can target.
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
@@ -416,7 +401,7 @@ if(RAC_PLATFORM_ANDROID)
 endif()
 
 # =============================================================================
-# Self-registration carrier (ENG-SHERPA-03)
+# Self-registration carrier
 # =============================================================================
 # Matches the llamacpp pattern: thin shim that wraps
 # RAC_STATIC_PLUGIN_REGISTER(sherpa). On RAC_STATIC_PLUGINS=ON hosts

@@ -10,8 +10,6 @@
 
 // RunAnywhere IDL — voice agent streaming service.
 //
-// GAP 09 Phase 12 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
-//
 // gRPC-style service whose `Stream` rpc returns a server-streaming sequence
 // of `VoiceEvent` messages (defined in voice_events.proto). This is NOT
 // transported over network gRPC — frontends use the codegen-emitted client
@@ -20,7 +18,7 @@
 // adapter (~150 LOC per language).
 //
 // The service definition is the abstract contract; the per-language
-// adapter is the only hand-written piece (see GAP 09 Phases 16-19).
+// adapter is the only hand-written piece.
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -34,7 +32,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -42,7 +40,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// Empty request type — the voice agent already has its config set via
 /// `rac_voice_agent_init()` at handle creation time. The Stream rpc just
 /// opens a new event subscription on an existing handle.
-public struct RAVoiceAgentRequest: Sendable {
+public nonisolated struct RAVoiceAgentRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -67,7 +65,7 @@ public struct RAVoiceAgentRequest: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: One-shot voice-turn result.
+/// One-shot voice-turn result.
 ///
 /// Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
 /// `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
@@ -76,7 +74,7 @@ public struct RAVoiceAgentRequest: Sendable {
 /// blob produces transcription + assistant response + synthesized audio in
 /// one call (as opposed to the streaming path served by the Stream rpc).
 /// ---------------------------------------------------------------------------
-public struct RAVoiceAgentResult: @unchecked Sendable {
+public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -212,7 +210,7 @@ public struct RAVoiceAgentResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAVoiceAgentTurnRequest: Sendable {
+public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -248,14 +246,14 @@ public struct RAVoiceAgentTurnRequest: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Voice session behavior configuration.
+/// Voice session behavior configuration.
 ///
 /// Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
 /// Controls runtime behavior of the voice agent's session loop — silence
 /// timing, speech threshold, auto-TTS playback, continuous mode, and
 /// LLM thinking-mode toggle.
 /// ---------------------------------------------------------------------------
-public struct RAVoiceSessionConfig: Sendable {
+public nonisolated struct RAVoiceSessionConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -312,12 +310,12 @@ public struct RAVoiceSessionConfig: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Audio pipeline state-manager configuration.
+/// Audio pipeline state-manager configuration.
 ///
 /// Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
 /// to prevent microphone/TTS feedback loops.
 /// ---------------------------------------------------------------------------
-public struct RAAudioPipelineConfig: Sendable {
+public nonisolated struct RAAudioPipelineConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -334,7 +332,7 @@ public struct RAAudioPipelineConfig: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// v3.2: Aggregated voice-agent compose configuration.
+/// Aggregated voice-agent compose configuration.
 ///
 /// Mirrors the C ABI `rac_voice_agent_config_t` and Swift
 /// `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
@@ -346,7 +344,7 @@ public struct RAAudioPipelineConfig: Sendable {
 /// runtime resolves IDs against the model registry. An empty string means
 /// "use the currently loaded model/voice for that capability".
 /// ---------------------------------------------------------------------------
-public struct RAVoiceAgentComposeConfig: @unchecked Sendable {
+public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -571,8 +569,8 @@ public struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-/// Wave D-7 helper-level proto requests for voice-agent sub-components.
-public struct RAVoiceAgentTranscribeProtoRequest: Sendable {
+/// Helper-level proto requests for voice-agent sub-components.
+public nonisolated struct RAVoiceAgentTranscribeProtoRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -594,7 +592,7 @@ public struct RAVoiceAgentTranscribeProtoRequest: Sendable {
   public init() {}
 }
 
-public struct RAVoiceAgentSynthesizeSpeechProtoRequest: Sendable {
+public nonisolated struct RAVoiceAgentSynthesizeSpeechProtoRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -621,9 +619,9 @@ public struct RAVoiceAgentSynthesizeSpeechProtoRequest: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_filter\0\u{3}session_id\0\u{1}categories\0\u{3}min_severity\0\u{3}replay_from_seq\0\u{3}include_audio\0")
 
@@ -678,7 +676,7 @@ extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0\u{3}synthesized_audio_sample_rate_hz\0\u{3}synthesized_audio_channels\0\u{3}synthesized_audio_encoding\0\u{3}session_id\0\u{3}turn_id\0\u{3}stt_time_ms\0\u{3}llm_time_ms\0\u{3}tts_time_ms\0\u{3}total_time_ms\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -860,7 +858,7 @@ extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentTurnRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}session_id\0\u{3}audio_data\0\u{3}sample_rate_hz\0\u{1}channels\0\u{1}encoding\0\u{3}session_config\0\u{1}metadata\0")
 
@@ -929,7 +927,7 @@ extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceSessionConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}silence_duration_ms\0\u{3}speech_threshold\0\u{3}auto_play_tts\0\u{3}continuous_mode\0\u{3}thinking_mode_enabled\0\u{3}max_tokens\0\u{3}max_recording_duration_ms\0\u{3}language_code\0\u{3}voice_id\0")
 
@@ -1003,7 +1001,7 @@ extension RAVoiceSessionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AudioPipelineConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}cooldown_duration_ms\0\u{3}strict_transitions\0\u{3}max_tts_duration_ms\0")
 
@@ -1043,7 +1041,7 @@ extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{3}wakeword_enabled\0\u{3}wakeword_model_path\0\u{3}wakeword_model_id\0\u{3}wakeword_phrase\0\u{3}wakeword_threshold\0\u{3}wakeword_embedding_model_path\0\u{3}wakeword_vad_model_path\0\u{3}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0")
 
@@ -1267,7 +1265,7 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentTranscribeProtoRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}session_id\0\u{3}sample_rate\0\u{3}language_hint\0\u{1}channels\0\u{1}encoding\0")
 
@@ -1322,7 +1320,7 @@ extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message, SwiftProtob
   }
 }
 
-extension RAVoiceAgentSynthesizeSpeechProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceAgentSynthesizeSpeechProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentSynthesizeSpeechProtoRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}session_id\0\u{1}options\0")
 

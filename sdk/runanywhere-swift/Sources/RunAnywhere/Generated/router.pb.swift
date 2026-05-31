@@ -10,7 +10,7 @@
 
 // RunAnywhere IDL — engine-router capability-query types.
 //
-// Wave H-5 (KOT-12): moves per-SDK SDKComponent → ModelCategory →
+// Moves per-SDK SDKComponent → ModelCategory →
 // framework mapping into commons. Frontends call
 // `rac_router_frameworks_for_capability_proto` with an
 // `SDKComponent` and receive the ordered list of `InferenceFramework`
@@ -24,7 +24,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -35,7 +35,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// answers "which engines CAN run this capability on this host" independent
 /// of whether any matching model has been registered yet.
 /// ---------------------------------------------------------------------------
-public struct RAFrameworksForCapabilityRequest: Sendable {
+public nonisolated struct RAFrameworksForCapabilityRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -53,7 +53,7 @@ public struct RAFrameworksForCapabilityRequest: Sendable {
 /// primitive(s) mapped from `component`. Duplicates are removed while
 /// preserving first-seen order.
 /// ---------------------------------------------------------------------------
-public struct RAFrameworksForCapabilityResponse: Sendable {
+public nonisolated struct RAFrameworksForCapabilityResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -67,9 +67,9 @@ public struct RAFrameworksForCapabilityResponse: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAFrameworksForCapabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAFrameworksForCapabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FrameworksForCapabilityRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0")
 
@@ -99,7 +99,7 @@ extension RAFrameworksForCapabilityRequest: SwiftProtobuf.Message, SwiftProtobuf
   }
 }
 
-extension RAFrameworksForCapabilityResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAFrameworksForCapabilityResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FrameworksForCapabilityResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}frameworks\0")
 

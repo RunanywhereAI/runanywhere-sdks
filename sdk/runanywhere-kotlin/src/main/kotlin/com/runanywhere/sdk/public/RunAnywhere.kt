@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * The main entry point for the RunAnywhere SDK.
- * Two-phase initialization is owned by commons (rac_sdk_init.h, P2-T9):
- *   * Phase 1 → rac_sdk_init_phase1_proto (validate + state init)
- *   * Phase 2 → rac_sdk_init_phase2_proto (device registration, model
- *     assignments, HTTP-state snapshot)
- *   * HTTP retry → rac_sdk_retry_http_proto
+ * Two-phase initialization delegates to CppBridge:
+ *   * Phase 1 → CppBridge.initialize() → CppBridgeSdkInit.phase1
+ *     (rac_sdk_init_phase1_proto) for validation + config/state init.
+ *   * Phase 2 → CppBridge.initializeServices() — device registration, HTTP
+ *     auth round-trip, telemetry flush (Kotlin-side OkHttp orchestration).
+ *   * HTTP retry → retryHTTPSetup() tries the idempotent
+ *     CppBridgeSdkInit.retryHTTP() (rac_sdk_retry_http_proto) fast-path before
+ *     falling back to re-running the Kotlin Phase 2 services init.
  * Kotlin retains only the parts that cannot move into C++:
  *   * Coroutine Mutex + servicesMutex concurrency primitive
  *   * EncryptedSharedPreferences / file-backed SDK params persistence
@@ -19,8 +22,11 @@
 
 package com.runanywhere.sdk.public
 
+import android.content.Context
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
@@ -47,7 +53,8 @@ import kotlinx.coroutines.sync.withLock
 //     │    ├─ Events.register()           ← Analytics callback
 //     │    ├─ Telemetry.initialize()      ← HTTP callback
 //     │    ├─ Device.register()           ← Device registration
-//     │    └─ SDKInit.phase1(proto)       ← validate + state init
+//     │    └─ CppBridgeSdkInit.phase1 (rac_sdk_init_phase1_proto)
+//     │         ← validation + config/state init
 //     ├─ Emit SDKInitStarted / SDKInitCompleted events (via CppBridge)
 //     └─ Mark: isInitialized = true; spawn Phase 2 in background
 //
@@ -55,11 +62,9 @@ import kotlinx.coroutines.sync.withLock
 // ────────────────────────────────────────────────────────────────────
 //   RunAnywhere.completeServicesInitialization()
 //     ├─ CppBridge.initializeServices()  (via initializePlatformBridgeServices expect)
-//     │    ├─ Step 1 (deferred from C++): HTTP transport + auth round-trip
-//     │    ├─ Step 2 (MainActor / Main dispatcher): platform-plugin registration
-//     │    ├─ Step 3 (C++): SDKInit.phase2(proto) – device reg + model assignments
-//     │    ├─ Step 4 (deferred from C++): dev-mode device registration with build token
-//     │    └─ Step 5 (deferred from C++): filesystem-backed model discovery
+//     │    ├─ Step 1: HTTP transport + auth round-trip (OkHttp/CppBridgeAuth)
+//     │    ├─ Step 2: telemetry flush (CppBridgeTelemetry)
+//     │    ├─ Step 3: device registration (CppBridgeDevice.triggerRegistration)
 //     └─ Mark: areServicesReady = true; capture hasCompletedHTTPSetup flag
 //
 // ═══════════════════════════════════════════════════════════════════════════
@@ -79,7 +84,7 @@ import kotlinx.coroutines.sync.withLock
  * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadModel(RAModelLoadRequest)
  * - LLM: RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
- * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
+ * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream()
  *
  * All AI component logic (LLM, STT, TTS, VAD) is delegated to the C++ runanywhere-commons
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).
@@ -236,7 +241,8 @@ object RunAnywhere {
      *    (`rac_validate_api_key` / `rac_validate_base_url`) — invalid combos
      *    throw [SDKException] before any native state is mutated.
      * 3. Calls the platform bridge, which internally drives Phase 1
-     *    (`rac_sdk_init_phase1_proto`), telemetry boot, and the
+     *    (`rac_sdk_init_phase1_proto` via `CppBridgeSdkInit.phase1` for
+     *    validation + config/state init), telemetry boot, and the
      *    `emitSDKInitStarted` / `emitSDKInitCompleted` event pair.
      * 4. Spawns Phase 2 in the background via [initScope] so the call
      *    returns synchronously (mirrors Swift's
@@ -283,11 +289,44 @@ object RunAnywhere {
     }
 
     /**
+     * Initialize the RunAnywhere SDK with an Android [Context] (Android-specific
+     * convenience overload). Absorbs the previously example-side
+     * `AndroidPlatformContext.initialize(context)` call so callers do not need
+     * to reach into SDK-internal foundation packages.
+     *
+     * The Context is wired into [AndroidPlatformContext] (which feeds
+     * `CppBridgePlatformAdapter` for secure storage and `CppBridgeModelPaths`
+     * for filesDir/cacheDir resolution) before Phase 1 starts. Subsequent calls
+     * with the same application context are no-ops at the `AndroidPlatformContext`
+     * level.
+     *
+     * Equivalent to the Swift `RunAnywhere.initialize(apiKey:baseURL:environment:)`
+     * entry point — Apple platforms do not need an explicit Context handle
+     * (Keychain is process-scoped).
+     *
+     * @param context Android application context (any Context is fine — the
+     *                application context will be retained, not the activity).
+     * @param apiKey  API key (optional for development).
+     * @param baseURL Backend API base URL (optional for development).
+     * @param environment SDK environment (default: DEVELOPMENT).
+     */
+    fun initialize(
+        context: Context,
+        apiKey: String? = null,
+        baseURL: String? = null,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+    ) {
+        AndroidPlatformContext.initialize(context)
+        initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
+    }
+
+    /**
      * Phase 1 core init — delegated to commons. Mirrors Swift's
      * `performCoreInit(with:startBackgroundServices:)`.
      *
      * The platform bridge encapsulates the canonical step list:
-     *   * Phase 1 proto (`rac_sdk_init_phase1_proto`) validation + state init.
+     *   * `rac_sdk_init_phase1_proto` via `CppBridgeSdkInit.phase1` for
+     *     validation + config/state init.
      *   * SDK config + Keychain auth-storage install.
      *   * `emitSDKInitStarted` / `emitSDKInitCompleted` event emission.
      *
@@ -322,10 +361,9 @@ object RunAnywhere {
                 SDKLogger.setLevel(logLevel)
 
                 // Hand off to the platform bridge, which loads native libs,
-                // registers the platform adapter, runs `rac_sdk_init_phase1_proto`
-                // (validation + state init), and emits SDKInitStarted /
-                // SDKInitCompleted events. Mirrors Swift's
-                // `CppBridge.SdkInit.phase1(...)` step inside `performCoreInit`.
+                // registers the platform adapter, runs CppBridgeSdkInit.phase1
+                // (rac_sdk_init_phase1_proto — validation + config/state init),
+                // and emits SDKInitStarted / SDKInitCompleted events.
                 initializePlatformBridge(
                     environment = params.environment,
                     apiKey = params.apiKey,
@@ -371,20 +409,21 @@ object RunAnywhere {
      * once. Mirrors Swift's `completeServicesInitialization()` (the
      * `_servicesInitTask` + `_servicesInitLock.sync { ... }` fan-in).
      *
-     * The platform bridge owns the canonical 5-step Phase 2 sequence:
-     *   1. (deferred from C++) HTTP transport + auth round-trip.
+     * The platform bridge runs the Kotlin-side OkHttp orchestration:
+     *   1. HTTP transport + auth round-trip (OkHttp/CppBridgeAuth).
      *      Tolerates offline mode — local/cached models stay accessible.
-     *   2. (MainActor / Main dispatcher) platform-plugin registration.
-     *   3. (C++) `rac_sdk_init_phase2_proto` — device registration + model
-     *      assignments + HTTP-state snapshot.
-     *   4. (deferred from C++) dev-mode device registration with the
-     *      build-token path.
-     *   5. (deferred from C++) filesystem-backed model discovery.
+     *   2. Telemetry flush (CppBridgeTelemetry.flush).
+     *   3. Device registration (CppBridgeDevice.triggerRegistration).
      *
-     * Each step's outcome surfaces through the [SdkInitResult] envelope; the
-     * `http_configured` flag drives [_hasCompletedHTTPSetup] so a later
-     * [ensureServicesReady] call can retry HTTP without re-running the rest of
-     * the bootstrap.
+     * (The commons `rac_sdk_init_phase2_proto` ABI is now bound via
+     * `CppBridgeSdkInit.phase2`; Kotlin keeps the OkHttp-backed orchestration
+     * here because auth/device/telemetry transport are platform-side, and
+     * routes the idempotent HTTP fast-path through `CppBridgeSdkInit.retryHTTP`
+     * in [retryHTTPSetup].)
+     *
+     * HTTPClientAdapter.isConfigured drives [_hasCompletedHTTPSetup] so a
+     * later [ensureServicesReady] call can retry HTTP without re-running the
+     * rest of the bootstrap.
      */
     suspend fun completeServicesInitialization() {
         // Fast path: already completed.
@@ -408,11 +447,8 @@ object RunAnywhere {
             logger.info("Initializing services for ${params.environment.wireString} mode...")
 
             try {
-                // Delegate to the platform bridge — runs the full Step-1..5
-                // sequence including `rac_sdk_init_phase2_proto`. The bridge
-                // also flushes the linked-models warning and dev-mode device
-                // registration. Mirrors Swift's awaited steps in
-                // `_performServicesInitialization`.
+                // Delegate to the platform bridge — runs the Kotlin-side
+                // OkHttp HTTP auth, telemetry flush, and device registration.
                 val httpConfigured = initializePlatformBridgeServices()
 
                 // Decouple "services ready" from "HTTP/auth complete" so
@@ -474,20 +510,30 @@ object RunAnywhere {
 
     /**
      * Retry HTTP/auth after an offline initialization. Mirrors Swift's
-     * private `retryHTTPSetup()` — combines the C ABI idempotency guard
-     * (`rac_sdk_retry_http_proto`) with the platform-side auth round-trip
-     * that the proto explicitly defers.
+     * private `retryHTTPSetup()`.
      *
-     * Implementation note: routes through [initializePlatformBridgeServices]
-     * for now because the bridge's existing services init already calls
-     * `CppBridgeDevConfig.configureHTTP()` and `HTTPClientAdapter.configure()`
-     * on the same code path the Swift `setupHTTP` helper exercises.
+     * Tries the idempotent commons fast-path
+     * `CppBridgeSdkInit.retryHTTP()` (`rac_sdk_retry_http_proto`) first: when
+     * commons reports `http_configured` (already authenticated), the full
+     * Kotlin Phase 2 re-run is skipped. Otherwise it falls back to
+     * [initializePlatformBridgeServices] (OkHttp/CppBridgeAuth) so an offline
+     * init can complete once connectivity returns.
      */
     private suspend fun retryHTTPSetup() {
         val params = _initParams ?: return
         logger.debug("Retrying HTTP/auth setup for ${params.environment.wireString}...")
 
         try {
+            // Idempotent fast-path: commons returns http_configured=true with
+            // no side effects when auth is already established, so we avoid
+            // re-running the full Kotlin Phase 2 bootstrap on every call.
+            val fastPath = runCatching { CppBridgeSdkInit.retryHTTP() }.getOrNull()
+            if (fastPath?.http_configured == true) {
+                _hasCompletedHTTPSetup = true
+                logger.info("HTTP/Auth already configured (idempotent fast-path)")
+                return
+            }
+
             val httpConfigured = initializePlatformBridgeServices()
             _hasCompletedHTTPSetup = httpConfigured
             if (httpConfigured) {

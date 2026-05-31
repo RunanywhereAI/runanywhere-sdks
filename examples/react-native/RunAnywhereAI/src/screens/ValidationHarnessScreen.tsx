@@ -8,7 +8,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import RNFS from 'react-native-fs';
 import { RunAnywhere } from '@runanywhere/core';
 import {
   JSONSchema,
@@ -19,36 +18,28 @@ import {
   ToolCall,
   ToolDefinition,
   ToolParameterType,
+  type ToolValue,
 } from '@runanywhere/proto-ts/tool_calling';
-import type { LoRAAdapterConfig } from '@runanywhere/proto-ts/lora_options';
 import {
   ModelCategory,
-  ModelGetRequest,
   ModelLoadRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
+import { attachLoRAFixture } from '../utils/loraFixture';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing } from '../theme/spacing';
 
 const ACTION_LOG_PREFIX = '[RN_VALIDATION_ACTION]';
-// LoRA fixture lives inside the app's sandboxed documents dir so the
-// validation harness works on real devices / fresh sims where the host
-// /tmp path is unreachable. The harness operator stages
-// `identity-adapter.gguf` into this path before the run; see
-// test_workflows/instructions/cross-platform-e2e-test-catalog.md §9b
-// "LoRA fixture deployment" for the per-platform copy commands
-// (RN-AND-005 / RN-IOS-007).
-const FIXTURE_ADAPTER_PATH = `${RNFS.DocumentDirectoryPath}/lora/identity-adapter.gguf`;
 // Mirrors Voice Assistant Setup in the iOS app (VoiceAgentViewModel.swift):
 // vad.synthetic_* actions invoke RunAnywhere.detectVoiceActivity, which in
 // turn calls rac_vad_process_lifecycle_proto. Without a loaded VAD model the
 // commons ABI returns "VAD lifecycle model is not loaded" — the harness must
 // load silero-vad up-front so the synthetic_silence / synthetic_tone actions
-// have a deterministic precondition (CLUSTER-03 / RN-VAD-001).
+// have a deterministic precondition.
 const SILERO_VAD_MODEL_ID = 'silero-vad';
 
-type VadReadiness = 'idle' | 'downloading' | 'loading' | 'ready' | 'failed';
+type VadReadiness = 'idle' | 'loading' | 'ready' | 'failed';
 
 type HarnessStatus = 'PASS' | 'FAIL' | 'EXPECTED_ERROR';
 
@@ -138,17 +129,6 @@ const createStructuredSchema = (): JSONSchema =>
     },
   });
 
-const createLoRAFixtureConfig = (): LoRAAdapterConfig => ({
-  adapterPath: FIXTURE_ADAPTER_PATH,
-  adapterId: 'rn-validation-identity',
-  scale: 0.5,
-  metadata: {
-    lane: 'react-native-validation',
-    fixture: 'identity-adapter',
-  },
-  targetModules: ['q_proj', 'v_proj'],
-});
-
 const createSyntheticAudio = (kind: 'silence' | 'tone'): Float32Array => {
   const sampleRate = 16000;
   const audio = new Float32Array(sampleRate);
@@ -173,14 +153,14 @@ export const ValidationHarnessScreen: React.FC = () => {
   // Mirrors Voice Assistant Setup → silero-vad auto-load on iOS
   // (VoiceAgentViewModel.swift): without this precondition the underlying
   // rac_vad_process_lifecycle_proto returns RAC_ERROR_NOT_INITIALIZED with
-  // "VAD lifecycle model is not loaded" — see CLUSTER-03 / RN-VAD-001.
+  // "VAD lifecycle model is not loaded".
   //
-  // CLUSTER-16 (RN-IOS-VAD-002 + RN-AND-VAD-002): the auto-load must drive
-  // the canonical RunAnywhere.downloadModel(...) flow when the registry
-  // entry has no `localPath` yet. Without a downloaded artifact, commons
-  // `resolved_path_for_model` falls back to the bare modelId string, which
-  // Sherpa then receives as the file path and rejects with
-  // `Silero vad model file 'silero-vad' does not exist`.
+  // Commons `rac_model_lifecycle_load_proto` owns the canonical
+  // download→load atom when `validateAvailability=true`: if the registered
+  // ModelInfo has no local artifact and advertises a download source, the
+  // SDK drives the download plan→start→poll cycle internally before
+  // proceeding with the load. The example never reaches into multi-step
+  // orchestration.
   useEffect(() => {
     let cancelled = false;
     const ensureVadLoaded = async () => {
@@ -194,44 +174,6 @@ export const ValidationHarnessScreen: React.FC = () => {
           return;
         }
 
-        // Step 1 — verify the registry has a resolvable artifact for the
-        // silero-vad model id. If `localPath` is empty (and the model is
-        // not marked downloaded), drive the canonical download flow first.
-        const getResult = await RunAnywhere.getModel(
-          ModelGetRequest.fromPartial({ modelId: SILERO_VAD_MODEL_ID })
-        );
-        if (cancelled) return;
-        if (!getResult.found || !getResult.model) {
-          setVadReadiness('failed');
-          setVadError(
-            getResult.errorMessage ||
-              `silero-vad is not registered in the model registry`
-          );
-          return;
-        }
-
-        const hasLocalPath =
-          (getResult.model.localPath?.length ?? 0) > 0 ||
-          getResult.model.isDownloaded === true;
-
-        if (!hasLocalPath) {
-          setVadReadiness('downloading');
-          // Manual async iteration — Hermes does not support for-await
-          // over NitroModules AsyncIterables (see CLAUDE.md / ModelSelectionSheet).
-          const iter =
-            RunAnywhere.downloadModel(SILERO_VAD_MODEL_ID)[
-              Symbol.asyncIterator
-            ]();
-          let step = await iter.next();
-          while (!step.done) {
-            if (cancelled) return;
-            step = await iter.next();
-          }
-        }
-        if (cancelled) return;
-
-        // Step 2 — load the model now that the registry entry has a
-        // resolved local file path.
         setVadReadiness('loading');
         const result = await RunAnywhere.loadModel(
           ModelLoadRequest.fromPartial({
@@ -255,6 +197,8 @@ export const ValidationHarnessScreen: React.FC = () => {
         setVadError(getErrorMessage(error));
       }
     };
+    // void: deliberate fire-and-forget; setVadReadiness handles outcome.
+    // eslint-disable-next-line no-void
     void ensureVadLoaded();
     return () => {
       cancelled = true;
@@ -358,16 +302,16 @@ export const ValidationHarnessScreen: React.FC = () => {
               ],
               metadata: { lane: 'react-native-validation' },
             }),
-            async (args) => {
-              const includeDeviceId = args.includeDeviceId === true;
+            async (args: Record<string, ToolValue>): Promise<Record<string, ToolValue>> => {
+              const includeDeviceId = args.includeDeviceId?.boolValue === true;
               const deviceId = includeDeviceId
                 ? await RunAnywhere.deviceId
                 : '';
               return {
-                label: `${Platform.OS}-${Platform.Version}`,
-                platform: Platform.OS,
-                version: String(Platform.Version),
-                deviceIdSuffix: deviceId ? deviceId.slice(-6) : '',
+                label: { stringValue: `${Platform.OS}-${Platform.Version}` },
+                platform: { stringValue: Platform.OS },
+                version: { stringValue: String(Platform.Version) },
+                deviceIdSuffix: { stringValue: deviceId ? deviceId.slice(-6) : '' },
               };
             }
           );
@@ -421,31 +365,37 @@ export const ValidationHarnessScreen: React.FC = () => {
         id: 'lora.compatibility',
         title: 'LoRA Compatibility',
         detail: 'Check a deterministic fixture adapter config.',
-        run: async () =>
-          RunAnywhere.lora.checkCompatibility(createLoRAFixtureConfig()),
+        run: async () => {
+          const { config } = await attachLoRAFixture();
+          return RunAnywhere.lora.checkCompatibility(config);
+        },
       },
       {
         id: 'lora.apply_fixture',
         title: 'LoRA Apply',
         detail: 'Apply the fixture path and capture success or bridge error.',
-        run: async () =>
-          RunAnywhere.lora.apply({
+        run: async () => {
+          const { config } = await attachLoRAFixture();
+          return RunAnywhere.lora.apply({
             requestId: `rn-validation-lora-apply-${Date.now()}`,
-            adapters: [createLoRAFixtureConfig()],
+            adapters: [config],
             replaceExisting: true,
-          }),
+          });
+        },
       },
       {
         id: 'lora.remove_fixture',
         title: 'LoRA Remove',
         detail: 'Remove the fixture adapter id/path and capture state.',
-        run: async () =>
-          RunAnywhere.lora.remove({
+        run: async () => {
+          const { adapterPath } = await attachLoRAFixture();
+          return RunAnywhere.lora.remove({
             requestId: `rn-validation-lora-remove-${Date.now()}`,
             adapterIds: ['rn-validation-identity'],
-            adapterPaths: [FIXTURE_ADAPTER_PATH],
+            adapterPaths: [adapterPath],
             clearAll: false,
-          }),
+          });
+        },
       },
       {
         id: 'pluginloader.snapshot',
@@ -471,14 +421,20 @@ export const ValidationHarnessScreen: React.FC = () => {
   const runHarnessAction = useCallback(
     async (action: HarnessAction) => {
       const expectedError = action.id === 'pluginloader.load_empty_error';
+      let fixtureAdapterPath: string | undefined;
+      if (action.id.startsWith('lora.')) {
+        try {
+          fixtureAdapterPath = (await attachLoRAFixture()).adapterPath;
+        } catch {
+          fixtureAdapterPath = undefined;
+        }
+      }
       await recordAction(
         action.id,
         {
           screen: 'Validation',
           action: action.title,
-          fixtureAdapterPath: action.id.startsWith('lora.')
-            ? FIXTURE_ADAPTER_PATH
-            : undefined,
+          fixtureAdapterPath,
         },
         action.run,
         expectedError
@@ -507,15 +463,13 @@ export const ValidationHarnessScreen: React.FC = () => {
       >
         <View style={styles.statusBanner} testID="validation-vad-status">
           <Text style={styles.statusBannerText}>
-            {vadReadiness === 'downloading'
-              ? `Downloading VAD model (${SILERO_VAD_MODEL_ID})...`
-              : vadReadiness === 'loading'
-                ? `Loading VAD model (${SILERO_VAD_MODEL_ID})...`
-                : vadReadiness === 'ready'
-                  ? `VAD ready: ${SILERO_VAD_MODEL_ID}`
-                  : vadReadiness === 'failed'
-                    ? `VAD load failed: ${vadError ?? 'unknown'}`
-                    : 'Checking VAD model...'}
+            {vadReadiness === 'loading'
+              ? `Loading VAD model (${SILERO_VAD_MODEL_ID})...`
+              : vadReadiness === 'ready'
+                ? `VAD ready: ${SILERO_VAD_MODEL_ID}`
+                : vadReadiness === 'failed'
+                  ? `VAD load failed: ${vadError ?? 'unknown'}`
+                  : 'Checking VAD model...'}
           </Text>
         </View>
 
@@ -532,6 +486,8 @@ export const ValidationHarnessScreen: React.FC = () => {
                 accessibilityRole="button"
                 accessibilityLabel={action.title}
                 disabled={disabled}
+                // void: TouchableOpacity onPress is sync; intentional fire-and-forget.
+                // eslint-disable-next-line no-void
                 onPress={() => void runHarnessAction(action)}
                 style={[
                   styles.actionButton,
@@ -543,13 +499,11 @@ export const ValidationHarnessScreen: React.FC = () => {
                   {isRunning ? 'Running...' : action.title}
                 </Text>
                 <Text style={styles.actionDetail}>
-                  {vadGate && vadReadiness === 'downloading'
-                    ? 'Downloading VAD model...'
-                    : vadGate && vadReadiness === 'loading'
-                      ? 'Loading VAD model...'
-                      : vadGate
-                        ? 'Waiting for VAD model load.'
-                        : action.detail}
+                  {vadGate && vadReadiness === 'loading'
+                    ? 'Loading VAD model...'
+                    : vadGate
+                      ? 'Waiting for VAD model load.'
+                      : action.detail}
                 </Text>
               </TouchableOpacity>
             );

@@ -3,7 +3,7 @@
  * Source: idl/sdk_events.proto
  * Template: idl/codegen/templates/ts_async_iterable.njk
  *
- * GAP 09 Phase 14. Provides an AsyncIterable<SDKEvent> client
+ * Provides an AsyncIterable<SDKEvent> client
  * over an in-process server-streaming callback. The transport ("how a token
  * arrives in the JS heap") is platform-specific:
  *   - React Native: a Nitro HybridObject method whose callback fires once
@@ -14,63 +14,15 @@
  * function; this generated wrapper turns it into an AsyncIterable.
  */
 
+import { streamFactory, type StreamTransport } from "./_streamFactory";
 import type { SDKEventSubscribeRequest } from "../sdk_events";
 import type { SDKEvent } from "../sdk_events";
 
-export interface SDKEventsStreamTransport {
-    subscribe(
-        req: SDKEventSubscribeRequest,
-        onMessage: (msg: SDKEvent) => void,
-        onError:   (err: Error) => void,
-        onDone:    () => void,
-    ): () => void;   // returns a cancel function
-}
+export interface SDKEventsStreamTransport extends StreamTransport<SDKEventSubscribeRequest, SDKEvent> {}
 
-/**
- * Wrap the platform `transport.subscribe` callback into an
- * `AsyncIterable<SDKEvent>`. Cancellation is propagated by
- * `break`-ing out of `for await` (the iterator's `return()` calls the
- * transport's cancel function).
- */
 export function subscribeSDKEvents(
     transport: SDKEventsStreamTransport,
     req: SDKEventSubscribeRequest,
 ): AsyncIterable<SDKEvent> {
-    return {
-        [Symbol.asyncIterator](): AsyncIterator<SDKEvent> {
-            const queue: SDKEvent[] = [];
-            let resolve: ((v: IteratorResult<SDKEvent>) => void) | null = null;
-            let error: Error | null = null;
-            let done = false;
-
-            const cancel = transport.subscribe(
-                req,
-                (msg) => {
-                    if (resolve) { resolve({ value: msg, done: false }); resolve = null; }
-                    else queue.push(msg);
-                },
-                (err) => {
-                    error = err;
-                    if (resolve) { resolve({ value: undefined as any, done: true }); resolve = null; }
-                },
-                () => {
-                    done = true;
-                    if (resolve) { resolve({ value: undefined as any, done: true }); resolve = null; }
-                },
-            );
-
-            return {
-                next(): Promise<IteratorResult<SDKEvent>> {
-                    if (queue.length > 0) return Promise.resolve({ value: queue.shift()!, done: false });
-                    if (error) return Promise.reject(error);
-                    if (done)  return Promise.resolve({ value: undefined as any, done: true });
-                    return new Promise((r) => { resolve = r; });
-                },
-                return(): Promise<IteratorResult<SDKEvent>> {
-                    cancel();
-                    return Promise.resolve({ value: undefined as any, done: true });
-                },
-            };
-        },
-    };
+    return streamFactory(transport, req);
 }

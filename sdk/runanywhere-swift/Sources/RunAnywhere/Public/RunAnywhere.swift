@@ -3,7 +3,7 @@
 //  RunAnywhere SDK
 //
 //  The main entry point for the RunAnywhere SDK.
-//  Two-phase initialization is owned by commons (rac_sdk_init.h, P2-T9):
+//  Two-phase initialization is owned by commons (rac_sdk_init.h):
 //    * Phase 1 → rac_sdk_init_phase1_proto (validate + state init)
 //    * Phase 2 → rac_sdk_init_phase2_proto (device registration, model
 //      assignments, HTTP-state snapshot)
@@ -18,8 +18,6 @@
 //
 
 import Foundation
-#if os(iOS) || os(tvOS) || os(watchOS)
-#endif
 
 /// The RunAnywhere SDK - Single entry point for on-device AI
 public enum RunAnywhere {
@@ -47,6 +45,14 @@ public enum RunAnywhere {
 
     /// Check if SDK is initialized (Phase 1 complete).
     public static var isInitialized: Bool { isInitializedFlag }
+
+    /// Backward-compatible alias for `isInitialized`.
+    /// Pre-refactor callers spelled the property `isSDKInitialized`; keep the
+    /// old spelling alive as a soft-deprecation so consumers built against the
+    /// previous symbol still compile and link. Pinned for removal so downstream
+    /// apps have a concrete migration deadline rather than an open-ended warning.
+    @available(*, deprecated, renamed: "isInitialized", message: "Use isInitialized; this backwards-compat alias will be removed in v0.21.0")
+    public static var isSDKInitialized: Bool { isInitialized }
 
     /// Check if services are fully ready (Phase 2 complete)
     public static var areServicesReady: Bool { hasCompletedServicesInit }

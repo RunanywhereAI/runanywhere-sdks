@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/graph/memory_pool.hpp — v3.1 Phase 9 DAG primitive (GAP 05 Phase 2).
+// rac/graph/memory_pool.hpp — DAG primitive.
 //
 // Bounded, thread-safe pool of reusable T instances. Designed for hot-path
 // pipeline nodes that emit frame-sized buffers (audio PCM, LLM token chunks,

@@ -1,13 +1,13 @@
 /**
- * SDK smoke test — Wave E G-11 MVP harness.
+ * SDK smoke test — MVP harness.
  *
  * Loads the RunAnywhereAI example app in a real browser, waits for the
  * SDK initialization flow to hit the "interactive" readiness state, and
  * asserts the public API surfaces exist on `window.RunAnywhere`.
  *
  * Scope is intentionally tight: we do not download models or run actual
- * inference here. End-to-end LLM/STT/TTS testing comes after G-01 unblocks
- * ONNX WASM on Emscripten.
+ * inference here. End-to-end LLM/STT/TTS testing comes after ONNX WASM is
+ * unblocked on Emscripten.
  */
 import { test, expect } from '@playwright/test';
 
@@ -34,7 +34,10 @@ declare global {
       isAuthenticated: boolean;
       textGeneration: Record<string, unknown>;
       modelRegistry: Record<string, unknown>;
-      modelLifecycle: Record<string, unknown>;
+      // Model lifecycle is exposed via flat top-level verbs
+      // (loadModel/unloadModel/currentModel) mirroring the Swift source-of-truth
+      // facade — there is intentionally no `modelLifecycle` namespace.
+      loadModel: (...args: unknown[]) => unknown;
       stt: Record<string, unknown>;
       tts: Record<string, unknown>;
       vad: Record<string, unknown>;
@@ -83,7 +86,7 @@ test.describe('Web SDK smoke test', () => {
           ra.textGeneration !== null &&
           typeof ra.textGeneration.generateStream === 'function',
         hasModelRegistry: typeof ra.modelRegistry === 'object' && ra.modelRegistry !== null,
-        hasModelLifecycle: typeof ra.modelLifecycle === 'object' && ra.modelLifecycle !== null,
+        hasLoadModel: typeof ra.loadModel === 'function',
         hasStt: typeof ra.stt === 'object' && ra.stt !== null,
         hasTts: typeof ra.tts === 'object' && ra.tts !== null,
         hasVad: typeof ra.vad === 'object' && ra.vad !== null,
@@ -105,7 +108,9 @@ test.describe('Web SDK smoke test', () => {
     // Public namespace facades must be present.
     expect(surface.hasTextGenerationStream).toBe(true);
     expect(surface.hasModelRegistry).toBe(true);
-    expect(surface.hasModelLifecycle).toBe(true);
+    // Model lifecycle is the flat `loadModel` verb (Swift-parity facade shape),
+    // not a `modelLifecycle` namespace.
+    expect(surface.hasLoadModel).toBe(true);
     expect(surface.hasStt).toBe(true);
     expect(surface.hasTts).toBe(true);
     expect(surface.hasVad).toBe(true);

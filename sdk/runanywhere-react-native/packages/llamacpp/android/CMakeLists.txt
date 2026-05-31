@@ -39,7 +39,7 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_llamacpp.so")
     message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
-                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_llamacpp SHARED IMPORTED)
@@ -84,6 +84,9 @@ set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLi
 
 include_directories(
     "src/main/cpp"
+    # Package-local hybrid headers (HybridRunAnywhereLlama.hpp etc.) — needed by the
+    # nitrogen-generated OnLoad + cpp-adapter. The forked rac_llm_llamacpp.h that used
+    # to live here was deleted (canonical commons header resolves via CORE_INCLUDE_DIR).
     "../cpp"
     # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
     # Sharing avoids re-fetching the dependency and keeps both packages on the
@@ -142,9 +145,6 @@ target_link_libraries(
     rac_commons
     rac_backend_llamacpp
 )
-
-# HAS_LLAMACPP and HAS_RACOMMONS are always defined since backends are required
-target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_LLAMACPP=1 HAS_RACOMMONS=1)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE

@@ -264,7 +264,7 @@ RAC_API rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result
 RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out);
 
 // =============================================================================
-// CANONICAL DEFAULTS (P2-T14)
+// CANONICAL DEFAULTS
 // =============================================================================
 
 /**

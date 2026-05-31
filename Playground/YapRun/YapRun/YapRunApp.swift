@@ -10,6 +10,7 @@
 import SwiftUI
 import RunAnywhere
 import ONNXRuntime
+import WhisperKitRuntime
 import os
 
 @main
@@ -129,6 +130,7 @@ struct YapRunApp: App {
     func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
 
             try RunAnywhere.initialize()
             logger.info("SDK initialized in development mode")

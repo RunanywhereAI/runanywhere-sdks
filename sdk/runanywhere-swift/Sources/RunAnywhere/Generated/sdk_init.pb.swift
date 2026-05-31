@@ -10,7 +10,7 @@
 
 // RunAnywhere IDL — two-phase SDK initialization.
 //
-// P2-T9: Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
+// Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
 // list that lives in every SDK (RunAnywhere.swift, Kotlin RunAnywhere object,
 // Flutter RunAnywhereSDK, RN RunAnywhere, Web RunAnywhere) into a single C
 // ABI surface owned by commons. Platform SDKs still spawn their own
@@ -39,7 +39,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -49,7 +49,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// result describes. Mirrors the SDK_INIT_* analytics events (started /
 /// completed / failed) that exist in sdk_events.proto.
 /// ---------------------------------------------------------------------------
-public enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -102,8 +102,21 @@ public enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
 /// (development=0, staging=1, production=2). Numeric values are part of the
 /// wire format; do not reorder.
+///
+/// The prior attempt to
+/// add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
+/// Swift iOS at runtime — the shipped librac_commons.a in
+/// sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
+/// original 0/1/2 layout, so Swift sending the regenerated enum value 1
+/// (DEVELOPMENT) was decoded as STAGING by the old C++ side, which then failed
+/// validation with RAC_ERROR_INVALID_ARGUMENT ("API key required"). The other
+/// SDKs (Kotlin / Flutter / RN / Web) were never regenerated for the bumped
+/// layout either, so reverting to the original 0/1/2 wire-format restores
+/// cross-SDK consistency without requiring a coordinated xcframework rebuild.
+/// Re-introducing UNSPECIFIED=0 must be paired with a synchronized rebuild of
+/// every prebuilt commons binary AND regeneration of all five SDK bindings.
 /// ---------------------------------------------------------------------------
-public enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case development // = 0
   case staging // = 1
@@ -150,7 +163,7 @@ public enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// memory) are registered separately via rac_platform_adapter_t prior to
 /// calling this entry point. This message is purely the data envelope.
 /// ---------------------------------------------------------------------------
-public struct RASdkInitPhase1Request: Sendable {
+public nonisolated struct RASdkInitPhase1Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -178,7 +191,7 @@ public struct RASdkInitPhase1Request: Sendable {
 /// for future flags such as `force_refresh_assignments` or
 /// `skip_device_registration` once Kotlin/RN/Flutter parity demands them.
 /// ---------------------------------------------------------------------------
-public struct RASdkInitPhase2Request: Sendable {
+public nonisolated struct RASdkInitPhase2Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -199,7 +212,7 @@ public struct RASdkInitPhase2Request: Sendable {
 /// success=true, http_configured=false, and warning carries the offline-mode
 /// notice.
 /// ---------------------------------------------------------------------------
-public struct RASdkInitResult: @unchecked Sendable {
+public nonisolated struct RASdkInitResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -262,6 +275,23 @@ public struct RASdkInitResult: @unchecked Sendable {
     set {_uniqueStorage()._durationMs = newValue}
   }
 
+  /// Explicit two-phase HTTP-setup completion flag,
+  /// decoupled from services-init completion so SDKs that initialize
+  /// offline (no connectivity) can still report success=true with
+  /// has_completed_http_setup=false and retry HTTP later via the
+  /// SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
+  /// (`internal static var hasCompletedHTTPSetup`) and is the canonical
+  /// signal Flutter / Web / RN consume to decide whether the next
+  /// download/authenticated call can proceed without a retryHTTP step.
+  ///
+  /// Distinct from `http_configured` (field 4) which historically meant
+  /// "HTTP transport wired up at this phase's call site"; this field is
+  /// the cross-phase latched bit that survives between phase calls.
+  public var hasCompletedHTTPSetup_p: Bool {
+    get {_storage._hasCompletedHTTPSetup_p}
+    set {_uniqueStorage()._hasCompletedHTTPSetup_p = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -271,17 +301,17 @@ public struct RASdkInitResult: @unchecked Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitPhase: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_PHASE_UNSPECIFIED\0\u{1}SDK_INIT_PHASE_ONE\0\u{1}SDK_INIT_PHASE_TWO\0\u{1}SDK_INIT_PHASE_RETRY_HTTP\0")
 }
 
-extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_INIT_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_INIT_ENVIRONMENT_STAGING\0\u{1}SDK_INIT_ENVIRONMENT_PRODUCTION\0")
 }
 
-extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase1Request"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}environment\0\u{3}api_key\0\u{3}base_url\0\u{3}device_id\0")
 
@@ -326,7 +356,7 @@ extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase2Request"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
@@ -345,9 +375,9 @@ extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0")
 
   fileprivate class _StorageClass {
     var _phase: RASdkInitPhase = .unspecified
@@ -359,6 +389,7 @@ extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     var _discoveredOrphans: UInt32 = 0
     var _warning: String = String()
     var _durationMs: Int64 = 0
+    var _hasCompletedHTTPSetup_p: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -378,6 +409,7 @@ extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
       _discoveredOrphans = source._discoveredOrphans
       _warning = source._warning
       _durationMs = source._durationMs
+      _hasCompletedHTTPSetup_p = source._hasCompletedHTTPSetup_p
     }
   }
 
@@ -405,6 +437,7 @@ extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
         case 7: try { try decoder.decodeSingularUInt32Field(value: &_storage._discoveredOrphans) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._warning) }()
         case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._durationMs) }()
+        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._hasCompletedHTTPSetup_p) }()
         default: break
         }
       }
@@ -444,6 +477,9 @@ extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
       if _storage._durationMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._durationMs, fieldNumber: 9)
       }
+      if _storage._hasCompletedHTTPSetup_p != false {
+        try visitor.visitSingularBoolField(value: _storage._hasCompletedHTTPSetup_p, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -462,6 +498,7 @@ extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
         if _storage._discoveredOrphans != rhs_storage._discoveredOrphans {return false}
         if _storage._warning != rhs_storage._warning {return false}
         if _storage._durationMs != rhs_storage._durationMs {return false}
+        if _storage._hasCompletedHTTPSetup_p != rhs_storage._hasCompletedHTTPSetup_p {return false}
         return true
       }
       if !storagesAreEqual {return false}

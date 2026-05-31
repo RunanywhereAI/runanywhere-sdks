@@ -17,7 +17,7 @@
 
 #include "rac_types.h"
 #include "rac_error.h"
-#include "rac_error_proto.h"  // P2-T1: rac_result_to_proto_error
+#include "rac_error_proto.h"  // rac_result_to_proto_error
 #include "rac_proto_buffer.h"
 #include "rac_structured_error.h"
 #include "rac_logger.h"
@@ -29,7 +29,7 @@
 // Lifecycle management
 #include "rac_lifecycle.h"
 #include "rac_model_lifecycle.h"
-#include "rac_sdk_init.h"  // P2-T9: rac_sdk_init_phase{1,2}_proto + retry_http_proto
+#include "rac_sdk_init.h"  // rac_sdk_init_phase{1,2}_proto + retry_http_proto
 
 // SDK State (centralized state management)
 #include "rac_sdk_state.h"
@@ -46,8 +46,8 @@
 #include "rac_llm_metrics.h"
 #include "rac_llm_analytics.h"
 #include "rac_llm_structured_output.h"
-#include "rac_llm_schema_to_json.h"  // P2-T15: rac_structured_output_schema_to_json_proto
-// v2 close-out Phase G-2: proto-byte LLM stream ABI.
+#include "rac_llm_schema_to_json.h"  // rac_structured_output_schema_to_json_proto
+// proto-byte LLM stream ABI.
 #include "rac_llm_stream.h"
 #include "rac_tool_calling.h"
 
@@ -100,7 +100,7 @@
 // RAG (Retrieval-Augmented Generation)
 #include "rac_rag.h"
 
-// Solutions (T4.7) — proto/YAML driven L5 solution runtime
+// Solutions — proto/YAML driven L5 solution runtime
 #include "rac_solution.h"
 
 // =============================================================================
@@ -132,7 +132,7 @@
 
 // Device
 #include "rac_device_manager.h"
-#include "rac_device_identity.h"  // P2-T13: rac_device_get_or_create_persistent_id
+#include "rac_device_identity.h"  // rac_device_get_or_create_persistent_id
 
 // =============================================================================
 // PLATFORM BACKEND - Apple Foundation Models, System TTS, CoreML Diffusion
@@ -169,18 +169,18 @@
 #include "rac_telemetry_manager.h"
 
 // =============================================================================
-// PLUGIN REGISTRY + ROUTER (v3 Phase B10 — replaces rac_service_* legacy)
+// PLUGIN REGISTRY + ROUTER (replaces rac_service_* legacy)
 // =============================================================================
 
 #include "rac_primitive.h"
 #include "rac_engine_vtable.h"
 #include "rac_cpu_runtime_provider.h"
 #include "rac_plugin_entry.h"
-#include "rac_plugin_loader.h"  // v2 close-out (B31): runtime dlopen path
-#include "rac_plugin_entry_platform.h"  // Phase 5b: platform plugin (Apple FM / System TTS / CoreML Diffusion)
+#include "rac_plugin_loader.h"  // runtime dlopen path
+#include "rac_plugin_entry_platform.h"  // platform plugin (Apple FM / System TTS / CoreML Diffusion)
 #include "rac_routing_hints.h"
 #include "rac_route.h"
-#include "rac_runtime_registry.h"  // SWIFT-IOS-008: explicit-module mode requirement
+#include "rac_runtime_registry.h"  // explicit-module mode requirement
 #include "rac_runtime_vtable.h"
 
 #endif /* CRACOMMONS_H */

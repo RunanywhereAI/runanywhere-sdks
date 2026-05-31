@@ -12,12 +12,22 @@ class EventBus {
 
   final _allEventsController = StreamController<SDKEvent>.broadcast();
 
+  /// Native publish hook injected by [DartBridgeEvents] during SDK init.
+  ///
+  /// When set, [publish] delegates to this callback first and falls back to
+  /// the local stream only when it returns false. Avoids a circular import
+  /// between event_bus.dart and dart_bridge_events.dart.
+  Future<bool> Function(SDKEvent)? _nativePublish;
+
+  /// Inject the native publish callback. Called once by [DartBridgeEvents]
+  /// after the C++ commons bridge is available.
+  void setNativePublish(Future<bool> Function(SDKEvent) fn) {
+    _nativePublish = fn;
+  }
+
   /// Public streams for subscribing to generated proto events.
   Stream<SDKEvent> get initializationEvents =>
       _where(EventCategory.EVENT_CATEGORY_INITIALIZATION);
-
-  Stream<SDKEvent> get configurationEvents =>
-      _where(EventCategory.EVENT_CATEGORY_SDK);
 
   Stream<SDKEvent> get generationEvents =>
       _where(EventCategory.EVENT_CATEGORY_LLM);
@@ -43,8 +53,26 @@ class EventBus {
   /// dynamic category selection instead of using a named getter.
   Stream<SDKEvent> onCategory(EventCategory category) => _where(category);
 
-  /// Generic event publisher - dispatches to appropriate stream
-  void publish(SDKEvent event) {
+  /// Publish [event] through the C++ commons event pipeline first; fall back
+  /// to the local broadcast stream only when native publish is unavailable.
+  ///
+  /// Mirrors Swift's `if !CppBridge.Events.publishSDKEvent(event) { subject.send(event) }`.
+  Future<void> publish(SDKEvent event) async {
+    if (_allEventsController.isClosed) return;
+    final nativePublish = _nativePublish;
+    if (nativePublish != null) {
+      final published = await nativePublish(event);
+      if (published) return;
+    }
+    _allEventsController.add(event);
+  }
+
+  /// Fan-out an event that has already been delivered by the native layer.
+  ///
+  /// Used exclusively by [DartBridgeEvents.emit] so that events received from
+  /// C++ commons are broadcast to Dart subscribers without triggering a
+  /// redundant [rac_sdk_event_publish_proto] round-trip back to native.
+  void addFromNative(SDKEvent event) {
     if (_allEventsController.isClosed) return;
     _allEventsController.add(event);
   }

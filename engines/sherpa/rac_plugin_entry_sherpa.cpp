@@ -2,13 +2,11 @@
  * @file rac_plugin_entry_sherpa.cpp
  * @brief Unified-ABI entry point for the Sherpa-ONNX backend.
  *
- * GAP 02 Phase 9 + GAP 06 T5.1 — see the matching specs.
- *
  * The sherpa engine owns Sherpa-ONNX-backed STT / TTS / VAD primitives.
  * It only advertises those primitives when both the Sherpa-ONNX prebuilt and
  * the real RAC speech ops are compiled into this target.
  *
- * CPP-04: declarative manifest publishes package ownership, availability and
+ * Declarative manifest publishes package ownership, availability and
  * the served primitive set alongside the routing metadata. The manifest mirrors
  * the conditional ops slots so registry validation accepts both routable and
  * stub builds.
@@ -22,9 +20,8 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
-#if defined(SHERPA_ONNX_AVAILABLE) && SHERPA_ONNX_AVAILABLE &&                 \
-    defined(RAC_SHERPA_SPEECH_OPS_AVAILABLE) &&                                \
-    RAC_SHERPA_SPEECH_OPS_AVAILABLE
+#if defined(SHERPA_ONNX_AVAILABLE) && SHERPA_ONNX_AVAILABLE && \
+    defined(RAC_SHERPA_SPEECH_OPS_AVAILABLE) && RAC_SHERPA_SPEECH_OPS_AVAILABLE
 #define RAC_SHERPA_ROUTABLE 1
 #else
 #define RAC_SHERPA_ROUTABLE 0
@@ -40,9 +37,9 @@ extern const rac_vad_service_ops_t g_sherpa_vad_ops;
 
 static rac_result_t sherpa_capability_check(void) {
 #if RAC_SHERPA_ROUTABLE
-  return RAC_SUCCESS;
+    return RAC_SUCCESS;
 #else
-  return RAC_ERROR_BACKEND_UNAVAILABLE;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #endif
 }
 
@@ -158,11 +155,10 @@ static const rac_engine_vtable_t g_sherpa_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(sherpa) {
-  return rac_engine_entry_with_manifest(&k_sherpa_manifest,
-                                        &g_sherpa_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_sherpa_manifest, &g_sherpa_engine_vtable);
 }
 
-} // extern "C"
+}  // extern "C"
 
 // ENG-SHERPA-03: the legacy `__attribute__((constructor))` auto-register
 // block previously lived here. It has been removed so all three active

@@ -27,6 +27,7 @@ import ai.runanywhere.proto.v1.ModelInfoList as ProtoModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery as ProtoModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequest
 import ai.runanywhere.proto.v1.ModelRegistryRefreshResult as ProtoModelRegistryRefreshResult
+import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest as ProtoRegisterModelFromUrlRequest
 
 /**
  * Model registry bridge that provides direct access to the C++ model registry.
@@ -214,6 +215,27 @@ object CppBridgeModelRegistry {
                 error_message = "Failed to decode ModelDiscoveryResult proto: ${e.message}",
             )
         }
+    }
+
+    /**
+     * Canonical single-call URL → saved [ProtoModelInfo] via the
+     * `rac_register_model_from_url_proto` C ABI. Mirrors Swift
+     * `RunAnywhere.registerModelFromUrl(_:)`.
+     *
+     * Commons performs the full build-and-save flow (URL → ModelInfoMakeRequest
+     * → registry save) and returns the persisted [ProtoModelInfo]. Returns
+     * `null` when the native ABI is not yet bound so callers can fall back to
+     * the legacy local build-and-save path.
+     */
+    fun registerModelFromUrl(request: ProtoRegisterModelFromUrlRequest): ProtoModelInfo? {
+        val bytes =
+            callProtoBytes("registerModelFromUrlProto") {
+                RunAnywhereBridge.racRegisterModelFromUrlProto(
+                    ProtoRegisterModelFromUrlRequest.ADAPTER.encode(request),
+                )
+            } ?: return null
+
+        return decodeProtoModel(bytes)
     }
 
     /**

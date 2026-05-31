@@ -146,7 +146,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
         // 2. Generation Settings Section
         SettingsSection(title = "Generation Settings", icon = null) {
-            // Temperature Slider + editable TextField (B-AK-18-001).
+            // Temperature Slider + editable TextField.
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -181,7 +181,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-            // Max Tokens Slider + editable TextField (B-AK-18-001).
+            // Max Tokens Slider + editable TextField.
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -263,7 +263,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         ) {
             StorageOverviewRow(
                 icon = Icons.Filled.Storage,
-                // CLUSTER-08 / KOTLIN-AND-HARNESS-001: value comes from
+                // Value comes from
                 // `StorageInfo.device.total_bytes` (device total disk size),
                 // not used-storage — rename label to match what's displayed.
                 label = "Total Disk Size",
@@ -812,7 +812,7 @@ fun ToolSettingsSection() {
 
     SettingsSection(title = "Tool Calling") {
         // Enable/Disable Toggle
-        // B-AK-7-002: wrap the entire row in `clickable` so taps anywhere on
+        // Wrap the entire row in `clickable` so taps anywhere on
         // the label (not just the small switch hit-area) flip the toggle.
         Row(
             modifier =

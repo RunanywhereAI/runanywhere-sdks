@@ -43,6 +43,18 @@
 #include "rac/features/wakeword/rac_wakeword_types.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
+// Legacy non-proto entry points are scheduled
+// for removal. They retain external callers today (Playground/linux-voice,
+// commons tests) so we mark them deprecated with -Wdeprecated-declarations
+// instead of deleting outright — clang-tidy / -Wdeprecated-declarations
+// flags any remaining caller for follow-up migration.
+#if defined(__clang__) || defined(__GNUC__)
+#define RAC_VOICE_AGENT_LEGACY_DEPRECATED \
+    __attribute__((deprecated("Use the proto-byte voice-agent ABI instead.")))
+#else
+#define RAC_VOICE_AGENT_LEGACY_DEPRECATED
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -594,9 +606,9 @@ RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
  * rac_voice_agent_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
-                                                        const void* audio_data, size_t audio_size,
-                                                        rac_voice_agent_result_t* out_result);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle, const void* audio_data,
+                                   size_t audio_size, rac_voice_agent_result_t* out_result);
 
 /**
  * @brief Process audio with streaming events.
@@ -611,10 +623,9 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle,
-                                                    const void* audio_data, size_t audio_size,
-                                                    rac_voice_agent_event_callback_fn callback,
-                                                    void* user_data);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t rac_voice_agent_process_stream(
+    rac_voice_agent_handle_t handle, const void* audio_data, size_t audio_size,
+    rac_voice_agent_event_callback_fn callback, void* user_data);
 
 // =============================================================================
 // INDIVIDUAL COMPONENT ACCESS API
@@ -631,9 +642,9 @@ RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t han
  * @param out_transcription Output: Transcribed text (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
-                                                const void* audio_data, size_t audio_size,
-                                                char** out_transcription);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_transcribe(rac_voice_agent_handle_t handle, const void* audio_data,
+                           size_t audio_size, char** out_transcription);
 
 /**
  * @brief Generate LLM response only.
@@ -645,8 +656,8 @@ RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
  * @param out_response Output: Generated response (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle,
-                                                       const char* prompt, char** out_response);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t rac_voice_agent_generate_response(
+    rac_voice_agent_handle_t handle, const char* prompt, char** out_response);
 
 /**
  * @brief Synthesize speech only.
@@ -659,9 +670,8 @@ RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t 
  * @param out_audio_size Output: Size of audio data in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle,
-                                                       const char* text, void** out_audio,
-                                                       size_t* out_audio_size);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t rac_voice_agent_synthesize_speech(
+    rac_voice_agent_handle_t handle, const char* text, void** out_audio, size_t* out_audio_size);
 
 /**
  * @brief Check if VAD detects speech.
@@ -674,9 +684,9 @@ RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t 
  * @param out_speech_detected Output: RAC_TRUE if speech detected
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle,
-                                                   const float* samples, size_t sample_count,
-                                                   rac_bool_t* out_speech_detected);
+RAC_API RAC_VOICE_AGENT_LEGACY_DEPRECATED rac_result_t
+rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle, const float* samples,
+                              size_t sample_count, rac_bool_t* out_speech_detected);
 
 // =============================================================================
 // MEMORY MANAGEMENT
@@ -694,6 +704,51 @@ RAC_API void rac_voice_agent_result_free(rac_voice_agent_result_t* result);
 // =============================================================================
 
 /**
+ * @section voice_agent_audio_ingress Audio-Ingress Contract
+ *
+ * The voice-agent C ABI is a pure-CPU library and owns NO microphone access.
+ * All audio must be captured by the platform SDK (iOS AVAudioEngine, Android
+ * AudioRecord, Web getUserMedia, Flutter platform channels, RN audio plugin)
+ * and pushed into the C core through one of the entry points below. There is
+ * no implicit "C++ pulls audio" path — anything that depends on a microphone
+ * MUST be wired by the SDK frontend.
+ *
+ * Supported ingress modes today (proto-byte path; the legacy struct path is
+ * deprecated — see RAC_VOICE_AGENT_LEGACY_DEPRECATED above):
+ *
+ *   1. Per-utterance turn:
+ *        rac_voice_agent_process_voice_turn_proto(handle, pcm, n, &result)
+ *      or, with streamed VoiceEvent fan-out,
+ *        rac_voice_agent_process_turn_proto(handle, request_bytes, n,
+ *                                           event_callback, user_data).
+ *      The SDK feeds ONE complete, VAD-trimmed audio buffer per turn. The
+ *      C++ pipeline runs STT -> LLM -> TTS over that buffer and emits a
+ *      single TURN_COMPLETED VoiceEvent. SDKs that drive their voice screen
+ *      through these APIs MUST call them once per detected utterance — the
+ *      C core will not transcribe anything until the SDK pushes a buffer.
+ *
+ *   2. Continuous streaming (per-modality, no voice-agent aggregation):
+ *        rac_stt_stream_feed_audio_proto(session, audio_bytes, n) and
+ *        rac_vad_stream_feed_audio_proto(session, audio_bytes, n).
+ *      SDKs that prefer per-frame VAD/STT events bypass the voice-agent
+ *      turn ABI and drive the STT/VAD streams directly, then call
+ *      rac_voice_agent_transcribe_proto / synthesize_speech_proto /
+ *      generate-LLM helpers for the remaining stages.
+ *
+ * Planned (NOT yet wired): a streaming
+ * `rac_voice_agent_feed_audio_proto(handle, samples, n, sample_rate,
+ * is_final)` entry point that internally tees the audio into the STT/VAD
+ * streams and emits an aggregated VoiceEvent stream identical to the
+ * per-turn path. Until that lands, SDK frontends MUST use one of the two
+ * modes above; the voice-agent will NOT silently consume mic audio.
+ *
+ * Frontend authors: if a voice-screen view-model only calls
+ * rac_voice_agent_set_proto_callback / rac_voice_agent_process_turn_proto
+ * without ever pushing an audio buffer, expect dead-air. Either drive the
+ * per-turn API per utterance, or attach a parallel STT/VAD stream session.
+ */
+
+/**
  * @brief Initialize from serialized runanywhere.v1.VoiceAgentComposeConfig bytes.
  */
 RAC_API rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
@@ -709,6 +764,11 @@ RAC_API rac_result_t rac_voice_agent_component_states_proto(
 
 /**
  * @brief Process one voice turn and return serialized runanywhere.v1.VoiceAgentResult bytes.
+ *
+ * Per-utterance entry point — see the @ref voice_agent_audio_ingress section
+ * above. SDKs MUST call this once per detected utterance with a complete
+ * (typically VAD-trimmed) PCM buffer. The C core does not capture or buffer
+ * mic audio on its own; without an explicit call the pipeline is dead-air.
  */
 RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
                                                               const void* audio_data,
@@ -719,7 +779,7 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_ha
 }
 #endif
 
-// Wave D-7: full-session voice-agent ABI + per-helper proto wrappers.
+// Full-session voice-agent ABI + per-helper proto wrappers.
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -727,6 +787,19 @@ extern "C" {
 typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_bytes,
                                                        size_t event_size, void* user_data);
 
+/**
+ * @brief Drive one voice turn and stream VoiceEvent fan-out via @p event_callback.
+ *
+ * Per-utterance entry point — see the @ref voice_agent_audio_ingress section
+ * (above the GENERATED-PROTO C ABI block). The SDK serializes a
+ * `runanywhere.v1.VoiceAgentTurnRequest` containing the complete PCM buffer
+ * for one detected utterance; the C core runs VAD/STT/LLM/TTS over it and
+ * emits VoiceEvents through @p event_callback. The C core does NOT capture
+ * microphone audio — frontends that wire up
+ * rac_voice_agent_set_proto_callback without ever calling this API (or
+ * driving a parallel rac_stt_stream_feed_audio_proto session) will see
+ * dead-air on the voice screen.
+ */
 RAC_API rac_result_t rac_voice_agent_process_turn_proto(
     rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
     rac_voice_agent_turn_event_callback_fn event_callback, void* user_data);

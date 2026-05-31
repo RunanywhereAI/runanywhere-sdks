@@ -64,6 +64,11 @@ class DartBridge {
   static bool _servicesInitialized = false;
   static DynamicLibrary? _lib;
 
+  // Wired by RunAnywhere.initializeWithParams so capability files can call
+  // ensureServicesReady() without importing runanywhere.dart (which imports
+  // all capability files — a circular dependency). Null before Phase 1.
+  static Future<void> Function()? _ensureServicesReadyHook;
+
   /// Current environment
   static SDKEnvironment get environment => _environment;
 
@@ -72,6 +77,30 @@ class DartBridge {
 
   /// Whether Phase 2 (services) initialization is complete
   static bool get servicesInitialized => _servicesInitialized;
+
+  /// Register the Phase-2 readiness hook. Called once by
+  /// RunAnywhere.initializeWithParams so capability files can invoke
+  /// [ensureServicesReady] without importing runanywhere.dart.
+  static void registerEnsureServicesReadyHook(
+    Future<void> Function() hook,
+  ) {
+    _ensureServicesReadyHook = hook;
+  }
+
+  /// Await Phase-2 completion before any work that requires services (HTTP,
+  /// auth, model-assignment, model-discovery). Mirrors Swift's
+  /// `try? await ensureServicesReady()` guard in RunAnywhere+ModelLifecycle.swift
+  /// and RunAnywhere+Storage.swift. If Phase 1 has not run, throws
+  /// [SDKException.notInitialized]; if the hook is not yet wired (very early
+  /// call before initializeWithParams), returns immediately.
+  static Future<void> ensureServicesReady() {
+    if (!_isInitialized) {
+      throw StateError('SDK not initialized');
+    }
+    final hook = _ensureServicesReadyHook;
+    if (hook == null) return Future<void>.value();
+    return hook();
+  }
 
   /// Native library reference
   static DynamicLibrary get lib {
@@ -213,7 +242,24 @@ class DartBridge {
     final effectiveDeviceId =
         deviceId ?? DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
 
-    // Step 2: Initialize C++ state with credentials
+    // Step 2: HTTP transport — configure C++ HTTP layer BEFORE phase2 so that
+    // rac_sdk_init_phase2_proto's device-registration POST has a live transport.
+    // Mirrors Swift Step 1 in _performServicesInitialization(): setupHTTP runs
+    // before CppBridge.SdkInit.phase2() (RunAnywhere.swift:266-279 → :287).
+    if (!DartBridgeHTTP.instance.isConfigured) {
+      try {
+        await DartBridgeHTTP.instance.configure(
+          environment: _environment,
+          apiKey: apiKey,
+          baseURL: baseURL,
+        );
+        _logger.debug('HTTP transport configured');
+      } catch (e) {
+        _logger.warning('HTTP setup failed (offline?): $e');
+      }
+    }
+
+    // Step 3: Initialize C++ state with credentials
     // Matches Swift: CppBridge.State.initialize(environment:apiKey:baseURL:deviceId:)
     await DartBridgeState.instance.initialize(
       environment: _environment,
@@ -223,9 +269,9 @@ class DartBridge {
     );
     _logger.debug('C++ state initialized');
 
-    // Step 2b: Drive the canonical Phase 2 step-list inside commons.
-    // Matches Swift: CppBridge.SdkInit.phase2() — runs auth + device
-    // registration + model-assignment fetch + telemetry flush inside C++.
+    // Step 4: Drive the canonical Phase 2 step-list inside commons. HTTP is
+    // now configured so device-registration completes in a single round-trip.
+    // Matches Swift Step 3: CppBridge.SdkInit.phase2() (RunAnywhere.swift:287).
     // Soft failures (offline mode, missing creds) come back as
     // success=true + warning; hard failures throw.
     try {
@@ -243,10 +289,10 @@ class DartBridge {
       _logger.warning('SDK Phase 2 proto error: $e');
     }
 
-    // Step 3: Initialize service bridges
+    // Step 5: Initialize service bridges
     // Matches Swift: CppBridge.initializeServices()
 
-    // Step 3a: Model assignment callbacks
+    // Step 5a: Model assignment callbacks
     // Only auto-fetch in staging/production, not development
     final shouldAutoFetch =
         _environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
@@ -257,11 +303,11 @@ class DartBridge {
     _logger.debug(
         'Model assignment callbacks registered (autoFetch: $shouldAutoFetch)');
 
-    // Step 3b: Platform services (Foundation Models, System TTS)
+    // Step 5b: Platform services (Foundation Models, System TTS)
     await DartBridgePlatform.registerServices();
     _logger.debug('Platform services registered');
 
-    // Step 4: Flush telemetry (if any queued events)
+    // Step 6: Flush telemetry (if any queued events)
     // Matches Swift: CppBridge.Telemetry.flush()
     DartBridgeTelemetry.flush();
     _logger.debug('Telemetry flushed');
@@ -283,11 +329,9 @@ class DartBridge {
   /// do not leak across `RunAnywhere.reset()` -> `initialize()` cycles.
   ///
   /// Mirrors Swift `CppBridge.shutdown()`
-  /// (`sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift`):
+  /// (`sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift:176`):
   /// destroys AI components (LLM -> STT -> TTS -> VAD -> VoiceAgent -> VLM)
-  /// sequentially BEFORE Telemetry + Events teardown. Note: VAD and VLM
-  /// Dart bridges currently expose no `destroy()` (their state lives in
-  /// commons model lifecycle); they are intentionally skipped here.
+  /// sequentially BEFORE Telemetry + Events teardown.
   static Future<void> shutdown() async {
     if (!_isInitialized) {
       _logger.debug('Not initialized, nothing to shutdown');
@@ -298,12 +342,14 @@ class DartBridge {
 
     // Destroy per-modality component handles FIRST so commons-side state
     // is released while Telemetry/Events are still wired (mirrors Swift's
-    // CppBridge.shutdown() order). Each destroy() is best-effort and
-    // swallows its own errors internally.
+    // CppBridge.shutdown() order at CppBridge.swift:181-186). Each destroy()
+    // is best-effort and swallows its own errors internally.
     DartBridgeLLM.shared.destroy();
     DartBridgeSTT.shared.destroy();
     DartBridgeTTS.shared.destroy();
+    DartBridgeVAD.shared.destroy();
     DartBridgeVoiceAgent.shared.destroy();
+    DartBridgeVLM.shared.destroy();
 
     // Shutdown in reverse order of initialization
     DartBridgeTelemetry.shutdown();
@@ -311,6 +357,7 @@ class DartBridge {
 
     _isInitialized = false;
     _servicesInitialized = false;
+    _ensureServicesReadyHook = null;
 
     _logger.info('DartBridge shutdown complete');
   }

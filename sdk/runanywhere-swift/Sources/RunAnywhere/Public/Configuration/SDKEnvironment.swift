@@ -4,7 +4,7 @@
 //
 //  SDK Environment mode — determines how data is handled.
 //
-//  GAP 01 Phase 2: `SDKEnvironment` is a typealias for the proto3-generated
+//  `SDKEnvironment` is a typealias for the proto3-generated
 //  `RASDKEnvironment` (idl/model_types.proto). The hand-written enum was
 //  removed; all C-bridge helpers, validation, and UX behaviour are
 //  preserved as extensions.

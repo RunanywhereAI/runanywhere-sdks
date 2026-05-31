@@ -14,13 +14,15 @@
  * Proto field numbers used (must stay in sync with hardware_profile.proto):
  *   HardwareProfile: chip=1, has_neural_engine=2, acceleration_mode=3,
  *     total_memory_bytes=4, core_count=5, performance_cores=6,
- *     efficiency_cores=7, architecture=8, platform=9.
+ *     efficiency_cores=7, architecture=8, platform=9, npu_chip=10.
  *   HardwareProfileResult: profile=1, accelerators=2.
  *   AcceleratorInfo: name=1, type=2, available=3.
  */
 
 #include "rac/router/rac_hardware_abi.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -141,6 +143,121 @@ static std::string android_property(const char* key) {
 #endif
 
 // ============================================================================
+// Chip / SoC string → NPUChip vendor classifier
+// ============================================================================
+//
+// Single source of truth for the chip-name → NPU vendor mapping (previously
+// duplicated in the RN JS facade as `mapChipStringToNPUChip`). Values match
+// `runanywhere.v1.NPUChip` in storage_types.proto:
+//   UNSPECIFIED=0, NONE=1, APPLE_NEURAL_ENGINE=2, QUALCOMM_HEXAGON=3,
+//   MEDIATEK_APU=4, GOOGLE_TPU=5, INTEL_NPU=6, OTHER=99.
+
+static constexpr int NPU_CHIP_UNSPECIFIED = 0;
+static constexpr int NPU_CHIP_NONE = 1;
+static constexpr int NPU_CHIP_APPLE_NEURAL_ENGINE = 2;
+static constexpr int NPU_CHIP_QUALCOMM_HEXAGON = 3;
+static constexpr int NPU_CHIP_MEDIATEK_APU = 4;
+static constexpr int NPU_CHIP_GOOGLE_TPU = 5;
+static constexpr int NPU_CHIP_INTEL_NPU = 6;
+static constexpr int NPU_CHIP_OTHER = 99;
+
+static bool npu_contains(const std::string& haystack, const char* needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
+static bool npu_starts_with(const std::string& s, const char* prefix) {
+    return s.rfind(prefix, 0) == 0;
+}
+
+// Word-boundary match for Apple model codes: a single `[aA]<n>` / `[mM]<n>`
+// token where `n` is in [lo, hi]. Mirrors the RN regexes
+// /\ba(?:[1-9]|1[0-9])\b/ (A1..A19) and /\bm[1-9]\b/ (M1..M9): the letter must
+// not be preceded by an alphanumeric, and the trailing digits must not be
+// followed by an alphanumeric.
+static bool npu_has_model_code(const std::string& s, char letter, int lo, int hi) {
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] != letter)
+            continue;
+        bool left_boundary = (i == 0) || !std::isalnum(static_cast<unsigned char>(s[i - 1]));
+        if (!left_boundary)
+            continue;
+        size_t j = i + 1;
+        if (j >= s.size() || !std::isdigit(static_cast<unsigned char>(s[j])))
+            continue;
+        size_t digit_start = j;
+        while (j < s.size() && std::isdigit(static_cast<unsigned char>(s[j])))
+            ++j;
+        bool right_boundary = (j >= s.size()) || !std::isalnum(static_cast<unsigned char>(s[j]));
+        if (!right_boundary)
+            continue;
+        int num = std::atoi(s.substr(digit_start, j - digit_start).c_str());
+        if (num >= lo && num <= hi)
+            return true;
+    }
+    return false;
+}
+
+// Map a free-form chip/SoC string to the NPUChip vendor enum. Returns
+// NPU_CHIP_UNSPECIFIED when the string is empty or matches no known vendor.
+static int map_chip_string_to_npu(const std::string& chip) {
+    std::string lower;
+    lower.reserve(chip.size());
+    for (char c : chip)
+        lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+    // Trim surrounding whitespace.
+    const auto first = lower.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+        return NPU_CHIP_UNSPECIFIED;
+    const auto last = lower.find_last_not_of(" \t\r\n");
+    lower = lower.substr(first, last - first + 1);
+
+    if (npu_contains(lower, "apple") || npu_has_model_code(lower, 'a', 1, 19) ||
+        npu_has_model_code(lower, 'm', 1, 9)) {
+        return NPU_CHIP_APPLE_NEURAL_ENGINE;
+    }
+    if (npu_contains(lower, "snapdragon") || npu_contains(lower, "qualcomm") ||
+        npu_contains(lower, "hexagon") || npu_starts_with(lower, "sdm") ||
+        npu_starts_with(lower, "sm8") || npu_starts_with(lower, "sm7") ||
+        npu_starts_with(lower, "sm6") || npu_starts_with(lower, "msm")) {
+        return NPU_CHIP_QUALCOMM_HEXAGON;
+    }
+    if (npu_contains(lower, "mediatek") || npu_contains(lower, "dimensity") ||
+        npu_contains(lower, "helio") || npu_starts_with(lower, "mt6") ||
+        npu_starts_with(lower, "mt8")) {
+        return NPU_CHIP_MEDIATEK_APU;
+    }
+    if (npu_contains(lower, "tensor") || npu_contains(lower, "pixel") ||
+        npu_starts_with(lower, "gs1") || npu_starts_with(lower, "gs2") ||
+        npu_starts_with(lower, "gs3")) {
+        return NPU_CHIP_GOOGLE_TPU;
+    }
+    if (npu_contains(lower, "intel") || npu_contains(lower, "core ultra") ||
+        npu_contains(lower, "meteor lake") || npu_contains(lower, "lunar lake") ||
+        npu_contains(lower, "arrow lake")) {
+        return NPU_CHIP_INTEL_NPU;
+    }
+    if (npu_contains(lower, "exynos") || npu_starts_with(lower, "s5e") ||
+        npu_contains(lower, "samsung") || npu_contains(lower, "kirin") ||
+        npu_contains(lower, "hisilicon")) {
+        return NPU_CHIP_OTHER;
+    }
+    return NPU_CHIP_UNSPECIFIED;
+}
+
+// Resolve the NPUChip enum for the profile: classify the chip string, then
+// fall back to NONE / OTHER based on neural-engine presence. Mirrors the RN
+// getNPUChip() gating: a mapped vendor wins; otherwise a present NPU (ANE on
+// Apple, QNN/Hexagon on Android) reports OTHER and absence reports NONE.
+static int resolve_npu_chip(const rac::router::HardwareProfile& hp, const std::string& chip) {
+    int mapped = map_chip_string_to_npu(chip);
+    if (mapped != NPU_CHIP_UNSPECIFIED)
+        return mapped;
+    if (hp.has_ane || hp.has_qnn)
+        return NPU_CHIP_OTHER;
+    return NPU_CHIP_NONE;
+}
+
+// ============================================================================
 // Build HardwareProfile proto bytes from the cached HardwareProfile struct
 // ============================================================================
 
@@ -230,6 +347,15 @@ static std::vector<uint8_t> build_hardware_profile_bytes(const rac::router::Hard
 #endif
     encode_string_field(buf, 9, platform);
 
+    // field 10: npu_chip (NPUChip enum varint) — commons-classified from the
+    // resolved chip string so every SDK reads the vendor family from the proto
+    // instead of re-implementing the mapping client-side.
+    int npu_chip = resolve_npu_chip(hp, chip);
+    if (npu_chip != NPU_CHIP_UNSPECIFIED) {
+        encode_tag(buf, 10, WIRE_VARINT);
+        encode_varint(buf, static_cast<uint64_t>(npu_chip));
+    }
+
     return buf;
 }
 
@@ -255,7 +381,7 @@ static std::vector<uint8_t> build_accelerator_info_bytes(const std::string& name
 
 static std::vector<uint8_t> build_hardware_profile_result_bytes(bool include_profile) {
     using namespace rac::router;
-    const HardwareProfile& hp = HardwareProfile::cached();
+    const HardwareProfile hp = HardwareProfile::cached();
 
     std::vector<uint8_t> result_buf;
 
@@ -370,10 +496,13 @@ rac_result_t rac_hardware_get_accelerators(uint8_t** proto_bytes_out, size_t* pr
 }
 
 rac_result_t rac_hardware_set_accelerator_preference(int preference_enum) {
-    // Validate against `runanywhere.v1.AccelerationPreference` value range.
-    // Historic mapping documented in the header remains in range (0..3); the
-    // proto values used by tests and SDKs are CPU=2, GPU=3.
-    if (preference_enum < 0 || preference_enum > 3) {
+    // Validate against the full `runanywhere.v1.AccelerationPreference` value
+    // range (UNSPECIFIED=0 .. VULKAN=7). Must stay in sync with
+    // hardware_profile.proto — the generated header exposes
+    // AccelerationPreference_MAX=7, but we hardcode the bound here because
+    // this TU deliberately avoids depending on protoc-generated code (see
+    // file header comment).
+    if (preference_enum < 0 || preference_enum > 7) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     g_accelerator_preference.store(preference_enum, std::memory_order_relaxed);

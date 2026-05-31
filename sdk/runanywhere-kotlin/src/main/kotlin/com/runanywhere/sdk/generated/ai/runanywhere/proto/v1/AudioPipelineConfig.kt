@@ -30,7 +30,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: Audio pipeline state-manager configuration.
+ * Audio pipeline state-manager configuration.
  *
  * Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
  * to prevent microphone/TTS feedback loops.

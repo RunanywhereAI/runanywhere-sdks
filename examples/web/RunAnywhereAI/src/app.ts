@@ -93,8 +93,8 @@ const TABS: TabDef[] = [
 
 let activeTab = 0;
 
-/** Per-tab lifecycle callbacks (indexed same as TABS). */
-const tabLifecycles: (TabLifecycle | undefined)[] = new Array(TABS.length).fill(undefined);
+/** Per-tab lifecycle callbacks keyed by tab id. */
+const tabLifecycles: Record<string, TabLifecycle | undefined> = {};
 
 function buildSvgIcon(paths: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
@@ -131,16 +131,21 @@ export function buildAppShell(): void {
   app.appendChild(tabContent);
   app.appendChild(tabBar);
 
-  // Initialize all tab views, capturing lifecycle callbacks
-  tabLifecycles[0] = initChatTab(document.getElementById('tab-chat')!);
-  tabLifecycles[1] = initVisionTab(document.getElementById('tab-vision')!);
-  tabLifecycles[2] = initVoiceTab(document.getElementById('tab-voice')!);
-  tabLifecycles[3] = initTranscribeTab(document.getElementById('tab-transcribe')!);
-  tabLifecycles[4] = initSpeakTab(document.getElementById('tab-speak')!);
-  tabLifecycles[5] = initDocumentsTab(document.getElementById('tab-documents')!);
-  tabLifecycles[6] = initStorageTab(document.getElementById('tab-storage')!);
-  tabLifecycles[7] = initSolutionsTab(document.getElementById('tab-solutions')!);
-  initSettingsTab(document.getElementById('tab-settings')!);
+  // Initialize all tab views, capturing lifecycle callbacks keyed by tab id.
+  const tabInitializers: Record<string, (el: HTMLElement) => TabLifecycle | undefined> = {
+    chat: (el) => initChatTab(el),
+    vision: (el) => initVisionTab(el),
+    voice: (el) => initVoiceTab(el),
+    transcribe: (el) => initTranscribeTab(el),
+    speak: (el) => initSpeakTab(el),
+    documents: (el) => initDocumentsTab(el),
+    storage: (el) => initStorageTab(el),
+    solutions: (el) => initSolutionsTab(el),
+    settings: (el) => { initSettingsTab(el); return undefined; },
+  };
+  for (const tab of TABS) {
+    tabLifecycles[tab.id] = tabInitializers[tab.id]?.(document.getElementById(`tab-${tab.id}`)!);
+  }
 
   // Activate default tab
   switchTab(0);
@@ -152,10 +157,11 @@ function switchTab(index: number): void {
 
   // Notify the outgoing tab so it can release resources (camera, mic, etc.)
   if (previousTab !== index) {
+    const previousId = TABS[previousTab].id;
     try {
-      tabLifecycles[previousTab]?.onDeactivate?.();
+      tabLifecycles[previousId]?.onDeactivate?.();
     } catch (err) {
-      console.warn(`[App] Tab ${TABS[previousTab].id} onDeactivate error:`, err);
+      console.warn(`[App] Tab ${previousId} onDeactivate error:`, err);
     }
   }
 
@@ -171,10 +177,11 @@ function switchTab(index: number): void {
 
   // Notify the incoming tab so it can resume if needed
   if (previousTab !== index) {
+    const incomingId = TABS[index].id;
     try {
-      tabLifecycles[index]?.onActivate?.();
+      tabLifecycles[incomingId]?.onActivate?.();
     } catch (err) {
-      console.warn(`[App] Tab ${TABS[index].id} onActivate error:`, err);
+      console.warn(`[App] Tab ${incomingId} onActivate error:`, err);
     }
   }
 }

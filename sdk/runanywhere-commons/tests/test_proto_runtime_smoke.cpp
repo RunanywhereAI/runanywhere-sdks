@@ -193,7 +193,7 @@ int test_llm_no_model_returns_typed_domain_error() {
 }
 
 // -----------------------------------------------------------------------------
-// Wave D proto ABI runtime-activation smokes.
+// Proto ABI runtime-activation smokes.
 //
 // Each CHECK below confirms the API is wired into the protobuf runtime by
 // asserting the return code is NOT RAC_ERROR_FEATURE_NOT_AVAILABLE. The API

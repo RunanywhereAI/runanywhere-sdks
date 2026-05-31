@@ -1,7 +1,6 @@
 /**
  * @file test_artifact_helpers_proto.cpp
- * @brief Parity tests for the canonical artifact ExpectedModelFiles helper
- *        (P2-T7).
+ * @brief Parity tests for the canonical artifact ExpectedModelFiles helper.
  *
  * Exercises rac_artifact_expected_files_proto for every artifact subtype
  * Swift's RAModelInfo.expectedArtifactFiles +
@@ -398,9 +397,12 @@ int main(int /*argc*/, char** /*argv*/) {
     static const TestCase kTests[] = {
         {.name = "top_level_expected_files_short_circuit",
          .fn = test_top_level_expected_files_short_circuit},
-        {.name = "single_file_with_explicit_manifest", .fn = test_single_file_with_explicit_manifest},
-        {.name = "single_file_with_pattern_shorthand", .fn = test_single_file_with_pattern_shorthand},
-        {.name = "zip_archive_with_explicit_manifest", .fn = test_zip_archive_with_explicit_manifest},
+        {.name = "single_file_with_explicit_manifest",
+         .fn = test_single_file_with_explicit_manifest},
+        {.name = "single_file_with_pattern_shorthand",
+         .fn = test_single_file_with_pattern_shorthand},
+        {.name = "zip_archive_with_explicit_manifest",
+         .fn = test_zip_archive_with_explicit_manifest},
         {.name = "tar_gz_archive_with_pattern_shorthand",
          .fn = test_tar_gz_archive_with_pattern_shorthand},
         {.name = "multi_file_descriptors", .fn = test_multi_file_descriptors},

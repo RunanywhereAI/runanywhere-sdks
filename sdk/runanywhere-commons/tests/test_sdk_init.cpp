@@ -1,6 +1,6 @@
 /**
  * @file test_sdk_init.cpp
- * @brief Parity coverage for the canonical two-phase SDK init ABI (P2-T9).
+ * @brief Parity coverage for the canonical two-phase SDK init ABI.
  *
  * Drives rac_sdk_init_phase1_proto + rac_sdk_init_phase2_proto +
  * rac_sdk_retry_http_proto with hand-built request bytes and verifies the

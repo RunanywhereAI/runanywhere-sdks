@@ -14,6 +14,7 @@
 
 package com.runanywhere.sdk.native.bridge
 
+import ai.runanywhere.proto.v1.ErrorCode
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.hybrid.DeviceStateProvider
@@ -123,6 +124,20 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLogMetadataShouldRedact(key: String): Boolean
 
+    /**
+     * Map a `rac_result_t` (signed C ABI error code) to a serialized
+     * `runanywhere.v1.SDKError` proto via the canonical commons helper
+     * `rac_result_to_proto_error`. Keeps the rac_result_t → proto translation
+     * in commons — the single source of truth shared with Swift
+     * (RASDKError+Helpers.swift) — instead of re-mapping per SDK.
+     *
+     * @param code Signed `rac_result_t` error code.
+     * @return Serialized `SDKError` proto bytes, or `null` if serialization
+     *         produced no payload.
+     */
+    @JvmStatic
+    external fun racResultToProtoError(code: Int): ByteArray?
+
     // ========================================================================
     // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
     // Path shape: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/
@@ -155,6 +170,15 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racLlmComponentDestroy(handle: Long)
+
+    /**
+     * Per-handle cancel of an in-flight LLM generation. Mirrors Swift's
+     * `CppBridge.LLM.cancel()` which calls `rac_llm_component_cancel(handle)`
+     * — distinct from the lifecycle-aware [racLlmCancelProto] that drives the
+     * public `cancelGeneration()` path. Returns rac_result_t.
+     */
+    @JvmStatic
+    external fun racLlmComponentCancel(handle: Long): Int
 
     // ========================================================================
     // LLM GENERATED-PROTO ABI (rac_llm_service.h)
@@ -290,7 +314,7 @@ object RunAnywhereBridge {
     ): Int
 
     // ========================================================================
-    // VAD STREAM PROTO ABI (rac_vad_stream.h) — Wave H-5
+    // VAD STREAM PROTO ABI (rac_vad_stream.h)
     // Lifecycle-owned proto-byte VADStreamEvent session API. Register the
     // per-handle listener, start a session to obtain a 64-bit session id, feed
     // PCM int16 mono audio frames, and stop/cancel to tear down.
@@ -340,7 +364,7 @@ object RunAnywhereBridge {
     external fun racVlmCancelProto(handle: Long): Int
 
     /**
-     * Lifecycle-style cancel (Wave 7 / T23, mirrors Swift's
+     * Lifecycle-style cancel (mirrors Swift's
      * `rac_vlm_cancel_lifecycle_proto`). The lifecycle ABI acquires the
      * lifecycle-owned VLM service internally and emits canonical
      * `CANCELLATION_EVENT_KIND_*` SDKEvents — no handle threaded.
@@ -371,8 +395,8 @@ object RunAnywhereBridge {
     // XCFramework (RABackendLlamaCPP, RABackendONNX) with separate registration.
     // ========================================================================
 
-    // Download + non-proto model-registry thunks removed per
-    // gaps/kotlin.md KOT-JNI-ORPHAN. All of `racDownloadStart` /
+    // Download + non-proto model-registry thunks removed. All of
+    // `racDownloadStart` /
     // `racDownloadCancel` / `racDownloadGetProgress` /
     // `racModelRegistry{Save,Get,GetAll,GetDownloaded,Remove,UpdateDownloadStatus}`
     // had zero Kotlin callers; the proto-backed siblings below
@@ -445,6 +469,21 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryRefreshProto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Canonical "register a model from a URL" entry point. Forwards to
+     * `rac_register_model_from_url_proto`, which translates a serialized
+     * runanywhere.v1.RegisterModelFromUrlRequest into a ModelInfoMakeRequest and
+     * composes the existing registry save path so SDKs replace the build-and-save
+     * glue with a single ABI call.
+     *
+     * Input is serialized runanywhere.v1.RegisterModelFromUrlRequest bytes; output
+     * is the saved runanywhere.v1.ModelInfo bytes (matches Swift parity), or null
+     * when the native proto ABI is unavailable so the Kotlin caller can fall back
+     * to the local build-and-save path.
+     */
+    @JvmStatic
+    external fun racRegisterModelFromUrlProto(requestBytes: ByteArray): ByteArray?
 
     /**
      * Infer a ModelFormat from a portable URL/file-path string.
@@ -945,7 +984,7 @@ object RunAnywhereBridge {
     // VOICE AGENT (rac_voice_agent.h)
     // ========================================================================
     //
-    // v3.1 P3.2: 4 thunks exposing the voice-agent handle lifecycle to
+    // 4 thunks exposing the voice-agent handle lifecycle to
     // Kotlin. Mirrors Swift's CppBridge.VoiceAgent.shared.getHandle()
     // pattern. The handle is what VoiceAgentStreamAdapter(handle).stream()
     // subscribes to for proto event streaming.
@@ -976,7 +1015,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racVoiceAgentProcessVoiceTurnProto(handle: Long, audioData: ByteArray): ByteArray?
 
     // ========================================================================
-    // TOOL-CALLING SESSION (rac_tool_calling.h — Wave D-4 / KOT-08)
+    // TOOL-CALLING SESSION (rac_tool_calling.h)
     // ========================================================================
     //
     // Native-owned state machine for generate → parse → execute → loop. The
@@ -1011,7 +1050,7 @@ object RunAnywhereBridge {
     external fun racToolCallingSessionDestroyProto(sessionHandle: Long): Int
 
     /**
-     * pass2-syn-007: Cancel an in-flight tool-calling session. Latches a
+     * Cancel an in-flight tool-calling session. Latches a
      * cancel-requested flag on the session and asks the in-flight
      * LifecycleLlmRef to abort the underlying backend `ops->generate`.
      * Safe to call from any thread; does NOT take the session mutex held
@@ -1021,7 +1060,66 @@ object RunAnywhereBridge {
     external fun racToolCallingSessionCancelProto(sessionHandle: Long): Int
 
     // ========================================================================
-    // SOLUTIONS (rac/solutions/rac_solution.h) — T4.7/T4.8
+    // TOOL-CALLING RUN LOOP (rac_tool_calling.h)
+    // ========================================================================
+    //
+    // Single-call native orchestration. Mirrors Swift's
+    // RunAnywhere+ToolCalling.swift which drives
+    // rac_tool_calling_run_loop_with_handle_proto. Kotlin uses the
+    // `_and_cb_proto` variant so the just-minted run-loop handle is published
+    // synchronously into a Kotlin sink the moment it is minted, letting a
+    // cancel coroutine on a different thread fan a cancel into
+    // [racToolCallingRunLoopCancelProto].
+
+    /**
+     * Run the full generate → parse → validate → execute → loop cycle in
+     * commons. Accepts serialized `ToolCallingSessionCreateRequest` bytes.
+     * [executor] is invoked synchronously for each tool call (returns a
+     * serialized `ToolResult`); [onHandle] is fired the moment the
+     * cancellable handle is minted (may be null). Returns serialized
+     * `ToolCallingResult` bytes, or null on failure.
+     */
+    @JvmStatic
+    external fun racToolCallingRunLoopWithHandleAndCbProto(
+        requestBytes: ByteArray,
+        executor: NativeToolExecuteListener,
+        onHandle: NativeRunLoopHandleListener?,
+    ): ByteArray?
+
+    /**
+     * Cancel an in-flight run loop from any thread. Idempotent — a stale or
+     * zero handle is a no-op returning RAC_SUCCESS.
+     */
+    @JvmStatic
+    external fun racToolCallingRunLoopCancelProto(runLoopHandle: Long): Int
+
+    // ========================================================================
+    // TOOL VALUE JSON BRIDGE (rac_tool_calling.h)
+    // ========================================================================
+    //
+    // Moves the recursive ToolValue <-> JSON walk into commons. Mirrors
+    // Swift's ToolCallingTypes.swift which loads the same two symbols.
+
+    /**
+     * Serialize a `runanywhere.v1.ToolValue` proto to its JSON string. Input
+     * is serialized ToolValue bytes; output is serialized `ToolValueJSON`
+     * bytes (whose `json` field holds the canonical JSON text), or null on
+     * failure. Forwards to `rac_tool_value_to_json_proto`.
+     */
+    @JvmStatic
+    external fun racToolValueToJsonProto(toolValueProto: ByteArray): ByteArray?
+
+    /**
+     * Parse a JSON string into a `runanywhere.v1.ToolValue` proto. Input is
+     * serialized `ToolValueJSON` bytes (whose `json` field carries the JSON
+     * text); output is serialized ToolValue bytes, or null on failure.
+     * Forwards to `rac_tool_value_from_json_proto`.
+     */
+    @JvmStatic
+    external fun racToolValueFromJsonProto(toolValueJsonProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // SOLUTIONS (rac/solutions/rac_solution.h)
     // ========================================================================
     //
     // Proto-byte / YAML driven L5 solution runtime. Each call returns a
@@ -1065,12 +1163,17 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
 
+    @JvmStatic external fun racEmbeddingsEmbedBatchLifecycleProto(requestProto: ByteArray): ByteArray?
+
     // ========================================================================
     // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
     // ========================================================================
 
     /** Create a RAG session. Returns 0 on failure. */
     @JvmStatic external fun racRagSessionCreateProto(configProto: ByteArray): Long
+
+    /** Create a RAG session and write the native rac_result_t into outRc[0]. */
+    @JvmStatic external fun racRagSessionCreateProtoWithError(configProto: ByteArray, outRc: IntArray): Long
 
     /** Destroy a RAG session and release all resources. */
     @JvmStatic external fun racRagSessionDestroyProto(handle: Long)
@@ -1113,10 +1216,10 @@ object RunAnywhereBridge {
     external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
-    // PLUGIN LOADER (rac/router/rac_plugin_loader.h) — Round 1 G-A4
+    // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
     // ========================================================================
     //
-    // Round 1 KOTLIN (G-A4): added external thunks for the plugin loader.
+    // External thunks for the plugin loader.
 
     /** Returns the compile-time plugin API version this build supports. */
     @JvmStatic external fun racRegistryGetPluginApiVersion(): Int
@@ -1138,7 +1241,7 @@ object RunAnywhereBridge {
     // ========================================================================
     //
     // Legacy direct HTTP runner retained for modality-specific adapters that
-    // still need KOT-03 migration. Registry/model downloads use the generated
+    // still need migration. Registry/model downloads use the generated
     // Download* proto service in CppBridgeDownload.
     //
     // @param url                  Absolute HTTP/HTTPS URL.
@@ -1163,7 +1266,7 @@ object RunAnywhereBridge {
     ): Int
 
     // ========================================================================
-    // PLATFORM HTTP TRANSPORT (rac_http_transport.h) — v2 close-out Phase H4
+    // PLATFORM HTTP TRANSPORT (rac_http_transport.h)
     // ========================================================================
     //
     // Registers / unregisters the OkHttp-backed `rac_http_transport_ops`
@@ -1185,7 +1288,7 @@ object RunAnywhereBridge {
     // NATIVE HTTP REQUEST (rac_http_client.h)
     // ========================================================================
     //
-    // v2.1 quick-wins / T3.5. Single blocking entrypoint that wraps
+    // Single blocking entrypoint that wraps
     // rac_http_client_create + rac_http_request_send + rac_http_response_free
     // + rac_http_client_destroy. Used by CppBridgeHTTP, CppBridgeAuth, and
     // CppBridgeTelemetry to replace per-SDK HttpURLConnection plumbing with
@@ -1251,7 +1354,7 @@ object RunAnywhereBridge {
     // AUTH MANAGER (rac_auth_manager.h)
     // ========================================================================
     //
-    // v2.1 quick-wins Item 4 / GAP 08 #2. 16 thunks delegating to the
+    // 16 thunks delegating to the
     // matching rac_auth_* C ABI in runanywhere_commons_jni.cpp. The
     // higher-level CppBridgeAuth facade calls these instead of doing its
     // own HTTP/JSON state bookkeeping. The HTTP transport stays in Kotlin
@@ -1259,7 +1362,7 @@ object RunAnywhereBridge {
     // parsing + state.
 
     /** Initialize auth state with in-memory storage. KeyStore-backed
-     *  variant is the v2.1-2 follow-up. */
+     *  variant is a follow-up. */
     @JvmStatic external fun racAuthInit()
 
     /** Reset auth state (clears in-memory tokens + IDs). */
@@ -1315,6 +1418,16 @@ object RunAnywhereBridge {
     @JvmStatic external fun racStructuredOutputValidateProto(requestProto: ByteArray): ByteArray?
 
     /**
+     * Serialize a `runanywhere.v1.JSONSchema` proto into the canonical
+     * compact, key-sorted JSON Schema text used by the commons
+     * structured-output pipeline (mirrors Swift
+     * `RAJSONSchema.jsonSchemaString`). Returns the UTF-8 text bytes, or
+     * `null` on failure. Forwards to `rac_structured_output_schema_to_json_proto`.
+     */
+    @JvmStatic
+    external fun racStructuredOutputSchemaToJsonProto(schemaProto: ByteArray): ByteArray?
+
+    /**
      * Stream structured generation. Emits serialized `StructuredOutputStreamEvent`
      * payloads through [listener]. Returns `RAC_SUCCESS` when the generation
      * transport completed successfully.
@@ -1326,19 +1439,19 @@ object RunAnywhereBridge {
     ): Int
 
     // ========================================================================
-    // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h) — Round 2
+    // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
     // ========================================================================
     //
-    // Round 2 KOTLIN: Added JNI thunk for rac_hardware_profile_get which
-    // was added by the C++ round 1 fix. Returns a serialized HardwareProfileResult
-    // proto, or null if the C++ implementation is not wired yet.
+    // JNI thunk for rac_hardware_profile_get. Returns a serialized
+    // HardwareProfileResult proto, or null if the C++ implementation is not
+    // wired yet.
 
     /** Get the hardware profile for the current device.
      *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
     @JvmStatic external fun racHardwareProfileGet(): ByteArray?
 
     // ========================================================================
-    // ENGINE ROUTER — CAPABILITY QUERIES (Wave H-5 / KOT-12)
+    // ENGINE ROUTER — CAPABILITY QUERIES
     // ========================================================================
     //
     // `rac_router_frameworks_for_capability_proto` consumes a serialized
@@ -1348,7 +1461,7 @@ object RunAnywhereBridge {
     // Kotlin.
 
     // ========================================================================
-    // HARDWARE ACCELERATORS (Swift-alignment Phase 1 — Group A)
+    // HARDWARE ACCELERATORS (Swift-alignment)
     // ========================================================================
     //
     // Surface the lightweight accelerator list and preference setter that
@@ -1366,7 +1479,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racHardwareSetAcceleratorPreference(bytes: ByteArray): Int
 
     // ========================================================================
-    // VAD COMPONENT METADATA (Swift-alignment Phase 1 — Group A)
+    // VAD COMPONENT METADATA (Swift-alignment)
     // ========================================================================
 
     /** Check if the VAD component is initialized. */
@@ -1379,7 +1492,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racVadComponentCleanup(handle: Long): Int
 
     // ========================================================================
-    // VAD LIFECYCLE PROTO ABI (rac_vad_service.h — Swift-alignment Phase 1 — Group B)
+    // VAD LIFECYCLE PROTO ABI (rac_vad_service.h — Swift-alignment)
     //
     // Handle-less lifecycle-owned VAD operations. Each routes through the
     // commons VAD lifecycle to the currently-loaded VAD service. Mirrors
@@ -1418,7 +1531,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racVadProcessLifecycleProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
-    // VLM COMPONENT METADATA (Swift-alignment Phase 1 — Group A)
+    // VLM COMPONENT METADATA (Swift-alignment)
     // ========================================================================
 
     /** Check if the VLM component supports streaming. */
@@ -1428,7 +1541,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racVlmComponentGetState(handle: Long): Int
 
     // ========================================================================
-    // STT COMPONENT METADATA (Swift-alignment Phase 1 — Group A)
+    // STT COMPONENT METADATA (Swift-alignment)
     // ========================================================================
 
     /** Check if the STT component supports streaming. */
@@ -1440,7 +1553,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racSttComponentConfigure(handle: Long, framework: Int): Int
 
     // ========================================================================
-    // VOICE AGENT — COMPOSITE LIFECYCLE (Swift-alignment Phase 1 — Group B)
+    // VOICE AGENT — COMPOSITE LIFECYCLE (Swift-alignment)
     // ========================================================================
 
     /** Create a voice-agent handle that wraps four already-created STT/LLM/TTS/VAD
@@ -1453,7 +1566,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racVoiceAgentCleanup(handle: Long): Int
 
     // ========================================================================
-    // PROTO BRIDGES — Lifecycle/Registry/Structured Output (Group C)
+    // PROTO BRIDGES — Lifecycle/Registry/Structured Output
     // ========================================================================
 
     /** Clear queued SDKEvents without removing subscriptions. Test helper.
@@ -1478,7 +1591,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racStructuredOutputGenerateProto(handle: Long, req: ByteArray): ByteArray?
 
     // ========================================================================
-    // SDK STATE ACCESSORS (Swift-alignment Phase 1 — Group D)
+    // SDK STATE ACCESSORS (Swift-alignment)
     // ========================================================================
     //
     // Mirrors Swift's CppBridge+State.swift. Reads the global SDK state
@@ -1506,7 +1619,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racDeviceGetOrCreatePersistentId(): String?
 
     // ========================================================================
-    // MODEL PATHS — FULL SURFACE (Swift-alignment Phase 1 — Group F)
+    // MODEL PATHS — FULL SURFACE (Swift-alignment)
     // ========================================================================
     //
     // Mirrors Swift's CppBridge+ModelPaths. racModelPathsSetBaseDir +
@@ -1541,8 +1654,91 @@ object RunAnywhereBridge {
     /** Check if the given path is a canonical model path. */
     @JvmStatic external fun racModelPathsIsModelPath(path: String): Boolean
 
+    /**
+     * Infer the descriptor role for a sidecar filename. Delegates to the shared
+     * commons classifier `rac_infer_model_file_role`. [modalityProto] is a
+     * `ModelCategory.value`; returns a `ModelFileRole.value`.
+     */
+    @JvmStatic external fun racInferModelFileRole(filename: String, modalityProto: Int): Int
+
     // ========================================================================
-    // FILE MANAGER — FULL PROTO/STRUCTURED SURFACE (Group G)
+    // INFERENCE FRAMEWORK display / analytics / raw tables
+    // ========================================================================
+    //
+    // Replaces the hand-written rawValue/displayName/analyticsKey switch
+    // tables in ModelTypes.kt with the canonical commons tables Swift
+    // consumes. Each takes the proto InferenceFramework int (the generated
+    // enum's `value`); commons converts to its C enum internally via
+    // rac_inference_framework_from_proto.
+
+    /** Human-readable display name (e.g. "llama.cpp"). Null on failure. */
+    @JvmStatic external fun racInferenceFrameworkDisplayName(frameworkProto: Int): String?
+
+    /** Snake_case analytics key (e.g. "llama_cpp"). Null on failure. */
+    @JvmStatic external fun racInferenceFrameworkAnalyticsKey(frameworkProto: Int): String?
+
+    /** Canonical raw value string (e.g. "LlamaCpp", "ONNX"). Null on failure. */
+    @JvmStatic external fun racFrameworkRawValue(frameworkProto: Int): String?
+
+    // ========================================================================
+    // ARCHIVE TYPE helpers
+    // ========================================================================
+
+    /**
+     * Detect the archive type from a URL/file-path. Returns the proto
+     * `ArchiveType` int (>= 0), or -1 when no archive is detected. Forwards to
+     * `rac_archive_type_from_path`.
+     */
+    @JvmStatic external fun racArchiveTypeFromPath(path: String): Int
+
+    /**
+     * File extension for an archive type (e.g. "zip", "tar.bz2"). Input is the
+     * proto `ArchiveType` int. Null on failure. Forwards to
+     * `rac_archive_type_extension`.
+     */
+    @JvmStatic external fun racArchiveTypeExtension(archiveProto: Int): String?
+
+    /**
+     * Resolve the canonical [ai.runanywhere.proto.v1.ExpectedModelFiles]
+     * manifest for a serialized `ModelInfo`. Mirrors Swift's
+     * `expectedArtifactFiles`. Returns serialized ExpectedModelFiles bytes, or
+     * null on failure. Forwards to `rac_artifact_expected_files_proto`.
+     */
+    @JvmStatic external fun racArtifactExpectedFilesProto(modelInfoProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // TWO-PHASE SDK INIT (rac_sdk_init.h)
+    // ========================================================================
+    //
+    // Mirrors Swift's CppBridge.SdkInit. phase1/phase2 take a serialized
+    // request and return a serialized SdkInitResult; retryHttp takes no input.
+
+    /**
+     * Drive Phase 1 (synchronous core init: validation + secure-storage
+     * persist + rac_state_initialize) from serialized
+     * `SdkInitPhase1Request` bytes. Returns serialized `SdkInitResult` bytes,
+     * or null on failure. Forwards to `rac_sdk_init_phase1_proto`.
+     */
+    @JvmStatic external fun racSdkInitPhase1Proto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Drive Phase 2 (services init step list owned by commons) from
+     * serialized `SdkInitPhase2Request` bytes. Returns serialized
+     * `SdkInitResult` bytes, or null on failure. Forwards to
+     * `rac_sdk_init_phase2_proto`.
+     */
+    @JvmStatic external fun racSdkInitPhase2Proto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Re-attempt the HTTP/auth setup from Phase 2 after an offline init.
+     * Idempotent fast-path when already authenticated. Returns serialized
+     * `SdkInitResult` bytes, or null on failure. Forwards to
+     * `rac_sdk_retry_http_proto`.
+     */
+    @JvmStatic external fun racSdkRetryHttpProto(): ByteArray?
+
+    // ========================================================================
+    // FILE MANAGER — FULL PROTO/STRUCTURED SURFACE
     // ========================================================================
     //
     // The racFileManager* bindings below provide the Swift-aligned naming for
@@ -1579,7 +1775,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racFileManagerCheckStorage(required: Long): Boolean
 
     // ========================================================================
-    // ENVIRONMENT VALIDATION + ENDPOINTS (Swift-alignment Phase 1 — Group H)
+    // ENVIRONMENT VALIDATION + ENDPOINTS (Swift-alignment)
     // ========================================================================
 
     /** Check if an environment int requires API authentication. */
@@ -1844,23 +2040,31 @@ object RunAnywhereBridge {
     // CONSTANTS
     // ========================================================================
 
-    // Result codes
+    // Result codes.
+    //
+    // `rac_result_t` is a signed C ABI int: 0 = success, negative = the
+    // canonical commons error code (range -100..-999, see rac_error.h). The
+    // proto `ErrorCode` enum holds the POSITIVE magnitude of each code, so the
+    // signed C ABI value is `-ErrorCode.<X>.value`. These are derived from the
+    // proto enum rather than hand-written to stay in lock-step with the C ABI
+    // (every other SDK uses the same negate-the-proto-magnitude convention).
     const val RAC_SUCCESS = 0
-    const val RAC_ERROR_INVALID_PARAMS = -1
-    const val RAC_ERROR_INVALID_HANDLE = -2
-    const val RAC_ERROR_NOT_INITIALIZED = -3
-    const val RAC_ERROR_ALREADY_INITIALIZED = -4
-    const val RAC_ERROR_OPERATION_FAILED = -5
-    const val RAC_ERROR_NOT_SUPPORTED = -6
-    const val RAC_ERROR_MODEL_NOT_LOADED = -7
-    const val RAC_ERROR_OUT_OF_MEMORY = -8
-    const val RAC_ERROR_IO = -9
-    const val RAC_ERROR_CANCELLED = -10
-    const val RAC_ERROR_MODULE_ALREADY_REGISTERED = -20
-    const val RAC_ERROR_MODULE_NOT_FOUND = -21
-    const val RAC_ERROR_SERVICE_NOT_FOUND = -22
-    const val RAC_ERROR_NOT_FOUND = -423
-    const val RAC_ERROR_FEATURE_NOT_AVAILABLE = -801
+    val RAC_ERROR_INVALID_PARAMETER = -ErrorCode.ERROR_CODE_INVALID_PARAMETER.value
+    val RAC_ERROR_INVALID_HANDLE = -ErrorCode.ERROR_CODE_INVALID_HANDLE.value
+    val RAC_ERROR_NOT_INITIALIZED = -ErrorCode.ERROR_CODE_NOT_INITIALIZED.value
+    val RAC_ERROR_ALREADY_INITIALIZED = -ErrorCode.ERROR_CODE_ALREADY_INITIALIZED.value
+
+    /** Returned by [ComponentVTable] load slots when the lifecycle load fails. */
+    val RAC_ERROR_MODEL_LOAD_FAILED = -ErrorCode.ERROR_CODE_MODEL_LOAD_FAILED.value
+    val RAC_ERROR_NOT_SUPPORTED = -ErrorCode.ERROR_CODE_NOT_SUPPORTED.value
+    val RAC_ERROR_MODEL_NOT_LOADED = -ErrorCode.ERROR_CODE_MODEL_NOT_LOADED.value
+    val RAC_ERROR_OUT_OF_MEMORY = -ErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY.value
+    val RAC_ERROR_CANCELLED = -ErrorCode.ERROR_CODE_CANCELLED.value
+    val RAC_ERROR_MODULE_ALREADY_REGISTERED = -ErrorCode.ERROR_CODE_MODULE_ALREADY_REGISTERED.value
+    val RAC_ERROR_MODULE_NOT_FOUND = -ErrorCode.ERROR_CODE_MODULE_NOT_FOUND.value
+    val RAC_ERROR_SERVICE_NOT_FOUND = -ErrorCode.ERROR_CODE_SERVICE_NOT_FOUND.value
+    val RAC_ERROR_NOT_FOUND = -ErrorCode.ERROR_CODE_NOT_FOUND.value
+    val RAC_ERROR_FEATURE_NOT_AVAILABLE = -ErrorCode.ERROR_CODE_FEATURE_NOT_AVAILABLE.value
 
     // Lifecycle states
     const val RAC_LIFECYCLE_IDLE = 0

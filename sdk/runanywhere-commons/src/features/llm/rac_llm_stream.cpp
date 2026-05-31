@@ -1,6 +1,6 @@
 /**
  * @file rac_llm_stream.cpp
- * @brief Implementation of the v2 close-out Phase G-2 LLM proto-byte
+ * @brief Implementation of the LLM proto-byte
  *        stream ABI. See rac_llm_stream.h for the declared contract.
  *
  * Implementation mirrors rac_voice_event_abi.cpp:
@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -43,9 +44,10 @@ namespace {
 // race the dispatch thread and free the user_data while slot.fn() is still
 // running on another thread, yielding EXC_BAD_ACCESS in the trampoline (iOS
 // Swift) or SIGSEGV in the std::function copy (RN Android/iOS). The in_flight
-// counter is incremented at entry to dispatch_llm_stream_event() and
-// decremented just before returning. rac_llm_proto_quiesce() spin-waits for
-// the counter to drain to zero, exactly mirroring voice_agent.cpp:594 and
+// counter is incremented under g_mu() once a live slot is found and decremented
+// when dispatch_llm_stream_event() returns (so an unregistered handle never
+// touches the atomic). rac_llm_proto_quiesce() spin-waits for the counter to
+// drain to zero, exactly mirroring voice_agent.cpp:594 and
 // rac_vlm_proto_abi.cpp:412.
 std::atomic<int>& llm_in_flight() {
     static std::atomic<int> counter{0};
@@ -495,18 +497,24 @@ namespace rac::llm {
  * different threads do not contend on heap allocation.
  */
 void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& p) {
-    // pass2-syn-001-followup-llm: hold an InFlightGuard for the entirety of
-    // the dispatch (lock acquire → callback fire). rac_llm_proto_quiesce()
-    // spin-waits on the counter so destroy/teardown threads can be sure no
-    // slot.fn invocation is still in flight before freeing user_data.
-    LlmInFlightGuard in_flight_guard;
+    // pass2-syn-001-followup-llm: hold an InFlightGuard across the callback
+    // fire so rac_llm_proto_quiesce() can be sure no slot.fn invocation is
+    // still running before destroy/teardown frees user_data. The guard is
+    // taken *inside* the registry lock, only once a live slot is found: an
+    // unregistered handle returns before the atomic is touched (no wasted
+    // barrier on the hot path for SDKs not using the proto callback), and
+    // because the increment is ordered under g_mu() with the slot's presence,
+    // a concurrent unset+quiesce either observes the in-flight count (we won
+    // the lock) or finds an empty slot (it won — nothing to wait on).
     CallbackSlot slot;
     uint64_t seq;
+    std::optional<LlmInFlightGuard> in_flight_guard;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
         if (it == g_slots().end() || it->second.fn == nullptr)
             return;
+        in_flight_guard.emplace();
         slot = it->second;
         // Bump the per-handle counter under the lock so concurrent
         // dispatches on the same handle still produce monotonic seq values.

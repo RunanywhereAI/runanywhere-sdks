@@ -39,9 +39,8 @@ typedef struct rac_diffusion_coreml_impl rac_diffusion_coreml_impl_t;
  * @param out_impl    Receives the impl pointer.
  * @return RAC_SUCCESS on success.
  */
-rac_result_t
-rac_diffusion_coreml_create(const char *model_id, const char *config_json,
-                            rac_diffusion_coreml_impl_t **out_impl);
+rac_result_t rac_diffusion_coreml_create(const char* model_id, const char* config_json,
+                                         rac_diffusion_coreml_impl_t** out_impl);
 
 /**
  * @brief Initialize by loading the MLModel bundles under `model_path`.
@@ -55,10 +54,9 @@ rac_diffusion_coreml_create(const char *model_id, const char *config_json,
  *
  * @return RAC_SUCCESS when every required MLModel loaded.
  */
-rac_result_t
-rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t *impl,
-                                const char *model_path,
-                                const rac_diffusion_config_t *config);
+rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
+                                             const char* model_path,
+                                             const rac_diffusion_config_t* config);
 
 /**
  * @brief Run text-to-image denoising through TextEncoder, Unet, and VAEDecoder.
@@ -66,34 +64,32 @@ rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t *impl,
  * Returns `RAC_ERROR_NOT_SUPPORTED` for unsupported bundle layouts or modes
  * (for example img2img/inpainting), not for supported text-to-image bundles.
  */
-rac_result_t
-rac_diffusion_coreml_generate(rac_diffusion_coreml_impl_t *impl,
-                              const rac_diffusion_options_t *options,
-                              rac_diffusion_result_t *out_result);
+rac_result_t rac_diffusion_coreml_generate(rac_diffusion_coreml_impl_t* impl,
+                                           const rac_diffusion_options_t* options,
+                                           rac_diffusion_result_t* out_result);
 
 /**
  * @brief Generate with progress callback.
  */
-rac_result_t rac_diffusion_coreml_generate_with_progress(
-    rac_diffusion_coreml_impl_t *impl, const rac_diffusion_options_t *options,
-    rac_diffusion_progress_callback_fn progress_cb, void *user_data,
-    rac_diffusion_result_t *out_result);
-
 rac_result_t
-rac_diffusion_coreml_get_info(const rac_diffusion_coreml_impl_t *impl,
-                              rac_diffusion_info_t *out_info);
+rac_diffusion_coreml_generate_with_progress(rac_diffusion_coreml_impl_t* impl,
+                                            const rac_diffusion_options_t* options,
+                                            rac_diffusion_progress_callback_fn progress_cb,
+                                            void* user_data, rac_diffusion_result_t* out_result);
 
-uint32_t
-rac_diffusion_coreml_get_capabilities(const rac_diffusion_coreml_impl_t *impl);
+rac_result_t rac_diffusion_coreml_get_info(const rac_diffusion_coreml_impl_t* impl,
+                                           rac_diffusion_info_t* out_info);
 
-rac_result_t rac_diffusion_coreml_cancel(rac_diffusion_coreml_impl_t *impl);
+uint32_t rac_diffusion_coreml_get_capabilities(const rac_diffusion_coreml_impl_t* impl);
 
-rac_result_t rac_diffusion_coreml_cleanup(rac_diffusion_coreml_impl_t *impl);
+rac_result_t rac_diffusion_coreml_cancel(rac_diffusion_coreml_impl_t* impl);
 
-void rac_diffusion_coreml_destroy(rac_diffusion_coreml_impl_t *impl);
+rac_result_t rac_diffusion_coreml_cleanup(rac_diffusion_coreml_impl_t* impl);
+
+void rac_diffusion_coreml_destroy(rac_diffusion_coreml_impl_t* impl);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // RUNANYWHERE_DIFFUSION_COREML_BACKEND_H
+#endif  // RUNANYWHERE_DIFFUSION_COREML_BACKEND_H

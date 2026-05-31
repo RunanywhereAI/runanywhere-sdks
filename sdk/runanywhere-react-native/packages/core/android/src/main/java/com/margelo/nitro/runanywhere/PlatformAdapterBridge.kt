@@ -527,4 +527,85 @@ object PlatformAdapterBridge {
         // Fallback: Check display metrics if context unavailable
         return false
     }
+
+    // ========================================================================
+    // Directory Enumeration (Platform Adapter Slots)
+    //
+    // Cross-SDK parity with the Kotlin SDK sibling and Swift / Flutter /
+    // Web. The C++
+    // model-registry refresh path (rescan_local) and
+    // rac_model_info_make_proto's is_downloaded probe for multi-file
+    // artifacts read these via JNI from InitBridge.cpp.
+    // ========================================================================
+
+    /**
+     * Directory entry surface mirroring `rac_directory_entry_t` field-for-field
+     * so the C++ side can populate `rac_directory_entry_t` arrays via FieldID
+     * reflection without an additional marshalling layer.
+     */
+    data class RacDirectoryEntry(
+        val name: String,
+        val isDir: Boolean,
+        val sizeBytes: Long,
+    )
+
+    /**
+     * Maximum entry name length (incl. NUL) per `RAC_DIRECTORY_ENTRY_NAME_MAX`.
+     * Oversized entries are skipped per the truncation contract in
+     * `rac_platform_adapter.h::rac_directory_entry_t::name`.
+     */
+    private const val DIRECTORY_ENTRY_NAME_MAX = 512
+
+    /**
+     * Enumerate directory entries via java.io.File.listFiles().
+     *
+     * @return Array of RacDirectoryEntry or null if the path does not exist /
+     *         is not a directory. Oversized names (UTF-8 + NUL > 512) are
+     *         filtered out with a single WARN summary; the C++ layer enforces
+     *         the same contract defensively.
+     */
+    @JvmStatic
+    fun fileListDirectory(dirPath: String): Array<RacDirectoryEntry>? {
+        val dir = File(dirPath)
+        if (!dir.exists() || !dir.isDirectory) {
+            return null
+        }
+        val children = dir.listFiles() ?: return emptyArray()
+
+        var skipped = 0
+        val entries = ArrayList<RacDirectoryEntry>(children.size)
+        for (child in children) {
+            val name = child.name
+            val utf8Bytes = name.toByteArray(Charsets.UTF_8)
+            if (utf8Bytes.size + 1 > DIRECTORY_ENTRY_NAME_MAX) {
+                skipped++
+                continue
+            }
+            entries.add(
+                RacDirectoryEntry(
+                    name = name,
+                    isDir = child.isDirectory,
+                    sizeBytes = if (child.isFile) child.length() else 0L,
+                ),
+            )
+        }
+        if (skipped > 0) {
+            Log.w(TAG, "fileListDirectory: skipped $skipped oversized entry name(s) in $dirPath")
+        }
+        return entries.toTypedArray()
+    }
+
+    /**
+     * Cheap directory-probe used by rac_model_info_make_proto's is_downloaded
+     * gating for multi-file artifacts.
+     */
+    @JvmStatic
+    fun isNonEmptyDirectory(path: String): Boolean {
+        val dir = File(path)
+        if (!dir.exists() || !dir.isDirectory) {
+            return false
+        }
+        val children = dir.list() ?: return false
+        return children.isNotEmpty()
+    }
 }

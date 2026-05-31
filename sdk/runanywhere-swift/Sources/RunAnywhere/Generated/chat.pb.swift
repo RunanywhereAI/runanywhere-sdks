@@ -13,7 +13,7 @@
 // Phase 3 of v2 IDL Exhaustiveness migration. ChatMessage + MessageRole were
 // duplicated across:
 //   - Swift  ChatMessage.swift / MessageRole.swift (TBD location)
-//   - Kotlin commonMain/.../ChatMessage.kt
+//   - Kotlin main/kotlin/.../ChatMessage.kt
 //   - Dart   lib/public/types/message_types.dart (MessageRole)
 //   - RN     core/src/types/chat.ts
 //   - Web    packages/core/src/chat/types.ts
@@ -33,7 +33,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -41,7 +41,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// ---------------------------------------------------------------------------
 /// Conversational role of a ChatMessage.
 /// ---------------------------------------------------------------------------
-public enum RAMessageRole: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAMessageRole: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case user // = 1
@@ -94,7 +94,7 @@ public enum RAMessageRole: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAChatMessageStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAChatMessageStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case pending // = 1
@@ -144,7 +144,7 @@ public enum RAChatMessageStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAChatStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAChatStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case messageStarted // = 1
@@ -198,7 +198,7 @@ public enum RAChatStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public struct RAChatAttachment: Sendable {
+public nonisolated struct RAChatAttachment: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -249,7 +249,7 @@ public struct RAChatAttachment: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Source: Equatable, Sendable {
+  public nonisolated enum OneOf_Source: Equatable, Sendable {
     case data(Data)
     case uri(String)
     case adapterHandle(String)
@@ -264,7 +264,7 @@ public struct RAChatAttachment: Sendable {
 /// ---------------------------------------------------------------------------
 /// A single message in a chat conversation.
 /// ---------------------------------------------------------------------------
-public struct RAChatMessage: @unchecked Sendable {
+public nonisolated struct RAChatMessage: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -377,7 +377,7 @@ public struct RAChatMessage: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAChatGenerationRequest: @unchecked Sendable {
+public nonisolated struct RAChatGenerationRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -427,7 +427,7 @@ public struct RAChatGenerationRequest: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAChatGenerationResult: Sendable {
+public nonisolated struct RAChatGenerationResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -476,7 +476,7 @@ public struct RAChatGenerationResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAChatStreamEvent: @unchecked Sendable {
+public nonisolated struct RAChatStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -572,7 +572,7 @@ public struct RAChatStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAChatConversationState: Sendable {
+public nonisolated struct RAChatConversationState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -594,21 +594,21 @@ public struct RAChatConversationState: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAMessageRole: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAMessageRole: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MESSAGE_ROLE_UNSPECIFIED\0\u{1}MESSAGE_ROLE_USER\0\u{1}MESSAGE_ROLE_ASSISTANT\0\u{1}MESSAGE_ROLE_SYSTEM\0\u{1}MESSAGE_ROLE_TOOL\0\u{1}MESSAGE_ROLE_DEVELOPER\0")
 }
 
-extension RAChatMessageStatus: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatMessageStatus: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CHAT_MESSAGE_STATUS_UNSPECIFIED\0\u{1}CHAT_MESSAGE_STATUS_PENDING\0\u{1}CHAT_MESSAGE_STATUS_STREAMING\0\u{1}CHAT_MESSAGE_STATUS_COMPLETE\0\u{1}CHAT_MESSAGE_STATUS_FAILED\0\u{1}CHAT_MESSAGE_STATUS_CANCELLED\0")
 }
 
-extension RAChatStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CHAT_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED\0\u{1}CHAT_STREAM_EVENT_KIND_TOKEN\0\u{1}CHAT_STREAM_EVENT_KIND_TOOL_CALL\0\u{1}CHAT_STREAM_EVENT_KIND_TOOL_RESULT\0\u{1}CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED\0\u{1}CHAT_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RAChatAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatAttachment"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}media_type\0\u{1}data\0\u{1}uri\0\u{3}adapter_handle\0\u{1}name\0\u{3}size_bytes\0\u{1}metadata\0")
 
@@ -702,7 +702,7 @@ extension RAChatAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatMessage"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}role\0\u{1}content\0\u{3}timestamp_us\0\u{1}name\0\u{4}\u{2}tool_call_id\0\u{3}tool_calls\0\u{3}tool_result\0\u{3}parent_id\0\u{1}status\0\u{3}error_message\0\u{1}metadata\0\u{1}attachments\0\u{b}tool_calls_json\0\u{c}\u{6}\u{1}")
 
@@ -856,7 +856,7 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RAChatGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatGenerationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}conversation_id\0\u{1}messages\0\u{1}options\0\u{3}tool_calling\0\u{1}metadata\0")
 
@@ -961,7 +961,7 @@ extension RAChatGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RAChatGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatGenerationResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}conversation_id\0\u{1}message\0\u{1}generation\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1025,7 +1025,7 @@ extension RAChatGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAChatStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{3}conversation_id\0\u{1}kind\0\u{1}token\0\u{1}message\0\u{3}tool_call\0\u{3}tool_result\0\u{3}final_result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1172,7 +1172,7 @@ extension RAChatStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAChatConversationState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAChatConversationState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatConversationState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}conversation_id\0\u{1}messages\0\u{3}created_at_ms\0\u{3}updated_at_ms\0\u{1}metadata\0")
 

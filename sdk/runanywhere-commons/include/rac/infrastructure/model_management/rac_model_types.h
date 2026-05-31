@@ -369,6 +369,20 @@ RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t cat
 RAC_API rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t framework);
 
 /**
+ * @brief Get the default inference framework for a model category.
+ * Mirrors Swift's RAModelCategory.defaultFramework — the framework the SDK
+ * falls back to when a category has no explicit model framework resolved
+ * (e.g. a pending UI selection that has not yet matched a catalogued model).
+ *
+ * @param category Model category
+ * @return RAC_FRAMEWORK_LLAMACPP for language/multimodal, RAC_FRAMEWORK_ONNX
+ *         for speech recognition / synthesis / embedding / VAD, otherwise
+ *         RAC_FRAMEWORK_UNKNOWN.
+ */
+RAC_API rac_inference_framework_t rac_model_category_default_framework(
+    rac_model_category_t category);
+
+/**
  * @brief Get supported formats for a framework.
  * Mirrors Swift's InferenceFramework.supportedFormats.
  *
@@ -824,7 +838,7 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
 
 // =============================================================================
-// CANONICAL RAModelInfo FACTORY (P2-T4)
+// CANONICAL RAModelInfo FACTORY
 // =============================================================================
 //
 // Commons-owned implementation of Swift's RAModelInfo.make(...). Consumes a
@@ -903,7 +917,7 @@ RAC_API rac_result_t rac_model_info_make_proto(const uint8_t* in_request_bytes,
 RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 
 // =============================================================================
-// CANONICAL ARTIFACT EXPECTED-FILES HELPER (P2-T7)
+// CANONICAL ARTIFACT EXPECTED-FILES HELPER
 // =============================================================================
 //
 // Commons-owned port of Swift's RAModelInfo.expectedArtifactFiles and the
@@ -920,7 +934,7 @@ RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 // shape every SDK already consumes.
 
 // =============================================================================
-// PROTO ENUM ↔ C ENUM MAPPERS (T15a / SWIFT-DUP-MODELTYPES-COMPUTED)
+// PROTO ENUM ↔ C ENUM MAPPERS
 // =============================================================================
 //
 // Bidirectional mappers between the proto-wire `int32` enum values declared in
@@ -1147,6 +1161,64 @@ RAC_API rac_result_t rac_archive_structure_to_proto(rac_archive_structure_t valu
 RAC_API rac_result_t rac_artifact_expected_files_proto(const uint8_t* in_model_bytes,
                                                        size_t in_model_size,
                                                        rac_proto_buffer_t* out_proto);
+
+// =============================================================================
+// MODEL HEURISTICS — DERIVED FROM RAModelInfo
+// =============================================================================
+//
+// Commons-owned accessors that derive cross-SDK display state from a
+// serialized `runanywhere.v1.ModelInfo`. Centralizes the model-naming
+// heuristics that examples-flutter, examples-ios, examples-android, and
+// examples-react-native were each duplicating. Companion tool-call accessor lives in
+// `rac/features/llm/rac_tool_calling.h` (`rac_tool_call_format_from_model_info_proto`).
+
+/**
+ * @brief Estimate the parameter count (in billions) of a model from its
+ *        catalog metadata.
+ *
+ * Scans the `name` / `id` / `description` fields of the supplied ModelInfo
+ * proto for canonical `<N>B` / `<N>M` size tokens (e.g. "1.2B", "350M",
+ * "Qwen2.5 0.5B-Instruct"). The first token found wins and millions are
+ * converted to billions (`<N>M` ⇒ `<N>/1000`). When no recognisable token is
+ * present the helper reports a sentinel of -1.0f so callers can distinguish
+ * "unknown" from "very small".
+ *
+ * @param model_info_proto_bytes Borrowed runanywhere.v1.ModelInfo bytes (may
+ *                               be NULL when @p size is 0).
+ * @param size                   Byte count of @p model_info_proto_bytes.
+ * @param out_parameter_count_b  Output: parameter count in billions, or -1.0f
+ *                               when no size token is found. Must not be NULL.
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER when @p
+ *         out_parameter_count_b is NULL, RAC_ERROR_DECODING_ERROR when the
+ *         supplied bytes do not parse as runanywhere.v1.ModelInfo.
+ */
+RAC_API rac_result_t rac_model_info_parameter_count_b_proto(const uint8_t* model_info_proto_bytes,
+                                                            size_t size,
+                                                            float* out_parameter_count_b);
+
+/**
+ * @brief Decide whether a model qualifies as "small" (≤500M params) for
+ *        cross-SDK reliability banners (e.g. Flutter B-FL-6-003 tool-calling
+ *        banner that warns when small models attempt tool calls).
+ *
+ * Implementation: derives `parameter_count_b` via
+ * @ref rac_model_info_parameter_count_b_proto and reports `RAC_TRUE` when the
+ * value is in `(0, 1.0)` — covers the 350M, 360M, 500M, 0.3B, 0.5B, 0.6B
+ * cases the reviewer enumerated while keeping LFM2-1.2B-Tool above the
+ * threshold. Unknown parameter counts (sentinel -1.0f) report `RAC_FALSE` to
+ * avoid spurious banners.
+ *
+ * @param model_info_proto_bytes Borrowed runanywhere.v1.ModelInfo bytes (may
+ *                               be NULL when @p size is 0).
+ * @param size                   Byte count of @p model_info_proto_bytes.
+ * @param out_is_small           Output: RAC_TRUE when the model is below the
+ *                               1.0B threshold, RAC_FALSE otherwise.
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER when @p out_is_small
+ *         is NULL, RAC_ERROR_DECODING_ERROR when the supplied bytes do not
+ *         parse as runanywhere.v1.ModelInfo.
+ */
+RAC_API rac_result_t rac_model_info_is_small_model_proto(const uint8_t* model_info_proto_bytes,
+                                                         size_t size, rac_bool_t* out_is_small);
 
 #ifdef __cplusplus
 }

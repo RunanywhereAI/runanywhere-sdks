@@ -46,8 +46,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 // (which provides embedding_ops, required for RAG pipeline creation). Loads
 // are try/catch-wrapped so apps without those modules aren't blocked.
 //
-// CLUSTER-08 / KOTLIN-AND-RAG-002: `librac_backend_rag_jni.so` is currently
-// not packaged for arm64-v8a in many builds. The ONNX engine plugin
+// `librac_backend_rag_jni.so` is currently not packaged for arm64-v8a in
+// many builds. The ONNX engine plugin
 // (`librac_backend_onnx.so`) is the canonical RAG backend and provides
 // embedding_ops; the RAG flow works end-to-end without the JNI shim. The
 // shim's absence is therefore demoted to DEBUG to avoid alarming users while
@@ -119,6 +119,26 @@ private suspend fun loadRagArtifactModel(
         throw SDKException.model("$errorLabel model '${model.id}': $message")
     }
     return result
+}
+
+/**
+ * Create the RAG pipeline from registry models. Model artifact layout is
+ * resolved by commons lifecycle rather than by file-name heuristics, so callers
+ * can hand in [RAModelInfo] entries from the catalogue without first building a
+ * [RARAGConfiguration] by hand. Mirrors Swift `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)`.
+ */
+suspend fun RunAnywhere.ragCreatePipeline(
+    embeddingModel: RAModelInfo,
+    llmModel: RAModelInfo,
+    baseConfiguration: RARAGConfiguration = RARAGConfiguration.defaults(),
+) {
+    val resolved =
+        ragResolvedConfiguration(
+            embeddingModel = embeddingModel,
+            llmModel = llmModel,
+            baseConfiguration = baseConfiguration,
+        )
+    ragCreatePipeline(resolved)
 }
 
 suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {

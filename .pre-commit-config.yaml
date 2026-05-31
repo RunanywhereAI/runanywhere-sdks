@@ -15,19 +15,19 @@ repos:
       - id: trailing-whitespace
         exclude: |
           (?x)^(
-            sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/|
+            sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
             sdk/runanywhere-commons/src/generated/|
             sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
-            sdk/runanywhere-web/packages/core/src/generated/|
+            sdk/shared/proto-ts/src/|
             idl/
           )
       - id: end-of-file-fixer
         exclude: |
           (?x)^(
-            sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/|
+            sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/|
             sdk/runanywhere-commons/src/generated/|
             sdk/runanywhere-swift/Sources/RunAnywhere/Generated/|
-            sdk/runanywhere-web/packages/core/src/generated/|
+            sdk/shared/proto-ts/src/|
             idl/
           )
       - id: check-yaml
@@ -82,10 +82,16 @@ repos:
 
       - id: ios-sdk-periphery
         name: iOS SDK Periphery (Unused Code)
-        entry: bash -c 'cd sdk/runanywhere-swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime --targets FoundationModelsAdapter --targets FluidAudioDiarization 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
+        entry: bash -c 'cd sdk/runanywhere-swift && if which periphery >/dev/null; then OUTPUT=$(periphery scan --targets RunAnywhere --targets ONNXRuntime --targets LlamaCPPRuntime 2>&1); WARNINGS=$(echo "$OUTPUT" | grep "warning:" | grep -v "Associatedtype .* is unused"); if [ -n "$WARNINGS" ]; then echo "$WARNINGS"; echo "Periphery found unused code"; exit 1; fi; exit 0; else echo "Periphery not installed"; exit 0; fi'
         language: system
         files: ^sdk/runanywhere-swift/.*\.swift$
         pass_filenames: false
+
+  # NOTE (ci-037, FIXED-PARTIAL): clang-format + dart format hooks are deferred to a
+  # dedicated formatter-baseline PR. clang-format v20.1.8 oscillates (period-2) on the
+  # codebase's macro-continuation / trailing-comment constructs, so `pre-commit run
+  # --all-files` cannot converge; enabling either formatter cleanly requires a one-time
+  # repo-wide reformat committed atomically with a pinned, idempotent formatter version.
 
   # SwiftLint for iOS App
   - repo: local

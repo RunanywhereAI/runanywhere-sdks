@@ -34,6 +34,7 @@ import {
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 const VLM_PICKER_FILTER: readonly ModelCategory[] = [
@@ -69,6 +70,20 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
     void syncVisionLanguageProvider();
     renderView();
   });
+
+  // Tear down the model-state subscription if the panel element ever
+  // detaches (e.g. a full app-shell re-render).
+  const rootParent = container.parentElement;
+  if (typeof MutationObserver !== 'undefined' && rootParent) {
+    const disposeObserver = new MutationObserver(() => {
+      if (!container.isConnected) {
+        disposeObserver.disconnect();
+        unsubscribeState?.();
+        unsubscribeState = null;
+      }
+    });
+    disposeObserver.observe(rootParent, { childList: true });
+  }
 
   return {
     onActivate: () => {
@@ -160,20 +175,19 @@ function renderView(): void {
         <h3>Analyze</h3>
         <p class="text-secondary">
           Runs <code>RunAnywhere.processImage(image, options)</code> on the last
-          captured frame. The provider decodes the proto message and calls
-          <code>_rac_vlm_process_proto</code>.
+          captured frame.
         </p>
         <label class="form-label" for="vision-prompt">Prompt</label>
         <textarea id="vision-prompt" class="chat-input" rows="2"
           ${isBusy ? 'disabled' : ''}
-          placeholder="What's in this image?">${escape(DEFAULT_PROMPT)}</textarea>
+          placeholder="What's in this image?">${escapeHtml(DEFAULT_PROMPT)}</textarea>
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="vision-analyze-btn" ${canAnalyze ? '' : 'disabled'}>
             ${isBusy ? 'Analyzing…' : 'Capture & analyze'}
           </button>
         </div>
-        <div id="vision-status" class="docs-status">${escape(status)}</div>
-        <pre id="vision-output" class="docs-pre">${escape(lastResult ?? '(no response yet)')}</pre>
+        <div id="vision-status" class="docs-status">${escapeHtml(status)}</div>
+        <pre id="vision-output" class="docs-pre">${escapeHtml(lastResult ?? '(no response yet)')}</pre>
       </div>
     </div>
   `;
@@ -372,32 +386,4 @@ function setStatus(text: string): void {
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
   return formatError(err);
-}
-
-function escape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-// Dispose subscription on full panel teardown (mirrors chat.ts pattern).
-const disposeObserver =
-  typeof MutationObserver !== 'undefined'
-    ? new MutationObserver(() => {
-        if (container && !container.isConnected) {
-          disposeObserver?.disconnect();
-          unsubscribeState?.();
-          unsubscribeState = null;
-        }
-      })
-    : null;
-if (disposeObserver && typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (container?.parentElement) {
-      disposeObserver.observe(container.parentElement, { childList: true });
-    }
-  });
 }

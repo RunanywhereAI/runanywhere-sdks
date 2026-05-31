@@ -40,12 +40,7 @@ ktlint = "14.2.0"
 
 workManager = "2.11.2"
 
-commonsIo = "2.22.0"
 okio = "3.17.0"
-
-whisperJni = "1.7.1"
-androidVad = "2.0.10"
-prdownloader = "1.0.2"
 
 room = "2.8.4"
 securityCrypto = "1.1.0"
@@ -109,14 +104,9 @@ mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 
-commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 
 wire-runtime = { group = "com.squareup.wire", name = "wire-runtime", version.ref = "wire" }
-
-whisper-jni = { group = "io.github.givimad", name = "whisper-jni", version.ref = "whisperJni" }
-android-vad-webrtc = { group = "com.github.gkonovalov.android-vad", name = "webrtc", version.ref = "androidVad" }
-prdownloader = { group = "com.github.amitshekhariitbhu", name = "PRDownloader", version.ref = "prdownloader" }
 
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }

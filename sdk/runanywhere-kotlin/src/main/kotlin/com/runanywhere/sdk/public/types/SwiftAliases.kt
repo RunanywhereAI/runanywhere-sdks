@@ -71,4 +71,3 @@ public typealias RAHardwareProfile = ai.runanywhere.proto.v1.HardwareProfile
 public typealias RAAcceleratorInfo = ai.runanywhere.proto.v1.AcceleratorInfo
 public typealias RAAccelerationPreference = ai.runanywhere.proto.v1.AccelerationPreference
 public typealias RASDKError = ai.runanywhere.proto.v1.SDKError
-public typealias RASDKEvent = ai.runanywhere.proto.v1.SDKEvent

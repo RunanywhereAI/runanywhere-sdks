@@ -27,6 +27,11 @@ export interface ProtoWasmModule {
     opts?: { async?: boolean },
   ): unknown;
 
+  _rac_wasm_infer_model_file_role?(filenamePtr: number, modalityProto: number): number;
+
+  /** Canonical rac_result_t -> serialized SDKError proto mapping. */
+  _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
+
   _rac_proto_buffer_init?(bufferPtr: number): void;
   _rac_proto_buffer_free?(bufferPtr: number): void;
   _rac_wasm_sizeof_proto_buffer?(): number;
@@ -270,6 +275,40 @@ export class ProtoWasmBridge {
 
   free(ptr: number): void {
     this.module._free?.(ptr);
+  }
+
+  /**
+   * Infer the descriptor role for a sidecar filename. Delegates to the shared
+   * commons classifier via the `rac_wasm_infer_model_file_role` WASM export so
+   * the heuristic stays byte-identical with the C++ resolver and every other
+   * SDK. `modalityProto` and the return value are proto `ModelCategory` /
+   * `ModelFileRole` int values; returns `MODEL_FILE_ROLE_PRIMARY_MODEL` (1) on
+   * any failure or when the export is unavailable.
+   */
+  inferModelFileRole(filename: string, modalityProto: number): number {
+    const mod = this.module;
+    const filenamePtr = this.allocUtf8(filename);
+    if (!filenamePtr) {
+      return 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
+    }
+    try {
+      if (typeof mod.ccall === 'function') {
+        const result = mod.ccall(
+          'rac_wasm_infer_model_file_role',
+          'number',
+          ['number', 'number'],
+          [filenamePtr, modalityProto],
+        );
+        return Number(result);
+      }
+      if (mod._rac_wasm_infer_model_file_role) {
+        return mod._rac_wasm_infer_model_file_role(filenamePtr, modalityProto);
+      }
+      this.logger.warning('rac_wasm_infer_model_file_role export unavailable');
+      return 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
+    } finally {
+      this.free(filenamePtr);
+    }
   }
 
   readU32(ptr: number): number {

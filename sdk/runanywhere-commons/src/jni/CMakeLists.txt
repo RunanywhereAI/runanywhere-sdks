@@ -16,7 +16,7 @@
 # This mirrors the Swift SDK architecture where each backend has its own
 # XCFramework (RABackendLlamaCPP, RABackendONNX).
 
-# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.30).
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
 cmake_minimum_required(VERSION 3.24)
 project(runanywhere_commons_jni)
 
@@ -66,7 +66,7 @@ endif()
 # Source files
 set(JNI_SOURCES
     runanywhere_commons_jni.cpp
-    # H4: OkHttp-backed rac_http_transport_ops adapter. Routes
+    # OkHttp-backed rac_http_transport_ops adapter. Routes
     # rac_http_request_* calls through Kotlin's
     # `com.runanywhere.sdk.foundation.http.OkHttpTransport` so Android
     # consumers get the system trust store + NetworkSecurityConfig +

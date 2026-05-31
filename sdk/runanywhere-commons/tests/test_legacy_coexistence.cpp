@@ -3,7 +3,7 @@
  * @brief Verifies the new plugin_registry does not interact with the legacy
  *        service_registry.
  *
- * GAP 02 Phase 10. The spec requires downstream Swift / Kotlin / Dart
+ * The spec requires downstream Swift / Kotlin / Dart
  * frontends to keep working unchanged. The legacy path is exercised by every
  * existing backend test (`test_stt`, `test_llm`, etc.) — this test asserts
  * the narrower contract that the plugin registry:

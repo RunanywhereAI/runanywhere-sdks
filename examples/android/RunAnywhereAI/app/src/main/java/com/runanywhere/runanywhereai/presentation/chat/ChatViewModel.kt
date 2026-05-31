@@ -20,6 +20,7 @@ import com.runanywhere.runanywhereai.domain.models.MessageModelInfo
 import com.runanywhere.runanywhereai.domain.models.MessageRole
 import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
+import com.runanywhere.runanywhereai.util.ThinkingContentParser
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
@@ -121,7 +122,7 @@ class ChatViewModel(
             }
             GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED -> {
                 Timber.i("✅ Generation completed: ${event.tokens_used} tokens")
-                // B-AK-7-002 — force-clear isGenerating in case generateAndCollect's
+                // Force-clear isGenerating in case generateAndCollect's
                 // Flow never received is_final=true. Also sync the conversation store.
                 if (_uiState.value.isGenerating) {
                     _uiState.value = _uiState.value.copy(isGenerating = false)
@@ -365,25 +366,14 @@ class ChatViewModel(
     }
 
     /**
-     * Split `<think>...</think>` from a model response.
-     *
-     * Mirrors iOS `ThinkingContentParser.extract`. Returns the user-facing
-     * display text (with the think block removed) and the captured thinking
-     * content (null when there's no `<think>` block).
+     * Split `<think>...</think>` from a model response via the shared
+     * example-app `ThinkingContentParser` (mirrors iOS). Returns the
+     * user-facing display text and the captured thinking content (null
+     * when there's no complete `<think>` block).
      */
     private fun extractThinking(rawText: String): Pair<String, String?> {
-        val thinkStart = rawText.indexOf("<think>")
-        if (thinkStart < 0) return rawText.trim() to null
-        val thinkEnd = rawText.indexOf("</think>")
-        if (thinkEnd < 0) {
-            // Unterminated think block — strip the opening tag, leave the rest.
-            return rawText.replace("<think>", "").trim() to null
-        }
-        val thinking = rawText.substring(thinkStart + "<think>".length, thinkEnd).trim()
-        val display =
-            (rawText.substring(0, thinkStart) + rawText.substring(thinkEnd + "</think>".length))
-                .trim()
-        return display to thinking.takeIf { it.isNotEmpty() }
+        val extracted = ThinkingContentParser.extract(rawText)
+        return extracted.text to extracted.thinking
     }
 
     /**
@@ -440,7 +430,7 @@ class ChatViewModel(
         Timber.i("📤 Starting streaming generation")
 
         try {
-            // v2 close-out Phase G-2: generateStream now returns
+            // generateStream now returns
             // Flow<LLMStreamEvent>; collect token text off each event.
             // Use transformWhile so the flow terminates as soon as is_final=true
             // arrives — plain return@collect does NOT close the upstream flow,
@@ -476,40 +466,40 @@ class ChatViewModel(
                         }
                     }
 
-                    // Handle thinking mode
-                    if (fullResponse.contains("<think>") && !isInThinkingMode) {
+                    // Track transitions into / out of a thinking block for
+                    // analytics. Tag-scanning + splitting is owned by the
+                    // shared example-app `ThinkingContentParser` (mirrors
+                    // iOS) so this ViewModel only does flow-control via the
+                    // parser's exported tag constants.
+                    val hasOpen = fullResponse.contains(ThinkingContentParser.OPEN_TAG)
+                    val hasClose = fullResponse.contains(ThinkingContentParser.CLOSE_TAG)
+
+                    if (hasOpen && !isInThinkingMode && thinkingStartTime == null) {
                         isInThinkingMode = true
                         thinkingStartTime = System.currentTimeMillis()
                         Timber.i("🧠 Entering thinking mode")
                     }
+                    if (isInThinkingMode && hasClose) {
+                        isInThinkingMode = false
+                        thinkingEndTime = System.currentTimeMillis()
+                        Timber.i("🧠 Exiting thinking mode")
+                    }
 
                     if (isInThinkingMode) {
-                        if (fullResponse.contains("</think>")) {
-                            // Extract thinking and response content
-                            val thinkingRange = fullResponse.indexOf("<think>") + 7
-                            val thinkingEndRange = fullResponse.indexOf("</think>")
-
-                            if (thinkingRange < thinkingEndRange) {
-                                thinkingContent = fullResponse.substring(thinkingRange, thinkingEndRange)
-                                responseContent = fullResponse.substring(thinkingEndRange + 8)
-                                isInThinkingMode = false
-                                thinkingEndTime = System.currentTimeMillis()
-                                Timber.i("🧠 Exiting thinking mode")
-                            }
-                        } else {
-                            // Still in thinking mode
-                            val thinkingRange = fullResponse.indexOf("<think>") + 7
-                            if (thinkingRange < fullResponse.length) {
-                                thinkingContent = fullResponse.substring(thinkingRange)
-                            }
+                        // Partial buffer — capture the in-progress thinking
+                        // tail (no closing tag yet). `ThinkingContentParser
+                        // .extract` only returns content for closed blocks,
+                        // so we slice the unterminated open tag here.
+                        val openIdx = fullResponse.indexOf(ThinkingContentParser.OPEN_TAG)
+                        if (openIdx >= 0) {
+                            thinkingContent =
+                                fullResponse.substring(openIdx + ThinkingContentParser.OPEN_TAG.length)
                         }
+                        responseContent = ""
                     } else {
-                        // Not in thinking mode, show response tokens directly
-                        responseContent =
-                            fullResponse
-                                .replace("<think>", "")
-                                .replace("</think>", "")
-                                .trim()
+                        val extracted = ThinkingContentParser.extract(fullResponse)
+                        responseContent = extracted.text
+                        extracted.thinking?.let { thinkingContent = it }
                     }
 
                     // Update the assistant message
@@ -531,17 +521,16 @@ class ChatViewModel(
 
         val endTime = System.currentTimeMillis()
 
-        // Handle edge case: Stream ended while still in thinking mode
-        if (isInThinkingMode && !fullResponse.contains("</think>")) {
+        // Handle edge case: stream ended while still inside an unterminated
+        // `<think>` block. Delegate to the shared parser to drop the
+        // unclosed open tag, then carve out the captured thinking tail.
+        if (isInThinkingMode) {
             Timber.w("⚠️ Stream ended while in thinking mode")
             wasInterrupted = true
 
             if (thinkingContent.isNotEmpty()) {
-                val remainingContent =
-                    fullResponse
-                        .replace("<think>", "")
-                        .replace(thinkingContent, "")
-                        .trim()
+                val stripped = ThinkingContentParser.strip(fullResponse)
+                val remainingContent = stripped.replace(thinkingContent, "").trim()
 
                 val intelligentResponse =
                     if (remainingContent.isEmpty()) {
@@ -782,7 +771,7 @@ class ChatViewModel(
      */
     private fun createCurrentModelInfo(): MessageModelInfo? {
         val modelName = _uiState.value.loadedModelName ?: return null
-        // Round 1 (G-A8): currentLLMModelId removed. Reuse loadedModelName as
+        // currentLLMModelId removed. Reuse loadedModelName as
         // the modelId fallback; the proper resolved id is captured in
         // [refreshLoraState] / [checkModelStatus] via currentLLMModel().
         return MessageModelInfo(
@@ -937,7 +926,7 @@ class ChatViewModel(
                         Timber.i("✅ Chat model loaded successfully: ${chatModel.name}")
                     } catch (e: Throwable) {
                         // Cold-start best-effort load — DO NOT propagate to UI as
-                        // an error dialog (B-AK-1-002). Just log and let the user
+                        // an error dialog. Just log and let the user
                         // pick a model from the sheet.
                         Timber.w(e, "Cold-start auto-load skipped (${e.message})")
                         _uiState.value =
@@ -965,7 +954,7 @@ class ChatViewModel(
                 Timber.i("❌ SDK not ready")
             }
         } catch (e: Throwable) {
-            // Outer try also degrades silently on cold start (B-AK-1-002).
+            // Outer try also degrades silently on cold start.
             Timber.w(e, "checkModelStatus skipped: ${e.message}")
             _uiState.value =
                 _uiState.value.copy(

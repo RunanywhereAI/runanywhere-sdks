@@ -2,8 +2,6 @@
  * @file rac_primitive.h
  * @brief Canonical enumeration of runtime primitives exposed by engine plugins.
  *
- * GAP 02 Phase 7 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * Every engine plugin (llama.cpp, ONNX Runtime, whispercpp, WhisperKit CoreML,
  * MetalRT, …) declares which of these primitives it serves via the new unified
  * `rac_engine_vtable_t`. The pipeline runtime keys off this enum to dispatch
@@ -66,12 +64,12 @@ typedef enum rac_primitive {
 const char* rac_primitive_name(rac_primitive_t p);
 
 /* ===========================================================================
- * GAP 04: Runtime identifier (which compute target an engine uses)
+ * Runtime identifier (which compute target an engine uses)
  *
  * Distinct from rac_primitive_t (which models WHAT the engine does) and from
  * idl/model_types.proto::ModelFormat (which models the file format). Plugins
- * declare which runtimes they can serve via the `runtimes[]` metadata field
- * (added in GAP 04 Phase 11). The router scores plugins higher when the
+ * declare which runtimes they can serve via the `runtimes[]` metadata field.
+ * The router scores plugins higher when the
  * caller's `preferred_runtime` matches one of the plugin's declared runtimes.
  *
  * Order is wire-stable. Add new runtimes in the reserved range only and bump

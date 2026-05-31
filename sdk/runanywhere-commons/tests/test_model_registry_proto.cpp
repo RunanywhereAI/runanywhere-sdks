@@ -481,6 +481,40 @@ int test_update_preserves_proto_only_fields() {
     return 0;
 }
 
+// commons-053 regression: re-registering a model with a minimal payload must
+// merge into (not replace) the existing snapshot. Down-stream services depend
+// on checksum_sha256 (download verification), preferred_framework (engine
+// routing) and routing_policy (compatibility filter) surviving the catalog
+// re-seed call apps perform on startup.
+int test_register_proto_preserves_proto_only_fields_on_resave() {
+    rac_model_registry_handle_t registry = create_registry();
+    ASSERT_TRUE(registry != nullptr);
+
+    runanywhere::v1::ModelInfo original =
+        build_full_model_proto("llama.test", "Original", "/models/llama.test");
+    ASSERT_TRUE(register_model_proto(registry, original));
+
+    // Catalog re-seed: same id, minimal fields, no checksum/routing/preferred.
+    runanywhere::v1::ModelInfo reseed = build_minimal_update_proto("llama.test", "Reseed");
+    ASSERT_TRUE(register_model_proto(registry, reseed));
+
+    runanywhere::v1::ModelInfo decoded;
+    ASSERT_TRUE(get_model_proto(registry, "llama.test", &decoded));
+    ASSERT_EQ(decoded.name(), "Reseed");
+    ASSERT_TRUE(decoded.has_checksum_sha256());
+    ASSERT_EQ(decoded.checksum_sha256(), "sha256:root");
+    ASSERT_TRUE(decoded.has_preferred_framework());
+    ASSERT_EQ(decoded.preferred_framework(), runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    ASSERT_TRUE(decoded.has_routing_policy());
+    ASSERT_EQ(decoded.routing_policy(), runanywhere::v1::ROUTING_POLICY_PREFER_LOCAL);
+    ASSERT_EQ(decoded.acceleration_preference(), runanywhere::v1::ACCELERATION_PREFERENCE_GPU);
+    ASSERT_TRUE(decoded.has_compatibility());
+    ASSERT_EQ(decoded.compatibility().compatible_frameworks_size(), 1);
+
+    rac_model_registry_destroy(registry);
+    return 0;
+}
+
 int test_query_filters_and_downloaded_list_proto() {
     rac_model_registry_handle_t registry = create_registry();
     ASSERT_TRUE(registry != nullptr);
@@ -864,6 +898,7 @@ int main() {
         RUN(test_full_field_round_trip_proto);
         RUN(test_expanded_proto_fields_survive_struct_state_updates);
         RUN(test_update_preserves_proto_only_fields);
+        RUN(test_register_proto_preserves_proto_only_fields_on_resave);
         RUN(test_query_filters_and_downloaded_list_proto);
         RUN(test_query_source_filter_and_sorting_proto);
         RUN(test_remove_proto);

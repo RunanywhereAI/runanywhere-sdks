@@ -17,8 +17,20 @@ import 'package:runanywhere/native/types/basic_types.dart';
 /// Opaque handle wrapper — capability code never sees the underlying
 /// `Pointer`. The bridge dereferences this back into a native
 /// `RacHandle` for every C call.
+///
+/// A [Finalizer] is attached on construction so that if the Dart owner is
+/// garbage-collected without an explicit [DartBridgeSolutions.destroy] call
+/// the C handle is still released. The finalizer is best-effort: Dart GC is
+/// non-deterministic, so explicit [DartBridgeSolutions.destroy] is preferred.
 class SolutionNativeHandle {
-  SolutionNativeHandle._(this._handle);
+  SolutionNativeHandle._(this._handle) {
+    if (_handle != null) {
+      _finalizer.attach(this, _handle!, detach: this);
+    }
+  }
+
+  static final _finalizer = Finalizer<RacHandle>(NativeFunctions.solutionDestroy);
+
   RacHandle? _handle;
   bool get isAlive => _handle != null;
 }
@@ -111,6 +123,7 @@ class DartBridgeSolutions {
   static void destroy(SolutionNativeHandle handle) {
     final h = handle._handle;
     if (h == null) return;
+    SolutionNativeHandle._finalizer.detach(handle);
     handle._handle = null;
     try {
       NativeFunctions.solutionDestroy(h);

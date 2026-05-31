@@ -2,7 +2,7 @@
  * @file rac_llm_thinking.h
  * @brief C ABI for splitting `<think>...</think>` content from LLM output.
  *
- * v2 close-out Phase 5 — moves the Swift `ThinkingContentParser` block out
+ * Moves the Swift `ThinkingContentParser` block out
  * of every frontend (currently duplicated in Swift, with stubs queued for
  * Kotlin / Dart / RN / Web). The behavior must be byte-for-byte identical
  * across SDKs so streaming UIs that distinguish thinking vs answer

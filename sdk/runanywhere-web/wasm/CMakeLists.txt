@@ -80,8 +80,8 @@ set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
 # NOTE: Each WASM target picks which static archives it links from the unified
 # set of backend libraries below. We always build llama.cpp + ONNX archives
 # whenever ANY backend WASM target is requested, so the same RACommons tree
-# can satisfy multiple per-package binaries in one configure step (option (a)
-# from plan P4 — keeps things simple, dead-strip handles unused engines).
+# can satisfy multiple per-package binaries in one configure step — keeps
+# things simple, dead-strip handles unused engines.
 if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX OR RAC_WASM_BUILD_CORE)
     set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
 else()
@@ -251,19 +251,17 @@ if(RAC_WASM_ONNX AND NOT TARGET rac_backend_onnx)
         "Configure the root build with ONNX enabled. "
         "Note: under Emscripten, engines/onnx requires the vendored static archive at "
         "sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a. "
-        "See CPP-13 / WEB-01 and thoughts/shared/plans/wasm_onnx_unblock.md."
     )
 endif()
 # Sherpa backend provides STT/TTS/VAD under the ONNX umbrella on WASM.
 # It's optional: the build continues when the vendored Sherpa archives
 # aren't present, but STT/TTS/VAD routing will return BackendNotAvailable
-# at runtime. See CPP-13 / WEB-01.
+# at runtime.
 if(RAC_WASM_ONNX AND NOT TARGET rac_backend_sherpa)
     message(STATUS
         "RAC_WASM_ONNX=ON: rac_backend_sherpa not available (no vendored "
         "sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/ archives). "
         "STT/TTS/VAD calls will return BackendNotAvailable. "
-        "See CPP-13 / WEB-01 and thoughts/shared/plans/wasm_onnx_unblock.md."
     )
 endif()
 
@@ -318,7 +316,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_proto_buffer_copy_to_raw"
     "_rac_proto_buffer_free_data"
 
-    # HTTP client / download (T3.13 — Web SDK migration off hand-rolled
+    # HTTP client / download (Web SDK migration off hand-rolled
     # fetch() onto the commons libcurl-backed C ABI). See
     # sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
     # and rac_http_download.h. TypeScript wrapper lives at
@@ -333,7 +331,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_http_response_free"
     "_rac_http_download_execute"
 
-    # Platform HTTP transport registry (v2 close-out Phase H2 / H7). The
+    # Platform HTTP transport registry. The
     # WASM shim in rac_http_client_emscripten.cpp registers an
     # emscripten_fetch()-backed adapter via this vtable so the router in
     # rac_http_client_curl.cpp short-circuits to it. TypeScript side calls
@@ -341,7 +339,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_http_transport_register"
     "_rac_http_transport_is_registered"
     "_rac_http_transport_register_emscripten"
-    # Stage 3d: JS-side adapter registration. JS provides function-table
+    # JS-side adapter registration. JS provides function-table
     # indices (from Module.addFunction) that implement the transport
     # vtable directly in JS. See FetchHttpTransport.ts.
     "_rac_http_transport_register_from_js"
@@ -384,6 +382,11 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_offsetof_proto_buffer_status"
     "_rac_wasm_offsetof_proto_buffer_error_message"
 
+    # Canonical rac_result_t -> SDKError proto mapping. Lets
+    # SDKException route error construction through the shared commons helper
+    # rac_result_to_proto_error instead of the local TypeScript category table.
+    "_rac_wasm_result_to_proto_error"
+
     # Module registry
     "_rac_module_register"
     "_rac_module_unregister"
@@ -400,7 +403,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_registry_free_plugin_list"
 
     # Service registry
-    # v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_*
+    # Legacy rac_service_* exports DELETED. Use rac_plugin_*
     # from rac/plugin/rac_plugin_entry.h and rac/router/rac_route.h.
 
     # Events
@@ -451,6 +454,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_refresh_proto"
     "_rac_model_registry_proto_free"
     "_rac_model_info_is_downloaded"
+    # Derive parameterCountB + isSmallModel from
+    # RAModelInfo proto so the web example can drop its inlined heuristics.
+    "_rac_model_info_is_small_model_proto"
+    "_rac_model_info_parameter_count_b_proto"
     "_rac_model_info_alloc"
     "_rac_model_info_free"
     "_rac_model_info_array_free"
@@ -544,6 +551,8 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_tool_call_format_name"
     "_rac_tool_call_detect_format"
     "_rac_tool_call_format_from_name"
+    # Derive tool-call format from RAModelInfo proto.
+    "_rac_tool_call_format_from_model_info_proto"
     "_rac_tool_call_format_prompt"
     "_rac_tool_call_format_prompt_with_format"
     "_rac_tool_call_format_prompt_json"
@@ -556,13 +565,13 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_tool_call_definitions_to_json"
     "_rac_tool_call_result_to_json"
     "_rac_tool_calling_run_loop_proto"
-    # pass2-syn-026: Session-based orchestration so the Web SDK can delegate
+    # Session-based orchestration so the Web SDK can delegate
     # the tool-calling run loop to commons even when TS executors are async
     # (the run-loop-proto callback is synchronous and cannot await a JS Promise).
     "_rac_tool_calling_session_create_proto"
     "_rac_tool_calling_session_step_with_result_proto"
     "_rac_tool_calling_session_destroy_proto"
-    # pass2-syn-007: cancel ABI so AbortSignal-driven Web hosts can interrupt
+    # Cancel ABI so AbortSignal-driven Web hosts can interrupt
     # the in-flight tool-calling session generate from JS.
     "_rac_tool_calling_session_cancel_proto"
     "_rac_tool_calling_run_loop_with_handle_proto"
@@ -637,7 +646,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vad_destroy"
 
     # VAD component
-    # pass2-syn-002: rac_vad_{start,stop,reset} bare-service decls deleted;
+    # rac_vad_{start,stop,reset} bare-service decls deleted;
     # use rac_vad_component_{start,stop,reset} / *_lifecycle_proto.
     "_rac_vad_component_create"
     "_rac_vad_component_configure"
@@ -693,18 +702,20 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_voice_agent_detect_speech"
     "_rac_voice_agent_result_free"
 
-    # Voice Agent — proto-byte streaming ABI (GAP 09 Phase 15 / v3 Phase A4)
+    # Voice Agent — proto-byte streaming ABI
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/
     # VoiceAgentStreamAdapter.ts, which calls it through
     # m._rac_voice_agent_set_proto_callback(handle, cbPtr, 0). Pair with
     # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
     # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
     "_rac_voice_agent_set_proto_callback"
+    # Caller-side shutdown helper.
+    "_rac_voice_agent_proto_quiesce"
     "_rac_voice_agent_initialize_proto"
     "_rac_voice_agent_component_states_proto"
     "_rac_voice_agent_process_voice_turn_proto"
 
-    # Solutions runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8.
+    # Solutions runtime (rac/solutions/rac_solution.h).
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/
     # SolutionAdapter.ts (proto-byte / YAML driven L5 pipeline runtime).
     # `rac_solution_create_from_proto` consumes a serialized
@@ -834,7 +845,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # RAG generated-proto pipeline exports are appended conditionally on
     # RAC_BACKEND_RAG below — they are commons-local symbols (the RAG OBJECT
     # library folds into rac_commons). When RAC_BACKEND_RAG=ON these exports
-    # ride along with both the llamacpp target (CLUSTER-05 / WEB-RAG-001) and
+    # ride along with both the llamacpp target and
     # the ONNX-sherpa target; the runtime layer surfaces
     # RAC_ERROR_FEATURE_NOT_AVAILABLE if no embeddings provider is registered.
     # See sdk/runanywhere-commons/CMakeLists.txt's RAC_WASM_RAG_STANDALONE
@@ -909,7 +920,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_sizeof_platform_adapter"
     # Per-field offsetof helpers for rac_platform_adapter_t — required so the
     # TS PlatformAdapter never hard-codes PTR_SIZE or sequential offsets.
-    # BUG-WEB-003 (resolved): These MUST ship in BOTH CPU and WebGPU variants.
+    # These MUST ship in BOTH CPU and WebGPU variants.
     # The pre-9226feb2c WebGPU artifact predated these helpers, which caused
     # PlatformAdapter.register() to throw and LlamaCppBridge.ts to silently
     # fall back to CPU. Always rebuild `racommons-llamacpp-webgpu.{js,wasm}`
@@ -1324,7 +1335,7 @@ if(RAC_WASM_LLAMACPP)
     set(_llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
     list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_LLAMACPP})
 
-    # CLUSTER-05 / WEB-RAG-001: when RAG is enabled on the llamacpp WASM target
+    # When RAG is enabled on the llamacpp WASM target
     # (e.g. via build.sh --rag for the auto-loaded Docs/RAG bundle), append the
     # rac_rag_*_proto exports so the TS proto-byte bridge can reach the symbols.
     # The RAG OBJECT library has already been folded into librac_commons by
@@ -1380,8 +1391,7 @@ if(RAC_WASM_ONNX)
 
     # RAG proto-byte exports: the ONNX target also ships RAG so the same
     # bundle can serve embeddings via the ONNX provider. (The llamacpp target
-    # above receives the same exports when RAC_BACKEND_RAG=ON — see
-    # CLUSTER-05 / WEB-RAG-001.)
+    # above receives the same exports when RAC_BACKEND_RAG=ON.)
     if(RAC_BACKEND_RAG)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
     endif()

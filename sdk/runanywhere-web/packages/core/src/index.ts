@@ -42,8 +42,27 @@ export type {
   PluginInfo,
   PluginLoaderCapability,
 } from './Public/Extensions/RunAnywhere+PluginLoader';
-export type { RAGDocumentSummary } from './Public/Extensions/RunAnywhere+RAG';
+export type {
+  RAGAvailability,
+  RAGDocumentSummary,
+  RAGEnsureReadyOptions,
+} from './Public/Extensions/RunAnywhere+RAG';
+export type {
+  EmbeddingsOptions,
+  EmbeddingsRequest,
+  EmbeddingsResult,
+} from './Public/Extensions/RunAnywhere+Embeddings';
+export type {
+  RegisterModelFile,
+  RegisterModelOptions,
+  RegisterMultiFileOptions,
+} from './Public/Extensions/RunAnywhere+Storage';
+export type {
+  BackendModalitySupport,
+  OnnxBackendStatus,
+} from './Public/Extensions/Backends/onnxStatus';
 export { LogLevel } from './Public/Extensions/RunAnywhere+Logging';
+export type { LoggingConfiguration, LogDestination } from './Public/Extensions/RunAnywhere+Logging';
 export type {
   HardwareProfile,
   HardwareProfileResult,
@@ -58,6 +77,7 @@ export type {
 export { setStreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
 export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
 
+// SDKErrorCode is a @deprecated compat shim; prefer ProtoErrorCode from '@runanywhere/proto-ts/errors'.
 export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
 export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException';
 export {
@@ -84,3 +104,6 @@ export {
 export { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 
 export * from './types/index';
+
+// Helpers — pure-JS proxies for commons utilities.
+export { formatFramework } from './Public/Helpers/formatFramework';

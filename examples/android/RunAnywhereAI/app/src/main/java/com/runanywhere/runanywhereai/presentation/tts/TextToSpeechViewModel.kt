@@ -8,9 +8,6 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.SDKComponent
 import android.app.Application
-import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioTrack
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.lifecycle.AndroidViewModel
@@ -22,6 +19,8 @@ import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.extensions.speak
+import com.runanywhere.sdk.public.extensions.stopSpeaking
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
@@ -29,7 +28,6 @@ import com.runanywhere.sdk.public.types.RATTSOptions
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,8 +36,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -138,7 +134,7 @@ data class TTSUiState(
  * This ViewModel manages:
  * - Voice/model selection and loading via RunAnywhere SDK
  * - Speech generation from text via RunAnywhere.synthesize()
- * - Audio playback controls with AudioTrack
+ * - Audio playback via RunAnywhere.speak()
  * - Voice settings (speed, pitch)
  *
  * Architecture matches iOS:
@@ -152,12 +148,13 @@ class TextToSpeechViewModel(
     private val _uiState = MutableStateFlow(TTSUiState())
     val uiState: StateFlow<TTSUiState> = _uiState.asStateFlow()
 
-    // Audio playback
-    private var audioTrack: AudioTrack? = null
-    private var generatedAudioData: ByteArray? = null
+    // Playback driver — `RunAnywhere.speak()` owns synthesis + audio output,
+    // so we only need to track the in-flight job for cancellation. The SDK
+    // handles raw-audio decoding, sample-rate conversion, output device
+    // lifecycle, and playback progress (mirrors iOS TTSViewModel).
     private var playbackJob: Job? = null
 
-    // System TTS playback
+    // System TTS playback (Android-only — no cross-platform SDK affordance).
     private var systemTts: TextToSpeech? = null
     private var systemTtsInit: CompletableDeferred<Boolean>? = null
 
@@ -229,7 +226,7 @@ class TextToSpeechViewModel(
     private suspend fun updateTTSState() {
         val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_TTS)
         val isLoaded =
-            snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+            snapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                 snapshot.model_id.isNotEmpty()
         val voiceId =
             RunAnywhere
@@ -363,7 +360,7 @@ class TextToSpeechViewModel(
             val isSystem = _uiState.value.isSystemTTS
             val ttsSnapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_TTS)
             val isTtsLoaded =
-                ttsSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                ttsSnapshot?.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     ttsSnapshot.model_id.isNotEmpty()
             if (!isSystem && !isTtsLoaded) {
                 _uiState.update {
@@ -410,56 +407,37 @@ class TextToSpeechViewModel(
                         )
                     }
                 } else {
-                    // Use RunAnywhere.synthesize() via SDK extension function
+                    // Synthesise via the SDK to capture metrics (duration / size /
+                    // sample rate) for the Audio Info panel. Playback is a
+                    // separate action driven by `RunAnywhere.speak()` (see
+                    // startPlayback) so we do not retain the raw audio bytes
+                    // here.
                     val result =
                         withContext(Dispatchers.IO) {
                             RunAnywhere.synthesize(text, options)
                         }
 
                     val processingTime = System.currentTimeMillis() - startTime
+                    val audioBytes = result.audio_data.toByteArray()
+                    val protoSampleRate =
+                        result.sample_rate.takeIf { it > 0 }
+                            ?: options.sample_rate.takeIf { it > 0 }
+                            ?: 22050
+                    Timber.i(
+                        "✅ Speech generation complete: ${audioBytes.size} bytes, " +
+                            "sample_rate=$protoSampleRate Hz, duration=${(result.duration_ms / 1000.0)}s",
+                    )
 
-                    if (result.audio_data.toByteArray().isEmpty()) {
-                        Timber.i("TTS synthesis returned empty audio")
-                        _uiState.update {
-                            it.copy(
-                                isGenerating = false,
-                                isSpeaking = false,
-                                audioDuration = (result.duration_ms / 1000.0),
-                                audioSize = null,
-                                sampleRate = null,
-                                processingTimeMs = processingTime,
-                            )
-                        }
-                    } else {
-                        // ONNX/Piper TTS returns RAW FLOAT32 PCM (not WAV). The
-                        // proto's `sample_rate` field is the source of truth —
-                        // Piper VITS reports 22050 Hz; the WhisperKit/sherpa
-                        // backends may differ. iOS reads `output.sampleRate`
-                        // and feeds it into `rac_audio_float32_to_wav` (see
-                        // sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/RunAnywhere+TTS.swift#speak).
-                        val audioBytes = result.audio_data.toByteArray()
-                        val protoSampleRate =
-                            result.sample_rate.takeIf { it > 0 }
-                                ?: options.sample_rate.takeIf { it > 0 }
-                                ?: 22050
-                        Timber.i(
-                            "✅ Speech generation complete: ${audioBytes.size} bytes (float32 PCM), " +
-                                "sample_rate=$protoSampleRate Hz, duration=${(result.duration_ms / 1000.0)}s",
+                    _uiState.update {
+                        it.copy(
+                            isGenerating = false,
+                            isSpeaking = false,
+                            hasGeneratedAudio = audioBytes.isNotEmpty(),
+                            audioDuration = (result.duration_ms / 1000.0),
+                            audioSize = audioBytes.size.takeIf { it > 0 },
+                            sampleRate = protoSampleRate.takeIf { audioBytes.isNotEmpty() },
+                            processingTimeMs = processingTime,
                         )
-
-                        generatedAudioData = audioBytes
-
-                        _uiState.update {
-                            it.copy(
-                                isGenerating = false,
-                                isSpeaking = false,
-                                hasGeneratedAudio = true,
-                                audioDuration = (result.duration_ms / 1000.0),
-                                audioSize = audioBytes.size,
-                                sampleRate = protoSampleRate,
-                                processingTimeMs = processingTime,
-                            )
-                        }
                     }
                 }
             } catch (e: Exception) {
@@ -476,8 +454,9 @@ class TextToSpeechViewModel(
     }
 
     /**
-     * Toggle audio playback
-     * iOS Reference: togglePlayback() in TTSViewModel
+     * Toggle audio playback. Delegates to `RunAnywhere.speak()` for the
+     * synthesise + play pipeline; iOS routes the same way through
+     * `RunAnywhere.speak()` in TTSViewModel.
      */
     fun togglePlayback() {
         if (_uiState.value.isPlaying) {
@@ -488,180 +467,57 @@ class TextToSpeechViewModel(
     }
 
     /**
-     * Start audio playback using AudioTrack
-     * iOS Reference: startPlayback() using AVAudioPlayer
+     * Start audio playback via the SDK. `RunAnywhere.speak()` owns
+     * synthesis, encoded-PCM conversion, audio-output wiring, and
+     * lifecycle teardown — the example just kicks the call off and
+     * surfaces errors.
      */
     private fun startPlayback() {
-        val audioData = generatedAudioData
-        if (audioData == null || audioData.isEmpty()) {
-            Timber.w("No audio data to play")
+        val text = _uiState.value.inputText
+        if (text.isEmpty()) {
+            Timber.w("No text to play")
             return
         }
 
-        Timber.i("Starting playback of ${audioData.size} bytes")
-        _uiState.update { it.copy(isPlaying = true) }
+        Timber.i("Starting SDK playback for ${text.length}-char text")
+        _uiState.update { it.copy(isPlaying = true, errorMessage = null) }
 
         playbackJob =
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch {
                 try {
-                    // Detect whether `audioData` is a complete WAV file or raw
-                    // PCM. The SDK's `RunAnywhere.synthesize()` returns RAW
-                    // FLOAT32 PCM (no header) — iOS converts that via
-                    // `rac_audio_float32_to_wav` before handing it to
-                    // AVAudioPlayer. We do the equivalent here: detect WAV
-                    // (legacy), else assume Float32 PCM at the proto-reported
-                    // sample rate, then convert to Int16 PCM for AudioTrack.
-                    val isWav =
-                        audioData.size > 44 &&
-                            audioData[0] == 'R'.code.toByte() &&
-                            audioData[1] == 'I'.code.toByte() &&
-                            audioData[2] == 'F'.code.toByte() &&
-                            audioData[3] == 'F'.code.toByte()
-
-                    val sampleRate: Int
-                    val pcmData: ByteArray
-
-                    if (isWav) {
-                        // WAV header: bytes 24-27 = sample rate (little-endian uint32)
-                        sampleRate = (audioData[24].toInt() and 0xFF) or
-                            ((audioData[25].toInt() and 0xFF) shl 8) or
-                            ((audioData[26].toInt() and 0xFF) shl 16) or
-                            ((audioData[27].toInt() and 0xFF) shl 24)
-
-                        // Scan for the "data" chunk — WAV files can have extra
-                        // chunks (LIST, fact, bext, …) before the PCM payload.
-                        var offset = 12 // skip RIFF header (12 bytes)
-                        var dataStart = -1
-                        while (offset + 8 <= audioData.size) {
-                            val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
-                            val chunkSize =
-                                (audioData[offset + 4].toInt() and 0xFF) or
-                                    ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
-                                    ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
-                                    ((audioData[offset + 7].toInt() and 0xFF) shl 24)
-                            if (chunkId == "data") {
-                                dataStart = offset + 8
-                                break
-                            }
-                            offset += 8 + chunkSize
-                        }
-                        val pcmOffset = if (dataStart > 0) dataStart else 44
-                        pcmData = audioData.copyOfRange(pcmOffset, audioData.size)
-                        Timber.i("WAV header: sampleRate=$sampleRate, pcmOffset=$pcmOffset")
-                    } else {
-                        // Raw Float32 PCM straight from the SDK. The proto's
-                        // `sample_rate` (captured into uiState during synthesis)
-                        // is REQUIRED here — Piper VITS = 22050 Hz, sherpa
-                        // English voices may report different rates.
-                        sampleRate = _uiState.value.sampleRate ?: 22050
-                        pcmData = float32PcmToInt16Pcm(audioData)
-                        Timber.i(
-                            "Raw PCM: sampleRate=$sampleRate Hz, " +
-                                "float32 bytes=${audioData.size}, int16 bytes=${pcmData.size}",
+                    val options =
+                        RATTSOptions(
+                            voice = _uiState.value.selectedModelId ?: "",
+                            language_code = "en-US",
+                            speaking_rate = _uiState.value.speed,
+                            pitch = _uiState.value.pitch,
+                            volume = 1.0f,
                         )
-                    }
-
-                    val channelConfig = AudioFormat.CHANNEL_OUT_MONO
-                    val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-
-                    val bufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-
-                    audioTrack =
-                        AudioTrack
-                            .Builder()
-                            .setAudioAttributes(
-                                AudioAttributes
-                                    .Builder()
-                                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                    .build(),
-                            ).setAudioFormat(
-                                AudioFormat
-                                    .Builder()
-                                    .setEncoding(audioFormat)
-                                    .setSampleRate(sampleRate)
-                                    .setChannelMask(channelConfig)
-                                    .build(),
-                            ).setBufferSizeInBytes(bufferSize.coerceAtLeast(pcmData.size))
-                            .setTransferMode(AudioTrack.MODE_STATIC)
-                            .build()
-
-                    audioTrack?.write(pcmData, 0, pcmData.size)
-                    audioTrack?.play()
-
-                    // Track playback progress (matches iOS timer pattern)
-                    val duration = _uiState.value.audioDuration ?: (pcmData.size.toDouble() / (sampleRate * 2))
-                    var currentTime = 0.0
-
-                    while (_uiState.value.isPlaying && audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
-                        delay(100)
-                        currentTime += 0.1
-
-                        // Check if we've reached the end of audio
-                        if (currentTime >= duration) {
-                            break
+                    val result =
+                        withContext(Dispatchers.IO) {
+                            RunAnywhere.speak(text, options)
                         }
-
-                        withContext(Dispatchers.Main) {
-                            _uiState.update {
-                                it.copy(
-                                    currentTime = currentTime,
-                                    playbackProgress = (currentTime / duration).coerceIn(0.0, 1.0),
-                                )
-                            }
-                        }
-                    }
-
-                    // Playback finished - stop and reset state
-                    withContext(Dispatchers.Main) {
-                        stopPlayback()
-                    }
+                    Timber.i("Speech playback complete: duration=${result.duration_ms}ms")
                 } catch (e: Exception) {
-                    Timber.e(e, "Playback error: ${e.message}")
-                    withContext(Dispatchers.Main) {
-                        _uiState.update {
-                            it.copy(
-                                isPlaying = false,
-                                errorMessage = "Playback failed: ${e.message}",
-                            )
-                        }
+                    Timber.e(e, "Playback failed: ${e.message}")
+                    _uiState.update {
+                        it.copy(errorMessage = "Playback failed: ${e.message}")
                     }
+                } finally {
+                    _uiState.update { it.copy(isPlaying = false) }
+                    playbackJob = null
                 }
             }
     }
 
     /**
-     * Convert raw Float32 PCM bytes (little-endian, range [-1.0, 1.0]) to
-     * Int16 PCM bytes (little-endian) for AudioTrack `ENCODING_PCM_16BIT`.
-     *
-     * Mirrors the Float32→Int16 conversion done by
-     * `rac_audio_float32_to_wav` in
-     * `sdk/runanywhere-commons/src/core/rac_audio_utils.cpp` — same scaling
-     * (× 32767), same clamp range, same little-endian output layout. iOS uses
-     * that C helper directly via `convertPCMToWAV()`; on Android we do the
-     * conversion in Kotlin so the example app does not depend on internal
-     * SDK bridge symbols.
-     */
-    private fun float32PcmToInt16Pcm(floatBytes: ByteArray): ByteArray {
-        if (floatBytes.isEmpty()) return ByteArray(0)
-        val sampleCount = floatBytes.size / 4
-        val inBuf = ByteBuffer.wrap(floatBytes).order(ByteOrder.LITTLE_ENDIAN)
-        val out = ByteArray(sampleCount * 2)
-        val outBuf = ByteBuffer.wrap(out).order(ByteOrder.LITTLE_ENDIAN)
-        for (i in 0 until sampleCount) {
-            val sample = inBuf.float
-            val scaled = (sample * 32767.0f).coerceIn(-32768.0f, 32767.0f)
-            outBuf.putShort(scaled.toInt().toShort())
-        }
-        return out
-    }
-
-    /**
-     * Stop audio playback
-     * iOS Reference: stopPlayback() using AVAudioPlayer
+     * Stop audio playback. Routes through the SDK so the same path that
+     * started playback also tears it down.
      */
     private fun stopPlayback() {
-        // Update state first to signal the playback loop to stop
+        playbackJob?.cancel()
+        playbackJob = null
+        viewModelScope.launch { RunAnywhere.stopSpeaking() }
         _uiState.update {
             it.copy(
                 isPlaying = false,
@@ -669,16 +525,6 @@ class TextToSpeechViewModel(
                 playbackProgress = 0.0,
             )
         }
-
-        // Cancel the playback job
-        playbackJob?.cancel()
-        playbackJob = null
-
-        // Stop and release AudioTrack
-        audioTrack?.stop()
-        audioTrack?.release()
-        audioTrack = null
-
         Timber.d("Playback stopped")
     }
 
@@ -697,7 +543,6 @@ class TextToSpeechViewModel(
         super.onCleared()
         Timber.i("ViewModel cleared, cleaning up resources")
         stopPlayback()
-        generatedAudioData = null
         systemTts?.shutdown()
         systemTts = null
         systemTtsInit = null

@@ -7,28 +7,6 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 20)
 
 # =============================================================================
-# nlohmann/json - Header-only JSON library for robust JSON parsing.
-# Used by JSON-based bridge helpers such as RAGBridge.
-#
-# Version is centralized in sdk/runanywhere-commons/VERSIONS::NLOHMANN_JSON_VERSION.
-# This RN package is consumed standalone from node_modules (no access to the
-# monorepo VERSIONS file at consumer build time), so we fall back to a literal
-# pinned value when the parent CMake didn't already supply it. Keep the
-# fallback in sync with the canonical VERSIONS file when bumping.
-# =============================================================================
-include(FetchContent)
-if(NOT DEFINED NLOHMANN_JSON_VERSION)
-    set(NLOHMANN_JSON_VERSION "3.11.3")
-endif()
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v${NLOHMANN_JSON_VERSION}
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(nlohmann_json)
-
-# =============================================================================
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
@@ -47,7 +25,7 @@ set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/include)
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_commons.so")
     message(FATAL_ERROR "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
-                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_commons SHARED IMPORTED)
@@ -58,9 +36,9 @@ set_target_properties(rac_commons PROPERTIES
 message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_commons.so")
 
 # =============================================================================
-# HTTP transport vtable: bundled librac_commons.so (post-Stage-5) always
-# exports rac_http_transport_register, so the OkHttp adapter is wired in
-# unconditionally. No auto-detect fallback — commons v0.2.0+ is required.
+# HTTP transport vtable: the OkHttp JNI adapter ships with librunanywhere_jni.so
+# (built from sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp).
+# RN loads that lib at runtime in RunAnywhereCorePackage; no fork compiled here.
 # =============================================================================
 set(RAC_HAS_HTTP_TRANSPORT ON)
 message(STATUS "[RunAnywhereCore] OkHttp HTTP transport adapter ENABLED (RAC_HAS_HTTP_TRANSPORT=1)")
@@ -74,12 +52,6 @@ file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
-    # OkHttp platform HTTP transport JNI bridge (v2 close-out Phase H6).
-    # Registers a rac_http_transport_ops vtable that routes HTTP through
-    # the duplicated Kotlin `com.runanywhere.sdk.foundation.http.OkHttpTransport`
-    # so Android consumers get the system CA store + HTTP/2 + proxies via OkHttp
-    # instead of libcurl. Copy of commons' src/jni/okhttp_transport_adapter.cpp.
-    src/main/cpp/okhttp_transport_adapter.cpp
     ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
     ${HYBRID_CORE_DOMAIN_SOURCES}
@@ -116,7 +88,6 @@ include_directories(
     # jniLibs/include so our copy wins where needed.
     "../cpp"
     "../cpp/bridges"
-    "../cpp/third_party"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from runanywhere-commons (flat access)
     "${RAC_INCLUDE_DIR}"
@@ -163,9 +134,6 @@ target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 # OkHttp adapter is always compiled in — commons v0.2.0+ is required and
 # the bundled librac_commons.so always exports rac_http_transport_register.
 target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_HAS_HTTP_TRANSPORT=1)
-
-# Link nlohmann_json for JSON-based bridge helpers
-target_link_libraries(${PACKAGE_NAME} nlohmann_json::nlohmann_json)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE

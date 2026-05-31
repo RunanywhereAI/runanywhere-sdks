@@ -1,10 +1,6 @@
 /**
  * @file rag_pipeline_graph.cpp
- * @brief GraphScheduler-driven implementation of the RAG query DAG.
- *
- * See rag_pipeline_graph.h for the high-level shape. This file owns the
- * node lambdas (embed/retrieve/assemble/llm) and the per-query
- * scheduler lifecycle.
+ * @brief Sequential implementation of the RAG query pipeline.
  */
 
 #include "rag_pipeline_graph.h"
@@ -13,9 +9,7 @@
 #include "vector_store_usearch.h"
 
 #include <algorithm>
-#include <atomic>
-#include <memory>
-#include <mutex>
+#include <exception>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -23,9 +17,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
-#include "rac/graph/graph_scheduler.hpp"
-#include "rac/graph/pipeline_node.hpp"
-#include "rac/graph/stream_edge.hpp"
 
 #define LOG_TAG "RAG.Graph"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -34,36 +25,6 @@
 namespace runanywhere::rag {
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// Edge payloads
-// ---------------------------------------------------------------------------
-
-struct EmbeddedQuery {
-    std::string text;
-    std::vector<float> embedding;
-};
-
-struct RetrievedChunks {
-    std::string query_text;
-    std::vector<SearchResult> results;
-};
-
-struct AssembledPrompt {
-    std::string prompt;
-    std::string context_used;
-    std::vector<SearchResult> sources;
-};
-
-// Shared state populated by the LLM sink and read after the graph joins.
-struct GraphSinkState {
-    std::mutex mu;
-    std::string accumulated_answer;
-    std::vector<SearchResult> sources;
-    std::string assembled_context;
-    rac_result_t status{RAC_SUCCESS};
-    std::atomic<bool> cancel_requested{false};
-};
 
 // ---------------------------------------------------------------------------
 // Reciprocal Rank Fusion — pulled verbatim from the previous RAGBackend
@@ -172,15 +133,27 @@ std::string build_context(const std::vector<SearchResult>& results, size_t max_c
 
 std::string format_prompt(const std::string& query, const std::string& context,
                           const std::string& tmpl) {
-    std::string prompt = tmpl;
-    for (size_t pos = prompt.find("{query}"); pos != std::string::npos;
-         pos = prompt.find("{query}", pos + query.size())) {
-        prompt.replace(pos, 7, query);
+    static constexpr const char* kQueryPlaceholder = "{query}";
+    static constexpr const char* kContextPlaceholder = "{context}";
+    static constexpr size_t kQueryPlaceholderSize = 7;
+    static constexpr size_t kContextPlaceholderSize = 9;
+
+    std::string prompt;
+    prompt.reserve(tmpl.size() + query.size() + context.size());
+
+    for (size_t pos = 0; pos < tmpl.size();) {
+        if (tmpl.compare(pos, kQueryPlaceholderSize, kQueryPlaceholder) == 0) {
+            prompt.append(query);
+            pos += kQueryPlaceholderSize;
+        } else if (tmpl.compare(pos, kContextPlaceholderSize, kContextPlaceholder) == 0) {
+            prompt.append(context);
+            pos += kContextPlaceholderSize;
+        } else {
+            prompt.push_back(tmpl[pos]);
+            ++pos;
+        }
     }
-    for (size_t pos = prompt.find("{context}"); pos != std::string::npos;
-         pos = prompt.find("{context}", pos + context.size())) {
-        prompt.replace(pos, 9, context);
-    }
+
     return prompt;
 }
 
@@ -189,7 +162,7 @@ std::string format_prompt(const std::string& query, const std::string& context,
 // ---------------------------------------------------------------------------
 
 struct LLMStreamCtx {
-    GraphSinkState* state;
+    std::string* accumulated_answer;
     const RAGTokenSink* on_token;
 };
 
@@ -199,15 +172,11 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
         return RAC_TRUE;
 
     const std::string s(token);
-    {
-        std::lock_guard<std::mutex> lock(ctx->state->mu);
-        ctx->state->accumulated_answer.append(s);
-    }
+    ctx->accumulated_answer->append(s);
 
     if (ctx->on_token && *ctx->on_token) {
         const bool keep_going = (*ctx->on_token)(s);
         if (!keep_going) {
-            ctx->state->cancel_requested.store(true, std::memory_order_release);
             return RAC_FALSE;
         }
     }
@@ -217,7 +186,7 @@ rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// run_rag_query — assemble a 4-node DAG, run it once, return the result.
+// run_rag_query — run embed → retrieve → assemble → LLM once, then return the result.
 // ---------------------------------------------------------------------------
 
 rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
@@ -229,19 +198,6 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         return RAC_ERROR_INVALID_STATE;
     }
 
-    auto state = std::make_shared<GraphSinkState>();
-    auto sink_callback = std::make_shared<RAGTokenSink>(std::move(on_token));
-
-    using rac::graph::GraphScheduler;
-    using rac::graph::make_primitive_node;
-    using rac::graph::OverflowPolicy;
-    using rac::graph::StreamEdge;
-
-    // Capture-by-value of all inputs needed by each node — `inputs` may
-    // reference stack memory that could be reused after we return, so
-    // copy the small fields. Pointers (vector_store, bm25_index, service
-    // handles) are borrowed for the call duration; the caller guarantees
-    // they outlive the scheduler join below.
     const std::string question = inputs.question;
     const rac_handle_t embeddings_handle = inputs.embeddings_service;
     const rac_handle_t llm_handle = inputs.llm_service;
@@ -258,145 +214,66 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         llm_options.system_prompt = sys_prompt.c_str();
     }
 
-    // -------------------- EmbedNode --------------------
-    auto embed_node = make_primitive_node<std::string, EmbeddedQuery>(
-        "RAG.Embed",
-        [embeddings_handle, embed_dim, state](std::string text, StreamEdge<EmbeddedQuery>& out) {
-            rac_embeddings_result_t result = {};
-            rac_result_t status =
-                rac_embeddings_embed(embeddings_handle, text.c_str(), nullptr, &result);
-            if (status != RAC_SUCCESS || result.num_embeddings == 0 || !result.embeddings) {
-                LOGE("EmbedNode: embed failed (%d)", status);
-                rac_embeddings_result_free(&result);
-                std::lock_guard<std::mutex> lock(state->mu);
-                if (state->status == RAC_SUCCESS) {
-                    state->status = (status != RAC_SUCCESS) ? status : RAC_ERROR_PROCESSING_FAILED;
-                }
-                return;
-            }
-
-            EmbeddedQuery payload;
-            payload.text = std::move(text);
-            payload.embedding.assign(result.embeddings[0].data,
-                                     result.embeddings[0].data + result.embeddings[0].dimension);
-            rac_embeddings_result_free(&result);
-
-            if (payload.embedding.size() != embed_dim) {
-                LOGE("EmbedNode: dim mismatch (%zu vs %zu)", payload.embedding.size(), embed_dim);
-                std::lock_guard<std::mutex> lock(state->mu);
-                if (state->status == RAC_SUCCESS) {
-                    state->status = RAC_ERROR_PROCESSING_FAILED;
-                }
-                return;
-            }
-            out.push(std::move(payload));
-        });
-
-    // -------------------- RetrieveNode --------------------
-    auto retrieve_node = make_primitive_node<EmbeddedQuery, RetrievedChunks>(
-        "RAG.Retrieve", [vstore, bm25, top_k, sim_thresh, state](EmbeddedQuery in,
-                                                                 StreamEdge<RetrievedChunks>& out) {
-            try {
-                auto dense = vstore->search(in.embedding, top_k, sim_thresh);
-                std::vector<std::pair<std::string, float>> bm25_results;
-                if (bm25)
-                    bm25_results = bm25->search(in.text, top_k);
-
-                RetrievedChunks payload;
-                payload.query_text = std::move(in.text);
-                payload.results = fuse_results(dense, bm25_results, vstore, top_k);
-                LOGI("RetrieveNode: %zu dense, %zu bm25, %zu fused", dense.size(),
-                     bm25_results.size(), payload.results.size());
-                out.push(std::move(payload));
-            } catch (const std::exception& e) {
-                LOGE("RetrieveNode: %s", e.what());
-                std::lock_guard<std::mutex> lock(state->mu);
-                if (state->status == RAC_SUCCESS) {
-                    state->status = RAC_ERROR_PROCESSING_FAILED;
-                }
-            }
-        });
-
-    // -------------------- ContextAssemblyNode --------------------
-    auto assemble_node = make_primitive_node<RetrievedChunks, AssembledPrompt>(
-        "RAG.Assemble",
-        [max_ctx_tokens, prompt_tmpl, state](RetrievedChunks in, StreamEdge<AssembledPrompt>& out) {
-            if (in.results.empty()) {
-                std::lock_guard<std::mutex> lock(state->mu);
-                state->accumulated_answer =
-                    "I don't have enough information to answer that question.";
-                // Leaving sources empty + status SUCCESS — caller treats this
-                // as a graceful no-context response, matching legacy semantics.
-                return;
-            }
-
-            AssembledPrompt payload;
-            payload.context_used = build_context(in.results, max_ctx_tokens);
-            payload.prompt = format_prompt(in.query_text, payload.context_used, prompt_tmpl);
-            payload.sources = std::move(in.results);
-            {
-                std::lock_guard<std::mutex> lock(state->mu);
-                state->sources = payload.sources;
-                state->assembled_context = payload.context_used;
-            }
-            LOGI("AssembleNode: built prompt, %zu chars context, %zu sources",
-                 payload.context_used.size(), payload.sources.size());
-            out.push(std::move(payload));
-        });
-
-    // -------------------- LLMNode --------------------
-    // We deliberately do NOT push tokens through the output edge here — the
-    // streaming callback fires on every token from inside generate_stream and
-    // accumulates into `state` directly. Pushing each token onto a typed edge
-    // would add an extra hop without any real consumer downstream.
-    auto llm_node = make_primitive_node<AssembledPrompt, std::string>(
-        "RAG.LLM", [llm_handle, llm_options, sink_callback,
-                    state](AssembledPrompt in, StreamEdge<std::string>& /*out*/) {
-            if (in.prompt.empty())
-                return;
-
-            LLMStreamCtx ctx{state.get(), sink_callback.get()};
-            rac_result_t status = rac_llm_generate_stream(
-                llm_handle, in.prompt.c_str(), &llm_options, llm_stream_trampoline, &ctx);
-            if (status != RAC_SUCCESS) {
-                LOGE("LLMNode: generate_stream failed (%d)", status);
-                std::lock_guard<std::mutex> lock(state->mu);
-                if (state->status == RAC_SUCCESS)
-                    state->status = status;
-            }
-        });
-
-    // -------------------- Wire + run --------------------
-    GraphScheduler scheduler(/*thread_pool_size=*/4);
-    scheduler.add_node(embed_node);
-    scheduler.add_node(retrieve_node);
-    scheduler.add_node(assemble_node);
-    scheduler.add_node(llm_node);
-
-    scheduler.connect(*embed_node, *retrieve_node);
-    scheduler.connect(*retrieve_node, *assemble_node);
-    scheduler.connect(*assemble_node, *llm_node);
-
-    scheduler.start();
-
-    {
-        auto in = embed_node->input();
-        in->push(question);
-        in->close();
+    rac_embeddings_result_t embedding_result = {};
+    rac_result_t status =
+        rac_embeddings_embed(embeddings_handle, question.c_str(), nullptr, &embedding_result);
+    if (status != RAC_SUCCESS || embedding_result.num_embeddings == 0 ||
+        !embedding_result.embeddings) {
+        LOGE("RAG embed failed (%d)", status);
+        rac_embeddings_result_free(&embedding_result);
+        out_result.status = (status != RAC_SUCCESS) ? status : RAC_ERROR_PROCESSING_FAILED;
+        return out_result.status;
     }
 
-    scheduler.wait();
+    std::vector<float> query_embedding(
+        embedding_result.embeddings[0].data,
+        embedding_result.embeddings[0].data + embedding_result.embeddings[0].dimension);
+    rac_embeddings_result_free(&embedding_result);
 
-    if (state->cancel_requested.load(std::memory_order_acquire)) {
-        scheduler.cancel_all();
+    if (query_embedding.size() != embed_dim) {
+        LOGE("RAG embed dim mismatch (%zu vs %zu)", query_embedding.size(), embed_dim);
+        out_result.status = RAC_ERROR_PROCESSING_FAILED;
+        return out_result.status;
     }
 
-    {
-        std::lock_guard<std::mutex> lock(state->mu);
-        out_result.answer = std::move(state->accumulated_answer);
-        out_result.assembled_context = std::move(state->assembled_context);
-        out_result.sources = std::move(state->sources);
-        out_result.status = state->status;
+    std::vector<SearchResult> results;
+    try {
+        auto dense_results = vstore->search(query_embedding, top_k, sim_thresh);
+        std::vector<std::pair<std::string, float>> bm25_results;
+        if (bm25) {
+            bm25_results = bm25->search(question, top_k);
+        }
+
+        results = fuse_results(dense_results, bm25_results, vstore, top_k);
+        LOGI("RAG retrieve: %zu dense, %zu bm25, %zu fused", dense_results.size(),
+             bm25_results.size(), results.size());
+    } catch (const std::exception& e) {
+        LOGE("RAG retrieve failed: %s", e.what());
+        out_result.status = RAC_ERROR_PROCESSING_FAILED;
+        return out_result.status;
+    }
+
+    if (results.empty()) {
+        out_result.answer = "I don't have enough information to answer that question.";
+        return RAC_SUCCESS;
+    }
+
+    out_result.assembled_context = build_context(results, max_ctx_tokens);
+    const std::string prompt = format_prompt(question, out_result.assembled_context, prompt_tmpl);
+    out_result.sources = std::move(results);
+
+    LOGI("RAG assemble: built prompt, %zu chars context, %zu sources",
+         out_result.assembled_context.size(), out_result.sources.size());
+
+    if (!prompt.empty()) {
+        LLMStreamCtx ctx{&out_result.answer, &on_token};
+        status = rac_llm_generate_stream(llm_handle, prompt.c_str(), &llm_options,
+                                         llm_stream_trampoline, &ctx);
+        if (status != RAC_SUCCESS) {
+            LOGE("RAG LLM generate_stream failed (%d)", status);
+            out_result.status = status;
+            return out_result.status;
+        }
     }
 
     return out_result.status;

@@ -2,8 +2,8 @@
  * @file rac_route.cpp
  * @brief Implementation of the C ABI route() wrapper.
  *
- * GAP 04 Phase 12. CPP-05: distinguish runtime-unavailable rejections from
- * generic "no plugin" rejections via `RAC_ERROR_RUNTIME_UNAVAILABLE`.
+ * Distinguishes runtime-unavailable rejections from generic "no plugin"
+ * rejections via `RAC_ERROR_RUNTIME_UNAVAILABLE`.
  */
 
 #include "rac/router/rac_route.h"
@@ -52,8 +52,8 @@ rac_result_t rac_plugin_route(rac_primitive_t primitive, uint32_t format,
     req.primitive = primitive;
     req.format = format;
     if (hints != nullptr) {
-        req.estimated_memory_bytes = hints->estimated_memory_bytes;
-        req.preferred_runtime = hints->preferred_runtime;
+        req.estimated_memory_bytes = static_cast<std::size_t>(hints->estimated_memory_bytes);
+        req.preferred_runtime = static_cast<rac_runtime_id_t>(hints->preferred_runtime);
         req.no_fallback = (hints->no_fallback != 0);
         if (hints->preferred_engine_name != nullptr) {
             req.pinned_engine = normalize_legacy_engine_pin(hints->preferred_engine_name);

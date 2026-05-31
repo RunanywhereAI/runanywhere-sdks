@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // test_voice_agent_pipeline_race.cpp — concurrent stress test for the
-// `commons-features-voice-003` fix.
+// pipeline_mutex fix.
 //
 // Background
 // ----------
@@ -14,8 +14,8 @@
 // external mutex synchronises them — which is exactly what
 // `rac_voice_agent::pipeline_mutex` provides.
 //
-// The W1 commit landed the fix but did not land a regression test. The
-// other W1 fixes (`engine_router` pinned-runtime, HTTP-200-on-resume,
+// The fix landed but did not land a regression test. The
+// other related fixes (`engine_router` pinned-runtime, HTTP-200-on-resume,
 // plugin double-load) all shipped with regression tests; this test
 // completes the matrix for `pipeline_mutex`.
 //
@@ -204,9 +204,8 @@ TEST(process_stream_vs_destroy_snapshot_race) {
         workers.emplace_back([&] {
             const std::vector<int16_t> buf(160, 0);  // 10ms silence @ 16kHz
             while (!stop.load(std::memory_order_acquire)) {
-                auto pipeline =
-                    std::make_shared<rac::voice_agent::VoiceAgentPipeline>(
-                        &agent, noop_callback, nullptr);
+                auto pipeline = std::make_shared<rac::voice_agent::VoiceAgentPipeline>(
+                    &agent, noop_callback, nullptr);
                 {
                     std::lock_guard<std::mutex> lock(agent.pipeline_mutex);
                     agent.pipeline = pipeline;

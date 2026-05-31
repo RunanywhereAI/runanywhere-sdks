@@ -21,9 +21,6 @@ sdk/runanywhere-web/packages/core/src/generated/**  linguist-generated=true -dif
 sdk/shared/proto-ts/src/**  linguist-generated=true -diff
 sdk/shared/proto-ts/dist/**  linguist-generated=true -diff
 
-# Python (future SDK; directory exists once generate_python.sh runs)
-sdk/runanywhere-python/src/runanywhere/generated/**  linguist-generated=true -diff
-
 # C++
 sdk/runanywhere-commons/src/generated/proto/**  linguist-generated=true -diff
 

@@ -22,7 +22,7 @@ import {
   type VADStatistics,
   type SpeechActivityEvent,
 } from '@runanywhere/proto-ts/vad_options';
-import { SDKException } from '../../Foundation/SDKException';
+import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
@@ -34,7 +34,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports';
 import { VADProtoAdapter, type ProtoEventHandler } from '../../Adapters/ModalityProtoAdapter';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   getSpeechProvider,
   hasSpeechProviderVAD,
@@ -112,7 +112,7 @@ function callCreate(module: VADComponentModule): number {
   const bridge = new ProtoWasmBridge(module, logger);
   const outPtr = bridge.allocOutPtr();
   if (!outPtr) {
-    throw SDKException.fromCode(-180, 'VAD.create: failed to allocate output handle slot');
+    throw SDKException.fromCode(SDKErrorCode.StorageError, 'VAD.create: failed to allocate output handle slot');
   }
   try {
     const rc = module._rac_vad_component_create(outPtr);
@@ -120,6 +120,7 @@ function callCreate(module: VADComponentModule): number {
       throw SDKException.fromRACResult(
         rc,
         `rac_vad_component_create failed with code ${rc}`,
+        { module, logger },
       );
     }
     const handle = bridge.readU32(outPtr);
@@ -152,7 +153,7 @@ function callLoadModel(
   const bridge = new ProtoWasmBridge(module, logger);
   const pathPtr = bridge.allocUtf8(modelPath);
   if (!pathPtr) {
-    throw SDKException.fromCode(-180, 'VAD.loadModel: failed to allocate model path');
+    throw SDKException.fromCode(SDKErrorCode.StorageError, 'VAD.loadModel: failed to allocate model path');
   }
   const idPtr = modelId ? bridge.allocUtf8(modelId) : 0;
   const namePtr = modelName ? bridge.allocUtf8(modelName) : 0;
@@ -162,6 +163,7 @@ function callLoadModel(
       throw SDKException.fromRACResult(
         rc,
         `rac_vad_component_load_model failed with code ${rc}`,
+        { module, logger },
       );
     }
   } finally {
@@ -359,8 +361,8 @@ export async function detectVoice(
   let modelId = options?.modelId;
   let modelName: string | undefined;
 
-  if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({
+  if (!modelPath && WebModelLifecycle.supportsNativeLifecycle()) {
+    const current = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       includeModelMetadata: true,
     });

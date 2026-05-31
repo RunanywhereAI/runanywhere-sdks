@@ -543,7 +543,7 @@ class DartBridgeModelRegistry {
   }
 
   // ============================================================================
-  // Refresh (T4.9) — bridges rac_model_registry_refresh
+  // Refresh — bridges rac_model_registry_refresh
   // ============================================================================
 
   /// Refresh the model registry via commons C ABI.
@@ -644,7 +644,7 @@ class DartBridgeModelRegistry {
 // =============================================================================
 
 /// Thin proto-byte bridge for URL → ModelFormat / ModelArtifactType inference.
-/// Delegates to the commons Wave D-3 APIs
+/// Delegates to the commons APIs
 /// (`rac_model_format_from_url_proto`, `rac_artifact_infer_from_url_proto`).
 ///
 /// Flutter does NOT own URL-suffix heuristics; commons is authoritative.

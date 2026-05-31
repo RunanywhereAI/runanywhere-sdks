@@ -24,10 +24,9 @@
  *      and call `RunAnywhere.cleanupVoiceAgent()`.
  *
  * The voice agent itself owns audio pacing (the energy-VAD inside the C++
- * agent runs against the mic samples once registered). Until the ONNX/Sherpa
- * WASM is rebuilt with the matched-set bump, `ONNX.register()` may resolve
- * but `initializeVoiceAgentWithLoadedModels()` will raise
- * `BackendNotAvailable` — the view surfaces that as an inline error.
+ * agent runs against the mic samples once registered). When the ONNX/Sherpa
+ * backend isn't available, `initializeVoiceAgentWithLoadedModels()` raises
+ * `BackendNotAvailable` and the view surfaces that as an inline error.
  */
 
 import type { TabLifecycle } from '../app';
@@ -52,6 +51,7 @@ import {
 } from '@runanywhere/web/browser';
 import { ONNX } from '@runanywhere/web-onnx';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 // `@runanywhere/web-llamacpp` is loaded lazily so the voice tab can be code-
@@ -222,19 +222,19 @@ function renderView(): void {
           <li>
             <strong>LLM:</strong>
             ${readiness.llmReady
-              ? `<span class="badge badge-green">Loaded</span> <code>${escape(readiness.llmModelId || '(default)')}</code>`
+              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.llmModelId || '(default)')}</code>`
               : '<span class="badge badge-grey">Not loaded</span> — load any chat model from the <em>Chat</em> tab'}
           </li>
           <li>
             <strong>STT:</strong>
             ${readiness.sttReady
-              ? `<span class="badge badge-green">Loaded</span> <code>${escape(readiness.sttModelId || '(default)')}</code>`
+              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.sttModelId || '(default)')}</code>`
               : '<span class="badge badge-grey">Not loaded</span> — load Whisper Tiny from the <em>Transcribe</em> tab'}
           </li>
           <li>
             <strong>TTS:</strong>
             ${readiness.ttsReady
-              ? `<span class="badge badge-green">Loaded</span> <code>${escape(readiness.ttsModelId || '(default)')}</code>`
+              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.ttsModelId || '(default)')}</code>`
               : '<span class="badge badge-grey">Not loaded</span> — load Piper US Lessac from the <em>Speak</em> tab'}
           </li>
         </ul>
@@ -261,7 +261,7 @@ function renderView(): void {
         <div class="docs-status">
           <strong>State:</strong>
           <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState)}">${prettyState(sessionState)}</span>
-          <span class="text-secondary" style="margin-left:8px"><code>${escape(lastEventSummary || '(no events yet)')}</code></span>
+          <span class="text-secondary" style="margin-left:8px"><code>${escapeHtml(lastEventSummary || '(no events yet)')}</code></span>
         </div>
         <div class="docs-status" id="voice-level-row">
           <strong>Mic level:</strong>
@@ -270,25 +270,25 @@ function renderView(): void {
           </div>
         </div>
         ${lastError
-          ? `<div class="docs-status error">Error: ${escape(lastError)}</div>`
+          ? `<div class="docs-status error">Error: ${escapeHtml(lastError)}</div>`
           : ''}
       </div>
 
       <div class="docs-section">
         <h3>You said</h3>
-        <pre id="voice-user-transcript" class="docs-pre">${escape(userTranscript || '(waiting for speech...)')}</pre>
+        <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || '(waiting for speech...)')}</pre>
       </div>
 
       ${assistantThinking
         ? `<div class="docs-section">
             <h3>Assistant thinking</h3>
-            <pre id="voice-assistant-thinking" class="docs-pre">${escape(assistantThinking)}</pre>
+            <pre id="voice-assistant-thinking" class="docs-pre">${escapeHtml(assistantThinking)}</pre>
           </div>`
         : ''}
 
       <div class="docs-section">
         <h3>Assistant</h3>
-        <pre id="voice-assistant-response" class="docs-pre">${escape(assistantResponse || '(no response yet)')}</pre>
+        <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || '(no response yet)')}</pre>
       </div>
     </div>
   `;
@@ -555,7 +555,7 @@ function decodePcm(frame: AudioFrameEvent): Float32Array {
     const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
     const samples = new Float32Array(pcm.byteLength / 2);
     for (let i = 0; i < samples.length; i += 1) {
-      samples[i] = view.getInt16(i * 2, true) / 0x7fff;
+      samples[i] = view.getInt16(i * 2, true) / 0x8000;
     }
     return samples;
   }
@@ -648,13 +648,4 @@ function stateBadgeClass(state: SessionState): string {
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
   return formatError(err);
-}
-
-function escape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

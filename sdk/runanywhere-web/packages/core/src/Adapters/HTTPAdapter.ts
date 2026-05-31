@@ -1,5 +1,5 @@
 /**
- * HTTPAdapter.ts (Web / WASM) — T3.13.
+ * HTTPAdapter.ts (Web / WASM).
  *
  * Thin TypeScript wrapper around the commons libcurl-backed C ABI
  * declared in:
@@ -7,7 +7,7 @@
  *   sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h
  *
  * Why this exists:
- *   Before T3.13 every Web SDK site re-implemented HTTP with browser fetch
+ *   Previously every Web SDK site re-implemented HTTP with browser fetch
  *   + ad-hoc progress loops. Parity with the other SDKs (Swift /
  *   Kotlin / React Native / Flutter) now routes through the commons
  *   HTTP C ABI so redirects, resume, checksum, and progress semantics
@@ -34,6 +34,9 @@
  *   dedicated worker or the main thread without caller-side changes.
  */
 
+import { HttpDownloadStatus } from '@runanywhere/proto-ts/download_service';
+
+import { SDKException, SDKErrorCode } from '../Foundation/SDKException';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { FetchHttpTransport } from './FetchHttpTransport';
 
@@ -85,7 +88,7 @@ export interface HTTPModule {
   _rac_http_client_destroy?(clientPtr: number): void;
   _rac_http_response_free?(respPtr: number): void;
 
-  // Transport registry (v2 close-out Phase H2 / H7). Present only on
+  // Transport registry. Present only on
   // the WASM build of commons — registers the emscripten_fetch-backed
   // adapter with the platform HTTP router so the libcurl fallback
   // (compiled out on WASM) is bypassed for every `rac_http_request_*`
@@ -93,7 +96,7 @@ export interface HTTPModule {
   _rac_http_transport_register_emscripten?(): number;
   _rac_http_transport_is_registered?(): number;
 
-  // Stage 3d — JS-side transport registration. The JS layer installs
+  // JS-side transport registration. The JS layer installs
   // function-table indices for the transport vtable directly (see
   // FetchHttpTransport.ts) so requests can be routed through `fetch()`
   // without bouncing through `emscripten_fetch`. Pass 0 for any op you
@@ -191,22 +194,13 @@ export interface DownloadRequest {
   expectedSha256Hex?: string;
 }
 
-// Mirrors rac_http_download_status_t in rac_http_download.h — keep in sync.
-export enum DownloadStatus {
-  OK = 0,
-  NetworkError = 1,
-  FileError = 2,
-  InsufficientStorage = 3,
-  InvalidUrl = 4,
-  ChecksumFailed = 5,
-  Cancelled = 6,
-  ServerError = 7,
-  Timeout = 8,
-  NetworkUnavailable = 9,
-  DnsError = 10,
-  SslError = 11,
-  Unknown = 99,
-}
+// Re-export the proto-generated HTTP download status enum as `DownloadStatus`
+// for backwards compatibility. Single source of truth lives in
+// idl/download_service.proto (HttpDownloadStatus) and mirrors the C ABI
+// rac_http_download_status_t in
+// sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
+// Numeric values are part of the C ABI return and must not be renumbered.
+export { HttpDownloadStatus as DownloadStatus } from '@runanywhere/proto-ts/download_service';
 
 // RAC_TRUE / RAC_FALSE from rac_types.h — curl-backed client returns
 // these raw ints through the chunk / progress callbacks.
@@ -271,9 +265,10 @@ function readBytes(m: HTTPModule, srcPtr: number, length: number): Uint8Array {
 
 function required<T>(fn: T | undefined, name: string): T {
   if (fn === undefined || fn === null) {
-    throw new Error(
+    throw SDKException.fromCode(
+      SDKErrorCode.WASMNotLoaded,
       `HTTPAdapter: WASM module is missing export '${name}'. ` +
-      `Rebuild the WASM target with the T3.13 HTTP exports enabled.`,
+      `Rebuild the WASM target with the HTTP exports enabled.`,
     );
   }
   return fn;
@@ -375,7 +370,10 @@ export class HTTPAdapter {
       const reqPtr = writeRequestStruct(scope, this.m, req);
       const rc = await this.ccall('rac_http_request_send', 'number', ['number', 'number', 'number'], [clientPtr, reqPtr, respPtr]);
       if (rc !== 0) {
-        throw new Error(`rac_http_request_send failed: rc=${rc} url=${req.url}`);
+        throw SDKException.fromCode(
+          SDKErrorCode.NetworkError,
+          `rac_http_request_send failed: rc=${rc} url=${req.url}`,
+        );
       }
       const response = readResponseStruct(this.m, respPtr);
       required(this.m._rac_http_response_free, 'rac_http_response_free')(respPtr);
@@ -444,7 +442,10 @@ export class HTTPAdapter {
         [clientPtr, reqPtr, cbPtr, 0, respPtr]);
       if (rc !== 0) {
         const reason = cancelled ? 'cancelled by chunk handler' : `rc=${rc}`;
-        throw new Error(`rac_http_request_stream failed: ${reason} url=${req.url}`);
+        throw SDKException.fromCode(
+          cancelled ? SDKErrorCode.DownloadCancelled : SDKErrorCode.NetworkError,
+          `rac_http_request_stream failed: ${reason} url=${req.url}`,
+        );
       }
       const response = readResponseStruct(this.m, respPtr);
       required(this.m._rac_http_response_free, 'rac_http_response_free')(respPtr);
@@ -466,7 +467,7 @@ export class HTTPAdapter {
    * native behaviour (iOS / Android / RN all hand the caller a file
    * path, not a buffer).
    */
-  async download(req: DownloadRequest, onProgress?: DownloadProgressHandler): Promise<DownloadStatus> {
+  async download(req: DownloadRequest, onProgress?: DownloadProgressHandler): Promise<HttpDownloadStatus> {
     const scope = new AllocScope(this.m);
 
     // Function-table trampoline for rac_http_download_progress_fn:
@@ -509,10 +510,10 @@ export class HTTPAdapter {
       const status = await this.ccall('rac_http_download_execute', 'number',
         ['number', 'number', 'number', 'number'],
         [reqPtr, progressPtr, 0, outHttpStatusPtr]) as number;
-      if (status !== DownloadStatus.OK && cancelled) {
-        return DownloadStatus.Cancelled;
+      if (status !== HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_OK && cancelled) {
+        return HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_CANCELLED;
       }
-      return status as DownloadStatus;
+      return status as HttpDownloadStatus;
     } finally {
       if (progressPtr !== 0) this.m.removeFunction(progressPtr);
       scope.free();
@@ -528,9 +529,19 @@ export class HTTPAdapter {
     try {
       this.m.setValue(outPtrPtr, 0, '*');
       const rc = await this.ccall('rac_http_client_create', 'number', ['number'], [outPtrPtr]) as number;
-      if (rc !== 0) throw new Error(`rac_http_client_create failed: rc=${rc}`);
+      if (rc !== 0) {
+        throw SDKException.fromCode(
+          SDKErrorCode.NetworkError,
+          `rac_http_client_create failed: rc=${rc}`,
+        );
+      }
       const clientPtr = this.m.getValue(outPtrPtr, '*');
-      if (clientPtr === 0) throw new Error('rac_http_client_create returned NULL');
+      if (clientPtr === 0) {
+        throw SDKException.fromCode(
+          SDKErrorCode.NetworkError,
+          'rac_http_client_create returned NULL',
+        );
+      }
       return clientPtr;
     } finally {
       this.m._free(outPtrPtr);
@@ -571,7 +582,7 @@ export class HTTPAdapter {
   static setDefaultModule(module: HTTPModule): void {
     HTTPAdapter.defaultInstance = new HTTPAdapter(module);
 
-    // v2 close-out Phase H7: on the WASM commons build the
+    // On the WASM commons build the
     // emscripten_fetch-backed adapter registers itself via the platform
     // HTTP transport vtable so the router in rac_http_client_curl.cpp
     // short-circuits to it. The symbol is only exported from the WASM
@@ -594,10 +605,10 @@ export class HTTPAdapter {
       }
     }
 
-    // Stage 3d — JS-side adapter registration. Installed AFTER the
+    // JS-side adapter registration. Installed AFTER the
     // emscripten_fetch registration above so any subsequent HTTP request
     // goes through the JS trampolines when the module supports them. When
-    // the build lacks the Stage 3d export (`_rac_http_transport_register_from_js`)
+    // the build lacks the export (`_rac_http_transport_register_from_js`)
     // the install() call is a silent no-op and the emscripten_fetch
     // adapter above remains active.
     //

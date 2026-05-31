@@ -38,7 +38,7 @@ if [ -f "${VERSIONS_FILE}" ]; then
 fi
 PROTOC_GEN_DART_VERSION="${PROTOC_GEN_DART_VERSION:-25.0.0}"
 
-# IDL-16 / CPP-10: pin Dart + protoc_plugin versions so local + CI runs
+# Pin Dart + protoc_plugin versions so local + CI runs
 # produce byte-identical output. Older Dart / protoc_plugin combos emit
 # subtly different code (e.g. accidental .pbgrpc.dart) that trips the
 # idl-drift-check CI gate on unrelated PRs.
@@ -59,7 +59,7 @@ fi
 mkdir -p "${OUT_DIR}"
 
 if ! command -v protoc >/dev/null 2>&1; then
-    echo "error: protoc not found. Run scripts/setup-toolchain.sh." >&2
+    echo "error: protoc not found. Run scripts/setup/setup-toolchain.sh." >&2
     exit 127
 fi
 if ! command -v protoc-gen-dart >/dev/null 2>&1; then
@@ -69,10 +69,17 @@ if ! command -v protoc-gen-dart >/dev/null 2>&1; then
     exit 127
 fi
 
-# IDL-16 / CPP-10: verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
+# Verify protoc_plugin is pinned at PROTOC_GEN_DART_VERSION
 # (loaded from VERSIONS). The plugin does not expose --version in older
 # releases; fall back to a best-effort check.
-if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
+#
+# IMPORTANT: stdin must be redirected from /dev/null. protoc plugins (including
+# protoc_plugin) implement the CodeGeneratorRequest/Response protocol over
+# stdin/stdout — if stdin is left attached to a terminal or a parent's stdin,
+# the plugin blocks indefinitely waiting for a request, even when --version is
+# passed. Without `</dev/null` this hangs generate_dart.sh forever when run
+# from generate_all.sh.
+if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version </dev/null 2>&1)"; then
     if ! echo "${PLUGIN_VERSION_OUT}" | grep -q "${PROTOC_GEN_DART_VERSION}"; then
         echo "warning: protoc_plugin version could not be verified as ${PROTOC_GEN_DART_VERSION}." >&2
         echo "         Got: ${PLUGIN_VERSION_OUT}" >&2
@@ -80,9 +87,9 @@ if PLUGIN_VERSION_OUT="$(protoc-gen-dart --version 2>&1)"; then
     fi
 fi
 
-# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone.
-# IDL-19b: router.proto is now included (empty exclusion list) so Flutter has
+# router.proto is now included (empty exclusion list) so Flutter has
 # future-proof parity with Kotlin / C++; no active Dart consumer today, but
 # generated router.pb.dart exists for symmetry.
 #

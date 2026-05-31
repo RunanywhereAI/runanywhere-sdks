@@ -2,7 +2,7 @@
  * @file rac_http_download.h
  * @brief Blocking file download runner built on `rac_http_client_*`.
  *
- * v2 close-out Phase H. Owns the end-to-end download primitive that
+ * Owns the end-to-end download primitive that
  * used to live in Kotlin's CppBridgeDownload.kt (HttpURLConnection
  * loop + FileOutputStream + SHA-256 verify + Range-based resume).
  *

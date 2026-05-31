@@ -28,7 +28,7 @@ fi
 if [ "${REFRESH_NATIVE:-0}" = "1" ]; then
     require_command cmake
     log "Refreshing Android native artifacts (${ANDROID_ABI})"
-    "${REPO_ROOT}/scripts/build-core-android.sh" "${ANDROID_ABI}"
+    "${REPO_ROOT}/scripts/build/build-core-android.sh" "${ANDROID_ABI}"
 fi
 
 log "Building Android debug APK"

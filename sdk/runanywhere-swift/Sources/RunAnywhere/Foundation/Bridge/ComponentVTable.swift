@@ -12,8 +12,7 @@
 //  async + composite (it must gather LLM/STT/TTS/VAD handles first).
 //  VoiceAgent keeps its own bespoke actor scaffold.
 //
-//  Per gaps/gaps/simplification/swift-bridge-duplication.md §1
-//  Pattern D, this collapses ~885 LOC of duplicated boilerplate.
+//  This collapses ~885 LOC of duplicated boilerplate.
 //
 
 import CRACommons
@@ -114,7 +113,7 @@ extension CppBridge.ComponentVTable {
 
     /// VLM component vtable — `rac_vlm_component_*` family.
     ///
-    /// Wave 7 / T23 removed all SDK-side `loadModel(from:)` adapters on the
+    /// SDK-side `loadModel(from:)` adapters were removed from the
     /// VLM actor; the level-3 handle is never loaded with a model and the
     /// `loadModel` slot is dead in practice. The slot is kept here only so
     /// the `ComponentVTable` shape stays uniform with the sibling modalities

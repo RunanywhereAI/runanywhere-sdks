@@ -11,7 +11,7 @@
  *   - Callback registration and session create/stop/cancel are fully wired.
  *   - The diffusion engine emits progress/completed events via
  *     `dispatch_diffusion_stream_event()` once
- *     `rac_diffusion_proto_abi.cpp` is taught to use it (TODO CPP-03
+ *     `rac_diffusion_proto_abi.cpp` is taught to use it (TODO
  *     follow-up).
  *   - start_proto today seeds a session — actual generation kickoff still
  *     flows through the existing `rac_diffusion_generate_with_progress_proto`
@@ -37,21 +37,54 @@
 
 namespace {
 
-// pass2-syn-001-followup-diffusion: lift the voice_agent in_flight quiesce
+// Lift the voice_agent in_flight quiesce
 // pattern to the diffusion proto-byte dispatcher. See rac_llm_stream.cpp
 // and rac_vlm_proto_abi.cpp for the canonical reference; this guards
 // dispatch_diffusion_stream_event so destroy/teardown can spin-wait until
 // any in-flight slot.fn() returns before freeing user_data.
+//
+// Complete the voice_agent pattern by adding
+// an is_shutting_down barrier (voice_agent.cpp:569 / 1212-1221). Without it
+// a new caller could acquire the in_flight counter mid-quiesce and extend
+// the spin-wait indefinitely (and worse, dispatch into a freed engine).
+// DiffusionInFlightGuard now performs the canonical TOCTOU-safe sequence:
+// check flag, increment counter, re-check flag, and exposes admitted() so
+// entry points can early-return without dispatching.
 std::atomic<int>& diffusion_in_flight() {
     static std::atomic<int> counter{0};
     return counter;
 }
 
+std::atomic<bool>& diffusion_proto_shutting_down() {
+    static std::atomic<bool> flag{false};
+    return flag;
+}
+
 struct DiffusionInFlightGuard {
-    DiffusionInFlightGuard() { diffusion_in_flight().fetch_add(1, std::memory_order_acq_rel); }
-    ~DiffusionInFlightGuard() { diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
+    DiffusionInFlightGuard() {
+        if (diffusion_proto_shutting_down().load(std::memory_order_acquire)) {
+            return;
+        }
+        diffusion_in_flight().fetch_add(1, std::memory_order_acq_rel);
+        // Re-check after incrementing to avoid TOCTOU with
+        // rac_diffusion_proto_quiesce().
+        if (diffusion_proto_shutting_down().load(std::memory_order_acquire)) {
+            diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel);
+            return;
+        }
+        admitted_ = true;
+    }
+    ~DiffusionInFlightGuard() {
+        if (admitted_) {
+            diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel);
+        }
+    }
+    bool admitted() const { return admitted_; }
     DiffusionInFlightGuard(const DiffusionInFlightGuard&) = delete;
     DiffusionInFlightGuard& operator=(const DiffusionInFlightGuard&) = delete;
+
+   private:
+    bool admitted_{false};
 };
 
 struct CallbackSlot {
@@ -81,7 +114,7 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
-// commons-features-other-003: the previous next_session_id() helper was
+// The previous next_session_id() helper was
 // inlined into rac_diffusion_stream_start_proto, but that entry point now
 // returns RAC_ERROR_NOT_IMPLEMENTED until the diffusion engine kickoff is
 // wired into dispatch_diffusion_stream_event(). The session id allocator
@@ -122,16 +155,34 @@ rac_result_t rac_diffusion_unset_stream_proto_callback(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-// pass2-syn-001-followup-diffusion: public quiesce helper. Mirrors
+// Public quiesce helper. Mirrors
 // rac_vlm_proto_quiesce / rac_llm_proto_quiesce. Spin-waits until every
 // in-flight dispatch_diffusion_stream_event invocation has returned. Callers
 // freeing user_data registered via rac_diffusion_set_stream_proto_callback,
 // or tearing down the diffusion component, MUST call this after the unset to
 // avoid a use-after-free in the dispatch thread.
+//
+// Set the is_shutting_down barrier FIRST so any
+// caller that tries to enter the dispatcher after quiesce begins is rejected
+// by DiffusionInFlightGuard, then spin-wait until currently-in-flight calls
+// drain. Mirrors rac_vlm_proto_quiesce / voice_agent.cpp:569-592.
+//
+// diffusion_component.cpp calls this quiesce both at destroy AND on every
+// model swap via load_model (see diffusion_component.cpp:369). To keep
+// model-swap reuse working, clear the barrier after the drain completes. The
+// barrier+drain window is still sufficient to close the TOCTOU race because
+// any dispatcher entry that observed the false→true transition (or was about
+// to) has either been rejected (admitted_=false) or drained (counter
+// decremented). VLM (rac_vlm_proto_quiesce) now clears the barrier the same
+// way: the RN and Flutter VLM bridges invoke it as a per-stream drain after
+// every rac_vlm_stream_proto, so a sticky barrier would reject all subsequent
+// streams with RAC_ERROR_INVALID_STATE (see e2e-rn-vlm-fix note there).
 void rac_diffusion_proto_quiesce(void) {
+    diffusion_proto_shutting_down().store(true, std::memory_order_release);
     while (diffusion_in_flight().load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
     }
+    diffusion_proto_shutting_down().store(false, std::memory_order_release);
 }
 
 rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
@@ -159,7 +210,7 @@ rac_result_t rac_diffusion_stream_start_proto(rac_handle_t handle,
     }
     (void)parsed;
 
-    // CPP-03 follow-up: until the diffusion engine kickoff is wired into
+    // Until the diffusion engine kickoff is wired into
     // dispatch_diffusion_stream_event(), this entrypoint cannot honour the
     // contract documented in rac_diffusion_stream.h ("Session started"
     // implies STARTED/PROGRESS/COMPLETED/ERROR will be dispatched). The
@@ -192,7 +243,13 @@ rac_result_t rac_diffusion_stream_cancel_proto(uint64_t session_id) {
     auto it = g_sessions().find(session_id);
     if (it == g_sessions().end())
         return RAC_ERROR_INVALID_ARGUMENT;
-    it->second.is_cancelled.store(true, std::memory_order_relaxed);
+    // Use release ordering so any writes the cancelling thread
+    // made before the store (e.g. draining session state) are visible to a
+    // consumer on another core that observes is_cancelled == true. Mirrors
+    // tool_calling_session.cpp:805/883 (cancel_requested.store release) and
+    // rac_llm_stream.cpp / rag_pipeline_graph.cpp. Readers must pair with
+    // memory_order_acquire on the load.
+    it->second.is_cancelled.store(true, std::memory_order_release);
     g_sessions().erase(it);
     return RAC_SUCCESS;
 }
@@ -211,10 +268,16 @@ void dispatch_diffusion_stream_event(rac_handle_t handle,
                                      const runanywhere::v1::DiffusionProgress* progress,
                                      const runanywhere::v1::DiffusionResult* result,
                                      const char* error_message, int error_code) {
-    // pass2-syn-001-followup-diffusion: hold the InFlightGuard across the
+    // Hold the InFlightGuard across the
     // whole dispatch so rac_diffusion_proto_quiesce() can spin-wait on the
     // counter before user_data is freed by a concurrent teardown thread.
+    // If the proto dispatcher is shutting down,
+    // the guard refuses admission and we must skip the slot lookup + callback
+    // invocation entirely — slot.fn / user_data may already be freed.
     DiffusionInFlightGuard in_flight_guard;
+    if (!in_flight_guard.admitted()) {
+        return;
+    }
     CallbackSlot slot;
     uint64_t seq = 0;
     {

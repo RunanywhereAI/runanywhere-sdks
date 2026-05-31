@@ -10,7 +10,7 @@
 
 // RunAnywhere v2 IDL — tool-calling primitives.
 //
-// Phase 3 of v2 IDL Exhaustiveness migration. The 7 tool-calling types were
+// The 7 tool-calling types were
 // duplicated across all 5 SDKs (~1,500 LOC):
 //   - Swift  Public/Extensions/LLM/ToolCallingTypes.swift (411 LOC)
 //   - Kotlin commonMain/.../tool/ (multiple files)
@@ -40,7 +40,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -48,7 +48,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// ---------------------------------------------------------------------------
 /// Supported parameter types.
 /// ---------------------------------------------------------------------------
-public enum RAToolParameterType: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAToolParameterType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case string // = 1
@@ -114,7 +114,7 @@ public enum RAToolParameterType: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// strongly-typed field. Keep `format_hint` (string) populated for legacy
 /// consumers until all SDKs migrate.
 /// ---------------------------------------------------------------------------
-public enum RAToolCallFormatName: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAToolCallFormatName: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case json // = 1
@@ -168,7 +168,7 @@ public enum RAToolCallFormatName: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAToolChoiceMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAToolChoiceMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case auto // = 1
@@ -214,7 +214,7 @@ public enum RAToolChoiceMode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case modelToken // = 1
@@ -275,7 +275,7 @@ public enum RAToolCallingStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable
 /// (string-only) and as the canonical wire shape when consumers want
 /// strongly-typed arguments rather than raw JSON.
 /// ---------------------------------------------------------------------------
-public struct RAToolValue: Sendable {
+public nonisolated struct RAToolValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -333,7 +333,7 @@ public struct RAToolValue: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Kind: Equatable, Sendable {
+  public nonisolated enum OneOf_Kind: Equatable, Sendable {
     case stringValue(String)
     case numberValue(Double)
     case boolValue(Bool)
@@ -347,7 +347,7 @@ public struct RAToolValue: Sendable {
   public init() {}
 }
 
-public struct RAToolValueArray: Sendable {
+public nonisolated struct RAToolValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -359,7 +359,7 @@ public struct RAToolValueArray: Sendable {
   public init() {}
 }
 
-public struct RAToolValueObject: Sendable {
+public nonisolated struct RAToolValueObject: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -378,7 +378,7 @@ public struct RAToolValueObject: Sendable {
 /// ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
 /// tool-calling round-trip stays self-contained in this proto.
 /// ---------------------------------------------------------------------------
-public struct RAToolValueJSON: Sendable {
+public nonisolated struct RAToolValueJSON: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -393,7 +393,7 @@ public struct RAToolValueJSON: Sendable {
 /// ---------------------------------------------------------------------------
 /// A single parameter definition for a tool.
 /// ---------------------------------------------------------------------------
-public struct RAToolParameter: Sendable {
+public nonisolated struct RAToolParameter: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -438,7 +438,7 @@ public struct RAToolParameter: Sendable {
 /// ---------------------------------------------------------------------------
 /// Definition of a tool that the LLM can call.
 /// ---------------------------------------------------------------------------
-public struct RAToolDefinition: Sendable {
+public nonisolated struct RAToolDefinition: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -482,7 +482,7 @@ public struct RAToolDefinition: Sendable {
 /// A tool call requested by the LLM. `arguments_json` is a JSON object
 /// matching the parameter shape declared in the corresponding ToolDefinition.
 /// ---------------------------------------------------------------------------
-public struct RAToolCall: Sendable {
+public nonisolated struct RAToolCall: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -495,7 +495,7 @@ public struct RAToolCall: Sendable {
 
   /// JSON-encoded arguments. Empty object "{}" if no args.
   ///
-  /// AUDIT (IDL-13): the C++ tokenizer / tool-prompt formatter
+  /// The C++ tokenizer / tool-prompt formatter
   /// (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
   /// `arguments_json` directly when building LLM prompts. It is the
   /// canonical wire shape for the prompt-formatting path.
@@ -538,7 +538,7 @@ public struct RAToolCall: Sendable {
 /// Result of executing a tool. `result_json` is a JSON-encoded payload;
 /// `error` is non-empty when the execution failed.
 /// ---------------------------------------------------------------------------
-public struct RAToolResult: Sendable {
+public nonisolated struct RAToolResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -549,7 +549,7 @@ public struct RAToolResult: Sendable {
 
   /// JSON-encoded tool execution result.
   ///
-  /// AUDIT (IDL-13): the C++ tool-prompt formatter
+  /// The C++ tool-prompt formatter
   /// (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
   /// reads `result_json` directly when building follow-up LLM prompts after
   /// tool execution. It is the canonical wire shape.
@@ -593,7 +593,7 @@ public struct RAToolResult: Sendable {
 /// ---------------------------------------------------------------------------
 /// Options for tool-enabled generation.
 /// ---------------------------------------------------------------------------
-public struct RAToolCallingOptions: Sendable {
+public nonisolated struct RAToolCallingOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -718,7 +718,7 @@ public struct RAToolCallingOptions: Sendable {
 /// ---------------------------------------------------------------------------
 /// Result of a tool-enabled generation.
 /// ---------------------------------------------------------------------------
-public struct RAToolCallingResult: Sendable {
+public nonisolated struct RAToolCallingResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -769,7 +769,7 @@ public struct RAToolCallingResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAToolParseRequest: @unchecked Sendable {
+public nonisolated struct RAToolParseRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -795,7 +795,7 @@ public struct RAToolParseRequest: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAToolParseResult: Sendable {
+public nonisolated struct RAToolParseResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -824,7 +824,7 @@ public struct RAToolParseResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAToolPromptFormatRequest: @unchecked Sendable {
+public nonisolated struct RAToolPromptFormatRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -870,7 +870,7 @@ public struct RAToolPromptFormatRequest: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAToolPromptFormatResult: Sendable {
+public nonisolated struct RAToolPromptFormatResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -899,7 +899,7 @@ public struct RAToolPromptFormatResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAToolCallValidationRequest: @unchecked Sendable {
+public nonisolated struct RAToolCallValidationRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -931,7 +931,7 @@ public struct RAToolCallValidationRequest: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAToolCallValidationResult: Sendable {
+public nonisolated struct RAToolCallValidationResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -970,7 +970,7 @@ public struct RAToolCallValidationResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAToolCallingStreamEvent: @unchecked Sendable {
+public nonisolated struct RAToolCallingStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1048,7 +1048,7 @@ public struct RAToolCallingStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAToolRegistrySnapshot: Sendable {
+public nonisolated struct RAToolRegistrySnapshot: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1062,7 +1062,7 @@ public struct RAToolRegistrySnapshot: Sendable {
   public init() {}
 }
 
-public struct RAToolCallingSessionCreateRequest: Sendable {
+public nonisolated struct RAToolCallingSessionCreateRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1134,7 +1134,7 @@ public struct RAToolCallingSessionCreateRequest: Sendable {
   fileprivate var _forcedToolName: String? = nil
 }
 
-public struct RAToolCallingSessionCreateResult: Sendable {
+public nonisolated struct RAToolCallingSessionCreateResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1146,7 +1146,7 @@ public struct RAToolCallingSessionCreateResult: Sendable {
   public init() {}
 }
 
-public struct RAToolCallingSessionEvent: Sendable {
+public nonisolated struct RAToolCallingSessionEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1191,7 +1191,7 @@ public struct RAToolCallingSessionEvent: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Kind: Equatable, Sendable {
+  public nonisolated enum OneOf_Kind: Equatable, Sendable {
     /// serialized LLMStreamEvent proto
     case llmStreamEventBytes(Data)
     case toolCall(RAToolCall)
@@ -1204,7 +1204,7 @@ public struct RAToolCallingSessionEvent: Sendable {
   public init() {}
 }
 
-public struct RAToolCallingSessionStepWithResultRequest: Sendable {
+public nonisolated struct RAToolCallingSessionStepWithResultRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1231,7 +1231,7 @@ public struct RAToolCallingSessionStepWithResultRequest: Sendable {
   fileprivate var _error: String? = nil
 }
 
-public struct RAToolCallingSessionDestroyRequest: Sendable {
+public nonisolated struct RAToolCallingSessionDestroyRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1245,25 +1245,25 @@ public struct RAToolCallingSessionDestroyRequest: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAToolParameterType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolParameterType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_PARAMETER_TYPE_UNSPECIFIED\0\u{1}TOOL_PARAMETER_TYPE_STRING\0\u{1}TOOL_PARAMETER_TYPE_NUMBER\0\u{1}TOOL_PARAMETER_TYPE_BOOLEAN\0\u{1}TOOL_PARAMETER_TYPE_OBJECT\0\u{1}TOOL_PARAMETER_TYPE_ARRAY\0")
 }
 
-extension RAToolCallFormatName: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallFormatName: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CALL_FORMAT_NAME_UNSPECIFIED\0\u{1}TOOL_CALL_FORMAT_NAME_JSON\0\u{1}TOOL_CALL_FORMAT_NAME_XML\0\u{1}TOOL_CALL_FORMAT_NAME_NATIVE\0\u{1}TOOL_CALL_FORMAT_NAME_PYTHONIC\0\u{1}TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS\0\u{1}TOOL_CALL_FORMAT_NAME_HERMES\0")
 }
 
-extension RAToolChoiceMode: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolChoiceMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CHOICE_MODE_UNSPECIFIED\0\u{1}TOOL_CHOICE_MODE_AUTO\0\u{1}TOOL_CHOICE_MODE_NONE\0\u{1}TOOL_CHOICE_MODE_REQUIRED\0\u{1}TOOL_CHOICE_MODE_SPECIFIC\0")
 }
 
-extension RAToolCallingStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED\0\u{1}TOOL_CALLING_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolValue"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}string_value\0\u{3}number_value\0\u{3}bool_value\0\u{3}array_value\0\u{3}object_value\0\u{3}null_value\0")
 
@@ -1378,7 +1378,7 @@ extension RAToolValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RAToolValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolValueArray"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0")
 
@@ -1408,7 +1408,7 @@ extension RAToolValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAToolValueObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolValueObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolValueObject"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}fields\0")
 
@@ -1438,7 +1438,7 @@ extension RAToolValueObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAToolValueJSON: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolValueJSON: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolValueJSON"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}json\0")
 
@@ -1468,7 +1468,7 @@ extension RAToolValueJSON: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RAToolParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolParameter"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}type\0\u{1}description\0\u{1}required\0\u{3}enum_values\0\u{3}json_schema\0\u{3}default_value\0")
 
@@ -1532,7 +1532,7 @@ extension RAToolParameter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolDefinition"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}description\0\u{1}parameters\0\u{1}category\0\u{3}json_schema\0\u{1}metadata\0")
 
@@ -1591,7 +1591,7 @@ extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCall"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{1}type\0\u{4}\u{2}call_id\0\u{3}created_at_ms\0\u{3}raw_text\0\u{b}arguments\0\u{c}\u{5}\u{1}")
 
@@ -1655,7 +1655,7 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0\u{1}success\0\u{4}\u{2}call_id\0\u{3}started_at_ms\0\u{3}completed_at_ms\0\u{b}result\0\u{c}\u{6}\u{1}")
 
@@ -1724,7 +1724,7 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}max_iterations\0\u{3}auto_execute\0\u{1}temperature\0\u{3}max_tokens\0\u{3}system_prompt\0\u{3}replace_system_prompt\0\u{3}keep_tools_available\0\u{3}format_hint\0\u{1}format\0\u{3}custom_system_prompt\0\u{3}max_tool_calls\0\u{3}tool_choice\0\u{3}forced_tool_name\0\u{3}parallel_tool_calls\0\u{3}require_json_arguments\0")
 
@@ -1833,7 +1833,7 @@ extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}conversation_id\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}raw_text\0")
 
@@ -1907,7 +1907,7 @@ extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAToolParseRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolParseRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolParseRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}options\0")
 
@@ -1984,7 +1984,7 @@ extension RAToolParseRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAToolParseResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolParseResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolParseResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}has_tool_call\0\u{3}tool_calls\0\u{3}remaining_text\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -2038,7 +2038,7 @@ extension RAToolParseResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAToolPromptFormatRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolPromptFormatRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolPromptFormatRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}user_prompt\0\u{1}options\0\u{3}tool_results\0\u{3}assistant_text\0")
 
@@ -2129,7 +2129,7 @@ extension RAToolPromptFormatRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAToolPromptFormatResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolPromptFormatResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolPromptFormatResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}formatted_prompt\0\u{1}format\0\u{3}format_hint\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -2183,7 +2183,7 @@ extension RAToolPromptFormatResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAToolCallValidationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallValidationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallValidationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call\0\u{1}options\0")
 
@@ -2260,7 +2260,7 @@ extension RAToolCallValidationRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAToolCallValidationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallValidationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallValidationResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}validation_errors\0\u{3}matched_tool\0\u{3}normalized_arguments_json\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -2319,7 +2319,7 @@ extension RAToolCallValidationResult: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RAToolCallingStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}conversation_id\0\u{1}kind\0\u{1}token\0\u{3}tool_call\0\u{3}tool_result\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -2452,7 +2452,7 @@ extension RAToolCallingStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolRegistrySnapshot"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}tools\0\u{3}updated_at_ms\0")
 
@@ -2487,7 +2487,7 @@ extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{3}format_hint\0\u{3}max_iterations\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{3}tool_choice\0\u{3}forced_tool_name\0\u{4}\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0\u{c}\u{9}\u{2}")
 
@@ -2576,7 +2576,7 @@ extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobu
   }
 }
 
-extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
 
@@ -2606,7 +2606,7 @@ extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, SwiftProtobuf
   }
 }
 
-extension RAToolCallingSessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingSessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_stream_event_bytes\0\u{3}tool_call\0\u{3}final_result\0\u{3}error_bytes\0\u{1}seq\0")
 
@@ -2702,7 +2702,7 @@ extension RAToolCallingSessionEvent: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAToolCallingSessionStepWithResultRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingSessionStepWithResultRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionStepWithResultRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0\u{3}tool_call_id\0\u{3}result_json\0\u{1}error\0")
 
@@ -2751,7 +2751,7 @@ extension RAToolCallingSessionStepWithResultRequest: SwiftProtobuf.Message, Swif
   }
 }
 
-extension RAToolCallingSessionDestroyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAToolCallingSessionDestroyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionDestroyRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
 

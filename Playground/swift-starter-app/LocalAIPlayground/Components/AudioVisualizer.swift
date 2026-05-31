@@ -29,16 +29,16 @@ import SwiftUI
 struct AudioLevelBars: View {
     /// Current audio level from 0.0 to 1.0
     let level: Float
-
+    
     /// Number of bars to display
     let barCount: Int
-
+    
     /// Color for active bars
     let activeColor: Color
-
+    
     /// Color for inactive bars
     let inactiveColor: Color
-
+    
     init(
         level: Float,
         barCount: Int = 5,
@@ -50,7 +50,7 @@ struct AudioLevelBars: View {
         self.activeColor = activeColor
         self.inactiveColor = inactiveColor
     }
-
+    
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<barCount, id: \.self) { index in
@@ -61,12 +61,12 @@ struct AudioLevelBars: View {
             }
         }
     }
-
+    
     private func isBarActive(_ index: Int) -> Bool {
         let threshold = Float(index + 1) / Float(barCount)
         return level >= threshold * 0.8
     }
-
+    
     private func barHeight(for index: Int) -> CGFloat {
         let minHeight: CGFloat = 8
         let maxHeight: CGFloat = 24
@@ -85,18 +85,18 @@ struct AudioLevelBars: View {
 struct WaveformVisualizer: View {
     /// Current audio level from 0.0 to 1.0
     let level: Float
-
+    
     /// Whether the visualization is active
     let isActive: Bool
-
+    
     /// Number of wave segments
     let segments: Int
-
+    
     /// Primary color for the waveform
     let color: Color
-
+    
     @State private var phase: Double = 0
-
+    
     init(
         level: Float,
         isActive: Bool = true,
@@ -108,31 +108,31 @@ struct WaveformVisualizer: View {
         self.segments = segments
         self.color = color
     }
-
+    
     var body: some View {
         Canvas { context, size in
             let midY = size.height / 2
             let width = size.width
-
+            
             var path = Path()
             path.move(to: CGPoint(x: 0, y: midY))
-
+            
             for i in 0..<segments {
                 let x = width * CGFloat(i) / CGFloat(segments - 1)
                 let normalizedX = Double(i) / Double(segments - 1)
-
+                
                 // Combine multiple sine waves for organic look
                 let wave1 = sin((normalizedX * 4 * .pi) + phase)
                 let wave2 = sin((normalizedX * 6 * .pi) + phase * 1.5) * 0.5
                 let wave3 = sin((normalizedX * 8 * .pi) + phase * 0.7) * 0.25
-
+                
                 // Amplitude based on audio level
                 let amplitude = Double(level) * (size.height / 3) * (isActive ? 1 : 0.1)
                 let y = midY + CGFloat((wave1 + wave2 + wave3) * amplitude)
-
+                
                 path.addLine(to: CGPoint(x: x, y: y))
             }
-
+            
             context.stroke(
                 path,
                 with: .linearGradient(
@@ -154,7 +154,7 @@ struct WaveformVisualizer: View {
             }
         }
     }
-
+    
     private func startAnimation() {
         withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
             phase = .pi * 2
@@ -172,18 +172,18 @@ struct WaveformVisualizer: View {
 struct CircularAudioVisualizer: View {
     /// Current audio level from 0.0 to 1.0
     let level: Float
-
+    
     /// Whether actively recording/playing
     let isActive: Bool
-
+    
     /// Size of the visualizer
     let size: CGFloat
-
+    
     /// Primary color
     let color: Color
-
+    
     @State private var pulseScale: CGFloat = 1
-
+    
     init(
         level: Float,
         isActive: Bool,
@@ -195,14 +195,14 @@ struct CircularAudioVisualizer: View {
         self.size = size
         self.color = color
     }
-
+    
     var body: some View {
         ZStack {
             // Outer pulse ring
             Circle()
                 .stroke(color.opacity(0.2), lineWidth: 2)
                 .frame(width: size * pulseScale, height: size * pulseScale)
-
+            
             // Middle ring (responds to audio level)
             Circle()
                 .stroke(color.opacity(0.4), lineWidth: 3)
@@ -211,7 +211,7 @@ struct CircularAudioVisualizer: View {
                     height: size * 0.8 * (1 + CGFloat(level) * 0.3)
                 )
                 .animation(.easeInOut(duration: 0.1), value: level)
-
+            
             // Inner circle
             Circle()
                 .fill(
@@ -225,7 +225,7 @@ struct CircularAudioVisualizer: View {
                 .frame(width: size * 0.5, height: size * 0.5)
                 .scaleEffect(1 + CGFloat(level) * 0.2)
                 .animation(.easeInOut(duration: 0.1), value: level)
-
+            
             // Microphone icon
             Image(systemName: isActive ? "mic.fill" : "mic")
                 .font(.system(size: size * 0.15, weight: .semibold))
@@ -242,7 +242,7 @@ struct CircularAudioVisualizer: View {
             }
         }
     }
-
+    
     private func startPulse() {
         withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
             pulseScale = 1.15
@@ -258,12 +258,12 @@ struct CircularAudioVisualizer: View {
 struct RecordingIndicator: View {
     /// Whether currently recording
     let isRecording: Bool
-
+    
     /// Recording duration in seconds
     let duration: TimeInterval
-
+    
     @State private var dotOpacity: Double = 1
-
+    
     var body: some View {
         HStack(spacing: AISpacing.sm) {
             // Recording dot
@@ -271,12 +271,12 @@ struct RecordingIndicator: View {
                 .fill(Color.red)
                 .frame(width: 12, height: 12)
                 .opacity(isRecording ? dotOpacity : 0.3)
-
+            
             // Duration
             Text(formattedDuration)
                 .font(.aiMono)
                 .foregroundStyle(isRecording ? .primary : .secondary)
-
+            
             // Status text
             Text(isRecording ? "Recording" : "Ready")
                 .font(.aiCaption)
@@ -299,13 +299,13 @@ struct RecordingIndicator: View {
             }
         }
     }
-
+    
     private var formattedDuration: String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
-
+    
     private func startBlinking() {
         withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
             dotOpacity = 0.3
@@ -321,19 +321,19 @@ struct RecordingIndicator: View {
 struct VoiceActivityIndicator: View {
     /// Whether voice is currently detected
     let isActive: Bool
-
+    
     /// Confidence level of detection (0.0 to 1.0)
     let confidence: Float
-
+    
     @State private var ringScale: CGFloat = 1
-
+    
     var body: some View {
         ZStack {
             // Background ring
             Circle()
                 .stroke(Color.aiSecondary.opacity(0.3), lineWidth: 4)
                 .frame(width: 60, height: 60)
-
+            
             // Active ring
             Circle()
                 .trim(from: 0, to: isActive ? CGFloat(confidence) : 0)
@@ -344,7 +344,7 @@ struct VoiceActivityIndicator: View {
                 .frame(width: 60, height: 60)
                 .rotationEffect(.degrees(-90))
                 .animation(.easeInOut(duration: 0.2), value: confidence)
-
+            
             // Pulse effect when active
             if isActive {
                 Circle()
@@ -352,7 +352,7 @@ struct VoiceActivityIndicator: View {
                     .frame(width: 60, height: 60)
                     .scaleEffect(ringScale)
             }
-
+            
             // Icon
             Image(systemName: isActive ? "waveform" : "waveform.slash")
                 .font(.system(size: 20, weight: .medium))
@@ -378,13 +378,13 @@ struct VoiceActivityIndicator: View {
 struct PlaybackProgressBar: View {
     /// Current progress from 0.0 to 1.0
     let progress: Double
-
+    
     /// Total duration in seconds
     let duration: TimeInterval
-
+    
     /// Whether audio is currently playing
     let isPlaying: Bool
-
+    
     var body: some View {
         VStack(spacing: AISpacing.sm) {
             // Progress bar
@@ -394,13 +394,13 @@ struct PlaybackProgressBar: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.secondary.opacity(0.3))
                         .frame(height: 4)
-
+                    
                     // Progress fill
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.aiPrimary)
                         .frame(width: geometry.size.width * progress, height: 4)
                         .animation(.linear(duration: 0.1), value: progress)
-
+                    
                     // Playhead
                     Circle()
                         .fill(Color.aiPrimary)
@@ -410,22 +410,22 @@ struct PlaybackProgressBar: View {
                 }
             }
             .frame(height: 12)
-
+            
             // Time labels
             HStack {
                 Text(formatTime(duration * progress))
                     .font(.aiCaption)
                     .foregroundStyle(.secondary)
-
+                
                 Spacer()
-
+                
                 Text(formatTime(duration))
                     .font(.aiCaption)
                     .foregroundStyle(.secondary)
             }
         }
     }
-
+    
     private func formatTime(_ seconds: TimeInterval) -> String {
         let mins = Int(seconds) / 60
         let secs = Int(seconds) % 60
@@ -450,7 +450,7 @@ struct PlaybackProgressBar: View {
     VStack(spacing: 24) {
         WaveformVisualizer(level: 0.3, isActive: true)
             .frame(height: 60)
-
+        
         WaveformVisualizer(level: 0.7, isActive: true, color: .aiSecondary)
             .frame(height: 60)
     }

@@ -17,6 +17,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   ModelArtifactType,
@@ -33,8 +34,11 @@ import {
   ModelListRequest,
   ModelListResult,
   ModelQuery,
-  type InferenceFramework,
+  ModelSource,
+  RegisterModelFromUrlRequest,
+  InferenceFramework,
 } from '@runanywhere/proto-ts/model_types';
+import { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   DownloadCancelRequest,
   DownloadPlanRequest,
@@ -59,10 +63,17 @@ import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 /**
  * Single-file registration shorthand. Mirrors Swift's
- * `RunAnywhere.registerModel(id:name:url:framework:...)`.
+ * `RunAnywhere.registerModel(id:name:url:framework:...)` — keep the optional
+ * fields in lock-step with `RunAnywhere+Storage.swift:19-72`.
  */
 export interface RegisterModelInput {
-  id: string;
+  /**
+   * Optional stable id. When omitted, commons' canonical
+   * `rac_register_model_from_url_proto` derives it from the URL; the local
+   * fallback (only hit when the native ABI is unavailable) uses the
+   * Kotlin-parity URL-tail derivation.
+   */
+  id?: string;
   name: string;
   url: string;
   framework: InferenceFramework;
@@ -74,6 +85,8 @@ export interface RegisterModelInput {
   artifactType?: ModelArtifactType;
   /** Optional thinking-tag support flag. */
   supportsThinking?: boolean;
+  /** Optional LoRA adapter compatibility flag (Swift parity). */
+  supportsLora?: boolean;
 }
 
 /**
@@ -95,26 +108,181 @@ export interface RegisterMultiFileModelInput {
 
 /**
  * Register a model in the native registry from a single download URL.
+ *
+ * Delegates the full build-and-save flow to the canonical
+ * `rac_register_model_from_url_proto` C ABI (mirroring Swift
+ * `RunAnywhere+Storage.swift:19-72` and Kotlin `RunAnywhereStorage.kt:67-149`):
+ * commons owns framework-aware defaulting, artifact-type-from-extension
+ * inference, and stable id-from-URL derivation, so RN no longer drifts from
+ * Swift/Kotlin/Flutter. Only the parameters the proto request does not model
+ * (id override, memory hint, thinking flag, LoRA flag, explicit artifact
+ * type) are patched onto the saved `ModelInfo` and re-persisted, matching
+ * Swift's `needsResave` pattern. When the native ABI is unavailable on the
+ * staged artifact we fall back to Kotlin's local build-and-save path
+ * (`buildModelFromUrlLocally`).
+ *
+ * Returns the resolved `ModelInfo` proto so callers can pipe it straight into
+ * `downloadModel(...)`.
  */
-export async function registerModel(input: RegisterModelInput): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
+export async function registerModel(
+  input: RegisterModelInput,
+): Promise<ModelInfo> {
+  if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
-  const message = ModelInfoCodec.fromPartial({
-    id: input.id,
+  const modality = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
+  const memoryHint =
+    input.memoryRequirement !== undefined && input.memoryRequirement > 0
+      ? input.memoryRequirement
+      : undefined;
+  const supportsThinking = input.supportsThinking ?? false;
+  const supportsLora = input.supportsLora ?? false;
+
+  const request = RegisterModelFromUrlRequest.fromPartial({
+    url: input.url,
     name: input.name,
-    category: input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: input.framework,
+    category: modality,
+    source: ModelSource.MODEL_SOURCE_REMOTE,
+  });
+  const savedBuffer = await native.registerModelFromUrlProto(
+    encodeProtoMessage(request, RegisterModelFromUrlRequest),
+  );
+  const savedBytes = arrayBufferToBytes(savedBuffer);
+  let model =
+    savedBytes.byteLength > 0
+      ? ModelInfoCodec.decode(savedBytes)
+      : await buildModelFromUrlLocally(native, {
+          input,
+          modality,
+          memoryHint,
+          supportsThinking,
+        });
+
+  // Patch fields the proto request does not yet model and re-persist through
+  // the registry's proto save path (mirrors Swift / Kotlin needsResave).
+  let needsResave = false;
+  if (input.id && input.id !== model.id) {
+    model = { ...model, id: input.id };
+    needsResave = true;
+  }
+  if (memoryHint !== undefined) {
+    model = {
+      ...model,
+      downloadSizeBytes: memoryHint,
+      memoryRequiredBytes: memoryHint,
+    };
+    needsResave = true;
+  }
+  if (supportsThinking && !model.thinkingPattern) {
+    model = {
+      ...model,
+      supportsThinking: true,
+      thinkingPattern: ThinkingTagPattern.fromPartial({}),
+    };
+    needsResave = true;
+  }
+  if (supportsLora) {
+    model = { ...model, supportsLora: true };
+    needsResave = true;
+  }
+  if (input.artifactType !== undefined && input.artifactType !== model.artifactType) {
+    model = { ...model, artifactType: input.artifactType };
+    needsResave = true;
+  }
+
+  if (needsResave) {
+    model = { ...model, updatedAtUnixMs: Date.now() };
+    const accepted = await native.registerModelProto(
+      encodeProtoMessage(model, ModelInfoCodec),
+    );
+    if (!accepted) {
+      throw SDKException.of(
+        ErrorCode.ERROR_CODE_INVALID_STATE,
+        `Model registry rejected '${model.id}'. Ensure the SDK is initialized before calling registerModel().`,
+        { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
+      );
+    }
+  }
+
+  return model;
+}
+
+/**
+ * Local URL → saved `ModelInfo` fallback used only when commons'
+ * `rac_register_model_from_url_proto` is unavailable on the staged native
+ * artifact. Mirrors Kotlin's `buildModelFromUrlLocally`
+ * (`RunAnywhereStorage.kt:157-180`): build a minimal `ModelInfo` and persist
+ * it through the registry's proto save path.
+ */
+async function buildModelFromUrlLocally(
+  native: ReturnType<typeof requireNativeModule>,
+  params: {
+    input: RegisterModelInput;
+    modality: ModelCategory;
+    memoryHint: number | undefined;
+    supportsThinking: boolean;
+  },
+): Promise<ModelInfo> {
+  const { input, modality, memoryHint, supportsThinking } = params;
+  const model = ModelInfoCodec.fromPartial({
+    id: input.id ?? deriveModelIdFromUrl(input.url, input.name),
+    name: input.name,
+    category: modality,
     framework: input.framework,
     preferredFramework: input.framework,
-    format: ModelFormat.MODEL_FORMAT_GGUF,
+    format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     downloadUrl: input.url,
-    ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
-      ? { memoryRequiredBytes: input.memoryRequirement }
-      : {}),
-    supportsThinking: input.supportsThinking ?? false,
-    artifactType: input.artifactType,
+    ...(memoryHint !== undefined ? { downloadSizeBytes: memoryHint } : {}),
+    supportsThinking,
+    source: ModelSource.MODEL_SOURCE_REMOTE,
   });
-  const bytes = encodeProtoMessage(message, ModelInfoCodec);
-  return native.registerModelProto(bytes);
+  const accepted = await native.registerModelProto(
+    encodeProtoMessage(model, ModelInfoCodec),
+  );
+  if (!accepted) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_INVALID_STATE,
+      `Model registry rejected '${model.id}'. Ensure the SDK is initialized before calling registerModel().`,
+      { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
+    );
+  }
+  return model;
+}
+
+/**
+ * Kotlin-parity URL → id fallback. Mirrors `deriveModelIdFromUrl` in
+ * `RunAnywhereStorage.kt:337-344` so an RN caller that omits `id` ends up
+ * with the same id Kotlin's local fallback produces.
+ */
+function deriveModelIdFromUrl(url: string, name: string): string {
+  const tail = url.split('/').pop()?.split('?')[0]?.trim() ?? '';
+  if (tail.length > 0) {
+    const withoutExtension = tail.split('.')[0];
+    if (withoutExtension && withoutExtension.length > 0) {
+      return withoutExtension;
+    }
+  }
+  const normalized = name.replace(/\s+/g, '-').toLowerCase();
+  return normalized.length > 0 ? normalized : `model-${Date.now()}`;
+}
+
+/**
+ * Register a single-file remote model by URL. Canonical entry point that
+ * mirrors Swift's `RunAnywhere.registerModel(id:name:url:framework:...)`,
+ * Kotlin's `RunAnywhere.registerModel(...)`, Flutter's
+ * `RunAnywhere.registerModel(...)`, and Web's `registerModelFromUrl(...)`.
+ *
+ * Delegates to `registerModel` which routes through the commons
+ * `rac_register_model_from_url_proto` factory so format, artifact type,
+ * and id are inferred by commons rather than hard-coded by the caller.
+ */
+export async function registerModelFromUrl(
+  url: string,
+  name: string,
+  framework: InferenceFramework,
+  options: Omit<RegisterModelInput, 'url' | 'name' | 'framework'> = {},
+): Promise<ModelInfo> {
+  return registerModel({ url, name, framework, ...options });
 }
 
 /**
@@ -410,6 +578,49 @@ function isCompletedProgress(progress: DownloadProgress): boolean {
   );
 }
 
+/**
+ * Plan a download and retry once after clearing oversize partial bytes.
+ *
+ * Mirrors Swift's `RunAnywhere+Storage.swift` `planDownload(...)` self-heal:
+ * when a previous interrupted download left more bytes on disk than the new
+ * plan expects (e.g. a CDN swap shrank Content-Length), commons rejects with
+ * "existing partial bytes exceed". Instead of surfacing that as a permanent
+ * stuck state, delete the oversize partials and re-plan once. `react-native-fs`
+ * is an optional dependency; if it is unavailable we fall back to the original
+ * rejection so callers still see a deterministic error.
+ */
+async function planDownload(
+  native: ReturnType<typeof requireNativeModule>,
+  request: DownloadPlanRequest
+): Promise<DownloadPlanResult> {
+  const planBytes = await native.downloadPlanProto(
+    encodeProtoMessage(request, DownloadPlanRequest)
+  );
+  const plan = DownloadPlanResult.decode(arrayBufferToBytes(planBytes));
+  if (plan.canStart || !plan.errorMessage.includes('existing partial bytes exceed')) {
+    return plan;
+  }
+
+  let RNFS: typeof import('react-native-fs');
+  try {
+    RNFS = require('react-native-fs');
+  } catch {
+    return plan;
+  }
+
+  for (const file of plan.files) {
+    if (!file.destinationPath) continue;
+    if (await RNFS.exists(file.destinationPath)) {
+      await RNFS.unlink(file.destinationPath).catch(() => {});
+    }
+  }
+
+  const retryBytes = await native.downloadPlanProto(
+    encodeProtoMessage(request, DownloadPlanRequest)
+  );
+  return DownloadPlanResult.decode(arrayBufferToBytes(retryBytes));
+}
+
 async function persistDownloadCompletion(
   model: ModelInfo,
   progress: DownloadProgress
@@ -525,6 +736,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
         if (started) return;
         started = true;
         try {
+          await ensureServicesReady();
           await subscribeToDownloadProgress(subscriberEntry);
           subscribed = true;
           const modelBuffer = await native.getModelInfoProto(modelId);
@@ -541,10 +753,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             modelId,
             model,
           });
-          const planBytes = await native.downloadPlanProto(
-            encodeProtoMessage(planRequest, DownloadPlanRequest)
-          );
-          const plan = DownloadPlanResult.decode(arrayBufferToBytes(planBytes));
+          const plan = await planDownload(native, planRequest);
           if (!plan.canStart) {
             streamError = new Error(
               plan.errorMessage || `download plan rejected for ${modelId}`
@@ -650,4 +859,64 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
       };
     },
   };
+}
+
+/**
+ * Flat alias for `downloadModel` that matches Swift's canonical shape:
+ * `RunAnywhere.downloadModel(_ model, onProgress:) async throws -> DownloadProgress`.
+ *
+ * Drives the underlying `AsyncIterable<DownloadProgress>` internally and calls
+ * `onProgress` for each event, returning the final terminal `DownloadProgress`
+ * on success or throwing on failure/cancellation — mirroring
+ * `RunAnywhere+Storage.swift:177-263`.
+ *
+ * Callers that prefer the streaming iterable can still use `downloadModel(id)`
+ * directly; both shapes are supported.
+ */
+export async function downloadModelWithProgress(
+  model: ModelInfo,
+  onProgress?: (progress: DownloadProgress) => void,
+): Promise<DownloadProgress> {
+  const iterable = downloadModel(model.id);
+  const iterator = iterable[Symbol.asyncIterator]();
+  let last: DownloadProgress | undefined;
+  while (true) {
+    const result = await iterator.next();
+    if (result.done) break;
+    const progress = result.value;
+    onProgress?.(progress);
+    last = progress;
+    if (isTerminalProgress(progress)) break;
+  }
+  if (!last) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      'Download completed without any progress event',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK },
+    );
+  }
+  return last;
+}
+
+/**
+ * Framework the SDK falls back to when a category has no explicit model
+ * framework resolved (e.g. a pending UI selection that has not yet matched a
+ * catalogued model). Mirrors commons' `rac_model_category_default_framework`
+ * and Swift's `RAModelCategory.defaultFramework`.
+ */
+export function getDefaultFramework(
+  category: ModelCategory
+): InferenceFramework {
+  switch (category) {
+    case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+    case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
+      return InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
+    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+    case ModelCategory.MODEL_CATEGORY_EMBEDDING:
+    case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+      return InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
+    default:
+      return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+  }
 }

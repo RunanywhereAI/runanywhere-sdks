@@ -78,7 +78,26 @@ enum NativeProtoABI {
         guard let data = buffer.data, buffer.size > 0 else {
             return responseType.init()
         }
-        return try responseType.init(serializedBytes: Data(bytes: data, count: buffer.size))
+        let bytes = Data(bytes: data, count: buffer.size)
+        do {
+            return try responseType.init(serializedBytes: bytes)
+        } catch BinaryDecodingError.invalidUTF8 {
+            // Commons can emit proto `string` fields carrying invalid UTF-8
+            // (model output and byte-sliced document text — see
+            // `ProtoUTF8Sanitizer`). C++ protobuf serializes those bytes without
+            // failing, and Android (Wire) / Flutter (dart-protobuf) decode them
+            // leniently by substituting U+FFFD. SwiftProtobuf is the strict
+            // outlier and throws `.invalidUTF8`. Match the other SDKs by
+            // repairing the offending byte runs and decoding the wire-equivalent
+            // payload. This runs ONLY on the strict-decode failure path, and only
+            // for message types with a registered repair shape, so valid
+            // responses are unaffected and there is no cross-SDK parity risk.
+            guard let shape = ProtoUTF8Sanitizer.shape(forMessageNamed: responseType.protoMessageName),
+                  let repaired = ProtoUTF8Sanitizer.repair(bytes, as: shape) else {
+                throw BinaryDecodingError.invalidUTF8
+            }
+            return try responseType.init(serializedBytes: repaired)
+        }
     }
 
     static func free(_ buffer: inout rac_proto_buffer_t) {

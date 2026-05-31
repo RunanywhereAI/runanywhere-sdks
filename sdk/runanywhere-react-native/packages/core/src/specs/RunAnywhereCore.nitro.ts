@@ -54,6 +54,15 @@ export interface RunAnywhereCore extends HybridObject<{
   completeServicesInitialization(): Promise<boolean>;
 
   /**
+   * Retry HTTP/auth setup after an offline initialization via the commons
+   * `rac_sdk_retry_http_proto` idempotency guard. Returns the resulting
+   * `http_configured` flag so the TS recovery path knows whether the
+   * platform-side auth round-trip is still required.
+   * Matches Swift: CppBridge.SdkInit.retryHTTP().
+   */
+  retryHTTPSetupProto(): Promise<boolean>;
+
+  /**
    * Destroy the SDK and clean up resources
    */
   destroy(): Promise<void>;
@@ -148,6 +157,20 @@ export interface RunAnywhereCore extends HybridObject<{
   registerModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
 
   /**
+   * Canonical single-call URL -> saved ModelInfo registration.
+   *
+   * Routes a serialized runanywhere.v1.RegisterModelFromUrlRequest through the
+   * commons `rac_register_model_from_url_proto` C ABI, which owns
+   * framework-aware defaulting, artifact-type-from-extension inference, and
+   * stable id-from-URL derivation, then persists through the registry's proto
+   * save path. Returns the saved runanywhere.v1.ModelInfo bytes (empty buffer
+   * when the ABI is unavailable on the staged native artifact). Mirrors Swift
+   * `RunAnywhere.registerModelFromUrl` and Kotlin
+   * `CppBridgeModelRegistry.registerModelFromUrl`.
+   */
+  registerModelFromUrlProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
    * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
    */
   updateModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
@@ -176,7 +199,7 @@ export interface RunAnywhereCore extends HybridObject<{
   importModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Refresh the model registry — T4.9 unified cross-SDK surface.
+   * Refresh the model registry — unified cross-SDK surface.
    *
    * Routes to `rac_model_registry_refresh` in commons. Each flag is
    * independent and interpreted by the native registry implementation.
@@ -369,13 +392,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Configure HTTP client base URL / API key for downstream C++ consumers
-   * (DeviceBridge etc.). TypeScript callers use `httpRequest` directly.
-   * @returns true if configured successfully
-   */
-  configureHttp(baseUrl: string, apiKey: string): Promise<boolean>;
-
-  /**
    * Perform a synchronous HTTP request via the native curl-backed client.
    * Returns a JSON string `{"status": number, "body": string, "headersJson":
    * string}` on any HTTP response (including 4xx/5xx). Rejects the promise
@@ -423,29 +439,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * @returns The new auth response body as a JSON string.
    */
   authRefreshToken(baseURL: string): Promise<string>;
-
-  // ============================================================================
-  // Utility Functions
-  // ============================================================================
-
-  /**
-   * Extract an archive (tar.bz2, tar.gz, zip)
-   * @param archivePath Path to the archive
-   * @param destPath Destination directory
-   */
-  extractArchive(archivePath: string, destPath: string): Promise<boolean>;
-
-  /**
-   * Get device capabilities
-   * @returns JSON string with device info
-   */
-  getDeviceCapabilities(): Promise<string>;
-
-  /**
-   * Get memory usage
-   * @returns Current memory usage in bytes
-   */
-  getMemoryUsage(): Promise<number>;
 
   // ============================================================================
   // LLM Capability (Backend-Agnostic)
@@ -586,58 +579,9 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   vlmCancelProto(): Promise<ArrayBuffer>;
 
-  // ============================================================================
-  // Secure Storage
-  // Matches Swift: KeychainManager.swift
-  // Uses platform secure storage (Keychain on iOS, Keystore on Android)
-  // ============================================================================
-
   /**
-   * Store a string value securely
-   * @param key Storage key (e.g., "com.runanywhere.sdk.apiKey")
-   * @param value String value to store
-   * @returns true if stored successfully
-   */
-  secureStorageSet(key: string, value: string): Promise<boolean>;
-
-  /**
-   * Retrieve a string value from secure storage
-   * @param key Storage key
-   * @returns Stored value or null if not found
-   */
-  secureStorageGet(key: string): Promise<string | null>;
-
-  /**
-   * Delete a value from secure storage
-   * @param key Storage key
-   * @returns true if deleted successfully
-   */
-  secureStorageDelete(key: string): Promise<boolean>;
-
-  /**
-   * Check if a key exists in secure storage
-   * @param key Storage key
-   * @returns true if key exists
-   */
-  secureStorageExists(key: string): Promise<boolean>;
-
-  /**
-   * Store a string value securely (semantic alias for secureStorageSet)
-   * @param key Storage key
-   * @param value String value to store
-   */
-  secureStorageStore(key: string, value: string): Promise<void>;
-
-  /**
-   * Retrieve a string value from secure storage (semantic alias for secureStorageGet)
-   * @param key Storage key
-   * @returns Stored value or null if not found
-   */
-  secureStorageRetrieve(key: string): Promise<string | null>;
-
-  /**
-   * Get persistent device UUID
-   * This UUID survives app reinstalls (stored in Keychain/Keystore)
+   * Get persistent device UUID.
+   * Survives app reinstalls (stored in Keychain/Keystore).
    * Matches Swift: DeviceIdentity.persistentUUID
    * @returns Persistent device UUID
    */
@@ -675,7 +619,7 @@ export interface RunAnywhereCore extends HybridObject<{
   /**
    * Get the native voice-agent handle as a JS number. Pass to
    * `VoiceAgent.subscribeProtoEvents(handle, ...)` to subscribe to
-   * streaming events. v3.1 addition — exposes the underlying
+   * streaming events. Exposes the underlying
    * `rac_voice_agent_handle_t` so the adapter pattern works.
    *
    * @returns handle as number (0 if voice agent not yet initialized).
@@ -781,7 +725,7 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<ArrayBuffer>;
 
   /**
-   * Cancellation-aware variant of toolRunLoopProto (pass2-syn-007).
+   * Cancellation-aware variant of toolRunLoopProto.
    *
    * Backed by `rac_tool_calling_run_loop_with_handle_proto`. Commons publishes
    * an opaque `run_loop_handle` synchronously, before the iteration loop
@@ -794,7 +738,7 @@ export interface RunAnywhereCore extends HybridObject<{
    * with-handle ABI is unavailable on this commons build.
    *
    * Mirrors Swift `generateWithToolsCancellable` in
-   * `RunAnywhere+ToolCalling.swift` (pass3-syn-047).
+   * `RunAnywhere+ToolCalling.swift`.
    */
   toolRunLoopProtoWithHandle(
     requestBytes: ArrayBuffer,
@@ -804,7 +748,7 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Cancel an in-flight tool-calling run loop started via
-   * `toolRunLoopProtoWithHandle` (pass2-syn-007).
+   * `toolRunLoopProtoWithHandle`.
    *
    * Backed by `rac_tool_calling_run_loop_cancel_proto`. Idempotent: safe to
    * call after the loop has already returned (the handle will be stale and
@@ -918,7 +862,7 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<ArrayBuffer>;
 
   // ===========================================================================
-  // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
+  // Solutions Runtime (rac/solutions/rac_solution.h)
   //
   // Proto-byte / YAML driven L5 solution runtime. Callers pass a serialized
   // `runanywhere.v1.SolutionConfig` (or PipelineSpec) protobuf or a YAML

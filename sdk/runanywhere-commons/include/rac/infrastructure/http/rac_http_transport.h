@@ -1,6 +1,6 @@
 /**
  * @file rac_http_transport.h
- * @brief Platform HTTP transport vtable (v2 close-out Phase H2).
+ * @brief Platform HTTP transport vtable.
  *
  * Cross-platform HTTP routing layer inspired by Realm Core / Mapbox GL
  * Native: the C++ core defines a pure-C vtable, and each platform SDK

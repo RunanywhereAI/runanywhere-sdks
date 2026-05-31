@@ -12,7 +12,7 @@
 //
 // Every enum below is the *union* of cases currently declared by hand across
 // Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL drift table
-// (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is what motivated
+// is what motivated
 // this schema. Every SDK consumes generated output; nothing is hand-written.
 
 import SwiftProtobuf
@@ -22,7 +22,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -36,7 +36,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
 ///   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
 /// ---------------------------------------------------------------------------
-public enum RAAudioFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAAudioFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case pcm // = 1
@@ -116,7 +116,7 @@ public enum RAAudioFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///                                       SafeTensors, Zip, Folder, Proprietary)
 ///   Web    enums.ts:56                (copy of RN)
 /// ---------------------------------------------------------------------------
-public enum RAModelFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case gguf // = 1
@@ -230,7 +230,7 @@ public enum RAModelFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   RN     enums.ts:30 (LLMFramework) (16 cases)
 ///   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
 /// ---------------------------------------------------------------------------
-public enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case onnx // = 1
@@ -376,7 +376,7 @@ public enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
 ///   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
 /// ---------------------------------------------------------------------------
-public enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case language // = 1
@@ -453,7 +453,7 @@ public enum RAModelCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   RN     enums.ts:11                (Development, Staging, Production)
 ///   Web    enums.ts:9                 (Development, Staging, Production)
 /// ---------------------------------------------------------------------------
-public enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case development // = 1
@@ -498,7 +498,7 @@ public enum RASDKEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// ---------------------------------------------------------------------------
 /// Model source — where the catalog entry came from.
 /// ---------------------------------------------------------------------------
-public enum RAModelSource: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelSource: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -552,7 +552,7 @@ public enum RAModelSource: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
 ///   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
 /// ---------------------------------------------------------------------------
-public enum RAArchiveType: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAArchiveType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case zip // = 1
@@ -598,7 +598,7 @@ public enum RAArchiveType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAArchiveStructure: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAArchiveStructure: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case singleFileNested // = 1
@@ -652,7 +652,7 @@ public enum RAArchiveStructure: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
 ///   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
 /// ---------------------------------------------------------------------------
-public enum RAModelArtifactType: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelArtifactType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case singleFile // = 1
@@ -730,7 +730,7 @@ public enum RAModelArtifactType: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
 ///   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
 /// ---------------------------------------------------------------------------
-public enum RAModelRegistryStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelRegistryStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case registered // = 1
@@ -784,7 +784,7 @@ public enum RAModelRegistryStatus: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAModelQuerySortField: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelQuerySortField: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case name // = 1
@@ -838,7 +838,7 @@ public enum RAModelQuerySortField: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAModelQuerySortOrder: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelQuerySortOrder: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case ascending // = 1
@@ -879,7 +879,7 @@ public enum RAModelQuerySortOrder: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Role of a file inside a single/multi-file artifact. The generic COMPANION
 /// role covers arbitrary sidecars; specific roles document common public
 /// catalog files such as VLM mmproj files and tokenizer/config assets.
-public enum RAModelFileRole: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelFileRole: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case primaryModel // = 1
@@ -960,7 +960,7 @@ public enum RAModelFileRole: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Canonical short-form below; specific PreferLocal/PreferCloud cover the
 /// "preferred" cases, MANUAL covers explicit user override.
 /// ---------------------------------------------------------------------------
-public enum RARoutingPolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RARoutingPolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case preferLocal // = 1
@@ -1010,7 +1010,7 @@ public enum RARoutingPolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public struct RAModelInfoMetadata: Sendable {
+public nonisolated struct RAModelInfoMetadata: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1030,7 +1030,7 @@ public struct RAModelInfoMetadata: Sendable {
   public init() {}
 }
 
-public struct RAModelRuntimeCompatibility: Sendable {
+public nonisolated struct RAModelRuntimeCompatibility: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1052,7 +1052,7 @@ public struct RAModelRuntimeCompatibility: Sendable {
 ///   Dart   model_types.dart:335       (similar shape, nullable divergences)
 ///   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
 /// ---------------------------------------------------------------------------
-public struct RAModelInfo: @unchecked Sendable {
+public nonisolated struct RAModelInfo: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1359,7 +1359,7 @@ public struct RAModelInfo: @unchecked Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Artifact: Equatable, Sendable {
+  public nonisolated enum OneOf_Artifact: Equatable, Sendable {
     case singleFile(RASingleFileArtifact)
     case archive(RAArchiveArtifact)
     case multiFile(RAMultiFileArtifact)
@@ -1375,7 +1375,7 @@ public struct RAModelInfo: @unchecked Sendable {
 
 /// Repeated model registry responses use this wrapper because protobuf cannot
 /// serialize a bare repeated field as a top-level message.
-public struct RAModelInfoList: Sendable {
+public nonisolated struct RAModelInfoList: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1387,7 +1387,7 @@ public struct RAModelInfoList: Sendable {
   public init() {}
 }
 
-public struct RASingleFileArtifact: Sendable {
+public nonisolated struct RASingleFileArtifact: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1415,7 +1415,7 @@ public struct RASingleFileArtifact: Sendable {
   fileprivate var _expectedFiles: RAExpectedModelFiles? = nil
 }
 
-public struct RAArchiveArtifact: Sendable {
+public nonisolated struct RAArchiveArtifact: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1447,7 +1447,7 @@ public struct RAArchiveArtifact: Sendable {
   fileprivate var _expectedFiles: RAExpectedModelFiles? = nil
 }
 
-public struct RAModelFileDescriptor: Sendable {
+public nonisolated struct RAModelFileDescriptor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1531,7 +1531,7 @@ public struct RAModelFileDescriptor: Sendable {
   fileprivate var _checksumSha256: String? = nil
 }
 
-public struct RAMultiFileArtifact: Sendable {
+public nonisolated struct RAMultiFileArtifact: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1550,7 +1550,7 @@ public struct RAMultiFileArtifact: Sendable {
 ///   Flutter core/types/model_types.dart:420
 ///   Swift   ModelTypes.swift:~300
 /// ---------------------------------------------------------------------------
-public struct RAExpectedModelFiles: Sendable {
+public nonisolated struct RAExpectedModelFiles: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1590,7 +1590,7 @@ public struct RAExpectedModelFiles: Sendable {
 /// Registry/query filters shared by SDK model-management APIs. UI-only
 /// presentation state and platform filesystem handles are intentionally not
 /// represented here.
-public struct RAModelQuery: Sendable {
+public nonisolated struct RAModelQuery: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1703,7 +1703,7 @@ public struct RAModelQuery: Sendable {
   fileprivate var _registryStatus: RAModelRegistryStatus? = nil
 }
 
-public struct RAModelRegistryRefreshRequest: @unchecked Sendable {
+public nonisolated struct RAModelRegistryRefreshRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1762,7 +1762,7 @@ public struct RAModelRegistryRefreshRequest: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAModelRegistryRefreshResult: Sendable {
+public nonisolated struct RAModelRegistryRefreshResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1805,7 +1805,7 @@ public struct RAModelRegistryRefreshResult: Sendable {
   fileprivate var _models: RAModelInfoList? = nil
 }
 
-public struct RAModelListRequest: Sendable {
+public nonisolated struct RAModelListRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1830,7 +1830,7 @@ public struct RAModelListRequest: Sendable {
   fileprivate var _query: RAModelQuery? = nil
 }
 
-public struct RAModelListResult: Sendable {
+public nonisolated struct RAModelListResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1863,7 +1863,7 @@ public struct RAModelListResult: Sendable {
   fileprivate var _models: RAModelInfoList? = nil
 }
 
-public struct RAModelGetRequest: Sendable {
+public nonisolated struct RAModelGetRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1875,7 +1875,7 @@ public struct RAModelGetRequest: Sendable {
   public init() {}
 }
 
-public struct RAModelGetResult: Sendable {
+public nonisolated struct RAModelGetResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1900,7 +1900,7 @@ public struct RAModelGetResult: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RAModelImportRequest: Sendable {
+public nonisolated struct RAModelImportRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1937,7 +1937,7 @@ public struct RAModelImportRequest: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RAModelImportResult: Sendable {
+public nonisolated struct RAModelImportResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1972,7 +1972,7 @@ public struct RAModelImportResult: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RAModelDiscoveryRequest: @unchecked Sendable {
+public nonisolated struct RAModelDiscoveryRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2025,7 +2025,7 @@ public struct RAModelDiscoveryRequest: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RADiscoveredModel: Sendable {
+public nonisolated struct RADiscoveredModel: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2056,7 +2056,7 @@ public struct RADiscoveredModel: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RAModelDiscoveryResult: Sendable {
+public nonisolated struct RAModelDiscoveryResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2082,7 +2082,7 @@ public struct RAModelDiscoveryResult: Sendable {
   public init() {}
 }
 
-public struct RAModelLoadRequest: Sendable {
+public nonisolated struct RAModelLoadRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2119,7 +2119,7 @@ public struct RAModelLoadRequest: Sendable {
   fileprivate var _framework: RAInferenceFramework? = nil
 }
 
-public struct RAModelLoadResult: Sendable {
+public nonisolated struct RAModelLoadResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2152,7 +2152,7 @@ public struct RAModelLoadResult: Sendable {
   public init() {}
 }
 
-public struct RAModelUnloadRequest: Sendable {
+public nonisolated struct RAModelUnloadRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2187,7 +2187,7 @@ public struct RAModelUnloadRequest: Sendable {
   fileprivate var _framework: RAInferenceFramework? = nil
 }
 
-public struct RAModelUnloadResult: Sendable {
+public nonisolated struct RAModelUnloadResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2207,7 +2207,7 @@ public struct RAModelUnloadResult: Sendable {
   public init() {}
 }
 
-public struct RACurrentModelRequest: Sendable {
+public nonisolated struct RACurrentModelRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2240,7 +2240,7 @@ public struct RACurrentModelRequest: Sendable {
   fileprivate var _framework: RAInferenceFramework? = nil
 }
 
-public struct RACurrentModelResult: Sendable {
+public nonisolated struct RACurrentModelResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2277,7 +2277,7 @@ public struct RACurrentModelResult: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RAModelDeleteRequest: Sendable {
+public nonisolated struct RAModelDeleteRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2295,7 +2295,7 @@ public struct RAModelDeleteRequest: Sendable {
   public init() {}
 }
 
-public struct RAModelDeleteResult: Sendable {
+public nonisolated struct RAModelDeleteResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2329,7 +2329,7 @@ public struct RAModelDeleteResult: Sendable {
 /// registry entry, computes the compatibility verdict (canRun / canFit),
 /// and returns reasons / suggested alternative model ids.
 /// ---------------------------------------------------------------------------
-public struct RAModelCompatibilityRequest: Sendable {
+public nonisolated struct RAModelCompatibilityRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2385,7 +2385,7 @@ public struct RAModelCompatibilityRequest: Sendable {
   fileprivate var _preferredFramework: RAInferenceFramework? = nil
 }
 
-public struct RAModelCompatibilityResult: Sendable {
+public nonisolated struct RAModelCompatibilityResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2435,7 +2435,7 @@ public struct RAModelCompatibilityResult: Sendable {
 /// URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
 /// inner format, ...) into commons so every SDK uses one implementation.
 /// ---------------------------------------------------------------------------
-public struct RAModelFormatFromUrlRequest: Sendable {
+public nonisolated struct RAModelFormatFromUrlRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2449,7 +2449,7 @@ public struct RAModelFormatFromUrlRequest: Sendable {
   public init() {}
 }
 
-public struct RAModelFormatFromUrlResult: Sendable {
+public nonisolated struct RAModelFormatFromUrlResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2475,7 +2475,7 @@ public struct RAModelFormatFromUrlResult: Sendable {
 /// withInferredArtifact and Kotlin inferArtifactFields with a single commons
 /// call.
 /// ---------------------------------------------------------------------------
-public struct RAArtifactInferFromUrlRequest: Sendable {
+public nonisolated struct RAArtifactInferFromUrlRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2492,7 +2492,7 @@ public struct RAArtifactInferFromUrlRequest: Sendable {
   public init() {}
 }
 
-public struct RAArtifactInferFromUrlResult: Sendable {
+public nonisolated struct RAArtifactInferFromUrlResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2531,7 +2531,7 @@ public struct RAArtifactInferFromUrlResult: Sendable {
 /// transport; commons consumes the cached / fetched entries and returns a
 /// canonical proto byte payload.
 /// ---------------------------------------------------------------------------
-public struct RAModelRegistryFetchAssignmentsRequest: Sendable {
+public nonisolated struct RAModelRegistryFetchAssignmentsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2562,7 +2562,7 @@ public struct RAModelRegistryFetchAssignmentsRequest: Sendable {
   fileprivate var _environment: RASDKEnvironment? = nil
 }
 
-public struct RAModelRegistryFetchAssignmentsResult: Sendable {
+public nonisolated struct RAModelRegistryFetchAssignmentsResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2594,14 +2594,14 @@ public struct RAModelRegistryFetchAssignmentsResult: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+/// Inputs for the canonical RAModelInfo factory. Replaces Swift's
 /// `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
 /// logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
 /// (id, name, category/format/framework defaults, context-length defaults,
 /// thinking gating + default pattern, artifact inference, source mark,
 /// timestamps, and is_downloaded probe).
 /// ---------------------------------------------------------------------------
-public struct RAModelInfoMakeRequest: Sendable {
+public nonisolated struct RAModelInfoMakeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2659,13 +2659,13 @@ public struct RAModelInfoMakeRequest: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Inputs for the canonical "register a model from a URL" entry point (P2-T6).
-/// Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+/// Inputs for the canonical "register a model from a URL" entry point.
+/// Composes ModelInfoMakeRequest with the existing registry save path
 /// so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
 /// Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
 /// shape).
 /// ---------------------------------------------------------------------------
-public struct RARegisterModelFromUrlRequest: Sendable {
+public nonisolated struct RARegisterModelFromUrlRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2720,65 +2720,65 @@ public struct RARegisterModelFromUrlRequest: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAAudioFormat: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAudioFormat: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUDIO_FORMAT_UNSPECIFIED\0\u{1}AUDIO_FORMAT_PCM\0\u{1}AUDIO_FORMAT_WAV\0\u{1}AUDIO_FORMAT_MP3\0\u{1}AUDIO_FORMAT_OPUS\0\u{1}AUDIO_FORMAT_AAC\0\u{1}AUDIO_FORMAT_FLAC\0\u{1}AUDIO_FORMAT_OGG\0\u{1}AUDIO_FORMAT_M4A\0\u{1}AUDIO_FORMAT_PCM_S16LE\0")
 }
 
-extension RAModelFormat: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelFormat: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_FORMAT_UNSPECIFIED\0\u{1}MODEL_FORMAT_GGUF\0\u{1}MODEL_FORMAT_GGML\0\u{1}MODEL_FORMAT_ONNX\0\u{1}MODEL_FORMAT_ORT\0\u{1}MODEL_FORMAT_BIN\0\u{1}MODEL_FORMAT_COREML\0\u{1}MODEL_FORMAT_MLMODEL\0\u{1}MODEL_FORMAT_MLPACKAGE\0\u{1}MODEL_FORMAT_TFLITE\0\u{1}MODEL_FORMAT_SAFETENSORS\0\u{1}MODEL_FORMAT_QNN_CONTEXT\0\u{1}MODEL_FORMAT_ZIP\0\u{1}MODEL_FORMAT_FOLDER\0\u{1}MODEL_FORMAT_PROPRIETARY\0\u{1}MODEL_FORMAT_UNKNOWN\0")
 }
 
-extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{1}INFERENCE_FRAMEWORK_WHISPERKIT_COREML\0\u{1}INFERENCE_FRAMEWORK_METALRT\0\u{1}INFERENCE_FRAMEWORK_GENIE\0\u{1}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{1}INFERENCE_FRAMEWORK_WHISPERKIT\0\u{1}INFERENCE_FRAMEWORK_OPENAI_WHISPER\0\u{1}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0")
 }
 
-extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_CATEGORY_UNSPECIFIED\0\u{1}MODEL_CATEGORY_LANGUAGE\0\u{1}MODEL_CATEGORY_SPEECH_RECOGNITION\0\u{1}MODEL_CATEGORY_SPEECH_SYNTHESIS\0\u{1}MODEL_CATEGORY_VISION\0\u{1}MODEL_CATEGORY_IMAGE_GENERATION\0\u{1}MODEL_CATEGORY_MULTIMODAL\0\u{1}MODEL_CATEGORY_AUDIO\0\u{1}MODEL_CATEGORY_EMBEDDING\0\u{1}MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION\0")
 }
 
-extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKEnvironment: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_ENVIRONMENT_UNSPECIFIED\0\u{1}SDK_ENVIRONMENT_DEVELOPMENT\0\u{1}SDK_ENVIRONMENT_STAGING\0\u{1}SDK_ENVIRONMENT_PRODUCTION\0")
 }
 
-extension RAModelSource: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelSource: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_SOURCE_UNSPECIFIED\0\u{1}MODEL_SOURCE_REMOTE\0\u{1}MODEL_SOURCE_LOCAL\0\u{1}MODEL_SOURCE_BUILT_IN\0")
 }
 
-extension RAArchiveType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAArchiveType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ARCHIVE_TYPE_UNSPECIFIED\0\u{1}ARCHIVE_TYPE_ZIP\0\u{1}ARCHIVE_TYPE_TAR_BZ2\0\u{1}ARCHIVE_TYPE_TAR_GZ\0\u{1}ARCHIVE_TYPE_TAR_XZ\0")
 }
 
-extension RAArchiveStructure: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAArchiveStructure: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ARCHIVE_STRUCTURE_UNSPECIFIED\0\u{1}ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED\0\u{1}ARCHIVE_STRUCTURE_DIRECTORY_BASED\0\u{1}ARCHIVE_STRUCTURE_NESTED_DIRECTORY\0\u{1}ARCHIVE_STRUCTURE_UNKNOWN\0")
 }
 
-extension RAModelArtifactType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelArtifactType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_ARTIFACT_TYPE_UNSPECIFIED\0\u{1}MODEL_ARTIFACT_TYPE_SINGLE_FILE\0\u{1}MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE\0\u{1}MODEL_ARTIFACT_TYPE_DIRECTORY\0\u{1}MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE\0\u{1}MODEL_ARTIFACT_TYPE_CUSTOM\0\u{1}MODEL_ARTIFACT_TYPE_ARCHIVE\0\u{1}MODEL_ARTIFACT_TYPE_MULTI_FILE\0\u{1}MODEL_ARTIFACT_TYPE_BUILT_IN\0\u{1}MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE\0\u{1}MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE\0")
 }
 
-extension RAModelRegistryStatus: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryStatus: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_REGISTRY_STATUS_UNSPECIFIED\0\u{1}MODEL_REGISTRY_STATUS_REGISTERED\0\u{1}MODEL_REGISTRY_STATUS_DOWNLOADING\0\u{1}MODEL_REGISTRY_STATUS_DOWNLOADED\0\u{1}MODEL_REGISTRY_STATUS_LOADING\0\u{1}MODEL_REGISTRY_STATUS_LOADED\0\u{1}MODEL_REGISTRY_STATUS_ERROR\0")
 }
 
-extension RAModelQuerySortField: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelQuerySortField: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_QUERY_SORT_FIELD_UNSPECIFIED\0\u{1}MODEL_QUERY_SORT_FIELD_NAME\0\u{1}MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS\0\u{1}MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS\0\u{1}MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES\0\u{1}MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS\0\u{1}MODEL_QUERY_SORT_FIELD_USAGE_COUNT\0")
 }
 
-extension RAModelQuerySortOrder: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelQuerySortOrder: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_QUERY_SORT_ORDER_UNSPECIFIED\0\u{1}MODEL_QUERY_SORT_ORDER_ASCENDING\0\u{1}MODEL_QUERY_SORT_ORDER_DESCENDING\0")
 }
 
-extension RAModelFileRole: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelFileRole: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_FILE_ROLE_UNSPECIFIED\0\u{1}MODEL_FILE_ROLE_PRIMARY_MODEL\0\u{1}MODEL_FILE_ROLE_COMPANION\0\u{1}MODEL_FILE_ROLE_VISION_PROJECTOR\0\u{1}MODEL_FILE_ROLE_TOKENIZER\0\u{1}MODEL_FILE_ROLE_CONFIG\0\u{1}MODEL_FILE_ROLE_VOCABULARY\0\u{1}MODEL_FILE_ROLE_MERGES\0\u{1}MODEL_FILE_ROLE_LABELS\0")
 }
 
-extension RARoutingPolicy: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARoutingPolicy: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ROUTING_POLICY_UNSPECIFIED\0\u{1}ROUTING_POLICY_PREFER_LOCAL\0\u{1}ROUTING_POLICY_PREFER_CLOUD\0\u{1}ROUTING_POLICY_COST_OPTIMIZED\0\u{1}ROUTING_POLICY_LATENCY_OPTIMIZED\0\u{1}ROUTING_POLICY_MANUAL\0")
 }
 
-extension RAModelInfoMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelInfoMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfoMetadata"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}description\0\u{1}author\0\u{1}license\0\u{1}tags\0\u{1}version\0")
 
@@ -2828,7 +2828,7 @@ extension RAModelInfoMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAModelRuntimeCompatibility: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRuntimeCompatibility: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRuntimeCompatibility"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}compatible_frameworks\0\u{3}compatible_formats\0")
 
@@ -2863,7 +2863,7 @@ extension RAModelRuntimeCompatibility: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}category\0\u{1}format\0\u{1}framework\0\u{3}download_url\0\u{3}local_path\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{1}description\0\u{1}source\0\u{3}created_at_unix_ms\0\u{3}updated_at_unix_ms\0\u{3}memory_required_bytes\0\u{3}checksum_sha256\0\u{3}thinking_pattern\0\u{1}metadata\0\u{3}single_file\0\u{1}archive\0\u{3}multi_file\0\u{3}custom_strategy_id\0\u{3}built_in\0\u{3}artifact_type\0\u{3}expected_files\0\u{3}acceleration_preference\0\u{3}routing_policy\0\u{1}compatibility\0\u{3}preferred_framework\0\u{3}registry_status\0\u{3}is_downloaded\0\u{3}is_available\0\u{3}last_used_at_unix_ms\0\u{3}usage_count\0\u{3}sync_pending\0\u{3}status_message\0")
 
@@ -3231,7 +3231,7 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RAModelInfoList: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelInfoList: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfoList"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}models\0")
 
@@ -3261,7 +3261,7 @@ extension RAModelInfoList: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SingleFileArtifact"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}required_patterns\0\u{3}optional_patterns\0\u{3}expected_files\0")
 
@@ -3305,7 +3305,7 @@ extension RASingleFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ArchiveArtifact"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}structure\0\u{3}required_patterns\0\u{3}optional_patterns\0\u{3}expected_files\0")
 
@@ -3359,7 +3359,7 @@ extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{b}checksum\0\u{c}\u{5}\u{1}")
 
@@ -3433,7 +3433,7 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAMultiFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAMultiFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".MultiFileArtifact"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}files\0")
 
@@ -3463,7 +3463,7 @@ extension RAMultiFileArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAExpectedModelFiles: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAExpectedModelFiles: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ExpectedModelFiles"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}files\0\u{3}root_directory\0\u{3}required_patterns\0\u{3}optional_patterns\0\u{1}description\0")
 
@@ -3517,7 +3517,7 @@ extension RAExpectedModelFiles: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelQuery"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}framework\0\u{1}category\0\u{1}format\0\u{3}downloaded_only\0\u{3}available_only\0\u{3}max_size_bytes\0\u{3}search_query\0\u{1}source\0\u{3}sort_field\0\u{3}sort_order\0\u{3}registry_status\0")
 
@@ -3601,7 +3601,7 @@ extension RAModelQuery: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAModelRegistryRefreshRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryRefreshRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryRefreshRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_remote_catalog\0\u{3}rescan_local\0\u{3}prune_orphans\0\u{1}query\0\u{3}catalog_uri\0\u{3}force_refresh\0\u{3}include_downloaded_state\0")
 
@@ -3713,7 +3713,7 @@ extension RAModelRegistryRefreshRequest: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension RAModelRegistryRefreshResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryRefreshResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryRefreshResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}models\0\u{3}registered_count\0\u{3}updated_count\0\u{3}discovered_count\0\u{3}pruned_count\0\u{3}refreshed_at_unix_ms\0\u{1}warnings\0\u{3}error_message\0\u{3}downloaded_count\0\u{3}available_count\0\u{3}error_count\0")
 
@@ -3802,7 +3802,7 @@ extension RAModelRegistryRefreshResult: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelListRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}query\0\u{3}include_counts\0")
 
@@ -3841,7 +3841,7 @@ extension RAModelListRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAModelListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelListResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}models\0\u{3}error_message\0\u{3}total_count\0\u{3}downloaded_count\0\u{3}available_count\0\u{3}filtered_count\0")
 
@@ -3905,7 +3905,7 @@ extension RAModelListResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAModelGetRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelGetRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelGetRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0")
 
@@ -3935,7 +3935,7 @@ extension RAModelGetRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAModelGetResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelGetResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelGetResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}found\0\u{1}model\0\u{3}error_message\0")
 
@@ -3979,7 +3979,7 @@ extension RAModelGetResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAModelImportRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelImportRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelImportRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}model\0\u{3}source_path\0\u{3}copy_into_managed_storage\0\u{3}overwrite_existing\0\u{1}files\0\u{3}validate_before_register\0")
 
@@ -4038,7 +4038,7 @@ extension RAModelImportRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAModelImportResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelImportResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelImportResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}model\0\u{3}local_path\0\u{3}imported_bytes\0\u{1}warnings\0\u{3}error_message\0\u{1}registered\0\u{3}copied_into_managed_storage\0")
 
@@ -4107,7 +4107,7 @@ extension RAModelImportResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAModelDiscoveryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelDiscoveryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelDiscoveryRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}search_roots\0\u{1}recursive\0\u{3}link_downloaded\0\u{3}purge_invalid\0\u{1}query\0\u{3}include_built_in\0\u{3}include_user_imports\0")
 
@@ -4219,7 +4219,7 @@ extension RAModelDiscoveryRequest: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RADiscoveredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADiscoveredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiscoveredModel"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}local_path\0\u{3}matched_registry\0\u{1}model\0\u{3}size_bytes\0\u{1}warnings\0")
 
@@ -4278,7 +4278,7 @@ extension RADiscoveredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAModelDiscoveryResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelDiscoveryResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelDiscoveryResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}discovered_models\0\u{3}linked_count\0\u{3}purged_count\0\u{1}warnings\0\u{3}error_message\0\u{3}scanned_count\0\u{3}imported_count\0")
 
@@ -4343,7 +4343,7 @@ extension RAModelDiscoveryResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelLoadRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}category\0\u{1}framework\0\u{3}force_reload\0\u{3}validate_availability\0")
 
@@ -4397,7 +4397,7 @@ extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelLoadResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}model_id\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}loaded_at_unix_ms\0\u{3}error_message\0\u{1}warnings\0\u{3}already_loaded\0\u{3}resolved_artifacts\0")
 
@@ -4472,7 +4472,7 @@ extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAModelUnloadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelUnloadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelUnloadRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}category\0\u{3}unload_all\0\u{1}framework\0")
 
@@ -4521,7 +4521,7 @@ extension RAModelUnloadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAModelUnloadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelUnloadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelUnloadResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}unloaded_model_ids\0\u{3}error_message\0\u{3}unloaded_at_unix_ms\0\u{1}warnings\0")
 
@@ -4571,7 +4571,7 @@ extension RAModelUnloadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RACurrentModelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RACurrentModelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CurrentModelRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}category\0\u{1}framework\0\u{3}include_model_metadata\0")
 
@@ -4615,7 +4615,7 @@ extension RACurrentModelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RACurrentModelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RACurrentModelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CurrentModelResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}model\0\u{3}loaded_at_unix_ms\0\u{1}found\0\u{3}error_message\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}resolved_artifacts\0\u{b}has_model\0\u{c}\u{1}\u{1}")
 
@@ -4689,7 +4689,7 @@ extension RACurrentModelResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAModelDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelDeleteRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}delete_files\0\u{1}unregister\0\u{3}unload_if_loaded\0")
 
@@ -4734,7 +4734,7 @@ extension RAModelDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAModelDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelDeleteResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}model_id\0\u{3}deleted_bytes\0\u{3}files_deleted\0\u{3}registry_updated\0\u{3}was_loaded\0\u{3}error_message\0\u{1}warnings\0")
 
@@ -4799,7 +4799,7 @@ extension RAModelDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}hardware_profile\0\u{3}available_ram_bytes\0\u{3}available_storage_bytes\0\u{3}accelerator_preference\0\u{3}preferred_framework\0")
 
@@ -4858,7 +4858,7 @@ extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAModelCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}can_run\0\u{3}can_fit\0\u{3}required_memory_bytes\0\u{3}available_memory_bytes\0\u{3}required_storage_bytes\0\u{3}available_storage_bytes\0\u{1}reasons\0\u{3}suggested_alternatives\0\u{3}model_id\0\u{3}error_code\0\u{3}error_message\0")
 
@@ -4943,7 +4943,7 @@ extension RAModelCompatibilityResult: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RAModelFormatFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelFormatFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFormatFromUrlRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0")
 
@@ -4973,7 +4973,7 @@ extension RAModelFormatFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAModelFormatFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelFormatFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFormatFromUrlResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}format\0\u{3}inner_format\0")
 
@@ -5008,7 +5008,7 @@ extension RAModelFormatFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RAArtifactInferFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAArtifactInferFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ArtifactInferFromUrlRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{3}model_id\0")
 
@@ -5043,7 +5043,7 @@ extension RAArtifactInferFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension RAArtifactInferFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAArtifactInferFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ArtifactInferFromUrlResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}artifact_type\0\u{3}archive_type\0\u{3}archive_structure\0\u{3}primary_relpath\0\u{3}inner_format\0")
 
@@ -5093,7 +5093,7 @@ extension RAArtifactInferFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RAModelRegistryFetchAssignmentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryFetchAssignmentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryFetchAssignmentsRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{1}environment\0\u{3}force_refresh\0")
 
@@ -5137,7 +5137,7 @@ extension RAModelRegistryFetchAssignmentsRequest: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-extension RAModelRegistryFetchAssignmentsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryFetchAssignmentsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryFetchAssignmentsResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}models\0\u{3}model_count\0\u{3}fetched_at_unix_ms\0\u{3}error_code\0\u{3}error_message\0")
 
@@ -5196,7 +5196,7 @@ extension RAModelRegistryFetchAssignmentsResult: SwiftProtobuf.Message, SwiftPro
   }
 }
 
-extension RAModelInfoMakeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelInfoMakeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelInfoMakeRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0")
 
@@ -5250,7 +5250,7 @@ extension RAModelInfoMakeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RegisterModelFromUrlRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0")
 

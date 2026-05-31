@@ -3,28 +3,25 @@
  *
  * Domain implementation for HybridRunAnywhereCore.
  *
- * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
- * "Bridge Layer Audit"):
+ * Bridge classification:
  *   - SDK-facing pass-through: toolParseProto, toolFormatPromptProto,
  *     toolValidateProto, structuredOutputParseProto,
  *     structuredOutputPreparePromptProto, structuredOutputValidateProto,
  *     ragCreatePipelineProto, ragDestroyPipelineProto, ragIngestProto,
  *     ragQueryProto, ragClearProto, ragStatsProto,
  *     embeddingsEmbedBatchProto.
- *   - Bridge limitation tracked on commons backlog: embeddingsCreateProto
+ *   - Bridge limitation: embeddingsCreateProto
  *     still calls `rac_embeddings_create` / `rac_embeddings_initialize`
  *     because no `rac_embeddings_create_proto` lifecycle ABI exists yet.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
-#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <future>
 #include <stdexcept>
-#include <thread>
 
 namespace margelo::nitro::runanywhere {
 
@@ -391,17 +388,16 @@ HybridRunAnywhereCore::toolRunLoopProto(
         });
 }
 
-// pass3-syn-047: cancellation-aware variant of toolRunLoopProto. Wires the
-// commons `rac_tool_calling_run_loop_with_handle_proto` ABI to JS via a Nitro
-// callback (`onHandle`) so an AbortSignal can fan into
-// `rac_tool_calling_run_loop_cancel_proto(handle)` from another thread.
-//
-// The C ABI writes `out_run_loop_handle` synchronously, BEFORE the iteration
-// loop begins, then proceeds to drive the tool-calling loop (which blocks the
-// async worker thread). To surface the handle to JS while the call is still
-// in flight, we spawn a short-lived watcher thread that polls a shared atomic
-// slot and invokes the JS `onHandle` callback as soon as commons has stored
-// the handle.
+// Cancellation-aware variant of toolRunLoopProto. Binds to the
+// commons `rac_tool_calling_run_loop_with_handle_and_cb_proto` ABI, which
+// fires `on_handle_published(handle, user_data)` SYNCHRONOUSLY on the worker
+// thread the moment the cancellable handle is minted and BEFORE the first
+// iteration runs (rac_tool_calling.h:761-770). The callback forwards the
+// handle straight to the JS `onHandle` callback, mirroring the Swift
+// `HandleBox.set` (RunAnywhere+ToolCalling.swift:374-449), Kotlin
+// `CompletableDeferred.complete`, Flutter `Completer.complete`, and Web
+// synchronous-capture contracts. JS then arms an AbortSignal listener that
+// calls `toolRunLoopCancelProto(handle)` to interrupt long-running loops.
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
     const std::shared_ptr<ArrayBuffer>& requestBytes,
@@ -411,47 +407,36 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
         [bytes = std::move(bytes), onExecuteToolBytes, onHandle]() {
             auto runLoopFn =
-                proto_compat::symbol<proto_compat::ToolRunLoopWithHandleProtoFn>(
-                    "rac_tool_calling_run_loop_with_handle_proto");
+                proto_compat::symbol<proto_compat::ToolRunLoopWithHandleAndCbProtoFn>(
+                    "rac_tool_calling_run_loop_with_handle_and_cb_proto");
             if (!runLoopFn) {
                 LOGE(
                     "toolRunLoopProtoWithHandle: "
-                    "rac_tool_calling_run_loop_with_handle_proto unavailable");
+                    "rac_tool_calling_run_loop_with_handle_and_cb_proto unavailable");
                 throw std::runtime_error(
                     "toolRunLoopProtoWithHandle: commons export "
-                    "rac_tool_calling_run_loop_with_handle_proto unavailable");
+                    "rac_tool_calling_run_loop_with_handle_and_cb_proto unavailable");
             }
 
             ToolRunLoopExecutorState state{onExecuteToolBytes};
             rac_proto_buffer_t out;
             proto_compat::initBuffer(&out);
 
-            // Shared slot the C ABI writes synchronously before its loop
-            // begins. The watcher thread reads it and fans the value into JS.
-            std::atomic<uint64_t> handleSlot{0};
-            std::atomic<bool> watcherDone{false};
-            std::thread watcher([&handleSlot, &watcherDone, &onHandle]() {
-                // Poll on millisecond granularity. The commons ABI publishes
-                // the handle before the iteration loop begins, typically
-                // within microseconds of the call.
-                while (!watcherDone.load(std::memory_order_acquire)) {
-                    uint64_t observed =
-                        handleSlot.load(std::memory_order_acquire);
-                    if (observed != 0) {
-                        if (onHandle) {
-                            try {
-                                onHandle(static_cast<double>(observed));
-                            } catch (...) {
-                                LOGE(
-                                    "toolRunLoopProtoWithHandle: onHandle "
-                                    "callback threw");
-                            }
-                        }
-                        return;
-                    }
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            struct OnHandleCtx {
+                const ToolRunLoopHandleCallback& cb;
+            };
+            OnHandleCtx ctx{onHandle};
+            auto onHandlePublished = [](uint64_t handle, void* userData) {
+                auto* c = static_cast<OnHandleCtx*>(userData);
+                if (!c || !c->cb) {
+                    return;
                 }
-            });
+                try {
+                    c->cb(static_cast<double>(handle));
+                } catch (...) {
+                    LOGE("toolRunLoopProtoWithHandle: onHandle callback threw");
+                }
+            };
 
             uint64_t runLoopHandle = 0;
             const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
@@ -460,16 +445,10 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
                 bytes.size(),
                 toolRunLoopExecuteCallback,
                 &state,
+                onHandlePublished,
+                &ctx,
                 &runLoopHandle,
                 &out);
-
-            // Make sure the watcher observes the handle (or terminates if the
-            // call returned without publishing one) before we join it.
-            handleSlot.store(runLoopHandle, std::memory_order_release);
-            watcherDone.store(true, std::memory_order_release);
-            if (watcher.joinable()) {
-                watcher.join();
-            }
 
             if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
                 LOGE("toolRunLoopProtoWithHandle: rc=%d", rc);
@@ -483,7 +462,7 @@ HybridRunAnywhereCore::toolRunLoopProtoWithHandle(
         });
 }
 
-// pass3-syn-047: cancel an in-flight tool-calling run loop. Idempotent per the
+// Cancel an in-flight tool-calling run loop. Idempotent per the
 // commons contract — a stale or already-retired handle still returns
 // RAC_SUCCESS, so callers can wire this directly to AbortSignal abort events.
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::toolRunLoopCancelProto(
@@ -601,12 +580,14 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
 
         auto destroyFn = proto_compat::symbol<proto_compat::RAGSessionDestroyProtoFn>(
             "rac_rag_session_destroy_proto");
-        {
-            std::lock_guard<std::mutex> lock(g_ragProtoMutex);
-            if (g_ragProtoSession && destroyFn) {
-                destroyFn(g_ragProtoSession);
-                g_ragProtoSession = nullptr;
-            }
+
+        // Hold the mutex across destroy + create + install so concurrent
+        // callers cannot interleave and leak a session (Kotlin CppBridgeRAG
+        // serializes the same sequence with @Synchronized).
+        std::lock_guard<std::mutex> lock(g_ragProtoMutex);
+        if (g_ragProtoSession && destroyFn) {
+            destroyFn(g_ragProtoSession);
+            g_ragProtoSession = nullptr;
         }
 
         rac_handle_t session = nullptr;
@@ -616,10 +597,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
             LOGE("ragCreatePipelineProto: rc=%d", rc);
             return false;
         }
-        {
-            std::lock_guard<std::mutex> lock(g_ragProtoMutex);
-            g_ragProtoSession = session;
-        }
+        g_ragProtoSession = session;
         return true;
     });
 }

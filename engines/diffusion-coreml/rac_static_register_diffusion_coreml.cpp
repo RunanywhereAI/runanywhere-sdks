@@ -3,8 +3,6 @@
  * @brief One-line shim: opt-in static registration of the diffusion-coreml
  *        engine plugin at process start.
  *
- * GAP 03 Phase 5 — see v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md.
- *
  * Mirrors `rac_static_register_llamacpp.cpp`. Two compile paths:
  *   - RAC_PLUGIN_MODE_STATIC (iOS / WASM hosts or
  *     `cmake -DRAC_STATIC_PLUGINS=ON`): expands

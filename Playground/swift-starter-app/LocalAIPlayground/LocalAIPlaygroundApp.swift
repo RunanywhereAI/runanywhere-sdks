@@ -53,21 +53,21 @@ import ONNXRuntime
 // -----------------------------------------------------------------------------
 @main
 struct LocalAIPlaygroundApp: App {
-
+    
     // -------------------------------------------------------------------------
     // MARK: - State Properties
     // -------------------------------------------------------------------------
-
+    
     /// Shared model service for managing AI models
     @StateObject private var modelService = ModelService()
-
+    
     /// Tracks whether the SDK has been initialized
     @State private var isSDKInitialized = false
-
+    
     // -------------------------------------------------------------------------
     // MARK: - App Body
     // -------------------------------------------------------------------------
-
+    
     var body: some Scene {
         WindowGroup {
             Group {
@@ -86,7 +86,7 @@ struct LocalAIPlaygroundApp: App {
             }
         }
     }
-
+    
     // -------------------------------------------------------------------------
     // MARK: - SDK Initialization
     // -------------------------------------------------------------------------
@@ -113,7 +113,7 @@ struct LocalAIPlaygroundApp: App {
             // - .production: Minimal logging, optimized for release
             // -----------------------------------------------------------------
             try RunAnywhere.initialize(environment: .development)
-
+            
             // -----------------------------------------------------------------
             // Step 2: Register the LlamaCPP Backend
             // -----------------------------------------------------------------
@@ -123,7 +123,7 @@ struct LocalAIPlaygroundApp: App {
             // IMPORTANT: Register backends BEFORE registering models
             // -----------------------------------------------------------------
             LlamaCPP.register()
-
+            
             // -----------------------------------------------------------------
             // Step 3: Register the ONNX Backend
             // -----------------------------------------------------------------
@@ -133,7 +133,7 @@ struct LocalAIPlaygroundApp: App {
             // - VAD (Voice Activity Detection): For voice pipelines
             // -----------------------------------------------------------------
             ONNX.register()
-
+            
             // -----------------------------------------------------------------
             // Step 4: Register Default Models
             // -----------------------------------------------------------------
@@ -141,16 +141,16 @@ struct LocalAIPlaygroundApp: App {
             // can be downloaded or loaded. This is done via ModelService.
             // -----------------------------------------------------------------
             ModelService.registerDefaultModels()
-
+            
             print("✅ RunAnywhere SDK initialized successfully")
             print("   Version: \(RunAnywhere.version)")
-
+            
             // Mark initialization as complete
             isSDKInitialized = true
-
+            
             // Refresh model service state
             await modelService.refreshLoadedStates()
-
+            
         } catch {
             print("❌ Failed to initialize RunAnywhere SDK: \(error)")
             // Still show UI even if initialization fails
@@ -169,7 +169,7 @@ struct SDKLoadingView: View {
         VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
-
+            
             Text("Initializing AI...")
                 .font(.headline)
                 .foregroundStyle(.secondary)

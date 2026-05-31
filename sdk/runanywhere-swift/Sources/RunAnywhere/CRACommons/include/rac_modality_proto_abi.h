@@ -138,6 +138,13 @@ RAC_API rac_result_t rac_embeddings_embed_batch_proto(
     size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 
+// Embeddings lifecycle proto ABI — no handle, resolves the current embeddings
+// lifecycle component inside commons (parity with the Flutter embed flow).
+RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
 // RAG proto ABI.
 RAC_API rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                                                   size_t config_proto_size,

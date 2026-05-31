@@ -2,15 +2,13 @@
 # ONNX Backend - generic ONNX Runtime services
 # =============================================================================
 
-# T5.4: per-engine build toggle owned locally. Emscripten has no in-tree
+# Per-engine build toggle owned locally. Emscripten has no in-tree
 # ONNX Runtime WASM binary (FetchONNXRuntime expects third_party/onnxruntime-wasm);
 # WASM ONNX ships via onnxruntime-web from the frontend. Force off there.
 #
 # =============================================================================
-# TODO(WAVE D-2 follow-up): WASM ONNX unblock — exact remaining work
+# TODO: WASM ONNX unblock — exact remaining work
 # =============================================================================
-# See: thoughts/shared/plans/wasm_onnx_unblock.md  (step-by-step plan)
-# See: gaps/gaps/inconsistencies/cpp-layer.md § CPP-WASM-ONNX-UNBLOCK
 #
 # To flip this engine on for EMSCRIPTEN the following vendored artifact is
 # required:
@@ -55,7 +53,7 @@
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 # EXISTS-gated disable under Emscripten: only force OFF when the vendored
 # ONNX Runtime WASM static archive is missing. When present, build normally.
-# See CPP-13 / WEB-01. Drop libonnxruntime.a under
+# Drop libonnxruntime.a under
 # sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/ to enable.
 if(EMSCRIPTEN)
     set(RAC_ONNX_WASM_RUNTIME_DIR
@@ -63,7 +61,7 @@ if(EMSCRIPTEN)
     if(NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
         message(STATUS "RAC_BACKEND_ONNX: no WASM ORT archive at "
                        "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a; "
-                       "disabling ONNX backend (see CPP-13 / WEB-01)")
+                       "disabling ONNX backend")
         set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
     else()
         message(STATUS "RAC_BACKEND_ONNX: found vendored WASM ORT archive; "
@@ -112,7 +110,7 @@ endif()
 # ONNX Backend Library (generic ONNX Runtime + RAG embeddings)
 # =============================================================================
 # Diffusion is Apple CoreML-only; no ONNX diffusion in this backend.
-# v3.1.2: target declaration migrated to rac_add_engine_plugin() macro
+# Target declaration migrated to rac_add_engine_plugin() macro
 # (cmake/plugins.cmake).
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
@@ -125,7 +123,7 @@ set(ONNX_BACKEND_SOURCES
     rac_plugin_entry_onnx.cpp
 )
 
-# ONNX embedding provider (ENG-ONNX-02): engine-owned primitive. The
+# ONNX embedding provider: engine-owned primitive. The
 # ONNXEmbeddingProvider class + its embeddings_service vtable adapter
 # live in this directory so the engine fully owns its primitives
 # (no cross-module surgery into commons/src/features/rag/). The files
@@ -157,7 +155,7 @@ if(NOT TARGET rac_runtime_onnxrt)
     message(FATAL_ERROR "RAC_BACKEND_ONNX requires rac_runtime_onnxrt. Enable RAC_RUNTIME_ONNXRT or disable RAC_BACKEND_ONNX.")
 endif()
 
-# v3.1.2: TARGET_NAME=rac_backend_onnx preserves the historical CMake
+# TARGET_NAME=rac_backend_onnx preserves the historical CMake
 # target name so the 52 existing references across tests + sample apps +
 # RN Android linker config + WASM exports keep working without renaming.
 # CXX_STANDARD=20 because the ONNX backend uses std::span / concepts.
@@ -168,7 +166,7 @@ endif()
 #   * the Swift xcframework layout distributes the ONNX backend as a
 #     SEPARATE xcframework (RABackendONNX) from RACommons.
 # Default linkage is STATIC unless RAC_BUILD_SHARED=ON, which matches the
-# pre-v3.1.2 hand-rolled CMakeLists exactly and produces the .a archive
+# previously hand-rolled CMakeLists exactly and produces the .a archive
 # the xcframework packager consumes on iOS.
 rac_add_engine_plugin(onnx
     TARGET_NAME         rac_backend_onnx
@@ -190,7 +188,7 @@ rac_add_engine_plugin(onnx
 )
 
 # =============================================================================
-# Self-registration carrier (ENG-SHERPA-03)
+# Self-registration carrier
 # =============================================================================
 # Matches the llamacpp / sherpa pattern: thin shim that wraps
 # RAC_STATIC_PLUGIN_REGISTER(onnx). On RAC_STATIC_PLUGINS=ON hosts

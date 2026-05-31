@@ -1,7 +1,7 @@
 /**
  * @file test_proto_event_dispatch.cpp
- * @brief Unit tests for the GAP 09 Phase 15 + v2 close-out Phase 2
- *        proto-byte event dispatch in rac_voice_event_abi.cpp.
+ * @brief Unit tests for the proto-byte event dispatch in
+ *        rac_voice_event_abi.cpp.
  *
  * Scenarios:
  *   1. set_proto_callback(NULL handle) returns RAC_ERROR_INVALID_HANDLE.
@@ -77,12 +77,12 @@ rac_voice_agent_handle_t fake_handle() {
         }                                                                                   \
     } while (0)
 
-#define ASSERT_FALSE(cond)                                                                          \
-    do {                                                                                            \
-        if ((cond)) {                                                                               \
-            std::fprintf(stderr, "ASSERT FAILED: !(%s) @ %s:%d\n", #cond, __FILE__, __LINE__);      \
-            return 1;                                                                               \
-        }                                                                                           \
+#define ASSERT_FALSE(cond)                                                                     \
+    do {                                                                                       \
+        if ((cond)) {                                                                          \
+            std::fprintf(stderr, "ASSERT FAILED: !(%s) @ %s:%d\n", #cond, __FILE__, __LINE__); \
+            return 1;                                                                          \
+        }                                                                                      \
     } while (0)
 
 #define ASSERT_EQ(a, b)                                                                            \
@@ -101,7 +101,7 @@ int test_invalid_handle_rejected() {
 
 int test_set_callback_returns_correct_status() {
     rac_result_t rc = rac_voice_agent_set_proto_callback(fake_handle(), test_callback, nullptr);
-    // B-AK-15-001 fix: registration now succeeds in both Protobuf and
+    // Registration now succeeds in both Protobuf and
     // no-Protobuf builds. The no-Protobuf path serializes via the
     // hand-encoded wire format in rac_voice_event_abi.cpp (mirrors the
     // LLM stream fix in rac_llm_stream.cpp).
@@ -196,7 +196,7 @@ int test_vad_arm() {
     ASSERT_TRUE(
         decoded.ParseFromArray(g_capture.bytes.data(), static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_vad());
-    // IDL-18: VADEvent.type is now VADStreamEventKind; speech-start/end ride
+    // VADEvent.type is now VADStreamEventKind; speech-start/end ride
     // SPEECH_ACTIVITY, with direction on the companion is_speech bool.
     ASSERT_EQ(decoded.vad().type(), runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
     ASSERT_TRUE(decoded.vad().is_speech());

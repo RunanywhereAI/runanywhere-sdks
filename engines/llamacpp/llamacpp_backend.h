@@ -12,10 +12,12 @@
 #include <llama.h>
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "common/rac_engine_device_type.h"
@@ -28,24 +30,31 @@ namespace runanywhere {
 // =============================================================================
 
 struct TextGenerationRequest {
-  std::string prompt;
-  std::string system_prompt;
-  std::vector<std::pair<std::string, std::string>>
-      messages; // role, content pairs
-  int max_tokens = 256;
-  float temperature = 0.7f;
-  float top_p = 0.9f;
-  int top_k = 40;
-  float repetition_penalty = 1.1f;
-  std::vector<std::string> stop_sequences;
+    std::string prompt;
+    std::string system_prompt;
+    std::vector<std::pair<std::string, std::string>> messages;  // role, content pairs
+    int max_tokens = 256;
+    float temperature = 0.7f;
+    float top_p = 0.9f;
+    int top_k = 40;
+    float repetition_penalty = 1.1f;
+    // commons-030-A: additional proto-exposed sampling knobs threaded through
+    // rac_llm_options_t. 0.0 / 0 / empty = disabled (apply only when set).
+    float frequency_penalty = 0.0f;
+    float presence_penalty = 0.0f;
+    float min_p = 0.0f;
+    int64_t seed = 0;        // 0 = LLAMA_DEFAULT_SEED
+    int n_threads = 0;       // 0 = backend default (model-load thread count)
+    std::string grammar;     // GBNF rule text; empty = unconstrained
+    std::vector<std::string> stop_sequences;
 };
 
 struct TextGenerationResult {
-  std::string text;
-  int tokens_generated = 0;
-  int prompt_tokens = 0;
-  double inference_time_ms = 0.0;
-  std::string finish_reason; // "stop", "length", "cancelled"
+    std::string text;
+    int tokens_generated = 0;
+    int prompt_tokens = 0;
+    double inference_time_ms = 0.0;
+    std::string finish_reason;  // "stop", "length", "cancelled"
 };
 
 // Verify request struct size — allocated per generate() call.
@@ -56,7 +65,7 @@ static_assert(sizeof(TextGenerationRequest) <= 256,
               "reducing members");
 
 // Streaming callback: receives token, returns false to cancel
-using TextStreamCallback = std::function<bool(const std::string &token)>;
+using TextStreamCallback = std::function<bool(const std::string& token)>;
 
 // =============================================================================
 // FORWARD DECLARATIONS
@@ -69,32 +78,32 @@ class LlamaCppTextGeneration;
 // =============================================================================
 
 class LlamaCppBackend {
-public:
-  LlamaCppBackend();
-  ~LlamaCppBackend();
+   public:
+    LlamaCppBackend();
+    ~LlamaCppBackend();
 
-  // Initialize the backend
-  bool initialize(const nlohmann::json &config = {});
-  bool is_initialized() const;
-  void cleanup();
+    // Initialize the backend
+    bool initialize(const nlohmann::json& config = {});
+    bool is_initialized() const;
+    void cleanup();
 
-  DeviceType get_device_type() const;
-  size_t get_memory_usage() const;
+    DeviceType get_device_type() const;
+    size_t get_memory_usage() const;
 
-  // Get number of threads to use
-  int get_num_threads() const { return num_threads_; }
+    // Get number of threads to use
+    int get_num_threads() const { return num_threads_; }
 
-  // Get text generation capability
-  LlamaCppTextGeneration *get_text_generation() { return text_gen_.get(); }
+    // Get text generation capability
+    LlamaCppTextGeneration* get_text_generation() { return text_gen_.get(); }
 
-private:
-  void create_text_generation();
+   private:
+    void create_text_generation();
 
-  bool initialized_ = false;
-  nlohmann::json config_;
-  int num_threads_ = 0;
-  std::unique_ptr<LlamaCppTextGeneration> text_gen_;
-  mutable std::mutex mutex_;
+    bool initialized_ = false;
+    nlohmann::json config_;
+    int num_threads_ = 0;
+    std::unique_ptr<LlamaCppTextGeneration> text_gen_;
+    mutable std::mutex mutex_;
 };
 
 // =============================================================================
@@ -106,131 +115,150 @@ private:
 // =============================================================================
 
 struct LoraAdapterEntry {
-  llama_adapter_lora *adapter = nullptr;
-  std::string path;
-  float scale = 1.0f;
-  bool applied = false;
+    LoraAdapterEntry() = default;
+    LoraAdapterEntry(const LoraAdapterEntry&) = delete;
+    LoraAdapterEntry& operator=(const LoraAdapterEntry&) = delete;
+    LoraAdapterEntry(LoraAdapterEntry&&) noexcept = default;
+    LoraAdapterEntry& operator=(LoraAdapterEntry&&) noexcept = default;
+
+    llama_adapter_lora* adapter = nullptr;
+    std::string path;
+    float scale = 1.0f;
+    bool applied = false;
 };
+
+static_assert(!std::is_copy_constructible_v<LoraAdapterEntry>);
+static_assert(std::is_move_constructible_v<LoraAdapterEntry>);
 
 // =============================================================================
 // TEXT GENERATION IMPLEMENTATION
 // =============================================================================
 
 class LlamaCppTextGeneration {
-public:
-  explicit LlamaCppTextGeneration(LlamaCppBackend *backend);
-  ~LlamaCppTextGeneration();
+   public:
+    explicit LlamaCppTextGeneration(LlamaCppBackend* backend);
+    ~LlamaCppTextGeneration();
 
-  bool is_ready() const;
-  bool load_model(const std::string &model_path,
-                  const nlohmann::json &config = {});
-  bool is_model_loaded() const;
-  bool unload_model();
+    bool is_ready() const;
+    bool load_model(const std::string& model_path, const nlohmann::json& config = {});
+    bool is_model_loaded() const;
+    bool unload_model();
 
-  TextGenerationResult generate(const TextGenerationRequest &request);
+    TextGenerationResult generate(const TextGenerationRequest& request);
 
-  /**
-   * Generate text with streaming, optional prompt-token output, and optional
-   * benchmark timing.
-   *
-   * When @p timing_out is non-null, captures:
-   *   - t2_prefill_start_ms: before the first llama_decode on the prompt
-   *   - t3_prefill_end_ms:   after the prompt prefill loop completes
-   *   - t5_last_token_ms:    after the decode loop exits
-   *   - output_tokens:       number of tokens generated
-   * Note: t4 (first token) is written at the LLM component layer, not in the
-   * backend.
-   *
-   * @param request           Generation request.
-   * @param callback          Streaming callback; return false to cancel.
-   * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
-   * @param timing_out        Optional: benchmark timing struct (may be NULL for
-   * no timing).
-   */
-  bool generate_stream(const TextGenerationRequest &request,
-                       TextStreamCallback callback,
-                       int *out_prompt_tokens = nullptr,
-                       rac_benchmark_timing_t *timing_out = nullptr);
+    /**
+     * Generate text with streaming, optional prompt-token output, and optional
+     * benchmark timing.
+     *
+     * When @p timing_out is non-null, captures:
+     *   - t2_prefill_start_ms: before the first llama_decode on the prompt
+     *   - t3_prefill_end_ms:   after the prompt prefill loop completes
+     *   - t5_last_token_ms:    after the decode loop exits
+     *   - output_tokens:       number of tokens generated
+     * Note: t4 (first token) is written at the LLM component layer, not in the
+     * backend.
+     *
+     * @param request           Generation request.
+     * @param callback          Streaming callback; return false to cancel.
+     * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
+     * @param timing_out        Optional: benchmark timing struct (may be NULL for
+     * no timing).
+     */
+    bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
+                         int* out_prompt_tokens = nullptr,
+                         rac_benchmark_timing_t* timing_out = nullptr);
 
-  void cancel();
+    void cancel();
 
-  /**
-   * @brief Inject a system prompt into the KV cache at position 0.
-   * Clears existing KV cache first, then decodes the prompt tokens.
-   * @return true on success, false on error.
-   */
-  bool inject_system_prompt(const std::string &prompt);
+    /**
+     * @brief Inject a system prompt into the KV cache at position 0.
+     * Clears existing KV cache first, then decodes the prompt tokens.
+     * @return true on success, false on error.
+     */
+    bool inject_system_prompt(const std::string& prompt);
 
-  /**
-   * @brief Append text to the KV cache after current content.
-   * Does not clear existing KV cache — adds at current position.
-   * @return true on success, false on error.
-   */
-  bool append_context(const std::string &text);
+    /**
+     * @brief Append text to the KV cache after current content.
+     * Does not clear existing KV cache — adds at current position.
+     * @return true on success, false on error.
+     */
+    bool append_context(const std::string& text);
 
-  /**
-   * @brief Generate a response from accumulated KV cache state.
-   * Unlike generate(), does NOT clear the KV cache first.
-   * @return TextGenerationResult with generated text.
-   */
-  TextGenerationResult
-  generate_from_context(const TextGenerationRequest &request);
+    /**
+     * @brief Generate a response from accumulated KV cache state.
+     * Unlike generate(), does NOT clear the KV cache first.
+     * @return TextGenerationResult with generated text.
+     */
+    TextGenerationResult generate_from_context(const TextGenerationRequest& request);
 
-  /**
-   * @brief Clear all KV cache state.
-   */
-  void clear_context();
+    /**
+     * @brief Clear all KV cache state.
+     */
+    void clear_context();
 
-  nlohmann::json get_model_info() const;
+    nlohmann::json get_model_info() const;
 
-  // LoRA adapter management
-  bool load_lora_adapter(const std::string &adapter_path, float scale);
-  bool remove_lora_adapter(const std::string &adapter_path);
-  void clear_lora_adapters();
-  nlohmann::json get_lora_info() const;
+    // LoRA adapter management
+    bool load_lora_adapter(const std::string& adapter_path, float scale);
+    bool remove_lora_adapter(const std::string& adapter_path);
+    void clear_lora_adapters();
+    nlohmann::json get_lora_info() const;
 
-private:
-  bool unload_model_internal();
-  bool recreate_context();
-  bool apply_lora_adapters();
-  std::string build_prompt(const TextGenerationRequest &request);
-  std::string apply_chat_template(
-      const std::vector<std::pair<std::string, std::string>> &messages,
-      const std::string &system_prompt, bool add_assistant_token);
+   private:
+    // Read model_loaded_/model_/context_ without locking; caller MUST already
+    // hold mutex_. Used by internal paths (generate_stream, inject_system_prompt,
+    // append_context, generate_from_context) that already lock for the
+    // surrounding operation. Public is_ready() / is_model_loaded() acquire the
+    // lock themselves.
+    bool is_ready_locked() const;
+    bool unload_model_internal();
+    bool recreate_context();
+    bool apply_lora_adapters();
+    std::string build_prompt(const TextGenerationRequest& request);
+    std::string
+    apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
+                        const std::string& system_prompt, bool add_assistant_token);
 
-  LlamaCppBackend *backend_;
-  llama_model *model_ = nullptr;
-  llama_context *context_ = nullptr;
-  llama_sampler *sampler_ = nullptr;
+    LlamaCppBackend* backend_;
+    llama_model* model_ = nullptr;
+    llama_context* context_ = nullptr;
+    llama_sampler* sampler_ = nullptr;
 
-  // Cached sampler parameters — skip rebuild when unchanged
-  float cached_temperature_ = -1.0f;
-  float cached_top_p_ = -1.0f;
-  int cached_top_k_ = -1;
-  float cached_repetition_penalty_ = -1.0f;
+    // Cached sampler parameters — skip rebuild when unchanged
+    float cached_temperature_ = -1.0f;
+    float cached_top_p_ = -1.0f;
+    int cached_top_k_ = -1;
+    float cached_repetition_penalty_ = -1.0f;
+    // commons-030-A: cache the extended sampling knobs too so a request that
+    // changes only a penalty / min_p / seed / grammar still rebuilds the chain.
+    float cached_frequency_penalty_ = -1.0f;
+    float cached_presence_penalty_ = -1.0f;
+    float cached_min_p_ = -1.0f;
+    int64_t cached_seed_ = -1;
+    std::string cached_grammar_ = "\x01";  // sentinel that no real grammar matches
 
-  bool model_loaded_ = false;
-  std::atomic<bool> cancel_requested_{false};
-  std::atomic<bool> decode_failed_{false};
+    bool model_loaded_ = false;
+    std::atomic<bool> cancel_requested_{false};
+    std::atomic<bool> decode_failed_{false};
 
-  std::string model_path_;
-  nlohmann::json model_config_;
+    std::string model_path_;
+    nlohmann::json model_config_;
 
-  int context_size_ = 0;
-  // CLUSTER-12 (WEB-LLM-COHERENCE): raised from 1024 to 2048 so small
-  // base models like SmolLM2-360M get enough room for a chat-template
-  // system+user+assistant turn (~600-900 tokens of template scaffolding
-  // alone) on Web/CPU builds where common_fit_params is not used. The
-  // model's own train context (e.g. 8192 for SmolLM2) is still the upper
-  // ceiling — this only raises the SDK's default cap.
-  int max_default_context_ = 2048;
-  int batch_size_ = 0;
+    int context_size_ = 0;
+    // Raised from 1024 to 2048 so small
+    // base models like SmolLM2-360M get enough room for a chat-template
+    // system+user+assistant turn (~600-900 tokens of template scaffolding
+    // alone) on Web/CPU builds where common_fit_params is not used. The
+    // model's own train context (e.g. 8192 for SmolLM2) is still the upper
+    // ceiling — this only raises the SDK's default cap.
+    int max_default_context_ = 2048;
+    int batch_size_ = 0;
 
-  std::vector<LoraAdapterEntry> lora_adapters_;
+    std::vector<LoraAdapterEntry> lora_adapters_;
 
-  mutable std::mutex mutex_;
+    mutable std::mutex mutex_;
 };
 
-} // namespace runanywhere
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_LLAMACPP_BACKEND_H
+#endif  // RUNANYWHERE_LLAMACPP_BACKEND_H

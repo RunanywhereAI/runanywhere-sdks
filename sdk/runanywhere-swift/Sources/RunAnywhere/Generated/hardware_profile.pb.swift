@@ -15,7 +15,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -24,7 +24,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// Hardware acceleration preference for inference. Canonical single enum —
 /// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
 /// file and `AccelerationPreference` in model_types.proto. Consolidated here
-/// (Wave H-2 / IDL-01) because it is a pure hardware concept and
+/// because it is a pure hardware concept and
 /// hardware_profile.proto has no imports (model_types.proto already imports
 /// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
 ///   Web    enums.ts:165   (Auto / WebGPU / CPU)
@@ -32,7 +32,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
 /// Canonicalized union below.
 /// ---------------------------------------------------------------------------
-public enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case auto // = 1
@@ -90,7 +90,7 @@ public enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public struct RAHardwareProfile: Sendable {
+public nonisolated struct RAHardwareProfile: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -116,12 +116,15 @@ public struct RAHardwareProfile: Sendable {
   /// "ios", "android", "web", "macos", "linux", "windows"
   public var platform: String = String()
 
+  /// resolved NPU vendor family (commons-classified)
+  public var npuChip: RANPUChip = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public struct RAAcceleratorInfo: Sendable {
+public nonisolated struct RAAcceleratorInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -137,7 +140,7 @@ public struct RAAcceleratorInfo: Sendable {
   public init() {}
 }
 
-public struct RAHardwareProfileResult: Sendable {
+public nonisolated struct RAHardwareProfileResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -162,7 +165,7 @@ public struct RAHardwareProfileResult: Sendable {
 
 /// Empty request for the cached hardware profile. The native probe is owned by
 /// platform adapters; this request carries no portable parameters today.
-public struct RAHardwareProfileRequest: Sendable {
+public nonisolated struct RAHardwareProfileRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -174,7 +177,7 @@ public struct RAHardwareProfileRequest: Sendable {
 
 /// Empty request for the accelerator list. Mirrors HardwareProfileRequest:
 /// platform probes own all OS-level acceleration discovery.
-public struct RAHardwareAcceleratorsRequest: Sendable {
+public nonisolated struct RAHardwareAcceleratorsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -186,7 +189,7 @@ public struct RAHardwareAcceleratorsRequest: Sendable {
 
 /// Result-shaped response for SetAcceleratorPreference so the service contract
 /// stays consistent (every rpc returns a non-empty message).
-public struct RAHardwareAcceleratorPreferenceRequest: Sendable {
+public nonisolated struct RAHardwareAcceleratorPreferenceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -198,7 +201,7 @@ public struct RAHardwareAcceleratorPreferenceRequest: Sendable {
   public init() {}
 }
 
-public struct RAHardwareAcceleratorPreferenceResult: Sendable {
+public nonisolated struct RAHardwareAcceleratorPreferenceResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -214,15 +217,15 @@ public struct RAHardwareAcceleratorPreferenceResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0\u{1}ACCELERATION_PREFERENCE_WEBGPU\0\u{1}ACCELERATION_PREFERENCE_METAL\0\u{1}ACCELERATION_PREFERENCE_VULKAN\0")
 }
 
-extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareProfile"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chip\0\u{3}has_neural_engine\0\u{3}acceleration_mode\0\u{3}total_memory_bytes\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{1}architecture\0\u{1}platform\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chip\0\u{3}has_neural_engine\0\u{3}acceleration_mode\0\u{3}total_memory_bytes\0\u{3}core_count\0\u{3}performance_cores\0\u{3}efficiency_cores\0\u{1}architecture\0\u{1}platform\0\u{3}npu_chip\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -239,6 +242,7 @@ extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 7: try { try decoder.decodeSingularUInt32Field(value: &self.efficiencyCores) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self.architecture) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.platform) }()
+      case 10: try { try decoder.decodeSingularEnumField(value: &self.npuChip) }()
       default: break
       }
     }
@@ -272,6 +276,9 @@ extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if !self.platform.isEmpty {
       try visitor.visitSingularStringField(value: self.platform, fieldNumber: 9)
     }
+    if self.npuChip != .unspecified {
+      try visitor.visitSingularEnumField(value: self.npuChip, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -285,12 +292,13 @@ extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.efficiencyCores != rhs.efficiencyCores {return false}
     if lhs.architecture != rhs.architecture {return false}
     if lhs.platform != rhs.platform {return false}
+    if lhs.npuChip != rhs.npuChip {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension RAAcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AcceleratorInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}type\0\u{1}available\0")
 
@@ -330,7 +338,7 @@ extension RAAcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAHardwareProfileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareProfileResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareProfileResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}profile\0\u{1}accelerators\0")
 
@@ -369,7 +377,7 @@ extension RAHardwareProfileResult: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RAHardwareProfileRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareProfileRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareProfileRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
@@ -388,7 +396,7 @@ extension RAHardwareProfileRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAHardwareAcceleratorsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareAcceleratorsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareAcceleratorsRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
@@ -407,7 +415,7 @@ extension RAHardwareAcceleratorsRequest: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension RAHardwareAcceleratorPreferenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareAcceleratorPreferenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareAcceleratorPreferenceRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}preference\0")
 
@@ -437,7 +445,7 @@ extension RAHardwareAcceleratorPreferenceRequest: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-extension RAHardwareAcceleratorPreferenceResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareAcceleratorPreferenceResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareAcceleratorPreferenceResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}error_message\0")
 

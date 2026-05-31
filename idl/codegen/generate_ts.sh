@@ -5,7 +5,7 @@
 #
 # Requirements: pinned ts-proto version sourced from
 #   sdk/runanywhere-commons/VERSIONS::TS_PROTO_VERSION
-# Install via: scripts/setup-toolchain.sh (or `npm install -g ts-proto@${TS_PROTO_VERSION}`).
+# Install via: scripts/setup/setup-toolchain.sh (or `npm install -g ts-proto@${TS_PROTO_VERSION}`).
 #
 # Output:
 #   sdk/shared/proto-ts/src/
@@ -29,7 +29,7 @@ TS_PROTO_VERSION="${TS_PROTO_VERSION:-1.181.1}"
 mkdir -p "${TS_OUT_DIR}"
 
 if ! command -v protoc >/dev/null 2>&1; then
-    echo "error: protoc not found. Run scripts/setup-toolchain.sh." >&2
+    echo "error: protoc not found. Run scripts/setup/setup-toolchain.sh." >&2
     exit 127
 fi
 
@@ -42,14 +42,14 @@ if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
     exit 127
 fi
 
-# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone.
-# IDL-19a (post-fix): component_types.proto is included explicitly. ts-proto
+# component_types.proto is included explicitly. ts-proto
 # does transitively emit component_types.ts via dependent imports, but the
 # positive list is made explicit here so behaviour stays aligned with Kotlin
 # (which requires the explicit entry — Wire does not transitively emit
 # enum-only dependencies).
-# IDL-19b: router.proto is now included (empty exclusion list) so RN + Web
+# router.proto is now included (empty exclusion list) so RN + Web
 # have future-proof parity with Kotlin / C++; no active TS consumer today,
 # but generated router.ts exists for symmetry.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then

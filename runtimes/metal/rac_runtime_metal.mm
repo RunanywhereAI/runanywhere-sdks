@@ -5,13 +5,28 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
 #include <new>
 
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
+#include "rac/runtime/rac_runtime_helpers.h"
 
 namespace {
+
+/* runtimes-003: serialize all access to the g_device / g_queue file-scope
+ * globals. The registry calls vtable->init() and vtable->destroy() outside
+ * the registry lock (see sdk/runanywhere-commons/src/plugin/
+ * rac_runtime_registry.cpp:264), so two concurrent
+ * rac_runtime_register/_unregister calls -- or an alloc_buffer arriving
+ * during tear-down -- could read/write these without ordering. One mutex
+ * is enough to make init/destroy idempotent and to keep the
+ * consult-and-use sequence in alloc_buffer / device_info atomic. */
+std::mutex& metal_globals_mutex() {
+    static std::mutex m;
+    return m;
+}
 
 id<MTLDevice> g_device = nil;
 id<MTLCommandQueue> g_queue = nil;
@@ -29,15 +44,11 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_MLMODEL,
     RAC_MODEL_FORMAT_ID_MLPACKAGE,
 };
-const rac_primitive_t k_supported_primitives[] = {
-    RAC_PRIMITIVE_GENERATE_TEXT,
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_SYNTHESIZE,
-    RAC_PRIMITIVE_VLM,
-};
 
 rac_result_t metal_init(void) {
-    if (g_device != nil) return RAC_SUCCESS;
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
+    if (g_device != nil)
+        return RAC_SUCCESS;
     g_device = MTLCreateSystemDefaultDevice();
     if (g_device == nil) {
         return RAC_ERROR_CAPABILITY_UNSUPPORTED;
@@ -52,6 +63,7 @@ rac_result_t metal_init(void) {
 }
 
 void metal_destroy(void) {
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
     if (g_queue != nil) {
         [g_queue release];
         g_queue = nil;
@@ -63,12 +75,20 @@ void metal_destroy(void) {
 }
 
 rac_result_t metal_alloc_buffer(size_t bytes, rac_runtime_buffer_t** out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
-    if (g_device == nil) return RAC_ERROR_BACKEND_UNAVAILABLE;
+    /* runtimes-003: hold the globals mutex across the device read and the
+     * newBufferWithLength: call so destroy() cannot run between the nil
+     * check and the buffer allocation. */
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
+    if (g_device == nil)
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
     auto* buffer = new (std::nothrow) MetalRuntimeBuffer();
-    if (!buffer) return RAC_ERROR_OUT_OF_MEMORY;
-    buffer->metal_buffer = [g_device newBufferWithLength:bytes options:MTLResourceStorageModeShared];
+    if (!buffer)
+        return RAC_ERROR_OUT_OF_MEMORY;
+    buffer->metal_buffer = [g_device newBufferWithLength:bytes
+                                                 options:MTLResourceStorageModeShared];
     if (buffer->metal_buffer == nil) {
         delete buffer;
         return RAC_ERROR_OUT_OF_MEMORY;
@@ -80,7 +100,8 @@ rac_result_t metal_alloc_buffer(size_t bytes, rac_runtime_buffer_t** out) {
 }
 
 void metal_free_buffer(rac_runtime_buffer_t* buffer) {
-    if (!buffer) return;
+    if (!buffer)
+        return;
     auto* typed = reinterpret_cast<MetalRuntimeBuffer*>(buffer);
     if (typed->metal_buffer != nil) {
         [typed->metal_buffer release];
@@ -90,7 +111,8 @@ void metal_free_buffer(rac_runtime_buffer_t* buffer) {
 
 rac_result_t metal_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
                                    rac_runtime_buffer_t** out) {
-    if (!desc || !out) return RAC_ERROR_NULL_POINTER;
+    if (!desc || !out)
+        return RAC_ERROR_NULL_POINTER;
     if (desc->device_class != RAC_DEVICE_CLASS_UNSPECIFIED &&
         desc->device_class != RAC_DEVICE_CLASS_GPU) {
         return RAC_ERROR_NOT_SUPPORTED;
@@ -118,21 +140,18 @@ rac_result_t metal_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
         return RAC_ERROR_NOT_SUPPORTED;
     }
     const uint64_t k_supported_usage_flags =
-        RAC_RUNTIME_BUFFER_USAGE_INPUT |
-        RAC_RUNTIME_BUFFER_USAGE_OUTPUT |
-        RAC_RUNTIME_BUFFER_USAGE_TEMPORARY |
-        RAC_RUNTIME_BUFFER_USAGE_CONSTANT |
-        RAC_RUNTIME_BUFFER_USAGE_MAP_READ |
-        RAC_RUNTIME_BUFFER_USAGE_MAP_WRITE;
+        RAC_RUNTIME_BUFFER_USAGE_INPUT | RAC_RUNTIME_BUFFER_USAGE_OUTPUT |
+        RAC_RUNTIME_BUFFER_USAGE_TEMPORARY | RAC_RUNTIME_BUFFER_USAGE_CONSTANT |
+        RAC_RUNTIME_BUFFER_USAGE_MAP_READ | RAC_RUNTIME_BUFFER_USAGE_MAP_WRITE;
     if (desc->usage_flags & ~k_supported_usage_flags) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
     return metal_alloc_buffer(desc->bytes, out);
 }
 
-rac_result_t metal_buffer_info(rac_runtime_buffer_t* buffer,
-                               rac_runtime_buffer_info_t* out) {
-    if (!buffer || !out) return RAC_ERROR_NULL_POINTER;
+rac_result_t metal_buffer_info(rac_runtime_buffer_t* buffer, rac_runtime_buffer_info_t* out) {
+    if (!buffer || !out)
+        return RAC_ERROR_NULL_POINTER;
     auto* typed = reinterpret_cast<MetalRuntimeBuffer*>(buffer);
     *out = rac_runtime_buffer_info_t{};
     out->bytes = typed->bytes;
@@ -143,17 +162,17 @@ rac_result_t metal_buffer_info(rac_runtime_buffer_t* buffer,
     return RAC_SUCCESS;
 }
 
-rac_result_t metal_map_buffer(rac_runtime_buffer_t* buffer,
-                              size_t offset,
-                              size_t bytes,
-                              uint32_t map_flags,
-                              rac_runtime_buffer_mapping_t* out) {
-    if (!buffer || !out) return RAC_ERROR_NULL_POINTER;
+rac_result_t metal_map_buffer(rac_runtime_buffer_t* buffer, size_t offset, size_t bytes,
+                              uint32_t map_flags, rac_runtime_buffer_mapping_t* out) {
+    if (!buffer || !out)
+        return RAC_ERROR_NULL_POINTER;
     auto* typed = reinterpret_cast<MetalRuntimeBuffer*>(buffer);
-    if (offset > typed->bytes) return RAC_ERROR_INVALID_PARAMETER;
+    if (offset > typed->bytes)
+        return RAC_ERROR_INVALID_PARAMETER;
     const size_t available = typed->bytes - offset;
     const size_t mapped_bytes = bytes == 0 ? available : bytes;
-    if (mapped_bytes > available) return RAC_ERROR_INVALID_PARAMETER;
+    if (mapped_bytes > available)
+        return RAC_ERROR_INVALID_PARAMETER;
     *out = rac_runtime_buffer_mapping_t{};
     out->data = static_cast<unsigned char*>(typed->data) + offset;
     out->bytes = mapped_bytes;
@@ -164,49 +183,42 @@ rac_result_t metal_map_buffer(rac_runtime_buffer_t* buffer,
 
 rac_result_t metal_unmap_buffer(rac_runtime_buffer_t* buffer,
                                 rac_runtime_buffer_mapping_t* mapping) {
-    if (!buffer || !mapping) return RAC_ERROR_NULL_POINTER;
+    if (!buffer || !mapping)
+        return RAC_ERROR_NULL_POINTER;
     *mapping = rac_runtime_buffer_mapping_t{};
     return RAC_SUCCESS;
 }
 
-rac_result_t metal_copy_buffer(rac_runtime_buffer_t* dst,
-                               size_t dst_offset,
-                               const rac_runtime_buffer_t* src,
-                               size_t src_offset,
-                               size_t bytes) {
-    if (!dst || !src) return RAC_ERROR_NULL_POINTER;
+rac_result_t metal_copy_buffer(rac_runtime_buffer_t* dst, size_t dst_offset,
+                               const rac_runtime_buffer_t* src, size_t src_offset, size_t bytes) {
+    if (!dst || !src)
+        return RAC_ERROR_NULL_POINTER;
     auto* dst_typed = reinterpret_cast<MetalRuntimeBuffer*>(dst);
     auto* src_typed = reinterpret_cast<const MetalRuntimeBuffer*>(src);
     if (dst_offset > dst_typed->bytes || src_offset > src_typed->bytes) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
-    if (bytes > dst_typed->bytes - dst_offset ||
-        bytes > src_typed->bytes - src_offset) {
+    if (bytes > dst_typed->bytes - dst_offset || bytes > src_typed->bytes - src_offset) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     std::memmove(static_cast<unsigned char*>(dst_typed->data) + dst_offset,
-                 static_cast<const unsigned char*>(src_typed->data) + src_offset,
-                 bytes);
+                 static_cast<const unsigned char*>(src_typed->data) + src_offset, bytes);
     return RAC_SUCCESS;
 }
 
 void metal_release_tensor(rac_runtime_tensor_t* tensor) {
-    if (!tensor) return;
-    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
-        std::free(tensor->data);
-    }
-    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape) {
-        std::free(tensor->shape);
-    }
-    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->buffer) {
-        metal_free_buffer(tensor->buffer);
-    }
-    *tensor = rac_runtime_tensor_t{};
+    rac::runtime::rac_runtime_release_tensor(tensor, metal_free_buffer);
 }
 
 rac_result_t metal_device_info(rac_runtime_device_info_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
-    if (g_device == nil) return RAC_ERROR_BACKEND_UNAVAILABLE;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
+    /* runtimes-003: lock across the device read + property query so a
+     * concurrent destroy() cannot release g_device between the nil check
+     * and the recommendedMaxWorkingSetSize call. */
+    std::lock_guard<std::mutex> lock(metal_globals_mutex());
+    if (g_device == nil)
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
     *out = rac_runtime_device_info_t{};
     out->device_class = RAC_DEVICE_CLASS_GPU;
     out->device_id = "apple-metal";
@@ -221,24 +233,21 @@ extern const rac_runtime_vtable_v2_t k_metal_vtable_v2;
 extern const rac_runtime_vtable_t k_metal_vtable;
 
 rac_result_t metal_capabilities(rac_runtime_capabilities_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
     /* Buffer-related capabilities are unconditional: the runtime itself
      * implements alloc/map/copy regardless of session-op presence. */
-    uint64_t flags =
-        RAC_RUNTIME_CAP_FP16           |
-        RAC_RUNTIME_CAP_ZERO_COPY      |
-        RAC_RUNTIME_CAP_BUFFER_MAPPING |
-        RAC_RUNTIME_CAP_BUFFER_COPY    |
-        RAC_RUNTIME_CAP_DEVICE_ALLOC;
+    uint64_t flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_ZERO_COPY |
+                     RAC_RUNTIME_CAP_BUFFER_MAPPING | RAC_RUNTIME_CAP_BUFFER_COPY |
+                     RAC_RUNTIME_CAP_DEVICE_ALLOC;
     /* Only advertise OWNED_OUTPUTS when an execution path can actually return
      * runtime-owned outputs. Today the Metal adapter is buffer-allocator +
      * device probe only (V1 create/run/destroy session and V2 run_session_v2
      * are all nullptr). Mirrors cpu_capabilities's `any_v2` condition at
      * runtimes/cpu/rac_runtime_cpu.cpp:214. */
     const bool has_session_ops =
-        k_metal_vtable_v2.run_session_v2 != nullptr ||
-        k_metal_vtable.run_session != nullptr;
+        k_metal_vtable_v2.run_session_v2 != nullptr || k_metal_vtable.run_session != nullptr;
     if (has_session_ops) {
         flags |= RAC_RUNTIME_CAP_OWNED_OUTPUTS;
     }
@@ -280,9 +289,11 @@ const rac_runtime_vtable_t k_metal_vtable = {
         /* .version                 = */ nullptr,
         /* .priority                = */ 100,
         /* .supported_formats       = */ k_supported_formats,
-        /* .supported_formats_count = */ sizeof(k_supported_formats) / sizeof(k_supported_formats[0]),
+        /* .supported_formats_count = */ sizeof(k_supported_formats) /
+            sizeof(k_supported_formats[0]),
         /* .supported_devices       = */ k_supported_devices,
-        /* .supported_devices_count = */ sizeof(k_supported_devices) / sizeof(k_supported_devices[0]),
+        /* .supported_devices_count = */ sizeof(k_supported_devices) /
+            sizeof(k_supported_devices[0]),
         /* .reserved_0              = */ 0,
         /* .reserved_1              = */ 0,
     },
@@ -306,21 +317,8 @@ const rac_runtime_vtable_t k_metal_vtable = {
 }  // namespace
 
 extern "C" rac_result_t rac_metal_runtime_require_available(void) {
-    return rac_runtime_get_by_id(RAC_RUNTIME_METAL) != nullptr
-               ? RAC_SUCCESS
-               : RAC_ERROR_BACKEND_UNAVAILABLE;
-}
-
-extern "C" rac_result_t rac_metal_runtime_alloc_host_buffer(size_t bytes, void** out_data) {
-    if (!out_data) return RAC_ERROR_NULL_POINTER;
-    *out_data = nullptr;
-    *out_data = std::malloc(bytes);
-    if (!*out_data) return RAC_ERROR_OUT_OF_MEMORY;
-    return RAC_SUCCESS;
-}
-
-extern "C" void rac_metal_runtime_free_host_buffer(void* data) {
-    std::free(data);
+    return rac_runtime_get_by_id(RAC_RUNTIME_METAL) != nullptr ? RAC_SUCCESS
+                                                               : RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_metal(void) {

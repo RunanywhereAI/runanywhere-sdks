@@ -11,7 +11,6 @@
 #define RAC_AUDIO_UTILS_H
 
 #include "rac/core/rac_types.h"
-#include "rac/features/tts/rac_tts_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,7 +46,7 @@ extern "C" {
  * void* wav_data = NULL;
  * size_t wav_size = 0;
  * rac_result_t result = rac_audio_float32_to_wav(
- *     pcm_samples, pcm_size, RAC_TTS_DEFAULT_SAMPLE_RATE, &wav_data, &wav_size);
+ *     pcm_samples, pcm_size, 22050, &wav_data, &wav_size);
  * if (result == RAC_SUCCESS) {
  *     // Use wav_data...
  *     rac_free(wav_data);

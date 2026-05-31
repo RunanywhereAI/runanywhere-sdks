@@ -105,10 +105,39 @@ typedef struct rac_llm_options {
 
     /** System prompt (can be NULL) */
     const char* system_prompt;
+
+    /** Top-k sampling parameter (idl/llm_options.proto:55). 0 = disabled. */
+    int32_t top_k;
+
+    /** Repetition penalty (idl/llm_options.proto:59). 1.0 = no penalty. */
+    float repetition_penalty;
+
+    /** OpenAI-style frequency penalty (idl/llm_options.proto:100). 0.0 = disabled. */
+    float frequency_penalty;
+
+    /** OpenAI-style presence penalty (idl/llm_options.proto:101). 0.0 = disabled. */
+    float presence_penalty;
+
+    /** Minimum-probability sampling (idl/llm_options.proto:107). 0.0 = disabled. */
+    float min_p;
+
+    /** Deterministic sampling seed (idl/llm_options.proto:97). 0 = backend default. */
+    int64_t seed;
+
+    /** Grammar / constrained-decoding rule text, GBNF (can be NULL). */
+    const char* grammar;
+
+    /** Per-request backend thread hint (idl/llm_options.proto:119). 0 = backend default. */
+    int32_t n_threads;
 } rac_llm_options_t;
 
 /**
  * @brief Default LLM generation options
+ *
+ * The sampling fields below the legacy struct members default to the proto's
+ * documented "unset / disabled" sentinels (idl/llm_options.proto): top_k=0,
+ * repetition_penalty=1.0, frequency/presence/min_p=0.0, seed=0, no grammar,
+ * n_threads=0. Engines apply each only when its non-disabled value is present.
  */
 static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .temperature = 0.8f,
@@ -116,7 +145,15 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .stop_sequences = RAC_NULL,
                                                           .num_stop_sequences = 0,
                                                           .streaming_enabled = RAC_FALSE,
-                                                          .system_prompt = RAC_NULL};
+                                                          .system_prompt = RAC_NULL,
+                                                          .top_k = 0,
+                                                          .repetition_penalty = 1.0f,
+                                                          .frequency_penalty = 0.0f,
+                                                          .presence_penalty = 0.0f,
+                                                          .min_p = 0.0f,
+                                                          .seed = 0,
+                                                          .grammar = RAC_NULL,
+                                                          .n_threads = 0};
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult

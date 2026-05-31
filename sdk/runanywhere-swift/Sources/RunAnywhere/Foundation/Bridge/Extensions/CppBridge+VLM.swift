@@ -10,12 +10,11 @@
 //  proto ABI to satisfy the C signature — the canonical model state
 //  is owned by the C++ lifecycle (`rac_model_lifecycle_load_proto`),
 //  and `rac_vlm_process[_stream]_proto` route through the lifecycle
-//  whenever it is loaded (Phase 6j). All VLM-specific load helpers
-//  have been removed in Wave 7 / T23 in favour of that single source
-//  of truth.
+//  whenever it is loaded. All VLM-specific load helpers have been
+//  removed in favour of that single source of truth.
 //
 //  VLM-specific surfaces kept here:
-//   - `cancel()` — calls `rac_vlm_cancel_lifecycle_proto` (Wave 7 / T23).
+//   - `cancel()` — calls `rac_vlm_cancel_lifecycle_proto`.
 //     No handle is threaded; the cancel acquires the lifecycle service
 //     internally, mirroring the LLM cancel-proto path.
 //   - `supportsStreaming` and `state` introspection on the legacy
@@ -58,8 +57,8 @@ extension CppBridge {
 
         /// Cancel ongoing generation via the lifecycle cancel proto.
         ///
-        /// Replaces the legacy handle-based `rac_vlm_component_cancel` path
-        /// (Wave 7 / T23). The lifecycle ABI acquires the lifecycle-owned
+        /// Replaces the legacy handle-based `rac_vlm_component_cancel` path.
+        /// The lifecycle ABI acquires the lifecycle-owned
         /// VLM service internally, dispatches `cancel` on its vtable, and
         /// emits canonical `CANCELLATION_EVENT_KIND_*` SDKEvents — keeping
         /// the cancel path consistent with LLM cancellation semantics.

@@ -29,7 +29,7 @@ import {
   speechBackendRequirementMessage,
 } from '../../runtime/SpeechBackendExports';
 import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
-import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 import {
   getSpeechProvider,
   hasSpeechProviderTTS,
@@ -108,6 +108,7 @@ function callCreate(module: TTSComponentModule): number {
       throw SDKException.fromRACResult(
         rc,
         `rac_tts_component_create failed with code ${rc}`,
+        { module, logger },
       );
     }
     const handle = bridge.readU32(outPtr);
@@ -149,6 +150,7 @@ function callLoadVoice(
       throw SDKException.fromRACResult(
         rc,
         `rac_tts_component_load_voice failed with code ${rc}`,
+        { module, logger },
       );
     }
   } finally {
@@ -297,8 +299,8 @@ export async function synthesize(
   let voiceId = options?.voiceId;
   let voiceName: string | undefined;
 
-  if (!voicePath && ModelLifecycle.supportsNativeLifecycle()) {
-    const current = ModelLifecycle.currentModel({
+  if (!voicePath && WebModelLifecycle.supportsNativeLifecycle()) {
+    const current = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       includeModelMetadata: true,
     });

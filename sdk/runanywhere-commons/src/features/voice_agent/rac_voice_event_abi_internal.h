@@ -1,8 +1,8 @@
 /**
  * @file rac_voice_event_abi_internal.h
- * @brief Internal C++ entry point for the GAP 09 proto-byte event ABI.
+ * @brief Internal C++ entry point for the proto-byte event ABI.
  *
- * v2 close-out Phase 2 — paired with rac_voice_event_abi.cpp. NOT part of
+ * Paired with rac_voice_event_abi.cpp. NOT part of
  * the public C ABI; do NOT include from headers under include/. Only
  * voice_agent.cpp's event dispatcher calls this.
  */

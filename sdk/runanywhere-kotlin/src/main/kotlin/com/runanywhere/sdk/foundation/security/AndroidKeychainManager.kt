@@ -11,6 +11,7 @@ package com.runanywhere.sdk.foundation.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
@@ -46,14 +47,14 @@ class AndroidKeychainManager(
 
     override fun get(key: String): ByteArray? {
         val stored = encryptedPreferences.getString(key, null) ?: return null
-        return stored.toByteArray(Charsets.ISO_8859_1)
+        return Base64.decode(stored, Base64.NO_WRAP)
     }
 
     override fun set(key: String, value: ByteArray): Boolean {
         return try {
             encryptedPreferences
                 .edit()
-                .putString(key, String(value, Charsets.ISO_8859_1))
+                .putString(key, Base64.encodeToString(value, Base64.NO_WRAP))
                 .apply()
             true
         } catch (t: Throwable) {

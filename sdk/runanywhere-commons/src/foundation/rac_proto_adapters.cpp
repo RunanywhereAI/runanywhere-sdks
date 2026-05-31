@@ -1,6 +1,6 @@
 /**
  * @file rac_proto_adapters.cpp
- * @brief Phase C6 — implementation of the C ABI <-> proto adapters declared
+ * @brief Implementation of the C ABI <-> proto adapters declared
  *        in include/rac/foundation/rac_proto_adapters.h.
  *
  * Each adapter is a straightforward field-by-field copy. Drift between the
@@ -23,6 +23,9 @@
 // without a `std::` qualifier.
 #include "rac/foundation/rac_proto_adapters.h"
 
+// Per-modality adapter declarations now live in features/ headers.
+// The .cpp pulls them in alongside the
+// foundation header so it can define all adapter bodies.
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -32,9 +35,16 @@
 #include <unordered_map>
 #include <utility>
 
+#include "rac/features/diffusion/rac_diffusion_proto_adapters.h"
+#include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
+#include "rac/features/stt/rac_stt_proto_adapters.h"
+#include "rac/features/tts/rac_tts_proto_adapters.h"
+#include "rac/features/vad/rac_vad_proto_adapters.h"
+#include "rac/features/vlm/rac_vlm_proto_adapters.h"
+
 #ifdef RAC_HAVE_PROTOBUF
 
-// MF-3 (AG-V3): the generated .pb.h files live here, NOT in the public
+// The generated .pb.h files live here, NOT in the public
 // header. The header forward-declares every proto class; the full message
 // definitions are only needed inside the adapter implementation TU. Anyone
 // editing this file should add new proto includes here, not in the header.
@@ -899,7 +909,7 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
             break;
     }
 
-    // hotspot-syn-091: round-trip the chat-template + image-marker overrides
+    // Round-trip the chat-template + image-marker overrides
     // that the C ABI carries (rac_vlm_options_t.custom_chat_template,
     // .image_marker_override). VLMChatTemplate has 3 string fields
     // (template_text, image_marker, default_system_prompt) — only set the
@@ -918,7 +928,7 @@ bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
         out->set_image_marker_override(in->image_marker_override);
     }
 
-    // pass3-syn-128: extended sampling knobs added to rac_vlm_options_t so the
+    // Extended sampling knobs added to rac_vlm_options_t so the
     // proto/C ABI boundary stays in sync. Only emit non-default scalars so the
     // wire stays sparse (matches the convention used for top_k above).
     if (in->seed != 0) {
@@ -972,7 +982,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
             break;
     }
 
-    // hotspot-engine-llamacpp-001: carry request-owned strings into
+    // Carry request-owned strings into
     // rac_vlm_options_t so the llama.cpp VLM engine can actually apply
     // them. The engine reads options->system_prompt directly when building
     // the VLM prompt; stop_sequences is in the C ABI struct for future
@@ -1005,7 +1015,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         }
     }
 
-    // hotspot-syn-091: allocate a heap rac_vlm_chat_template_t and its owned
+    // Allocate a heap rac_vlm_chat_template_t and its owned
     // strings when the proto carries a custom_chat_template, and rac_strdup
     // image_marker_override. rac_vlm_options_free_owned releases both.
     if (in.has_custom_chat_template()) {
@@ -1029,7 +1039,7 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         out->image_marker_override = rac_strdup(in.image_marker_override().c_str());
     }
 
-    // pass3-syn-128: extended sampling knobs round-trip into the C struct so
+    // Extended sampling knobs round-trip into the C struct so
     // the llama.cpp VLM engine can honor them in configure_sampler(). All
     // scalars — no allocation needed; rac_vlm_options_free_owned is unaffected.
     if (in.top_k() > 0) {
@@ -1071,7 +1081,7 @@ void rac_vlm_options_free_owned(rac_vlm_options_t* options) {
     options->stop_sequences = nullptr;
     options->num_stop_sequences = 0;
 
-    // hotspot-syn-091: free adapter-owned chat-template + marker override
+    // Free adapter-owned chat-template + marker override
     // allocations produced by rac_vlm_options_from_proto.
     if (options->custom_chat_template) {
         auto* tpl = const_cast<rac_vlm_chat_template_t*>(options->custom_chat_template);
@@ -1161,29 +1171,52 @@ bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_ima
         out->format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
         out->file_path = copy_string_required(in.file_path());
     } else if (in.has_raw_rgb()) {
+        // The `raw_rgb` oneof slot carries either RAW_RGB (3 B/px) or
+        // RAW_RGBA (4 B/px); only `in.format()` distinguishes them. The
+        // C ABI / mtmd backend speak RGB only, so downsample RGBA → RGB at
+        // the proto boundary — mirrors RAVLMImage.fromUIImage's CGContext
+        // path. Without this, a 4 B/px buffer reaches mtmd_bitmap_init,
+        // which reads it as 3 B/px, overshoots the heap by 33%, and either
+        // hallucinates or EXC_BAD_ACCESSes.
         out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
-        out->data_size = in.raw_rgb().size();
-        if (out->data_size > 0) {
+        const ::std::string& src = in.raw_rgb();
+        if (in.format() == ::runanywhere::v1::VLM_IMAGE_FORMAT_RAW_RGBA) {
+            const size_t pixels = static_cast<size_t>(out->width) * out->height;
+            if (pixels == 0 || src.size() < pixels * 4) {
+                // Dimensions inconsistent with RGBA payload — refuse rather
+                // than read past the buffer.
+                return false;
+            }
+            out->data_size = pixels * 3;
             uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            std::memcpy(buf, in.raw_rgb().data(), out->data_size);
+            const uint8_t* in_px = reinterpret_cast<const uint8_t*>(src.data());
+            for (size_t i = 0; i < pixels; ++i) {
+                buf[i * 3 + 0] = in_px[i * 4 + 0];
+                buf[i * 3 + 1] = in_px[i * 4 + 1];
+                buf[i * 3 + 2] = in_px[i * 4 + 2];
+            }
             out->pixel_data = buf;
+        } else {
+            out->data_size = src.size();
+            if (out->data_size > 0) {
+                uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
+                std::memcpy(buf, src.data(), out->data_size);
+                out->pixel_data = buf;
+            }
         }
     } else if (in.has_base64()) {
         out->format = RAC_VLM_IMAGE_FORMAT_BASE64;
         out->base64_data = copy_string_required(in.base64());
         out->data_size = in.base64().size();
     } else if (in.has_encoded()) {
-        // No exact C ABI carrier — surface as RGB_PIXELS bytes (encoded
-        // payload). Caller must inspect the (proto-side) format hint
-        // separately. This is a best-effort path; pixel data will not be
-        // raw RGB but the caller can still treat it as opaque bytes.
-        out->format = RAC_VLM_IMAGE_FORMAT_RGB_PIXELS;
-        out->data_size = in.encoded().size();
-        if (out->data_size > 0) {
-            uint8_t* buf = static_cast<uint8_t*>(rac_alloc(out->data_size));
-            std::memcpy(buf, in.encoded().data(), out->data_size);
-            out->pixel_data = buf;
-        }
+        // The C ABI has no carrier for encoded JPEG/PNG/WEBP containers.
+        // Coercing them into RGB_PIXELS would silently feed container bytes
+        // into mtmd_bitmap_init (which expects width*height*3 raw pixels)
+        // and crash the engine. Mirror the BASE64 hotspot fix — refuse at
+        // the proto boundary so the caller sees a clean decoding error
+        // instead of a backend crash. SDKs must decode containers to
+        // RAW_RGB or supply a file path before calling C.
+        return false;
     } else {
         // No source set — leave pointers NULL and pick FILE_PATH as the
         // safest default (matches RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0).
@@ -1465,6 +1498,12 @@ bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
     if (in->image_data && in->image_size > 0) {
         out->set_image_data(
             ::std::string(reinterpret_cast<const char*>(in->image_data), in->image_size));
+        // Every shipped C-ABI diffusion engine (diffusion_coreml,
+        // rac_diffusion_platform) emits raw RGBA bytes — surface the media
+        // type so SDKs can route through CGContext/Canvas instead of
+        // Image(data:). A future backend that returns a PNG container must
+        // override this on a parallel C-side carrier.
+        out->set_image_media_type("image/raw-rgba");
     }
     out->set_width(in->width);
     out->set_height(in->height);

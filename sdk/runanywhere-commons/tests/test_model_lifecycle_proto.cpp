@@ -188,6 +188,19 @@ runanywhere::v1::ModelInfo build_llm_model() {
     return model;
 }
 
+runanywhere::v1::ModelInfo build_llm_model_alt() {
+    runanywhere::v1::ModelInfo model;
+    model.set_id("lifecycle.llm.alt");
+    model.set_name("Lifecycle LLM Alt");
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
+    model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    model.set_local_path("/tmp/lifecycle-test-alt.gguf");
+    model.set_is_downloaded(true);
+    model.set_is_available(true);
+    return model;
+}
+
 std::filesystem::path make_temp_dir(const char* prefix) {
     const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
     std::filesystem::path dir = std::filesystem::temp_directory_path() /
@@ -522,6 +535,87 @@ int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) 
     return 0;
 }
 
+// Covers the previous-model unload branch inside
+// `rac_model_lifecycle_load_proto`. Loading a different model for the same
+// SDK component MUST destroy the previously-loaded impl exactly once before
+// the new impl is created, with the new impl observably swapped in via the
+// current-model snapshot.
+int test_load_replaces_previous_model(rac_model_registry_handle_t registry) {
+    g_create_count = g_initialize_count = g_cleanup_count = g_destroy_count = 0;
+    rac_model_lifecycle_reset();
+    rac_sdk_event_clear_queue();
+
+    rac_llm_service_ops_t ops{};
+    ops.create = dummy_llm_create;
+    ops.initialize = dummy_llm_initialize;
+    ops.cleanup = dummy_llm_cleanup;
+    ops.destroy = dummy_llm_destroy;
+
+    const uint32_t formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+    auto vtable = make_dummy_llm_vtable(&ops, formats);
+    (void)rac_plugin_unregister("llamacpp");
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "replace plugin registers");
+    CHECK(register_model(registry, build_llm_model()), "primary LLM model registers");
+    CHECK(register_model(registry, build_llm_model_alt()), "alt LLM model registers");
+
+    // Load the first model.
+    runanywhere::v1::ModelLoadRequest load_first;
+    load_first.set_model_id("lifecycle.llm");
+    std::vector<uint8_t> load_first_bytes;
+    CHECK(serialize(load_first, &load_first_bytes), "first load request serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_model_lifecycle_load_proto(registry, load_first_bytes.data(),
+                                                     load_first_bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult first_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &first_result),
+          "first load returns parsable ModelLoadResult");
+    CHECK(first_result.success() && first_result.model_id() == "lifecycle.llm",
+          "first load reports success for primary model");
+    CHECK(g_create_count == 1 && g_initialize_count == 1 && g_destroy_count == 0,
+          "first load triggers exactly one create+initialize and zero destroys");
+    rac_proto_buffer_free(&out);
+
+    // Load a different model for the same SDK_COMPONENT_LLM. This MUST
+    // unload the previous model (destroy_loaded_model in the load path)
+    // and create the new impl.
+    runanywhere::v1::ModelLoadRequest load_second;
+    load_second.set_model_id("lifecycle.llm.alt");
+    std::vector<uint8_t> load_second_bytes;
+    CHECK(serialize(load_second, &load_second_bytes), "second load request serializes");
+
+    rac_proto_buffer_init(&out);
+    rc = rac_model_lifecycle_load_proto(registry, load_second_bytes.data(),
+                                        load_second_bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult second_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &second_result),
+          "replacing load returns parsable ModelLoadResult");
+    CHECK(second_result.success() && second_result.model_id() == "lifecycle.llm.alt",
+          "replacing load swaps to the alternate model");
+    CHECK(g_destroy_count == 1, "replacing load destroys exactly one previously-loaded impl");
+    CHECK(g_cleanup_count == 1, "replacing load cleans up previously-loaded impl");
+    CHECK(g_create_count == 2 && g_initialize_count == 2,
+          "replacing load creates+initializes the new impl");
+    rac_proto_buffer_free(&out);
+
+    // Snapshot must report the new model, not the original.
+    rac_proto_buffer_init(&out);
+    rc = rac_component_lifecycle_snapshot_proto(
+        static_cast<uint32_t>(runanywhere::v1::SDK_COMPONENT_LLM), &out);
+    runanywhere::v1::ComponentLifecycleSnapshot snapshot;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &snapshot), "post-replace snapshot parses");
+    CHECK(snapshot.state() == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
+          "post-replace snapshot still reports ready state");
+    CHECK(snapshot.model_id() == "lifecycle.llm.alt",
+          "post-replace snapshot reports the replacing model id");
+    rac_proto_buffer_free(&out);
+
+    rac_plugin_unregister("llamacpp");
+    rac_model_lifecycle_reset();
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -542,6 +636,7 @@ int main() {
         test_unsupported_route(registry);
         test_success_current_snapshot_unload_events(registry);
         test_vlm_lifecycle_resolved_artifacts(registry);
+        test_load_replaces_previous_model(registry);
 
         rac_model_registry_destroy(registry);
         std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

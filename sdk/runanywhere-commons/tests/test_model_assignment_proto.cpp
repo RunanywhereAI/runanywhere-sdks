@@ -278,13 +278,13 @@ int main() {
         std::fprintf(stdout, "  skip: protobuf runtime is disabled\n");
         return 0;
 #else
-#define RUN_TEST(fn)                                    \
-    do {                                                \
-        std::fprintf(stdout, "[ RUN  ] %s\n", #fn);     \
-        const int rc = fn();                            \
-        if (rc != 0)                                    \
-            return rc;                                  \
-        std::fprintf(stdout, "[ OK   ] %s\n", #fn);     \
+#define RUN_TEST(fn)                                \
+    do {                                            \
+        std::fprintf(stdout, "[ RUN  ] %s\n", #fn); \
+        const int rc = fn();                        \
+        if (rc != 0)                                \
+            return rc;                              \
+        std::fprintf(stdout, "[ OK   ] %s\n", #fn); \
     } while (0)
 
         RUN_TEST(test_cache_refresh_policy);

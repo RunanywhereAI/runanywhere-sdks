@@ -1,8 +1,6 @@
 # =============================================================================
 # cmake/plugins.cmake — engine plugin authoring helpers
 #
-# GAP 07 Phase 4 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # Hides the static-vs-shared decision and the per-platform
 # linker-keep-alive incantations (-Wl,-force_load on Apple, --whole-archive on
 # GNU, /INCLUDE: on MSVC) behind two functions. Engine authors call ONE
@@ -10,7 +8,7 @@
 #
 # This is the helper that
 # `sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h` already
-# documents as "introduced in GAP 07" (~line 126).
+# documents (~line 126).
 #
 # Usage in engines/<name>/CMakeLists.txt:
 #
@@ -58,14 +56,14 @@ include_guard(GLOBAL)
 # -----------------------------------------------------------------------------
 # rac_add_engine_plugin(name
 #                       SOURCES <s1> <s2> ...
-#                       [TARGET_NAME <override>]      # v3.1.2: e.g. rac_backend_onnx
-#                       [CXX_STANDARD <17|20>]        # v3.1.2: default 17
-#                       [SHARED_ONLY]                  # v3.1.2: never link into rac_commons
+#                       [TARGET_NAME <override>]      # e.g. rac_backend_onnx
+#                       [CXX_STANDARD <17|20>]        # default 17
+#                       [SHARED_ONLY]                  # never link into rac_commons
 #                       [LINK_LIBRARIES <lib1> <lib2> ...]
 #                       [INCLUDE_DIRECTORIES <dir1> ...]
 #                       [COMPILE_DEFINITIONS <def1> ...]
-#                       [COMPILE_OPTIONS <opt1> ...]   # v3.1.2: e.g. -O3 -fvisibility=hidden
-#                       [LINK_OPTIONS <opt1> ...]      # v3.1.2: e.g. -Wl,--gc-sections
+#                       [COMPILE_OPTIONS <opt1> ...]   # e.g. -O3 -fvisibility=hidden
+#                       [LINK_OPTIONS <opt1> ...]      # e.g. -Wl,--gc-sections
 #                       [PRIMITIVES <GENERATE_TEXT|EMBED|...>]
 #                       [RUNTIMES <CPU|METAL|...>]
 #                       [FORMATS <GGUF|ONNX|...>]
@@ -84,9 +82,9 @@ include_guard(GLOBAL)
 #       SHARED_ONLY engines (which expose JNI bridges or test-link surfaces)
 #       keep default visibility.
 #
-# v3.1.2 additions to support migrating the 4 hand-rolled engines (onnx,
+# Additions to support migrating the 4 hand-rolled engines (onnx,
 # whispercpp, whisperkit_coreml, metalrt) without renaming their existing
-# CMake target names — the macro now supports TARGET_NAME override + non-17
+# CMake target names — the macro supports TARGET_NAME override + non-17
 # C++ standards + SHARED_ONLY (skip the static-fold-into-rac_commons path).
 #
 # PRIMITIVES + RUNTIMES + FORMATS + ownership are recorded as GLOBAL properties for tooling
@@ -94,7 +92,7 @@ include_guard(GLOBAL)
 # -----------------------------------------------------------------------------
 function(rac_add_engine_plugin name)
     set(_options "")
-    # v3.1.2: TARGET_NAME lets engines opt into the macro while preserving
+    # TARGET_NAME lets engines opt into the macro while preserving
     # their existing CMake target name (e.g. rac_backend_onnx). Default is
     # `runanywhere_<name>` for SHARED builds (matches the dlopen loader's
     # `entry_symbol_from_path()` heuristic).
@@ -227,7 +225,7 @@ endfunction()
 # -----------------------------------------------------------------------------
 # rac_apply_android_page_alignment(<target>)
 #
-# DUP-07 — the three active engines (llamacpp, sherpa, onnx) all need the same
+# The three active engines (llamacpp, sherpa, onnx) all need the same
 # linker incantation on Android to stay compliant with Android 15+ (API 35)
 # 16 KiB page-size requirement (mandatory Nov 2025). Bundled with
 # `-Wl,--gc-sections` because every engine historically attaches them to the

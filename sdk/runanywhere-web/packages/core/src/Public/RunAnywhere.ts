@@ -20,13 +20,16 @@
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import {
   SDKEnvironment,
-  InferenceFramework,
-  ModelFileRole,
   ModelArtifactType,
+  ModelCategory,
+  AudioFormat,
+  type InferenceFramework,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
   DownloadState,
+  type DownloadPlanRequest,
+  type DownloadPlanResult,
   type DownloadProgress,
 } from '@runanywhere/proto-ts/download_service';
 import type { TTSSpeakResult } from '@runanywhere/proto-ts/tts_options';
@@ -40,18 +43,25 @@ import {
 import type { SDKInitOptions } from '../types/models';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
+import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
+import { AudioPlayback } from '../Infrastructure/AudioPlayback';
+import {
+  frameworkOPFSDir,
+  primaryFilenameFromModel,
+} from '../Infrastructure/FrameworkOPFSPaths';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import { RAG as RAGCapability } from './Extensions/RunAnywhere+RAG';
 import { VoiceAgent as VoiceAgentCapability } from './Extensions/RunAnywhere+VoiceAgent';
 import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads';
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
 import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
-import { ModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
+import { WebModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
 import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
 import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
@@ -62,8 +72,13 @@ import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
-import { createStorageNamespace } from './Extensions/RunAnywhere+Storage';
+import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
+import {
+  createStorageNamespace,
+  setRegisterModelHydrateHook,
+} from './Extensions/RunAnywhere+Storage';
 import { disposeSpeechProvider } from './Extensions/SpeechProvider';
+import { flatFacade } from './Extensions/RunAnywhere+FlatFacade';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { SDK_VERSION } from '../Foundation/Version';
@@ -114,10 +129,20 @@ let _initializingPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
+/** True once the commons WASM loaded successfully during initialize(). When
+ * false, `isInitialized` reflects TS-layer readiness only; WASM-backed APIs
+ * will fail until a backend module registers and calls
+ * `completeNativePhase1ForModule`. This flag has the same semantics as
+ * Swift's `isInitializedFlag` combined with the Phase 1 proto success path. */
+let _jsOnlyInit = false;
 
 // Phase 2 (services) init state — mirrors Swift's
 // `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
 let _hasCompletedServicesInit = false;
+// Separate from _hasCompletedServicesInit: Phase 2 marks services ready even
+// if the HTTP/auth round-trip failed (offline mode). ensureServicesReady()
+// retries HTTP-only on the next API call without re-running Phase 2.
+let _hasCompletedHTTPSetup = false;
 let _servicesInitPromise: Promise<void> | null = null;
 
 interface SdkInitModule extends EmscriptenRunanywhereModule {
@@ -149,9 +174,39 @@ function generateDeviceId(): string {
   });
 }
 
-/** Persist + retrieve a device ID across SDK sessions (best-effort localStorage). */
+/** Persist + retrieve a device ID across SDK sessions.
+ *
+ * Mirrors Swift's `CppBridge.Device.persistentId`: delegates to commons'
+ * device-identity chain (secure_get → vendor ID → synthesized UUID) when a
+ * WASM module is available, falling back to the TS-local UUID only when no
+ * module is installed. This ensures the same canonical ID is returned whether
+ * the call happens before or after a backend module registers.
+ *
+ * The `rac_state_get_persistent_device_id` function is exported by the commons
+ * WASM and reads/writes via the `secure_get` / `secure_set` ABI backed by
+ * `localStorage` with the `rac_sdk_` key prefix — the same storage slot that
+ * C++ uses, so there is only one device-ID registry entry.
+ */
 function ensureDeviceId(): string {
   if (_deviceId) return _deviceId;
+
+  // Prefer the commons device-identity chain so all layers share one ID.
+  try {
+    const mod = tryRunanywhereModule();
+    const modWithDeviceId = mod as (EmscriptenRunanywhereModule & { _rac_state_get_persistent_device_id?: () => number }) | null;
+    if (modWithDeviceId && typeof modWithDeviceId._rac_state_get_persistent_device_id === 'function') {
+      const ptr = modWithDeviceId._rac_state_get_persistent_device_id();
+      if (ptr) {
+        const id = modWithDeviceId.UTF8ToString(ptr);
+        if (id) {
+          _deviceId = id;
+          return id;
+        }
+      }
+    }
+  } catch { /* fall through to TS fallback */ }
+
+  // TS fallback: keep backwards-compat key so existing installs keep their ID.
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('runanywhere.deviceId');
@@ -275,33 +330,104 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Optional extra args accepted by the Swift-shaped flat facade verbs that
+ * mirror the cancellation contract Swift expresses through Task cancellation.
+ * Mirrors the `{ signal?: AbortSignal }` shape already used by
+ * `toolCalling.generateWithTools`.
+ */
+export interface CancellableCall {
+  signal?: AbortSignal;
+}
+
+/**
+ * Pre-check an AbortSignal before issuing a blocking native call. The Swift
+ * source dispatches via `Task.checkCancellation()` at each suspension point;
+ * the Web port can only short-circuit at the entry boundary because every
+ * `_rac_*` invocation runs synchronously inside a single WASM worker tick.
+ * Mirrors the eager-check pattern in `RunAnywhere+ToolCalling.ts`.
+ */
+function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
+  if (signal?.aborted) {
+    throw SDKException.fromCode(
+      SDKErrorCode.GenerationCancelled,
+      `${verb} cancelled`,
+      'AbortSignal was already aborted before the call was invoked',
+    );
+  }
+}
+
+/**
+ * Wire an AbortSignal into the synchronous WASM cancel ABI for a streaming
+ * call: the cancel function is invoked on abort so commons stops pulling
+ * more tokens. The returned cleanup detaches the listener. Suitable for
+ * `generateStream` / `transcribeStream` / `synthesizeStream` / VLM stream.
+ */
+function attachSignalToCancel(
+  signal: AbortSignal | undefined,
+  cancel: () => void,
+): () => void {
+  if (!signal) return () => undefined;
+  const onAbort = (): void => {
+    try {
+      cancel();
+    } catch { /* best-effort; native cancel may not be wired yet */ }
+  };
+  signal.addEventListener('abort', onAbort);
+  return () => signal.removeEventListener('abort', onAbort);
+}
+
+/**
+ * Decode a TTSOutput's audio bytes into Float32 PCM samples suitable for
+ * `AudioPlayback.play(...)`. Mirrors the Swift `RunAnywhere+TTS.swift`
+ * `convertPCMToWAV` + AudioPlaybackManager pipeline: convert whatever the
+ * engine produced into the audio-frame shape the platform player needs.
+ *
+ * The Web Audio API ultimately wants Float32 samples in [-1, 1]; we
+ * interpret the engine bytes as follows:
+ *   - `AUDIO_FORMAT_PCM`: typed Float32 native bytes (4-byte aligned). This
+ *     is what the standalone Sherpa SpeechProvider produces.
+ *   - `AUDIO_FORMAT_PCM_S16LE`: signed 16-bit little-endian PCM; convert
+ *     by normalizing to [-1, 1].
+ *   - Any other (WAV/MP3/Opus/...): unsupported here without a decoder,
+ *     return null so the caller can warn and continue.
+ */
+function decodeTTSAudioToFloat32(output: {
+  audioFormat: AudioFormat;
+  audioData: Uint8Array;
+}): Float32Array | null {
+  const bytes = output.audioData;
+  if (!bytes || bytes.byteLength === 0) return null;
+  switch (output.audioFormat) {
+    case AudioFormat.AUDIO_FORMAT_PCM: {
+      // Float32 native bytes — copy via a DataView read because the source
+      // Uint8Array's byte offset is not guaranteed to be 4-aligned.
+      const sampleCount = Math.floor(bytes.byteLength / 4);
+      const out = new Float32Array(sampleCount);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, sampleCount * 4);
+      for (let i = 0; i < sampleCount; i += 1) {
+        out[i] = view.getFloat32(i * 4, true);
+      }
+      return out;
+    }
+    case AudioFormat.AUDIO_FORMAT_PCM_S16LE: {
+      const usableBytes = bytes.byteLength - (bytes.byteLength % 2);
+      const sampleCount = usableBytes / 2;
+      const out = new Float32Array(sampleCount);
+      const view = new DataView(bytes.buffer, bytes.byteOffset, usableBytes);
+      for (let i = 0; i < sampleCount; i += 1) {
+        out[i] = view.getInt16(i * 2, true) / 0x8000;
+      }
+      return out;
+    }
+    default:
+      return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Multi-file Download Helpers (Web / OPFS platform layer)
 // ---------------------------------------------------------------------------
-
-// Mirrors C++ rac_framework_raw_value — directory names under
-// /opfs/RunAnywhere/Models/<dir>/<modelId>/<filename>.
-const FRAMEWORK_OPFS_DIR: Partial<Record<InferenceFramework, string>> = {
-  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'LlamaCpp',
-  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
-  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'CoreML',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
-};
-
-function frameworkOPFSDir(framework: InferenceFramework): string | null {
-  return FRAMEWORK_OPFS_DIR[framework] ?? null;
-}
-
-function primaryFilenameFromModel(model: ModelInfo): string | null {
-  const primary = model.multiFile?.files?.find(
-    (f) => f.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-  ) ?? model.multiFile?.files?.[0];
-  if (primary?.filename) return primary.filename;
-  const url = model.downloadUrl ?? '';
-  const trailing = url.split('?')[0].split('/').pop() ?? '';
-  return trailing.length > 0 ? trailing : null;
-}
 
 function isTarGzArchiveArtifact(model: ModelInfo): boolean {
   return model.artifactType === ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE;
@@ -352,43 +478,12 @@ async function resolveHydratedModelPath(
   return { exists, localPath: exists ? opfsPath : modelDir };
 }
 
-async function fetchFileBytes(
-  url: string,
-  onProgress?: (loaded: number) => void,
-): Promise<Uint8Array> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`fetch(${url}) returned HTTP ${response.status}`);
-  }
-  const reader = response.body?.getReader();
-  if (!reader) {
-    const buf = new Uint8Array(await response.arrayBuffer());
-    onProgress?.(buf.byteLength);
-    return buf;
-  }
-  const chunks: Uint8Array[] = [];
-  let received = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      chunks.push(value);
-      received += value.byteLength;
-      onProgress?.(received);
-    }
-  }
-  const out = new Uint8Array(received);
-  let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
-  return out;
-}
-
 /**
  * Mirror a completed download into the user-visible model registry so
  * `getModel()` / `downloadedModels()` reflect on-disk state immediately.
  * Matches iOS `RunAnywhere+Storage.persistDownloadCompletion` → `importModel`.
  *
- * CPP-02 self-heal inside the C++ download orchestrator may update only the
+ * Self-heal inside the C++ download orchestrator may update only the
  * commons WASM's `s_model_registry`. `registerModel` broadcasts to every
  * known module via `ModelRegistryAdapter`.
  */
@@ -403,106 +498,123 @@ function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string)
   ModelRegistryCapability.registerModel(importedModel);
 }
 
-async function downloadMultiFileModel(
-  request: DownloadModelOptions,
-  model: ModelInfo,
-  onProgress?: (progress: DownloadProgress) => void,
-): Promise<DownloadProgress> {
-  const files = model.multiFile?.files ?? [];
-  const frameworkDir = frameworkOPFSDir(model.framework as InferenceFramework);
-  if (!frameworkDir) {
-    throw new Error(`Multi-file download: unsupported framework ${model.framework}`);
-  }
-
-  const folderSegments = ['RunAnywhere', 'Models', frameworkDir, request.modelId];
-  const opfsFolder = `/opfs/${folderSegments.join('/')}`;
-  const totalBytes = files.reduce((s, f) => s + (f.sizeBytes || 0), 0);
-  let downloadedBytes = 0;
-
-  const allModules = getAllRegisteredModules();
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (!file.url || !file.filename) continue;
-
-    const bytes = await fetchFileBytes(file.url, (loaded) => {
-      const overall = totalBytes > 0 ? (downloadedBytes + loaded) / totalBytes : 0;
-      onProgress?.({
-        modelId: request.modelId,
-        state: DownloadState.DOWNLOAD_STATE_DOWNLOADING,
-        overallProgress: Math.min(1, overall),
-        bytesDownloaded: downloadedBytes + loaded,
-        totalBytes,
-        stageProgress: overall,
-        overallSpeedBps: 0,
-        etaSeconds: -1,
-        retryAttempt: 0,
-        errorMessage: '',
-        taskId: '',
-        stage: i,
-        currentFileIndex: i,
-        totalFiles: files.length,
-        storageKey: '',
-        localPath: '',
-        startedAtUnixMs: 0,
-        updatedAtUnixMs: Date.now(),
-        currentFileName: file.filename,
-        resumeToken: '',
-      });
-    });
-
-    downloadedBytes += bytes.byteLength;
-
-    // Persist to OPFS
-    await OPFSBridge.writeFileToOPFS([...folderSegments, file.filename], bytes);
-
-    // Mirror into every backend MEMFS so immediate loadModel works
-    const filePath = `${opfsFolder}/${file.filename}`;
-    if (allModules.length > 0) {
-      await OPFSBridge.restoreToMemfsAll(allModules, filePath);
-      if (OPFSBridge.maxMemfsFileSizeAcrossModules(allModules, filePath) === 0) {
-        throw SDKException.fromCode(
-          SDKErrorCode.StorageError,
-          `Multi-file persist failed: '${filePath}' has 0 bytes in MEMFS`,
-          'downloadModel',
-        );
-      }
-    }
-  }
-
-  // Mirror folder path into every WASM module's registry (WEB-001).
+/**
+ * Reconcile the Web vision-language provider's private "loaded" flag with
+ * the canonical C++ lifecycle state. Called from `loadModel` and
+ * `unloadModel` so example app views never need to invoke
+ * `RunAnywhere.visionLanguage.loadCurrentModel()` themselves.
+ *
+ * Both `.multimodal` and `.vision` categories collapse to
+ * `SDK_COMPONENT_VLM` in C++ commons (same as iOS Swift); query both
+ * before deciding the provider should be unloaded.
+ *
+ * Errors are swallowed because backend availability is allowed to lag
+ * the lifecycle (e.g. LlamaCPP WASM still initializing). Real provider
+ * failures will surface when `processImage` next runs.
+ */
+async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
   try {
-    mirrorDownloadCompletionToRegistry(model, opfsFolder);
+    const currentVLM =
+      ModelLifecycleCapability.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        includeModelMetadata: true,
+      }) ??
+      ModelLifecycleCapability.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_VISION,
+        includeModelMetadata: true,
+      });
+
+    const hasVLMModelLoaded = Boolean(currentVLM?.modelId);
+    const providerReportsLoaded = VisionLanguageCapability.isModelLoaded;
+
+    if (hasVLMModelLoaded && !providerReportsLoaded) {
+      await VisionLanguageCapability.loadCurrentModel();
+    } else if (!hasVLMModelLoaded && providerReportsLoaded) {
+      await VisionLanguageCapability.unloadModel();
+    }
   } catch (err) {
+    if (err instanceof SDKException && err.code === SDKErrorCode.BackendNotAvailable) {
+      return;
+    }
+    logger.debug(
+      `vision-language provider sync skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
+ * Plan a download and retry once after clearing oversize partial bytes.
+ *
+ * Mirrors Swift `RunAnywhere+Storage.planDownload(_:)`: when a prior
+ * interrupted download left more bytes on disk than the new plan expects
+ * (e.g. the server reported a smaller Content-Length after a CDN swap),
+ * delete the oversize partials and re-plan instead of surfacing
+ * `existing partial bytes exceed` to the caller as a hard error. Web partials
+ * live in each module's MEMFS and in OPFS under the synthetic `/opfs/` prefix,
+ * so the removal goes through `OPFSBridge.removeFile`.
+ */
+async function planDownloadWithSelfHeal(
+  modelId: string,
+  request: DownloadPlanRequest,
+): Promise<DownloadPlanResult | null> {
+  const plan = DownloadsCapability.plan(request);
+  if (!plan || plan.canStart || !plan.errorMessage.includes('existing partial bytes exceed')) {
+    return plan;
+  }
+
+  const modules = getAllRegisteredModules();
+  for (const file of plan.files) {
+    if (!file.destinationPath) continue;
+    await OPFSBridge.removeFile(modules, file.destinationPath);
     logger.warning(
-      `Multi-file registry mirror failed: ${err instanceof Error ? err.message : String(err)}`,
+      `Removed oversize partial download at '${file.destinationPath}' for '${modelId}'`,
     );
   }
 
-  const completed: DownloadProgress = {
-    modelId: request.modelId,
-    state: DownloadState.DOWNLOAD_STATE_COMPLETED,
-    overallProgress: 1,
-    bytesDownloaded: downloadedBytes,
-    totalBytes,
-    stageProgress: 1,
-    overallSpeedBps: 0,
-    etaSeconds: 0,
-    retryAttempt: 0,
-    errorMessage: '',
-    taskId: '',
-    stage: 0,
-    currentFileIndex: files.length,
-    totalFiles: files.length,
-    storageKey: '',
-    localPath: opfsFolder,
-    startedAtUnixMs: 0,
-    updatedAtUnixMs: Date.now(),
-    currentFileName: '',
-    resumeToken: '',
-  };
-  onProgress?.(completed);
-  return completed;
+  return DownloadsCapability.plan(request);
+}
+
+// The previous in-TS multi-file
+// orchestrator that walked `model.multiFile.files`, fetched each URL,
+// wrote to OPFS, and mirrored to MEMFS used to live here. The commons C
+// download orchestrator already drives the same flow via
+// `rac_download_plan_proto` / `rac_download_start_proto` /
+// `rac_download_progress_poll_proto` (the multi_file_plan branch in
+// `download_orchestrator.cpp` writes the folder path back as
+// `completion_local_path`), and the post-download
+// `OPFSBridge.ensureDownloadPersisted` already detects directory artifacts
+// and flushes them recursively into OPFS via `flushDirectoryFromMemfs`.
+// Multi-file models now share the single canonical download codepath as
+// every other framework SDK; nothing Web-specific belongs in the TS layer.
+
+// ---------------------------------------------------------------------------
+// HTTP retry (mirrors Swift retryHTTPSetup / RN retryHTTPSetupInternal)
+// ---------------------------------------------------------------------------
+
+/**
+ * Retry HTTP/auth after an offline initialization. The Web SDK does not yet
+ * have a browser-side authenticate flow, so the retry probes the commons
+ * auth state via `_rac_auth_is_authenticated` — if the C++ layer has since
+ * acquired a token (e.g. another call path authenticated), flip the flag.
+ * Once a full browser auth flow lands, the authenticate call goes here.
+ */
+async function retryHTTPSetup(): Promise<void> {
+  if (_hasCompletedHTTPSetup) return;
+  const module = tryRunanywhereModule() as SdkInitModule | null;
+  if (!module) return;
+
+  const authFn = module._rac_auth_is_authenticated;
+  if (typeof authFn !== 'function') return;
+
+  try {
+    const authenticated = authFn.call(module) !== 0;
+    if (authenticated) {
+      _hasCompletedHTTPSetup = true;
+      logger.info('HTTP/Auth setup succeeded on retry');
+    }
+  } catch {
+    // Still offline or auth state unavailable — leave _hasCompletedHTTPSetup false.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -518,9 +630,12 @@ export const RunAnywhere = {
     return _isInitialized;
   },
 
-  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete). */
+  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete).
+   * Returns false when commons WASM failed to load during initialize() so
+   * callers know native Phase 1 was deferred and WASM-backed APIs are not yet
+   * available, even though `isInitialized` is true. */
   get areServicesReady(): boolean {
-    return _hasCompletedServicesInit;
+    return _hasCompletedServicesInit && !_jsOnlyInit;
   },
 
   /** Mirror Swift `RunAnywhere.isActive`. */
@@ -660,12 +775,18 @@ export const RunAnywhere = {
           logger.warning(`Failed to restore local storage: ${err instanceof Error ? err.message : String(err)}`);
         }
 
+        await requestPersistentStorage();
+
         // Load the core commons WASM so the SDK facade (init, environment,
         // auth, model registry, lifecycle, proto events) has its native
         // backing. Failure is non-fatal — backend packages (LlamaCPP, ONNX)
         // load their own WASM modules and install them via
         // `setRunanywhereModule`, so apps that only need backend-specific
         // operations can still proceed if the core artifact is missing.
+        // When it fails, `_jsOnlyInit = true` so `areServicesReady` accurately
+        // reflects that native Phase 1 was deferred (mirrors Swift's
+        // `isInitializedFlag = false` on Phase 1 failure, adapted to Web's
+        // intentional non-fatal policy).
         try {
           await CommonsModule.shared.ensureLoaded();
         } catch (err) {
@@ -674,6 +795,7 @@ export const RunAnywhere = {
               err instanceof Error ? err.message : String(err)
             }`,
           );
+          _jsOnlyInit = true;
         }
 
         _isInitialized = true;
@@ -685,11 +807,36 @@ export const RunAnywhere = {
           environment: env,
         });
 
+        // Phase 2 (services) runs in the background so initialize() can
+        // resolve before the WASM-backed services come up. A failure must
+        // be observable to callers — surface it on the event bus and keep
+        // `areServicesReady === false` so polling consumers can react.
+        // The promise itself is intentionally fire-and-forget; consumers
+        // who need to wait can call `RunAnywhere.completeServicesInitialization()`
+        // (or `ensureServicesReady()`) directly and await the same promise.
         void RunAnywhere.completeServicesInitialization().catch((err) => {
-          logger.warning(
-            `Phase 2 init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          const message = err instanceof Error ? err.message : String(err);
+          logger.warning(`Phase 2 init failed (non-fatal): ${message}`);
+          EventBus.shared.emit(
+            'sdk.initializationFailed',
+            EventCategory.EVENT_CATEGORY_INITIALIZATION,
+            { error: message, source: 'completeServicesInitialization' },
           );
         });
+
+        // Hydrate any pre-existing OPFS-backed models registered before
+        // `initialize()` returned, so the Storage tab paints the correct
+        // "Downloaded" state on first render. Catalogs registered AFTER
+        // `initialize()` resolves go through the new `registerModel(...)`
+        // overloads, which schedule their own follow-up hydrate. This
+        // call is idempotent and no-ops if the registry is empty.
+        try {
+          await RunAnywhere.hydrateModelRegistry();
+        } catch (err) {
+          logger.warning(
+            `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       } finally {
         _initializingPromise = null;
       }
@@ -701,7 +848,11 @@ export const RunAnywhere = {
   /**
    * Complete the Phase 2 (services) initialization. Mirror of Swift's
    * `RunAnywhere.completeServicesInitialization()`. Idempotent — concurrent
-   * callers share a single in-flight promise.
+   * callers share a single in-flight promise. The promise is kept alive until
+   * it either settles successfully (`_hasCompletedServicesInit = true`) or
+   * throws, mirroring Swift's `_servicesInitLock` + `_servicesInitTask` join
+   * pattern so two callers arriving concurrently never spawn duplicate Phase 2
+   * work.
    */
   async completeServicesInitialization(): Promise<void> {
     if (_hasCompletedServicesInit) return;
@@ -719,6 +870,7 @@ export const RunAnywhere = {
           completeNativePhase1ForModule(module);
         }
 
+        let httpConfigured = false;
         if (typeof module._rac_sdk_init_phase2_proto === 'function') {
           const bytes = SdkInitPhase2Request.encode({}).finish();
           const result = invokeSdkInitProto(
@@ -728,26 +880,60 @@ export const RunAnywhere = {
             'rac_sdk_init_phase2_proto',
           );
           throwIfSdkInitFailed(result, 'SDK Phase 2');
+          httpConfigured = result?.httpConfigured ?? false;
         } else {
           logger.warning(
             'WASM module missing _rac_sdk_init_phase2_proto; services init remains browser-only until rebuild.',
           );
         }
 
+        // Step 5 (deferred from C++): post-Phase-2 model discovery.
+        // Phase 2 fetches model assignments from the backend; models linked by
+        // those assignments won't appear in downloadedModels() until the OPFS
+        // scan runs again with the updated registry. Mirrors Swift Step 5:
+        // CppBridge.ModelRegistry.shared.discoverDownloadedModels().
+        try {
+          await RunAnywhere.hydrateModelRegistry();
+        } catch (err) {
+          logger.debug(
+            `Post-Phase-2 model discovery failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+
         _hasCompletedServicesInit = true;
-        logger.debug('Services initialization complete (Phase 2)');
-      } finally {
+        _hasCompletedHTTPSetup = httpConfigured;
+        if (httpConfigured) {
+          logger.debug('Services initialization complete (Phase 2)');
+        } else {
+          logger.debug('Services initialization complete (Phase 2, HTTP/auth deferred — will retry on next online call)');
+        }
+      } catch (err) {
+        // Clear the promise on failure so a subsequent retry can re-enter.
         _servicesInitPromise = null;
+        throw err;
       }
+      // Success path: leave _servicesInitPromise set so any late concurrent
+      // caller that reads it after _hasCompletedServicesInit flips true still
+      // gets a resolved promise rather than re-entering the init logic.
     })();
     return _servicesInitPromise;
   },
 
   /**
    * Internal-style guard used by extensions that need a fully-initialized SDK.
+   * Three-branch mirror of Swift's ensureServicesReady():
+   *   1. Fast path: services + HTTP both done → return immediately.
+   *   2. Recovery path: services done, HTTP failed (offline init) → retry HTTP only.
+   *   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
    */
   async ensureServicesReady(): Promise<void> {
-    if (_hasCompletedServicesInit) return;
+    if (_hasCompletedServicesInit && _hasCompletedHTTPSetup) {
+      return;
+    }
+    if (_hasCompletedServicesInit && !_hasCompletedHTTPSetup) {
+      await retryHTTPSetup();
+      return;
+    }
     return RunAnywhere.completeServicesInitialization();
   },
 
@@ -840,8 +1026,13 @@ export const RunAnywhere = {
   /** C++ model registry proto bridge — list/query/listDownloaded/get/mutate. */
   modelRegistry: ModelRegistryCapability,
 
-  /** C++ model lifecycle proto bridge — load/unload/current/snapshot. */
-  modelLifecycle: ModelLifecycleCapability,
+  // Cross-SDK lifecycle surface is the four top-level flat verbs below
+  // (`loadModel` / `unloadModel` / `currentModel` /
+  // `componentLifecycleSnapshot`), mirroring Swift's source-of-truth shape.
+  // Web's extra OPFS/MEMFS helpers live on the internal `WebModelLifecycle`
+  // namespace and are NOT exposed here; if cross-SDK code needs `isLoaded`,
+  // `isComponentReady`, `unloadAllModels`, `loadModelAsync`, etc., they
+  // must be promoted to the canonical contract in Swift first.
 
   /** Text generation — `RunAnywhere.textGeneration.generate(options)` etc. */
   textGeneration: TextGenerationCapability,
@@ -870,6 +1061,9 @@ export const RunAnywhere = {
   /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */
   rag: RAGCapability,
 
+  /** Embeddings generation — `RunAnywhere.embeddings.embed('text', {modelID})` etc. */
+  embeddings: EmbeddingsCapability,
+
   /** Voice-agent orchestration — `RunAnywhere.voiceAgent.processTurn(...)` etc. */
   voiceAgent: VoiceAgentCapability,
 
@@ -882,61 +1076,62 @@ export const RunAnywhere = {
   /** Hardware profile — `RunAnywhere.hardware.getProfile()` etc. */
   hardware: HardwareCapability,
 
+  /**
+   * Backend availability snapshots — `RunAnywhere.backends.onnxStatus()`
+   * etc. Returns build-flag-free reasons that example apps can render
+   * directly without leaking CMake symbol names into the UI.
+   */
+  backends: BackendsCapability,
+
   // =========================================================================
   // Swift-shaped flat facade
+  //
+  // Pure-delegate forwarding methods live in RunAnywhere+FlatFacade.ts and
+  // are spread below. Methods with real orchestration logic (VLM lifecycle
+  // sync, AbortSignal wiring, async generator wrapping, audio playback) are
+  // implemented here where they can access module-scoped state and helpers.
   // =========================================================================
+
+  ...flatFacade,
 
   async loadModel(
     request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],
   ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.loadModelAsync>>> {
-    return ModelLifecycleCapability.loadModelAsync(request);
+    await RunAnywhere.ensureServicesReady();
+    const result = await ModelLifecycleCapability.loadModelAsync(request);
+    // VLM lifecycle mirror: when the loaded model is multimodal/vision and a
+    // Web vision-language provider is registered, automatically populate
+    // its private `_modelLoaded` flag against the lifecycle-resolved
+    // current model. Without this, app code had to call
+    // `RunAnywhere.visionLanguage.loadCurrentModel()` itself after every
+    // load — the SDK now owns that coupling so example views stay free
+    // of SDK-internal lifecycle bridge calls.
+    if (result?.success) {
+      await syncVisionLanguageProviderToLifecycle();
+    }
+    return result;
   },
 
   async unloadModel(
     request: Parameters<typeof ModelLifecycleCapability.unloadModel>[0],
   ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.unloadModelAsync>>> {
-    return ModelLifecycleCapability.unloadModelAsync(request);
-  },
-
-  currentModel(
-    request?: Parameters<typeof ModelLifecycleCapability.currentModel>[0],
-  ): ReturnType<typeof ModelLifecycleCapability.currentModel> {
-    return ModelLifecycleCapability.currentModel(request);
-  },
-
-  componentLifecycleSnapshot(
-    component: Parameters<typeof ModelLifecycleCapability.componentLifecycleSnapshot>[0],
-  ): ReturnType<typeof ModelLifecycleCapability.componentLifecycleSnapshot> {
-    return ModelLifecycleCapability.componentLifecycleSnapshot(component);
-  },
-
-  listModels(): ReturnType<typeof ModelRegistryCapability.listModels> {
-    return ModelRegistryCapability.listModels();
-  },
-
-  queryModels(
-    query: Parameters<typeof ModelRegistryCapability.queryModels>[0],
-  ): ReturnType<typeof ModelRegistryCapability.queryModels> {
-    return ModelRegistryCapability.queryModels(query);
-  },
-
-  getModel(
-    modelId: Parameters<typeof ModelRegistryCapability.getModel>[0],
-  ): ReturnType<typeof ModelRegistryCapability.getModel> {
-    return ModelRegistryCapability.getModel(modelId);
-  },
-
-  downloadedModels(): ReturnType<typeof ModelRegistryCapability.downloadedModels> {
-    return ModelRegistryCapability.downloadedModels();
-  },
-
-  importModel(model: ModelInfo): boolean {
-    return ModelRegistryCapability.registerModel(model);
+    const result = await ModelLifecycleCapability.unloadModelAsync(request);
+    // Symmetric to loadModel above: drop the VLM provider's loaded flag
+    // when the lifecycle no longer reports a current VLM model so the
+    // next processImage call surfaces "no model loaded" instead of
+    // dispatching against a stale provider handle.
+    if (result?.success) {
+      await syncVisionLanguageProviderToLifecycle();
+    }
+    return result;
   },
 
   async downloadModel(
     input: string | DownloadModelOptions,
+    extra: CancellableCall = {},
   ): Promise<DownloadProgress> {
+    throwIfAborted(extra.signal, 'downloadModel');
+    await RunAnywhere.ensureServicesReady();
     const request = typeof input === 'string' ? { modelId: input } : input;
     const model = request.model ?? ModelRegistryCapability.getModel(request.modelId) ?? undefined;
     if (!model) {
@@ -946,14 +1141,13 @@ export const RunAnywhere = {
       );
     }
 
-    // Multi-file models (VLM = primary GGUF + mmproj sidecar, embeddings =
-    // model.onnx + vocab.txt) cannot use the C++ download orchestrator on
-    // Web because that path writes to MEMFS and reports the folder as
-    // `localPath`; OPFSBridge.flushFromMemfs treats that as a single file
-    // and silently no-ops. Use the browser-side fetch path instead.
-    if ((model.multiFile?.files?.length ?? 0) > 1) {
-      return downloadMultiFileModel(request, model, request.onProgress);
-    }
+    // Multi-file models (VLM = primary GGUF + mmproj
+    // sidecar, embeddings = model.onnx + vocab.txt) now flow through the
+    // same canonical plan/start/poll path. The C++ orchestrator's
+    // multi_file_plan branch reports the folder path as
+    // `completion_local_path`, and `OPFSBridge.ensureDownloadPersisted`
+    // recursively flushes the directory contents to OPFS + mirrors them
+    // into every module's MEMFS. No Web-specific orchestrator below.
 
     await prepareModelLoad({
       request: {
@@ -965,7 +1159,7 @@ export const RunAnywhere = {
     });
     ModelRegistryCapability.registerModel(model);
 
-    const plan = DownloadsCapability.plan({
+    const planRequest = {
       modelId: request.modelId,
       model,
       resumeExisting: request.resumeExisting ?? false,
@@ -975,7 +1169,8 @@ export const RunAnywhere = {
       validateExistingBytes: request.validateExistingBytes ?? false,
       verifyChecksums: request.verifyChecksums ?? false,
       requiredFreeBytesAfterDownload: request.requiredFreeBytesAfterDownload ?? 0,
-    });
+    };
+    const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
     if (!plan?.canStart) {
       throw SDKException.backendNotAvailable(
         'downloadModel',
@@ -1002,23 +1197,47 @@ export const RunAnywhere = {
       DownloadState.DOWNLOAD_STATE_FAILED,
       DownloadState.DOWNLOAD_STATE_CANCELLED,
     ]);
-    let lastProgress = start.initialProgress;
-    if (lastProgress) request.onProgress?.(lastProgress);
 
-    while (!lastProgress || !terminal.has(lastProgress.state)) {
-      await delay(request.pollIntervalMs ?? 250);
-      const progress = DownloadsCapability.poll({
+    // Mirror Swift's `cancelNativeDownload(taskID:modelID:)`: wire the
+    // AbortSignal so rac_download_cancel_proto fires with deletePartialBytes=false
+    // (preserves resume tokens). Detach the listener in the finally block.
+    const detachCancel = attachSignalToCancel(extra.signal, () => {
+      DownloadsCapability.cancel({
         modelId: request.modelId,
         taskId: start.taskId,
+        deletePartialBytes: false,
       });
-      if (!progress) continue;
-      lastProgress = progress;
-      // Defer COMPLETED to onProgress until OPFS flush finishes (WEB-001).
-      // UI/E2E often triggers loadModel on COMPLETED; firing it early races
-      // the async MEMFS→OPFS persist that follows the poll loop.
-      if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
-        request.onProgress?.(progress);
+    });
+
+    let lastProgress = start.initialProgress;
+    // Suppress COMPLETED here for the same reason as the poll loop below:
+    // a cached download whose `start.initialProgress` is already COMPLETED
+    // would otherwise produce two onProgress callbacks (one here, one after
+    // the OPFS flush below). The single post-flush emit at the bottom of
+    // downloadModel() is the canonical "download done" signal.
+    if (lastProgress && lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+      request.onProgress?.(lastProgress);
+    }
+
+    try {
+      while (!lastProgress || !terminal.has(lastProgress.state)) {
+        throwIfAborted(extra.signal, 'downloadModel');
+        await delay(request.pollIntervalMs ?? 250);
+        const progress = DownloadsCapability.poll({
+          modelId: request.modelId,
+          taskId: start.taskId,
+        });
+        if (!progress) continue;
+        lastProgress = progress;
+        // Defer COMPLETED to onProgress until OPFS flush finishes.
+        // UI/E2E often triggers loadModel on COMPLETED; firing it early races
+        // the async MEMFS→OPFS persist that follows the poll loop.
+        if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+          request.onProgress?.(progress);
+        }
       }
+    } finally {
+      detachCancel();
     }
 
     if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
@@ -1028,7 +1247,7 @@ export const RunAnywhere = {
       );
     }
 
-    // BUG-WEB-002 / OPFS persistence: the C++ download orchestrator wrote
+    // OPFS persistence: the C++ download orchestrator wrote
     // bytes via `std::ofstream` which on Emscripten lands on MEMFS — an
     // in-memory filesystem invisible to `navigator.storage.estimate()` and
     // destroyed on tab reload. Flush the freshly-written file into the
@@ -1061,9 +1280,14 @@ export const RunAnywhere = {
       }
     }
 
+    // Single canonical COMPLETED emit: both the start.initialProgress
+    // branch and the poll loop intentionally suppress COMPLETED so the only
+    // place this fires is HERE, AFTER OPFSBridge.ensureDownloadPersisted has
+    // resolved. UI/E2E observers gate loadModel on this; firing earlier races
+    // the MEMFS→OPFS persist.
     request.onProgress?.(lastProgress);
 
-    // CPP-02 self-heal may only update the commons WASM registry. Mirror
+    // Self-heal may only update the commons WASM registry. Mirror
     // localPath + isDownloaded into every module so harness/UI polls succeed.
     if (request.updateRegistryOnCompletion !== false && lastProgress.localPath) {
       try {
@@ -1102,7 +1326,7 @@ export const RunAnywhere = {
 
       const { exists, localPath } = await resolveHydratedModelPath(existing, dir);
 
-      // WEB-REDOWNLOAD-WAIT-001: clearSiteStorage (or manual OPFS purge)
+      // clearSiteStorage (or manual OPFS purge)
       // wipes bytes but the registry can still report isDownloaded=true from
       // a prior session. Reconcile: if the canonical OPFS path is gone, clear
       // the flag so the next downloadModel() re-fetches instead of no-oping.
@@ -1124,7 +1348,7 @@ export const RunAnywhere = {
       } catch { /* ignore */ }
     }
     if (patched > 0) {
-      // WEB-OPFS-HYDRATE-UI-001: notify UI subscribers (Storage tab, model
+      // Notify UI subscribers (Storage tab, model
       // sheet) so they re-query the registry and render Downloaded/Load
       // instead of Download after a fresh page load.
       EventBus.shared.emit(
@@ -1162,75 +1386,95 @@ export const RunAnywhere = {
     );
   },
 
-  generate(
+  async generate(
     options: Parameters<typeof TextGenerationCapability.generate>[0],
+    extra: CancellableCall = {},
   ): ReturnType<typeof TextGenerationCapability.generate> {
-    return TextGenerationCapability.generate(options);
+    throwIfAborted(extra.signal, 'generate');
+    await RunAnywhere.ensureServicesReady();
+    // Mirror Swift's Task cancellation: bridge the abort signal to commons
+    // cancelGeneration so the synchronous WASM call returns early.
+    const detach = attachSignalToCancel(extra.signal, () => TextGenerationCapability.cancelGeneration());
+    return TextGenerationCapability.generate(options).finally(detach);
   },
 
-  generateStream(
+  async generateStream(
     options: Parameters<typeof TextGenerationCapability.generateStream>[0],
-  ): ReturnType<typeof TextGenerationCapability.generateStream> {
-    return TextGenerationCapability.generateStream(options);
-  },
-
-  cancelGeneration(): void {
-    TextGenerationCapability.cancelGeneration();
-  },
-
-  generateStructured(
-    ...args: Parameters<typeof StructuredOutputCapability.generate>
-  ): ReturnType<typeof StructuredOutputCapability.generate> {
-    return StructuredOutputCapability.generate(...args);
-  },
-
-  generateStructuredStream(
-    ...args: Parameters<typeof TextGenerationCapability.generateStructuredStream>
-  ): ReturnType<typeof TextGenerationCapability.generateStructuredStream> {
-    return TextGenerationCapability.generateStructuredStream(...args);
-  },
-
-  extractStructuredOutput(
-    ...args: Parameters<typeof TextGenerationCapability.extractStructuredOutput>
-  ): ReturnType<typeof TextGenerationCapability.extractStructuredOutput> {
-    return TextGenerationCapability.extractStructuredOutput(...args);
-  },
-
-  generateWithTools(
-    prompt: Parameters<typeof ToolCallingCapability.generateWithTools>[0],
-    options?: Parameters<typeof ToolCallingCapability.generateWithTools>[1],
-  ): ReturnType<typeof ToolCallingCapability.generateWithTools> {
-    return ToolCallingCapability.generateWithTools(prompt, options);
-  },
-
-  transcribe(
-    ...args: Parameters<typeof STTCapability.transcribeAuto>
-  ): ReturnType<typeof STTCapability.transcribeAuto> {
-    return STTCapability.transcribeAuto(...args);
+    extra: CancellableCall = {},
+  ): Promise<Awaited<ReturnType<typeof TextGenerationCapability.generateStream>>> {
+    throwIfAborted(extra.signal, 'generateStream');
+    await RunAnywhere.ensureServicesReady();
+    const stream = await TextGenerationCapability.generateStream(options);
+    const detach = attachSignalToCancel(extra.signal, () => stream.cancel());
+    void stream.result.finally(detach);
+    return stream;
   },
 
   transcribeStream(
-    ...args: Parameters<typeof STTCapability.transcribeStream>
+    handle: Parameters<typeof STTCapability.transcribeStream>[0],
+    audio: Parameters<typeof STTCapability.transcribeStream>[1],
+    options: Parameters<typeof STTCapability.transcribeStream>[2],
+    extra: CancellableCall = {},
   ): ReturnType<typeof STTCapability.transcribeStream> {
-    return STTCapability.transcribeStream(...args);
-  },
-
-  synthesize(
-    ...args: Parameters<typeof TTSCapability.synthesizeAuto>
-  ): ReturnType<typeof TTSCapability.synthesizeAuto> {
-    return TTSCapability.synthesizeAuto(...args);
+    throwIfAborted(extra.signal, 'transcribeStream');
+    const iterable = STTCapability.transcribeStream(handle, audio, options);
+    if (!extra.signal) return iterable;
+    const signal = extra.signal;
+    return (async function* () {
+      for await (const partial of iterable) {
+        throwIfAborted(signal, 'transcribeStream');
+        yield partial;
+      }
+    })();
   },
 
   synthesizeStream(
-    ...args: Parameters<typeof TTSCapability.synthesizeStream>
+    handle: Parameters<typeof TTSCapability.synthesizeStream>[0],
+    text: Parameters<typeof TTSCapability.synthesizeStream>[1],
+    options: Parameters<typeof TTSCapability.synthesizeStream>[2],
+    extra: CancellableCall = {},
   ): ReturnType<typeof TTSCapability.synthesizeStream> {
-    return TTSCapability.synthesizeStream(...args);
+    throwIfAborted(extra.signal, 'synthesizeStream');
+    const iterable = TTSCapability.synthesizeStream(handle, text, options);
+    if (!extra.signal) return iterable;
+    const detach = attachSignalToCancel(extra.signal, () => TTSCapability.stop(handle));
+    return (async function* () {
+      try {
+        yield* iterable;
+      } finally {
+        detach();
+      }
+    })();
   },
 
   async speak(
     ...args: Parameters<typeof TTSCapability.synthesizeAuto>
   ): Promise<TTSSpeakResult> {
     const output = await TTSCapability.synthesizeAuto(...args);
+    // Swift parity: speak() must actually play the synthesized audio through
+    // the default device speakers. AudioPlayback expects Float32Array PCM
+    // samples; convert from the proto AudioFormat as needed. Failure to
+    // play audio is non-fatal — return the synthesis result either way so
+    // callers can still inspect timings / format metadata.
+    if (output.audioData && output.audioData.byteLength > 0) {
+      try {
+        const samples = decodeTTSAudioToFloat32(output);
+        if (samples && samples.length > 0) {
+          const playback = new AudioPlayback({
+            sampleRate: output.sampleRate > 0 ? output.sampleRate : 22050,
+          });
+          try {
+            await playback.play(samples, output.sampleRate || undefined);
+          } finally {
+            playback.dispose();
+          }
+        }
+      } catch (err) {
+        logger.warning(
+          `speak(): audio playback failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
     return {
       audioFormat: output.audioFormat,
       sampleRate: output.sampleRate,
@@ -1243,24 +1487,6 @@ export const RunAnywhere = {
     };
   },
 
-  stopSynthesis(
-    handle: Parameters<typeof TTSCapability.stop>[0],
-  ): ReturnType<typeof TTSCapability.stop> {
-    return TTSCapability.stop(handle);
-  },
-
-  stopSpeaking(
-    handle: Parameters<typeof TTSCapability.stop>[0],
-  ): ReturnType<typeof TTSCapability.stop> {
-    return TTSCapability.stop(handle);
-  },
-
-  detectVoiceActivity(
-    ...args: Parameters<typeof VADCapability.detectVoiceAuto>
-  ): ReturnType<typeof VADCapability.detectVoiceAuto> {
-    return VADCapability.detectVoiceAuto(...args);
-  },
-
   async *streamVAD(
     audio: AsyncIterable<Parameters<typeof VADCapability.detectVoiceAuto>[0]>,
     options?: Parameters<typeof VADCapability.detectVoiceAuto>[1],
@@ -1270,109 +1496,44 @@ export const RunAnywhere = {
     }
   },
 
-  resetVAD(
-    handle: Parameters<typeof VADCapability.reset>[0],
-  ): ReturnType<typeof VADCapability.reset> {
-    return VADCapability.reset(handle);
-  },
-
-  ragCreatePipeline(
-    ...args: Parameters<typeof RAGCapability.createPipeline>
-  ): ReturnType<typeof RAGCapability.createPipeline> {
-    return RAGCapability.createPipeline(...args);
-  },
-
-  ragDestroyPipeline(): ReturnType<typeof RAGCapability.destroyPipeline> {
-    return RAGCapability.destroyPipeline();
-  },
-
-  ragIngest(
-    ...args: Parameters<typeof RAGCapability.ingest>
-  ): ReturnType<typeof RAGCapability.ingest> {
-    return RAGCapability.ingest(...args);
-  },
-
-  ragAddDocumentsBatch(
-    ...args: Parameters<typeof RAGCapability.addDocumentsBatch>
-  ): ReturnType<typeof RAGCapability.addDocumentsBatch> {
-    return RAGCapability.addDocumentsBatch(...args);
-  },
-
-  ragGetDocumentCount(): ReturnType<typeof RAGCapability.getDocumentCount> {
-    return RAGCapability.getDocumentCount();
-  },
-
-  ragGetStatistics(): ReturnType<typeof RAGCapability.getStatistics> {
-    return RAGCapability.getStatistics();
-  },
-
-  ragClearDocuments(): ReturnType<typeof RAGCapability.clearDocuments> {
-    return RAGCapability.clearDocuments();
-  },
-
-  ragQuery(
-    ...args: Parameters<typeof RAGCapability.query>
-  ): ReturnType<typeof RAGCapability.query> {
-    return RAGCapability.query(...args);
-  },
-
-  initializeVoiceAgent(
-    ...args: Parameters<typeof VoiceAgentCapability.initialize>
-  ): ReturnType<typeof VoiceAgentCapability.initialize> {
-    return VoiceAgentCapability.initialize(...args);
-  },
-
-  initializeVoiceAgentWithLoadedModels(): ReturnType<typeof VoiceAgentCapability.initializeWithLoadedModels> {
-    return VoiceAgentCapability.initializeWithLoadedModels();
-  },
-
-  getVoiceAgentComponentStates(): ReturnType<typeof VoiceAgentCapability.getComponentStates> {
-    return VoiceAgentCapability.getComponentStates();
-  },
-
-  processVoiceTurn(
-    ...args: Parameters<typeof VoiceAgentCapability.processTurn>
-  ): ReturnType<typeof VoiceAgentCapability.processTurn> {
-    return VoiceAgentCapability.processTurn(...args);
-  },
-
-  streamVoiceAgent(
-    ...args: Parameters<typeof VoiceAgentCapability.stream>
-  ): ReturnType<typeof VoiceAgentCapability.stream> {
-    return VoiceAgentCapability.stream(...args);
-  },
-
-  cleanupVoiceAgent(): ReturnType<typeof VoiceAgentCapability.cleanup> {
-    return VoiceAgentCapability.cleanup();
-  },
-
   async processImage(
-    ...args: Parameters<typeof VisionLanguageCapability.processImage>
+    image: Parameters<typeof VisionLanguageCapability.processImage>[0],
+    options: Parameters<typeof VisionLanguageCapability.processImage>[1],
+    extra: CancellableCall = {},
   ): Promise<Awaited<ReturnType<typeof VisionLanguageCapability.processImage>>> {
+    throwIfAborted(extra.signal, 'processImage');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
-    return VisionLanguageCapability.processImage(...args);
+    const detach = attachSignalToCancel(
+      extra.signal,
+      () => { void VisionLanguageCapability.cancelVLMGeneration(); },
+    );
+    return VisionLanguageCapability.processImage(image, options).finally(detach);
   },
 
   async processImageStream(
-    ...args: Parameters<typeof VisionLanguageCapability.processImageStream>
+    image: Parameters<typeof VisionLanguageCapability.processImageStream>[0],
+    options: Parameters<typeof VisionLanguageCapability.processImageStream>[1],
+    extra: CancellableCall = {},
   ): ReturnType<typeof VisionLanguageCapability.processImageStream> {
+    throwIfAborted(extra.signal, 'processImageStream');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
-    return VisionLanguageCapability.processImageStream(...args);
-  },
-
-  cancelVLMGeneration(): ReturnType<typeof VisionLanguageCapability.cancelVLMGeneration> {
-    return VisionLanguageCapability.cancelVLMGeneration();
+    const stream = await VisionLanguageCapability.processImageStream(image, options);
+    attachSignalToCancel(
+      extra.signal,
+      () => { void VisionLanguageCapability.cancelVLMGeneration(); },
+    );
+    return stream;
   },
 
   // =========================================================================
   // Shutdown
   // =========================================================================
 
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
     // Clear every WASM adapter singleton that `setRunanywhereModule()`
@@ -1387,23 +1548,23 @@ export const RunAnywhere = {
     HTTPAdapter.clearDefaultModule();
     StorageAdapter.clearDefaultHandles();
 
-    // Tear down any registered speech provider (e.g. standalone Sherpa
-    // installed by `@runanywhere/web-onnx`) so its backend module/component
-    // handles do not survive across shutdown/reset boundaries. Errors are
-    // logged but do not block the rest of the teardown.
-    void disposeSpeechProvider().catch((err) => {
+    // Await speech-provider teardown before resetting _isInitialized so that
+    // a subsequent initialize() cannot allocate fresh WASM handles while the
+    // previous provider's dispose() is still in flight. Mirrors Swift's
+    // async reset() which serializes teardown before clearing state flags.
+    await disposeSpeechProvider().catch((err) => {
       logger.warning(`SpeechProvider.dispose() threw during shutdown: ${String(err)}`);
     });
 
-    // Tear down the T6.1 Worker streaming pipeline. The pass-1 fix
-    // established `clearRunanywhereModule()` + `disposeSpeechProvider()`
-    // as the WASM ownership boundary, but the Worker singletons
+    // Tear down the Worker streaming pipeline. The WASM ownership boundary
+    // is `clearRunanywhereModule()` + `disposeSpeechProvider()`,
+    // but the Worker singletons
     // (`OffscreenRuntimeBridge._instance`, `_init` payload, and the
     // `StreamWorkerFactoryRegistry._factory`) live outside that
     // boundary. Without explicit teardown the spawned worker keeps its
     // mirror Emscripten module + loaded model weights alive across
     // logout / account-switch / test reset, and the next `initialize()`
-    // would reuse the stale bridge. See pass2-syn-033.
+    // would reuse the stale bridge.
     try {
       OffscreenRuntimeBridge.disposeShared();
     } catch (err) {
@@ -1415,17 +1576,32 @@ export const RunAnywhere = {
     EventBus.reset();
 
     _isInitialized = false;
+    _jsOnlyInit = false;
     _initOptions = null;
     _initializingPromise = null;
     _localFileStorage = null;
     _hasCompletedNativePhase1 = false;
     _hasCompletedServicesInit = false;
+    _hasCompletedHTTPSetup = false;
     _servicesInitPromise = null;
 
     logger.info('RunAnywhere Web SDK shut down');
   },
 
-  reset(): void {
-    RunAnywhere.shutdown();
+  reset(): Promise<void> {
+    return RunAnywhere.shutdown();
   },
 };
+
+// Install the post-register hydrate hook so the high-level
+// `RunAnywhere.registerModel*(...)` overloads in `RunAnywhere+Storage.ts`
+// automatically reconcile OPFS-backed model state with the freshly-added
+// catalog entry. Fire-and-forget — `hydrateModelRegistry()` is idempotent
+// and logs its own failures.
+setRegisterModelHydrateHook(() => {
+  void RunAnywhere.hydrateModelRegistry().catch((err) => {
+    logger.debug(
+      `post-register hydrate failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+});

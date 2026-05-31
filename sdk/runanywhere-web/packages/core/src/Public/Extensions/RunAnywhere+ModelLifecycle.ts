@@ -1,13 +1,14 @@
 import type {
   CurrentModelRequest,
   CurrentModelResult,
+  ModelCategory,
   ModelInfo,
   ModelLoadRequest,
   ModelLoadResult,
   ModelUnloadRequest,
   ModelUnloadResult,
 } from '@runanywhere/proto-ts/model_types';
-import { InferenceFramework, ModelFileRole } from '@runanywhere/proto-ts/model_types';
+import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import type {
   ComponentLifecycleSnapshot,
   SDKComponent,
@@ -18,6 +19,10 @@ import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/Runt
 import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import {
+  frameworkOPFSDir,
+  primaryFilenameFromModel,
+} from '../../Infrastructure/FrameworkOPFSPaths';
 import { getAllRegisteredModules } from '../../runtime/EmscriptenModule';
 
 export type {
@@ -40,32 +45,18 @@ function requireAdapter(framework?: unknown): ModelLifecycleAdapter {
     ? ModelLifecycleAdapter.tryDefaultForFramework(framework as never)
     : ModelLifecycleAdapter.tryDefault();
   if (!adapter) {
-    throw new Error('RunAnywhere model lifecycle proto adapter is not installed');
+    throw SDKException.backendNotAvailable(
+      'ModelLifecycle',
+      'RunAnywhere model lifecycle proto adapter is not installed. Register a backend WASM module (e.g. LlamaCPP.register()) during app init.',
+    );
   }
   return adapter;
-}
-
-const FRAMEWORK_OPFS_DIR: Partial<Record<InferenceFramework, string>> = {
-  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'LlamaCpp',
-  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
-  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
-  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'CoreML',
-  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
-};
-
-function primaryFilenameFromModel(model: ModelInfo): string | null {
-  const primary = model.multiFile?.files?.find(
-    (file) => file.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
-  ) ?? model.multiFile?.files?.[0];
-  if (primary?.filename) return primary.filename;
-  const trailing = (model.downloadUrl ?? '').split('?')[0].split('/').pop() ?? '';
-  return trailing.length > 0 ? trailing : null;
 }
 
 async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null> {
   if (model.localPath) return model.localPath;
 
-  const frameworkDir = FRAMEWORK_OPFS_DIR[model.framework as InferenceFramework];
+  const frameworkDir = frameworkOPFSDir(model.framework as InferenceFramework);
   if (!frameworkDir) return null;
 
   const filename = primaryFilenameFromModel(model);
@@ -80,7 +71,17 @@ async function resolveLocalPathFromOpfs(model: ModelInfo): Promise<string | null
     : opfsPath;
 }
 
-export const ModelLifecycle = {
+// Web-internal lifecycle namespace. The cross-SDK canonical contract lives on
+// `RunAnywhere.{loadModel,unloadModel,currentModel,componentLifecycleSnapshot}`
+// (top-level, mirroring Swift's source-of-truth surface). The extras exposed
+// below — `supportsNativeLifecycle`, `loadModelAsync`, `unloadModelAsync`,
+// `unloadAllModels`, `isLoaded`, `isComponentReady`, `reset` — are Web-only
+// helpers required by the OPFS/MEMFS async hydration model and the
+// multi-WASM module fan-out (LlamaCPP + ONNX private heaps). They are NOT
+// part of the portable cross-SDK surface; iOS/Android/Flutter/RN do not
+// expose them. Keep them internal to the Web package so app authors who
+// follow Swift as the reference do not accidentally bind to them.
+export const WebModelLifecycle = {
   supportsNativeLifecycle(): boolean {
     return ModelLifecycleAdapter.tryDefault()?.supportsProtoLifecycle() ?? false;
   },
@@ -104,7 +105,7 @@ export const ModelLifecycle = {
       ModelRegistry.registerModel(modelSnapshot);
     }
 
-    // BUG-WEB-002 / OPFS persistence: model files were persisted to OPFS
+    // OPFS persistence: model files were persisted to OPFS
     // after download (see RunAnywhere.downloadModel). On a fresh tab the
     // Emscripten MEMFS is empty, so the C++ engine loader's `fopen` /
     // `mmap` against the canonical /opfs/... path would fail. Restore
@@ -196,8 +197,19 @@ export const ModelLifecycle = {
   },
 
   isLoaded(request: CurrentModelRequest = { includeModelMetadata: false }): boolean {
-    const current = ModelLifecycle.currentModel(request);
+    const current = WebModelLifecycle.currentModel(request);
     return Boolean(current?.modelId);
+  },
+
+  // Canonical cross-SDK helper (mirrors Swift `modelInfoForCategory`):
+  // returns the full `ModelInfo` for the model currently loaded under
+  // `category`, or null when nothing is loaded. Forces
+  // `includeModelMetadata=true` so callers get the populated proto rather
+  // than reconstructing a stand-in.
+  modelInfoForCategory(category: ModelCategory): ModelInfo | null {
+    const result = WebModelLifecycle.currentModel({ category, includeModelMetadata: true });
+    if (!result?.found) return null;
+    return result.model ?? null;
   },
 
   componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot | null {
@@ -221,7 +233,7 @@ export const ModelLifecycle = {
   },
 
   isComponentReady(component: SDKComponent): boolean {
-    return ModelLifecycle.componentLifecycleSnapshot(component)?.state ===
+    return WebModelLifecycle.componentLifecycleSnapshot(component)?.state ===
       ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
   },
 

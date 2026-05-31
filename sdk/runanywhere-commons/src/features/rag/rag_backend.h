@@ -29,12 +29,18 @@ namespace runanywhere {
 namespace rag {
 
 struct RAGBackendConfig {
+    // Canonical defaults mirrored from idl/rag.proto `rac_default` annotations
+    // (see also Swift RARAGConfiguration.defaults()). These in-struct defaults
+    // are what `build_backend_config` (rac_rag_proto_abi.cpp) applies when a
+    // caller passes a partial RAGConfiguration (proto zeros), so every platform
+    // SDK ends up with the same chunk/retrieval behavior. Keep these in sync
+    // with the IDL.
     size_t embedding_dimension = 384;
-    size_t top_k = 10;
-    float similarity_threshold = 0.12f;
+    size_t top_k = 5;
+    float similarity_threshold = 0.7f;
     size_t max_context_tokens = 2048;
-    size_t chunk_size = 180;
-    size_t chunk_overlap = 30;
+    size_t chunk_size = 512;
+    size_t chunk_overlap = 64;
     std::string prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:";
 };
 
@@ -75,7 +81,7 @@ class RAGBackend {
     /**
      * @brief End-to-end RAG query.
      *
-     * GAP 05 / T4.6: this method now constructs a per-call GraphScheduler-driven
+     * This method constructs a per-call GraphScheduler-driven
      * DAG (Embed → Retrieve → ContextAssembly → LLM) via `run_rag_query()`
      * instead of running the steps imperatively. When `on_token` is non-null,
      * tokens are forwarded as the LLM streams them.

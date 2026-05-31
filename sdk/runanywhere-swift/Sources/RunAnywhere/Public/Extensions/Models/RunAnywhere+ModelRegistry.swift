@@ -42,7 +42,7 @@ public extension RunAnywhere {
     }
 
     /// Rescan managed model directories and reconcile downloaded state in the registry.
-    /// Mirrors Flutter `RunAnywhere.refreshModelRegistry()` / Kotlin `refreshModelRegistry()`.
+    /// Mirrors Flutter `RunAnywhere.refreshModelRegistry()`.
     static func refreshModelRegistry(
         rescanLocal: Bool = true,
         includeRemoteCatalog: Bool = false,

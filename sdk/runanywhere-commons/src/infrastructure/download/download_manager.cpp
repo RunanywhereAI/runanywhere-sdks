@@ -12,12 +12,14 @@
  */
 
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
 #include <new>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "rac/core/rac_logger.h"
@@ -61,10 +63,38 @@ struct rac_download_manager {
     // Thread safety
     std::mutex mutex;
 
+    // Teardown coordination. Platform-adapter download threads call the
+    // progress/completion entry points (update_progress, mark_complete,
+    // mark_failed, mark_extraction_*) asynchronously. is_shutting_down lets
+    // those entry points fail-fast once destroy begins, and in_flight lets
+    // destroy wait until every such call has returned before freeing the
+    // handle — otherwise a worker still inside an entry point would touch
+    // freed memory (use-after-free).
+    std::atomic<bool> is_shutting_down{false};
+    std::atomic<int> in_flight{0};
+
     // Health state
     bool is_healthy;
     bool is_paused;
 };
+
+// RAII counter for in-flight entry-point calls so destroy can drain them
+// before freeing the handle. Each entry point constructs this FIRST, then
+// checks is_shutting_down: incrementing before the check (paired with
+// destroy storing the flag before reading the counter) closes the window
+// where destroy could observe in_flight == 0 and free while a caller is
+// still between the check and the increment.
+namespace {
+struct InFlightGuard {
+    rac_download_manager* mgr;
+    explicit InFlightGuard(rac_download_manager* m) : mgr(m) {
+        mgr->in_flight.fetch_add(1, std::memory_order_acq_rel);
+    }
+    ~InFlightGuard() { mgr->in_flight.fetch_sub(1, std::memory_order_acq_rel); }
+    InFlightGuard(const InFlightGuard&) = delete;
+    InFlightGuard& operator=(const InFlightGuard&) = delete;
+};
+}  // namespace
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
 
@@ -189,6 +219,19 @@ void rac_download_manager_destroy(rac_download_manager_handle_t handle) {
         return;
     }
 
+    // Signal shutdown so newly-entering entry points fail fast, then wait
+    // for any call already in flight to return before freeing the handle.
+    // Storing the flag before reading the counter pairs with each entry
+    // point incrementing the counter before reading the flag, so no caller
+    // can slip past undetected. Sleep 1ms between checks rather than yield-
+    // spin: a busy yield burns 100% CPU on the destroying thread for the
+    // duration of an in-flight call (battery/thermal hit on mobile) and can
+    // starve the worker holding the counter on QoS-scheduled threads.
+    handle->is_shutting_down.store(true, std::memory_order_release);
+    while (handle->in_flight.load(std::memory_order_acquire) > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
     // Cancel any active downloads
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
@@ -218,6 +261,10 @@ rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle, co
                                         void* user_data, char** out_task_id) {
     if (!handle || !model_id || !url || !destination_path || !out_task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
     }
 
     std::unique_lock<std::mutex> lock(handle->mutex);
@@ -275,6 +322,10 @@ rac_result_t rac_download_manager_cancel(rac_download_manager_handle_t handle,
     if (!handle || !task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
@@ -305,6 +356,10 @@ rac_result_t rac_download_manager_pause_all(rac_download_manager_handle_t handle
     if (!handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
     handle->is_paused = true;
@@ -317,6 +372,10 @@ rac_result_t rac_download_manager_pause_all(rac_download_manager_handle_t handle
 rac_result_t rac_download_manager_resume_all(rac_download_manager_handle_t handle) {
     if (!handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
     }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
@@ -337,6 +396,10 @@ rac_result_t rac_download_manager_get_progress(rac_download_manager_handle_t han
     if (!handle || !task_id || !out_progress) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
@@ -353,6 +416,10 @@ rac_result_t rac_download_manager_get_active_tasks(rac_download_manager_handle_t
                                                    char*** out_task_ids, size_t* out_count) {
     if (!handle || !out_task_ids || !out_count) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
     }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
@@ -387,6 +454,10 @@ rac_result_t rac_download_manager_is_healthy(rac_download_manager_handle_t handl
     if (!handle || !out_is_healthy) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
     *out_is_healthy = handle->is_healthy ? RAC_TRUE : RAC_FALSE;
@@ -403,6 +474,10 @@ rac_result_t rac_download_manager_update_progress(rac_download_manager_handle_t 
                                                   int64_t total_bytes) {
     if (!handle || !task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
     }
 
     // Hold the lock only while mutating shared state. The progress callback
@@ -471,6 +546,10 @@ rac_result_t rac_download_manager_mark_complete(rac_download_manager_handle_t ha
     if (!handle || !task_id || !downloaded_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
@@ -513,6 +592,10 @@ rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t hand
                                               const char* error_message) {
     if (!handle || !task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
     }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
@@ -565,6 +648,10 @@ rac_result_t rac_download_manager_mark_extraction_complete(rac_download_manager_
     if (!handle || !task_id || !extracted_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
@@ -593,6 +680,10 @@ rac_result_t rac_download_manager_mark_extraction_failed(rac_download_manager_ha
                                                          const char* error_message) {
     if (!handle || !task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    InFlightGuard guard(handle);
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
     }
 
     std::lock_guard<std::mutex> lock(handle->mutex);

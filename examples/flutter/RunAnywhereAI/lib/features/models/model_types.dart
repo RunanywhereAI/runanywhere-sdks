@@ -1,4 +1,5 @@
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart' show formatFramework;
 
 typedef ModelInfo = sdk.ModelInfo;
 typedef ModelCategory = sdk.ModelCategory;
@@ -94,24 +95,7 @@ extension ModelCategoryDisplay on ModelCategory {
 }
 
 extension InferenceFrameworkDisplay on LLMFramework {
-  String get displayName {
-    switch (this) {
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return 'llama.cpp';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-        return 'ONNX';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
-        return 'Sherpa-ONNX';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return 'Foundation Models';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return 'System TTS';
-      case sdk.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return 'Genie';
-      default:
-        return 'Unknown';
-    }
-  }
+  String get displayName => formatFramework(this);
 }
 
 extension ModelFormatDisplay on ModelFormat {
@@ -161,7 +145,17 @@ extension ExampleModelInfoView on ModelInfo {
 
   LLMFramework get preferredFramework => framework;
 
-  bool get isDownloaded =>
+  /// Readiness check for the example UI.
+  ///
+  /// NOTE: this is deliberately NOT named `isDownloaded`. The generated
+  /// `ModelInfo` proto already exposes a `bool isDownloaded` instance member,
+  /// and a Dart extension getter of the same name is silently shadowed by that
+  /// instance member. The C++ registry populates `localPath` on download but
+  /// does not flip the proto `isDownloaded` flag, so gating load on
+  /// `model.isDownloaded` resolved to the always-false proto field and made the
+  /// "Use" action a no-op. Gate on the same on-disk/built-in signal the row UI
+  /// uses instead (mirrors Swift `isDownloaded` / Kotlin `isDownloadedOnDisk`).
+  bool get isReadyOnDevice =>
       localPath.isNotEmpty ||
       framework ==
           sdk.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||

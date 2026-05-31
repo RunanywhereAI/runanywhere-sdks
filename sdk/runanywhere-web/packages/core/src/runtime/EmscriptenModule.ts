@@ -1,7 +1,7 @@
 /**
  * EmscriptenModule.ts
  *
- * v3-readiness Phase A4. Typed surface over the Emscripten-compiled
+ * Typed surface over the Emscripten-compiled
  * RACommons module so TypeScript call sites (VoiceAgentStreamAdapter,
  * future ccall wrappers) can reference `runanywhereModule`
  * without each site re-declaring the function signatures.
@@ -37,7 +37,7 @@ import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
  */
 export interface EmscriptenRunanywhereModule {
   // =============================================================================
-  // Exported C functions (post-v3-readiness-PhaseA4)
+  // Exported C functions
   // =============================================================================
   // Must be listed in sdk/runanywhere-web/wasm/CMakeLists.txt
   // RAC_EXPORTED_FUNCTIONS to actually resolve at runtime.
@@ -58,8 +58,6 @@ export interface EmscriptenRunanywhereModule {
   ): number;
 
   /**
-   * v2 close-out Phase G-2:
-   *
    * `rac_result_t rac_llm_set_stream_proto_callback(
    *    rac_handle_t handle,
    *    rac_llm_stream_proto_callback_fn callback,  // function-table index
@@ -172,6 +170,7 @@ export interface EmscriptenRunanywhereModule {
     audioSize: number,
     outResult: number,
   ): number;
+  _rac_voice_agent_component_destroy_proto?(handle: number): number;
 
   _rac_vlm_process_proto?(
     handle: number,
@@ -315,7 +314,7 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
   /**
-   * pass2-syn-026: Session-based tool-calling ABI. The Web SDK uses these
+   * Session-based tool-calling ABI. The Web SDK uses these
    * (instead of the synchronous `_rac_tool_calling_run_loop_proto`) so that
    * TypeScript executors returning `Promise<ToolResult>` can be awaited
    * between commons-driven generate -> parse -> validate cycles.
@@ -356,7 +355,7 @@ export interface EmscriptenRunanywhereModule {
     sessionHandle: number | bigint,
   ): number;
   /**
-   * pass2-syn-007: `_rac_tool_calling_session_cancel_proto(sessionHandle)`:
+   * `_rac_tool_calling_session_cancel_proto(sessionHandle)`:
    *   Latches a cancel-requested flag on the session and asks the in-flight
    *   LifecycleLlmRef to interrupt the underlying backend `ops->generate`.
    *   Distinct from `_rac_tool_calling_session_destroy_proto` — the host
@@ -379,6 +378,30 @@ export interface EmscriptenRunanywhereModule {
   ): number;
 
   // -----------------------------------------------------------------------------
+  // Model-path helpers
+  // -----------------------------------------------------------------------------
+
+  /**
+   * `rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
+   *    rac_inference_framework_t* out);`
+   *
+   * Converts a proto enum integer (the JS `InferenceFramework` rawValue) to
+   * the C `rac_inference_framework_t` enum value required by path helpers.
+   * `outPtr` must point to a 4-byte malloc'd slot; read back with HEAP32.
+   */
+  _rac_inference_framework_from_proto?(protoValue: number, outPtr: number): number;
+
+  /**
+   * `const char* rac_framework_raw_value(rac_inference_framework_t framework);`
+   *
+   * Returns a statically-allocated C string with the directory-name component
+   * used under `/opfs/RunAnywhere/Models/<dir>/<modelId>/` (e.g. "LlamaCpp",
+   * "ONNX"). Returns "Unknown" for unrecognized values. The pointer is valid
+   * for the lifetime of the WASM module; callers must NOT free it.
+   */
+  _rac_framework_raw_value?(frameworkCEnum: number): number;
+
+  // -----------------------------------------------------------------------------
   // SDK initialization / auth state
   // -----------------------------------------------------------------------------
   _rac_sdk_init_phase1_proto?(
@@ -397,7 +420,7 @@ export interface EmscriptenRunanywhereModule {
   _rac_state_is_device_registered?(): number;
 
   // -----------------------------------------------------------------------------
-  // Solutions runtime (T4.7 / T4.8) — `rac/solutions/rac_solution.h`
+  // Solutions runtime — `rac/solutions/rac_solution.h`
   // -----------------------------------------------------------------------------
   // Backing the `RunAnywhere.solutions.run(...)` capability. `_create_from_proto`
   // takes a `(bytesPtr, bytesLen, outHandlePtr)` triple and populates the
@@ -435,7 +458,7 @@ export interface EmscriptenRunanywhereModule {
   _rac_solution_destroy(handle: number): void;
 
   // -----------------------------------------------------------------------------
-  // HTTP transport registry (Stage 3d — JS-side fetch adapter)
+  // HTTP transport registry (JS-side fetch adapter)
   // -----------------------------------------------------------------------------
   // The JS layer installs function-table indices (from `addFunction`) for the
   // transport vtable so HTTP requests route through `window.fetch()` directly
@@ -446,7 +469,7 @@ export interface EmscriptenRunanywhereModule {
   //
   // Pass 0 for any slot to fall back to the emscripten_fetch adapter for
   // that op; all-zero unregisters and restores the libcurl/emscripten_fetch
-  // default. Optional at type level: older WASM builds without the Stage 3d
+  // default. Optional at type level: older WASM builds without the JS-side
   // export will simply be missing this symbol — callers check with
   // `typeof mod._rac_http_transport_register_from_js === 'function'`.
   _rac_http_transport_register_from_js?(
@@ -544,6 +567,13 @@ export interface EmscriptenRunanywhereModule {
   _rac_wasm_offsetof_proto_buffer_status?(): number;
   _rac_wasm_offsetof_proto_buffer_error_message?(): number;
 
+  /**
+   * Canonical rac_result_t -> serialized SDKError proto mapping.
+   * Lets SDKException route error construction through the
+   * shared commons helper rac_result_to_proto_error.
+   */
+  _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
+
   // -----------------------------------------------------------------------------
   // Storage analyzer proto-byte ABI
   // -----------------------------------------------------------------------------
@@ -630,6 +660,19 @@ export interface EmscriptenRunanywhereModule {
   // =============================================================================
   // Emscripten runtime helpers
   // =============================================================================
+
+  /**
+   * Read a scalar value from the WASM heap at `ptr`.
+   * `type` is an Emscripten type string: `'i8'`, `'i16'`, `'i32'`, `'i64'`,
+   * `'float'`, `'double'`, or `'*'` (pointer-width integer).
+   */
+  getValue(ptr: number, type: string): number;
+
+  /**
+   * Write a scalar value to the WASM heap at `ptr`.
+   * `type` mirrors the `getValue` type string vocabulary.
+   */
+  setValue(ptr: number, value: number, type: string): void;
 
   /** Raw heap as a typed array — only valid until the next WASM alloc. */
   readonly HEAPU8: Uint8Array;
@@ -718,7 +761,7 @@ export type WasmCapability =
 /**
  * Complete set of capabilities — used as the default for the legacy
  * `setRunanywhereModule()` alias, which registers a single module against
- * everything (matches pre-P4 monolithic behavior).
+ * everything (matches the original monolithic behavior).
  */
 const ALL_CAPABILITIES: readonly WasmCapability[] = [
   'commons',
@@ -892,6 +935,12 @@ export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
 /** Clear the entire registry during full SDK shutdown. */
 export function clearRunanywhereModule(): void {
   _moduleByCapability.clear();
+  // Framework→module map mirrors the capability registry and is populated
+  // alongside it via `registerWasmModule(_, _, frameworks)`. Without this
+  // clear, a fresh tab boot followed by re-registration would see stale
+  // framework rows from the previous session (e.g. plugin-route lookups
+  // routing 'llamacpp' to a torn-down WASM instance).
+  _moduleByFramework.clear();
   DownloadAdapter.clearDefaultModule();
   HardwareAdapter.clearDefaultModule();
   ModelLifecycleAdapter.clearDefaultModule();
@@ -901,21 +950,48 @@ export function clearRunanywhereModule(): void {
 }
 
 /**
+ * Canonical fallback precedence for `tryRunanywhereModule()` when no
+ * 'commons' module is registered. Insertion order of `_moduleByCapability`
+ * is not load-order deterministic (backends may register/unregister at
+ * runtime), so callers used to see different "primary" modules based on
+ * which backend booted first. Pin the order explicitly: LLM-bearing
+ * backends first (most likely to expose SDK-state proto exports), then
+ * speech, then the remaining specialized capabilities.
+ */
+const FALLBACK_CAPABILITY_PRECEDENCE: readonly WasmCapability[] = [
+  'llm',
+  'vlm',
+  'embedding',
+  'rag',
+  'tool-calling',
+  'structured-output',
+  'lora',
+  'diffusion',
+  'stt',
+  'tts',
+  'vad',
+  'voice-agent',
+];
+
+/**
  * Return the COMMONS module, if registered. This is the closest analog of
  * the old monolithic singleton — facade reads that touch SDK-state surface
  * (init, auth, model registry, lifecycle, events) route through this.
  * Modality verbs should use `getModuleForCapability(...)` instead.
  */
 export function tryRunanywhereModule(): EmscriptenRunanywhereModule | null {
-  // Prefer the commons module; fall back to ANY registered module so the
-  // SDK-state APIs continue to work when only a backend (not commons) is
-  // loaded. This matches the pre-P4 behavior where the single installed
-  // module also satisfied commons reads.
+  // Prefer the commons module; fall back to a canonical precedence order
+  // (see FALLBACK_CAPABILITY_PRECEDENCE) so the SDK-state APIs continue to
+  // work when only a backend (not commons) is loaded. Deterministic
+  // precedence (rather than insertion order) keeps `tryRunanywhereModule`
+  // stable across register/unregister churn.
   const commons = _moduleByCapability.get('commons');
   if (commons) return commons;
-  // Fall back to whatever was registered first.
-  const iter = _moduleByCapability.values().next();
-  return iter.done ? null : iter.value;
+  for (const cap of FALLBACK_CAPABILITY_PRECEDENCE) {
+    const candidate = _moduleByCapability.get(cap);
+    if (candidate) return candidate;
+  }
+  return null;
 }
 
 /**

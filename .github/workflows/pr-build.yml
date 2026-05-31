@@ -1,16 +1,14 @@
 name: PR build matrix
 
-# GAP 07 Phase 7 rewrite — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md.
-#
 # This file replaces the previous 601-line workflow that called per-SDK
-# build-*.sh scripts. After GAP 07 the canonical entry point is the root
+# build-*.sh scripts. The canonical entry point is the root
 # CMake + presets:
 #
 #   cmake --preset <preset>
 #   cmake --build  --preset <preset>
 #   ctest          --preset <preset>     # debug presets only
 #
-# The wrapper scripts under scripts/build-core-*.sh package the artifacts for
+# The wrapper scripts under scripts/build/build-core-*.sh package the artifacts for
 # each frontend SDK; per-SDK jobs that need those artifacts call the wrapper
 # instead of duplicating cmake calls.
 
@@ -24,9 +22,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Minimal token surface — PR-triggered workflows run on untrusted fork code;
+# restricting to contents:read prevents token abuse via gh CLI calls.
+permissions:
+  contents: read
+
 jobs:
   # =============================================================================
-  # Centralization gates — defend the T4 invariant that toolchain + library
+  # Centralization gates — defend the invariant that toolchain + library
   # pins live in a single source of truth (sdk/runanywhere-commons/VERSIONS,
   # dependencies/versions.json, sdk/runanywhere-flutter/pubspec.yaml, and
   # gradle/libs.versions.toml). Fast-fail before kicking off the SDK matrix.
@@ -40,16 +43,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: TypeScript / Web / RN centralization (syncpack)
-        run: bash scripts/validation/check_typescript_centralization.sh
+        run: bash scripts/validation/gates/check_typescript_centralization.sh
       - name: Flutter dependency centralization
         # Strict by default — drift in ffi / http / protobuf is runtime-critical
         # because these deps lockstep with the C ABI surface. Use STRICT=0 only
         # for short-lived investigations; the workflow should not ship soft.
         env:
           FLUTTER_CENTRALIZATION_STRICT: '1'
-        run: bash scripts/validation/check_flutter_centralization.sh
+        run: bash scripts/validation/gates/check_flutter_centralization.sh
       - name: Gradle / Kotlin centralization
-        run: bash scripts/validation/check_gradle_centralization.sh
+        run: bash scripts/validation/gates/check_gradle_centralization.sh
 
   # =============================================================================
   # Native core builds (one job per CMake preset family)
@@ -124,6 +127,24 @@ jobs:
       # no longer hold (same as linux-debug + macos-debug above).
       - run: ctest --preset linux-asan -E "solution_runner_tests"
 
+  wasm:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
+          /tmp/emsdk/emsdk install latest
+          /tmp/emsdk/emsdk activate latest
+      - name: Configure (WASM)
+        run: |
+          source /tmp/emsdk/emsdk_env.sh
+          cmake --preset wasm
+      - name: Build (WASM)
+        run: |
+          source /tmp/emsdk/emsdk_env.sh
+          cmake --build --preset wasm
+
   ios-device:
     runs-on: macos-15
     steps:
@@ -171,10 +192,10 @@ jobs:
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
         run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
       - name: Build XCFramework
-        run: ./scripts/build-core-xcframework.sh
+        run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
       - name: swift build
         run: swift build --target RunAnywhere
-      # pass3-syn-024: per-SDK lint lane — fail PRs that introduce SwiftLint
+      # Per-SDK lint lane — fail PRs that introduce SwiftLint
       # violations or unused declarations. Soft (continue-on-error) until the
       # baseline is clean; flip to required gate once the backlog clears.
       - name: SwiftLint (lint lane)
@@ -215,7 +236,7 @@ jobs:
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
       - name: Build Android JNI libs
-        run: ./scripts/build-core-android.sh
+        run: ./scripts/build/build-core-android.sh
       - name: gradle assembleDebug
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew assembleDebug
@@ -235,7 +256,7 @@ jobs:
         with:
           platform: flutter
       - run: cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib
-      # pass3-syn-024: per-SDK lint lane — run melos analyze across the full
+      # Per-SDK lint lane — run melos analyze across the full
       # Flutter workspace (not just the single `runanywhere` package). Soft
       # gate (continue-on-error) until baseline is clean.
       - name: melos bootstrap + analyze (workspace lint lane)
@@ -273,12 +294,21 @@ jobs:
         run: yarn install --immutable
       - name: Typecheck @runanywhere/core
         run: yarn workspace @runanywhere/core typecheck
-      # pass3-syn-024: per-SDK lint lane — run eslint via the package's lint
+      # Per-SDK lint lane — run eslint via the package's lint
       # script when an eslint config is present. Soft (continue-on-error) until
       # the lint config is committed and baseline is clean.
       - name: ESLint (@runanywhere/core lint lane)
         continue-on-error: true
         run: yarn workspace @runanywhere/core run lint || echo "eslint not yet wired"
+      # Per-SDK unit-test lane. Smoke tests
+      # cover Foundation/Errors and services/Proto* utilities; the runner
+      # (ts-jest) is wired in `packages/core/jest.config.js`. Soft
+      # (continue-on-error) until the in-tree jest devDependencies are
+      # installed in the workspace lock — flip to required once the lane
+      # exits 0 cleanly.
+      - name: Jest unit tests (@runanywhere/core)
+        continue-on-error: true
+        run: yarn workspace @runanywhere/core run test || echo "jest devDeps not yet installed in workspace lock"
 
   web-typecheck:
     runs-on: ubuntu-22.04
@@ -306,14 +336,14 @@ jobs:
       - name: Typecheck Web workspace (proto-ts + packages)
         working-directory: sdk/runanywhere-web
         run: npm run typecheck
-      # pass3-syn-024: per-SDK lint lane — run eslint across the web workspace.
+      # Per-SDK lint lane — run eslint across the web workspace.
       # Soft (continue-on-error) until baseline is clean.
       - name: ESLint (web workspace lint lane)
         continue-on-error: true
         working-directory: sdk/runanywhere-web
         run: npm run lint || echo "eslint not yet wired"
 
-  # pass3-syn-024: dedicated validation lane — runs the source-of-truth
+  # Dedicated validation lane — runs the source-of-truth
   # validation scripts so deprecated-surface drift and RAC_API export drift
   # are caught in CI rather than landing silently. Soft (continue-on-error)
   # while we baseline; flip to required gate once both scripts exit 0 cleanly
@@ -324,7 +354,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Deprecated surface check
         continue-on-error: true
-        run: bash scripts/validation/check_deprecated_surfaces.sh
+        run: bash scripts/validation/gates/check_deprecated_surfaces.sh
       - name: RAC_API export drift check (strict)
         continue-on-error: true
-        run: bash scripts/validation/check_rac_api_exports.sh --strict
+        run: bash scripts/validation/commons/check_rac_api_exports.sh --strict

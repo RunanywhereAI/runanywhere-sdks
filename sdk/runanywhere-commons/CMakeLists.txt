@@ -34,7 +34,16 @@ option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 
-# T5.4: per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
+# Ensure EMSCRIPTEN is always defined so
+# generator-expression references like $<BOOL:${EMSCRIPTEN}> below do not trip
+# CMake's --warn-uninitialized check on native (non-Emscripten) builds. The
+# Emscripten toolchain file sets EMSCRIPTEN=1 itself; we only paper over the
+# native case where the variable is otherwise unset.
+if(NOT DEFINED EMSCRIPTEN)
+    set(EMSCRIPTEN "")
+endif()
+
+# Per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
 # Only commons-local backends (RAG pipeline) declare their option here.
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 
@@ -47,7 +56,7 @@ option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 # safely default ON whenever the ONNX backend is requested for the same
 # build.
 #
-# RAC_WASM_RAG_STANDALONE (CLUSTER-05 / WEB-RAG-001): the Web Docs/RAG tab
+# RAC_WASM_RAG_STANDALONE: the Web Docs/RAG tab
 # ships against the auto-loaded llamacpp WASM bundle, which is built with
 # RAC_BACKEND_ONNX=OFF. Forcing RAC_BACKEND_RAG=OFF on that artifact strips
 # the `rac_rag_*_proto` exports from the JS glue, so the TS bridge can't
@@ -63,7 +72,7 @@ if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX AND NOT RAC_WASM_RAG_STANDALONE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
-# B20: Opt-in proto regeneration.
+# Opt-in proto regeneration.
 #
 # The 23 `*.pb.cc` / `*.pb.h` pairs under `src/generated/proto/` are committed
 # so CI / release builds never need a working protoc on-path. However, the
@@ -146,7 +155,7 @@ include(FetchContent)
 # Cross-compilation targets that bundle zlib/BZip2 need a stable archive
 # output directory so downstream FetchContent projects can consume concrete
 # file paths instead of unresolved logical library names.
-# CLUSTER-02 / COMMONS-LIBARCHIVE-001: iOS is added here too because we now
+# iOS is added here too because we now
 # force-bundle zlib for iOS slices (see comment below); libarchive's internal
 # find_package(ZLIB) needs a concrete archive path on cross-compile targets
 # the same way Android/Emscripten do.
@@ -182,7 +191,7 @@ endif()
 # Windows (MSVC) and some cross-compilation targets don't ship zlib.
 # We try system first; if not found, build from source so libarchive gets it.
 #
-# CLUSTER-02 / COMMONS-LIBARCHIVE-001: also force bundled zlib for iOS and
+# Also force bundled zlib for iOS and
 # Android cross-compilation. Without this, libarchive's own
 # `FIND_PACKAGE(ZLIB 1.2.1)` inside its FetchContent CMake project occasionally
 # fails when cross-compiling for iOS / iOS-simulator slices (the host toolchain
@@ -202,7 +211,7 @@ if(EMSCRIPTEN OR ANDROID OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(_RAC_FORCE_BUNDLED_ZLIB ON)
 endif()
 
-# CLUSTER-14 / WEB-EXTRACT-001: defense-in-depth normalization of the
+# Defense-in-depth normalization of the
 # ZLIB_VERSION cache. LoadVersions.cmake now strips a leading 'v' from
 # ZLIB_VERSION specifically (so engines that re-`include(LoadVersions)` don't
 # restore the raw form). Re-assert the strip here in case a future caller
@@ -215,7 +224,7 @@ endif()
 if(DEFINED ZLIB_VERSION AND ZLIB_VERSION MATCHES "^v")
     string(REGEX REPLACE "^v" "" _RAC_ZLIB_VERSION_NUMERIC "${ZLIB_VERSION}")
     set(ZLIB_VERSION "${_RAC_ZLIB_VERSION_NUMERIC}" CACHE STRING "" FORCE)
-    message(STATUS "CLUSTER-14: pre-normalized ZLIB_VERSION 'v${_RAC_ZLIB_VERSION_NUMERIC}' -> '${_RAC_ZLIB_VERSION_NUMERIC}' "
+    message(STATUS "Pre-normalized ZLIB_VERSION 'v${_RAC_ZLIB_VERSION_NUMERIC}' -> '${_RAC_ZLIB_VERSION_NUMERIC}' "
                    "(GIT_TAG '${RAC_ZLIB_VERSION}' preserved on RAC_ZLIB_VERSION for FetchContent) "
                    "so libarchive's find_package(ZLIB 1.2.1) accepts it.")
 endif()
@@ -275,7 +284,7 @@ if(NOT ZLIB_FOUND)
         set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
     endif()
     set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
-    # CLUSTER-02-FOLLOWUP: VERSIONS file pins ZLIB_VERSION=v1.3.2 (the GIT_TAG
+    # VERSIONS file pins ZLIB_VERSION=v1.3.2 (the GIT_TAG
     # form madler/zlib uses). libarchive's bundled CMake module runs
     # `find_package(ZLIB 1.2.1)`, which dispatches to CMake's FindZLIB module
     # with `VERSION_VAR ZLIB_VERSION`. FindZLIB normally derives ZLIB_VERSION
@@ -313,7 +322,7 @@ endif()
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
 #
-# CLUSTER-02 / COMMONS-LIBARCHIVE-001: also force bundled BZip2 on iOS for the
+# Also force bundled BZip2 on iOS for the
 # same reason as zlib above. The Apple iOS SDK does ship libbz2.dylib, but
 # libarchive's `program("bzip2 -d")` fallback path (analogous to gzip) is
 # similarly blocked by the iOS sandbox. Forcing the bundled in-process
@@ -426,10 +435,20 @@ set(ENABLE_ACL OFF CACHE BOOL "" FORCE)
 set(ENABLE_XATTR OFF CACHE BOOL "" FORCE)
 set(ENABLE_ICONV OFF CACHE BOOL "" FORCE)
 # Save and restore BUILD_SHARED_LIBS since libarchive respects it
-set(_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+# Use DEFINED check to avoid uninitialized-variable warning when not set upstream.
+if(DEFINED BUILD_SHARED_LIBS)
+    set(_SAVED_BUILD_SHARED_LIBS "${BUILD_SHARED_LIBS}")
+    set(_HAD_BUILD_SHARED_LIBS TRUE)
+else()
+    set(_HAD_BUILD_SHARED_LIBS FALSE)
+endif()
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(libarchive)
-set(BUILD_SHARED_LIBS ${_SAVED_BUILD_SHARED_LIBS})
+if(_HAD_BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS "${_SAVED_BUILD_SHARED_LIBS}")
+else()
+    unset(BUILD_SHARED_LIBS)
+endif()
 
 if(TARGET bz2_bundled AND TARGET archive_static)
     target_link_libraries(archive_static bz2_bundled)
@@ -442,19 +461,19 @@ if(TARGET zlibstatic AND TARGET archive_static)
 endif()
 
 # -----------------------------------------------------------------------------
-# CLUSTER-14 / WEB-EXTRACT-001: configure-time assertion that libarchive's
+# Configure-time assertion that libarchive's
 # generated config.h has HAVE_ZLIB_H defined on every cross-compile target
 # where the platform CANNOT fork+exec /usr/bin/gzip. Without this, an
 # accidentally-undefined HAVE_ZLIB_H silently re-enables the
 # archive_read_support_filter_program("gzip -d") fallback inside libarchive's
 # filter_gzip.c — which iOS app sandboxes and Emscripten/WASM both block.
 #
-# CLUSTER-02 + CLUSTER-02-FOLLOWUP fixed this for iOS by:
+# This was fixed for iOS by:
 #   (a) forcing bundled zlib for IOS|ANDROID|EMSCRIPTEN
 #   (b) stripping the 'v' prefix from ZLIB_VERSION so libarchive's internal
 #       find_package(ZLIB 1.2.1) version check succeeds
 #
-# But the cross-compile cache is order-sensitive (the iter-2 web lane shipped
+# But the cross-compile cache is order-sensitive (the web lane once shipped
 # a build with HAVE_ZLIB_H still undefined because the libarchive subbuild
 # already ran before the v-strip lines executed in a stale FetchContent
 # state). Surface that class of regression here, while we still have a CMake
@@ -468,7 +487,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         # Look for an active `#define HAVE_ZLIB_H 1` (NOT `/* #undef HAVE_ZLIB_H */`).
         if(NOT _RAC_LIBARCHIVE_CONFIG_CONTENTS MATCHES "#define HAVE_ZLIB_H[ \t]+1")
             message(FATAL_ERROR
-                "CLUSTER-14 / WEB-EXTRACT-001: libarchive's generated config.h "
+                "libarchive's generated config.h "
                 "is missing #define HAVE_ZLIB_H 1 on ${RAC_PLATFORM_NAME}. "
                 "libarchive will fall back to archive_read_support_filter_program(\"gzip -d\"), "
                 "which iOS sandbox and Emscripten/WASM both block, so every .tar.gz "
@@ -479,7 +498,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
                 "  ZLIB_INCLUDE_DIR cache: ${ZLIB_INCLUDE_DIR}\n"
                 "Fix: ensure ZLIB_VERSION is a plain numeric string (e.g. 1.3.2, "
                 "NOT v1.3.2) and re-configure from a clean build dir. See the "
-                "CLUSTER-02-FOLLOWUP v-strip block above for the canonical fix.")
+                "v-strip block above for the canonical fix.")
         endif()
         # Same check for bzip2 — the iOS sandbox + Emscripten also block
         # program(\"bzip2 -d\"), and the same find_package(BZip2) version
@@ -487,7 +506,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         # cache already shows this can fail independently.
         if(NOT _RAC_LIBARCHIVE_CONFIG_CONTENTS MATCHES "#define HAVE_BZLIB_H[ \t]+1")
             message(FATAL_ERROR
-                "CLUSTER-14 / WEB-EXTRACT-001: libarchive's generated config.h "
+                "libarchive's generated config.h "
                 "is missing #define HAVE_BZLIB_H 1 on ${RAC_PLATFORM_NAME}. "
                 "libarchive will fall back to archive_read_support_filter_program(\"bzip2 -d\"), "
                 "which iOS sandbox and Emscripten/WASM both block.\n"
@@ -497,7 +516,7 @@ if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         message(STATUS "libarchive config.h verified: HAVE_ZLIB_H + HAVE_BZLIB_H both defined (${RAC_PLATFORM_NAME})")
     else()
         message(WARNING
-            "CLUSTER-14: libarchive config.h not yet generated at ${_RAC_LIBARCHIVE_CONFIG_H} — "
+            "libarchive config.h not yet generated at ${_RAC_LIBARCHIVE_CONFIG_H} — "
             "skipping HAVE_ZLIB_H assertion. Re-configure once libarchive has materialized "
             "its build dir to enable the regression guard.")
     endif()
@@ -542,7 +561,7 @@ endif()
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 
 # =============================================================================
-# HTTP transport (v2 close-out Phase H, Stage S5 — libcurl removed)
+# HTTP transport (libcurl removed)
 # =============================================================================
 # The native `rac_http_client_*` C ABI no longer bundles libcurl or any
 # TLS backend. Every SDK registers a platform HTTP transport adapter
@@ -655,11 +674,19 @@ set(RAC_CORE_SOURCES
     src/core/sdk_state.cpp
     src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
+    # model_lifecycle.cpp was split per SRP into
+    # five TUs (proto<->C translation, artifact resolution, auto-download,
+    # per-modality accessors, and the C ABI entry points). All five share
+    # the internal layout declared in `model_lifecycle_internal.h`.
     src/core/model_lifecycle.cpp
+    src/core/model_lifecycle_translation.cpp
+    src/core/model_lifecycle_resolve.cpp
+    src/core/model_lifecycle_download.cpp
+    src/core/model_lifecycle_accessors.cpp
     src/core/rac_error_model.cpp
     src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
-    # P2-T9: canonical two-phase SDK init ABI. Wraps existing rac_state /
+    # Canonical two-phase SDK init ABI. Wraps existing rac_state /
     # rac_auth / rac_device_manager / rac_model_assignment internals behind
     # one rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto surface so
     # platform SDKs collapse their duplicated step list.
@@ -670,23 +697,23 @@ set(RAC_CORE_SOURCES
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
     src/infrastructure/registry/module_registry.cpp
-    # v3.0.0 (C1): legacy service_registry.cpp DELETED. Plugin registration
+    # Legacy service_registry.cpp DELETED. Plugin registration
     # now flows exclusively through rac_plugin_registry.cpp below.
     src/plugin/rac_plugin_registry.cpp
-    # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
+    # Dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp
-    # T4.1: L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
+    # L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.
     src/plugin/rac_runtime_registry.cpp
-    # GAP 04 Phase 9-10: HardwareProfile + EngineRouter (hardware-aware plugin scoring).
+    # HardwareProfile + EngineRouter (hardware-aware plugin scoring).
     src/router/rac_hardware_profile.cpp
     src/router/rac_engine_router.cpp
-    # GAP 04 Phase 12: C ABI wrapper around EngineRouter (rac_plugin_route).
+    # C ABI wrapper around EngineRouter (rac_plugin_route).
     src/router/rac_route.cpp
-    # Round-1 CPP fix (G-C6): proto-serialised hardware profile C ABI for all 5 frontends.
+    # Proto-serialised hardware profile C ABI for all 5 frontends.
     src/router/rac_hardware_abi.cpp
-    # Wave H-5 (KOT-12): proto-serialised SDKComponent → [InferenceFramework] query.
+    # Proto-serialised SDKComponent → [InferenceFramework] query.
     src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
@@ -711,12 +738,12 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
-    # v2 close-out Phase H / H7 / S5 — native HTTP transport.
+    # Native HTTP transport.
     # - Native targets (macOS/iOS/Android/Windows/Linux): the default
     #   client in rac_http_client_default.cpp dispatches every request
     #   through the platform transport vtable registered by the owning
     #   SDK (OkHttp, URLSession, dart:io, ...). libcurl + mbedTLS were
-    #   deleted in S5; every SDK MUST register an adapter during init.
+    #   deleted; every SDK MUST register an adapter during init.
     # - Emscripten/WASM: the emscripten_fetch shim provides both the
     #   `rac_http_transport_register_emscripten` / `_from_js` entry
     #   points AND direct implementations of the public C ABI (it's
@@ -724,24 +751,27 @@ set(RAC_INFRASTRUCTURE_SOURCES
     #   adapter yet needs to handle the "no adapter registered" case).
     $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:src/infrastructure/http/rac_http_client_default.cpp>
     $<$<BOOL:${EMSCRIPTEN}>:src/infrastructure/http/rac_http_client_emscripten.cpp>
+    # Single `rac_http_response_free` TU shared
+    # by the default + emscripten clients (was duplicated before).
+    src/infrastructure/http/rac_http_response.cpp
     src/infrastructure/http/rac_http_download.cpp
-    # v2 close-out Phase H2 — platform HTTP transport vtable / registry.
+    # Platform HTTP transport vtable / registry.
     # Platform SDKs register a native-stack adapter here (Swift URLSession,
     # Kotlin OkHttp, Web fetch, Flutter dart:io, RN fetch/JSI); when no
     # adapter is registered, native public HTTP calls fail with
     # RAC_ERROR_FEATURE_NOT_AVAILABLE. Emscripten uses its Web fetch adapter.
     src/infrastructure/http/rac_http_transport.cpp
-    # v2 close-out Phase H Stage 2 — internal C++ HTTP facade.
+    # Internal C++ HTTP facade.
     # Every commons component that needs HTTP funnels through
     # rac::http::execute / execute_stream. The facade routes through the
     # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
-    # P2-T10 — Supabase-style upsert request flag. Lets platform SDKs
+    # Supabase-style upsert request flag. Lets platform SDKs
     # arm a request via `rac_http_request_set_upsert_mode`; the dispatch
     # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
     # consume it and apply the on_conflict URL rewrite + Prefer header.
     src/infrastructure/http/rac_http_upsert_mode.cpp
-    # P2-T11 — single canonical default-header list shared across SDKs
+    # Single canonical default-header list shared across SDKs
     # (RunAnywhereSDK / commons VERSION / application-json). Lets every
     # platform's `defaultHeaders` block resolve through one C entry point
     # so they stay in lockstep with the commons VERSION file.
@@ -750,12 +780,12 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
-    # P2-T13: persistent device-id resolution chain
+    # Persistent device-id resolution chain
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
     src/infrastructure/device/device_identity.cpp
     src/infrastructure/extraction/rac_extraction.cpp
-    # v3.1 Phase 9: DAG streaming runtime (GAP 05 Phase 2). The primitives
+    # DAG streaming runtime. The primitives
     # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /
     # MemoryPool / PipelineNode) are header-only templates; only the
     # non-templated GraphScheduler has a .cpp to compile here.
@@ -784,23 +814,28 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
-    # P2-T15: JSONSchema-proto -> JSON Schema text canonical writer (replaces
+    # JSONSchema-proto -> JSON Schema text canonical writer (replaces
     # Swift JSONSchemaWriter / per-SDK serializers).
     src/features/llm/schema_to_json.cpp
-    # v2 close-out Phase 5: thinking-content split (replaces Swift
+    # Thinking-content split (replaces Swift
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
-    # G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
+    # Commons-owned heuristics derived from
+    # RAModelInfo (tool-call format + parameterCountB + isSmallModel). Replaces
+    # the duplicated detectToolCallFormat / isLikelySmallModel helpers that
+    # examples-flutter, -ios, -android, -react-native were each hand-rolling.
+    src/features/llm/rac_model_heuristics.cpp
+    # ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
     src/features/llm/rac_tool_value_json.cpp
-    # Wave D-4: tool-calling session state machine (collapses per-SDK
+    # Tool-calling session state machine (collapses per-SDK
     # 200-400 LOC orchestration loop into one native session).
     src/features/llm/tool_calling_session.cpp
-    # P2-T8: synchronous single-call tool-calling loop (parse -> validate ->
+    # Synchronous single-call tool-calling loop (parse -> validate ->
     # execute -> follow-up). Collapses Swift's ~100 LOC generateWithTools
     # to ~10 LOC; same loop will benefit Kotlin/RN over the same ABI.
     src/features/llm/tool_calling_run_loop.cpp
-    # v2 close-out Phase G-2: proto-byte LLM stream ABI (mirrors
+    # Proto-byte LLM stream ABI (mirrors
     # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
     # AsyncThrowingStream / callbackFlow / tokenQueue shims).
     src/features/llm/rac_llm_stream.cpp
@@ -808,26 +843,27 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp
     src/features/stt/stt_analytics.cpp
-    # CPP-03: lifecycle-owned proto-byte STTStreamEvent ABI
+    # Lifecycle-owned proto-byte STTStreamEvent ABI
     src/features/stt/rac_stt_stream.cpp
-    # P2-T14: canonical STTConfiguration defaults helper
+    # Canonical STTConfiguration defaults helper
     src/features/stt/rac_stt_config_defaults.cpp
     # TTS
     src/features/tts/tts_component.cpp
     src/features/tts/rac_tts_service.cpp
     src/features/tts/tts_analytics.cpp
-    # CPP-03: lifecycle-owned proto-byte TTSStreamEvent ABI
+    # Lifecycle-owned proto-byte TTSStreamEvent ABI
     src/features/tts/rac_tts_stream.cpp
-    # P2-T14: canonical TTSConfiguration defaults helper
+    # Canonical TTSConfiguration defaults helper
     src/features/tts/rac_tts_config_defaults.cpp
     # VAD
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
-    # CPP-03: lifecycle-owned proto-byte VADStreamEvent ABI
+    # Lifecycle-owned proto-byte VADStreamEvent ABI
     src/features/vad/rac_vad_stream.cpp
-    # Wake Word — high-level service scaffold was removed in Phase F of the
-    # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
+    # Shared per-handle threshold-mutex registry.
+    src/features/vad/vad_threshold_registry.cpp
+    # Wake Word — high-level service scaffold was removed. All real
     # consumers call the speech backend's rac_wakeword_onnx_* compatibility
     # API directly. The shared types in
     # include/rac/features/wakeword/rac_wakeword_types.h remain.
@@ -841,7 +877,7 @@ set(RAC_FEATURES_SOURCES
     src/features/diffusion/rac_diffusion_proto_abi.cpp
     src/features/diffusion/diffusion_model_registry.cpp
     src/features/diffusion/rac_diffusion_tokenizer.cpp
-    # CPP-03: lifecycle-owned proto-byte DiffusionStreamEvent ABI
+    # Lifecycle-owned proto-byte DiffusionStreamEvent ABI
     src/features/diffusion/rac_diffusion_stream.cpp
     # Embeddings
     src/features/embeddings/rac_embeddings_service.cpp
@@ -854,12 +890,23 @@ set(RAC_FEATURES_SOURCES
     src/features/platform/rac_platform_services.cpp
     # LoRA
     src/features/lora/rac_lora_service.cpp
-    # Voice Agent
+    # Voice Agent — SRP split:
+    #   voice_agent.cpp                       — lifecycle (create/destroy/init)
+    #   voice_agent_legacy_abi.cpp            — legacy non-proto C ABI
+    #   voice_agent_proto_abi.cpp             — synchronous proto C ABI
+    #   voice_agent_d7_abi.cpp                — full-session proto ABI
+    #   voice_agent_audio_pipeline_state.cpp  — audio pipeline state helpers
+    #   voice_agent_internal_helpers.cpp      — shared emit/state helpers
     src/features/voice_agent/voice_agent.cpp
-    # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
+    src/features/voice_agent/voice_agent_internal_helpers.cpp
+    src/features/voice_agent/voice_agent_legacy_abi.cpp
+    src/features/voice_agent/voice_agent_proto_abi.cpp
+    src/features/voice_agent/voice_agent_d7_abi.cpp
+    src/features/voice_agent/voice_agent_audio_pipeline_state.cpp
+    # Proto-byte event ABI (coexists with struct callback).
     src/features/voice_agent/rac_voice_event_abi.cpp
-    # GAP 05 Phase 2: GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
-    # First v3.1 Phase 9 DAG consumer; replaces the in-line process_stream
+    # GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
+    # First DAG consumer; replaces the in-line process_stream
     # orchestration with typed PipelineNodes + bounded StreamEdge
     # backpressure + hierarchical CancelToken propagation.
     src/features/voice_agent/voice_agent_pipeline.cpp
@@ -890,11 +937,11 @@ else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
-# T5.4: WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
+# WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
 # which declares its own rac_backend_whisperkit_coreml target (via
 # rac_add_engine_plugin). Commons no longer compiles those TUs directly.
 
-# T4.7 Solutions C ABI — always-built fallback.
+# Solutions C ABI — always-built fallback.
 #
 # The full SolutionRunner implementation (rac_solution.cpp + companions)
 # requires the Solutions runtime and is added to rac_commons only when
@@ -951,6 +998,13 @@ endif()
 # this define, so accidental SDK-side inclusion still triggers the warning.
 target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_COMMONS=1)
 
+# Canonical SDK version string (from the VERSION file) injected as a compile
+# define so rac_get_version()/rac_sdk_get_version() return the real release
+# version. Single source of truth: sdk/runanywhere-commons/VERSION -> RAC_VERSION
+# (read at the top of this file). Every platform SDK delegates its public
+# version constant to this value instead of hand-maintaining a copy.
+target_compile_definitions(rac_commons PRIVATE RAC_VERSION_STRING="${RAC_VERSION}")
+
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)
     target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_SHARED=1)
@@ -997,13 +1051,13 @@ endif()
 # _rac_* symbols currently called by the 5 SDKs (Swift / Kotlin / Flutter /
 # React Native / Web). Matters for App Store symbol analysis; Android keeps
 # the default-visibility workaround above until RAC_API annotations are
-# complete (TODO v0.21 / B19). Note: target_link_options only takes effect
+# complete (TODO v0.21). Note: target_link_options only takes effect
 # when the target is linked as a dynamic library — static-archive builds
 # ignore it, which is fine because symbol visibility only matters at final
-# link time. Use scripts/validation/check_rac_api_exports.sh to verify the
+# link time. Use scripts/validation/commons/check_rac_api_exports.sh to verify the
 # list stays in sync; update the count here when it changes materially.
 #
-# pass3-syn-081 / pass3-syn-169: this block is additionally gated on
+# This block is additionally gated on
 # RAC_BUILD_SHARED. `-exported_symbols_list` is a no-op for STATIC
 # archives (which is the default for every Apple preset in
 # CMakePresets.json — macos-{debug,release}, ios-{device,simulator}),
@@ -1017,7 +1071,7 @@ endif()
 # whose definitions live in src/features/rag/ — i.e. inside commons —
 # so a future SHARED Apple build with any plugin-link mode is safe.
 if(APPLE AND RAC_BUILD_SHARED)
-    # pass2-syn-002: backend-conditional exports live in sibling files and
+    # Backend-conditional exports live in sibling files and
     # are concatenated into a single per-build merged list under
     # ${CMAKE_CURRENT_BINARY_DIR}. The Apple linker takes exactly one
     # `-exported_symbols_list` argument, so we cannot list the conditional
@@ -1029,7 +1083,7 @@ if(APPLE AND RAC_BUILD_SHARED)
         list(APPEND _rac_exports_merged_inputs
             "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.rag.exports")
     endif()
-    # pass3-syn-002: the onnx_embeddings and whisperkit_coreml sibling
+    # The onnx_embeddings and whisperkit_coreml sibling
     # exports siblings were dropped here — those `_rac_backend_*_register`
     # symbols are defined in the engine targets (engines/onnx,
     # engines/whisperkit_coreml), not in librac_commons. Listing them in
@@ -1051,7 +1105,7 @@ if(APPLE AND RAC_BUILD_SHARED)
         file(APPEND "${_rac_exports_merged}" "${_rac_exports_part_contents}\n")
     endforeach()
     unset(_rac_exports_part_contents)
-    # pass3-syn-082: also register a build-time custom command with a
+    # Also register a build-time custom command with a
     # DEPENDS edge on the source .exports files. `file(WRITE/APPEND)`
     # above runs only at *configure* time and is not tracked by the
     # Ninja/Make/Xcode dependency graph; without this custom command,
@@ -1065,7 +1119,7 @@ if(APPLE AND RAC_BUILD_SHARED)
         "${CMAKE_CURRENT_BINARY_DIR}/_RACommons_MergeExports.cmake")
     file(WRITE "${_rac_exports_merge_script}"
 "# Auto-generated by sdk/runanywhere-commons/CMakeLists.txt for the\n"
-"# pass3-syn-082 build-time merge of RACommons exports siblings.\n"
+"# build-time merge of RACommons exports siblings.\n"
 "# Invoked via: cmake -DRAC_EXPORTS_OUT=<path> -DRAC_EXPORTS_IN=<list> -P\n"
 "file(WRITE \"\${RAC_EXPORTS_OUT}\"\n"
 "    \"# Auto-generated by RACommons exports merge step. DO NOT EDIT.\\n\")\n"
@@ -1112,7 +1166,7 @@ else()
 endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
-# HTTP transport — S5: libcurl deleted. On Emscripten we still link
+# HTTP transport — libcurl deleted. On Emscripten we still link
 # the `-sFETCH=1` runtime glue so emscripten_fetch is available inside
 # `rac_http_client_emscripten.cpp`. On every other target the default
 # client dispatches through the platform transport vtable and needs
@@ -1129,7 +1183,7 @@ if(EMSCRIPTEN)
 endif()
 
 # =============================================================================
-# B20: Reproducible proto C++ codegen
+# Reproducible proto C++ codegen
 # =============================================================================
 # Committed `.pb.{cc,h}` pairs in `src/generated/proto/` must stay in sync with
 # `idl/*.proto`. When RAC_REGENERATE_PROTO=ON AND `protoc` is on-path, rerun
@@ -1168,7 +1222,7 @@ if(RAC_REGENERATE_PROTO)
             )
             add_custom_target(rac_proto_gen DEPENDS "${_RAC_PROTO_STAMP}")
             add_dependencies(rac_commons rac_proto_gen)
-            message(STATUS "B20: rac_proto_gen wired (idl/*.proto → ${_RAC_PROTO_OUT}); rac_commons depends on it")
+            message(STATUS "rac_proto_gen wired (idl/*.proto → ${_RAC_PROTO_OUT}); rac_commons depends on it")
         else()
             message(WARNING "RAC_REGENERATE_PROTO=ON but ${_RAC_IDL_CODEGEN} or idl/*.proto missing — skipping regen target")
         endif()
@@ -1231,7 +1285,7 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
     ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
-    # P2-T9: two-phase SDK init request/result envelope.
+    # Two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
     # Hybrid LLM router wire shape: descriptor, policy, filter, cascade,
     # routing context, generate request/response, routed metadata.
@@ -1259,7 +1313,7 @@ if(RAC_ENABLE_PROTOBUF)
     # synthesized version string. Accept either so local dev on macOS works
     # without requiring a vendored FetchContent build.
     #
-    # T1.1: require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
+    # Require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
     # install (Ubuntu 22.04 ships 3.12, 24.04 ships 3.21) is rejected and
     # FetchContent fetches the centralized PROTOBUF_VERSION below. The
     # checked-in generated headers under src/generated/proto/ are Protobuf
@@ -1292,7 +1346,7 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
         set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
         set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
-        # T1.1 follow-up: FIND_PACKAGE_ARGS was removed because on Ubuntu CI
+        # FIND_PACKAGE_ARGS was removed because on Ubuntu CI
         # the internal find_package(Protobuf ... NAMES Protobuf) call silently
         # registered `protobuf::libprotobuf-lite` as an IMPORTED target from
         # a config file even when the EXACT version check failed. Protobuf
@@ -1386,7 +1440,7 @@ if(RAC_ENABLE_PROTOBUF)
     # Shared builds with some system protobuf packages still need explicit absl
     # link targets. Vendored protobuf normally propagates these transitively.
     #
-    # T1.1: only collect absl components whose imported targets actually
+    # Only collect absl components whose imported targets actually
     # exist. Ubuntu 22.04's libabsl-dev (20210324) is missing absl::log —
     # which lands in 20220623 — and `target_link_libraries` on a missing
     # target reports "Target ... links to absl::log but the target was not
@@ -1441,7 +1495,7 @@ if(RAC_ENABLE_SOLUTIONS)
     )
     target_compile_definitions(rac_commons PRIVATE RAC_HAVE_SOLUTIONS=1)
     set(RAC_SOLUTIONS_RUNTIME_ENABLED ON CACHE INTERNAL "rac_commons Solutions runtime enabled" FORCE)
-    message(STATUS "T4.7: SolutionRunner + PipelineExecutor compiled into rac_commons")
+    message(STATUS "SolutionRunner + PipelineExecutor compiled into rac_commons")
 else()
     message(STATUS "RAC_ENABLE_SOLUTIONS=OFF — rac_solution_* symbols served by rac_solution_stub.cpp (RAC_ERROR_FEATURE_NOT_AVAILABLE)")
 endif()
@@ -1470,7 +1524,7 @@ if(RAC_PLATFORM_WINDOWS)
 endif()
 
 # =============================================================================
-# GAP 03: Plugin Loading Mode (static vs. dynamic)
+# Plugin Loading Mode (static vs. dynamic)
 # =============================================================================
 # Two paths share one plugin entry-point convention:
 #   - STATIC: plugin TUs compiled directly into rac_commons; registration
@@ -1545,7 +1599,7 @@ endif()
 # =============================================================================
 # COMMONS-LOCAL BACKENDS (RAG)
 #
-# T5.4: engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
+# Engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
 # are wired exclusively from engines/<name>/CMakeLists.txt via the root
 # add_subdirectory(engines) path. Commons no longer instantiates or forwards
 # engine targets — only commons-local OBJECT libraries (RAG) are folded into

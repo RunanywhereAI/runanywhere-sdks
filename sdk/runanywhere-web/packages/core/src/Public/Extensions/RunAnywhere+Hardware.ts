@@ -3,11 +3,13 @@
  *
  * Canonical `RunAnywhere.hardware.*` namespace per CANONICAL_API.md §14.
  *
- * Surface:
- *   - `hardware.getProfile() → HardwareProfile`
- *   - `hardware.getChip() → string`
- *   - `hardware.hasNeuralEngine: boolean`
- *   - `hardware.accelerationMode: string`
+ * Surface (matches Swift/Kotlin canonical 3-method surface):
+ *   - `hardware.getProfile() → HardwareProfileResult`
+ *   - `hardware.getAccelerators() → AcceleratorInfo[]`
+ *   - `hardware.setAcceleratorPreference(preference) → boolean`
+ *
+ * Chip, NPU, and acceleration-mode data are available via
+ * `getProfile().profile.chip`, `.npuChip`, and `.accelerationMode`.
  *
  * Hardware data is decoded from the commons serialized-proto ABI when the
  * active WASM module exports it. Browser-owned facts (`navigator.*`, WebGPU,
@@ -19,10 +21,16 @@ import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeC
 import { HardwareAdapter } from '../../Adapters/HardwareAdapter';
 import {
   AccelerationPreference,
+  type AcceleratorInfo,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
+import { NPUChip } from '@runanywhere/proto-ts/storage_types';
 
-export type { HardwareProfile, HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
+export type {
+  AcceleratorInfo,
+  HardwareProfile,
+  HardwareProfileResult,
+} from '@runanywhere/proto-ts/hardware_profile';
 
 type NavigatorWithExtras = Omit<Navigator, 'hardwareConcurrency'> & {
   deviceMemory?: number;
@@ -83,6 +91,7 @@ function browserHardwareProfileResult(): HardwareProfileResult {
       efficiencyCores: 0,
       architecture: chip,
       platform: 'web',
+      npuChip: NPUChip.NPU_CHIP_NONE,
     },
     accelerators: [
       {
@@ -123,6 +132,7 @@ function mergeBrowserFacts(
           efficiencyCores: protoProfile.efficiencyCores || browserProfile.efficiencyCores,
           architecture: protoProfile.architecture || browserProfile.architecture,
           platform: protoProfile.platform || browserProfile.platform,
+          npuChip: protoProfile.npuChip || browserProfile.npuChip,
         }
       : protoProfile ?? browserProfile,
     accelerators: Array.from(acceleratorsByName.values()),
@@ -137,35 +147,24 @@ export const Hardware = {
     return protoResult ? mergeBrowserFacts(protoResult, browserResult) : browserResult;
   },
 
-  /** Best-effort chip name (e.g., "apple-silicon", "x86_64"). */
-  getChip(): string {
-    return Hardware.getProfile().profile?.chip || detectChip();
+  /**
+   * Returns the available accelerators as a list. Swift parity:
+   * `getAccelerators() throws -> [RAAcceleratorInfo]`. When the proto
+   * bridge is unavailable the browser-detected accelerator list is
+   * returned (single GPU/CPU entry, see {@link browserHardwareProfileResult}).
+   */
+  getAccelerators(): AcceleratorInfo[] {
+    const fromProto = HardwareAdapter.tryDefault()?.getAccelerators();
+    if (fromProto) return fromProto.accelerators;
+    return Hardware.getProfile().accelerators;
   },
 
   /**
-   * Whether the device has a Neural Engine. The proto bridge is authoritative
-   * when present; browser detection fills the gap for older or partial modules.
+   * Set the preferred accelerator for subsequent inference. Swift parity:
+   * `setAcceleratorPreference(_ preference: RAAccelerationPreference)`.
+   * Returns false when the preference is rejected (not supported on this platform).
    */
-  get hasNeuralEngine(): boolean {
-    return Hardware.getProfile().profile?.hasNeuralEngine ?? detectChip() === 'apple-silicon';
-  },
-
-  /**
-   * Active acceleration mode. Reflects the value of
-   * `RunAnywhere.runtime.preferred` (or the resolved `activeMode` when
-   * `preferred === 'auto'`).
-   */
-  get accelerationMode(): string {
-    return Hardware.getProfile().profile?.accelerationMode || detectAccelerationMode();
-  },
-
-  getAccelerators(): HardwareProfileResult {
-    return HardwareAdapter.tryDefault()?.getAccelerators() ?? {
-      accelerators: Hardware.getProfile().accelerators,
-    };
-  },
-
-  setAccelerationPreference(preference: AccelerationPreference): boolean {
+  setAcceleratorPreference(preference: AccelerationPreference): boolean {
     return HardwareAdapter.tryDefault()?.setAccelerationPreference(preference) ?? false;
   },
 };

@@ -12,8 +12,6 @@
  */
 
 import { LlamaCppProvider } from './LlamaCppProvider';
-import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
 import { SDKLogger } from '@runanywhere/core/internal';
 
 const log = new SDKLogger('LLM.LlamaCpp');
@@ -24,15 +22,13 @@ const log = new SDKLogger('LLM.LlamaCpp');
  * Matches iOS: public enum LlamaCPP: RunAnywhereModule
  *
  * Only provides backend registration. Model registration is done via
- * RunAnywhere.registerModel(framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP, ...) on the core SDK.
+ * RunAnywhere.registerModel() on the core SDK.
  *
  * ## Usage
  *
  * ```typescript
  * import { LlamaCPP } from '@runanywhere/llamacpp';
  * import { RunAnywhere } from '@runanywhere/core';
- * import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
- *
  * // Register LlamaCPP backend
  * await LlamaCPP.register();
  *
@@ -47,19 +43,6 @@ const log = new SDKLogger('LLM.LlamaCpp');
  * ```
  */
 export const LlamaCPP = {
-  /**
-   * Module metadata
-   * Matches iOS: static let moduleId, moduleName, inferenceFramework, capabilities
-   */
-  moduleId: 'llamacpp',
-  moduleName: 'LlamaCPP',
-  inferenceFramework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-  capabilities: [
-    SDKComponent.SDK_COMPONENT_LLM,
-    SDKComponent.SDK_COMPONENT_VLM,
-  ] as const,
-  defaultPriority: 100,
-
   /**
    * Register LlamaCPP module with the SDK
    *

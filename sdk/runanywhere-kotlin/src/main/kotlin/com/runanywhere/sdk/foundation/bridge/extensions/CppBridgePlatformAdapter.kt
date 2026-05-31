@@ -12,9 +12,30 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import okio.ByteString.Companion.decodeBase64
-import okio.ByteString.Companion.toByteString
 import java.io.File
+
+/**
+ * One directory entry returned by [CppBridgePlatformAdapter.fileListDirectory].
+ *
+ * Mirrors `rac_directory_entry_t` in
+ * `sdk/runanywhere-commons/include/rac/core/rac_platform_adapter.h`. The
+ * JNI layer reflects on the field names ([name], [isDir], [sizeBytes]) so
+ * keep the property names in sync with the FieldID lookups in
+ * `runanywhere_commons_jni.cpp::jni_file_list_directory_callback`.
+ *
+ * @property name UTF-8 entry name (no path component). MUST fit in
+ *                [CppBridgePlatformAdapter.NAME_MAX_BYTES] including the
+ *                trailing NUL byte that the JNI layer appends; oversized
+ *                entries MUST be filtered by the producer (we do this in
+ *                [CppBridgePlatformAdapter.fileListDirectory]).
+ * @property isDir true when the entry is a directory.
+ * @property sizeBytes file size in bytes; 0 for directories or unknown.
+ */
+data class RacDirectoryEntry(
+    @JvmField val name: String,
+    @JvmField val isDir: Boolean,
+    @JvmField val sizeBytes: Long,
+)
 
 /**
  * Platform adapter that provides JNI callbacks for C++ core operations.
@@ -48,6 +69,18 @@ object CppBridgePlatformAdapter {
     private val lock = Any()
 
     /**
+     * Maximum byte length (including the trailing NUL) of an entry name
+     * returned via [RacDirectoryEntry]. Mirrors
+     * `RAC_DIRECTORY_ENTRY_NAME_MAX` in `rac_platform_adapter.h`.
+     *
+     * Per the truncation contract on `rac_directory_entry_t::name`,
+     * oversized entries MUST be skipped rather than truncated so the
+     * no-error path never returns a half-name that could alias a
+     * different on-disk artifact.
+     */
+    const val NAME_MAX_BYTES: Int = 512
+
+    /**
      * Platform-specific storage delegate. MUST be set before any secure-storage
      * callback is invoked. On Android, use `setContext` (defined in
      * `com.runanywhere.sdk.foundation.security`) which installs an
@@ -62,65 +95,20 @@ object CppBridgePlatformAdapter {
     private const val TAG = "CppBridge"
 
     /**
-     * FQCN of the JVM-only AES-GCM secure storage fallback. Loaded reflectively
-     * so the shared jvmAndroidMain source set does not accumulate a hard
-     * reference to a jvmMain-only class.
-     */
-    private const val JVM_SECURE_STORAGE_CLASS =
-        "com.runanywhere.sdk.foundation.security.JvmKeychainManager"
-
-    /**
-     * Android runtime marker class; used to detect whether the SDK is running
-     * on Android and should skip the JVM-file-based secure storage fallback.
-     */
-    private const val ANDROID_BUILD_CLASS = "android.os.Build"
-
-    /**
-     * Fetch the configured [PlatformSecureStorage], auto-installing the JVM
-     * file-based AES-GCM implementation if nothing is configured AND we're
-     * running on a non-Android JVM. Android consumers MUST call
-     * [setContext] (or [setPlatformStorage] directly) explicitly — there is no
-     * sane auto-fallback on Android since we need a real [android.content.Context].
+     * Fetch the configured [PlatformSecureStorage].
+     *
+     * Android consumers MUST call [setContext] (or [setPlatformStorage] directly)
+     * before any secure-storage callback is invoked. This SDK is Android-only;
+     * there is no automatic fallback.
      */
     private fun requirePlatformStorage(): PlatformSecureStorage {
         platformStorage?.let { return it }
         synchronized(lock) {
             platformStorage?.let { return it }
-            val fallback = tryInstallJvmFallback()
-            if (fallback != null) {
-                platformStorage = fallback
-                return fallback
-            }
         }
         throw IllegalStateException(
             "Platform secure storage not configured — call RunAnywhere.setPlatformStorage() before use",
         )
-    }
-
-    /**
-     * Attempt to load the JVM AES-GCM secure storage via reflection. Returns
-     * null if we're on Android or the JVM-only class is not present on the
-     * classpath. Keeps the jvmAndroidMain source set free of direct jvmMain
-     * class references (those classes only exist in the JVM jar, not the AAR).
-     */
-    private fun tryInstallJvmFallback(): PlatformSecureStorage? {
-        return try {
-            // Short-circuit when we're clearly running on Android: the Build class
-            // is always present in the Android runtime.
-            try {
-                Class.forName(ANDROID_BUILD_CLASS)
-                return null
-            } catch (_: ClassNotFoundException) {
-                // Not Android — proceed to load the JVM implementation.
-            }
-            val cls = Class.forName(JVM_SECURE_STORAGE_CLASS)
-            val ctor = cls.getDeclaredConstructor()
-            val instance = ctor.newInstance()
-            instance as? PlatformSecureStorage
-        } catch (e: Throwable) {
-            logCallback(LogLevel.DEBUG, TAG, "JvmKeychainManager auto-install skipped: ${e.message}")
-            null
-        }
     }
 
     /**
@@ -361,6 +349,108 @@ object CppBridgePlatformAdapter {
     }
 
     // ========================================================================
+    // DIRECTORY ENUMERATION CALLBACKS (kotlin-005-C)
+    // ========================================================================
+    //
+    // Populate the `file_list_directory` and `is_non_empty_directory` slots
+    // in `rac_platform_adapter_t` so model-registry refresh (`rescan_local`)
+    // and `rac_model_info_make_proto`'s `is_downloaded` probe for multi-file
+    // artifacts both work on Android the same way they do on Web/iOS. See
+    // the per-slot doc-blocks in
+    // `sdk/runanywhere-commons/include/rac/core/rac_platform_adapter.h`.
+
+    /**
+     * Enumerate the entries in [dirPath] for the commons platform adapter.
+     *
+     * Returns null when the directory does not exist (mapped to
+     * RAC_ERROR_FILE_NOT_FOUND in the JNI layer). On other failures we log
+     * and return an empty array so commons treats the directory as empty
+     * rather than crashing the rescan / is_downloaded path.
+     *
+     * Truncation contract (per `rac_directory_entry_t::name`): entries
+     * whose UTF-8 byte length plus the trailing NUL exceed
+     * [NAME_MAX_BYTES] MUST be skipped rather than silently truncated. We
+     * emit a single WARN log per call that summarises how many entries
+     * were skipped so operators can detect the rare event without flooding
+     * logcat.
+     */
+    @JvmStatic
+    fun fileListDirectoryCallback(dirPath: String): Array<RacDirectoryEntry>? {
+        val dir =
+            try {
+                File(dirPath)
+            } catch (e: Exception) {
+                logCallback(LogLevel.ERROR, "FileOps", "fileListDirectory invalid path '$dirPath': ${e.message}")
+                return emptyArray()
+            }
+        if (!dir.exists() || !dir.isDirectory) {
+            // Mirror the C ABI contract: null signals RAC_ERROR_FILE_NOT_FOUND.
+            return null
+        }
+        return try {
+            // listFiles() returns null on I/O errors (permission denied,
+            // disk error, etc.). Treat that as "empty directory" so commons
+            // can continue rather than abort the whole rescan.
+            val children = dir.listFiles() ?: return emptyArray()
+            val retained = ArrayList<RacDirectoryEntry>(children.size)
+            var skipped = 0
+            for (child in children) {
+                val nameBytes = child.name.toByteArray(Charsets.UTF_8)
+                if (nameBytes.size + 1 > NAME_MAX_BYTES) {
+                    skipped++
+                    continue
+                }
+                val isDir = child.isDirectory
+                val sizeBytes = if (isDir) 0L else runCatching { child.length() }.getOrDefault(0L)
+                retained.add(RacDirectoryEntry(child.name, isDir, sizeBytes))
+            }
+            if (skipped > 0) {
+                logCallback(
+                    LogLevel.WARN,
+                    "PlatformAdapter",
+                    "Skipped $skipped directory entries in '$dirPath': name longer than " +
+                        "$NAME_MAX_BYTES bytes (truncation contract).",
+                )
+            }
+            retained.toTypedArray()
+        } catch (e: SecurityException) {
+            // SecurityManager / Android scoped-storage denial. Surface as
+            // "empty" rather than RAC_ERROR_FILE_NOT_FOUND so commons does
+            // not treat a permission miss as a missing directory.
+            logCallback(LogLevel.WARN, "FileOps", "fileListDirectory denied for '$dirPath': ${e.message}")
+            emptyArray()
+        } catch (e: Exception) {
+            logCallback(LogLevel.ERROR, "FileOps", "fileListDirectory failed for '$dirPath': ${e.message}")
+            emptyArray()
+        }
+    }
+
+    /**
+     * Cheap directory-probe — RAC_TRUE iff [path] is a directory containing
+     * at least one entry. Commons uses this from `rac_model_info_make_proto`
+     * to compute the `is_downloaded` flag for multi-file artifacts without
+     * paying for a full enumeration.
+     */
+    @JvmStatic
+    fun isNonEmptyDirectoryCallback(path: String): Boolean {
+        return try {
+            val dir = File(path)
+            if (!dir.exists() || !dir.isDirectory) {
+                return false
+            }
+            // listFiles() returns null on I/O / permission errors — treat
+            // those as "not non-empty" to match the conservative C
+            // contract: a false negative degrades to is_downloaded=false,
+            // which is safer than a false positive.
+            val children = dir.listFiles()
+            children != null && children.isNotEmpty()
+        } catch (e: Exception) {
+            logCallback(LogLevel.WARN, "FileOps", "isNonEmptyDirectory failed for '$path': ${e.message}")
+            false
+        }
+    }
+
+    // ========================================================================
     // SECURE STORAGE CALLBACKS
     // ========================================================================
 
@@ -478,24 +568,19 @@ object CppBridgePlatformAdapter {
 
     fun fileDelete(path: String): Boolean = fileDeleteCallback(path)
 
+    // JNI looks these up via GetMethodID in racSetPlatformAdapter — keep the
+    // signatures and the RacDirectoryEntry FQCN in sync with
+    // `runanywhere_commons_jni.cpp::racSetPlatformAdapter`.
+    fun fileListDirectory(dirPath: String): Array<RacDirectoryEntry>? = fileListDirectoryCallback(dirPath)
+
+    fun isNonEmptyDirectory(path: String): Boolean = isNonEmptyDirectoryCallback(path)
+
     fun secureGet(key: String): String? {
         val value = secureGetCallback(key) ?: return null
-        // Use okio.ByteString.base64() instead of java.util.Base64 so the
-        // JNI secure-storage callback path stays compatible with minSdk 24
-        // (java.util.Base64 is API 26+; the AAR currently has no core-library
-        // desugaring configured).
-        return value.toByteString().base64()
+        return String(value, Charsets.UTF_8)
     }
 
-    fun secureSet(key: String, value: String): Boolean {
-        val bytes =
-            value.decodeBase64()
-                ?: run {
-                    logCallback(LogLevel.ERROR, "SecureStorage", "secureSet decode failed: invalid base64 payload")
-                    return false
-                }
-        return secureSetCallback(key, bytes.toByteArray())
-    }
+    fun secureSet(key: String, value: String): Boolean = secureSetCallback(key, value.toByteArray(Charsets.UTF_8))
 
     fun secureDelete(key: String): Boolean = secureDeleteCallback(key)
 

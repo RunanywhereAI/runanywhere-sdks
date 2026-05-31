@@ -31,7 +31,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: One-shot voice-turn result.
+ * One-shot voice-turn result.
  *
  * Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
  * `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI

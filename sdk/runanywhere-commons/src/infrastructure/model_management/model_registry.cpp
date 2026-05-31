@@ -529,7 +529,7 @@ static void add_file_descriptors_to_proto(const rac_model_artifact_info_t* artif
     for (size_t i = 0; i < artifact->file_descriptor_count; ++i) {
         const rac_model_file_descriptor_t& in = artifact->file_descriptors[i];
         ModelFileDescriptor* file = out->add_files();
-        // CLUSTER-10: emit the real URL when the descriptor carries one.
+        // Emit the real URL when the descriptor carries one.
         // Previously this always emitted relative_path as the URL, so a
         // local filename like "lfm2-vl-1.2b-q4_k_m.gguf" was serialized as
         // ModelFileDescriptor.url and the planner downstream rejected it as
@@ -761,7 +761,7 @@ static bool apply_proto_artifact_to_model(const ModelInfo& proto, rac_model_info
                     out.destination_path = dup_optional_proto_string(destination);
                     out.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
                     out.role = model_file_role_from_proto(file.role());
-                    // CLUSTER-10: preserve ModelFileDescriptor.url through the
+                    // Preserve ModelFileDescriptor.url through the
                     // registry round-trip. Previously this field was dropped,
                     // which caused the round-trip serializer to emit
                     // relative_path as the URL (i.e. a local filename pretending
@@ -950,9 +950,27 @@ static rac_result_t parse_model_query_bytes(const uint8_t* query_proto_bytes,
     return RAC_SUCCESS;
 }
 
-static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming) {
+// Merge fields the caller left unset from `existing` into `incoming`.
+//
+// `preserve_empty_local_path` encodes the two distinct caller contracts:
+//   - update_proto is a PARTIAL merge: an absent/empty local_path means "leave
+//     the existing one alone", so pass true and we carry a non-empty existing
+//     path forward. ModelInfo.local_path is a presence-less proto3 string
+//     (tag 7, no `optional`), so an unset field and an explicit "" are wire-
+//     identical; the partial-merge entry point therefore treats empty as
+//     "keep existing".
+//   - register_proto is an AUTHORITATIVE replace / explicit reset escape hatch:
+//     an empty local_path is a deliberate clear that must win, so pass false
+//     and we never overwrite the incoming (possibly empty) path.
+static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming,
+                                         bool preserve_empty_local_path) {
     if (!incoming) {
         return;
+    }
+
+    if (preserve_empty_local_path && incoming->local_path().empty() &&
+        !existing.local_path().empty()) {
+        incoming->set_local_path(existing.local_path());
     }
 
     if (!incoming->has_memory_required_bytes() && existing.has_memory_required_bytes()) {
@@ -1027,6 +1045,36 @@ static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* i
             case ModelInfo::ARTIFACT_NOT_SET:
             default:
                 break;
+        }
+    } else if (incoming->artifact_case() == ModelInfo::kMultiFile &&
+               existing.artifact_case() == ModelInfo::kMultiFile) {
+        // Per-descriptor merge for multi-file artifacts: re-registering a
+        // catalog seed rebuilds the file descriptors from URL/filename but
+        // does not carry the per-file local_path or checksum_sha256 that the
+        // downloader populated. Match descriptors by URL and preserve those
+        // runtime fields so the next launch finds the files on disk.
+        const auto& existing_files = existing.multi_file().files();
+        auto* incoming_files = incoming->mutable_multi_file()->mutable_files();
+        for (int i = 0; i < incoming_files->size(); ++i) {
+            ModelFileDescriptor* file = incoming_files->Mutable(i);
+            if (file->url().empty()) {
+                continue;
+            }
+            for (const ModelFileDescriptor& prior : existing_files) {
+                if (prior.url() != file->url()) {
+                    continue;
+                }
+                if (!file->has_local_path() && prior.has_local_path()) {
+                    file->set_local_path(prior.local_path());
+                }
+                if (!file->has_checksum_sha256() && prior.has_checksum_sha256()) {
+                    file->set_checksum_sha256(prior.checksum_sha256());
+                }
+                if (!file->has_size_bytes() && prior.has_size_bytes()) {
+                    file->set_size_bytes(prior.size_bytes());
+                }
+                break;
+            }
         }
     }
 }
@@ -1683,8 +1731,18 @@ void rac_model_registry_destroy(rac_model_registry_handle_t handle) {
 // PUBLIC API - MODEL INFO
 // =============================================================================
 
-rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
-                                     const rac_model_info_t* model) {
+// Shared save implementation. `preserve_empty_local_path` controls the
+// legacy "registerModel() passes localPath=nil, keep the existing one"
+// heuristic: the C struct cannot carry proto field-presence, so for the
+// non-proto callers (Swift/Kotlin/etc. registerModel and platform/auto
+// registration) an empty incoming local_path is treated as "unset" and the
+// existing path is kept. The proto register/update paths set this to false
+// because they have already resolved local_path presence-aware in the proto
+// domain (preserve_absent_proto_fields), so an empty local_path there is an
+// *explicit* reset that must win.
+static rac_result_t save_model_info_impl(rac_model_registry_handle_t handle,
+                                         const rac_model_info_t* model,
+                                         bool preserve_empty_local_path) {
     if (!handle || !model || !model->id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -1700,7 +1758,8 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         // overwriting a localPath that was set by download completion or discovery.
         const char* existing_local_path = it->second->local_path;
         bool should_preserve_path =
-            (existing_local_path != nullptr) && strlen(existing_local_path) > 0 &&
+            preserve_empty_local_path && (existing_local_path != nullptr) &&
+            strlen(existing_local_path) > 0 &&
             (model->local_path == nullptr || strlen(model->local_path) == 0);
 
         // Store a deep copy of the incoming model
@@ -1749,6 +1808,13 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
     RAC_LOG_DEBUG("ModelRegistry", "Model saved");
 
     return RAC_SUCCESS;
+}
+
+rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
+                                     const rac_model_info_t* model) {
+    // Legacy / non-proto callers: keep the "empty local_path means unset, so
+    // preserve the existing one" behaviour.
+    return save_model_info_impl(handle, model, /*preserve_empty_local_path=*/true);
 }
 
 rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle, const char* model_id,
@@ -2054,6 +2120,28 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
     if (parse_rc != RAC_SUCCESS) {
         return parse_rc;
     }
+
+    // Merge-not-replace: when re-registering an existing model_id (catalog
+    // re-seed on app launch), preserve runtime fields the caller doesn't set
+    // — local_path, is_downloaded, checksum_sha256, expected_files,
+    // multi_file.files[*].local_path, etc. Without this, a registerModel()
+    // call that only carries factory defaults clobbers download progress and
+    // forces the user to re-download on every launch. Same merge contract as
+    // rac_model_registry_update_proto (see preserve_absent_proto_fields).
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        auto existing_it = handle->models.find(proto_model.id());
+        if (existing_it != handle->models.end()) {
+            ModelInfo existing =
+                model_snapshot_locked(handle, proto_model.id(), existing_it->second);
+            // register_proto is an authoritative replace: an explicit empty
+            // local_path is a deliberate reset that must win (override
+            // escape hatch), so do NOT preserve an empty path.
+            preserve_absent_proto_fields(existing, &proto_model,
+                                         /*preserve_empty_local_path=*/false);
+        }
+    }
+
     normalize_model_registry_state(&proto_model);
 
     rac_model_info_t* model = model_info_from_proto(proto_model);
@@ -2062,7 +2150,13 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
     }
 
     const std::string model_id = proto_model.id();
-    rac_result_t save_rc = rac_model_registry_save(handle, model);
+    // The proto register/update paths carry a caller-authored ModelInfo, so an
+    // empty local_path here is an explicit reset that must win. The merge-on-
+    // re-seed behaviour lives upstream (rac_register_model_from_url_proto carries
+    // the existing runtime fields forward before calling this), so the legacy
+    // C-struct "empty means keep the old path" heuristic must NOT fire here.
+    rac_result_t save_rc = save_model_info_impl(handle, model,
+                                                /*preserve_empty_local_path=*/false);
     rac_model_info_free(model);
     if (save_rc != RAC_SUCCESS) {
         return save_rc;
@@ -2098,7 +2192,11 @@ rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
             return RAC_ERROR_NOT_FOUND;
         }
         ModelInfo existing = model_snapshot_locked(handle, proto_model.id(), model_it->second);
-        preserve_absent_proto_fields(existing, &proto_model);
+        // update_proto is a partial merge: a field the caller left unset (or an
+        // empty local_path, which is wire-indistinguishable from unset for this
+        // presence-less proto3 string) must preserve the existing value.
+        preserve_absent_proto_fields(existing, &proto_model,
+                                     /*preserve_empty_local_path=*/true);
     }
     normalize_model_registry_state(&proto_model);
 
@@ -2108,7 +2206,13 @@ rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
     }
 
     const std::string model_id = proto_model.id();
-    rac_result_t save_rc = rac_model_registry_save(handle, model);
+    // The proto register/update paths carry a caller-authored ModelInfo, so an
+    // empty local_path here is an explicit reset that must win. The merge-on-
+    // re-seed behaviour lives upstream (rac_register_model_from_url_proto carries
+    // the existing runtime fields forward before calling this), so the legacy
+    // C-struct "empty means keep the old path" heuristic must NOT fire here.
+    rac_result_t save_rc = save_model_info_impl(handle, model,
+                                                /*preserve_empty_local_path=*/false);
     rac_model_info_free(model);
     if (save_rc != RAC_SUCCESS) {
         return save_rc;
@@ -2792,37 +2896,57 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
 
 namespace {
 
-constexpr size_t kRescanInitialEntryCapacity = 64;
 constexpr size_t kRescanMaxEntryCapacity = 4096;
 
-// List a directory through the platform adapter. Resizes the entry buffer to
-// fit. Returns RAC_SUCCESS on success (entries.size() is the count) or the
-// callback's error code (FILE_NOT_FOUND when the directory does not exist).
+// List a directory through the platform adapter using the POSIX two-call
+// contract documented on `rac_file_list_directory_fn`: first call with
+// out_entries=NULL to learn the required entry count, then allocate and call
+// again with a buffer of at least that capacity. Header-compliant adapters
+// (e.g. the Web TypeScript implementation) never write more than the capacity
+// we pass on the second call, so we cannot rely on a "needed more space"
+// signal — we must size up-front.
 rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, const char* dir_path,
                                         std::vector<rac_directory_entry_t>* out_entries) {
     if (!adapter || !adapter->file_list_directory || !dir_path || !out_entries) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
     out_entries->clear();
-    size_t capacity = kRescanInitialEntryCapacity;
-    while (capacity <= kRescanMaxEntryCapacity) {
-        out_entries->resize(capacity);
-        size_t count = capacity;
-        rac_result_t rc =
-            adapter->file_list_directory(dir_path, out_entries->data(), &count, adapter->user_data);
-        if (rc != RAC_SUCCESS) {
-            out_entries->clear();
-            return rc;
-        }
-        if (count <= capacity) {
-            out_entries->resize(count);
-            return RAC_SUCCESS;
-        }
-        // Caller asked for more space than we provided — grow and retry.
-        capacity = count;
+
+    // Step 1: capacity probe.
+    size_t required = 0;
+    rac_result_t probe_rc = adapter->file_list_directory(dir_path, /*out_entries=*/nullptr,
+                                                         &required, adapter->user_data);
+    if (probe_rc != RAC_SUCCESS) {
+        return probe_rc;
     }
-    out_entries->clear();
-    return RAC_ERROR_OUT_OF_MEMORY;
+    if (required == 0) {
+        return RAC_SUCCESS;
+    }
+    if (required > kRescanMaxEntryCapacity) {
+        // Defensive cap to keep refresh sweep bounded even on pathological dirs.
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Step 2: allocate and fetch. Use a small headroom in case the directory
+    // gained entries between the probe and the read; entries written beyond
+    // the probed count are still safe because we resize to the actual count
+    // the adapter reports.
+    const size_t capacity = required + 4;
+    out_entries->resize(capacity);
+    size_t count = capacity;
+    rac_result_t fill_rc =
+        adapter->file_list_directory(dir_path, out_entries->data(), &count, adapter->user_data);
+    if (fill_rc != RAC_SUCCESS) {
+        out_entries->clear();
+        return fill_rc;
+    }
+    if (count > capacity) {
+        // Header forbids this, but guard against a buggy adapter — never
+        // expose entries we did not actually receive.
+        count = capacity;
+    }
+    out_entries->resize(count);
+    return RAC_SUCCESS;
 }
 
 // Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose
@@ -3233,11 +3357,26 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
-    // Collect discovered models
+    // Lock-copy-dispatch: snapshot the registered ids (and which ones already
+    // have a local_path) under the lock, then drop it for the entire
+    // filesystem scan. Platform callbacks (Swift FileManager, Kotlin
+    // Files.exists, dart_ffi) MUST NOT be invoked while holding handle->mutex
+    // — they can stall on cold OS caches and may re-enter registry APIs via
+    // SDK glue, which would deadlock. Matches the event publisher's
+    // lock-copy-dispatch pattern documented in commons AGENTS.md.
+    std::map<std::string, bool> needs_link_by_id;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        for (const auto& pair : handle->models) {
+            const rac_model_info_t* model = pair.second;
+            const bool needs_link = !model || !model->local_path || model->local_path[0] == '\0';
+            needs_link_by_id.emplace(pair.first, needs_link);
+        }
+    }
+
+    // Collect discovered models (unlocked phase — no handle->mutex held).
     std::vector<rac_discovered_model_t> discovered;
     size_t unregistered = 0;
-
-    std::lock_guard<std::mutex> lock(handle->mutex);
 
     for (size_t f = 0; f < framework_count; f++) {
         rac_inference_framework_t framework = frameworks[f];
@@ -3260,6 +3399,15 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 
         if (callbacks->list_directory(framework_dir, &model_folders, &folder_count,
                                       callbacks->user_data) != RAC_SUCCESS) {
+            // Defensive guard. The list_directory
+            // contract says "no allocation on failure"; the C ABI is
+            // implemented by every platform SDK and a future regression
+            // could leave a partial allocation here. If callers DID populate
+            // model_folders before returning non-success, free it through
+            // their canonical entry point so we don't leak.
+            if (model_folders && callbacks->free_entries) {
+                callbacks->free_entries(model_folders, folder_count, callbacks->user_data);
+            }
             continue;
         }
 
@@ -3286,39 +3434,37 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
                 continue;
             }
 
-            // Check if this model is registered
-            auto it = handle->models.find(model_id);
-            if (it != handle->models.end()) {
-                // Model is registered - check if it needs update
-                rac_model_info_t* model = it->second;
-
-                if (!model->local_path || strlen(model->local_path) == 0) {
-                    // Update the local path
-                    if (model->local_path) {
-                        free(model->local_path);
-                    }
-                    model->local_path = rac_strdup(model_path.c_str());
-                    model->updated_at = rac_get_current_time_ms() / 1000;
-#ifdef RAC_HAVE_PROTOBUF
-                    store_proto_snapshot_locked(handle, model_id, model,
-                                                /*preserve_proto_only_fields=*/true,
-                                                /*overwrite_registry_state=*/true);
-#endif
-
-                    // Add to discovered list
-                    rac_discovered_model_t disc;
-                    disc.model_id = rac_strdup(model_id);
-                    disc.local_path = rac_strdup(model_path.c_str());
-                    disc.framework = framework;
-                    discovered.push_back(disc);
-
-                    RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
-                }
-            } else {
+            // Check if this model is registered (using snapshot taken above)
+            auto snap_it = needs_link_by_id.find(model_id);
+            if (snap_it == needs_link_by_id.end()) {
                 // Model folder exists but not registered
                 unregistered++;
                 RAC_LOG_DEBUG("ModelRegistry", "Found unregistered model folder");
+                continue;
             }
+            if (!snap_it->second) {
+                // Already linked at snapshot time — nothing to do.
+                continue;
+            }
+
+            // Apply the link under the registry's own lock via the canonical
+            // update entry point (it takes/releases handle->mutex briefly).
+            rac_result_t link_rc =
+                rac_model_registry_update_download_status(handle, model_id, model_path.c_str());
+            if (link_rc != RAC_SUCCESS) {
+                RAC_LOG_WARNING("ModelRegistry", "Discovery: failed to link '%s' (rc=%d)", model_id,
+                                static_cast<int>(link_rc));
+                continue;
+            }
+
+            // Add to discovered list
+            rac_discovered_model_t disc;
+            disc.model_id = rac_strdup(model_id);
+            disc.local_path = rac_strdup(model_path.c_str());
+            disc.framework = framework;
+            discovered.push_back(disc);
+
+            RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
         }
 
         if (callbacks->free_entries) {
@@ -3346,7 +3492,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
 }
 
 // =============================================================================
-// PUBLIC API - REFRESH (T4.9)
+// PUBLIC API - REFRESH
 // =============================================================================
 
 rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
@@ -3460,7 +3606,7 @@ void rac_discovery_result_free(rac_discovery_result_t* result) {
 }
 
 // =============================================================================
-// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)
+// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Web WASM)
 // =============================================================================
 
 rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refresh,

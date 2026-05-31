@@ -63,6 +63,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   @override
   void dispose() {
+    if (_isGenerating) {
+      sdk.RunAnywhere.llm.cancelGeneration();
+    }
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -122,7 +125,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
-      // B-FL-4-002 / B-FL-5-001: fall back to a sane default system
+      // Fall back to a sane default system
       // prompt when the user hasn't customised one. Without it, smaller
       // 0.5-1B models tend to ramble or echo the prompt verbatim.
       final systemPromptRaw =
@@ -302,7 +305,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final contentBuffer = StringBuffer();
 
     try {
-      // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
+      // generateStream returns Stream<LLMStreamEvent>;
       // collect token text off each non-terminal event.
       final eventStream = sdk.RunAnywhere.llm.generateStream(prompt, options);
 
@@ -648,7 +651,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   /// Heuristic check for small models (<= ~500M params) where tool
   /// calling tends to be unreliable. Used by the tool-calling reliability
-  /// banner (B-FL-6-003).
+  /// banner.
   bool _isLikelySmallModel(String? name) {
     if (name == null) return false;
     final n = name.toLowerCase();
@@ -684,7 +687,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Tool-calling reliability banner for small models (B-FL-6-003).
+            // Tool-calling reliability banner for small models.
             if (showSmallModelWarning) ...[
               Container(
                 padding: const EdgeInsets.all(AppSpacing.smallMedium),
@@ -849,7 +852,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
               _buildThinkingSection(),
 
             // Main message bubble. Long-press an assistant bubble to
-            // open an analytics sheet (B-FL-9-001).
+            // open an analytics sheet.
             GestureDetector(
               onLongPress: !isUser && widget.message.analytics != null
                   ? () => _showAnalyticsSheet(context)
@@ -923,7 +926,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
     );
   }
 
-  /// Show a bottom sheet of message analytics (B-FL-9-001).
+  /// Show a bottom sheet of message analytics.
   void _showAnalyticsSheet(BuildContext context) {
     final analytics = widget.message.analytics;
     if (analytics == null) return;

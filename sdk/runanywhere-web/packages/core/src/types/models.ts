@@ -1,7 +1,7 @@
 /**
  * RunAnywhere Web SDK - Model and environment types.
  *
- * Wave 2: Proto-aligned types live in `@runanywhere/proto-ts/*` and are
+ * Proto-aligned types live in `@runanywhere/proto-ts/*` and are
  * re-exported from `types/index.ts`. Generated model/storage shapes are
  * aliases here; browser-only environment and storage summary types remain
  * Web-local.

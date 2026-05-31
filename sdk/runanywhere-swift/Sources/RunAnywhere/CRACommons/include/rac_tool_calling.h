@@ -215,6 +215,23 @@ RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_outpu
  */
 RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
 
+/**
+ * @brief Map a runanywhere.v1.ToolCallFormatName proto enum value to its
+ *        canonical runtime hint string.
+ *
+ * *** SINGLE SOURCE OF TRUTH for the proto-enum -> hint-string mapping. ***
+ *
+ * SDKs pass their generated `ToolCallFormatName` enum's integer value here and
+ * forward the result as `format_hint`, instead of hand-rolling the table. The
+ * returned string is always a value rac_tool_call_format_from_name() accepts
+ * ("default" or "lfm2"): PYTHONIC (4) / HERMES (6) -> "lfm2"; everything else
+ * -> "default".
+ *
+ * @param format_name runanywhere.v1.ToolCallFormatName enum value as an int32.
+ * @return Static lowercase hint string (do not free).
+ */
+RAC_API const char* rac_tool_call_format_hint_from_format_name(int32_t format_name);
+
 // =============================================================================
 // PROMPT FORMATTING API - All prompt building happens here
 // =============================================================================
@@ -364,7 +381,7 @@ RAC_API rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_boo
                                                   const char* error_message, char** out_json);
 
 // =============================================================================
-// TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
+// TOOL VALUE JSON BRIDGE - Replaces hand-written per-SDK JSON serializers
 // =============================================================================
 
 /**
@@ -392,7 +409,7 @@ RAC_API rac_result_t rac_tool_value_from_json_proto(
     rac_proto_buffer_t* out_tool_value);
 
 // =============================================================================
-// TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
+// TOOL CALLING RUN LOOP - Single-call native orchestration
 // =============================================================================
 //
 // Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up

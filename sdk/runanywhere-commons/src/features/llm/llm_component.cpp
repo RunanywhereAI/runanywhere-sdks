@@ -30,7 +30,7 @@
 #include "rac/features/llm/rac_llm_stream.h"
 #include "rac/infrastructure/events/rac_events.h"
 
-// v2 close-out Phase G-2 / BUG-STREAMING-001: pull in the canonical
+// BUG-STREAMING-001: pull in the canonical
 // 13-field LLM stream emitter shared with rac_llm_proto_service.cpp.
 // We invoke `rac::llm::dispatch_llm_stream_event()` once per token and
 // once on terminal events so any collectors registered via
@@ -100,6 +100,100 @@ static std::string generate_unique_id() {
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "gen_%08x%08x", dis(gen), dis(gen));
     return {buffer};
+}
+
+// =============================================================================
+// EOS / SPECIAL TOKEN STRIPPING
+// =============================================================================
+
+/**
+ * Strip tokenizer-internal special tokens from a streamed LLM token before
+ * the value reaches user callbacks or downstream proto subscribers.
+ *
+ * Backends occasionally leak end-of-utterance / end-of-text sentinels into
+ * the streaming callback when the runtime swallow path missed them (notably
+ * SmolVLM, Qwen-VL, Llama-3 — see B-RN-14-001). Without this
+ * filter the angle-bracket artifacts (`<|im_end|>`, `<|eot_id|>`,
+ * `<|endoftext|>`, `<eot>`, `<end_of_utterance>`) appear in chat UIs.
+ *
+ * Two pattern families are recognised:
+ *   1. `<|TOKEN|>` — Qwen / Llama-3 / GPT-style pipe-wrapped sentinels.
+ *      The scanner consumes everything between `<|` and the next `|>` so
+ *      this naturally covers `im_end`, `eot_id`, `endoftext`, `im_start`,
+ *      `vision_start`, `vision_end`, etc.
+ *   2. Bare `<TOKEN>` sentinels — `<eot>`, `<end_of_utterance>`,
+ *      `<endoftext>`, `<eos>`. Only the explicit allowlist is stripped so
+ *      legitimate user content containing `<` is preserved.
+ *
+ * The cleaned output is written to @p buf and is guaranteed NUL-terminated
+ * provided @p buf_size >= 1. The function returns @p buf for convenience —
+ * if the entire token was a sentinel, @p buf points at the empty string.
+ */
+static const char* llm_strip_eos_tokens(const char* token, char* buf, size_t buf_size) {
+    if (!buf || buf_size == 0) {
+        return buf;
+    }
+    if (!token) {
+        buf[0] = '\0';
+        return buf;
+    }
+
+    // Bare-form sentinels matched as exact substrings. Keep the list short:
+    // every additional entry costs an O(n*m) scan per token. Patterns must
+    // not overlap (`<eos>` is a prefix of `<eos_id>` — not in this list).
+    static const char* kBareSentinels[] = {
+        "<end_of_utterance>",
+        "<endoftext>",
+        "<eot>",
+        "<eos>",
+    };
+    constexpr size_t kBareCount = sizeof(kBareSentinels) / sizeof(kBareSentinels[0]);
+
+    size_t out = 0;
+    size_t i = 0;
+    while (token[i] != '\0' && out + 1 < buf_size) {
+        if (token[i] == '<' && token[i + 1] == '|') {
+            // Pipe-wrapped form: skip everything through the next |> .
+            size_t end = i + 2;
+            while (token[end] != '\0') {
+                if (token[end] == '|' && token[end + 1] == '>') {
+                    i = end + 2;
+                    break;
+                }
+                ++end;
+            }
+            if (token[end] == '\0') {
+                // No closing |> in this chunk — copy `<` literally and
+                // continue so a multi-chunk sentinel surfacing across two
+                // callback invocations still appears (downstream gets one
+                // partial chunk; this never produced the angle-bracket
+                // artifact observed in the reports because the runtime
+                // emits the full sentinel as a single token).
+                buf[out++] = token[i++];
+            }
+            continue;
+        }
+
+        if (token[i] == '<') {
+            bool stripped = false;
+            for (size_t k = 0; k < kBareCount; ++k) {
+                const char* needle = kBareSentinels[k];
+                const size_t needle_len = strlen(needle);
+                if (strncmp(token + i, needle, needle_len) == 0) {
+                    i += needle_len;
+                    stripped = true;
+                    break;
+                }
+            }
+            if (stripped) {
+                continue;
+            }
+        }
+
+        buf[out++] = token[i++];
+    }
+    buf[out] = '\0';
+    return buf;
 }
 
 // =============================================================================
@@ -260,7 +354,7 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
     // protobuf decoder to throw "end-group tag did not match" on the first
     // generate after a model switch.
     rac_llm_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-llm: spin-wait for any in-flight
+    // Spin-wait for any in-flight
     // dispatch_llm_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy:350.
     rac_llm_proto_quiesce();
@@ -290,7 +384,7 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
     // load_model path elides destroy → original B-FL-5-001 fix in destroy()
     // never fires for handle reuse).
     rac_llm_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-llm: drain any in-flight dispatcher invocation
+    // Drain any in-flight dispatcher invocation
     // bound to the previous model before swapping in the new service. The
     // unset above clears the slot but a concurrent dispatcher that already
     // copied the slot keeps running until it finishes; spin-wait until that
@@ -577,7 +671,7 @@ struct llm_stream_context {
     // Benchmark timing (optional, NULL when not benchmarking)
     rac_benchmark_timing_t* timing_out;
 
-    // v2 close-out Phase G-2: component handle for the proto-byte stream
+    // Component handle for the proto-byte stream
     // dispatcher. Each delivered token fires a LLMStreamEvent to any
     // collector registered via rac_llm_set_stream_proto_callback().
     rac_handle_t component_handle;
@@ -585,6 +679,14 @@ struct llm_stream_context {
 
 /**
  * Internal token callback that wraps user callback and tracks metrics.
+ *
+ * Every emitted token is run through
+ * `llm_strip_eos_tokens()` before it reaches the user callback or the
+ * proto stream dispatcher. Backends occasionally leak EOS sentinels
+ * (`<|im_end|>`, `<|eot_id|>`, `<end_of_utterance>`, …) which the example
+ * apps used to strip locally; the regex-based example workaround in
+ * `useVLMCamera.ts` is now obsolete because commons emits cleaned tokens
+ * directly.
  */
 static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) {
     auto* ctx = reinterpret_cast<llm_stream_context*>(user_data);
@@ -593,8 +695,17 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         return RAC_FALSE;
     }
 
-    // Track first token time and emit first token event
-    if (!ctx->first_token_recorded) {
+    // Strip tokenizer-internal sentinels before any caller observes the
+    // chunk. The stack-allocated buffer comfortably fits a single decoded
+    // token; backends emit at most a few dozen bytes per callback.
+    char cleaned_buf[512];
+    const char* cleaned = llm_strip_eos_tokens(token, cleaned_buf, sizeof(cleaned_buf));
+    const bool cleaned_empty = (cleaned[0] == '\0');
+
+    // Track first token time and emit first token event only for the first
+    // non-empty cleaned chunk so TTFT does not get charged to a leading
+    // sentinel that the user never observes.
+    if (!ctx->first_token_recorded && !cleaned_empty) {
         ctx->first_token_recorded = true;
         ctx->first_token_time = std::chrono::steady_clock::now();
 
@@ -620,9 +731,12 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         rac_analytics_event_emit(RAC_EVENT_LLM_FIRST_TOKEN, &event);
     }
 
-    // Accumulate text and track token count
-    if (token) {
-        ctx->full_text += token;
+    // Accumulate text and track token count. Only the cleaned text reaches
+    // ctx->full_text — the raw backend token is intentionally discarded so
+    // downstream consumers (e.g. complete_callback's final_result.text)
+    // never see sentinel artifacts either.
+    if (!cleaned_empty) {
+        ctx->full_text += cleaned;
         ctx->token_count++;
 
         // Emit streaming update event (every 10 tokens to avoid spam)
@@ -636,21 +750,26 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         }
     }
 
-    // v2 close-out Phase G-2: fan-out the token as an LLMStreamEvent to
+    // Fan-out the token as an LLMStreamEvent to
     // any proto-byte subscribers. `is_final=false` on every per-token
     // event; the terminal is_final=true event is emitted by the
-    // generate_stream() caller once the engine returns (below).
-    rac::llm::dispatch_llm_stream_event(ctx->component_handle, token ? token : "",
-                                        /*is_final*/ false,
-                                        /*kind*/ 1 /* ANSWER */,
-                                        /*token_id*/ 0,
-                                        /*logprob*/ 0.0f,
-                                        /*finish_reason*/ nullptr,
-                                        /*error_message*/ nullptr);
+    // generate_stream() caller once the engine returns (below). Pure-
+    // sentinel chunks are suppressed entirely so subscribers don't have
+    // to filter empty events themselves.
+    if (!cleaned_empty) {
+        rac::llm::dispatch_llm_stream_event(ctx->component_handle, cleaned,
+                                            /*is_final*/ false,
+                                            /*kind*/ 1 /* ANSWER */,
+                                            /*token_id*/ 0,
+                                            /*logprob*/ 0.0f,
+                                            /*finish_reason*/ nullptr,
+                                            /*error_message*/ nullptr);
+    }
 
-    // Call user callback
-    if (ctx->token_callback) {
-        return ctx->token_callback(token, ctx->user_data);
+    // Forward only non-empty cleaned tokens to the user callback so the
+    // example/SDK rendering layer never has to strip these sentinels.
+    if (!cleaned_empty && ctx->token_callback) {
+        return ctx->token_callback(cleaned, ctx->user_data);
     }
 
     return RAC_TRUE;  // Continue by default
@@ -795,7 +914,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.error_message = "Streaming generation failed";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
 
-        // v2 close-out Phase G-2: terminal error event on the proto stream.
+        // Terminal error event on the proto stream.
         rac::llm::dispatch_llm_stream_event(handle,
                                             /*token*/ "",
                                             /*is_final*/ true,
@@ -875,11 +994,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
 
-    // v2 close-out Phase G-2: terminal success event on the proto stream.
+    // Terminal success event on the proto stream.
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
     const char* finish_reason_str = "stop";
-    if (component->cancel_requested.load()) {
+    if (component->cancel_requested.load(std::memory_order_relaxed)) {
         finish_reason_str = "cancelled";
     } else if (effective_options->max_tokens > 0 &&
                ctx.token_count >= effective_options->max_tokens) {
@@ -1056,7 +1175,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
             timing_out->t6_request_end_ms = rac_monotonic_now_ms();
         }
 
-        // v2 close-out Phase G-2: terminal error event on the proto stream.
+        // Terminal error event on the proto stream.
         rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, /*kind*/ 0, 0, 0.0f,
                                             /*finish_reason*/ "error",
                                             /*error_message*/ "Streaming generation failed");
@@ -1161,11 +1280,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
 
-    // v2 close-out Phase G-2: terminal success event on the proto stream.
+    // Terminal success event on the proto stream.
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
     const char* finish_reason_str_t = "stop";
-    if (component->cancel_requested.load()) {
+    if (component->cancel_requested.load(std::memory_order_relaxed)) {
         finish_reason_str_t = "cancelled";
     } else if (effective_options->max_tokens > 0 &&
                ctx.token_count >= effective_options->max_tokens) {

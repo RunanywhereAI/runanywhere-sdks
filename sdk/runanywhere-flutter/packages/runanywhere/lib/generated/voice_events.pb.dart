@@ -433,7 +433,7 @@ class VoiceEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   MetricsEvent ensureMetrics() => $_ensure(12);
 
-  /// v3.2: Voice agent lifecycle events. Mirror Swift VoiceSessionError /
+  /// Voice agent lifecycle events. Mirror Swift VoiceSessionError /
   /// VoiceAgentComponentStates and the AsyncSequence-style lifecycle
   /// signals consumed by the cross-platform VoiceAgent extensions
   /// (Swift VoiceAgentTypes.swift, Kotlin VoiceAgentTypes.kt, RN
@@ -973,7 +973,7 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
 
 /// Voice Activity Detection output. Frontends usually do not need this —
 /// exposed for debugging and custom UIs (waveform highlighting, etc.).
-/// IDL-18: `type` uses the canonical VADStreamEventKind enum from
+/// `type` uses the canonical VADStreamEventKind enum from
 /// vad_options.proto (the hand-rolled VADEventType was deleted).
 class VADEvent extends $pb.GeneratedMessage {
   factory VADEvent({
@@ -1499,7 +1499,7 @@ class MetricsEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearIsOverBudget() => $_clearField(7);
 
-  /// v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+  /// Monotonic producer-side timestamp in nanoseconds. Set by the
   /// producer (C++ dispatcher) at event-emit time; read by consumers
   /// (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
   /// latency without relying on wall-clock sync. Encoded as int64 so
@@ -1739,7 +1739,7 @@ class ComponentProgressEvent extends $pb.GeneratedMessage {
 /// `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
 /// `VoiceAgentComponentStates`.
 ///
-/// IDL-04: The former `ComponentLoadState` enum was consolidated into the
+/// The former `ComponentLoadState` enum was consolidated into the
 /// canonical richer `ComponentLifecycleState` (component_types.proto). Where
 /// the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
 /// component is ready to use", callers now use

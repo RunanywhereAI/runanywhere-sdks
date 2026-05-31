@@ -13,28 +13,19 @@
  *  - RAToolValue constructor / accessor / JSON helpers,
  *  - `RAToolCallingOptions.defaults()` factory.
  *
- * The JSON round-trip lives in pure Kotlin via `kotlinx.serialization.json`
- * (Swift uses the `rac_tool_value_{to,from}_json_proto` ABIs, which Kotlin
- * does not currently expose through JNI).
+ * G3: the recursive ToolValue <-> JSON walk lives in commons behind
+ * `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto` (mirroring
+ * Swift `ToolCallingTypes.swift`). Kotlin only marshals the proto bytes — this
+ * preserves the integer-vs-double distinction the pure-Kotlin walk used to
+ * lose, and keeps the SDKs byte-identical.
  */
 
 package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.LLMGenerationResult
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.longOrNull
+import ai.runanywhere.proto.v1.ToolValueJSON
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 // =============================================================================
 // PROTO TYPEALIASES (RA-prefixed, mirroring Swift)
@@ -160,14 +151,29 @@ internal fun ToolCallingResult.toLLMGenerationResult(modelUsed: String = ""): LL
         tool_results = tool_results,
     )
 
+/**
+ * Map the generated [ToolCallFormatName] proto enum to its canonical runtime
+ * hint string.
+ *
+ * This mirrors commons' single source of truth
+ * `rac_tool_call_format_hint_from_format_name` (sdk/runanywhere-commons/
+ * src/features/llm/tool_calling.cpp) exactly: PYTHONIC/HERMES -> "lfm2",
+ * everything else -> "default". The previous table emitted "pythonic" /
+ * "hermes" / "xml" / "native" / "openai", which the commons accept-list
+ * (rac_tool_call_format_from_name) does not recognize and silently downgrades —
+ * a per-SDK divergence from iOS. Returns only values commons accepts so the
+ * Kotlin and Swift SDKs resolve identical format routes.
+ */
 private fun ToolCallFormatName?.toToolFormatHint(): String =
     when (this) {
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON -> "default"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML -> "xml"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE -> "native"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC -> "pythonic"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS -> "openai"
-        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES -> "hermes"
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES,
+        -> "lfm2"
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_XML,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_NATIVE,
+        ToolCallFormatName.TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS,
+        -> "default"
         else -> ""
     }
 
@@ -230,88 +236,52 @@ val RAToolValue.array: List<RAToolValue>? get() = array_value?.values
 val RAToolValue.`object`: Map<String, RAToolValue>? get() = object_value?.fields
 
 // MARK: JSON bridge ------------------------------------------------------------
-
-private val toolValueJson: Json =
-    Json {
-        prettyPrint = false
-        encodeDefaults = false
-        isLenient = true
-        ignoreUnknownKeys = true
-    }
-
-private val toolValueJsonPretty: Json =
-    Json(from = toolValueJson) {
-        prettyPrint = true
-    }
-
-private fun RAToolValue.toJsonElement(): JsonElement =
-    when {
-        string_value != null -> JsonPrimitive(string_value)
-        number_value != null -> JsonPrimitive(number_value)
-        bool_value != null -> JsonPrimitive(bool_value)
-        array_value != null ->
-            buildJsonArray {
-                for (v in array_value.values) add(v.toJsonElement())
-            }
-        object_value != null ->
-            buildJsonObject {
-                for ((k, v) in object_value.fields) put(k, v.toJsonElement())
-            }
-        null_value == true -> JsonNull
-        else -> JsonNull
-    }
-
-private fun JsonElement.toRAToolValue(): RAToolValue =
-    when (this) {
-        is JsonNull -> RAToolValue(null_value = true)
-        is JsonPrimitive ->
-            when {
-                this.isString -> RAToolValue(string_value = contentOrNull ?: "")
-                booleanOrNull != null -> RAToolValue(bool_value = booleanOrNull)
-                longOrNull != null -> RAToolValue(number_value = longOrNull!!.toDouble())
-                intOrNull != null -> RAToolValue(number_value = intOrNull!!.toDouble())
-                doubleOrNull != null -> RAToolValue(number_value = doubleOrNull)
-                else -> RAToolValue(string_value = contentOrNull ?: "")
-            }
-        is JsonArray ->
-            RAToolValue(
-                array_value = RAToolValueArray(values = this.map { it.toRAToolValue() }),
-            )
-        is JsonObject ->
-            RAToolValue(
-                object_value =
-                    RAToolValueObject(
-                        fields = this.mapValues { (_, v) -> v.toRAToolValue() },
-                    ),
-            )
-    }
+//
+// The recursive walk lives in commons (G3); Kotlin only marshals bytes via
+// the `rac_tool_value_{to,from}_json_proto` JNI thunks, mirroring Swift's
+// ToolCallingTypes.swift. This preserves the integer-vs-double distinction the
+// previous pure-Kotlin walk lost and keeps every SDK byte-identical.
 
 /**
  * Render this value as a JSON string. Mirrors Swift
- * `RAToolValue.toJSONString(pretty:)`.
+ * `RAToolValue.toJSONString(pretty:)` — routes through
+ * `rac_tool_value_to_json_proto`. `pretty` re-renders the canonical JSON with
+ * sorted keys for presentation; null on any failure.
  */
-fun RAToolValue.toJSONString(pretty: Boolean = false): String? =
-    runCatching {
-        val encoder = if (pretty) toolValueJsonPretty else toolValueJson
-        encoder.encodeToString(JsonElement.serializer(), toJsonElement())
-    }.getOrNull()
+fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
+    val resultBytes =
+        RunAnywhereBridge.racToolValueToJsonProto(RAToolValue.ADAPTER.encode(this)) ?: return null
+    val json =
+        runCatching { ToolValueJSON.ADAPTER.decode(resultBytes).json }.getOrNull() ?: return null
+    if (!pretty) return json
+    // Pretty-print is a presentation concern; re-render the already-canonical
+    // JSON text with sorted keys (mirrors Swift's Foundation re-render).
+    return runCatching {
+        val pretty =
+            kotlinx.serialization.json.Json {
+                prettyPrint = true
+            }
+        val element = kotlinx.serialization.json.Json.parseToJsonElement(json)
+        pretty.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), element)
+    }.getOrDefault(json)
+}
 
 /**
- * Parse a JSON object string into a `[String: RAToolValue]` map. Returns an
- * empty map on any parse failure or for non-object roots, matching Swift's
- * `RAToolValue.parseObjectJSON(_:)` behavior.
+ * Parse a JSON object string into a `[String: RAToolValue]` map via
+ * `rac_tool_value_from_json_proto`. Returns an empty map on any parse failure
+ * or for non-object roots, matching the existing Kotlin contract (Swift throws
+ * here; Kotlin's two call sites already treat an empty map as a failure).
  */
 fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
     json: String,
 ): Map<String, RAToolValue> {
     if (json.isBlank()) return emptyMap()
+    val wrapper = ToolValueJSON(json = json)
+    val valueBytes =
+        RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper))
+            ?: return emptyMap()
     return runCatching {
-        val element = toolValueJson.parseToJsonElement(json)
-        if (element !is JsonObject) {
-            emptyMap()
-        } else {
-            element.mapValues { (_, v) -> v.toRAToolValue() }
-        }
+        RAToolValue.ADAPTER.decode(valueBytes).object_value?.fields ?: emptyMap()
     }.getOrDefault(emptyMap())
 }
 

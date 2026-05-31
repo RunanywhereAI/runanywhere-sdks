@@ -31,7 +31,7 @@ import kotlin.Suppress
  *                                    Cancelled=5)
  *   Kotlin / Web                    (no enum declared pre-IDL)
  *
- * IDL-08: VLMErrorCode deleted. All VLM error codes now route through the
+ * VLMErrorCode deleted. All VLM error codes now route through the
  * canonical `ErrorCode` taxonomy defined in `errors.proto`:
  *   - ERROR_CODE_MODEL_NOT_LOADED    = 116 (Swift/Dart/RN notInitialized +
  *                                          modelLoadFailed)

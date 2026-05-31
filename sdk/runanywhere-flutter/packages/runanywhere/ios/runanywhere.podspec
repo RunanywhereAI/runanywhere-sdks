@@ -4,7 +4,7 @@
 # Vendors the locally built RACommons.xcframework into Flutter iOS apps.
 #
 # The xcframework is staged into this plugin's ios/Frameworks/ directory by
-# scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
+# sdk/runanywhere-swift/scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
 # script once after checkout, and re-run it whenever the native layer changes.
 #
 
@@ -22,22 +22,33 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '15.1'
+  s.ios.deployment_target = '17.0'
   s.swift_version = '5.0'
 
   # Source files: Swift plugin entry point + URLSession HTTP transport.
+  # The URLSession ObjC++ wrapper at Classes/URLSessionHttpTransport.mm
+  # `#include`s the canonical implementation at
+  # sdk/shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm
+  # (shared with React Native) via a path RELATIVE to the .mm file on disk,
+  # so no additional HEADER_SEARCH_PATHS entry is needed.
   s.source_files = 'Classes/**/*'
 
   s.dependency 'Flutter'
 
   # =============================================================================
-  # Vendored xcframework (built by scripts/build-core-xcframework.sh)
+  # Vendored xcframework (built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh)
   # =============================================================================
   s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
 
   # Keep the xcframework next to the installed pod so downstream toolchains
-  # can resolve headers.
-  s.preserve_paths = ['Frameworks/**/*']
+  # can resolve headers. The canonical shared URLSessionHttpTransportImpl.inc.mm
+  # is referenced here to document the cross-pod dependency (the actual file
+  # is reached through a source-relative `#include`, no HEADER_SEARCH_PATHS
+  # entry required).
+  s.preserve_paths = [
+    'Frameworks/**/*',
+    '../../../../shared/ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm',
+  ]
 
   # Required frameworks
   s.frameworks = [

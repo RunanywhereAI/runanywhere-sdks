@@ -17,6 +17,7 @@ import type {
   RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
+import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 const logger = new SDKLogger('RAG');
 const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
@@ -321,22 +322,15 @@ function validateNativeRAGConfiguration(config: RAGConfiguration, feature: strin
 export function createDefaultRAGConfiguration(
   overrides: Partial<RAGConfiguration> = {},
 ): RAGConfiguration {
+  // Seed with the proto-generated canonical defaults so Web matches Swift /
+  // Kotlin / Flutter / RN parity (embeddingDimension=384, topK=5,
+  // similarityThreshold=0.7, chunkSize=512, chunkOverlap=64). Caller-supplied
+  // overrides (including explicit 0 for chunkOverlap / similarityThreshold)
+  // are honored end-to-end because RAGConfiguration numeric fields are proto3
+  // `optional` — commons distinguishes "unset" from "explicit zero" via
+  // `has_*()` in `build_backend_config` (rac_rag_proto_abi.cpp).
   return {
-    embeddingModelId: '',
-    llmModelId: '',
-    embeddingDimension: 0,
-    topK: 3,
-    similarityThreshold: 0,
-    chunkSize: 256,
-    chunkOverlap: 0,
-    maxContextTokens: 0,
-    promptTemplate: undefined,
-    embeddingConfigJson: undefined,
-    llmConfigJson: undefined,
-    indexPath: undefined,
-    persistIndex: false,
-    rerankResults: false,
-    rerankerModelId: undefined,
+    ...rAGConfigurationDefaults(),
     ...overrides,
   };
 }
@@ -346,6 +340,10 @@ function makeRAGQuery(
   config: RAGConfiguration,
   options: RAGQueryOverrides,
 ): RAGQueryOptions {
+  // Per rag.proto: `retrievalTopK = 0` and `similarityThreshold = 0` mean
+  // "use the RAGConfiguration default" so falling back to 0 when neither the
+  // per-query override nor the pipeline config supplies a value is the
+  // correct way to defer to commons.
   return {
     question,
     systemPrompt: options.systemPrompt,
@@ -353,8 +351,8 @@ function makeRAGQuery(
     temperature: options.temperature ?? 0.4,
     topP: options.topP ?? 1,
     topK: options.topK ?? 0,
-    retrievalTopK: options.retrievalTopK ?? config.topK,
-    similarityThreshold: options.similarityThreshold ?? config.similarityThreshold,
+    retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
+    similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
     stream: options.stream ?? false,
   };
 }
@@ -486,7 +484,13 @@ export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>
 }
 
 export async function ragDestroyPipeline(): Promise<void> {
-  await requireProvider('RAG.destroyPipeline').ragDestroyPipeline();
+  // Swift parity: `ragDestroyPipeline` is idempotent. When no provider has
+  // been installed there is nothing to tear down, so resolve quietly rather
+  // than throwing `backendNotAvailable`.
+  const provider = activeProvider();
+  if (!provider) return;
+  await provider.ragDestroyPipeline();
+  _provider = null;
   logger.info('RAG pipeline destroyed');
 }
 
@@ -592,23 +596,101 @@ function unavailableCapabilities(): RAGProviderCapabilities {
   };
 }
 
+/**
+ * Bootstrap options for `RunAnywhere.rag.ensureReady(...)`. When the RAG
+ * proto exports are present but no session is registered yet (the
+ * `wasm-exports` availability source), the SDK creates the native
+ * session for the caller using the supplied embedding/LLM model ids
+ * plus any other defaults.
+ */
+export interface RAGEnsureReadyOptions {
+  embeddingModelId: string;
+  llmModelId: string;
+  config?: Partial<RAGConfiguration>;
+}
+
+/**
+ * Ensure a RAG pipeline is live; idempotent. Absorbs the
+ * `availability() + createPipeline(defaultConfiguration({...}))`
+ * bootstrap step that example apps used to inline. Returns the final
+ * availability snapshot so callers can decide whether to surface a
+ * "RAG unavailable" placeholder (`source === 'unavailable'`) without
+ * re-querying the availability oracle separately.
+ *
+ * Mirrors the lifecycle ownership pattern used by Swift's RAG facade —
+ * app code never reaches into `defaultConfiguration` itself.
+ */
+export async function ragEnsureReady(
+  options: RAGEnsureReadyOptions,
+): Promise<RAGAvailability> {
+  let availability = getRAGAvailability();
+  if (availability.available) {
+    return availability;
+  }
+  if (availability.source !== 'wasm-exports') {
+    return availability;
+  }
+  try {
+    await ragCreatePipeline(createDefaultRAGConfiguration({
+      ...options.config,
+      embeddingModelId: options.embeddingModelId,
+      llmModelId: options.llmModelId,
+    }));
+  } catch (err) {
+    logger.warning(
+      `RAG.ensureReady() bootstrap failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    throw err;
+  }
+  availability = getRAGAvailability();
+  return availability;
+}
+
+/**
+ * Public `RunAnywhere.rag.*` namespace. Members marked `@webOnly` are
+ * Web-platform extensions that do not appear in the Swift source-of-truth
+ * (`RunAnywhere+RAG.swift`). They live here until either the cross-SDK
+ * spec adopts them (Kotlin / Flutter / RN / Swift) or the consumer surface
+ * migrates to the Swift-aligned subset.
+ *
+ * Swift-aligned surface (cross-SDK canonical):
+ *   - `createPipeline`     ↔ `ragCreatePipeline`
+ *   - `destroyPipeline`    ↔ `ragDestroyPipeline`
+ *   - `ingest`             ↔ `ragIngest`
+ *   - `addDocumentsBatch`  ↔ `ragAddDocumentsBatch`
+ *   - `query`              ↔ `ragQuery`
+ *   - `clearDocuments`     ↔ `ragClearDocuments`
+ *   - `getDocumentCount`   ↔ `ragGetDocumentCount`
+ *   - `getStatistics`      ↔ `ragGetStatistics`
+ */
 export const RAG = {
+  /** @webOnly Provider wiring entry point. Backend packages call this during register(). */
   setProvider: setRAGProvider,
+  /** @webOnly Construct a native (WASM-session-backed) RAG provider. */
   createNativeProvider: createRAGNativeProvider,
+  /** @webOnly Install a pre-existing native RAG session handle as the active provider. */
   setSessionHandle: setRAGSessionHandle,
+  /** @webOnly Inspect provider/availability without throwing. */
   availability: getRAGAvailability,
+  /** @webOnly Convenience boolean for availability checks. */
   isAvailable: isRAGAvailable,
+  /** @webOnly Inspect the active provider's declared capabilities (listing/removal/persistence). */
   capabilities: ragGetCapabilities,
+  /** @webOnly Build a default `RAGConfiguration` with sensible field defaults. */
   defaultConfiguration: createDefaultRAGConfiguration,
   createPipeline: ragCreatePipeline,
   destroyPipeline: ragDestroyPipeline,
+  /** @webOnly Idempotent "create-if-missing" bootstrap used by Web example apps. */
+  ensureReady: ragEnsureReady,
   ingest: ragIngest,
   addDocumentsBatch: ragAddDocumentsBatch,
   query: ragQuery,
   clearDocuments: ragClearDocuments,
   getDocumentCount: ragGetDocumentCount,
   getStatistics: ragGetStatistics,
+  /** @webOnly Document-level listing — pending the cross-SDK native list API. */
   listDocuments: ragListDocuments,
+  /** @webOnly Document-level removal — pending the cross-SDK native remove API. */
   removeDocument: ragRemoveDocument,
 };
 

@@ -56,7 +56,7 @@ extension CppBridge {
 
         public init(vtable: ComponentVTable) {
             self.vtable = vtable
-            self.logger = SDKLogger(category: "CppBridge.\(vtable.component.label)")
+            self.logger = SDKLogger(category: "CppBridge.\(vtable.component.displayName)")
         }
 
         // MARK: - Handle Management
@@ -69,7 +69,7 @@ extension CppBridge {
             if isClosed {
                 throw SDKException(
                     code: .notInitialized,
-                    message: "\(vtable.component.label) component is shut down",
+                    message: "\(vtable.component.displayName) component is shut down",
                     category: .component
                 )
             }
@@ -79,12 +79,12 @@ extension CppBridge {
             guard status == RAC_SUCCESS, let createdHandle = newHandle else {
                 throw SDKException(
                     code: .notInitialized,
-                    message: "Failed to create \(vtable.component.label) component: \(status)",
+                    message: "Failed to create \(vtable.component.displayName) component: \(status)",
                     category: .component
                 )
             }
             self.handle = createdHandle
-            logger.debug("\(vtable.component.label) component created")
+            logger.debug("\(vtable.component.displayName) component created")
             return createdHandle
         }
 
@@ -121,7 +121,7 @@ extension CppBridge {
             guard let load = vtable.loadModel else {
                 throw SDKException(
                     code: .notImplemented,
-                    message: "\(vtable.component.label) does not support generic loadModel",
+                    message: "\(vtable.component.displayName) does not support generic loadModel",
                     category: .component
                 )
             }
@@ -136,12 +136,12 @@ extension CppBridge {
             guard status == RAC_SUCCESS else {
                 throw SDKException(
                     code: .modelLoadFailed,
-                    message: "Failed to load \(vtable.component.label) model: \(status)",
+                    message: "Failed to load \(vtable.component.displayName) model: \(status)",
                     category: .component
                 )
             }
             loadedAssetId = id
-            logger.info("\(vtable.component.label) model loaded: \(id)")
+            logger.info("\(vtable.component.displayName) model loaded: \(id)")
         }
 
         /// Update the locally-tracked loaded asset id without touching
@@ -159,7 +159,7 @@ extension CppBridge {
             guard let handle = handle else { return }
             vtable.cleanup(handle)
             loadedAssetId = nil
-            logger.info("\(vtable.component.label) model unloaded")
+            logger.info("\(vtable.component.displayName) model unloaded")
         }
 
         /// Destroy the component, releasing C resources and marking the
@@ -167,36 +167,11 @@ extension CppBridge {
         public func destroy() {
             if let handle = handle {
                 vtable.destroy(handle)
-                logger.debug("\(vtable.component.label) component destroyed")
+                logger.debug("\(vtable.component.displayName) component destroyed")
             }
             handle = nil
             loadedAssetId = nil
             isClosed = true
-        }
-    }
-}
-
-// MARK: - Label helper
-
-private extension RASDKComponent {
-    /// Short human-friendly label used in log categories and error
-    /// messages. Avoids depending on `description` which has its own
-    /// proto-generated formatting.
-    var label: String {
-        switch self {
-        case .llm:                return "LLM"
-        case .stt:                return "STT"
-        case .tts:                return "TTS"
-        case .vad:                return "VAD"
-        case .vlm:                return "VLM"
-        case .voiceAgent:         return "VoiceAgent"
-        case .diffusion:          return "Diffusion"
-        case .rag:                return "RAG"
-        case .embeddings:         return "Embeddings"
-        case .wakeword:           return "Wakeword"
-        case .speakerDiarization: return "SpeakerDiarization"
-        case .unspecified, .UNRECOGNIZED:
-            return "UnknownComponent"
         }
     }
 }

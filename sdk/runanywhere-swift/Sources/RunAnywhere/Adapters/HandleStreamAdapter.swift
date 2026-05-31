@@ -74,6 +74,16 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     /// Closure that removes the trampoline from the native handle.
     public typealias Unregister = @Sendable (Handle) -> Void
 
+    /// Closure that spin-waits until every in-flight C dispatch of the
+    /// trampoline has returned. Invoked during teardown AFTER the
+    /// `unregister` call (which stops NEW dispatches) and BEFORE the
+    /// retained `Unmanaged` context is released, closing the use-after-free
+    /// window where a dispatcher that copied the callback slot before
+    /// `unregister` ran is still inside the trampoline with the about-to-be
+    /// freed context. Optional: omit when the C ABI exposes no quiesce
+    /// symbol (e.g. an older RACommons binary).
+    public typealias Quiesce = @Sendable () -> Void
+
     /// Predicate that classifies an event as terminal. When supplied
     /// and a yielded event satisfies it, every continuation is
     /// finished and the C registration is torn down immediately.
@@ -87,6 +97,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         private let storeKey: HandleStreamStoreKey
         private let register: Register
         private let unregister: Unregister
+        private let quiesce: Quiesce?
         private let isTerminalEvent: IsTerminalEvent?
         private let state = OSAllocatedUnfairLock<HandleFanOutState<Event>>(
             initialState: HandleFanOutState<Event>()
@@ -97,12 +108,14 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             storeKey: HandleStreamStoreKey,
             register: @escaping Register,
             unregister: @escaping Unregister,
+            quiesce: Quiesce?,
             isTerminalEvent: IsTerminalEvent?
         ) {
             self.handle = handle
             self.storeKey = storeKey
             self.register = register
             self.unregister = unregister
+            self.quiesce = quiesce
             self.isTerminalEvent = isTerminalEvent
         }
 
@@ -271,22 +284,49 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
             // the state under the lock, release it, then make the C
             // call. This matches the install() invariant at lines
             // 129-132 above.
-            let ptrToRelease: UnsafeMutableRawPointer? = state.withLock { lockedState in
-                guard lockedState.installation == .installed else { return nil }
-                lockedState.installation = .notInstalled
-                let ptr = lockedState.userPtr
-                lockedState.userPtr = nil
-                return ptr
-            }
+            //
+            // Snapshot AND clear the continuations under the same lock so
+            // the public `tearDown()` honours its "subscribers' streams
+            // will finish" contract: a force-teardown (e.g. component
+            // destruction) removes the C callback, so no terminal event
+            // will ever arrive to finish a consumer's `for await`. We
+            // finish them explicitly below. This mirrors Kotlin
+            // `forceTearDown`, which closes every snapshotted collector.
+            let teardown: (ptr: UnsafeMutableRawPointer?, continuations: [AsyncStream<Event>.Continuation]) =
+                state.withLock { lockedState in
+                    let continuations = Array(lockedState.continuations.values)
+                    lockedState.continuations.removeAll()
+                    guard lockedState.installation == .installed else {
+                        return (nil, continuations)
+                    }
+                    lockedState.installation = .notInstalled
+                    let ptr = lockedState.userPtr
+                    lockedState.userPtr = nil
+                    return (ptr, continuations)
+                }
 
-            if let ptrToRelease {
-                // Lock has been released — safe to call the C unregister
-                // even if it synchronously fires a final byte that
-                // re-enters broadcast().
+            if let ptrToRelease = teardown.ptr {
+                // Commons teardown contract (see rac_voice_event_abi.h /
+                // rac_llm_stream.h): (a) unregister stops NEW dispatches,
+                // (b) quiesce spin-waits until every in-flight trampoline
+                // invocation has returned, (c) release the retained
+                // context. Without (b) a dispatcher that copied the
+                // callback slot before (a) ran can still be inside the
+                // trampoline with `ptrToRelease` as its `user_data` when we
+                // free it → use-after-free. Lock is already released, so a
+                // synchronously-fired final byte can re-enter broadcast()
+                // safely.
                 unregister(handle)
+                quiesce?()
                 Unmanaged<HandleFanOut>.fromOpaque(ptrToRelease).release()
             }
             HandleStreamAdapter.removeFanOut(for: storeKey)
+
+            // Finish AFTER unregister/quiesce/release so a consumer that
+            // reacts to `.finished` cannot race the C teardown.
+            for continuation in teardown.continuations {
+                continuation.finish()
+            }
         }
     }
 
@@ -312,6 +352,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         streamKey: String,
         register: @escaping Register,
         unregister: @escaping Unregister,
+        quiesce: Quiesce?,
         isTerminalEvent: IsTerminalEvent?
     ) -> HandleFanOut {
         let key = HandleStreamStoreKey(streamKey: streamKey, handle: AnyHashable(handle))
@@ -324,6 +365,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 storeKey: key,
                 register: register,
                 unregister: unregister,
+                quiesce: quiesce,
                 isTerminalEvent: isTerminalEvent
             )
             dict[key] = fanOut
@@ -341,6 +383,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     private let streamKey: String
     private let register: Register
     private let unregister: Unregister
+    private let quiesce: Quiesce?
     private let isTerminalEvent: IsTerminalEvent?
 
     // MARK: - Init
@@ -359,6 +402,12 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
     ///     `{ h, cb, ud in rac_llm_set_stream_proto_callback(h, cb, ud) }`.
     ///   - unregister: Closure that removes the trampoline; e.g.
     ///     `{ h in _ = rac_llm_unset_stream_proto_callback(h) }`.
+    ///   - quiesce: Optional closure that spin-waits until every
+    ///     in-flight C dispatch of the trampoline has returned; e.g.
+    ///     `{ rac_llm_proto_quiesce() }`. Invoked during teardown between
+    ///     `unregister` and releasing the retained context to close the
+    ///     use-after-free window. Omit when the linked C ABI exposes no
+    ///     quiesce symbol.
     ///   - isTerminalEvent: Optional predicate that classifies an
     ///     event as terminal. When non-nil and an event satisfies it,
     ///     every continuation is finished and the C registration is
@@ -369,12 +418,14 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
         streamKey: String,
         register: @escaping Register,
         unregister: @escaping Unregister,
+        quiesce: Quiesce? = nil,
         isTerminalEvent: IsTerminalEvent? = nil
     ) {
         self.handle = handle
         self.streamKey = streamKey
         self.register = register
         self.unregister = unregister
+        self.quiesce = quiesce
         self.isTerminalEvent = isTerminalEvent
     }
 
@@ -392,6 +443,7 @@ public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unche
                 streamKey: streamKey,
                 register: register,
                 unregister: unregister,
+                quiesce: quiesce,
                 isTerminalEvent: isTerminalEvent
             )
             guard let id = fanOut.attach(continuation) else {

@@ -3,8 +3,7 @@
  *
  * Domain implementation for HybridRunAnywhereCore.
  *
- * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
- * "Bridge Layer Audit"):
+ * Bridge classification:
  *   - SDK-facing pass-through: every `*Proto` method (LLM gen/cancel,
  *     STT/TTS/VAD/VLM/diffusion/embeddings proto thunks, voice agent
  *     proto thunks, LoRA proto thunks). Each takes/returns ArrayBuffer
@@ -16,14 +15,18 @@
  *     target: source the live LLM handle from
  *     `rac_model_lifecycle_load_proto` (which returns the handle on
  *     load) so this bridge no longer creates components on its own.
- *     Tracked under react-native gap.
  *   - Other helpers (`callLoraRequestProto`, `callLoraCatalogProto`,
  *     proto callbacks, VAD activity callback) are pure pass-through.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <unordered_map>
 
 #include "rac/features/llm/rac_llm_service.h"
 
@@ -77,17 +80,91 @@ std::shared_ptr<ArrayBuffer> copyVoiceProtoBuffer(rac_proto_buffer_t& protoBuffe
     return buffer;
 }
 
+// --- Request-shaped stream callback lifetime --------------------------------
+//
+// `rac_llm_generate_stream_proto` and its STT/TTS/VLM siblings copy the
+// {callback, user_data} slot under an internal mutex and RELEASE that mutex
+// BEFORE invoking the callback (see rac_llm_stream.h "@warning user_data
+// ownership and lifetime"). A generator thread can therefore dispatch with the
+// snapshotted user_data AFTER `fn()` has already returned to this bridge. The
+// previous `unique_ptr`-owned wrapper freed its heap as soon as the Promise
+// lambda returned, so that late dispatch read freed memory (UAF).
+//
+// Ownership is held by a process-global `shared_ptr<StreamCallback>` registry
+// keyed by the registration's raw address (used solely as a map key — never
+// dereferenced through that pointer). The trampoline acquires its OWN strong
+// reference under a short mutex before touching the callback, so a dispatch
+// that races teardown either wins the lookup (the callback stays alive for the
+// dispatch) or loses it (observes null and returns). Teardown after `fn()`
+// returns runs the canonical commons recipe — quiesce in-flight dispatches,
+// then drop the registry's strong ref. This mirrors HybridLLM.cpp's
+// subscribe-then-trigger registry and Swift's ProtoStreamContext ownership.
+
+struct StreamCallback {
+    std::function<void(const std::shared_ptr<ArrayBuffer>&)> onBytes;
+    std::atomic<bool> active{true};
+};
+
+std::mutex& streamRegistryMutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::unordered_map<void*, std::shared_ptr<StreamCallback>>& streamRegistry() {
+    static std::unordered_map<void*, std::shared_ptr<StreamCallback>> reg;
+    return reg;
+}
+
+std::shared_ptr<StreamCallback> acquireStreamCallback(void* userData) {
+    std::lock_guard<std::mutex> lock(streamRegistryMutex());
+    auto it = streamRegistry().find(userData);
+    if (it == streamRegistry().end()) {
+        return nullptr;
+    }
+    return it->second;
+}
+
+// Publish a strong reference into the registry BEFORE the C callback is
+// installed so a synchronously-fired first event can resolve it.
+std::shared_ptr<StreamCallback> registerStreamCallback(
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onBytes) {
+    auto reg = std::make_shared<StreamCallback>();
+    reg->onBytes = onBytes;
+    std::lock_guard<std::mutex> lock(streamRegistryMutex());
+    streamRegistry()[reg.get()] = reg;
+    return reg;
+}
+
+// Teardown after `fn()` returns: stop NEW dispatch, wait out in-flight
+// dispatches via the modality's quiesce symbol (LLM/VLM expose one; the
+// strong-ref acquire above already makes STT/TTS safe even without it), then
+// drop the registry's strong ref. `quiesceSymbol` is resolved defensively so
+// the bridge keeps linking against staged artifacts that predate it.
+void releaseStreamCallback(const std::shared_ptr<StreamCallback>& reg,
+                           const char* quiesceSymbol) {
+    if (!reg) {
+        return;
+    }
+    reg->active.store(false, std::memory_order_release);
+    if (quiesceSymbol) {
+        if (auto quiesce = proto_compat::symbol<void (*)()>(quiesceSymbol)) {
+            quiesce();
+        }
+    }
+    std::lock_guard<std::mutex> lock(streamRegistryMutex());
+    streamRegistry().erase(reg.get());
+}
+
 void protoBytesCallback(const uint8_t* protoBytes, size_t protoSize, void* userData) {
     if (!protoBytes || protoSize == 0 || !userData) {
         return;
     }
-    auto* callback =
-        static_cast<std::function<void(const std::shared_ptr<ArrayBuffer>&)>*>(userData);
-    if (!callback || !(*callback)) {
+    auto reg = acquireStreamCallback(userData);
+    if (!reg || !reg->active.load(std::memory_order_acquire) || !reg->onBytes) {
         return;
     }
     try {
-        (*callback)(ArrayBuffer::copy(protoBytes, protoSize));
+        reg->onBytes(ArrayBuffer::copy(protoBytes, protoSize));
     } catch (...) {
         LOGE("proto callback dispatch failed");
     }
@@ -273,23 +350,12 @@ HybridRunAnywhereCore::llmGenerateStreamProto(
     return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
         auto fn = &rac_llm_generate_stream_proto;
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        // BUG-RN-IOS-004: heap-allocate the std::function so its address is
-        // stable for the entire C callback window, even if a future async
-        // backend fires the callback after this outer lambda scope would
-        // ordinarily destroy a stack-local. The unique_ptr owns the heap
-        // storage for the duration of fn() (which is synchronous in the
-        // current contract), guaranteeing protoBytesCallback's user_data
-        // dereference is always valid. Matches the ownership pattern used
-        // by the JNI bridge (see runanywhere_commons_jni.cpp).
-        auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
-        rac_result_t rc = fn(data, bytes.size(), protoBytesCallback, callback.get());
+        auto reg = registerStreamCallback(onEventBytes);
+        rac_result_t rc = fn(data, bytes.size(), protoBytesCallback, reg.get());
         if (rc != RAC_SUCCESS) {
             LOGE("llmGenerateStreamProto: rc=%d", rc);
         }
-        // callback unique_ptr is destroyed here AFTER fn() returns, freeing
-        // the heap. Since fn() is synchronous in the current C ABI contract,
-        // no more callback invocations are possible past this point.
+        releaseStreamCallback(reg, "rac_llm_proto_quiesce");
     });
 }
 
@@ -513,15 +579,13 @@ HybridRunAnywhereCore::sttTranscribeStreamProto(
             LOGE("sttTranscribeStreamProto: lifecycle stream ABI unavailable");
             return;
         }
-        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
-        // user_data pointer is stable for the duration of the C call.
-        auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        auto reg = registerStreamCallback(onEventBytes);
         const uint8_t* requestData = request.empty() ? nullptr : request.data();
-        rac_result_t rc = fn(requestData, request.size(), protoBytesCallback, callback.get());
+        rac_result_t rc = fn(requestData, request.size(), protoBytesCallback, reg.get());
         if (rc != RAC_SUCCESS) {
             LOGE("sttTranscribeStreamProto: rc=%d", rc);
         }
+        releaseStreamCallback(reg, "rac_stt_proto_quiesce");
     });
 }
 
@@ -632,15 +696,13 @@ HybridRunAnywhereCore::ttsSynthesizeStreamProto(
             LOGE("ttsSynthesizeStreamProto: lifecycle stream ABI unavailable");
             return;
         }
-        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
-        // user_data pointer is stable for the duration of the C call.
-        auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        auto reg = registerStreamCallback(onEventBytes);
         const uint8_t* requestData = request.empty() ? nullptr : request.data();
-        rac_result_t rc = fn(requestData, request.size(), protoBytesCallback, callback.get());
+        rac_result_t rc = fn(requestData, request.size(), protoBytesCallback, reg.get());
         if (rc != RAC_SUCCESS) {
             LOGE("ttsSynthesizeStreamProto: rc=%d", rc);
         }
+        releaseStreamCallback(reg, "rac_tts_proto_quiesce");
     });
 }
 
@@ -875,19 +937,17 @@ HybridRunAnywhereCore::vlmProcessStreamProto(
             LOGE("vlmProcessStreamProto: lifecycle stream ABI unavailable");
             return;
         }
-        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
-        // user_data pointer is stable for the duration of the C call.
-        auto callback = std::make_unique<
-            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        auto reg = registerStreamCallback(onEventBytes);
         const uint8_t* requestData = request.empty() ? nullptr : request.data();
         rac_result_t rc = fn(
             requestData,
             request.size(),
             vlmProtoBytesCallback,
-            callback.get());
+            reg.get());
         if (rc != RAC_SUCCESS) {
             LOGE("vlmProcessStreamProto: rc=%d", rc);
         }
+        releaseStreamCallback(reg, "rac_vlm_proto_quiesce");
     });
 }
 
@@ -946,7 +1006,7 @@ static rac_voice_agent_handle_t getGlobalVoiceAgentHandle() {
     return g_voice_agent_handle;
 }
 
-// v3.1: Expose the global voice-agent handle as a JS number. The
+// Expose the global voice-agent handle as a JS number. The
 // VoiceAgent.subscribeProtoEvents(handle, ...) Nitro method casts it
 // back to rac_voice_agent_handle_t on the C side. 0 means the handle
 // isn't allocated yet (pre-initializeVoiceAgentWithLoadedModels).
@@ -1156,7 +1216,7 @@ HybridRunAnywhereCore::voiceAgentProcessTurnProto(
 }
 
 // ============================================================================
-// Global component teardown (HOTSPOT-RN-CORE-002)
+// Global component teardown
 // ============================================================================
 //
 // Reset the LLM/STT/TTS/VAD/voice-agent globals plus the commons lifecycle

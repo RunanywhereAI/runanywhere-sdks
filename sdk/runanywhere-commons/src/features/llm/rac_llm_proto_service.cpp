@@ -161,33 +161,100 @@ SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
     return event;
 }
 
+// Pick the canonical system_prompt from the embedded
+// LLMGenerationOptions when set, falling back to the legacy inline field.
+std::string system_prompt_from_request(const LLMGenerateRequest& request) {
+    if (request.has_options() && request.options().has_system_prompt() &&
+        !request.options().system_prompt().empty()) {
+        return request.options().system_prompt();
+    }
+    return request.system_prompt();
+}
+
 // Fills `options` from `request`. The caller-owned `stop_storage`/`stop_ptrs`
 // must outlive every generate/generate_stream dispatch that observes
 // `options.stop_sequences` — they hold the backing memory the C ABI points
 // into. Mirrors RALLMTypes+CppBridge.swift toRALLMGenerateRequest which
 // copies stopSequences into the canonical proto request.
+//
+// Prefer values from the canonical `request.options()` embedded
+// LLMGenerationOptions message when set; fall back to the legacy inline
+// scalar fields for backwards compatibility with callers that have not
+// yet migrated.
 rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
                                        const std::string& system_prompt,
                                        std::vector<std::string>& stop_storage,
-                                       std::vector<const char*>& stop_ptrs) {
+                                       std::vector<const char*>& stop_ptrs,
+                                       std::string& grammar_storage) {
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-    if (request.max_tokens() > 0) {
-        options.max_tokens = request.max_tokens();
+
+    const bool has_options = request.has_options();
+    const auto& opts = request.options();
+
+    // max_tokens proto3 zero means "unset → engine default" (idl/llm_options.proto:45-47).
+    const int max_tokens =
+        (has_options && opts.max_tokens() > 0) ? opts.max_tokens() : request.max_tokens();
+    if (max_tokens > 0) {
+        options.max_tokens = max_tokens;
     }
-    if (request.temperature() > 0.0f) {
-        options.temperature = request.temperature();
+
+    // temperature: when the canonical LLMGenerationOptions is set, pass its value through
+    // unconditionally so the documented greedy-decoding sentinel (0.0) reaches the engine
+    // (idl/llm_options.proto:49). Mirrors RALLMTypes+CppBridge.swift:53. The legacy inline
+    // scalar still uses `> 0.0f` so an unmigrated caller that left the field zero gets the
+    // engine default (0.8) instead of accidental greedy decoding.
+    if (has_options) {
+        options.temperature = std::clamp(opts.temperature(), 0.0f, 2.0f);
+    } else if (request.temperature() > 0.0f) {
+        options.temperature = std::clamp(request.temperature(), 0.0f, 2.0f);
     }
-    if (request.top_p() > 0.0f) {
+
+    // top_p: same contract — proto3 zero is the unset sentinel, 1.0 means no truncation
+    // (idl/llm_options.proto:53). Pass embedded value through unconditionally; gate the
+    // legacy inline scalar to avoid clobbering the engine default on unmigrated callers.
+    if (has_options) {
+        options.top_p = opts.top_p();
+    } else if (request.top_p() > 0.0f) {
         options.top_p = request.top_p();
     }
+
+    // Thread the remaining sampling knobs the proto exposes
+    // (idl/llm_options.proto) into the C ABI so they reach the engine vtable.
+    // For every field except repetition_penalty the proto3 zero IS the
+    // documented "disabled" sentinel, so passing it through is identical to the
+    // struct default. repetition_penalty uses 1.0 = "no penalty"; proto3 zero
+    // means unset, so only override when positive (mirrors Swift's
+    // RALLMTypes+CppBridge defaults, which carry repetitionPenalty=1.0).
+    // Prefer the canonical embedded options; fall back to the legacy inline
+    // scalars for callers that have not migrated to `request.options()`.
+    options.top_k = has_options ? opts.top_k() : request.top_k();
+    const float repetition_penalty =
+        has_options ? opts.repetition_penalty() : request.repetition_penalty();
+    if (repetition_penalty > 0.0f) {
+        options.repetition_penalty = repetition_penalty;
+    }
+    options.frequency_penalty =
+        has_options ? opts.frequency_penalty() : request.frequency_penalty();
+    options.presence_penalty = has_options ? opts.presence_penalty() : request.presence_penalty();
+    options.min_p = has_options ? opts.min_p() : request.min_p();
+    options.seed = has_options ? opts.seed() : request.seed();
+    options.n_threads = has_options ? opts.n_threads() : request.n_threads();
+
+    grammar_storage = has_options ? opts.grammar() : request.grammar();
+    options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
+
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     stop_storage.clear();
     stop_ptrs.clear();
-    const int stop_count = request.stop_sequences_size();
+
+    const auto& canonical_stop_sequences = (has_options && opts.stop_sequences_size() > 0)
+                                               ? opts.stop_sequences()
+                                               : request.stop_sequences();
+    const int stop_count = canonical_stop_sequences.size();
     if (stop_count > 0) {
         stop_storage.reserve(static_cast<size_t>(stop_count));
-        for (const auto& seq : request.stop_sequences()) {
+        for (const auto& seq : canonical_stop_sequences) {
             if (!seq.empty()) {
                 stop_storage.push_back(seq);
             }
@@ -320,7 +387,7 @@ size_t find_earliest_tag(const std::string& text, const char* const* tags, size_
 // populate the same LLMStreamEvent shape so Swift iOS, Web, and Kotlin
 // Android consumers see identical wire bytes for identical inputs.
 //
-// pass3-syn-039: optional `tool_call` populates proto field 18 on
+// Optional `tool_call` populates proto field 18 on
 // LLMStreamEvent (idl/llm_service.proto:179). Producers pass it on the
 // synthesized TOOL_CALL boundary event when the streaming output contains
 // a parseable tool call; non-tool-call events leave it nullptr so legacy
@@ -353,7 +420,7 @@ void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_f
     ctx->callback(scratch.empty() ? nullptr : scratch.data(), scratch.size(), ctx->user_data);
 }
 
-// pass3-syn-039: parse the accumulated streaming response_text for a tool
+// Parse the accumulated streaming response_text for a tool
 // call boundary using the canonical commons parser (rac_tool_call_parse_proto
 // over runanywhere.v1.ToolParseRequest/Result). Returns true and populates
 // out_tool_call when a structured tool call is recognized; false when the
@@ -503,7 +570,7 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     flush_pending_stream_text(ctx);
     ctx->terminal_sent = true;
 
-    // pass3-syn-039: surface a structured tool call on LLMStreamEvent.tool_call
+    // Surface a structured tool call on LLMStreamEvent.tool_call
     // (proto field 18) when the streaming output contains one. The terminal
     // event still carries the same finish_reason / result; this emission is
     // an additional in-stream event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL
@@ -595,11 +662,12 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                              request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
                              0);
 
-    const std::string system_prompt = request.system_prompt();
+    const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
+    std::string grammar_storage;
     rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs);
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
@@ -687,11 +755,12 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                              request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
                              0);
 
-    const std::string system_prompt = request.system_prompt();
+    const std::string system_prompt = system_prompt_from_request(request);
     std::vector<std::string> stop_storage;
     std::vector<const char*> stop_ptrs;
+    std::string grammar_storage;
     rac_llm_options_t options =
-        options_from_request(request, system_prompt, stop_storage, stop_ptrs);
+        options_from_request(request, system_prompt, stop_storage, stop_ptrs, grammar_storage);
     options.streaming_enabled = RAC_TRUE;
 
     ProtoStreamContext ctx;
@@ -736,7 +805,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
                                  rac_error_message(rc), ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms);
     } else {
-        // commons-features-llm-rag-002: mirror the OpenAI-style finish_reason
+        // Mirror the OpenAI-style finish_reason
         // contract from llm_component.cpp:867-884 and rac_llm_generate_proto's
         // set_result_from_raw — when the backend stopped because it generated
         // the requested max_tokens, the terminal proto event must report

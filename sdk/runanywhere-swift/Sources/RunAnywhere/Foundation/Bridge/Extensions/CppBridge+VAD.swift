@@ -164,18 +164,25 @@ extension CppBridge {
 
         /// Destroy the component
         public func destroy() async {
-            // Release any retained activity-callback context BEFORE the
-            // underlying handle is destroyed. The C component teardown
-            // implicitly clears its own callback slot, so we just need to
-            // balance the +1 retain from the original `Unmanaged.passRetained`.
+            // Detach the C-side activity-callback slot BEFORE freeing the
+            // Swift context box, mirroring `setActivityCallbackProto`. A
+            // high-frequency activity callback can fire on the audio thread
+            // up until the slot is cleared; releasing the `ProtoProgressContext`
+            // first would expose a use-after-free window where the trampoline
+            // dereferences a freed box. Order: (1) clear the C slot, (2) destroy
+            // the handle, (3) release the +1 retain from `Unmanaged.passRetained`.
             // (See comment record `mlt-001`.)
-            if let ptr = activityCallbackContextPtr {
-                activityCallbackContextPtr = nil
+            let ctxPtr = activityCallbackContextPtr
+            activityCallbackContextPtr = nil
+            if let handle = await inner.existingHandle(), ctxPtr != nil {
+                _ = rac_vad_component_set_activity_proto_callback(handle, nil, nil)
+            }
+            await inner.destroy()
+            if let ptr = ctxPtr {
                 Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
                     .fromOpaque(ptr)
                     .release()
             }
-            await inner.destroy()
             loadedModelId = nil
         }
     }

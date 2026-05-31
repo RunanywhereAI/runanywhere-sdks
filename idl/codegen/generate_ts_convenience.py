@@ -505,14 +505,20 @@ def _emit_message_validate(
         max_int = _opt_int32(field.options, RAC_MAX_FIELD_NUM)
         min_f = _opt_double(field.options, RAC_MIN_FLOAT_FIELD_NUM)
         max_f = _opt_double(field.options, RAC_MAX_FLOAT_FIELD_NUM)
+        # proto3 explicit-optional fields are typed `T | undefined` on the
+        # ts-proto wire type, so direct numeric/string comparisons need a
+        # presence guard. When unset, validation is intentionally skipped:
+        # commons applies canonical defaults via rac_*_with_defaults_proto.
+        is_proto3_optional = bool(getattr(field, "proto3_optional", False))
+        opt_guard = f"m.{ts_field} !== undefined && " if is_proto3_optional else ""
 
         if is_required and field.label != LABEL_REPEATED:
             t = field.type
             zero_check: str | None = None
             if t == TYPE_STRING:
-                zero_check = f"m.{ts_field} === ''"
+                zero_check = f"{opt_guard}m.{ts_field} === ''"
             elif t in _INTEGER_TYPES or t in _FLOAT_TYPES:
-                zero_check = f"m.{ts_field} === 0"
+                zero_check = f"{opt_guard}m.{ts_field} === 0"
             # pass3-syn-038: TYPE_BOOL deliberately skips the required-check
             # to match Swift / Kotlin / Dart cross-SDK behaviour. The other
             # three generators treat `bool + rac_required` as a no-op
@@ -534,6 +540,8 @@ def _emit_message_validate(
             if max_int is not None:
                 parts.append(f"m.{ts_field} > {max_int}")
             cond = " || ".join(parts)
+            if is_proto3_optional:
+                cond = f"m.{ts_field} !== undefined && ({cond})"
             if min_int is not None and max_int is not None:
                 range_desc = f"{min_int}...{max_int}"
             elif min_int is not None:
@@ -552,6 +560,8 @@ def _emit_message_validate(
             if max_f is not None:
                 parts.append(f"m.{ts_field} > {max_f}")
             cond = " || ".join(parts)
+            if is_proto3_optional:
+                cond = f"m.{ts_field} !== undefined && ({cond})"
             if min_f is not None and max_f is not None:
                 range_desc = f"{min_f}...{max_f}"
             elif min_f is not None:

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -78,9 +77,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   void initState() {
     super.initState();
     unawaited(_initializeAudioPlayer());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_autoLoadSystemTtsForE2E());
-    });
   }
 
   @override
@@ -114,25 +110,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
   }
 
-
-  Future<void> _autoLoadSystemTtsForE2E() async {
-    if (!Platform.isIOS || _hasModelSelected) return;
-    try {
-      final models = await sdk.RunAnywhere.models.available();
-      final system = models.cast<sdk.ModelInfo?>().firstWhere(
-            (m) => m?.id == 'system-tts',
-            orElse: () => null,
-          );
-      if (system == null) return;
-      await _loadModel(system);
-      if (_textController.text.isEmpty) {
-        _textController.text = 'Hello from Flutter E2E harness';
-      }
-      if (mounted && _hasModelSelected) {
-        await _generateSpeech();
-      }
-    } catch (_) {}
-  }
 
   void _showModelSelectionSheet() {
     unawaited(showModalBottomSheet<void>(
@@ -176,7 +153,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         _errorMessage = 'Failed to load model: $e';
         _isGenerating = false;
       });
-      // B-FL-12-002: surface TTS load failures via SnackBar in addition to the
+      // Surface TTS load failures via SnackBar in addition to the
       // inline error text.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -244,12 +221,11 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         options,
       );
 
-      // Wave 2: TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
+      // TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
       final samples =
           Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
           '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
-      debugPrint('Speech generation complete');
       debugPrint('Speech generation complete');
 
       setState(() {
@@ -298,31 +274,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           '🔊 Playing TTS audio: ${samples.length} samples at $sampleRate Hz');
     } catch (e) {
       debugPrint('❌ Failed to play TTS audio: $e');
-      setState(() {
-        _errorMessage = 'Failed to play audio: $e';
-      });
-    }
-  }
-
-  /// Play audio using the audio player service (for Int16 PCM data)
-  // ignore: unused_element - kept for alternative audio formats
-  Future<void> _playAudio(List<int> audioData) async {
-    try {
-      // Convert List<int> to Uint8List
-      final audioBytes = Uint8List.fromList(audioData);
-
-      // The TTS component returns PCM16 data at 22050 Hz mono
-      // We need to pass the sample rate so the audio player can create proper WAV headers
-      await _playerService.playFromBytes(
-        audioBytes,
-        volume: 1.0, // Use full volume (pitch controls are in TTS synthesis)
-        rate: _speechRate,
-        sampleRate: 22050, // Piper TTS default sample rate
-        numChannels: 1, // Mono audio
-      );
-      debugPrint('🔊 Playing audio...');
-    } catch (e) {
-      debugPrint('❌ Failed to play audio: $e');
       setState(() {
         _errorMessage = 'Failed to play audio: $e';
       });

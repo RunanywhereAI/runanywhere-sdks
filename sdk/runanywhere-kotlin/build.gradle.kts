@@ -75,7 +75,7 @@ fun androidNdkHomeForRuntime(): File {
     val ndkVersion =
         rootProject.findProperty("racNdkVersion")?.toString()
             ?: project.findProperty("racNdkVersion")?.toString()
-            ?: "27.0.12077973"
+            ?: "27.3.13750724"
     return file("$androidSdk/ndk/$ndkVersion")
 }
 
@@ -216,7 +216,7 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
 }
 
-val buildCoreAndroidScript = projectDir.resolve("../../scripts/build-core-android.sh").canonicalFile
+val buildCoreAndroidScript = projectDir.resolve("../../scripts/build/build-core-android.sh").canonicalFile
 
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
@@ -232,7 +232,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.3.13750724"}",
     )
 
     doFirst {
@@ -271,7 +271,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
                 Local JNI build failed: No .so files found in $jniLibsDir
 
                 Run first-time setup:
-                  ./scripts/build-core-android.sh
+                  ./scripts/build/build-core-android.sh
 
                 Or download from releases:
                   ./gradlew -Prunanywhere.useLocalNatives=false assembleDebug
@@ -292,7 +292,7 @@ tasks.register("setup") {
             System.getenv("ANDROID_HOME")
                 ?: System.getenv("ANDROID_SDK_ROOT")
                 ?: "${System.getProperty("user.home")}/Android/Sdk"
-        val ndkVersion = project.findProperty("racNdkVersion")?.toString() ?: "27.0.12077973"
+        val ndkVersion = project.findProperty("racNdkVersion")?.toString() ?: "27.3.13750724"
         val ndkHome = System.getenv("ANDROID_NDK_HOME") ?: "$androidHome/ndk/$ndkVersion"
         val localProps = projectDir.resolve("local.properties")
         if (!localProps.exists()) {
@@ -331,7 +331,7 @@ tasks.register<Exec>("setupLocalDevelopment") {
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.3.13750724"}",
     )
 }
 
@@ -344,7 +344,7 @@ tasks.register<Exec>("rebuildCommons") {
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.3.13750724"}",
     )
 }
 

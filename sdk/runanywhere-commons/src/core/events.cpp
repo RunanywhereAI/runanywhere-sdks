@@ -90,25 +90,35 @@ void rac_analytics_event_emit(rac_event_type_t type, const rac_analytics_event_d
         return;
     }
 
-    auto& state = get_callback_state();
-    std::lock_guard<std::mutex> lock(state.mutex);
+    // Snapshot callbacks under lock, then dispatch unlocked to avoid
+    // re-entrant deadlock if a callback emits another event (std::mutex is
+    // non-recursive). Mirrors rac_event_publish in event_publisher.cpp.
+    rac_analytics_callback_fn analytics_cb;
+    void* analytics_ud;
+    rac_public_event_callback_fn public_cb;
+    void* public_ud;
+    {
+        auto& state = get_callback_state();
+        std::lock_guard<std::mutex> lock(state.mutex);
+        analytics_cb = state.analytics_callback;
+        analytics_ud = state.analytics_user_data;
+        public_cb = state.public_callback;
+        public_ud = state.public_user_data;
+    }
 
-    // Get the destination for this event type
     rac_event_destination_t dest = rac_event_get_destination(type);
 
     // Route to analytics callback (telemetry)
-    if (dest == RAC_EVENT_DESTINATION_ANALYTICS_ONLY || dest == RAC_EVENT_DESTINATION_ALL) {
-        if (state.analytics_callback != nullptr) {
-            RAC_LOG_DEBUG("Events", "Invoking analytics callback for event type %d", type);
-            state.analytics_callback(type, data, state.analytics_user_data);
-        }
+    if ((dest == RAC_EVENT_DESTINATION_ANALYTICS_ONLY || dest == RAC_EVENT_DESTINATION_ALL) &&
+        analytics_cb != nullptr) {
+        RAC_LOG_DEBUG("Events", "Invoking analytics callback for event type %d", type);
+        analytics_cb(type, data, analytics_ud);
     }
 
     // Route to public callback (app developers)
-    if (dest == RAC_EVENT_DESTINATION_PUBLIC_ONLY || dest == RAC_EVENT_DESTINATION_ALL) {
-        if (state.public_callback != nullptr) {
-            state.public_callback(type, data, state.public_user_data);
-        }
+    if ((dest == RAC_EVENT_DESTINATION_PUBLIC_ONLY || dest == RAC_EVENT_DESTINATION_ALL) &&
+        public_cb != nullptr) {
+        public_cb(type, data, public_ud);
     }
 }
 

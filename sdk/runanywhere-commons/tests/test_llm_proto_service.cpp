@@ -431,7 +431,8 @@ int test_structured_generate_proto(rac_model_registry_handle_t registry) {
     const rac_result_t rc = rac_structured_output_generate_proto(bytes.data(), bytes.size(), &out);
     runanywhere::v1::StructuredOutputResult result;
     CHECK(rc == RAC_SUCCESS, "structured generate returns success");
-    CHECK(parse_buffer(out, &result), "structured generate returns parsable StructuredOutputResult");
+    CHECK(parse_buffer(out, &result),
+          "structured generate returns parsable StructuredOutputResult");
     CHECK(result.validation().is_valid(), "structured generate validates JSON");
     CHECK(result.parsed_json() == "{\"ok\":true}", "structured generate returns parsed JSON bytes");
     CHECK(result.error_code() == RAC_SUCCESS, "structured generate reports success code");

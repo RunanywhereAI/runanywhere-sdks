@@ -12,8 +12,8 @@
 //
 // Every message and enum below is the *union* of cases currently declared by
 // hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
-// drift between the per-language storage definitions (see GAP_01_IDL_AND_CODEGEN.md
-// §"Why This Gap Matters") is what motivated this schema. Every SDK consumes
+// drift between the per-language storage definitions is what motivated this
+// schema. Every SDK consumes
 // generated output; nothing is hand-written.
 //
 // Pre-IDL drift table (canonicalized by this file):
@@ -73,7 +73,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -85,7 +85,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   Dart   npu_chip.dart:14    (snapdragon8Elite, snapdragon8EliteGen5)
 /// Canonical superset (this file): vendor-grouped, vendor-agnostic.
 /// ---------------------------------------------------------------------------
-public enum RANPUChip: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RANPUChip: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -168,7 +168,7 @@ public enum RANPUChip: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
-public struct RADeviceStorageInfo: Sendable {
+public nonisolated struct RADeviceStorageInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -195,7 +195,7 @@ public struct RADeviceStorageInfo: Sendable {
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
-public struct RAAppStorageInfo: Sendable {
+public nonisolated struct RAAppStorageInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -226,7 +226,7 @@ public struct RAAppStorageInfo: Sendable {
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
-public struct RAModelStorageMetrics: Sendable {
+public nonisolated struct RAModelStorageMetrics: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -259,7 +259,7 @@ public struct RAModelStorageMetrics: Sendable {
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
-public struct RAStorageInfo: Sendable {
+public nonisolated struct RAStorageInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -307,7 +307,7 @@ public struct RAStorageInfo: Sendable {
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
-public struct RAStorageAvailability: Sendable {
+public nonisolated struct RAStorageAvailability: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -357,7 +357,7 @@ public struct RAStorageAvailability: Sendable {
 ///
 /// Sources pre-IDL: see header drift table.
 /// ---------------------------------------------------------------------------
-public struct RAStoredModel: Sendable {
+public nonisolated struct RAStoredModel: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -387,7 +387,7 @@ public struct RAStoredModel: Sendable {
   fileprivate var _downloadedAtMs: Int64? = nil
 }
 
-public struct RAStorageInfoRequest: Sendable {
+public nonisolated struct RAStorageInfoRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -405,7 +405,7 @@ public struct RAStorageInfoRequest: Sendable {
   public init() {}
 }
 
-public struct RAStorageInfoResult: Sendable {
+public nonisolated struct RAStorageInfoResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -432,7 +432,7 @@ public struct RAStorageInfoResult: Sendable {
   fileprivate var _info: RAStorageInfo? = nil
 }
 
-public struct RAStorageAvailabilityRequest: Sendable {
+public nonisolated struct RAStorageAvailabilityRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -454,7 +454,7 @@ public struct RAStorageAvailabilityRequest: Sendable {
   public init() {}
 }
 
-public struct RAStorageAvailabilityResult: @unchecked Sendable {
+public nonisolated struct RAStorageAvailabilityResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -499,7 +499,7 @@ public struct RAStorageAvailabilityResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAStorageDeletePlanRequest: Sendable {
+public nonisolated struct RAStorageDeletePlanRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -521,7 +521,7 @@ public struct RAStorageDeletePlanRequest: Sendable {
   public init() {}
 }
 
-public struct RAStorageDeleteCandidate: Sendable {
+public nonisolated struct RAStorageDeleteCandidate: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -556,7 +556,7 @@ public struct RAStorageDeleteCandidate: Sendable {
   fileprivate var _lastUsedMs: Int64? = nil
 }
 
-public struct RAStorageDeletePlan: Sendable {
+public nonisolated struct RAStorageDeletePlan: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -584,7 +584,7 @@ public struct RAStorageDeletePlan: Sendable {
   public init() {}
 }
 
-public struct RAStorageDeleteRequest: Sendable {
+public nonisolated struct RAStorageDeleteRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -619,7 +619,7 @@ public struct RAStorageDeleteRequest: Sendable {
   fileprivate var _plan: RAStorageDeletePlan? = nil
 }
 
-public struct RAStorageDeleteResult: Sendable {
+public nonisolated struct RAStorageDeleteResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -651,13 +651,13 @@ public struct RAStorageDeleteResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RANPUChip: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RANPUChip: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0NPU_CHIP_UNSPECIFIED\0\u{1}NPU_CHIP_NONE\0\u{1}NPU_CHIP_APPLE_NEURAL_ENGINE\0\u{1}NPU_CHIP_QUALCOMM_HEXAGON\0\u{1}NPU_CHIP_MEDIATEK_APU\0\u{1}NPU_CHIP_GOOGLE_TPU\0\u{1}NPU_CHIP_INTEL_NPU\0\u{2}]\u{1}NPU_CHIP_OTHER\0")
 }
 
-extension RADeviceStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADeviceStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeviceStorageInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}total_bytes\0\u{3}free_bytes\0\u{3}used_bytes\0\u{3}used_percent\0")
 
@@ -702,7 +702,7 @@ extension RADeviceStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAAppStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAppStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AppStorageInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}documents_bytes\0\u{3}cache_bytes\0\u{3}app_support_bytes\0\u{3}total_bytes\0")
 
@@ -747,7 +747,7 @@ extension RAAppStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAModelStorageMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelStorageMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelStorageMetrics"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}size_on_disk_bytes\0\u{3}last_used_ms\0")
 
@@ -791,7 +791,7 @@ extension RAModelStorageMetrics: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}app\0\u{1}device\0\u{1}models\0\u{3}total_models\0\u{3}total_models_bytes\0")
 
@@ -845,7 +845,7 @@ extension RAStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageAvailability"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_available\0\u{3}required_bytes\0\u{3}available_bytes\0\u{3}warning_message\0\u{1}recommendation\0\u{3}shortfall_bytes\0\u{3}required_to_available_ratio\0")
 
@@ -909,7 +909,7 @@ extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAStoredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStoredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StoredModel"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}name\0\u{3}size_bytes\0\u{3}local_path\0\u{3}downloaded_at_ms\0")
 
@@ -963,7 +963,7 @@ extension RAStoredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageInfoRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_device\0\u{3}include_app\0\u{3}include_models\0\u{3}include_cache\0")
 
@@ -1008,7 +1008,7 @@ extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageInfoResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}info\0\u{3}error_message\0\u{1}warnings\0")
 
@@ -1057,7 +1057,7 @@ extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageAvailabilityRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}required_bytes\0\u{3}safety_margin\0\u{3}include_existing_model_bytes\0\u{3}include_delete_plan\0\u{3}allow_cache_reclamation\0")
 
@@ -1112,7 +1112,7 @@ extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RAStorageAvailabilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageAvailabilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageAvailabilityResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}availability\0\u{1}warnings\0\u{3}error_message\0\u{3}delete_plan\0")
 
@@ -1210,7 +1210,7 @@ extension RAStorageAvailabilityResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
   }
 }
 
-extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeletePlanRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}required_bytes\0\u{3}include_cache\0\u{3}oldest_first\0\u{3}allow_loaded_models\0\u{3}include_download_partials\0")
 
@@ -1265,7 +1265,7 @@ extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeleteCandidate"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}reclaimable_bytes\0\u{3}last_used_ms\0\u{3}is_loaded\0\u{3}local_path\0\u{3}requires_unload\0\u{3}requires_platform_delete\0\u{3}storage_key\0")
 
@@ -1334,7 +1334,7 @@ extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeletePlan"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_reclaim_required_bytes\0\u{3}required_bytes\0\u{3}reclaimable_bytes\0\u{1}candidates\0\u{1}warnings\0\u{3}error_message\0\u{3}requires_unload\0\u{3}requires_platform_delete\0\u{3}candidate_count\0")
 
@@ -1404,7 +1404,7 @@ extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeleteRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}delete_files\0\u{3}clear_registry_paths\0\u{3}unload_if_loaded\0\u{3}dry_run\0\u{1}plan\0\u{3}require_plan_match\0\u{3}allow_platform_delete\0")
 
@@ -1473,7 +1473,7 @@ extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeleteResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}deleted_bytes\0\u{3}deleted_model_ids\0\u{3}failed_model_ids\0\u{1}warnings\0\u{3}error_message\0\u{3}skipped_model_ids\0\u{3}dry_run\0\u{3}registry_updated\0\u{3}files_deleted\0")
 

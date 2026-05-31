@@ -31,7 +31,7 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+ * Inputs for the canonical RAModelInfo factory. Replaces Swift's
  * `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
  * logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
  * (id, name, category/format/framework defaults, context-length defaults,

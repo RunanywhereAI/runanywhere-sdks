@@ -25,26 +25,4 @@ export interface SDKInitOptions {
   /** SDK environment */
   environment?: SDKEnvironment;
 
-  /**
-   * Supabase project URL (development mode)
-   * When set, SDK makes calls directly to Supabase
-   */
-  supabaseURL?: string;
-
-  /**
-   * Supabase anon key (development mode)
-   */
-  supabaseKey?: string;
-
-  /**
-   * Build token for device registration.
-   *
-   * Resolution order (highest precedence first):
-   *   1. This option.
-   *   2. `RUNANYWHERE_BUILD_TOKEN` environment variable (build-time).
-   *   3. Native development-mode fallback (development environment only).
-   *
-   * Production/staging apps must provide this via option or env var.
-   */
-  buildToken?: string;
 }

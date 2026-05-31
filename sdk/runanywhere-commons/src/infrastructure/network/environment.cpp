@@ -78,7 +78,7 @@ const char* rac_env_description(rac_environment_t env) {
     }
 }
 
-// CLUSTER-12 (FLUTTER-IOS-007): in DEV mode the SDK targets an operator-
+// In DEV mode the SDK targets an operator-
 // side DNS alias (e.g. dev.runanywhere.local). When the alias is not
 // configured locally the OS resolver burns its full default timeout
 // before the request can fail, blocking SDK init for ~30 s per cold

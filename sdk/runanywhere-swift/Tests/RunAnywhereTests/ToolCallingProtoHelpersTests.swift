@@ -69,11 +69,43 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
     }
 
     func testToolCallingOptionsPreferGeneratedFormatEnum() {
+        // resolvedFormatName delegates the proto-enum -> hint-string mapping to
+        // commons (rac_tool_call_format_hint_from_format_name), the single
+        // source of truth. .openaiFunctions has no distinct runtime route, so
+        // it folds to the JSON-tagged "default" (the prior hand-rolled Swift
+        // table emitted "openai", a string commons never recognized).
         var options = RAToolCallingOptions.defaults()
         options.formatHint = "lfm2"
         options.format = .openaiFunctions
+        XCTAssertEqual(options.resolvedFormatName, "default")
 
-        XCTAssertEqual(options.resolvedFormatName, "openai")
+        // .pythonic routes to the LFM2 Pythonic format.
+        options.format = .pythonic
+        XCTAssertEqual(options.resolvedFormatName, "lfm2")
+    }
+
+    func testExecuteToolSurfacesParseFailureWhenArgumentsJsonIsInvalid() async {
+        // parseObjectJSON used to silently swallow malformed JSON
+        // into an empty dict, so executeTool reported success=true with no
+        // arguments. Now the parse failure must propagate as success=false
+        // with a non-empty error message regardless of whether the native
+        // ABI symbol is resolvable in the test environment.
+        let definition = RAToolDefinition(
+            name: "echo",
+            description: "echo tool",
+            parameters: []
+        )
+        await RunAnywhere.registerTool(definition) { _ in [:] }
+        defer { Task { await RunAnywhere.unregisterTool("echo") } }
+
+        var toolCall = RAToolCall()
+        toolCall.name = "echo"
+        toolCall.argumentsJson = "{not valid json}"
+        toolCall.id = "call_parse_fail"
+
+        let result = await RunAnywhere.executeTool(toolCall)
+        XCTAssertFalse(result.success)
+        XCTAssertFalse(result.error.isEmpty)
     }
 }
 

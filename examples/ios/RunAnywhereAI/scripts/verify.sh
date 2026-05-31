@@ -45,7 +45,7 @@ require_command xcodebuild
 
 if [ "${REFRESH_NATIVE:-0}" = "1" ]; then
     log "Refreshing iOS XCFramework artifacts"
-    "${REPO_ROOT}/scripts/build-core-xcframework.sh"
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 fi
 
 log "Checking local XCFramework artifacts"

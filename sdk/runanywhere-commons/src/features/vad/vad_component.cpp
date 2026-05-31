@@ -9,6 +9,8 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include "vad_threshold_registry.h"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -223,7 +225,7 @@ void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, 
     voice_event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
     if (error_code == RAC_SUCCESS) {
         auto* vad = voice_event.mutable_vad();
-        // IDL-18: VADEvent.type uses VADStreamEventKind; the speech/silence
+        // VADEvent.type uses VADStreamEventKind; the speech/silence
         // direction is carried in the companion is_speech field below.
         vad->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
         vad->set_confidence(confidence);
@@ -509,16 +511,22 @@ extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
     // Cleanup first
     rac_vad_component_cleanup(handle);
 
-    // B-FL-5-001 sibling fix: clear the SECOND proto-stream callback registry
+    // Clear the SECOND proto-stream callback registry
     // (g_slots in rac_vad_stream.cpp, set via rac_vad_set_stream_proto_callback)
     // in addition to the proto_activity_slot cleared above. Without this, the
     // wire-seq + stale user_data UAF triggers when the handle heap address is
     // reused by a fresh component (rac_vad_component_create).
     rac_vad_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-vad: spin-wait for any in-flight
+    // Spin-wait for any in-flight
     // dispatch_vad_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
     rac_vad_proto_quiesce();
+
+    // Drop the registry's strong reference to
+    // this handle's threshold mutex so the map does not grow unbounded
+    // across the lifetime of the process. Concurrent threads still holding
+    // shared_ptr copies keep the mutex alive until they release it.
+    rac::vad::erase_threshold_mutex(handle);
 
     RAC_LOG_INFO("VAD.Component", "VAD component destroyed");
 
@@ -639,14 +647,14 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    // B-FL-5-001 sibling v2 fix: clear any prior proto-stream callback
+    // Clear any prior proto-stream callback
     // registration BEFORE re-creating the internal model service. The
-    // load_model path elides destroy → original destroy-time fix never fires
+    // load_model path elides destroy → destroy-time clear never fires
     // for handle reuse, so the wire-seq counter in g_slots() would retain its
     // prior value and corrupt the proto stream on the very first detect call
     // after a model switch.
     rac_vad_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-vad: drain any in-flight dispatcher bound to the
+    // Drain any in-flight dispatcher bound to the
     // previous model before swapping in the new one so user_data captured by
     // the previous registration can be safely freed.
     rac_vad_proto_quiesce();
@@ -664,7 +672,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
 
-    // v3 Phase B8: route through the plugin registry.
+    // Route through the plugin registry.
     // VAD doesn't take a framework hint from the model_info registry
     // today (Swift VADCapability only passes model_path), so we rely
     // purely on format/priority scoring. onnx_vad (priority 100) will
@@ -724,7 +732,7 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
 
     RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
 
-    // DUP-06: single source of truth for the "*.backend.created" telemetry
+    // Single source of truth for the "*.backend.created" telemetry
     // event. Previously each backend fired this from its own *_create path;
     // now it fires once from the commons service layer so future backends
     // inherit the emit for free (and can't silently drop it).
@@ -1051,17 +1059,27 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
                                                               : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     }
 
-    const float original_threshold = threshold;
     const bool has_override = options.threshold() > 0.0f;
+
+    // Serialize the get→set(override)→process→
+    // restore window on the same per-handle mutex used by the streaming
+    // proto path (rac_vad_stream.cpp). Without it, two threads on the same
+    // VAD handle (one one-shot, one streaming, or two of either) can
+    // interleave their set/restore calls and corrupt the persistent
+    // energy_threshold. Only acquire the mutex when an override is in
+    // effect; the common no-override path stays lock-free.
+    rac_bool_t is_speech = RAC_FALSE;
+    rac_result_t rc = RAC_SUCCESS;
     if (has_override) {
+        auto handle_mutex = rac::vad::get_or_create_threshold_mutex(handle);
+        std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
+        const float original_threshold = rac_vad_component_get_energy_threshold(handle);
         (void)rac_vad_component_set_energy_threshold(handle, options.threshold());
         threshold = options.threshold();
-    }
-
-    rac_bool_t is_speech = RAC_FALSE;
-    rac_result_t rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
-    if (has_override) {
+        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
         (void)rac_vad_component_set_energy_threshold(handle, original_threshold);
+    } else {
+        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
     }
     if (rc != RAC_SUCCESS) {
         publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);

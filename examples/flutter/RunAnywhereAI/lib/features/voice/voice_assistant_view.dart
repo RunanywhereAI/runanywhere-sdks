@@ -188,7 +188,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     }
   }
 
-  /// Drive UI state from canonical VoiceEvent proto messages (v3.1).
+  /// Drive UI state from canonical VoiceEvent proto messages.
   ///
   /// Switches on `event.whichPayload()`. Turn-completion aggregation (was
   /// VoiceSessionTurnCompleted) is rebuilt locally from the proto state
@@ -216,6 +216,14 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
             setState(() {
               _sessionState = UiVoiceSessionState.speaking;
+              // Flush accumulated assistant tokens as a completed turn.
+              if (_assistantResponse.isNotEmpty) {
+                _conversation.add(_ConversationTurn(
+                  role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+                  text: _assistantResponse,
+                ));
+                _assistantResponse = '';
+              }
             });
             break;
           case sdk.PipelineState.PIPELINE_STATE_STOPPED:
@@ -228,7 +236,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
       case sdk.VoiceEvent_Payload.vad:
         final vad = event.vad;
-        // IDL-18: VADEvent.type is VADStreamEventKind; start/end ride
+        // VADEvent.type is VADStreamEventKind; start/end ride
         // SPEECH_ACTIVITY with direction on the is_speech bool.
         if (vad.type ==
             sdk.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
@@ -278,16 +286,15 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.userSaid:
         final text = event.userSaid.text;
         setState(() {
-          _currentTranscript = text;
           if (text.isNotEmpty) {
-            // Turn-completion aggregation: when the user said transcript
-            // arrives, append the user turn. The assistant turn is
-            // appended when thinking→speaking transition fires.
             _conversation.add(_ConversationTurn(
               role: proto.MessageRole.MESSAGE_ROLE_USER,
               text: text,
             ));
           }
+          // Clear in-progress transcript so the committed bubble above
+          // is not double-rendered.
+          _currentTranscript = '';
         });
         break;
 
@@ -313,6 +320,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         });
         break;
 
+      case sdk.VoiceEvent_Payload.audioLevel:
+        setState(() {
+          _audioLevel = event.audioLevel.rms.clamp(0.0, 1.0);
+        });
+        break;
+
       case sdk.VoiceEvent_Payload.interrupted:
       case sdk.VoiceEvent_Payload.metrics:
       case sdk.VoiceEvent_Payload.componentStateChanged:
@@ -322,10 +335,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.agentResponseStarted:
       case sdk.VoiceEvent_Payload.agentResponseCompleted:
       case sdk.VoiceEvent_Payload.turnLifecycle:
-      case sdk.VoiceEvent_Payload.audioLevel:
       case sdk.VoiceEvent_Payload.componentProgress:
       case sdk.VoiceEvent_Payload.notSet:
-        // No UX impact today.
         break;
     }
   }
@@ -500,7 +511,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               onTap: _showTTSModelSelection,
             ),
             const SizedBox(height: AppSpacing.smallMedium),
-            // B-FL-13-002: short-circuit row for the platform's built-in
+            // Short-circuit row for the platform's built-in
             // TTS engine — bypasses the model selection sheet entirely.
             // Apple-only: the commons `platform` engine plugin is gated
             // behind `if(APPLE AND RAC_BUILD_PLATFORM)` and

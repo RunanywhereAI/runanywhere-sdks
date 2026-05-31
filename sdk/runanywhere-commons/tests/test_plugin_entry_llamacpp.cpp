@@ -2,7 +2,7 @@
  * @file test_plugin_entry_llamacpp.cpp
  * @brief Verifies the llama.cpp plugin entry point returns a well-formed vtable.
  *
- * GAP 02 Phase 10. This test does NOT load a model — that's handled by
+ * This test does NOT load a model — that's handled by
  * downstream integration tests. It only asserts:
  *   - The entry symbol is present.
  *   - The returned vtable has abi_version == RAC_PLUGIN_API_VERSION.

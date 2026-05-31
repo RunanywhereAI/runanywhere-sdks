@@ -30,7 +30,15 @@ class DartBridgeState {
   // Initialization
   // ============================================================================
 
-  /// Initialize C++ state manager.
+  /// Initialize C++ state manager with the resolved credentials.
+  ///
+  /// This deliberately re-runs `rac_state_initialize`: `DartBridge.initialize`
+  /// (Phase 1) drives `rac_sdk_init_phase1_proto` with the environment only —
+  /// the api key / base URL / device ID are not known until they are resolved
+  /// (Keychain lookup + caller params) in Phase 2. This Phase-2 call backfills
+  /// `rac_sdk_state` with those resolved credentials, so it is NOT a redundant
+  /// duplicate of the Phase-1 call. `rac_state_initialize` is idempotent on the
+  /// environment and simply overwrites the cached api_key/base_url/device_id.
   ///
   /// Auth persistence (Keychain/KeyStore vtable + stored-token load) is handled
   /// by `DartBridgeAuth.initialize` which owns the `rac_auth_manager` lifecycle.
@@ -221,21 +229,6 @@ class DartBridgeState {
     }
   }
 
-  /// Get refresh token from the auth manager
-  String? get refreshToken {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getToken = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_auth_get_refresh_token');
-
-      final result = getToken();
-      if (result == nullptr) return null;
-      return result.toDartString();
-    } catch (e) {
-      return null;
-    }
-  }
-
   /// Check if authenticated (valid non-expired token)
   bool get isAuthenticated {
     try {
@@ -257,20 +250,6 @@ class DartBridgeState {
       return needsRefresh() != 0;
     } catch (e) {
       return false;
-    }
-  }
-
-  /// Get token expiry timestamp
-  DateTime? get tokenExpiresAt {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getExpiry = lib.lookupFunction<Int64 Function(), int Function()>(
-          'rac_auth_get_token_expires_at');
-
-      final unix = getExpiry();
-      return unix > 0 ? DateTime.fromMillisecondsSinceEpoch(unix * 1000) : null;
-    } catch (e) {
-      return null;
     }
   }
 

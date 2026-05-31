@@ -2,8 +2,6 @@
  * @file rac_hardware_profile.cpp
  * @brief Cross-platform hardware-capability detection.
  *
- * GAP 04 Phase 9 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- *
  * Probe philosophy:
  *   - Be conservative. We'd rather miss a runtime than claim one that won't
  *     work and crash later.
@@ -75,7 +73,7 @@ std::string detect_apple_chip_gen() {
     if (brand.starts_with("Apple ")) {
         return brand.substr(6); /* strip "Apple " */
     }
-    /* iOS: hw.machine like "iPhone16,1" — leave parsing to GAP-04 follow-up;
+    /* iOS: hw.machine like "iPhone16,1" — parsing left for a follow-up;
      * absence is fine, the router falls back to has_ane=false. */
     return {};
 }
@@ -202,7 +200,7 @@ HardwareProfile HardwareProfile::detect() {
 #elif defined(__EMSCRIPTEN__)
     /* WebGPU detection happens in JS land; the Emscripten-built host sets
      * has_webgpu via a JS shim that calls back into HardwareProfile::refresh()
-     * (out of scope for GAP 04 Phase 9 — left false here). */
+     * (left false here). */
     p.has_webgpu = false;
 #elif defined(_WIN32)
     p.cpu_vendor = CpuVendor::Other;
@@ -219,11 +217,13 @@ std::mutex g_cache_mu;
 std::optional<HardwareProfile> g_cached;
 }  // namespace
 
-const HardwareProfile& HardwareProfile::cached() {
+HardwareProfile HardwareProfile::cached() {
     std::lock_guard<std::mutex> lock(g_cache_mu);
     if (!g_cached.has_value()) {
         g_cached = HardwareProfile::detect();
     }
+    /* Return by value: copy under the lock so the caller's view is stable
+     * even if another thread calls refresh() between the caller's reads. */
     return *g_cached;
 }
 

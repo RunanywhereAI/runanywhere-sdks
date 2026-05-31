@@ -17,7 +17,7 @@ extension SDKEnvironmentExtension on SDKEnvironment {
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'Production Environment';
       default:
-        return 'Development Environment';
+        return 'Unspecified Environment';
     }
   }
 
@@ -27,6 +27,9 @@ extension SDKEnvironmentExtension on SDKEnvironment {
       this == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
       this == SDKEnvironment.SDK_ENVIRONMENT_STAGING;
 
+  // UNSPECIFIED falls through as `true` — fail-closed: an unrecognized
+  // environment is treated as requiring auth/backend so a malformed init
+  // envelope cannot silently downgrade to development.
   bool get requiresBackendURL =>
       this != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 
@@ -43,7 +46,7 @@ extension SDKEnvironmentExtension on SDKEnvironment {
         }());
         return !isDebug;
       default:
-        return true;
+        return false;
     }
   }
 
@@ -65,7 +68,7 @@ extension SDKEnvironmentExtension on SDKEnvironment {
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return LogLevel.warning;
       default:
-        return LogLevel.debug;
+        return LogLevel.info;
     }
   }
 
@@ -138,6 +141,15 @@ class SDKInitParams {
     required this.baseURL,
     this.environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
   }) {
+    // Fail-closed on UNSPECIFIED / UNRECOGNIZED: refuse to silently coerce
+    // an unknown wire-decoded enum value into DEVELOPMENT (which would
+    // disable auth, backend sync, and switch to mock data).
+    if (environment == SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED ||
+        !SDKEnvironment.values.contains(environment)) {
+      throw SDKException.invalidConfiguration(
+        'Unknown SDKEnvironment value; refusing to default to DEVELOPMENT',
+      );
+    }
     final result = DartBridgeEnvironment.instance.validateConfig(
       environment: environment,
       apiKey: apiKey,

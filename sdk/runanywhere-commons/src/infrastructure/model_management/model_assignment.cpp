@@ -70,48 +70,152 @@ static bool is_cache_valid() {
     return std::cmp_less(elapsed, g_cache_timeout_seconds);
 }
 
-// Simple JSON string extraction (finds "key": "value" or "key": number)
+// JSON string extraction that honours escaped
+// quotes and brace-depth tracking. The previous implementation walked
+// to the next `"` without escape handling and looked at byte
+// substrings (e.g. `find("null", pos)`), so a value containing `\"`,
+// `},`, or `\\` could either be truncated mid-string or — worse —
+// snap the field boundary so the wrong key/value pair got assigned.
+// Reimplementation: scan once with an explicit in-string state machine.
 static std::string json_get_string(const std::string& json, const std::string& key) {
-    std::string search = "\"" + key + "\"";
-    size_t pos = json.find(search);
-    if (pos == std::string::npos)
-        return "";
-
-    pos = json.find(':', pos);
-    if (pos == std::string::npos)
-        return "";
-
-    // Skip whitespace
-    pos++;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t'))
-        pos++;
-
-    if (pos >= json.size())
-        return "";
-
-    // Check for string value
-    if (json[pos] == '"') {
-        size_t start = pos + 1;
-        size_t end = json.find('"', start);
-        if (end == std::string::npos)
-            return "";
-        return json.substr(start, end - start);
+    auto skip_ws = [&](size_t& i) {
+        while (i < json.size() &&
+               (json[i] == ' ' || json[i] == '\t' || json[i] == '\n' || json[i] == '\r')) {
+            ++i;
+        }
+    };
+    // Locate the key as a top-level (depth-aware) field name.
+    bool in_string = false;
+    bool escaped = false;
+    int depth = 0;
+    for (size_t i = 0; i < json.size(); ++i) {
+        const char ch = json[i];
+        if (in_string) {
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (ch == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+        if (ch == '"') {
+            // Read the key string honouring escapes.
+            size_t k = i + 1;
+            std::string found_key;
+            bool key_escaped = false;
+            for (; k < json.size(); ++k) {
+                const char kc = json[k];
+                if (key_escaped) {
+                    found_key.push_back(kc);
+                    key_escaped = false;
+                    continue;
+                }
+                if (kc == '\\') {
+                    key_escaped = true;
+                    continue;
+                }
+                if (kc == '"') {
+                    break;
+                }
+                found_key.push_back(kc);
+            }
+            if (k >= json.size()) {
+                return "";
+            }
+            i = k;
+            // Match must be at depth 1 (inside the model object) — keys at
+            // other depths belong to nested objects we should not pluck.
+            if (depth != 1 || found_key != key) {
+                continue;
+            }
+            // Walk to the ':' that starts the value.
+            size_t colon = i + 1;
+            skip_ws(colon);
+            if (colon >= json.size() || json[colon] != ':') {
+                return "";
+            }
+            size_t v = colon + 1;
+            skip_ws(v);
+            if (v >= json.size()) {
+                return "";
+            }
+            // String value: read with escape handling.
+            if (json[v] == '"') {
+                std::string out;
+                bool v_escaped = false;
+                for (size_t p = v + 1; p < json.size(); ++p) {
+                    const char vc = json[p];
+                    if (v_escaped) {
+                        // Minimal JSON escape support — the same one
+                        // the proto path's `json_unescape_string` uses.
+                        switch (vc) {
+                            case '"':
+                            case '\\':
+                            case '/':
+                                out.push_back(vc);
+                                break;
+                            case 'b':
+                                out.push_back('\b');
+                                break;
+                            case 'f':
+                                out.push_back('\f');
+                                break;
+                            case 'n':
+                                out.push_back('\n');
+                                break;
+                            case 'r':
+                                out.push_back('\r');
+                                break;
+                            case 't':
+                                out.push_back('\t');
+                                break;
+                            default:
+                                out.push_back(vc);
+                                break;
+                        }
+                        v_escaped = false;
+                        continue;
+                    }
+                    if (vc == '\\') {
+                        v_escaped = true;
+                        continue;
+                    }
+                    if (vc == '"') {
+                        return out;
+                    }
+                    out.push_back(vc);
+                }
+                return "";
+            }
+            // null
+            if (json.compare(v, 4, "null") == 0) {
+                return "";
+            }
+            // Number / boolean — stop at the next top-level delimiter.
+            size_t end = v;
+            while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != ']') {
+                ++end;
+            }
+            std::string val = json.substr(v, end - v);
+            while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\n' ||
+                                    val.back() == '\r')) {
+                val.pop_back();
+            }
+            return val;
+        }
+        if (ch == '{' || ch == '[') {
+            ++depth;
+        } else if (ch == '}' || ch == ']') {
+            --depth;
+        }
     }
-
-    // Check for null
-    if (json.substr(pos, 4) == "null")
-        return "";
-
-    // Number or boolean
-    size_t end = json.find_first_of(",}]", pos);
-    if (end == std::string::npos)
-        return "";
-    std::string val = json.substr(pos, end - pos);
-    // Trim whitespace
-    while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\n')) {
-        val.pop_back();
-    }
-    return val;
+    return "";
 }
 
 static int64_t json_get_int(const std::string& json, const std::string& key,
@@ -130,6 +234,73 @@ static bool json_get_bool(const std::string& json, const std::string& key,
     return val == "true";
 }
 
+// Walk from `pos` to the end of the next
+// top-level JSON value (object/array/string/scalar), honouring strings
+// and escapes. Returns the one-past-end index of the value, or npos
+// when the JSON is truncated.
+static size_t fast_json_value_end(const std::string& json, size_t start) {
+    if (start >= json.size()) {
+        return std::string::npos;
+    }
+    const char first = json[start];
+    if (first == '"') {
+        bool escaped = false;
+        for (size_t i = start + 1; i < json.size(); ++i) {
+            const char ch = json[i];
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (ch == '"') {
+                return i + 1;
+            }
+        }
+        return std::string::npos;
+    }
+    if (first == '{' || first == '[') {
+        const char open = first;
+        const char close = (first == '{') ? '}' : ']';
+        int depth = 1;
+        bool in_string = false;
+        bool escaped = false;
+        for (size_t i = start + 1; i < json.size(); ++i) {
+            const char ch = json[i];
+            if (in_string) {
+                if (escaped) {
+                    escaped = false;
+                } else if (ch == '\\') {
+                    escaped = true;
+                } else if (ch == '"') {
+                    in_string = false;
+                }
+                continue;
+            }
+            if (ch == '"') {
+                in_string = true;
+                continue;
+            }
+            if (ch == open) {
+                ++depth;
+            } else if (ch == close) {
+                --depth;
+                if (depth == 0) {
+                    return i + 1;
+                }
+            }
+        }
+        return std::string::npos;
+    }
+    size_t end = start;
+    while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != ']') {
+        ++end;
+    }
+    return end;
+}
+
 // Parse models array from JSON response
 static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, size_t len) {
     std::vector<rac_model_info_t*> models;
@@ -138,7 +309,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
 
     std::string json(json_str, len);
 
-    // Find "models" array
+    // Find "models" array (the key may appear escaped inside a value;
+    // require depth-0 match by walking the top-level structure first).
     size_t models_pos = json.find("\"models\"");
     if (models_pos == std::string::npos) {
         RAC_LOG_WARNING(LOG_CAT, "No 'models' array in response");
@@ -150,29 +322,31 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
     if (arr_start == std::string::npos)
         return models;
 
-    // Find each object in array
+    // Depth- and escape-aware scan over the
+    // models array. The previous implementation only counted braces,
+    // so a quote-balanced string containing `{` or `}` could pull the
+    // wrong substring as an object.
     size_t pos = arr_start + 1;
     while (pos < json.size()) {
-        // Find next object start
-        size_t obj_start = json.find('{', pos);
-        if (obj_start == std::string::npos)
+        // Skip whitespace and array separators between objects.
+        while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n' ||
+                                     json[pos] == '\r' || json[pos] == ',')) {
+            ++pos;
+        }
+        if (pos >= json.size() || json[pos] == ']') {
             break;
-
-        // Find matching close brace (simple approach, may fail on nested objects)
-        int depth = 1;
-        size_t obj_end = obj_start + 1;
-        while (obj_end < json.size() && depth > 0) {
-            if (json[obj_end] == '{')
-                depth++;
-            else if (json[obj_end] == '}')
-                depth--;
-            obj_end++;
+        }
+        if (json[pos] != '{') {
+            ++pos;
+            continue;
         }
 
-        if (depth != 0)
+        size_t obj_end = fast_json_value_end(json, pos);
+        if (obj_end == std::string::npos) {
             break;
+        }
 
-        std::string obj = json.substr(obj_start, obj_end - obj_start);
+        std::string obj = json.substr(pos, obj_end - pos);
 
         // Parse model fields
         std::string id = json_get_string(obj, "id");

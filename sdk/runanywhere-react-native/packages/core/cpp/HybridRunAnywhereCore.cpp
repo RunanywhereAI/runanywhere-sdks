@@ -9,7 +9,7 @@
 #include <utility>
 
 // =============================================================================
-// Platform HTTP transport registration (v2 close-out Phase H6)
+// Platform HTTP transport registration
 //
 // On iOS, rn_register_urlsession_transport() installs a URLSession-backed
 // rac_http_transport_ops vtable so subsequent rac_http_request_* calls route
@@ -81,10 +81,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         std::string envStr = extractStringValue(configJson, "environment", "production");
         std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
 
-        // Determine environment
-        SDKEnvironment env = SDKEnvironment::Production;
-        if (envStr == "development") env = SDKEnvironment::Development;
-        else if (envStr == "staging") env = SDKEnvironment::Staging;
+        // Determine environment (canonical commons rac_environment_t).
+        rac_environment_t env = RAC_ENV_PRODUCTION;
+        if (envStr == "development") env = RAC_ENV_DEVELOPMENT;
+        else if (envStr == "staging") env = RAC_ENV_STAGING;
 
         // 1. Initialize core (platform adapter + state)
         rac_result_t result = InitBridge::shared().initialize(env, apiKey, baseURL, deviceId);
@@ -173,7 +173,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
 
         // 6. Configure HTTP only for deployable backend configs. Development
         // mode uses the C++ dev config directly in telemetry/device callbacks.
-        if (env != SDKEnvironment::Development &&
+        if (env != RAC_ENV_DEVELOPMENT &&
             config::isUsableHttpUrl(baseURL) &&
             config::isUsableSecret(apiKey)) {
             HTTPBridge::shared().configure(baseURL, apiKey);
@@ -190,8 +190,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
 
             if (!persistentDeviceId.empty()) {
                 TelemetryBridge::shared().initialize(
-                    env == SDKEnvironment::Development ? RAC_ENV_DEVELOPMENT :
-                    env == SDKEnvironment::Staging ? RAC_ENV_STAGING : RAC_ENV_PRODUCTION,
+                    env,
                     persistentDeviceId,
                     deviceModel,
                     osVersion,
@@ -268,7 +267,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
 
             callbacks.user_data = nullptr;
             // Only auto-fetch in staging/production, not development
-            bool shouldAutoFetch = (env != SDKEnvironment::Development);
+            bool shouldAutoFetch = (env != RAC_ENV_DEVELOPMENT);
             callbacks.auto_fetch = shouldAutoFetch ? RAC_TRUE : RAC_FALSE;
 
             result = rac_model_assignment_set_callbacks(&callbacks);
@@ -300,13 +299,27 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::completeServicesInitializa
     });
 }
 
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::retryHTTPSetupProto() {
+    return Promise<bool>::async([this]() {
+        bool httpConfigured = false;
+        rac_result_t result = InitBridge::shared().retryHTTPSetup(httpConfigured);
+        if (result != RAC_SUCCESS) {
+            setLastError("HTTP retry failed: " + std::to_string(result));
+            return false;
+        }
+        // Resolves to the proto http_configured flag. The TS recovery path
+        // falls through to the platform-side auth round-trip when this is false.
+        return httpConfigured;
+    });
+}
+
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
     return Promise<void>::async([this]() {
         std::lock_guard<std::mutex> lock(initMutex_);
 
         LOGI("Destroying Core SDK...");
 
-        // HOTSPOT-RN-CORE-002: tear down voice/component globals + the
+        // Tear down voice/component globals + the
         // commons lifecycle registry FIRST so any in-flight component
         // callbacks/streams stop referencing soon-to-be-destroyed bridges.
         // Defined in HybridRunAnywhereCore+Voice.cpp.

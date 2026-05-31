@@ -136,10 +136,12 @@ class DartBridgeLLM {
 
   /// Generate text using the lifecycle-owned generated-proto LLM ABI.
   LLMGenerationResult generateProto(LLMGenerateRequest request) {
-    if (!isLoaded) {
-      throw StateError('No LLM model loaded. Call loadModel() first.');
-    }
-
+    // No `isLoaded` gate: the generated-proto ABI resolves the engine from the
+    // commons model lifecycle (acquire_lifecycle_llm), NOT from this bridge's
+    // own `_handle` (which the lifecycle load path never populates). Gating on
+    // `_handle`/isLoaded here is a phantom check that spuriously throws even
+    // when a model IS loaded via the lifecycle, diverging from Kotlin/Swift
+    // (which have no such gate). Commons returns a clear error if truly unloaded.
     final fn = RacNative.bindings.rac_llm_generate_proto;
     if (fn == null) {
       throw UnsupportedError('rac_llm_generate_proto is unavailable');
@@ -155,12 +157,10 @@ class DartBridgeLLM {
 
   /// Stream text generation using the lifecycle-owned generated-proto LLM ABI.
   Stream<LLMStreamEvent> generateStreamProto(LLMGenerateRequest request) {
-    if (!isLoaded) {
-      return Stream<LLMStreamEvent>.error(
-        StateError('No LLM model loaded. Call loadModel() first.'),
-      );
-    }
-
+    // No `isLoaded` gate (see generateProto): generation resolves via the
+    // commons model lifecycle, not this bridge's `_handle`. The phantom gate
+    // here was the root cause of Flutter-only "No LLM model loaded" stream
+    // errors offline (the spurious throw then triggered a downstream cancel).
     final fn = RacNative.bindings.rac_llm_generate_stream_proto;
     if (fn == null) {
       return Stream<LLMStreamEvent>.error(
@@ -201,28 +201,25 @@ class DartBridgeLLM {
         //   3. Therefore the callback always fires on the Dart isolate that
         //      created it — the exact precondition `isolateLocal` requires.
         callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
-            (
-          Pointer<Uint8> bytesPtr,
-          int bytesLen,
-          Pointer<Void> _,
-        ) {
-          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
-            return;
-          }
+          (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+            if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+              return;
+            }
 
-          try {
-            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            final event = LLMStreamEvent.fromBuffer(copy);
-            sawTerminalEvent = sawTerminalEvent || event.isFinal;
-            controller.add(event);
-            if (event.isFinal) {
+            try {
+              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+              final event = LLMStreamEvent.fromBuffer(copy);
+              sawTerminalEvent = sawTerminalEvent || event.isFinal;
+              controller.add(event);
+              if (event.isFinal) {
+                unawaited(controller.close());
+              }
+            } catch (e, st) {
+              controller.addError(e, st);
               unawaited(controller.close());
             }
-          } catch (e, st) {
-            controller.addError(e, st);
-            unawaited(controller.close());
-          }
-        });
+          },
+        );
 
         final rc = fn(
           requestPtr,
@@ -231,10 +228,12 @@ class DartBridgeLLM {
           nullptr,
         );
         if (rc != RAC_SUCCESS && !controller.isClosed) {
-          controller.addError(StateError(
-            'rac_llm_generate_stream_proto failed: '
-            '${RacResultCode.getMessage(rc)}',
-          ));
+          controller.addError(
+            StateError(
+              'rac_llm_generate_stream_proto failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ),
+          );
           await controller.close();
         } else if (!sawTerminalEvent && !controller.isClosed) {
           await controller.close();
@@ -246,13 +245,41 @@ class DartBridgeLLM {
         }
       } finally {
         calloc.free(requestPtr);
+        // commons-127: safety here relies on Dart isolate single-threading
+        // plus the synchronous nature of `rac_llm_generate_stream_proto`
+        // (the single-call ABI used by this bridge). `fn(...)` only returns
+        // after the engine vtable's `generate_stream` has finished iterating
+        // tokens on this same isolate thread, so by the time we reach this
+        // `finally` the NativeCallable can no longer be invoked. The
+        // `rac_llm_proto_quiesce` call below is a NO-OP for this path
+        // (commons only increments the in-flight counter inside
+        // `dispatch_llm_stream_event`, which is the REGISTRY path used by
+        // `rac_llm_set_stream_proto_callback` — never invoked by Flutter)
+        // but we still issue it defensively so that if commons ever fans
+        // out a post-return emission on a worker through the single-call
+        // ABI, this teardown sequence does the right thing without further
+        // changes here. Pattern mirrors the voice-agent / STT / TTS / VAD /
+        // VLM streaming bridges.
+        RacNative.bindings.rac_llm_proto_quiesce?.call();
         callback?.close();
         callback = null;
       }
     }
 
     controller.onCancel = () {
+      // commons-127: cancel → quiesce → close. `rac_llm_cancel_proto`
+      // signals the engine to abort. Because the producing
+      // `rac_llm_generate_stream_proto` call runs synchronously on this
+      // Dart isolate thread, the NativeCallable cannot be re-entered once
+      // `run()` has returned — Dart isolate single-threading is what
+      // actually prevents the UAF here. `rac_llm_proto_quiesce` only spin-
+      // waits on commons' REGISTRY-path in-flight counter
+      // (`rac_llm_set_stream_proto_callback`), which Flutter never uses, so
+      // it is a NO-OP today. We still call it (best-effort, ignored if the
+      // symbol is absent) to future-proof this teardown the moment commons
+      // adds an async tail-emit on the single-call path.
       cancelProto();
+      RacNative.bindings.rac_llm_proto_quiesce?.call();
       callback?.close();
       callback = null;
     };

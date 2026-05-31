@@ -451,6 +451,7 @@ internal suspend fun platformExecuteHttp(
         nativeHttpResponseToResult(resp)
     }
 
+@Suppress("UnusedParameter")
 internal suspend fun platformExecuteHttpUpsert(
     method: String,
     url: String,
@@ -500,6 +501,7 @@ internal fun platformDefaultHeaders(): List<Pair<String, String>>? {
     }
 }
 
+@Suppress("FunctionOnlyReturningConstant")
 internal fun platformParseAPIError(
     @Suppress("UNUSED_PARAMETER") statusCode: Int,
     @Suppress("UNUSED_PARAMETER") body: String,

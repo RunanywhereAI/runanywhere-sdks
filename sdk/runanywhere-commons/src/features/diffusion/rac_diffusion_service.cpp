@@ -28,7 +28,7 @@ namespace fs = std::filesystem;
 
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        // commons-features-other-002: align with the lifecycle mapping in
+        // Align with the lifecycle mapping in
         // model_lifecycle.cpp (INFERENCE_FRAMEWORK_COREML → "platform") and
         // with the Swift / Flutter reference, both of which only register
         // rac_plugin_entry_platform() — the unified Apple platform vtable
@@ -38,14 +38,14 @@ static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
         // The standalone engines/diffusion-coreml/rac_plugin_entry_diffusion_coreml.cpp
         // exists as an opt-in plugin for hosts that prefer the dedicated
         // CoreML diffusion vtable, but no SDK currently registers it. Pinning
-        // the engine name to "diffusion-coreml" here would cause the engine
+        // the engine name to "diffusion_coreml" here would cause the engine
         // router (rac_engine_router.cpp:185-189) to hard-reject the platform
         // vtable that Swift/Flutter actually load, returning
         // RAC_ERROR_BACKEND_NOT_FOUND for every direct CoreML diffusion
         // creation through this service — splitting public diffusion
         // behavior between the lifecycle path (which routes via "platform")
         // and the direct-service path (which used to route via
-        // "diffusion-coreml").
+        // "diffusion_coreml").
         case RAC_FRAMEWORK_COREML:
             return "platform";
         // ONNX diffusion is not supported; leave the hint blank so the
@@ -159,11 +159,11 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
                      static_cast<int>(framework));
     }
 
-    // v3 Phase B8: route through the plugin registry.
+    // Route through the plugin registry.
     rac_routing_hints_t hints = {};
     hints.preferred_engine_name = framework_to_plugin_name(framework);
 
-    // commons-features-other-002: pass the model format hint so the engine
+    // Pass the model format hint so the engine
     // router awards kModelFormatWeight to vtables that advertise COREML
     // (the platform vtable in rac_plugin_entry_platform.cpp declares
     // RAC_MODEL_FORMAT_ID_COREML), letting it win the diffusion route even

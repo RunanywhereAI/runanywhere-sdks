@@ -137,6 +137,10 @@ HybridRunAnywhereCore::unsubscribeSDKEventsProto(double subscriptionId) {
             }
         }
 
+        if (registration) {
+            registration->active.store(false, std::memory_order_release);
+        }
+
         if (auto unsubscribe =
                 proto_compat::symbol<proto_compat::SDKEventUnsubscribeFn>(
                     "rac_sdk_event_unsubscribe")) {
@@ -144,8 +148,19 @@ HybridRunAnywhereCore::unsubscribeSDKEventsProto(double subscriptionId) {
         } else {
             LOGE("unsubscribeSDKEventsProto: rac_sdk_event_unsubscribe unavailable");
         }
+
+        // Commons dispatches subscriber callbacks after releasing its mutex, so
+        // unsubscribe alone does not guarantee no publisher thread is mid-call
+        // with this registration. Drain in-flight callbacks per the documented
+        // rac_sdk_event_stream.h teardown contract (unsubscribe -> quiesce ->
+        // free) before deleting, mirroring the Swift/Kotlin event bridges.
+        if (auto quiesce =
+                proto_compat::symbol<proto_compat::SDKEventQuiesceFn>(
+                    "rac_sdk_event_quiesce")) {
+            quiesce();
+        }
+
         if (registration) {
-            registration->active.store(false, std::memory_order_release);
             delete registration;
         }
     });

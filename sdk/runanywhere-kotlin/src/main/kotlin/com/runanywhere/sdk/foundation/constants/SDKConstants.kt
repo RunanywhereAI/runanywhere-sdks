@@ -10,7 +10,7 @@ package com.runanywhere.sdk.foundation.constants
  * (e.g. LLM, Storage, Download, Lifecycle, Registry).
  *
  * The value of [VERSION] must track the canonical `sdk/runanywhere-commons/VERSION`
- * file — see `scripts/sync-versions.sh`.
+ * file — see `scripts/release/sync-versions.sh`.
  *
  * Platform discrimination is handled by KMP source sets (jvmMain / androidMain),
  * so no `platform` constant is exposed here — that's a Swift-only concern.

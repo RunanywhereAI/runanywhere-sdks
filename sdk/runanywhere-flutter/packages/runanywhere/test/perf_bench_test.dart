@@ -31,7 +31,7 @@ void main() {
       expect(
         p50!,
         lessThan(1000000),
-        reason: 'p50 latency $p50 ns exceeds 1ms threshold (GAP 09 #8)',
+        reason: 'p50 latency $p50 ns exceeds 1ms threshold',
       );
     });
   });

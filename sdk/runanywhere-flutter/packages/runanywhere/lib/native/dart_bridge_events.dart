@@ -18,18 +18,22 @@ class DartBridgeEvents {
   static final _logger = SDKLogger('DartBridge.Events');
   static final DartBridgeEvents instance = DartBridgeEvents._();
 
-  static final _eventController =
-      StreamController<event_pb.SDKEvent>.broadcast();
-
   static bool _isRegistered = false;
   static int _subscriptionId = 0;
   static NativeCallable<RacSdkEventCallbackNative>? _eventCallback;
 
-  static Stream<event_pb.SDKEvent> get eventStream => _eventController.stream;
+  /// Thin alias for [EventBus.shared.allEvents] — single canonical bus.
+  static Stream<event_pb.SDKEvent> get eventStream => EventBus.shared.allEvents;
 
   /// Subscribe to the commons process-wide SDKEvent stream.
+  ///
+  /// Also wires the native publish hook into [EventBus] so that
+  /// [EventBus.publish] routes through [rac_sdk_event_publish_proto] first,
+  /// mirroring Swift's `CppBridge.Events.publishSDKEvent`.
   static void register() {
     if (_isRegistered) return;
+
+    EventBus.shared.setNativePublish(instance.publish);
 
     NativeCallable<RacSdkEventCallbackNative>? callback;
     try {
@@ -71,6 +75,13 @@ class DartBridgeEvents {
       if (unsubscribe != null && _subscriptionId != 0) {
         unsubscribe(_subscriptionId);
       }
+      // Commons dispatches subscriber callbacks after releasing its mutex, so
+      // unsubscribe alone does not guarantee no publisher thread is mid-call
+      // into our NativeCallable. Drain in-flight callbacks per the documented
+      // rac_sdk_event_stream.h teardown contract (unsubscribe -> quiesce ->
+      // close) before closing the callable, mirroring the Swift/Kotlin/RN
+      // event bridges and avoiding a use-after-free onto the closing isolate.
+      RacNative.bindings.rac_sdk_event_quiesce?.call();
     } catch (e) {
       _logger.debug('SDKEvent proto unregistration failed: $e');
     } finally {
@@ -90,8 +101,7 @@ class DartBridgeEvents {
   }
 
   void emit(event_pb.SDKEvent event) {
-    _eventController.add(event);
-    EventBus.shared.publish(event);
+    EventBus.shared.addFromNative(event);
   }
 
   Future<bool> publish(event_pb.SDKEvent event) async {
@@ -190,14 +200,14 @@ class DartBridgeEvents {
   }
 }
 
-/// FLUTTER-AND-PROTO-002 / FLUTTER-IOS-006: native callback is used as a
+/// The native callback is used as a
 /// wake-up signal only. The bytes pointed to by [protoBytes] are NOT safe to
 /// dereference from this listener because Dart `NativeCallable.listener`
 /// dispatches to the Dart isolate asynchronously — by the time this callback
 /// runs in the isolate, the commons producer (event_publisher.cpp) may have
 /// rotated its ring buffer slot to a newer serialization, leaving the pointer
 /// pointing at stale or partially overwritten bytes. This is precisely what
-/// CLUSTER-09's 64-slot ring tried to mitigate, but the contract in
+/// the 64-slot ring tried to mitigate, but the contract in
 /// `rac_sdk_event_stream.h:6-7` ("Callback memory is owned by commons and is
 /// valid only for the duration of the callback") cannot be honored when the
 /// listener runs after the native call returns.

@@ -151,7 +151,7 @@ fun MoreHubScreen(
 
         Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
-        // Solutions section — Wave 3 Step 3.3 (G-E6)
+        // Solutions section
         Text(
             "Solutions",
             style = MaterialTheme.typography.titleSmall,

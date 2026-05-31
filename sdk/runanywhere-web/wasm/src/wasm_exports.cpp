@@ -17,6 +17,7 @@
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_error_proto.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -258,6 +259,37 @@ int rac_wasm_sizeof_embeddings_result(void) {
  */
 EMSCRIPTEN_KEEPALIVE
 int rac_wasm_ping(void) { return 42; }
+
+/**
+ * Infer the descriptor role for a single sidecar filename
+ * (model-file-role-classifier family). Thin wrapper over the commons
+ * classifier rac_infer_model_file_role so the Web SDK shares the same
+ * heuristic as every other SDK. `modality_proto` is a proto ModelCategory
+ * value; the return value is a proto ModelFileRole value
+ * (MODEL_FILE_ROLE_PRIMARY_MODEL == 1 on any failure).
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_infer_model_file_role(const char *filename, int modality_proto) {
+  int role = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+  rac_infer_model_file_role(filename, modality_proto, &role);
+  return role;
+}
+
+/**
+ * Map a `rac_result_t` (signed C ABI error code) to a serialized
+ * `runanywhere.v1.SDKError` proto buffer via the canonical commons helper
+ * `rac_result_to_proto_error`. Lets the Web SDK route the rac_result_t -> proto
+ * translation through the same single source of truth as every other SDK
+ * (Swift's RASDKError+Helpers.swift) instead of re-mapping in TypeScript.
+ *
+ * `out_proto` is a `rac_proto_buffer_t*` the JS caller allocates and frees via
+ * the existing proto-buffer offset/free helpers. Returns the `rac_result_t`
+ * status of the serialization.
+ */
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_result_to_proto_error(int code, rac_proto_buffer_t *out_proto) {
+  return (int)rac_result_to_proto_error((rac_result_t)code, out_proto);
+}
 
 // =============================================================================
 // FIELD OFFSET HELPERS
@@ -564,7 +596,7 @@ rac_wasm_offsetof_diffusion_options_denoise_strength(void) {
   return (int)offsetof(rac_diffusion_options_t, denoise_strength);
 }
 EMSCRIPTEN_KEEPALIVE int
-rac_wasm_offsetof_diffusion_options_report_intermediate(void) {
+rac_wasm_offsetof_diffusion_options_report_intermediate_images(void) {
   return (int)offsetof(rac_diffusion_options_t, report_intermediate_images);
 }
 EMSCRIPTEN_KEEPALIVE int

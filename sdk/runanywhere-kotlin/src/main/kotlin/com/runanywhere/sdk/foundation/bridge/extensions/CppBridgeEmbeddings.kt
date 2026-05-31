@@ -1,6 +1,12 @@
 /*
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Embeddings proto bridge. Mirrors Swift
+ * `CppBridge.EmbeddingsProto.embedBatchLifecycle`: dispatches through the
+ * lifecycle-aware ABI `rac_embeddings_embed_batch_lifecycle_proto` so embed
+ * calls resolve the model loaded via `RunAnywhere.loadModel(category=EMBEDDING)`
+ * instead of spinning up a parallel per-handle engine.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -12,27 +18,23 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAEmbeddingsResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
-import java.util.concurrent.ConcurrentHashMap
 
 object CppBridgeEmbeddings {
-    private val handles = ConcurrentHashMap<String, Long>()
-
-    fun embed(request: EmbeddingsRequest, modelId: String): RAEmbeddingsResult {
-        val handle =
-            handles.computeIfAbsent(modelId) {
-                RunAnywhereBridge.racEmbeddingsCreate(it).also { created ->
-                    if (created == 0L) throw SDKException.operation("racEmbeddingsCreate returned 0")
-                }
-            }
-        return decodeOrThrow(
+    /**
+     * Generate embeddings using the model loaded in the commons embeddings
+     * lifecycle. The caller is expected to have already loaded an embeddings
+     * model (e.g. via `RunAnywhere.loadModel` with `category = EMBEDDING`);
+     * commons resolves the active lifecycle component internally — no handle
+     * threading.
+     */
+    fun embedBatchLifecycle(request: EmbeddingsRequest): RAEmbeddingsResult =
+        decodeOrThrow(
             EmbeddingsResult.ADAPTER,
-            RunAnywhereBridge.racEmbeddingsEmbedBatchProto(
-                handle,
+            RunAnywhereBridge.racEmbeddingsEmbedBatchLifecycleProto(
                 EmbeddingsRequest.ADAPTER.encode(request),
             ),
-            "racEmbeddingsEmbedBatchProto",
+            "racEmbeddingsEmbedBatchLifecycleProto",
         )
-    }
 
     private fun <M : Message<M, *>> decodeOrThrow(
         adapter: ProtoAdapter<M>,

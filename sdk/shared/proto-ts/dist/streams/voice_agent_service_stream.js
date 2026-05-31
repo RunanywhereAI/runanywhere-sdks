@@ -16,54 +16,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.streamVoiceAgent = streamVoiceAgent;
-/**
- * Wrap the platform `transport.subscribe` callback into an
- * `AsyncIterable<VoiceEvent>`. Cancellation is propagated by
- * `break`-ing out of `for await` (the iterator's `return()` calls the
- * transport's cancel function).
- */
+const _streamFactory_1 = require("./_streamFactory");
 function streamVoiceAgent(transport, req) {
-    return {
-        [Symbol.asyncIterator]() {
-            const queue = [];
-            let resolve = null;
-            let error = null;
-            let done = false;
-            const cancel = transport.subscribe(req, (msg) => {
-                if (resolve) {
-                    resolve({ value: msg, done: false });
-                    resolve = null;
-                }
-                else
-                    queue.push(msg);
-            }, (err) => {
-                error = err;
-                if (resolve) {
-                    resolve({ value: undefined, done: true });
-                    resolve = null;
-                }
-            }, () => {
-                done = true;
-                if (resolve) {
-                    resolve({ value: undefined, done: true });
-                    resolve = null;
-                }
-            });
-            return {
-                next() {
-                    if (queue.length > 0)
-                        return Promise.resolve({ value: queue.shift(), done: false });
-                    if (error)
-                        return Promise.reject(error);
-                    if (done)
-                        return Promise.resolve({ value: undefined, done: true });
-                    return new Promise((r) => { resolve = r; });
-                },
-                return() {
-                    cancel();
-                    return Promise.resolve({ value: undefined, done: true });
-                },
-            };
-        },
-    };
+    return (0, _streamFactory_1.streamFactory)(transport, req);
 }

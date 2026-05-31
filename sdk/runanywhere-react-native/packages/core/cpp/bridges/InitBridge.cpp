@@ -15,6 +15,7 @@
 #include "rac_model_paths.h"
 #include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
 #include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/device/rac_device_identity.h"  // rac_device_get_or_create_persistent_id
 
 #include <cstddef>
 
@@ -93,6 +94,12 @@ extern jmethodID g_getGPUFamilyMethod;
 extern jmethodID g_isTabletMethod;
 extern jmethodID g_httpDownloadMethod;
 extern jmethodID g_httpDownloadCancelMethod;
+// Directory enumeration slots populated by Kotlin PlatformAdapterBridge so
+// the C++ model-registry refresh path (rescan_local) and
+// rac_model_info_make_proto's is_downloaded probe for multi-file artifacts
+// behave the same on Android as they do on iOS / Web.
+extern jmethodID g_fileListDirectoryMethod;
+extern jmethodID g_isNonEmptyDirectoryMethod;
 
 // Helper to get JNIEnv for current thread
 static JNIEnv* getJNIEnv() {
@@ -481,6 +488,111 @@ namespace AndroidBridge {
 
         return result == JNI_TRUE;
     }
+
+    // Directory enumeration via
+    // java.io.File.listFiles(). Two-call semantics matching
+    // rac_file_list_directory_fn. Truncation contract: skip oversized
+    // names rather than write a half-name that aliases a different
+    // artifact (Kotlin side already filters; we defend on this side too).
+    rac_result_t fileListDirectory(const char* dir_path,
+                                   rac_directory_entry_t* out_entries,
+                                   size_t* in_out_count) {
+        if (!in_out_count) {
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+
+        JNIEnv* env = getJNIEnv();
+        if (!env) {
+            return RAC_ERROR_ADAPTER_NOT_SET;
+        }
+        if (!g_platformAdapterBridgeClass || !g_fileListDirectoryMethod) {
+            return RAC_ERROR_NOT_SUPPORTED;
+        }
+
+        jstring jPath = env->NewStringUTF(dir_path ? dir_path : "");
+        jobjectArray result = static_cast<jobjectArray>(env->CallStaticObjectMethod(
+            g_platformAdapterBridgeClass, g_fileListDirectoryMethod, jPath));
+        env->DeleteLocalRef(jPath);
+
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in fileListDirectory");
+            return RAC_ERROR_INTERNAL;
+        }
+        // Kotlin returns null when the path does not exist or is not a
+        // directory — map to RAC_ERROR_FILE_NOT_FOUND per the C ABI contract.
+        if (!result) {
+            return RAC_ERROR_FILE_NOT_FOUND;
+        }
+
+        const jsize total = env->GetArrayLength(result);
+
+        if (!out_entries) {
+            *in_out_count = static_cast<size_t>(total);
+            env->DeleteLocalRef(result);
+            return RAC_SUCCESS;
+        }
+
+        const size_t capacity = *in_out_count;
+        const size_t write_count =
+            (capacity < static_cast<size_t>(total)) ? capacity : static_cast<size_t>(total);
+        size_t written = 0;
+
+        for (size_t i = 0; i < write_count; ++i) {
+            jobject entryObj = env->GetObjectArrayElement(result, static_cast<jsize>(i));
+            if (!entryObj) {
+                continue;
+            }
+            jclass entryClass = env->GetObjectClass(entryObj);
+            jfieldID nameField = env->GetFieldID(entryClass, "name", "Ljava/lang/String;");
+            jfieldID isDirField = env->GetFieldID(entryClass, "isDir", "Z");
+            jfieldID sizeField = env->GetFieldID(entryClass, "sizeBytes", "J");
+
+            jstring jName = static_cast<jstring>(env->GetObjectField(entryObj, nameField));
+            jboolean jIsDir = env->GetBooleanField(entryObj, isDirField);
+            jlong jSize = env->GetLongField(entryObj, sizeField);
+
+            const char* nameChars =
+                jName ? env->GetStringUTFChars(jName, nullptr) : nullptr;
+            if (nameChars) {
+                const size_t nameLen = std::strlen(nameChars);
+                if (nameLen + 1 <= RAC_DIRECTORY_ENTRY_NAME_MAX) {
+                    std::memset(out_entries[written].name, 0, RAC_DIRECTORY_ENTRY_NAME_MAX);
+                    std::memcpy(out_entries[written].name, nameChars, nameLen);
+                    out_entries[written].is_dir = jIsDir ? RAC_TRUE : RAC_FALSE;
+                    out_entries[written].size_bytes = static_cast<int64_t>(jSize);
+                    written++;
+                }
+                env->ReleaseStringUTFChars(jName, nameChars);
+            }
+
+            if (jName) {
+                env->DeleteLocalRef(jName);
+            }
+            env->DeleteLocalRef(entryClass);
+            env->DeleteLocalRef(entryObj);
+        }
+
+        *in_out_count = written;
+        env->DeleteLocalRef(result);
+        return RAC_SUCCESS;
+    }
+
+    bool isNonEmptyDirectory(const char* path) {
+        JNIEnv* env = getJNIEnv();
+        if (!env || !g_platformAdapterBridgeClass || !g_isNonEmptyDirectoryMethod) {
+            return false;
+        }
+        jstring jPath = env->NewStringUTF(path ? path : "");
+        jboolean result = env->CallStaticBooleanMethod(
+            g_platformAdapterBridgeClass, g_isNonEmptyDirectoryMethod, jPath);
+        env->DeleteLocalRef(jPath);
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return false;
+        }
+        return result == JNI_TRUE;
+    }
 } // namespace AndroidBridge
 #elif defined(__APPLE__)
 #include <cstdio>
@@ -516,6 +628,22 @@ extern "C" {
     );
 
     bool PlatformAdapter_httpDownloadCancel(const char* taskId);
+
+    // Directory enumeration + Apple vendor-id.
+    // Mirrors `PlatformDirectoryEntry` in PlatformAdapterBridge.h field-for-field
+    // with `rac_directory_entry_t` so we can memcpy entries straight across.
+    typedef struct PlatformDirectoryEntry {
+        char name[512];  // RAC_DIRECTORY_ENTRY_NAME_MAX
+        bool is_dir;
+        int64_t size_bytes;
+    } PlatformDirectoryEntry;
+
+    void PlatformAdapter_listDirectory(const char* dirPath,
+                                       PlatformDirectoryEntry* outEntries,
+                                       size_t* inOutCount,
+                                       int* outResult);
+    bool PlatformAdapter_isNonEmptyDirectory(const char* path);
+    int PlatformAdapter_getVendorId(char* outBuffer, size_t bufferSize);
 }
 #define LOGI(...) printf("[InitBridge] "); printf(__VA_ARGS__); printf("\n")
 #define LOGD(...) printf("[InitBridge DEBUG] "); printf(__VA_ARGS__); printf("\n")
@@ -634,6 +762,7 @@ struct SdkInitResultSummary {
 using ProtoBufferInitFn = void (*)(rac_proto_buffer_t*);
 using ProtoBufferFreeFn = void (*)(rac_proto_buffer_t*);
 using SdkInitProtoFn = rac_result_t (*)(const uint8_t*, size_t, rac_proto_buffer_t*);
+using SdkRetryHttpProtoFn = rac_result_t (*)(rac_proto_buffer_t*);
 
 template <typename Fn>
 Fn loadOptionalSymbol(const char* name) {
@@ -694,13 +823,13 @@ static void appendStringField(std::vector<uint8_t>& out,
     out.insert(out.end(), value.begin(), value.end());
 }
 
-static std::vector<uint8_t> makePhase1RequestBytes(SDKEnvironment environment,
+static std::vector<uint8_t> makePhase1RequestBytes(rac_environment_t environment,
                                                    const std::string& apiKey,
                                                    const std::string& baseURL,
                                                    const std::string& deviceId) {
     std::vector<uint8_t> bytes;
     appendVarint(bytes, 0x08);  // field 1: environment
-    appendVarint(bytes, static_cast<uint64_t>(InitBridge::toRacEnvironment(environment)));
+    appendVarint(bytes, static_cast<uint64_t>(environment));
     appendStringField(bytes, 2, apiKey);
     appendStringField(bytes, 3, baseURL);
     appendStringField(bytes, 4, deviceId);
@@ -871,6 +1000,48 @@ static rac_result_t callSdkInitProto(const char* symbolName,
 #endif
 }
 
+// rac_sdk_retry_http_proto takes no request bytes (output buffer only), so it
+// cannot reuse callSdkInitProto's request-bytes signature. Same buffer
+// lifecycle + feature-unavailable downgrade as the phase{1,2} path.
+static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary) {
+#if RN_HAS_RAC_SDK_INIT_HEADER
+#if defined(__APPLE__)
+    SdkRetryHttpProtoFn fn = rac_sdk_retry_http_proto;
+#else
+    SdkRetryHttpProtoFn fn = loadOptionalSymbol<SdkRetryHttpProtoFn>("rac_sdk_retry_http_proto");
+#endif
+    if (!fn) {
+        LOGW("rac_sdk_retry_http_proto unavailable in bundled RACommons");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+
+    rac_proto_buffer_t out;
+    initProtoBuffer(&out);
+    rac_result_t rc = fn(&out);
+    if (outSummary) {
+        *outSummary = parseSdkInitResult(out);
+    }
+
+    if (rc != RAC_SUCCESS) {
+        if (out.error_message) {
+            LOGE("rac_sdk_retry_http_proto failed: %s", out.error_message);
+        } else {
+            LOGE("rac_sdk_retry_http_proto failed: %d", rc);
+        }
+        freeProtoBuffer(&out);
+        return rc;
+    }
+
+    rac_result_t status = out.status;
+    freeProtoBuffer(&out);
+    return status;
+#else
+    (void)outSummary;
+    LOGW("rac_sdk_init.h unavailable in bundled headers; skipping HTTP retry");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
+}
+
 // =============================================================================
 // C Callback Implementations (called by RACommons)
 // =============================================================================
@@ -974,12 +1145,19 @@ static rac_result_t platformSecureGetCallback(
     try {
         std::string value = g_platformCallbacks->secureGet(key);
         if (value.empty()) {
-            return RAC_ERROR_SECURE_STORAGE_FAILED;
+            // Contract (rac_platform_adapter.h secure_get): a clean key-miss
+            // MUST return RAC_ERROR_FILE_NOT_FOUND so commons consumers (e.g.
+            // rac_device_get_or_create_persistent_id) can distinguish a benign
+            // miss from a real secure-storage failure. The JS/TS bridge
+            // signals the miss case by resolving with an empty string.
+            return RAC_ERROR_FILE_NOT_FOUND;
         }
 
         *outValue = strdup(value.c_str());
         return *outValue ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
     } catch (...) {
+        // Real failure path stays distinct from the not-found code so the
+        // discrimination above remains meaningful.
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
 }
@@ -1105,6 +1283,88 @@ static void platformTrackErrorCallback(const char* errorJson, void* userData) {
         LOGE("Track error: %s", errorJson);
     }
 }
+
+// =============================================================================
+// Directory Enumeration + Vendor ID Callbacks (Platform Adapter)
+//
+// Cross-SDK parity with Swift (CppBridge+PlatformAdapter), Kotlin
+// (CppBridgePlatformAdapter), and Flutter (dart_bridge_platform.dart) — the
+// commons model-registry refresh path and rac_model_info_make_proto rely on
+// these three slots being populated for rescan_local to succeed and for the
+// is_downloaded gating on multi-file artifacts (mmproj + GGUF pairs,
+// tokenizer + ONNX bundles) to report TRUE. See rac_platform_adapter.h.
+// =============================================================================
+
+static rac_result_t platformFileListDirectoryCallback(const char* dir_path,
+                                                      rac_directory_entry_t* out_entries,
+                                                      size_t* in_out_count,
+                                                      void* user_data) {
+    (void)user_data;
+    if (!dir_path || !in_out_count) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::fileListDirectory(dir_path, out_entries, in_out_count);
+#elif defined(__APPLE__)
+    // Use a stack/heap PlatformDirectoryEntry buffer that mirrors
+    // rac_directory_entry_t field-for-field so we can copy across without
+    // an additional marshalling pass.
+    int result = -805;  // RAC_ERROR_INTERNAL
+    if (!out_entries) {
+        PlatformAdapter_listDirectory(dir_path, nullptr, in_out_count, &result);
+        return static_cast<rac_result_t>(result);
+    }
+
+    const size_t capacity = *in_out_count;
+    std::vector<PlatformDirectoryEntry> buffer(capacity);
+    PlatformAdapter_listDirectory(dir_path, buffer.data(), in_out_count, &result);
+    if (result != 0) {
+        return static_cast<rac_result_t>(result);
+    }
+
+    const size_t written = *in_out_count;
+    for (size_t i = 0; i < written; ++i) {
+        std::memcpy(out_entries[i].name, buffer[i].name, RAC_DIRECTORY_ENTRY_NAME_MAX);
+        out_entries[i].is_dir = buffer[i].is_dir ? RAC_TRUE : RAC_FALSE;
+        out_entries[i].size_bytes = buffer[i].size_bytes;
+    }
+    return RAC_SUCCESS;
+#else
+    (void)out_entries;
+    return RAC_ERROR_NOT_SUPPORTED;
+#endif
+}
+
+static rac_bool_t platformIsNonEmptyDirectoryCallback(const char* path, void* user_data) {
+    (void)user_data;
+    if (!path) {
+        return RAC_FALSE;
+    }
+#if defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::isNonEmptyDirectory(path) ? RAC_TRUE : RAC_FALSE;
+#elif defined(__APPLE__)
+    return PlatformAdapter_isNonEmptyDirectory(path) ? RAC_TRUE : RAC_FALSE;
+#else
+    return RAC_FALSE;
+#endif
+}
+
+#if defined(__APPLE__)
+// Apple-only: populates UIDevice.identifierForVendor.uuidString into the
+// commons device-identity chain. Non-Apple platforms intentionally leave
+// adapter_.get_vendor_id NULL — commons then walks
+// secure_get -> synthesized UUID per the cross-SDK contract on
+// rac_platform_adapter.h:get_vendor_id (Android has no equivalent stable
+// per-app vendor ID).
+static rac_result_t platformGetVendorIdCallback(char* out_buffer,
+                                                size_t buffer_size,
+                                                void* user_data) {
+    (void)user_data;
+    int result = PlatformAdapter_getVendorId(out_buffer, buffer_size);
+    return static_cast<rac_result_t>(result);
+}
+#endif
 
 // =============================================================================
 // HTTP Download Callbacks (Platform Adapter)
@@ -1297,6 +1557,21 @@ void InitBridge::registerPlatformAdapter() {
     // Archive extraction (handled by JS layer)
     adapter_.extract_archive = nullptr;
 
+    // Directory enumeration + Apple
+    // vendor-id slots. Cross-SDK parity with Swift / Kotlin / Flutter / Web.
+    // file_list_directory + is_non_empty_directory are populated on both
+    // platforms (FileManager.contentsOfDirectory on iOS, java.io.File.listFiles
+    // on Android via JNI). get_vendor_id is Apple-only — Android leaves it
+    // NULL per the cross-SDK contract on rac_platform_adapter.h:get_vendor_id
+    // (commons synthesizes + persists a UUID via secure_set on Android).
+    adapter_.file_list_directory = platformFileListDirectoryCallback;
+    adapter_.is_non_empty_directory = platformIsNonEmptyDirectoryCallback;
+#if defined(__APPLE__)
+    adapter_.get_vendor_id = platformGetVendorIdCallback;
+#else
+    adapter_.get_vendor_id = nullptr;
+#endif
+
     adapter_.user_data = nullptr;
 
     // Register with RACommons
@@ -1309,21 +1584,8 @@ void InitBridge::registerPlatformAdapter() {
     }
 }
 
-rac_environment_t InitBridge::toRacEnvironment(SDKEnvironment env) {
-    switch (env) {
-        case SDKEnvironment::Development:
-            return RAC_ENV_DEVELOPMENT;
-        case SDKEnvironment::Staging:
-            return RAC_ENV_STAGING;
-        case SDKEnvironment::Production:
-            return RAC_ENV_PRODUCTION;
-        default:
-            return RAC_ENV_DEVELOPMENT;
-    }
-}
-
 rac_result_t InitBridge::initialize(
-    SDKEnvironment environment,
+    rac_environment_t environment,
     const std::string& apiKey,
     const std::string& baseURL,
     const std::string& deviceId
@@ -1342,8 +1604,7 @@ rac_result_t InitBridge::initialize(
     registerPlatformAdapter();
 
     // Step 2: Configure logging based on environment
-    rac_environment_t racEnv = toRacEnvironment(environment);
-    rac_result_t logResult = rac_configure_logging(racEnv);
+    rac_result_t logResult = rac_configure_logging(environment);
     if (logResult != RAC_SUCCESS) {
         LOGE("Failed to configure logging: %d", logResult);
         // Continue anyway - logging is not critical
@@ -1490,8 +1751,7 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     ) -> std::tuple<bool, int, std::string, std::string> {
         (void)requiresAuth;
 
-        rac_environment_t env = InitBridge::toRacEnvironment(
-            InitBridge::shared().getEnvironment());
+        rac_environment_t env = InitBridge::shared().getEnvironment();
         std::string baseURL;
         std::string token;
 
@@ -1557,6 +1817,32 @@ rac_result_t InitBridge::completeServicesInitialization() {
          phase2Summary.httpConfigured ? 1 : 0,
          phase2Summary.deviceRegistered ? 1 : 0,
          phase2Summary.linkedModelsCount);
+    return RAC_SUCCESS;
+}
+
+rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
+    outHttpConfigured = false;
+    if (!initialized_) {
+        LOGE("retryHTTPSetup called before initialize");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    SdkInitResultSummary summary;
+    rac_result_t result = callSdkRetryHttpProto(&summary);
+    // Feature-unavailable on older packaged natives is non-fatal — the JS
+    // layer still drives the platform-side auth round-trip.
+    if (result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
+        return RAC_SUCCESS;
+    }
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    outHttpConfigured = summary.httpConfigured;
+    if (!summary.warning.empty()) {
+        LOGI("HTTP retry warning: %s", summary.warning.c_str());
+    }
+    LOGI("HTTP retry complete (http=%d)", outHttpConfigured ? 1 : 0);
     return RAC_SUCCESS;
 }
 
@@ -1739,73 +2025,19 @@ bool InitBridge::secureExists(const std::string& key) {
 }
 
 std::string InitBridge::getPersistentDeviceUUID() {
-    // Key matches Swift: KeychainManager.KeychainKey.deviceUUID
-    static const char* DEVICE_UUID_KEY = "com.runanywhere.sdk.device.uuid";
-
-    // Thread-safe: cached result (matches Swift pattern)
-    static std::string cachedUUID;
-    static std::mutex uuidMutex;
-
-    {
-        std::lock_guard<std::mutex> lock(uuidMutex);
-        if (!cachedUUID.empty()) {
-            return cachedUUID;
-        }
+    // Delegate to the canonical commons resolver so RN shares one device-id
+    // stream with the native Swift / Kotlin SDKs. Commons walks
+    // secure_get -> get_vendor_id (Apple UIDevice.identifierForVendor, populated
+    // above) -> synthesized UUIDv4, then persists via secure_set. Caching,
+    // the secure-storage key, and UUID generation all live in commons; a local
+    // copy here is exactly the divergence rn-012 flags.
+    char buffer[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {0};
+    rac_result_t result = rac_device_get_or_create_persistent_id(buffer, sizeof(buffer));
+    if (result != RAC_SUCCESS) {
+        LOGE("rac_device_get_or_create_persistent_id failed: %d", result);
+        return "";
     }
-
-    // Strategy 1: Try to load from secure storage (survives reinstalls)
-    std::string storedUUID;
-    if (secureGet(DEVICE_UUID_KEY, storedUUID) && !storedUUID.empty()) {
-        std::lock_guard<std::mutex> lock(uuidMutex);
-        cachedUUID = storedUUID;
-        LOGI("Loaded persistent device UUID from keychain");
-        return cachedUUID;
-    }
-
-    // Strategy 2: Generate new UUID
-    // Generate a UUID4-like string: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    auto generateUUID = []() -> std::string {
-        static const char hexChars[] = "0123456789abcdef";
-
-        // Use high-resolution clock and random for seeding
-        auto now = std::chrono::high_resolution_clock::now();
-        auto seed = static_cast<unsigned>(
-            now.time_since_epoch().count() ^
-            reinterpret_cast<uintptr_t>(&now)
-        );
-        srand(seed);
-
-        char uuid[37];
-        for (int i = 0; i < 36; i++) {
-            if (i == 8 || i == 13 || i == 18 || i == 23) {
-                uuid[i] = '-';
-            } else if (i == 14) {
-                uuid[i] = '4'; // UUID version 4
-            } else if (i == 19) {
-                uuid[i] = hexChars[(rand() & 0x03) | 0x08]; // variant bits
-            } else {
-                uuid[i] = hexChars[rand() & 0x0F];
-            }
-        }
-        uuid[36] = '\0';
-        return std::string(uuid);
-    };
-
-    std::string newUUID = generateUUID();
-
-    // Store in secure storage
-    if (secureSet(DEVICE_UUID_KEY, newUUID)) {
-        LOGI("Generated and stored new persistent device UUID");
-    } else {
-        LOGW("Generated device UUID but failed to persist (will regenerate on restart)");
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(uuidMutex);
-        cachedUUID = newUUID;
-    }
-
-    return newUUID;
+    return std::string(buffer);
 }
 
 // =============================================================================

@@ -119,6 +119,23 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
     }
 }
 
+rac_inference_framework_t rac_model_category_default_framework(rac_model_category_t category) {
+    // Mirrors Swift's RAModelCategory.defaultFramework: the framework the SDK
+    // falls back to when a category has no explicit model framework resolved.
+    switch (category) {
+        case RAC_MODEL_CATEGORY_LANGUAGE:
+        case RAC_MODEL_CATEGORY_MULTIMODAL:
+            return RAC_FRAMEWORK_LLAMACPP;
+        case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION:
+        case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS:
+        case RAC_MODEL_CATEGORY_EMBEDDING:
+        case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+            return RAC_FRAMEWORK_ONNX;
+        default:
+            return RAC_FRAMEWORK_UNKNOWN;
+    }
+}
+
 // =============================================================================
 // INFERENCE FRAMEWORK FUNCTIONS
 // =============================================================================

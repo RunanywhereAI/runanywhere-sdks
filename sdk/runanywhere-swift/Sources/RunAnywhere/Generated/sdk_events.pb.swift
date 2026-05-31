@@ -50,7 +50,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -66,7 +66,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// RN's ComponentInitializationEvent.components: SDKComponent[] but not yet
 /// in any SDK's enum).
 /// ---------------------------------------------------------------------------
-public enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case stt // = 1
@@ -148,7 +148,7 @@ public enum RASDKComponent: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   Kotlin SDKEvent.kt:24-33          — PUBLIC_ONLY / ANALYTICS_ONLY / ALL
 ///   Dart   sdk_event.dart:20-29       — all / publicOnly / analyticsOnly
 /// ---------------------------------------------------------------------------
-public enum RAEventDestination: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAEventDestination: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -196,7 +196,7 @@ public enum RAEventDestination: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAInitializationStage: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAInitializationStage: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -252,7 +252,7 @@ public enum RAInitializationStage: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAConfigurationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAConfigurationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case fetchStarted // = 1
@@ -356,7 +356,7 @@ public enum RAConfigurationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case sessionStarted // = 1
@@ -484,7 +484,7 @@ public enum RAGenerationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAModelEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case loadStarted // = 1
@@ -598,7 +598,7 @@ public enum RAModelEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAVoiceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVoiceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -836,7 +836,7 @@ public enum RAVoiceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAPerformanceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAPerformanceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case memoryWarning // = 1
@@ -882,7 +882,7 @@ public enum RAPerformanceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RANetworkEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RANetworkEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case requestStarted // = 1
@@ -932,7 +932,7 @@ public enum RANetworkEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAStorageEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAStorageEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case infoRequested // = 1
@@ -1030,7 +1030,7 @@ public enum RAStorageEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAFrameworkEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAFrameworkEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case adapterRegistered // = 1
@@ -1112,7 +1112,7 @@ public enum RAFrameworkEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RADeviceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADeviceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case deviceInfoCollected // = 1
@@ -1194,7 +1194,7 @@ public enum RADeviceEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAComponentInitializationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAComponentInitializationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case componentInitEventKindUnspecified // = 0
   case componentInitEventKindInitializationStarted // = 1
@@ -1284,7 +1284,7 @@ public enum RAComponentInitializationEventKind: SwiftProtobuf.Enum, Swift.CaseIt
 
 }
 
-public enum RASessionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASessionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case created // = 1
@@ -1342,7 +1342,7 @@ public enum RASessionEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAAuthEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAAuthEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case requested // = 1
@@ -1400,7 +1400,7 @@ public enum RAAuthEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAModelRegistryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAModelRegistryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case refreshStarted // = 1
@@ -1506,7 +1506,7 @@ public enum RAModelRegistryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RADownloadEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RADownloadEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case planStarted // = 1
@@ -1588,7 +1588,7 @@ public enum RADownloadEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAStorageLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAStorageLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case infoStarted // = 1
@@ -1670,7 +1670,7 @@ public enum RAStorageLifecycleEventKind: SwiftProtobuf.Enum, Swift.CaseIterable 
 
 }
 
-public enum RAHardwareRoutingEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAHardwareRoutingEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case profileStarted // = 1
@@ -1728,7 +1728,7 @@ public enum RAHardwareRoutingEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RACapabilityOperationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RACapabilityOperationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case vlmStarted // = 1
@@ -1830,7 +1830,7 @@ public enum RACapabilityOperationEventKind: SwiftProtobuf.Enum, Swift.CaseIterab
 
 }
 
-public enum RATelemetryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RATelemetryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case counter // = 1
@@ -1876,7 +1876,7 @@ public enum RATelemetryEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RACancellationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RACancellationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case requested // = 1
@@ -1928,7 +1928,7 @@ public enum RACancellationEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Plus integrated "configurationLoaded" source field. NOT to be confused
 /// with `ComponentInitializationEvent` (per-component lifecycle).
 /// ---------------------------------------------------------------------------
-public struct RAInitializationEvent: Sendable {
+public nonisolated struct RAInitializationEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1954,7 +1954,7 @@ public struct RAInitializationEvent: Sendable {
 /// routing-policy / analytics-status changes. Mirrors RN
 ///   events.ts:49-66 (SDKConfigurationEvent: 17 variants).
 /// ---------------------------------------------------------------------------
-public struct RAConfigurationEvent: Sendable {
+public nonisolated struct RAConfigurationEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2003,7 +2003,7 @@ public struct RAConfigurationEvent: Sendable {
 ///   events.ts:72-89 (SDKGenerationEvent: 12 variants).
 /// Plus Kotlin LLMEvent (5 variants), Dart SDKGenerationEvent (4 factories).
 /// ---------------------------------------------------------------------------
-public struct RAGenerationEvent: @unchecked Sendable {
+public nonisolated struct RAGenerationEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2135,7 +2135,7 @@ public struct RAGenerationEvent: @unchecked Sendable {
   }
 
   /// For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-  /// Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+  /// Enables totalTokens = input_tokens + tokens_used analytics
   /// from the event stream alone.
   public var inputTokens: Int32 {
     get {_storage._inputTokens}
@@ -2156,7 +2156,7 @@ public struct RAGenerationEvent: @unchecked Sendable {
 /// Plus Kotlin ModelEvent (7 ModelEventType) and Dart SDKModelEvent (10
 /// concrete classes).
 /// ---------------------------------------------------------------------------
-public struct RAModelEvent: Sendable {
+public nonisolated struct RAModelEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2211,7 +2211,7 @@ public struct RAModelEvent: Sendable {
 /// pipeline events are exposed via SDKEvent.voice_pipeline; this message
 /// is exposed via SDKEvent.voice.
 /// ---------------------------------------------------------------------------
-public struct RAVoiceLifecycleEvent: Sendable {
+public nonisolated struct RAVoiceLifecycleEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2260,7 +2260,7 @@ public struct RAVoiceLifecycleEvent: Sendable {
 /// Performance metrics events. Mirrors RN
 ///   events.ts:193-197 (SDKPerformanceEvent: 4 variants).
 /// ---------------------------------------------------------------------------
-public struct RAPerformanceEvent: Sendable {
+public nonisolated struct RAPerformanceEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2292,7 +2292,7 @@ public struct RAPerformanceEvent: Sendable {
 /// Network events. Mirrors RN
 ///   events.ts:203-207 (SDKNetworkEvent: 4 variants).
 /// ---------------------------------------------------------------------------
-public struct RANetworkEvent: Sendable {
+public nonisolated struct RANetworkEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2324,7 +2324,7 @@ public struct RANetworkEvent: Sendable {
 ///   events.ts:213-226 (SDKStorageEvent: 13 variants).
 /// Plus Dart SDKStorageEvent (cacheCleared, tempFilesCleaned).
 /// ---------------------------------------------------------------------------
-public struct RAStorageEvent: Sendable {
+public nonisolated struct RAStorageEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2362,7 +2362,7 @@ public struct RAStorageEvent: Sendable {
 /// Framework registry events. Mirrors RN
 ///   events.ts:232-251 (SDKFrameworkEvent: 11 variants).
 /// ---------------------------------------------------------------------------
-public struct RAFrameworkEvent: Sendable {
+public nonisolated struct RAFrameworkEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2406,7 +2406,7 @@ public struct RAFrameworkEvent: Sendable {
 /// already emits these as raw `BaseSDKEvent`s with category=device).
 /// Mirrors RN events.ts:257-264 (SDKDeviceEvent: 7 variants).
 /// ---------------------------------------------------------------------------
-public struct RADeviceEvent: Sendable {
+public nonisolated struct RADeviceEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2457,7 +2457,7 @@ public struct RADeviceEvent: Sendable {
 ///   events.ts:270-312 (ComponentInitializationEvent: 16 variants).
 /// Distinct from `InitializationEvent` (overall SDK lifecycle).
 /// ---------------------------------------------------------------------------
-public struct RAComponentInitializationEvent: Sendable {
+public nonisolated struct RAComponentInitializationEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2513,7 +2513,7 @@ public struct RAComponentInitializationEvent: Sendable {
 }
 
 /// Snapshot of a component's current model-backed lifecycle state.
-public struct RAComponentLifecycleSnapshot: Sendable {
+public nonisolated struct RAComponentLifecycleSnapshot: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2552,7 +2552,7 @@ public struct RAComponentLifecycleSnapshot: Sendable {
   fileprivate var _model: RAModelInfo? = nil
 }
 
-public struct RAComponentLifecycleSnapshotRequest: Sendable {
+public nonisolated struct RAComponentLifecycleSnapshotRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2566,7 +2566,7 @@ public struct RAComponentLifecycleSnapshotRequest: Sendable {
   public init() {}
 }
 
-public struct RAComponentLifecycleSnapshotResult: Sendable {
+public nonisolated struct RAComponentLifecycleSnapshotResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2585,7 +2585,7 @@ public struct RAComponentLifecycleSnapshotResult: Sendable {
 /// Operation-aware lifecycle event. The oneof arms intentionally reference the
 /// operation result/progress protos from this contract slice instead of adding
 /// another broad event taxonomy.
-public struct RAComponentLifecycleEvent: Sendable {
+public nonisolated struct RAComponentLifecycleEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2676,7 +2676,7 @@ public struct RAComponentLifecycleEvent: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Payload: Equatable, Sendable {
+  public nonisolated enum OneOf_Payload: Equatable, Sendable {
     case modelLoadResult(RAModelLoadResult)
     case modelUnloadResult(RAModelUnloadResult)
     case modelDeleteResult(RAModelDeleteResult)
@@ -2693,7 +2693,7 @@ public struct RAComponentLifecycleEvent: Sendable {
 }
 
 /// SDK session lifecycle independent of voice-agent turn sessions.
-public struct RASessionEvent: Sendable {
+public nonisolated struct RASessionEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2717,7 +2717,7 @@ public struct RASessionEvent: Sendable {
   public init() {}
 }
 
-public struct RAAuthEvent: Sendable {
+public nonisolated struct RAAuthEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2737,7 +2737,7 @@ public struct RAAuthEvent: Sendable {
   public init() {}
 }
 
-public struct RAModelRegistryEvent: @unchecked Sendable {
+public nonisolated struct RAModelRegistryEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2840,7 +2840,7 @@ public struct RAModelRegistryEvent: @unchecked Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Result: Equatable, Sendable {
+  public nonisolated enum OneOf_Result: Equatable, Sendable {
     case refreshResult(RAModelRegistryRefreshResult)
     case listResult(RAModelListResult)
     case getResult(RAModelGetResult)
@@ -2856,7 +2856,7 @@ public struct RAModelRegistryEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RADownloadEvent: Sendable {
+public nonisolated struct RADownloadEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2913,7 +2913,7 @@ public struct RADownloadEvent: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Payload: Equatable, Sendable {
+  public nonisolated enum OneOf_Payload: Equatable, Sendable {
     case planResult(RADownloadPlanResult)
     case startResult(RADownloadStartResult)
     case progress(RADownloadProgress)
@@ -2925,7 +2925,7 @@ public struct RADownloadEvent: Sendable {
   public init() {}
 }
 
-public struct RAStorageLifecycleEvent: @unchecked Sendable {
+public nonisolated struct RAStorageLifecycleEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2994,7 +2994,7 @@ public struct RAStorageLifecycleEvent: @unchecked Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Result: Equatable, Sendable {
+  public nonisolated enum OneOf_Result: Equatable, Sendable {
     case infoResult(RAStorageInfoResult)
     case availabilityResult(RAStorageAvailabilityResult)
     case deletePlan(RAStorageDeletePlan)
@@ -3007,7 +3007,7 @@ public struct RAStorageLifecycleEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAHardwareRoutingEvent: @unchecked Sendable {
+public nonisolated struct RAHardwareRoutingEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3063,7 +3063,7 @@ public struct RAHardwareRoutingEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RACapabilityOperationEvent: Sendable {
+public nonisolated struct RACapabilityOperationEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3093,7 +3093,7 @@ public struct RACapabilityOperationEvent: Sendable {
   public init() {}
 }
 
-public struct RATelemetryEvent: Sendable {
+public nonisolated struct RATelemetryEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3113,7 +3113,7 @@ public struct RATelemetryEvent: Sendable {
   public init() {}
 }
 
-public struct RACancellationEvent: Sendable {
+public nonisolated struct RACancellationEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3133,7 +3133,7 @@ public struct RACancellationEvent: Sendable {
   public init() {}
 }
 
-public struct RAFailureEvent: @unchecked Sendable {
+public nonisolated struct RAFailureEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3179,7 +3179,7 @@ public struct RAFailureEvent: @unchecked Sendable {
 /// Interrupted / StateChange / Error / Metrics). Higher-level voice
 /// lifecycle events live in this file's `voice` field.
 /// ---------------------------------------------------------------------------
-public struct RASDKEvent: @unchecked Sendable {
+public nonisolated struct RASDKEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3467,7 +3467,7 @@ public struct RASDKEvent: @unchecked Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Event: Equatable, Sendable {
+  public nonisolated enum OneOf_Event: Equatable, Sendable {
     case initialization(RAInitializationEvent)
     case configuration(RAConfigurationEvent)
     case generation(RAGenerationEvent)
@@ -3503,7 +3503,7 @@ public struct RASDKEvent: @unchecked Sendable {
 /// Subscription-side filter for the canonical SDKEvent stream. Empty fields are
 /// wildcards; implementations match populated fields against the envelope fields
 /// above without interpreting payload-specific data.
-public struct RASDKEventFilter: Sendable {
+public nonisolated struct RASDKEventFilter: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3531,7 +3531,7 @@ public struct RASDKEventFilter: Sendable {
   public init() {}
 }
 
-public struct RASDKEventPublishRequest: Sendable {
+public nonisolated struct RASDKEventPublishRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3557,7 +3557,7 @@ public struct RASDKEventPublishRequest: Sendable {
   fileprivate var _event: RASDKEvent? = nil
 }
 
-public struct RASDKEventPublishResult: @unchecked Sendable {
+public nonisolated struct RASDKEventPublishResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3605,7 +3605,7 @@ public struct RASDKEventPublishResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RASDKEventSubscribeRequest: Sendable {
+public nonisolated struct RASDKEventSubscribeRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3633,97 +3633,97 @@ public struct RASDKEventSubscribeRequest: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RASDKComponent: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKComponent: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SDK_COMPONENT_UNSPECIFIED\0\u{1}SDK_COMPONENT_STT\0\u{1}SDK_COMPONENT_TTS\0\u{1}SDK_COMPONENT_VAD\0\u{1}SDK_COMPONENT_LLM\0\u{1}SDK_COMPONENT_VLM\0\u{1}SDK_COMPONENT_DIFFUSION\0\u{1}SDK_COMPONENT_RAG\0\u{1}SDK_COMPONENT_EMBEDDINGS\0\u{1}SDK_COMPONENT_VOICE_AGENT\0\u{1}SDK_COMPONENT_WAKEWORD\0\u{1}SDK_COMPONENT_SPEAKER_DIARIZATION\0")
 }
 
-extension RAEventDestination: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEventDestination: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_DESTINATION_UNSPECIFIED\0\u{1}EVENT_DESTINATION_ALL\0\u{1}EVENT_DESTINATION_PUBLIC_ONLY\0\u{1}EVENT_DESTINATION_ANALYTICS_ONLY\0")
 }
 
-extension RAInitializationStage: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAInitializationStage: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INITIALIZATION_STAGE_UNSPECIFIED\0\u{1}INITIALIZATION_STAGE_STARTED\0\u{1}INITIALIZATION_STAGE_CONFIGURATION_LOADED\0\u{1}INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED\0\u{1}INITIALIZATION_STAGE_COMPLETED\0\u{1}INITIALIZATION_STAGE_FAILED\0\u{1}INITIALIZATION_STAGE_SHUTDOWN\0")
 }
 
-extension RAConfigurationEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAConfigurationEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CONFIGURATION_EVENT_KIND_UNSPECIFIED\0\u{1}CONFIGURATION_EVENT_KIND_FETCH_STARTED\0\u{1}CONFIGURATION_EVENT_KIND_FETCH_COMPLETED\0\u{1}CONFIGURATION_EVENT_KIND_FETCH_FAILED\0\u{1}CONFIGURATION_EVENT_KIND_LOADED\0\u{1}CONFIGURATION_EVENT_KIND_UPDATED\0\u{1}CONFIGURATION_EVENT_KIND_SYNC_STARTED\0\u{1}CONFIGURATION_EVENT_KIND_SYNC_COMPLETED\0\u{1}CONFIGURATION_EVENT_KIND_SYNC_FAILED\0\u{1}CONFIGURATION_EVENT_KIND_SYNC_REQUESTED\0\u{1}CONFIGURATION_EVENT_KIND_SETTINGS_REQUESTED\0\u{1}CONFIGURATION_EVENT_KIND_SETTINGS_RETRIEVED\0\u{1}CONFIGURATION_EVENT_KIND_ROUTING_POLICY_REQUESTED\0\u{1}CONFIGURATION_EVENT_KIND_ROUTING_POLICY_RETRIEVED\0\u{1}CONFIGURATION_EVENT_KIND_PRIVACY_MODE_REQUESTED\0\u{1}CONFIGURATION_EVENT_KIND_PRIVACY_MODE_RETRIEVED\0\u{1}CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_REQUESTED\0\u{1}CONFIGURATION_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED\0\u{1}CONFIGURATION_EVENT_KIND_CHANGED\0")
 }
 
-extension RAGenerationEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAGenerationEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0GENERATION_EVENT_KIND_UNSPECIFIED\0\u{1}GENERATION_EVENT_KIND_SESSION_STARTED\0\u{1}GENERATION_EVENT_KIND_SESSION_ENDED\0\u{1}GENERATION_EVENT_KIND_STARTED\0\u{1}GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED\0\u{1}GENERATION_EVENT_KIND_TOKEN_GENERATED\0\u{1}GENERATION_EVENT_KIND_STREAMING_UPDATE\0\u{1}GENERATION_EVENT_KIND_COMPLETED\0\u{1}GENERATION_EVENT_KIND_FAILED\0\u{1}GENERATION_EVENT_KIND_MODEL_LOADED\0\u{1}GENERATION_EVENT_KIND_MODEL_UNLOADED\0\u{1}GENERATION_EVENT_KIND_COST_CALCULATED\0\u{1}GENERATION_EVENT_KIND_ROUTING_DECISION\0\u{1}GENERATION_EVENT_KIND_STREAM_COMPLETED\0\u{1}GENERATION_EVENT_KIND_CANCEL_REQUESTED\0\u{1}GENERATION_EVENT_KIND_CANCELLED\0\u{1}GENERATION_EVENT_KIND_TOOL_CALL_STARTED\0\u{1}GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED\0\u{1}GENERATION_EVENT_KIND_TOOL_CALL_FAILED\0\u{1}GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED\0\u{1}GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED\0\u{1}GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED\0\u{1}GENERATION_EVENT_KIND_THINKING_STARTED\0\u{1}GENERATION_EVENT_KIND_THINKING_DELTA\0\u{1}GENERATION_EVENT_KIND_THINKING_COMPLETED\0")
 }
 
-extension RAModelEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_EVENT_KIND_UNSPECIFIED\0\u{1}MODEL_EVENT_KIND_LOAD_STARTED\0\u{1}MODEL_EVENT_KIND_LOAD_PROGRESS\0\u{1}MODEL_EVENT_KIND_LOAD_COMPLETED\0\u{1}MODEL_EVENT_KIND_LOAD_FAILED\0\u{1}MODEL_EVENT_KIND_UNLOAD_STARTED\0\u{1}MODEL_EVENT_KIND_UNLOAD_COMPLETED\0\u{1}MODEL_EVENT_KIND_UNLOAD_FAILED\0\u{1}MODEL_EVENT_KIND_DOWNLOAD_STARTED\0\u{1}MODEL_EVENT_KIND_DOWNLOAD_PROGRESS\0\u{1}MODEL_EVENT_KIND_DOWNLOAD_COMPLETED\0\u{1}MODEL_EVENT_KIND_DOWNLOAD_FAILED\0\u{1}MODEL_EVENT_KIND_DOWNLOAD_CANCELLED\0\u{1}MODEL_EVENT_KIND_LIST_REQUESTED\0\u{1}MODEL_EVENT_KIND_LIST_COMPLETED\0\u{1}MODEL_EVENT_KIND_LIST_FAILED\0\u{1}MODEL_EVENT_KIND_CATALOG_LOADED\0\u{1}MODEL_EVENT_KIND_DELETE_STARTED\0\u{1}MODEL_EVENT_KIND_DELETE_COMPLETED\0\u{1}MODEL_EVENT_KIND_DELETE_FAILED\0\u{1}MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED\0\u{1}MODEL_EVENT_KIND_BUILT_IN_REGISTERED\0")
 }
 
-extension RAVoiceEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_EVENT_KIND_UNSPECIFIED\0\u{1}VOICE_EVENT_KIND_LISTENING_STARTED\0\u{1}VOICE_EVENT_KIND_LISTENING_ENDED\0\u{1}VOICE_EVENT_KIND_SPEECH_DETECTED\0\u{1}VOICE_EVENT_KIND_TRANSCRIPTION_STARTED\0\u{1}VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL\0\u{1}VOICE_EVENT_KIND_TRANSCRIPTION_FINAL\0\u{1}VOICE_EVENT_KIND_RESPONSE_GENERATED\0\u{1}VOICE_EVENT_KIND_SYNTHESIS_STARTED\0\u{1}VOICE_EVENT_KIND_AUDIO_GENERATED\0\u{1}VOICE_EVENT_KIND_SYNTHESIS_COMPLETED\0\u{1}VOICE_EVENT_KIND_SYNTHESIS_FAILED\0\u{1}VOICE_EVENT_KIND_PIPELINE_STARTED\0\u{1}VOICE_EVENT_KIND_PIPELINE_COMPLETED\0\u{1}VOICE_EVENT_KIND_PIPELINE_ERROR\0\u{1}VOICE_EVENT_KIND_VAD_STARTED\0\u{1}VOICE_EVENT_KIND_VAD_DETECTED\0\u{1}VOICE_EVENT_KIND_VAD_ENDED\0\u{1}VOICE_EVENT_KIND_VAD_INITIALIZED\0\u{1}VOICE_EVENT_KIND_VAD_STOPPED\0\u{1}VOICE_EVENT_KIND_VAD_CLEANED_UP\0\u{1}VOICE_EVENT_KIND_SPEECH_STARTED\0\u{1}VOICE_EVENT_KIND_SPEECH_ENDED\0\u{1}VOICE_EVENT_KIND_STT_PROCESSING\0\u{1}VOICE_EVENT_KIND_STT_PARTIAL_RESULT\0\u{1}VOICE_EVENT_KIND_STT_COMPLETED\0\u{1}VOICE_EVENT_KIND_STT_FAILED\0\u{1}VOICE_EVENT_KIND_LLM_PROCESSING\0\u{1}VOICE_EVENT_KIND_TTS_PROCESSING\0\u{1}VOICE_EVENT_KIND_RECORDING_STARTED\0\u{1}VOICE_EVENT_KIND_RECORDING_STOPPED\0\u{1}VOICE_EVENT_KIND_PLAYBACK_STARTED\0\u{1}VOICE_EVENT_KIND_PLAYBACK_COMPLETED\0\u{1}VOICE_EVENT_KIND_PLAYBACK_STOPPED\0\u{1}VOICE_EVENT_KIND_PLAYBACK_PAUSED\0\u{1}VOICE_EVENT_KIND_PLAYBACK_RESUMED\0\u{1}VOICE_EVENT_KIND_PLAYBACK_FAILED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_STARTED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_LISTENING\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_STOPPED\0\u{1}VOICE_EVENT_KIND_VOICE_SESSION_ERROR\0")
 }
 
-extension RAPerformanceEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPerformanceEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PERFORMANCE_EVENT_KIND_UNSPECIFIED\0\u{1}PERFORMANCE_EVENT_KIND_MEMORY_WARNING\0\u{1}PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED\0\u{1}PERFORMANCE_EVENT_KIND_LATENCY_MEASURED\0\u{1}PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED\0")
 }
 
-extension RANetworkEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RANetworkEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0NETWORK_EVENT_KIND_UNSPECIFIED\0\u{1}NETWORK_EVENT_KIND_REQUEST_STARTED\0\u{1}NETWORK_EVENT_KIND_REQUEST_COMPLETED\0\u{1}NETWORK_EVENT_KIND_REQUEST_FAILED\0\u{1}NETWORK_EVENT_KIND_REQUEST_TIMEOUT\0\u{1}NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED\0")
 }
 
-extension RAStorageEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STORAGE_EVENT_KIND_UNSPECIFIED\0\u{1}STORAGE_EVENT_KIND_INFO_REQUESTED\0\u{1}STORAGE_EVENT_KIND_INFO_RETRIEVED\0\u{1}STORAGE_EVENT_KIND_MODELS_REQUESTED\0\u{1}STORAGE_EVENT_KIND_MODELS_RETRIEVED\0\u{1}STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED\0\u{1}STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED\0\u{1}STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED\0\u{1}STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED\0\u{1}STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED\0\u{1}STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED\0\u{1}STORAGE_EVENT_KIND_DELETE_MODEL_STARTED\0\u{1}STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED\0\u{1}STORAGE_EVENT_KIND_DELETE_MODEL_FAILED\0\u{1}STORAGE_EVENT_KIND_CACHE_HIT\0\u{1}STORAGE_EVENT_KIND_CACHE_MISS\0\u{1}STORAGE_EVENT_KIND_EVICTION\0\u{1}STORAGE_EVENT_KIND_DISK_FULL\0")
 }
 
-extension RAFrameworkEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAFrameworkEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0FRAMEWORK_EVENT_KIND_UNSPECIFIED\0\u{1}FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED\0\u{1}FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED\0\u{1}FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED\0\u{1}FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED\0\u{1}FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED\0\u{1}FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED\0\u{1}FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED\0\u{1}FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED\0\u{1}FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED\0\u{1}FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED\0\u{1}FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED\0\u{1}FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED\0\u{1}FRAMEWORK_EVENT_KIND_ERROR\0")
 }
 
-extension RADeviceEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADeviceEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DEVICE_EVENT_KIND_UNSPECIFIED\0\u{1}DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED\0\u{1}DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED\0\u{1}DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED\0\u{1}DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED\0\u{1}DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED\0\u{1}DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED\0\u{1}DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED\0\u{1}DEVICE_EVENT_KIND_BATTERY_CHANGED\0\u{1}DEVICE_EVENT_KIND_THERMAL_CHANGED\0\u{1}DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED\0\u{1}DEVICE_EVENT_KIND_DEVICE_REGISTERED\0\u{1}DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED\0")
 }
 
-extension RAComponentInitializationEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentInitializationEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_INIT_EVENT_KIND_UNSPECIFIED\0\u{1}COMPONENT_INIT_EVENT_KIND_INITIALIZATION_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_INITIALIZATION_COMPLETED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_STATE_CHANGED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_CHECKING\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_REQUIRED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_PROGRESS\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_COMPLETED\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_INITIALIZING\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_READY\0\u{1}COMPONENT_INIT_EVENT_KIND_COMPONENT_FAILED\0\u{1}COMPONENT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STARTED\0\u{1}COMPONENT_INIT_EVENT_KIND_ALL_COMPONENTS_READY\0\u{1}COMPONENT_INIT_EVENT_KIND_SOME_COMPONENTS_READY\0")
 }
 
-extension RASessionEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASessionEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SESSION_EVENT_KIND_UNSPECIFIED\0\u{1}SESSION_EVENT_KIND_CREATED\0\u{1}SESSION_EVENT_KIND_STARTED\0\u{1}SESSION_EVENT_KIND_RESUMED\0\u{1}SESSION_EVENT_KIND_PAUSED\0\u{1}SESSION_EVENT_KIND_ENDED\0\u{1}SESSION_EVENT_KIND_EXPIRED\0\u{1}SESSION_EVENT_KIND_FAILED\0")
 }
 
-extension RAAuthEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAuthEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUTH_EVENT_KIND_UNSPECIFIED\0\u{1}AUTH_EVENT_KIND_REQUESTED\0\u{1}AUTH_EVENT_KIND_SUCCEEDED\0\u{1}AUTH_EVENT_KIND_FAILED\0\u{1}AUTH_EVENT_KIND_TOKEN_REFRESHED\0\u{1}AUTH_EVENT_KIND_TOKEN_EXPIRED\0\u{1}AUTH_EVENT_KIND_DEVICE_REGISTERED\0\u{1}AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED\0")
 }
 
-extension RAModelRegistryEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED\0\u{1}MODEL_REGISTRY_EVENT_KIND_REFRESH_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_REFRESH_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_IMPORT_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_IMPORT_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED\0\u{1}MODEL_REGISTRY_EVENT_KIND_LIST_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_LIST_FAILED\0\u{1}MODEL_REGISTRY_EVENT_KIND_GET_STARTED\0\u{1}MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED\0\u{1}MODEL_REGISTRY_EVENT_KIND_GET_FAILED\0")
 }
 
-extension RADownloadEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOWNLOAD_EVENT_KIND_UNSPECIFIED\0\u{1}DOWNLOAD_EVENT_KIND_PLAN_STARTED\0\u{1}DOWNLOAD_EVENT_KIND_PLAN_COMPLETED\0\u{1}DOWNLOAD_EVENT_KIND_PLAN_FAILED\0\u{1}DOWNLOAD_EVENT_KIND_STARTED\0\u{1}DOWNLOAD_EVENT_KIND_PROGRESS\0\u{1}DOWNLOAD_EVENT_KIND_CANCEL_REQUESTED\0\u{1}DOWNLOAD_EVENT_KIND_CANCELLED\0\u{1}DOWNLOAD_EVENT_KIND_RESUME_REQUESTED\0\u{1}DOWNLOAD_EVENT_KIND_RESUMED\0\u{1}DOWNLOAD_EVENT_KIND_COMPLETED\0\u{1}DOWNLOAD_EVENT_KIND_FAILED\0\u{1}DOWNLOAD_EVENT_KIND_PAUSED\0\u{1}DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED\0")
 }
 
-extension RAStorageLifecycleEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageLifecycleEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREATED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_COMPLETED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED\0\u{1}STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED\0")
 }
 
-extension RAHardwareRoutingEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareRoutingEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_DETECTED\0\u{1}HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING\0")
 }
 
-extension RACapabilityOperationEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RACapabilityOperationEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED\0\u{1}CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED\0")
 }
 
-extension RATelemetryEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATelemetryEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TELEMETRY_EVENT_KIND_UNSPECIFIED\0\u{1}TELEMETRY_EVENT_KIND_COUNTER\0\u{1}TELEMETRY_EVENT_KIND_GAUGE\0\u{1}TELEMETRY_EVENT_KIND_HISTOGRAM\0\u{1}TELEMETRY_EVENT_KIND_TRACE\0")
 }
 
-extension RACancellationEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RACancellationEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CANCELLATION_EVENT_KIND_UNSPECIFIED\0\u{1}CANCELLATION_EVENT_KIND_REQUESTED\0\u{1}CANCELLATION_EVENT_KIND_ACKNOWLEDGED\0\u{1}CANCELLATION_EVENT_KIND_COMPLETED\0\u{1}CANCELLATION_EVENT_KIND_FAILED\0")
 }
 
-extension RAInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".InitializationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}stage\0\u{1}source\0\u{1}error\0\u{1}version\0")
 
@@ -3768,7 +3768,7 @@ extension RAInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAConfigurationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAConfigurationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ConfigurationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}source\0\u{1}error\0\u{3}changed_keys\0\u{3}settings_json\0\u{3}routing_policy\0\u{3}privacy_mode\0\u{3}analytics_enabled\0\u{3}old_value_json\0\u{3}new_value_json\0")
 
@@ -3843,7 +3843,7 @@ extension RAConfigurationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GenerationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0\u{3}input_tokens\0")
 
@@ -4070,7 +4070,7 @@ extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAModelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}task_id\0\u{1}progress\0\u{3}bytes_downloaded\0\u{3}total_bytes\0\u{3}download_state\0\u{3}local_path\0\u{1}error\0\u{3}model_count\0\u{3}custom_model_name\0\u{3}custom_model_url\0")
 
@@ -4155,7 +4155,7 @@ extension RAModelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceLifecycleEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}text\0\u{1}confidence\0\u{3}response_text\0\u{3}audio_base64\0\u{3}duration_ms\0\u{3}audio_level\0\u{1}transcription\0\u{3}turn_response\0\u{3}turn_audio_base64\0\u{1}error\0")
 
@@ -4240,7 +4240,7 @@ extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAPerformanceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAPerformanceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PerformanceEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}memory_bytes\0\u{3}thermal_state\0\u{1}operation\0\u{1}milliseconds\0\u{3}tokens_per_second\0")
 
@@ -4295,7 +4295,7 @@ extension RAPerformanceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RANetworkEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RANetworkEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".NetworkEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}url\0\u{3}status_code\0\u{3}is_online\0\u{1}error\0\u{3}latency_ms\0")
 
@@ -4350,7 +4350,7 @@ extension RANetworkEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RAStorageEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{1}error\0\u{3}total_bytes\0\u{3}available_bytes\0\u{3}used_bytes\0\u{3}stored_model_count\0\u{3}cache_key\0\u{3}evicted_bytes\0")
 
@@ -4420,7 +4420,7 @@ extension RAStorageEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RAFrameworkEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAFrameworkEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FrameworkEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}framework\0\u{3}adapter_name\0\u{3}adapter_count\0\u{3}framework_count\0\u{3}model_count\0\u{1}modality\0\u{1}error\0")
 
@@ -4485,7 +4485,7 @@ extension RAFrameworkEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RADeviceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADeviceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeviceEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}device_id\0\u{3}os_name\0\u{3}os_version\0\u{1}model\0\u{1}error\0\u{1}property\0\u{3}new_value\0\u{3}old_value\0\u{3}battery_level\0\u{3}is_charging\0\u{3}thermal_state\0\u{3}is_connected\0\u{3}connection_type\0")
 
@@ -4580,7 +4580,7 @@ extension RADeviceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentInitializationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}model_id\0\u{3}size_bytes\0\u{1}progress\0\u{1}error\0\u{3}old_state\0\u{3}new_state\0\u{1}components\0\u{3}ready_components\0\u{3}pending_components\0\u{3}init_success\0\u{3}ready_count\0\u{3}failed_count\0\u{3}previous_lifecycle_state\0\u{3}current_lifecycle_state\0")
 
@@ -4685,7 +4685,7 @@ extension RAComponentInitializationEvent: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension RAComponentLifecycleSnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentLifecycleSnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentLifecycleSnapshot"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{1}state\0\u{3}model_id\0\u{3}updated_at_ms\0\u{3}error_message\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}loaded_at_unix_ms\0\u{1}model\0")
 
@@ -4764,7 +4764,7 @@ extension RAComponentLifecycleSnapshot: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RAComponentLifecycleSnapshotRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentLifecycleSnapshotRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentLifecycleSnapshotRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{3}include_model\0")
 
@@ -4799,7 +4799,7 @@ extension RAComponentLifecycleSnapshotRequest: SwiftProtobuf.Message, SwiftProto
   }
 }
 
-extension RAComponentLifecycleSnapshotResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentLifecycleSnapshotResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentLifecycleSnapshotResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}snapshots\0\u{3}error_message\0")
 
@@ -4839,7 +4839,7 @@ extension RAComponentLifecycleSnapshotResult: SwiftProtobuf.Message, SwiftProtob
   }
 }
 
-extension RAComponentLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ComponentLifecycleEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{3}previous_state\0\u{3}current_state\0\u{3}model_id\0\u{3}timestamp_ms\0\u{4}\u{5}model_load_result\0\u{3}model_unload_result\0\u{3}model_delete_result\0\u{3}download_progress\0\u{3}storage_availability\0\u{3}storage_delete_result\0\u{1}snapshot\0\u{3}snapshot_result\0\u{3}storage_delete_plan\0")
 
@@ -5050,7 +5050,7 @@ extension RAComponentLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RASessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SessionEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{3}user_id\0\u{1}reason\0\u{1}error\0\u{3}started_at_ms\0\u{3}ended_at_ms\0")
 
@@ -5110,7 +5110,7 @@ extension RASessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RAAuthEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAAuthEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AuthEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}provider\0\u{3}subject_id\0\u{1}scope\0\u{1}error\0")
 
@@ -5160,7 +5160,7 @@ extension RAAuthEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RAModelRegistryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAModelRegistryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelRegistryEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}assignment_id\0\u{3}assigned_component\0\u{1}framework\0\u{3}source_path\0\u{1}error\0\u{4}\u{d}refresh_result\0\u{3}list_result\0\u{3}get_result\0\u{3}import_result\0\u{3}discovery_result\0\u{3}compatibility_result\0\u{3}current_model_result\0")
 
@@ -5397,7 +5397,7 @@ extension RAModelRegistryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RADownloadEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RADownloadEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DownloadEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}task_id\0\u{1}error\0\u{4}\u{10}plan_result\0\u{3}start_result\0\u{1}progress\0\u{3}cancel_result\0\u{3}resume_result\0")
 
@@ -5535,7 +5535,7 @@ extension RADownloadEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RAStorageLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStorageLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageLifecycleEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}cache_key\0\u{1}bytes\0\u{1}error\0\u{4}\u{f}info_result\0\u{3}availability_result\0\u{3}delete_plan\0\u{3}delete_result\0")
 
@@ -5707,7 +5707,7 @@ extension RAStorageLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RAHardwareRoutingEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAHardwareRoutingEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".HardwareRoutingEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{1}framework\0\u{1}capability\0\u{1}route\0\u{1}reason\0\u{1}error\0\u{4}\u{d}hardware_profile\0")
 
@@ -5826,7 +5826,7 @@ extension RAHardwareRoutingEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RACapabilityOperationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RACapabilityOperationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CapabilityOperationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}model_id\0\u{3}operation_id\0\u{1}operation\0\u{1}progress\0\u{3}input_count\0\u{3}output_count\0\u{3}result_json\0\u{1}error\0")
 
@@ -5901,7 +5901,7 @@ extension RACapabilityOperationEvent: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension RATelemetryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATelemetryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TelemetryEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}name\0\u{1}attributes\0\u{1}value\0\u{1}unit\0")
 
@@ -5951,7 +5951,7 @@ extension RATelemetryEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RACancellationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RACancellationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CancellationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{1}component\0\u{3}operation_id\0\u{1}reason\0\u{3}user_initiated\0")
 
@@ -6001,7 +6001,7 @@ extension RACancellationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAFailureEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAFailureEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".FailureEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}component\0\u{1}operation\0\u{1}error\0\u{1}recoverable\0")
 
@@ -6092,7 +6092,7 @@ extension RAFailureEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}initialization\0\u{1}configuration\0\u{1}generation\0\u{1}model\0\u{1}performance\0\u{1}network\0\u{1}storage\0\u{1}framework\0\u{1}device\0\u{3}component_init\0\u{1}id\0\u{3}session_id\0\u{1}destination\0\u{1}properties\0\u{1}voice\0\u{3}voice_pipeline\0\u{3}component_lifecycle\0\u{1}category\0\u{1}component\0\u{1}error\0\u{1}session\0\u{1}auth\0\u{3}model_registry\0\u{1}download\0\u{3}storage_lifecycle\0\u{3}hardware_routing\0\u{1}capability\0\u{1}telemetry\0\u{1}cancellation\0\u{1}failure\0\u{3}operation_id\0\u{3}correlation_id\0\u{1}source\0\u{3}trace_id\0")
 
@@ -6649,7 +6649,7 @@ extension RASDKEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension RASDKEventFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKEventFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKEventFilter"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}categories\0\u{1}components\0\u{1}destinations\0\u{3}minimum_severity\0\u{3}session_id\0\u{3}operation_id\0\u{3}correlation_id\0\u{1}source\0\u{3}trace_id\0")
 
@@ -6719,7 +6719,7 @@ extension RASDKEventFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RASDKEventPublishRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKEventPublishRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKEventPublishRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}event\0\u{3}normalize_envelope\0")
 
@@ -6758,7 +6758,7 @@ extension RASDKEventPublishRequest: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RASDKEventPublishResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKEventPublishResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKEventPublishResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}accepted\0\u{3}event_id\0\u{3}normalized_event\0\u{3}error_message\0\u{1}error\0")
 
@@ -6856,7 +6856,7 @@ extension RASDKEventPublishResult: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension RASDKEventSubscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASDKEventSubscribeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKEventSubscribeRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}filter\0\u{3}replay_queued_events\0")
 

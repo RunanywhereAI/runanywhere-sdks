@@ -2,12 +2,12 @@
  * @file rac_plugin_entry_onnx.cpp
  * @brief Unified-ABI entry point for the ONNX Runtime backend.
  *
- * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * A single vtable exposes ONNX-owned primitives. Sherpa-backed speech
  * primitives live in engines/sherpa; ONNX retains embeddings and generic
  * ONNX Runtime model services.
  */
+
+#include "rac_runtime_onnxrt.h"
 
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
@@ -16,7 +16,22 @@
 
 extern "C" {
 
-/* ENG-ONNX-02 resolved: embeddings ops live next to this file in
+/* Anchor the onnxrt runtime registrar translation unit at link
+ * time. The onnx engine declares RAC_RUNTIME_ONNXRT in its manifest, so the
+ * router hard-rejects it unless that runtime is in the registry. A file-scope
+ * reference to rac_onnxrt_runtime_require_available — defined in the same TU as
+ * RAC_STATIC_RUNTIME_REGISTER(onnxrt) — forces the linker to keep that TU on
+ * RAG-off / hidden-visibility iOS builds where nothing else references the
+ * onnxrt C++ Session symbols. `volatile` defeats dead-store elimination so the
+ * reference survives optimization; we do NOT call it from capability_check
+ * because the runtime registrar may fire after this engine registers (static
+ * init order across TUs is unspecified), which would wrongly reject the
+ * engine. Keeping the symbol live is sufficient — the router's
+ * has_registered_declared_runtime gate validates availability at route time. */
+void* const volatile rac_onnxrt_runtime_anchor =
+    reinterpret_cast<void*>(&rac_onnxrt_runtime_require_available);
+
+/* Embeddings ops live next to this file in
  * engines/onnx/rac_onnx_embeddings_register.cpp (engine-owned). When
  * RAC_BACKEND_RAG is off, onnx_embedding_provider.cpp is not compiled
  * and the symbol is unresolved — the vtable slot stays nullptr below
@@ -54,8 +69,7 @@ static const rac_engine_manifest_t k_onnx_manifest = {
     .capability_flags = 0,
 #if defined(RAC_BACKEND_RAG)
     .primitives = k_onnx_primitives,
-    .primitives_count =
-        sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
+    .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
 #else
     .primitives = nullptr,
     .primitives_count = 0,
@@ -100,8 +114,7 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(onnx) {
-  return rac_engine_entry_with_manifest(&k_onnx_manifest,
-                                        &g_onnx_engine_vtable);
+    return rac_engine_entry_with_manifest(&k_onnx_manifest, &g_onnx_engine_vtable);
 }
 
-} // extern "C"
+}  // extern "C"

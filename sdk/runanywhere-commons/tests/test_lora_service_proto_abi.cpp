@@ -152,8 +152,7 @@ rac_engine_vtable_t make_vtable(const char* name, const rac_llm_service_ops_t* l
     v.metadata.engine_version = "0.0.0";
     v.metadata.priority = 10000;
     v.metadata.formats = g_lora_test_formats;
-    v.metadata.formats_count =
-        sizeof(g_lora_test_formats) / sizeof(g_lora_test_formats[0]);
+    v.metadata.formats_count = sizeof(g_lora_test_formats) / sizeof(g_lora_test_formats[0]);
     v.llm_ops = llm_ops;
     return v;
 }
@@ -194,10 +193,8 @@ bool load_lora_test_model(rac_model_registry_handle_t registry, const std::strin
     const rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS &&
-                    out.status == RAC_SUCCESS &&
-                    result.ParseFromArray(out.data, static_cast<int>(out.size)) &&
-                    result.success();
+    const bool ok = rc == RAC_SUCCESS && out.status == RAC_SUCCESS &&
+                    result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
     rac_proto_buffer_free(&out);
     return ok;
 }

@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Wave 2 LLM capability — aligned to Swift + proto. Returns proto
+// LLM capability — aligned to Swift + proto. Returns proto
 // LLMGenerationResult; streams Stream<LLMStreamEvent>.
 
 import 'dart:async';
-import 'dart:ffi' as ffi;
 import 'dart:io' as io;
-import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart';
-import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
@@ -21,14 +17,13 @@ import 'package:runanywhere/generated/llm_service.pb.dart'
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
-    show ComponentLifecycleSnapshot, SDKEvent;
+    show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show JSONSchema, StructuredOutputResult;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
+import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
 /// LLM (text generation) capability surface.
@@ -77,11 +72,12 @@ class RunAnywhereLLM {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
 
     final logger = SDKLogger('RunAnywhere.LoadModel');
     logger.info('Loading model: $modelId');
 
-    // FLUTTER-AND-002 fix: ensure the registry has a resolved `local_path`
+    // Ensure the registry has a resolved `local_path`
     // before delegating to commons. Without this, `rac_llm_create` falls
     // through to `model_path_owned = model_id` (see
     // sdk/runanywhere-commons/src/features/llm/rac_llm_service.cpp:108-127)
@@ -412,9 +408,17 @@ class RunAnywhereLLM {
 
   /// Cancel any in-flight LLM generation.
   ///
-  /// Mirrors Swift `RunAnywhere.cancelGeneration()`.
-  Future<void> cancelGeneration() async {
-    _cancelProto();
+  /// Mirrors Swift `RunAnywhere.cancelGeneration()`: no-op when not
+  /// initialized; logs a warning on failure rather than surfacing the
+  /// exception to the caller (cancel is best-effort).
+  void cancelGeneration() {
+    if (!DartBridge.isInitialized) return;
+    try {
+      _cancelProto();
+    } catch (e) {
+      SDKLogger('RunAnywhere.cancelGeneration')
+          .warning('cancelGeneration failed: $e');
+    }
   }
 
   /// Extract structured output from arbitrary [text] using the provided JSON
@@ -441,124 +445,42 @@ class RunAnywhereLLM {
       );
 
   LLMGenerationResult _generateProto(LLMGenerateRequest request) {
-    final fn = RacNative.bindings.rac_llm_generate_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_llm_generate_proto is unavailable');
-    }
-
-    return DartBridgeProtoUtils.callRequest<LLMGenerationResult>(
-      request: request,
-      invoke: fn,
-      decode: LLMGenerationResult.fromBuffer,
-      symbol: 'rac_llm_generate_proto',
-    );
+    return DartBridgeLLM.shared.generateProto(request);
   }
 
   Stream<LLMStreamEvent> _generateStreamProto(LLMGenerateRequest request) {
-    final fn = RacNative.bindings.rac_llm_generate_stream_proto;
-    if (fn == null) {
-      return Stream<LLMStreamEvent>.error(
-        UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
-      );
-    }
-
     final controller = StreamController<LLMStreamEvent>(sync: false);
-    ffi.NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
-    var sawTerminalEvent = false;
 
     Future<void> run() async {
-      final bytes = request.writeToBuffer();
-      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
-
-      try {
-        callback = ffi.NativeCallable<RacLlmStreamProtoCallbackNative>.listener(
-          (
-            ffi.Pointer<ffi.Uint8> bytesPtr,
-            int bytesLen,
-            ffi.Pointer<ffi.Void> _,
-          ) {
-            if (controller.isClosed ||
-                bytesPtr == ffi.nullptr ||
-                bytesLen <= 0) {
-              return;
-            }
-
-            try {
-              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-              final event = LLMStreamEvent.fromBuffer(copy);
-              sawTerminalEvent = sawTerminalEvent || event.isFinal;
-              controller.add(event);
-              if (event.isFinal) {
-                unawaited(controller.close());
-              }
-            } catch (e, st) {
-              controller.addError(e, st);
-              unawaited(controller.close());
-            }
-          },
-        );
-
-        final rc = fn(
-          requestPtr,
-          bytes.length,
-          callback!.nativeFunction,
-          ffi.nullptr,
-        );
-        // FLUTTER-IOS-001 fix: `rac_llm_generate_stream_proto` is a blocking
-        // synchronous FFI call. While it runs, the main isolate's event loop
-        // is frozen, so `NativeCallable.listener` invocations queue up but do
-        // not execute. The terminal event (`event.isFinal`) — which closes the
-        // controller — therefore arrives ASYNCHRONOUSLY after `fn()` returns.
-        // Yield via the shared [drainPendingStreamCallbacks] helper to let
-        // queued callbacks drain before deciding whether to force-close the
-        // controller; without this, the controller is closed before any tokens
-        // reach subscribers (manifesting as a silent stream hang on the
-        // example app). See [kStreamDrainMaxMicrotasks].
-        await drainPendingStreamCallbacks(() => sawTerminalEvent);
-        if (rc != RacResultCode.success && !controller.isClosed) {
-          controller.addError(StateError(
-            'rac_llm_generate_stream_proto failed: '
-            '${RacResultCode.getMessage(rc)}',
-          ));
-          await controller.close();
-        } else if (!sawTerminalEvent && !controller.isClosed) {
-          await controller.close();
-        }
-      } catch (e, st) {
-        if (!controller.isClosed) {
-          controller.addError(e, st);
-          await controller.close();
-        }
-      } finally {
-        calloc.free(requestPtr);
-        callback?.close();
-        callback = null;
-      }
+      // Best-effort Phase-2 readiness, kicked off in the BACKGROUND (NOT
+      // awaited). On-device LLM generation must not be gated on — or delayed
+      // by — a remote auth/config round-trip: offline, `ensureServicesReady()`'s
+      // recovery path blocks ~4s on a DNS timeout (unreachable dev endpoint)
+      // before failing. Local generation resolves the engine from the commons
+      // model lifecycle and does not need it, so awaiting only adds latency to
+      // every send. Fire-and-forget; auth retries on the next online call.
+      // Mirrors the ungated non-streaming `generate` / RAG paths and Swift/Kotlin
+      // best-effort readiness.
+      unawaited(
+        DartBridge.ensureServicesReady().catchError((Object e) {
+          SDKLogger('RunAnywhere.GenerateStream').debug(
+            'Services not ready (HTTP/auth deferred — will retry on next '
+            'online call); proceeded with local generation: $e',
+          );
+        }),
+      );
+      final upstream = DartBridgeLLM.shared.generateStreamProto(request);
+      await controller.addStream(upstream);
+      await controller.close();
     }
 
-    controller.onCancel = () {
-      try {
-        _cancelProto();
-      } finally {
-        callback?.close();
-        callback = null;
-      }
-    };
+    controller.onCancel = _cancelProto;
 
     unawaited(run());
     return controller.stream;
   }
 
   void _cancelProto() {
-    final fn = RacNative.bindings.rac_llm_cancel_proto;
-    if (fn == null) {
-      throw UnsupportedError('rac_llm_cancel_proto is unavailable');
-    }
-
-    DartBridgeProtoUtils.callOut<SDKEvent>(
-      invoke: fn,
-      decode: SDKEvent.fromBuffer,
-      symbol: 'rac_llm_cancel_proto',
-    );
+    DartBridgeLLM.shared.cancelProto();
   }
 }

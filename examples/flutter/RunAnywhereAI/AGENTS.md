@@ -46,9 +46,9 @@ RUN_IOS=1 ./scripts/verify.sh
 
 # Rebuild native binaries if C++ layer changed (run from repo root)
 # Android:
-../../../scripts/build-core-android.sh arm64-v8a
+../../../scripts/build/build-core-android.sh arm64-v8a
 # iOS:
-../../../scripts/build-core-xcframework.sh
+../../../sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
 For iOS, after `flutter pub get`, you may need `cd ios && pod install && cd ..` if Pods are stale.
@@ -99,16 +99,6 @@ Two patterns coexist:
 - **ConversationStore** — file-based JSON persistence under `<documents>/Conversations/<id>.json`; messages carry optional `thinkingContent` and `MessageAnalytics`
 - **KeychainService / KeychainHelper** — wraps `flutter_secure_storage`; iOS Keychain with `first_unlock_this_device`, Android `EncryptedSharedPreferences`; keys prefixed with `com.runanywhere.RunAnywhereAI_`
 - **PermissionService** — wraps `permission_handler`; requests microphone + speech (iOS only) for STT, camera for VLM
-
-### Platform Channel (com.runanywhere.sdk/native)
-
-Both platforms implement the same 6 methods for audio session and device info — this is separate from the AI SDK's FFI path:
-
-- `configureAudioSession(mode)` / `activateAudioSession` / `deactivateAudioSession`
-- `requestMicrophonePermission` / `hasMicrophonePermission`
-- `getDeviceCapabilities` (memory, processors)
-
-iOS: `AppDelegate.swift`. Android: `PlatformChannelHandler.kt`.
 
 ### SDK API Surface Used
 

@@ -2,9 +2,7 @@
  * @file rac_engine_router.h
  * @brief Hardware-aware scorer that picks the best engine plugin for a primitive.
  *
- * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- *
- * The router consumes the global plugin registry (populated via GAP 02 + 03)
+ * The router consumes the global plugin registry
  * and a `HardwareProfile`, then scores every plugin that serves the
  * requested primitive. The highest-scoring plugin wins; ties break
  * deterministically (priority desc, then metadata.name asc) so the same
@@ -12,7 +10,7 @@
  *
  * Layered on top of `rac_plugin_find` (which only knows priority); callers
  * who don't need scoring continue to call `rac_plugin_find` directly. The
- * routing-aware C ABI wrapper `rac_plugin_route` (Phase 12) lets non-C++
+ * routing-aware C ABI wrapper `rac_plugin_route` lets non-C++
  * callers use the router without instantiating the class manually.
  */
 
@@ -63,13 +61,29 @@ struct RouteResult {
 /**
  * @brief Stateless scorer over the global plugin registry.
  *
+ * Non-C++ callers reach this through the C ABI wrapper `rac_plugin_route`;
+ * the `rac::router::` namespace is the C++ equivalent of the `rac_` public-
+ * symbol prefix used for C ABI types in this SDK.
+ *
  * Construct once per call site (or once per process) and re-use. Thread-safe;
  * each `route()` call snapshots the registry under its lock, then scores
  * outside the lock so concurrent registrations don't block routing.
+ *
+ * Scoring runs without holding the registry mutex, but the
+ * snapshotted vtable pointers are pinned against concurrent dynamic unload
+ * for the lifetime of the call. `rac_registry_unload_plugin` spin-waits the
+ * registry's in-flight router counter to zero AFTER `rac_plugin_unregister`
+ * (so no NEW router can pick up the about-to-be-unmapped vtable) and
+ * BEFORE `dlclose`, draining any router that already observed the vtable.
  */
 class EngineRouter {
    public:
-    explicit EngineRouter(const HardwareProfile& profile);
+    /* Store the profile by value rather than by reference so the
+     * router has no lifetime contract on its constructor argument — temporaries
+     * such as `EngineRouter(HardwareProfile::detect())` are safe. The profile
+     * struct is small (a few enums + bools + one short string) so the
+     * single per-construction copy is negligible compared to a routing call. */
+    explicit EngineRouter(HardwareProfile profile);
 
     /** Pick the single best plugin. */
     RouteResult route(const RouteRequest& req) const;
@@ -85,7 +99,7 @@ class EngineRouter {
     /** True iff the vtable serves this primitive (slot is non-NULL). */
     bool serves(const rac_engine_vtable_t& vt, rac_primitive_t p) const;
 
-    const HardwareProfile& profile_;
+    HardwareProfile profile_;
 };
 
 }  // namespace rac::router

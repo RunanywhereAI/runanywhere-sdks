@@ -2,12 +2,12 @@
 //
 // dart_bridge_voice_agent.dart — VoiceAgent component bridge.
 //
-// Wave E cleanup: local DTO classes (VoiceTurnResult, sealed VoiceAgentEvent
+// Local DTO classes (VoiceTurnResult, sealed VoiceAgentEvent
 // hierarchy, VoiceAgentComponent enum) have been deleted. All public events
 // flow through the canonical `VoiceEvent` proto from
 // `generated/voice_events.pb.dart`. Per-helper transcribe/synthesize calls
 // route through `rac_voice_agent_transcribe_proto` /
-// `rac_voice_agent_synthesize_speech_proto` (Wave D-7) instead of the old
+// `rac_voice_agent_synthesize_speech_proto` instead of the old
 // cstring native entrypoints. Composite handle lifecycle uses
 // `rac_voice_agent_component_create_proto` /
 // `rac_voice_agent_component_destroy_proto` so Dart no longer pins
@@ -48,6 +48,18 @@ class DartBridgeVoiceAgent {
   /// Default empty compose config is used if [getHandle] is invoked
   /// without an explicit [initializeProto] first — matches Swift's
   /// "compose on first access with defaults" behavior.
+  ///
+  /// No-yield invariant: the synchronous prefix below (read `_handle`,
+  /// read `_initFuture`, assign `_initFuture`) executes within a single
+  /// microtask — Dart's cooperative scheduler cannot interleave another
+  /// microtask at a non-`await` point. Concurrent `getHandle()` calls
+  /// therefore cannot both observe `_initFuture == null` and each create
+  /// a separate `Completer`, so only one C ABI
+  /// `rac_voice_agent_component_create_proto` call is issued per
+  /// lifecycle. Mirrors the `.installing` state gate in Swift's
+  /// `HandleFanOutAttachRole` / `HandleFanOut.attach`. Do NOT insert an
+  /// `await` between the null-checks and the `_initFuture` assignment —
+  /// that would open a real race window.
   Future<RacHandle> getHandle(
       [voice_agent_pb.VoiceAgentComposeConfig? config]) async {
     if (_handle != null) return _handle!;
@@ -302,7 +314,7 @@ class DartBridgeVoiceAgent {
     }
   }
 
-  /// Streaming turn processing — Wave D-7. Invokes
+  /// Streaming turn processing. Invokes
   /// `rac_voice_agent_process_turn_proto` and pipes decoded `VoiceEvent`
   /// bytes onto the returned broadcast stream.
   Stream<voice_events_pb.VoiceEvent> processTurnStream(
@@ -322,13 +334,28 @@ class DartBridgeVoiceAgent {
             unawaited(controller.close());
             return;
           }
-          nativeCb =
-              NativeCallable<RacVoiceAgentProtoEventCallbackNative>.listener((
+          // Use `isolateLocal` (not `.listener`) so the
+          // callback fires SYNCHRONOUSLY on the same Dart isolate that
+          // invokes `rac_voice_agent_process_turn_proto`. The commons
+          // implementation in `voice_agent_d7_abi.cpp` runs the entire turn
+          // (STT → LLM → TTS) on the calling thread under `handle->mutex`
+          // and invokes `event_callback` for each VoiceEvent inline. With
+          // `.listener` mode the callbacks are queued onto the isolate's
+          // event loop and the `finally` below closes the controller before
+          // any of them drain — every event is silently dropped at
+          // `controller.add(...)` on a closed controller. `isolateLocal`
+          // ensures every emission lands on the still-open controller
+          // before `fn(...)` returns. This mirrors the canonical pattern in
+          // `dart_bridge_llm.dart` (`_generateStreamProto`).
+          nativeCb = NativeCallable<
+              RacVoiceAgentProtoEventCallbackNative>.isolateLocal((
             Pointer<Uint8> bytesPtr,
             int bytesLen,
             Pointer<Void> _,
           ) {
-            if (bytesLen <= 0 || bytesPtr == nullptr) return;
+            if (controller.isClosed || bytesLen <= 0 || bytesPtr == nullptr) {
+              return;
+            }
             final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
             try {
               controller.add(voice_events_pb.VoiceEvent.fromBuffer(copy));
@@ -359,17 +386,28 @@ class DartBridgeVoiceAgent {
         } catch (e, st) {
           controller.addError(e, st);
         } finally {
+          // Teardown: with `isolateLocal`
+          // all events have already drained by the time `fn` returns, but
+          // `rac_voice_agent_proto_quiesce()` is still invoked as a defensive
+          // barrier in case a future commons revision posts late events from
+          // a worker thread.
+          RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
+          nativeCb?.close();
+          nativeCb = null;
           unawaited(controller.close());
         }
       }
       ..onCancel = () {
+        // Same ordering as the run() teardown above.
+        RacNative.bindings.rac_voice_agent_proto_quiesce?.call();
         nativeCb?.close();
+        nativeCb = null;
       };
 
     return controller.stream;
   }
 
-  /// Transcribe via the voice agent using the Wave D-7 proto helper.
+  /// Transcribe via the voice agent using the proto helper.
   Future<String> transcribe(Uint8List audioData) async {
     final handle = await getHandle();
     final fn = RacNative.bindings.rac_voice_agent_transcribe_proto;
@@ -426,7 +464,7 @@ class DartBridgeVoiceAgent {
     }
   }
 
-  /// Synthesize speech via the Wave D-7 proto helper. Returns Float32 samples
+  /// Synthesize speech via the proto helper. Returns Float32 samples
   /// carved out of the VoiceAgentResult.synthesized_audio WAV payload.
   Future<Float32List> synthesizeSpeech(String text) async {
     final handle = await getHandle();
@@ -497,7 +535,7 @@ class DartBridgeVoiceAgent {
     }
   }
 
-  /// Destroy the voice agent via the Wave D-7 lifecycle-owned destroy proto.
+  /// Destroy the voice agent via the lifecycle-owned destroy proto.
   void destroy() {
     if (_handle == null) return;
     final fn = RacNative.bindings.rac_voice_agent_component_destroy_proto;

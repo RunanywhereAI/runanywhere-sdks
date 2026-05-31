@@ -3,25 +3,74 @@
  *
  * Logging configuration namespace — mirrors Swift's `RunAnywhere+Logging.swift`.
  * Provides `RunAnywhere.logging.*` surface for controlling SDK log output.
+ * One-to-one method parity with Swift RunAnywhere+Logging.swift.
  */
 
-import { SDKLogger, LogLevel } from '../../Foundation/SDKLogger';
+import {
+  SDKLogger,
+  LogLevel,
+  type LoggingConfiguration,
+  type LogDestination,
+} from '../../Foundation/SDKLogger';
+
 export { LogLevel };
+export type { LoggingConfiguration, LogDestination };
 
 export const Logging = {
-  setLevel(level: LogLevel): void {
-    SDKLogger.level = level;
+  /**
+   * Configure logging with a predefined configuration.
+   * Matches iOS: static func configureLogging(_ config: LoggingConfiguration)
+   */
+  configureLogging(config: LoggingConfiguration): void {
+    SDKLogger.configure(config);
   },
 
-  getLevel(): LogLevel {
-    return SDKLogger.level;
+  /**
+   * Enable or disable local console logging.
+   * Matches iOS: static func setLocalLoggingEnabled(_ enabled: Bool)
+   */
+  setLocalLoggingEnabled(enabled: boolean): void {
+    SDKLogger.setLocalLoggingEnabled(enabled);
   },
 
-  setEnabled(enabled: boolean): void {
-    SDKLogger.enabled = enabled;
+  /**
+   * Set minimum log level for SDK logging.
+   * Matches iOS: static func setLogLevel(_ level: LogLevel)
+   */
+  setLogLevel(level: LogLevel): void {
+    SDKLogger.setMinLogLevel(level);
   },
 
-  isEnabled(): boolean {
-    return SDKLogger.enabled;
+  /**
+   * Enable or disable Sentry error tracking.
+   * Matches iOS: static func setSentryLoggingEnabled(_ enabled: Bool)
+   */
+  setSentryLoggingEnabled(enabled: boolean): void {
+    SDKLogger.setSentryLoggingEnabled(enabled);
+  },
+
+  /**
+   * Add a custom log destination.
+   * Matches iOS: static func addLogDestination(_ destination: LogDestination)
+   */
+  addLogDestination(destination: LogDestination): void {
+    SDKLogger.addDestination(destination);
+  },
+
+  /**
+   * Enable verbose debugging mode.
+   * Matches iOS: static func setDebugMode(_ enabled: Bool)
+   */
+  setDebugMode(enabled: boolean): void {
+    SDKLogger.setMinLogLevel(enabled ? LogLevel.Debug : LogLevel.Info);
+    SDKLogger.setLocalLoggingEnabled(enabled);
+  },
+
+  /**
+   * Force flush all pending logs to destinations.
+   * Matches iOS: static func flushLogs()
+   */
+  flushLogs(): void {
+    SDKLogger.flush();
   },
 };

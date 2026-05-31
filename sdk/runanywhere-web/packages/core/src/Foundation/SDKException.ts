@@ -1,7 +1,7 @@
 /**
  * RunAnywhere Web SDK - SDKException.
  *
- * Wave 2: SDKException is the SOLE exception class. The legacy `SDKError` has
+ * SDKException is the SOLE exception class. The legacy `SDKError` has
  * been deleted; all throw sites now use SDKException. SDKException wraps the
  * canonical proto-ts `SDKError` shape from `@runanywhere/proto-ts/errors` so a
  * thrown error can carry the full proto envelope (category, code, message,
@@ -15,15 +15,24 @@ import {
   ErrorCategory as ProtoErrorCategory,
   ErrorCode as ProtoErrorCode,
   ErrorSeverity as ProtoErrorSeverity,
+  SDKError as SDKErrorCodec,
   type SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
+import type { SDKLogger } from './SDKLogger';
 
 /**
- * Signed-negative SDK error codes that mirror the rac_result_t C ABI ranges.
- * Web SDK still throws / catches numeric codes; the proto envelope holds a
- * round-tripped copy in `c_abi_code`. The proto-ts `ErrorCode` enum carries
- * POSITIVE values (proto3 forbids negative literals) — the absolute magnitude
- * matches.
+ * @deprecated Compat shim — use `ProtoErrorCode` (positive values from
+ * `@runanywhere/proto-ts/errors`) instead. The canonical path is already
+ * wired: `SDKException.protoCode` returns `ProtoErrorCode`, `isExpected()`
+ * accepts `ProtoErrorCode`, and the WASM bridge round-trips `cAbiCode`
+ * directly from `rac_result_t`. This enum will be removed in a follow-up
+ * once all internal call sites in CommonsModule / OffscreenRuntimeBridge /
+ * Extensions / HTTPAdapter / RunAnywhere.ts are migrated.
+ *
+ * Migration: replace `SDKErrorCode.Foo` (negative) with
+ * `-ProtoErrorCode.ERROR_CODE_FOO` as the cAbiCode literal; pass the
+ * proto code directly to `SDKException` constructors.
  */
 export enum SDKErrorCode {
   // Success
@@ -83,18 +92,37 @@ export enum SDKErrorCode {
 
 /**
  * Map a signed-negative `SDKErrorCode` to the matching proto-ts `ErrorCategory`.
+ *
+ * Verbatim port of the canonical 18-range table in
+ * `sdk/runanywhere-commons/src/core/rac_error_proto.cpp::category_for_code()`.
+ * Web cannot call the C++ helper synchronously before WASM is loaded, so the
+ * table is replicated here; any change to the canonical mapping MUST be
+ * mirrored in this function (and in the RN equivalent).
  */
 function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
   if (code === 0) return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
   const abs = Math.abs(code);
   if (abs >= 100 && abs <= 109) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
   if (abs >= 110 && abs <= 129) return ProtoErrorCategory.ERROR_CATEGORY_MODEL;
-  if (abs >= 130 && abs <= 149) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 130 && abs <= 149) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   if (abs >= 150 && abs <= 179) return ProtoErrorCategory.ERROR_CATEGORY_NETWORK;
-  if (abs >= 180 && abs <= 219) return ProtoErrorCategory.ERROR_CATEGORY_IO;
-  if (abs >= 220 && abs <= 229) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
+  if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) {
+    return ProtoErrorCategory.ERROR_CATEGORY_IO;
+  }
+  if (abs >= 220 && abs <= 229) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   if (abs >= 230 && abs <= 249) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 250 && abs <= 279) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
+  if (abs >= 300 && abs <= 319) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 320 && abs <= 329) return ProtoErrorCategory.ERROR_CATEGORY_AUTH;
+  if (abs >= 330 && abs <= 349) return ProtoErrorCategory.ERROR_CATEGORY_AUTH;
+  if (abs >= 350 && abs <= 369) return ProtoErrorCategory.ERROR_CATEGORY_IO;
+  if (abs >= 370 && abs <= 379) return ProtoErrorCategory.ERROR_CATEGORY_VALIDATION;
+  if (abs >= 380 && abs <= 389) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
+  if (abs >= 400 && abs <= 499) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 500 && abs <= 599) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
   if (abs >= 600 && abs <= 699) return ProtoErrorCategory.ERROR_CATEGORY_COMPONENT;
+  if (abs >= 700 && abs <= 799) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
+  if (abs >= 800 && abs <= 899) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   if (abs >= 900 && abs <= 999) return ProtoErrorCategory.ERROR_CATEGORY_INTERNAL;
   return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
 }
@@ -124,10 +152,19 @@ function componentForCode(code: SDKErrorCode): string {
   if (abs >= 110 && abs <= 129) return 'model';
   if (abs >= 130 && abs <= 149) return 'generation';
   if (abs >= 150 && abs <= 179) return 'network';
-  if (abs >= 180 && abs <= 219) return 'storage';
-  if (abs >= 220 && abs <= 229) return 'validation';
+  if ((abs >= 180 && abs <= 219) || (abs >= 280 && abs <= 299)) return 'storage';
+  if (abs >= 220 && abs <= 229) return 'sdk';
   if (abs >= 230 && abs <= 249) return 'component';
+  if (abs >= 250 && abs <= 279) return 'validation';
+  if (abs >= 300 && abs <= 319) return 'component';
+  if (abs >= 320 && abs <= 349) return 'auth';
+  if (abs >= 350 && abs <= 369) return 'storage';
+  if (abs >= 370 && abs <= 379) return 'validation';
+  if (abs >= 380 && abs <= 389) return 'sdk';
+  if (abs >= 400 && abs <= 499) return 'component';
+  if (abs >= 500 && abs <= 599) return 'sdk';
   if (abs >= 600 && abs <= 699) return 'backend';
+  if (abs >= 700 && abs <= 899) return 'sdk';
   if (abs >= 900 && abs <= 999) return 'wasm';
   return 'sdk';
 }
@@ -168,7 +205,12 @@ export class SDKException extends Error {
 
   /** The signed-negative SDKErrorCode (matches rac_result_t). */
   get code(): SDKErrorCode {
-    return (this.proto.cAbiCode as SDKErrorCode) ?? (-this.proto.code as SDKErrorCode);
+    return (this.proto.cAbiCode as SDKErrorCode) ?? SDKErrorCode.Success;
+  }
+
+  /** The positive proto ErrorCode value (matches Swift proto.code / RAErrorCode.rawValue). */
+  get protoCode(): ProtoErrorCode {
+    return this.proto.code;
   }
 
   /** Optional structured details (proto.nestedMessage). */
@@ -179,7 +221,7 @@ export class SDKException extends Error {
   /**
    * Structured validation field-path accessor.
    *
-   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException.
+   * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException.
    * Reads `context.metadata['field_path']` populated by
    * `SDKException.validationFailed(...)` (see below). Cross-SDK consumer
    * code can rely on `e.fieldPath === 'X.y'` regardless of which SDK
@@ -204,10 +246,54 @@ export class SDKException extends Error {
     return new SDKException(code, message, details);
   }
 
-  /** Build an SDKException from a raw `rac_result_t` result code. */
-  static fromRACResult(resultCode: number, details?: string): SDKException {
+  /**
+   * Build an SDKException from a raw `rac_result_t` result code.
+   *
+   * When a loaded WASM [wasm] module is supplied, the rac_result_t -> proto
+   * translation is routed through the canonical commons helper
+   * `rac_result_to_proto_error` (mirroring Swift's `SDKException.from(rcResult:)`)
+   * so code/category/message stay byte-identical across SDKs. Without a module
+   * (e.g. before WASM is loaded), it falls back to the local mapping table —
+   * the same behaviour as before this routing was added.
+   */
+  static fromRACResult(
+    resultCode: number,
+    details?: string,
+    wasm?: { module: ProtoWasmModule; logger: SDKLogger },
+  ): SDKException {
+    if (wasm && typeof wasm.module._rac_wasm_result_to_proto_error === 'function') {
+      const proto = SDKException.protoFromCommons(wasm.module, wasm.logger, resultCode);
+      if (proto) {
+        if (details && !proto.nestedMessage) proto.nestedMessage = details;
+        return new SDKException(proto);
+      }
+    }
     const message = `RACommons error: ${resultCode}`;
     return SDKException.fromCode(resultCode as SDKErrorCode, message, details);
+  }
+
+  /**
+   * Decode the canonical commons SDKError proto for [resultCode] via the
+   * `_rac_wasm_result_to_proto_error` WASM export. Returns `undefined` when the
+   * export is unavailable or yields no payload, letting callers fall back to
+   * the local mapping.
+   */
+  private static protoFromCommons(
+    module: ProtoWasmModule,
+    logger: SDKLogger,
+    resultCode: number,
+  ): ProtoSDKError | undefined {
+    const bridge = new ProtoWasmBridge(module, logger);
+    const bytes = bridge.readResultProto(
+      (outPtr) => module._rac_wasm_result_to_proto_error!(resultCode, outPtr),
+      'rac_wasm_result_to_proto_error',
+    );
+    if (!bytes || bytes.length === 0) return undefined;
+    try {
+      return SDKErrorCodec.decode(bytes);
+    } catch {
+      return undefined;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -215,7 +301,50 @@ export class SDKException extends Error {
   // ---------------------------------------------------------------------------
 
   static notInitialized(message = 'SDK not initialized'): SDKException {
-    return SDKException.fromCode(SDKErrorCode.NotInitialized, message);
+    // Swift canonical: notInitialized uses category=COMPONENT (SDKException.swift:178-179).
+    // categoryForCode(-100) returns CONFIGURATION (matching C++ commons range table), so
+    // we construct the proto directly to override the category to COMPONENT.
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+      code: ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      cAbiCode: SDKErrorCode.NotInitialized,
+      message,
+      nestedMessage: undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(SDKErrorCode.NotInitialized),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
+  }
+
+  /**
+   * Canonical cancellation factory.
+   *
+   * Mirrors Swift `SDKException.cancelled(_:)` (SDKException.swift:225-226):
+   * code=.cancelled, category=.internal, shouldLog=false. Uses proto
+   * ERROR_CODE_CANCELLED=380 with cAbiCode=-380; isExpected() returns true so
+   * callers suppress ERROR-level logging.
+   */
+  static cancelled(message = 'Operation cancelled'): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+      code: ProtoErrorCode.ERROR_CODE_CANCELLED,
+      cAbiCode: -380,
+      message,
+      nestedMessage: undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_UNSPECIFIED,
+      component: 'sdk',
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
   }
 
   static wasmNotLoaded(message = 'WASM module not loaded'): SDKException {
@@ -260,7 +389,7 @@ export class SDKException extends Error {
   /**
    * Structured validation failure.
    *
-   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter/RN
+   * Byte-isomorphic with Swift/Kotlin/Flutter/RN
    * `SDKException.validationFailed(...)`. Encodes the structured field
    * path into `proto.context.metadata['field_path']` so consumers can
    * read it back uniformly across SDKs via {@link fieldPath}.
@@ -309,6 +438,17 @@ export class SDKException extends Error {
 /** Type guard: returns true if the value is an SDKException instance. */
 export function isSDKException(error: unknown): error is SDKException {
   return error instanceof SDKException;
+}
+
+/**
+ * Returns true when the proto error code represents a routine/expected
+ * condition (cancellation) that should not be logged at ERROR level.
+ *
+ * Mirrors Swift `RAErrorCode.isExpected`, Kotlin `ProtoErrorCode.isExpected`,
+ * and Dart `ErrorCodeClassification.isExpected` — all check the same two codes.
+ */
+export function isExpected(code: ProtoErrorCode): boolean {
+  return code === ProtoErrorCode.ERROR_CODE_CANCELLED || code === ProtoErrorCode.ERROR_CODE_STREAM_CANCELLED;
 }
 
 // Proto re-exports for advanced consumers needing the wire envelope shape.

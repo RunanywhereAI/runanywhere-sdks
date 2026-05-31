@@ -31,7 +31,7 @@ extension RAStructuredOutputOptions {
 extension RAJSONSchema {
     /// JSON Schema text consumed by the commons structured-output C ABI.
     ///
-    /// Delegates to `rac_structured_output_schema_to_json_proto` (P2-T15) so
+    /// Delegates to `rac_structured_output_schema_to_json_proto` so
     /// every SDK shares the same byte-exact, key-sorted, compact serializer.
     /// Returns `"{}"` on any serialization or ABI failure to preserve the
     /// previous fallback contract.

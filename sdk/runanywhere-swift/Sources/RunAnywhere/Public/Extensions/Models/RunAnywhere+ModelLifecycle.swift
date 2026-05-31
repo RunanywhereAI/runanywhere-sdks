@@ -12,11 +12,9 @@
 //  actor handles (`CppBridge.{STT,TTS,VAD,VLM}.shared`) remain only for
 //  legacy direct-handle ops still on `rac_*_component_*` (supports_streaming,
 //  introspection, etc.) and are not consulted for inference or compose-
-//  readiness. See gaps/gaps/inconsistencies/swift.md
-//  SWIFT-VOICE-AGENT-001 (closed in 4dc98989a) and the rac_vlm_process_proto
-//  precedent from Phase 6j. Wave 7 / T23 removed the last remnant of the
-//  VLM-specific synchroniser that mirrored the lifecycle into the Swift
-//  actor — there is now nothing to mirror.
+//  readiness. The last remnant of the VLM-specific synchroniser that
+//  mirrored the lifecycle into the Swift actor has been removed — there is
+//  now nothing to mirror.
 //
 
 
@@ -52,6 +50,21 @@ public extension RunAnywhere {
 
     static func currentModel(_ request: RACurrentModelRequest = RACurrentModelRequest()) -> RACurrentModelResult {
         CppBridge.ModelLifecycle.currentModel(request)
+    }
+
+    /// Full `RAModelInfo` for the model currently loaded under `category`,
+    /// or `nil` when nothing is loaded for it.
+    ///
+    /// Wraps `currentModel(_:)` with `includeModelMetadata = true` so callers
+    /// (e.g. view models surfacing the loaded model's display name / framework)
+    /// get the populated proto instead of reconstructing a stand-in.
+    static func modelInfoForCategory(_ category: RAModelCategory) -> RAModelInfo? {
+        var request = RACurrentModelRequest()
+        request.category = category
+        request.includeModelMetadata = true
+        let result = currentModel(request)
+        guard result.found, result.hasModel else { return nil }
+        return result.model
     }
 
     static func componentLifecycleSnapshot(

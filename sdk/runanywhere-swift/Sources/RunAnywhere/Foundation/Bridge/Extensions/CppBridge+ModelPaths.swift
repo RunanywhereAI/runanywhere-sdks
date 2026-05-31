@@ -178,6 +178,19 @@ extension CppBridge {
                 rac_model_paths_is_model_path(pathPtr) == RAC_TRUE
             }
         }
+
+        // MARK: - File Role Inference
+
+        /// Infer the canonical `RAModelFileRole` for a single sidecar filename.
+        /// Delegates to commons `rac_infer_model_file_role` so the classification
+        /// stays byte-identical with the C++ resolver and every other SDK.
+        public static func inferFileRole(filename: String, modality: ModelCategory) -> RAModelFileRole {
+            var roleProto = Int32(RAModelFileRole.primaryModel.rawValue)
+            _ = filename.withCString { name in
+                rac_infer_model_file_role(name, Int32(modality.rawValue), &roleProto)
+            }
+            return RAModelFileRole(rawValue: Int(roleProto)) ?? .primaryModel
+        }
     }
 }
 

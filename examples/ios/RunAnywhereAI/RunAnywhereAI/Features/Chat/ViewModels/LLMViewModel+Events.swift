@@ -12,6 +12,9 @@ import RunAnywhere
 extension LLMViewModel {
     // MARK: - Model Lifecycle Subscription
 
+    /// Subscribe to the SDK event bus for model lifecycle and generation
+    /// signals. The bus is the single source of truth — there is no parallel
+    /// NotificationCenter channel.
     func subscribeToModelLifecycle() {
         lifecycleCancellable = RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
@@ -21,11 +24,6 @@ extension LLMViewModel {
                     self.handleSDKEvent(event)
                 }
             }
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 100_000_000)
-            await checkModelStatusFromSDK()
-        }
     }
 
     func checkModelStatusFromSDK() async {
@@ -49,6 +47,14 @@ extension LLMViewModel {
     // MARK: - SDK Event Handling
 
     func handleSDKEvent(_ event: RASDKEvent) {
+        // Model load/unload completion arrives as a component-lifecycle event
+        // (EVENT_CATEGORY_COMPONENT) — the canonical channel the
+        // `RunAnywhere.loadModel` path publishes for SDK_COMPONENT_LLM.
+        if event.category == .component {
+            handleComponentLifecycleEvent(event)
+            return
+        }
+
         guard event.category == .llm || event.component == .llm else { return }
 
         let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
@@ -88,9 +94,29 @@ extension LLMViewModel {
         }
     }
 
+    /// React to the canonical component-lifecycle proto event for the LLM slot.
+    /// This is how `RunAnywhere.loadModel(category: .language)` signals a
+    /// completed load/unload, replacing the former "ModelLoaded" NotificationCenter post.
+    private func handleComponentLifecycleEvent(_ event: RASDKEvent) {
+        let lifecycle = event.componentLifecycle
+        guard lifecycle.component == .llm else { return }
+
+        switch lifecycle.currentState {
+        case .ready:
+            handleModelLoadCompleted(modelId: lifecycle.modelID)
+        case .notLoaded, .unloading, .shutdown, .deleting:
+            handleModelUnloaded(modelId: lifecycle.modelID)
+        default:
+            break
+        }
+    }
+
     func handleModelLoadCompleted(modelId: String) {
         let wasLoaded = isModelLoadedValue
         updateModelLoadedState(isLoaded: true)
+        // All LLM backends expose streaming via the canonical generateStream
+        // entry; the SDK no longer publishes a per-model capability flag.
+        setModelSupportsStreaming(true)
 
         if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
             updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
@@ -101,6 +127,7 @@ extension LLMViewModel {
             if messagesValue.first?.role != .system {
                 addSystemMessage()
             }
+            Task { await refreshAvailableAdapters() }
         }
     }
 

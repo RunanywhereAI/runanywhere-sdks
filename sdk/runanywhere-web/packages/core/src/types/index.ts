@@ -1,7 +1,7 @@
 /**
  * RunAnywhere Web SDK — Public Types Barrel.
  *
- * Wave 2: All hand-rolled duplicate type files have been deleted. This barrel
+ * All hand-rolled duplicate type files have been deleted. This barrel
  * re-exports proto-ts types directly (single source of truth = idl/*.proto) and
  * adds a small set of Web-only ergonomic shapes that proto doesn't cover
  * (browser-specific I/O, streaming session interfaces).
@@ -193,7 +193,7 @@ export interface SpeechSegment {
 // ---------------------------------------------------------------------------
 // LoRA — proto-ts canonical types
 // ---------------------------------------------------------------------------
-// Wave 2: Web SDK uses proto names directly: `adapterPath`, `url`,
+// Web SDK uses proto names directly: `adapterPath`, `url`,
 // `compatibleModels`, `sizeBytes`, `errorMessage`.
 export type {
   LoRAAdapterConfig,
@@ -233,7 +233,7 @@ export type {
   VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 export type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
-// IDL-04: former ComponentLoadState re-exported as the canonical
+// Former ComponentLoadState re-exported as the canonical
 // ComponentLifecycleState (from component_types.proto).
 
 // ---------------------------------------------------------------------------

@@ -1,11 +1,9 @@
 /*
  * CppBridge+Auth.kt — RunAnywhere SDK
  *
- * v2.1 quick-wins Item 4 / GAP 08 #2 — post T3.4 state.
- *
- * Before T3.4 this file was a ~150 LOC HTTP-transport adapter built on
+ * This file was previously a ~150 LOC HTTP-transport adapter built on
  * HttpURLConnection that forwarded request/response bodies to the
- * matching rac_auth_* C ABI. T3.4 moves the HTTP transport into the
+ * matching rac_auth_* C ABI. The HTTP transport now lives in the
  * commons libcurl-backed `rac_http_client_*` ABI (exposed via
  * [RunAnywhereBridge.racHttpRequestExecute]). Kotlin now owns zero
  * network plumbing for auth — the whole round-trip (request build →

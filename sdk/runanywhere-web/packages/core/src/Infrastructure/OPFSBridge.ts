@@ -714,4 +714,46 @@ export class OPFSBridge {
     const handle = await dir.getFileHandle(fileName, { create: true });
     await writeBytesToOPFSFile(handle, bytes);
   }
+
+  /**
+   * Remove a download partial from every module's MEMFS and from OPFS.
+   *
+   * The native SDKs delete an oversize partial with a plain `unlink` on the
+   * real filesystem. On Web the bytes live in each Emscripten module's
+   * private MEMFS (written by the C++ `std::ofstream`) and, once persisted,
+   * in OPFS under the synthetic `/opfs/` prefix. The download-planner
+   * self-heal in `RunAnywhere.downloadModel` calls this so a re-plan no
+   * longer sees the oversize partial. Best-effort: a missing file in either
+   * filesystem is not an error.
+   */
+  static async removeFile(modules: ModuleLike[], path: string): Promise<void> {
+    for (const module of modules) {
+      const fs = getFS(module);
+      if (!fs) continue;
+      try {
+        if (fs.analyzePath && !fs.analyzePath(path)?.exists) continue;
+        fs.unlink(path);
+      } catch (err) {
+        logger.debug(
+          `removeFile: MEMFS unlink failed for '${path}': ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
+
+    const segments = pathToOPFSSegments(path);
+    if (!segments || !isOPFSSupported()) return;
+    try {
+      const dir = await resolveOPFSDirectory(segments.slice(0, -1), false);
+      if (!dir) return;
+      await dir.removeEntry(segments[segments.length - 1]);
+    } catch (err) {
+      logger.debug(
+        `removeFile: OPFS removeEntry failed for '${path}': ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
 }

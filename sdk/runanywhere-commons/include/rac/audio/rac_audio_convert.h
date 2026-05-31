@@ -2,16 +2,17 @@
  * @file rac_audio_convert.h
  * @brief Shared inline audio-conversion helpers for engine backends.
  *
- * Wave H-3 cleanup (DUP-01): the sherpa and whispercpp STT backends previously
+ * The sherpa and whispercpp STT backends previously
  * hand-rolled identical Int16 -> Float32 PCM conversion routines inside their
  * `vtable_transcribe` trampolines. This header centralizes that conversion so
  * every STT backend can normalize Int16 PCM to Float32 in [-1.0, 1.0] without
  * duplication.
  *
  * Scope:
- *   - sherpa + whispercpp use this header today.
- *   - metalrt (Apple-only) is deferred per DEC-01 and still has its own
- *     inline conversion.
+ *   - sherpa, whispercpp, and metalrt-STT all consume this header today.
+ *     Any STT engine that resamples Int16 mic PCM to Float32 for its
+ *     transcription entry point should call this helper rather than
+ *     repeating the 1.0f/32768.0f scaling loop.
  */
 
 #ifndef RAC_AUDIO_CONVERT_H

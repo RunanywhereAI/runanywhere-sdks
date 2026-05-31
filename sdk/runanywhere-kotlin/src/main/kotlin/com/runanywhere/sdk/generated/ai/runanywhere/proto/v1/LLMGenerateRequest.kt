@@ -35,9 +35,14 @@ import kotlin.lazy
 import okio.ByteString
 
 /**
- * pass3-syn-025: structured field gaps below are intentional and documented;
- * the wire schema is consciously decoupled from llm_options.proto to avoid
- * the sdk_events ↔ llm_options package cycle. The companion fix for
+ * pass3-syn-025: the inline scalar fields below historically existed to avoid
+ * importing llm_options.proto. The cycle-avoidance rationale no longer holds
+ * (sdk_events.proto has no transitive dependency on llm_options.proto), so
+ * idl-005 introduces the canonical `LLMGenerationOptions options` embedded
+ * message at field 26. The inline scalar fields are RETAINED for wire-format
+ * backwards compatibility but are deprecated; new code SHOULD populate
+ * `options.*` and consumers SHOULD prefer `options.*` when set (falling back
+ * to the inline fields for legacy callers). The companion fix for
  * VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
  * proto carries tts_model_id but not tts_voice_id" issue) lives in
  * idl/solutions.proto where VoiceAgentConfig is declared.
@@ -50,6 +55,7 @@ public class LLMGenerateRequest(
     schemaIndex = 0,
   )
   public val prompt: String = "",
+  @Deprecated(message = "max_tokens is deprecated")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -58,6 +64,7 @@ public class LLMGenerateRequest(
     schemaIndex = 1,
   )
   public val max_tokens: Int = 0,
+  @Deprecated(message = "temperature is deprecated")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -65,6 +72,7 @@ public class LLMGenerateRequest(
     schemaIndex = 2,
   )
   public val temperature: Float = 0f,
+  @Deprecated(message = "top_p is deprecated")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -73,6 +81,7 @@ public class LLMGenerateRequest(
     schemaIndex = 3,
   )
   public val top_p: Float = 0f,
+  @Deprecated(message = "top_k is deprecated")
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -81,6 +90,7 @@ public class LLMGenerateRequest(
     schemaIndex = 4,
   )
   public val top_k: Int = 0,
+  @Deprecated(message = "system_prompt is deprecated")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -101,12 +111,11 @@ public class LLMGenerateRequest(
   )
   public val emit_thoughts: Boolean = false,
   /**
-   * Additional LLMGenerationOptions fields kept inline to avoid a codegen
-   * package cycle between service stubs and option messages.
+   * Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
    *
-   * idl-002: Intentionally omitted from this streaming request (no current
-   * streaming consumer; route them through the non-streaming
-   * rac_llm_generate_proto path which carries the full LLMGenerationOptions):
+   * Streaming gaps below remain intentional: a streaming consumer that
+   * requires these advanced knobs MUST set them on `options.*` rather than
+   * inline (no inline duplicate exists):
    *   - thinking_pattern (LLMGenerationOptions field 11)
    *   - structured_output (LLMGenerationOptions field 13)
    *   - enable_real_time_tracking (LLMGenerationOptions field 14)
@@ -114,12 +123,12 @@ public class LLMGenerateRequest(
    *   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
    *     is not yet supported on the LLM.Generate rpc; tool sessions must
    *     use the non-streaming generation path with LLMGenerationOptions.
-   * Additionally, preferred_framework (field 11) and execution_target
-   * (field 13) are degraded to `string` here instead of the InferenceFramework
-   * / ExecutionTarget enums to keep this file decoupled from llm_options.proto.
-   * Callers must use the canonical enum string values (see
-   * llm_options.proto:69 and :85). See also synthesis idl-002.
+   * Note the inline `preferred_framework` (field 11) and `execution_target`
+   * (field 13) are degraded to `string` for backwards compatibility;
+   * `options.preferred_framework` and `options.execution_target` carry the
+   * canonical InferenceFramework / ExecutionTarget enums.
    */
+  @Deprecated(message = "repetition_penalty is deprecated")
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -129,6 +138,7 @@ public class LLMGenerateRequest(
   )
   public val repetition_penalty: Float = 0f,
   stop_sequences: List<String> = emptyList(),
+  @Deprecated(message = "streaming_enabled is deprecated")
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -137,6 +147,7 @@ public class LLMGenerateRequest(
     schemaIndex = 9,
   )
   public val streaming_enabled: Boolean = false,
+  @Deprecated(message = "preferred_framework is deprecated")
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -145,6 +156,7 @@ public class LLMGenerateRequest(
     schemaIndex = 10,
   )
   public val preferred_framework: String = "",
+  @Deprecated(message = "json_schema is deprecated")
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -153,6 +165,7 @@ public class LLMGenerateRequest(
     schemaIndex = 11,
   )
   public val json_schema: String = "",
+  @Deprecated(message = "execution_target is deprecated")
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -185,6 +198,7 @@ public class LLMGenerateRequest(
     schemaIndex = 15,
   )
   public val conversation_id: String = "",
+  @Deprecated(message = "seed is deprecated")
   @field:WireField(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -192,6 +206,7 @@ public class LLMGenerateRequest(
     schemaIndex = 16,
   )
   public val seed: Long = 0L,
+  @Deprecated(message = "frequency_penalty is deprecated")
   @field:WireField(
     tag = 18,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -200,6 +215,7 @@ public class LLMGenerateRequest(
     schemaIndex = 17,
   )
   public val frequency_penalty: Float = 0f,
+  @Deprecated(message = "presence_penalty is deprecated")
   @field:WireField(
     tag = 19,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -208,6 +224,7 @@ public class LLMGenerateRequest(
     schemaIndex = 18,
   )
   public val presence_penalty: Float = 0f,
+  @Deprecated(message = "min_p is deprecated")
   @field:WireField(
     tag = 20,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -216,6 +233,7 @@ public class LLMGenerateRequest(
     schemaIndex = 19,
   )
   public val min_p: Float = 0f,
+  @Deprecated(message = "grammar is deprecated")
   @field:WireField(
     tag = 21,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -223,6 +241,7 @@ public class LLMGenerateRequest(
     schemaIndex = 20,
   )
   public val grammar: String = "",
+  @Deprecated(message = "response_format is deprecated")
   @field:WireField(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -231,6 +250,7 @@ public class LLMGenerateRequest(
     schemaIndex = 21,
   )
   public val response_format: String = "",
+  @Deprecated(message = "echo_prompt is deprecated")
   @field:WireField(
     tag = 23,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -239,6 +259,7 @@ public class LLMGenerateRequest(
     schemaIndex = 22,
   )
   public val echo_prompt: Boolean = false,
+  @Deprecated(message = "n_threads is deprecated")
   @field:WireField(
     tag = 24,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -248,8 +269,21 @@ public class LLMGenerateRequest(
   )
   public val n_threads: Int = 0,
   metadata: Map<String, String> = emptyMap(),
+  /**
+   * idl-005: canonical generation options. When set, consumers SHOULD use
+   * the values here in preference to the legacy inline scalar fields above.
+   * The wire schema retains the inline fields to avoid breaking existing
+   * serialized requests; new callers should only populate `options`.
+   */
+  @field:WireField(
+    tag = 26,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
+    schemaIndex = 25,
+  )
+  public val options: LLMGenerationOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerateRequest, Nothing>(ADAPTER, unknownFields) {
+  @Deprecated(message = "stop_sequences is deprecated")
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -302,6 +336,7 @@ public class LLMGenerateRequest(
     if (echo_prompt != other.echo_prompt) return false
     if (n_threads != other.n_threads) return false
     if (metadata != other.metadata) return false
+    if (options != other.options) return false
     return true
   }
 
@@ -334,6 +369,7 @@ public class LLMGenerateRequest(
       result = result * 37 + echo_prompt.hashCode()
       result = result * 37 + n_threads.hashCode()
       result = result * 37 + metadata.hashCode()
+      result = result * 37 + (options?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -366,6 +402,7 @@ public class LLMGenerateRequest(
     result += """echo_prompt=$echo_prompt"""
     result += """n_threads=$n_threads"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
+    if (options != null) result += """options=$options"""
     return result.joinToString(prefix = "LLMGenerateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -395,8 +432,9 @@ public class LLMGenerateRequest(
     echo_prompt: Boolean = this.echo_prompt,
     n_threads: Int = this.n_threads,
     metadata: Map<String, String> = this.metadata,
+    options: LLMGenerationOptions? = this.options,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k, system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, json_schema, execution_target, request_id, model_id, conversation_id, seed, frequency_penalty, presence_penalty, min_p, grammar, response_format, echo_prompt, n_threads, metadata, unknownFields)
+  ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k, system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, json_schema, execution_target, request_id, model_id, conversation_id, seed, frequency_penalty, presence_penalty, min_p, grammar, response_format, echo_prompt, n_threads, metadata, options, unknownFields)
 
   public companion object {
     @JvmField
@@ -485,6 +523,7 @@ public class LLMGenerateRequest(
           size += ProtoAdapter.INT32.encodedSizeWithTag(24, value.n_threads)
         }
         size += metadataAdapter.encodedSizeWithTag(25, value.metadata)
+        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(26, value.options)
         return size
       }
 
@@ -560,11 +599,13 @@ public class LLMGenerateRequest(
           ProtoAdapter.INT32.encodeWithTag(writer, 24, value.n_threads)
         }
         metadataAdapter.encodeWithTag(writer, 25, value.metadata)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerateRequest) {
         writer.writeBytes(value.unknownFields)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 26, value.options)
         metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         if (value.n_threads != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 24, value.n_threads)
@@ -664,6 +705,7 @@ public class LLMGenerateRequest(
         var echo_prompt: Boolean = false
         var n_threads: Int = 0
         val metadata = mutableMapOf<String, String>()
+        var options: LLMGenerationOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -691,6 +733,7 @@ public class LLMGenerateRequest(
             23 -> echo_prompt = ProtoAdapter.BOOL.decode(reader)
             24 -> n_threads = ProtoAdapter.INT32.decode(reader)
             25 -> metadata.putAll(metadataAdapter.decode(reader))
+            26 -> options = LLMGenerationOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -720,11 +763,13 @@ public class LLMGenerateRequest(
           echo_prompt = echo_prompt,
           n_threads = n_threads,
           metadata = metadata,
+          options = options,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LLMGenerateRequest): LLMGenerateRequest = value.copy(
+        options = value.options?.let(LLMGenerationOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

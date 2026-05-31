@@ -69,6 +69,12 @@ inline os_log_t ra_platform_log() {
 #define RA_PLATFORM_LOG_DEBUG(fmt, ...) os_log_debug(ra_platform_log(), fmt, ##__VA_ARGS__)
 #define RA_PLATFORM_LOG_ERROR(fmt, ...) os_log_error(ra_platform_log(), fmt, ##__VA_ARGS__)
 
+// Upper bound for a single synthesize call. Speech finishes well inside this;
+// exceeding it indicates a stall, surfaced as RAC_ERROR_TIMEOUT rather than a
+// permanent hang. Matches the 120s bound in the iOS Swift SDK reference
+// (CppBridge+Platform.swift `callbackTimeout`).
+static constexpr int64_t kSynthesizeTimeoutSeconds = 120;
+
 // =============================================================================
 // System TTS Service — AVSpeechSynthesizer wrapper
 // =============================================================================
@@ -76,9 +82,13 @@ inline os_log_t ra_platform_log() {
 /**
  * Drives AVSpeechSynthesizer for the platform TTS callbacks. Each
  * `rac_platform_tts_create_fn` invocation returns one of these (wrapped in
- * `rac_handle_t`). `synthesize` blocks the caller until playback completes
- * because the C ABI is synchronous (matches the iOS Swift SDK reference
- * which uses `DispatchGroup.wait()` for the same reason).
+ * `rac_handle_t`). The C ABI `synthesize` callback is synchronous, so this
+ * blocks the caller until playback completes — but the wait is bounded and
+ * never blocks the main thread on a semaphore the main thread itself would
+ * have to signal (see -speakText:). This mirrors the iOS Swift SDK reference
+ * `CppBridge+Platform.swift`, which runs the work off the caller's actor via
+ * `Task.detached` and waits on a bounded `DispatchSemaphore` instead of
+ * `DispatchGroup.wait()` / `DispatchQueue.main.sync`.
  */
 @interface RAFlutterSystemTTSService : NSObject <AVSpeechSynthesizerDelegate>
 @property(nonatomic, strong) AVSpeechSynthesizer* synthesizer;
@@ -152,15 +162,49 @@ inline os_log_t ra_platform_log() {
         self.cancelled = NO;
         self.completionSemaphore = dispatch_semaphore_create(0);
 
-        // AVSpeechSynthesizer must be driven from the main queue.
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self.synthesizer speakUtterance:utterance];
-        });
+        // The C ABI synthesize callback is invoked synchronously on whatever
+        // thread the commons router holds (which can be the main thread on
+        // `tts.speak(...)` UI flows). AVSpeechSynthesizer must be driven from
+        // the main queue and its delegate callbacks fire there too, so a
+        // `dispatch_semaphore_wait(..., DISPATCH_TIME_FOREVER)` from the main
+        // thread would block the very queue that has to signal the semaphore —
+        // a permanent deadlock. Mirror the Swift reference (Task.detached +
+        // bounded wait): when off the main thread, dispatch the utterance to
+        // the main queue and wait once with a bounded timeout; when ON the main
+        // thread, drive the synthesizer inline and pump the run loop so the
+        // delegate callbacks can still fire while we wait. Both paths consume
+        // the semaphore exactly once and surface RAC_ERROR_TIMEOUT on stall.
+        BOOL completed = NO;
 
-        // Block until completion / cancellation. The semaphore is signaled by
-        // didFinishSpeechUtterance or didCancelSpeechUtterance.
-        dispatch_semaphore_wait(self.completionSemaphore, DISPATCH_TIME_FOREVER);
+        if ([NSThread isMainThread]) {
+            [self.synthesizer speakUtterance:utterance];
+            const NSTimeInterval limit =
+                [NSDate timeIntervalSinceReferenceDate] + (NSTimeInterval)kSynthesizeTimeoutSeconds;
+            while ([NSDate timeIntervalSinceReferenceDate] < limit) {
+                if (dispatch_semaphore_wait(self.completionSemaphore, DISPATCH_TIME_NOW) == 0) {
+                    completed = YES;
+                    break;
+                }
+                [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode
+                                      beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+            }
+        } else {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self.synthesizer speakUtterance:utterance];
+            });
+            const dispatch_time_t deadline =
+                dispatch_time(DISPATCH_TIME_NOW, kSynthesizeTimeoutSeconds * NSEC_PER_SEC);
+            completed = (dispatch_semaphore_wait(self.completionSemaphore, deadline) == 0);
+        }
+
         self.completionSemaphore = nil;
+
+        if (!completed) {
+            RA_PLATFORM_LOG_ERROR("System TTS synthesize timed out after %lld s",
+                                  (long long)kSynthesizeTimeoutSeconds);
+            [self stop];
+            return RAC_ERROR_TIMEOUT;
+        }
 
         return self.cancelled ? RAC_ERROR_CANCELLED : RAC_SUCCESS;
     }

@@ -12,7 +12,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.SDKEvent
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.types.RASDKEvent
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -38,10 +37,11 @@ private fun <M : Message<M, *>> decodeOrNull(
  * Thin generated-proto facade over the canonical SDKEvent stream.
  */
 object CppBridgeSDKEventStream {
-    fun subscribe(onEvent: (RASDKEvent) -> Boolean): Long =
+    fun subscribe(onEvent: (SDKEvent) -> Unit): Long =
         RunAnywhereBridge.racSdkEventSubscribe(
             NativeProtoProgressListener { bytes ->
-                decodeOrNull(SDKEvent.ADAPTER, bytes, "sdkEventCallback")?.let(onEvent) ?: false
+                decodeOrNull(SDKEvent.ADAPTER, bytes, "sdkEventCallback")?.also(onEvent)
+                true
             },
         )
 
@@ -49,10 +49,10 @@ object CppBridgeSDKEventStream {
         RunAnywhereBridge.racSdkEventUnsubscribe(subscriptionId)
     }
 
-    fun publish(event: RASDKEvent): Int =
+    fun publish(event: SDKEvent): Int =
         RunAnywhereBridge.racSdkEventPublishProto(SDKEvent.ADAPTER.encode(event))
 
-    fun poll(): RASDKEvent? =
+    fun poll(): SDKEvent? =
         decodeOrNull(SDKEvent.ADAPTER, RunAnywhereBridge.racSdkEventPoll(), "sdkEventPoll")
 
     fun publishFailure(

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// rac/graph/cancel_token.hpp — v3.1 Phase 9 DAG primitive (GAP 05).
+// rac/graph/cancel_token.hpp — DAG primitive.
 //
 // Hierarchical cancellation token. Parent cancel cascades to all
 // children atomically. Children can be added/removed dynamically.

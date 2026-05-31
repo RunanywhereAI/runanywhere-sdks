@@ -40,8 +40,7 @@ void check_embeddings_rpc(const google::protobuf::ServiceDescriptor* service,
           "Embeddings RPC accepts EmbeddingsRequest");
     CHECK(method->output_type()->full_name() == "runanywhere.v1.EmbeddingsResult",
           "Embeddings RPC returns EmbeddingsResult");
-    CHECK(!(method->client_streaming() || method->server_streaming()),
-          "Embeddings RPC is unary");
+    CHECK(!(method->client_streaming() || method->server_streaming()), "Embeddings RPC is unary");
 }
 
 int test_embeddings_generated_service_contract() {

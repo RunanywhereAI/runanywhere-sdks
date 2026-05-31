@@ -2,23 +2,20 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * React Native copy of the Kotlin SDK's RunAnywhereBridge HTTP transport
- * registration entry point (v2 close-out Phase H6).
+ * React Native HTTP-transport registration entry point.
  *
- * Only the HTTP transport registration methods are replicated here — the
- * full `RunAnywhereBridge` from sdk/runanywhere-kotlin carries many more
- * JNI bindings that RN does not need, because RN talks to the C++ core
- * through its own Nitro bridges.
+ * The JNI symbols `Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
+ * racHttpTransportRegister/UnregisterOkHttp` come from
+ * librunanywhere_jni.so (built from
+ * sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp). RN does
+ * NOT compile its own copy of that adapter — the commons-jni library is
+ * staged into the package's jniLibs/ and loaded below before the symbols
+ * are referenced.
  *
- * The package + class name are intentionally identical to the Kotlin SDK
- * copy because `okhttp_transport_adapter.cpp` exports its JNI symbols
- * under this fully-qualified Java name:
- *
- *   Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegisterOkHttp
- *
- * RN's CMakeLists pulls the same `okhttp_transport_adapter.cpp` into
- * `librunanywherecore.so`, so the symbol lookup resolves against RN's
- * own native library rather than a Kotlin-SDK-provided one.
+ * Only the two transport registration thunks are exposed; the full
+ * RunAnywhereBridge from sdk/runanywhere-kotlin carries many more JNI
+ * bindings that RN does not need because RN talks to the C++ core through
+ * its own Nitro bridges.
  */
 
 package com.runanywhere.sdk.native.bridge
@@ -49,9 +46,9 @@ object RunAnywhereBridge {
     external fun racHttpTransportUnregisterOkHttp(): Int
 
     init {
-        // librunanywherecore.so bundles:
-        //   - okhttp_transport_adapter.cpp (the JNI bridge)
-        //   - librac_commons.so dependency (the transport registry)
-        System.loadLibrary("runanywherecore")
+        // librunanywhere_jni.so carries the okhttp_transport_adapter JNI
+        // symbols (built from commons). The linker pulls in librac_commons.so
+        // automatically because runanywhere_jni declares it as a NEEDED dep.
+        System.loadLibrary("runanywhere_jni")
     }
 }

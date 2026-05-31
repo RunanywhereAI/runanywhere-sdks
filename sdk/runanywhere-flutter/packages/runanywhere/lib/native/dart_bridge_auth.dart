@@ -119,6 +119,11 @@ class DartBridgeAuth {
     } catch (e) {
       _logger.debug('rac_auth_reset not available: $e');
     }
+    // Mirror Swift CppBridge.State.shutdown() which resets authStorageInstalled
+    // so that a subsequent initialize() re-wires the secure-storage vtable.
+    // Without this, initialize()'s early-return guard fires and token
+    // persistence silently breaks on logout→login re-init flows.
+    _isInitialized = false;
   }
 
   // ============================================================================
@@ -221,8 +226,9 @@ class DartBridgeAuth {
         try {
           const storage = FlutterSecureStorage(
             aOptions: AndroidOptions(),
-            iOptions:
-                IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+            iOptions: IOSOptions(
+              accessibility: KeychainAccessibility.first_unlock_this_device,
+            ),
           );
           deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
           if (deviceId != null && deviceId.isNotEmpty) {
@@ -576,7 +582,9 @@ class DartBridgeAuth {
     try {
       const storage = FlutterSecureStorage(
         aOptions: AndroidOptions(),
-        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+        iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock_this_device,
+        ),
       );
       final token = await storage.read(key: 'com.runanywhere.sdk.refreshToken');
       if (token != null && token.isNotEmpty) {
@@ -693,7 +701,9 @@ class DartBridgeAuth {
     try {
       const storage = FlutterSecureStorage(
         aOptions: AndroidOptions(),
-        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+        iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock_this_device,
+        ),
       );
 
       var storedCount = 0;
@@ -763,7 +773,9 @@ class DartBridgeAuth {
     try {
       const storage = FlutterSecureStorage(
         aOptions: AndroidOptions(),
-        iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+        iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock_this_device,
+        ),
       );
 
       final accessToken =
@@ -875,8 +887,10 @@ int _secureRetrieveCallback(Pointer<Utf8> key, Pointer<Utf8> outValue,
 
     if (value == null) return -1;
 
-    // Copy to output buffer
-    final bytes = value.codeUnits;
+    // Copy UTF-8 bytes into the caller buffer. `codeUnits` emits UTF-16 code
+    // units and silently mangles any non-ASCII secret; `utf8.encode` matches
+    // the Swift bridge, which copies `value.utf8CString`.
+    final bytes = utf8.encode(value);
     final maxLen = bufferSize - 1; // Leave room for null terminator
 
     if (bytes.length > maxLen) {
@@ -919,7 +933,9 @@ Future<void> _writeToSecureStorage(String key, String value) async {
   try {
     const storage = FlutterSecureStorage(
       aOptions: AndroidOptions(),
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      iOptions: IOSOptions(
+        accessibility: KeychainAccessibility.first_unlock_this_device,
+      ),
     );
     await storage.write(key: key, value: value);
   } catch (e) {
@@ -932,7 +948,9 @@ Future<void> _deleteFromSecureStorage(String key) async {
   try {
     const storage = FlutterSecureStorage(
       aOptions: AndroidOptions(),
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+      iOptions: IOSOptions(
+        accessibility: KeychainAccessibility.first_unlock_this_device,
+      ),
     );
     await storage.delete(key: key);
   } catch (e) {

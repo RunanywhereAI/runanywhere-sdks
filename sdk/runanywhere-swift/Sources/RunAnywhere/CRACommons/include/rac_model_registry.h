@@ -472,7 +472,7 @@ RAC_API rac_result_t rac_model_registry_discover_downloaded(
 RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
 
 // =============================================================================
-// REFRESH - Unified cross-SDK registry refresh (T4.9)
+// REFRESH - Unified cross-SDK registry refresh
 // =============================================================================
 
 /**
@@ -523,7 +523,7 @@ RAC_API rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t hand
                                                 rac_model_registry_refresh_opts_t opts);
 
 // =============================================================================
-// REGISTER MODEL FROM URL (P2-T6) — single-call URL+name+framework → save
+// REGISTER MODEL FROM URL — single-call URL+name+framework → save
 // =============================================================================
 
 /**

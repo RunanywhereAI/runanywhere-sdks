@@ -209,5 +209,5 @@ From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADStreamEventKin
 ## After Modifying the SDK
 
 - **TypeScript changes**: Picked up by Metro automatically (hot-reload)
-- **C++ changes**: Rebuild commons in the owning layer (`./scripts/build-core-xcframework.sh` / `./scripts/build-core-android.sh` from the repo root) and re-stage into the RN packages with `sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from <build/native-artifacts>`
+- **C++ changes**: Rebuild commons in the owning layer (`./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` / `./scripts/build/build-core-android.sh` from the repo root) and re-stage into the RN packages with `sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from <build/native-artifacts>`
 - **Missing xcframeworks** (`RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, etc.): Means the native artifact build step was skipped — run `build-core-xcframework.sh` / `build-core-android.sh`, then re-run `scripts/package-sdk.sh --natives-from PATH`

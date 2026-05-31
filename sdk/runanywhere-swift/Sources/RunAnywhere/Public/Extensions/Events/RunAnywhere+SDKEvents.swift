@@ -7,6 +7,11 @@
 
 import CRACommons
 
+/// Imperative SDK-event surface kept for cross-SDK parity (this is Kotlin's
+/// primary event API and the documented React Native surface). Swift consumers
+/// should prefer the Combine publisher `RunAnywhere.events.events`, which wraps
+/// this same native bridge; these top-level entry points are intentionally
+/// retained rather than removed as dead code.
 public extension RunAnywhere {
     @discardableResult
     static func subscribeSDKEvents(_ handler: @escaping (RASDKEvent) -> Void) -> UInt64 {

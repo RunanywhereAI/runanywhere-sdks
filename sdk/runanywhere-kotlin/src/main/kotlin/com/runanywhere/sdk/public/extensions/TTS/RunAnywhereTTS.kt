@@ -60,6 +60,7 @@ suspend fun RunAnywhere.synthesize(
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
+    ensureServicesReady()
 
     // Lifecycle check: mirrors Swift's `synthesize(_:options:)` which queries
     // `RunAnywhere.currentModel(category: .speechSynthesis)` and throws when

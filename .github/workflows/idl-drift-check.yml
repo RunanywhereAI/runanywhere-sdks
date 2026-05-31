@@ -12,31 +12,34 @@ on:
     paths:
       - 'idl/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
-      - 'sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**'
+      - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'scripts/setup-toolchain.sh'
+      - 'scripts/setup/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
-    # v2 close-out (B34): include long-lived integration branches so a
+    # Include long-lived integration branches so a
     # direct push that touches IDL-adjacent files without a PR still
     # gets the drift gate.
     branches: [main, feat/v2-architecture]
     paths:
       - 'idl/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'
-      - 'sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**'
+      - 'sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/**'
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'scripts/setup-toolchain.sh'
+      - 'scripts/setup/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
+
+permissions:
+  contents: read
 
 jobs:
   check:
     name: Verify generated code matches IDL
-    # T1.7: macos-15 ships Xcode 16 with Swift 6, which is the minimum
+    # macos-15 ships Xcode 16 with Swift 6, which is the minimum
     # required by Homebrew's grpc-swift v2 formula. On macos-14 the formula
     # bails with "protoc-gen-grpc-swift: An unsatisfied requirement failed
     # this build", which previously masked the Swift gRPC plugin install and
@@ -59,16 +62,16 @@ jobs:
             /usr/local/Homebrew
             /opt/homebrew
             ~/Library/Caches/Homebrew
-          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup-toolchain.sh') }}
+          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup/setup-toolchain.sh') }}
 
-      # T4.3: bootstrap the Mintfile so the Swift dev-tool versions pinned
+      # Bootstrap the Mintfile so the Swift dev-tool versions pinned
       # at the repo root (SwiftLint / Periphery / swift-format /
       # swift-protobuf / grpc-swift) are the single source of truth across
       # every CI workflow. The brew steps below intentionally remain — this
       # repo currently relies on Homebrew's `protoc-gen-grpc-swift-2`
       # binary which is not produced by the Mintfile-pinned grpc-swift 1.x
       # checkout. Mint bootstrap is run with `--overwrite y` so a stale
-      # cache cannot stall the job. Once `scripts/setup-toolchain.sh`
+      # cache cannot stall the job. Once `scripts/setup/setup-toolchain.sh`
       # migrates to mint-only, the brew installs can drop out.
       - name: Cache Mint packages
         uses: actions/cache@v4
@@ -92,11 +95,11 @@ jobs:
 
       - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
         run: |
-          # T1.7: grpc-swift v2 requires Swift 6 / Xcode 16 (macos-15 runner).
+          # grpc-swift v2 requires Swift 6 / Xcode 16 (macos-15 runner).
           # Fail loud if the install does not produce protoc-gen-grpc-swift —
           # silently skipping previously let Swift gRPC drift through CI.
           #
-          # v2 close-out Phase 3: grpc-swift formula installs the binary as
+          # grpc-swift formula installs the binary as
           # protoc-gen-grpc-swift-2; symlink to the legacy name the codegen
           # script expects so `protoc --grpc-swift_out=` invocations resolve.
           brew install grpc-swift
@@ -113,7 +116,7 @@ jobs:
           brew install wire || echo "wire bottle unavailable; Gradle Wire plugin will handle Kotlin codegen"
 
       - name: Install Dart 3.x
-        # T1.7: macos-{14,15} runners do not ship Dart by default, so the
+        # macos-{14,15} runners do not ship Dart by default, so the
         # previous `command -v dart` gate silently skipped the Dart codegen
         # and let Flutter bindings drift (e.g. tool_call additions to
         # LLMStreamEvent / LLMStreamFinalResult in idl/llm_service.proto were
@@ -124,13 +127,19 @@ jobs:
           sdk: stable
 
       - name: Install Dart plugin (protoc-gen-dart)
+        # Pinned to PROTOC_GEN_DART_VERSION in sdk/runanywhere-commons/VERSIONS
+        # (single source of truth for IDL codegen toolchain). Bump there first
+        # — this workflow mirrors that pin.
         run: |
-          dart pub global activate protoc_plugin 21.1.2
+          dart pub global activate protoc_plugin 25.0.0
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Install ts-proto (npm)
+        # Pinned to TS_PROTO_VERSION in sdk/runanywhere-commons/VERSIONS
+        # (single source of truth). Major-bumped to 2.x; generated TS still
+        # parses under tsc 5.9 strict.
         run: |
-          npm install -g ts-proto@1.181.1 protobufjs
+          npm install -g ts-proto@2.11.8 protobufjs
 
       - name: Install Python protobuf + pyyaml runtime
         # idl/codegen/generate_*_convenience.py drivers import
@@ -166,7 +175,7 @@ jobs:
             echo "::error::IDL-generated code is out of sync with .proto sources."
             echo ""
             echo "To fix locally:"
-            echo "  ./scripts/setup-toolchain.sh"
+            echo "  ./scripts/setup/setup-toolchain.sh"
             echo "  ./idl/codegen/generate_all.sh"
             echo "  (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build)"
             echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"

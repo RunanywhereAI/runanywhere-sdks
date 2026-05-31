@@ -111,6 +111,14 @@ using RegistryRemoveProtoFn = rac_result_t (*)(
     const char*);
 using RegistryProtoFreeFn = void (*)(uint8_t*);
 
+// rac_register_model_from_url_proto: handle-less global-registry C ABI that
+// translates a RegisterModelFromUrlRequest into the canonical build-and-save
+// flow (framework defaulting + artifact inference + id derivation).
+using RegisterModelFromUrlProtoFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+
 using ProtoBufferCallFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
@@ -138,6 +146,7 @@ using SDKEventSubscribeFn = uint64_t (*)(
     SDKEventCallbackFn,
     void*);
 using SDKEventUnsubscribeFn = void (*)(uint64_t);
+using SDKEventQuiesceFn = void (*)();
 using SDKEventPublishProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t);
@@ -318,13 +327,17 @@ using ToolRunLoopProtoFn = rac_result_t (*)(
     ToolExecuteCallbackFn,
     void*,
     rac_proto_buffer_t*);
-// pass3-syn-047: cancellation-aware variant — publishes a run-loop handle
-// before the iteration loop begins so RN AbortSignal / Swift task cancel can
-// fan into rac_tool_calling_run_loop_cancel_proto from another thread.
-using ToolRunLoopWithHandleProtoFn = rac_result_t (*)(
+// pass3-syn-028: callback variant — fires `on_handle_published(handle,
+// user_data)` SYNCHRONOUSLY before iteration so SDKs can publish the handle
+// to a thread-safe sink (JS callback, Completer, Deferred) without racing
+// the worker. Preferred over polling the out-pointer from a watcher thread.
+using ToolRunLoopOnHandlePublishedCb = void (*)(uint64_t, void*);
+using ToolRunLoopWithHandleAndCbProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,
     ToolExecuteCallbackFn,
+    void*,
+    ToolRunLoopOnHandlePublishedCb,
     void*,
     uint64_t*,
     rac_proto_buffer_t*);

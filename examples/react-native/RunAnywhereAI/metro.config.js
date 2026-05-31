@@ -1,6 +1,5 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
-const { resolve: resolveMetro } = require('metro-resolver');
 
 // Yarn workspace root (where node_modules with all hoisted deps lives)
 const workspaceRoot = path.resolve(__dirname, '../../../');
@@ -51,7 +50,15 @@ const config = {
       ) {
         return { type: 'sourceFile', filePath: bufbuildWireCjs };
       }
-      return resolveMetro(context, moduleName, platform);
+      // Delegate to Metro's own default resolver. Metro pre-sets
+      // `context.resolveRequest` to its internal `resolve` (with the
+      // `resolveRequest !== resolve` recursion guard pointing at the same
+      // module instance). Importing a separate `metro-resolver` package here
+      // would bind a *different* `resolve` identity — when the root
+      // metro-resolver (v0.84.x) and metro's bundled copy (v0.83.x) differ,
+      // that guard never matches and delegation recurses infinitely
+      // ("Maximum call stack size exceeded" in metro-resolver/src/resolve.js).
+      return context.resolveRequest(context, moduleName, platform);
     },
 
     // Standard hierarchical lookup; yarn workspace symlinks resolve cleanly.

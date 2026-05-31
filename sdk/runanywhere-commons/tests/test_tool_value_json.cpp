@@ -74,11 +74,11 @@ namespace {
 // silently skip the serialization and leave `y` empty. Use `RAC_HARD_CHECK`
 // instead — it always evaluates its argument and throws on failure so the
 // test harness reports the failure clearly.
-#define RAC_HARD_CHECK(expr)                                          \
-    do {                                                              \
-        if (!(expr)) {                                                \
+#define RAC_HARD_CHECK(expr)                                           \
+    do {                                                               \
+        if (!(expr)) {                                                 \
             throw std::runtime_error("RAC_HARD_CHECK failed: " #expr); \
-        }                                                             \
+        }                                                              \
     } while (0)
 
 std::string to_json(const runanywhere::v1::ToolValue& value) {

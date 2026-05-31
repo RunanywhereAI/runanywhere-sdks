@@ -198,6 +198,15 @@ RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registr
  * The registry converts the proto to its internal C++/C representation and
  * applies the same semantics as rac_model_registry_save().
  *
+ * Merge-not-replace on existing entries: when the model_id is already in the
+ * registry, runtime fields the caller did not set (local_path, is_downloaded,
+ * checksum_sha256, expected_files, multi_file per-file local_path) are
+ * preserved from the existing snapshot. Callers reseeding a curated catalog
+ * on app launch therefore retain previous download progress without needing
+ * an example-app skip-if-present workaround. To force a clean reset, callers
+ * must explicitly populate the desired field on the incoming ModelInfo (the
+ * "absent" check is field-presence-based via the proto `has_*` accessors).
+ *
  * @param handle Registry handle
  * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
  * @param proto_size Byte count
@@ -438,21 +447,10 @@ RAC_API rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_
  */
 RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model);
 
-/**
- * @brief Check if model category requires context length.
- *
- * @param category Model category
- * @return RAC_TRUE if requires context length
- */
-RAC_API rac_bool_t rac_model_category_requires_context_length(rac_model_category_t category);
-
-/**
- * @brief Check if model category supports thinking.
- *
- * @param category Model category
- * @return RAC_TRUE if supports thinking
- */
-RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t category);
+// NOTE: rac_model_category_requires_context_length() and
+// rac_model_category_supports_thinking() are declared in rac_model_types.h
+// (the canonical home for rac_model_category_t helpers) and intentionally
+// not re-declared here to avoid double-declaration drift.
 
 /**
  * @brief Infer artifact type from URL and format.
@@ -605,7 +603,7 @@ RAC_API rac_result_t rac_model_registry_discover_downloaded(
 RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
 
 // =============================================================================
-// REFRESH - Unified cross-SDK registry refresh (T4.9)
+// REFRESH - Unified cross-SDK registry refresh
 // =============================================================================
 
 /**
@@ -758,9 +756,9 @@ RAC_API rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request_by
                                                        rac_proto_buffer_t* out_result);
 
 // =============================================================================
-// REGISTER MODEL FROM URL (P2-T6) — single-call URL+name+framework → save
+// REGISTER MODEL FROM URL — single-call URL+name+framework → save
 //
-// Composes the canonical RAModelInfo factory (rac_model_info_make_proto, P2-T4)
+// Composes the canonical RAModelInfo factory (rac_model_info_make_proto)
 // with the existing registry persistence path so SDKs replace the ~60 LOC
 // build-and-save body of Swift's RunAnywhere.registerModel(...) (and the
 // equivalent Kotlin/Flutter/RN/Web glue) with a single ABI call. Output is

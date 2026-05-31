@@ -12,6 +12,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
@@ -142,6 +143,7 @@ export async function transcribe(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  await ensureServicesReady();
   const native = requireNativeModule();
   const audioBytes = audioToArrayBuffer(audio);
   return decodeSTTOutput(
@@ -150,13 +152,58 @@ export async function transcribe(
 }
 
 /**
- * Stream transcription results as an `AsyncIterable<STTPartialResult>` over
- * the native `sttTranscribeStreamProto` proto-byte callback.
+ * Stream-in / stream-out overload: mirrors Swift's `transcribeStream(audio:AsyncStream<Data>)`.
  *
- * Matches the canonical cross-SDK spec §4:
- *   `transcribeStream(audio: Bytes) → Stream<STTPartialResult>`
+ * Accumulates VAD-segmented `Uint8Array` chunks from the caller's `AsyncIterable`,
+ * concatenates them into a single buffer, then forwards to the native
+ * `sttTranscribeStreamProto` callback — matching the Swift behaviour exactly.
+ * Prefer this overload for live-mic transcription; use the single-buffer overload
+ * only when the full clip is already assembled.
  */
 export function transcribeStream(
+  audio: AsyncIterable<Uint8Array>,
+  options?: Partial<STTOptions>
+): AsyncIterable<STTPartialResult>;
+
+/**
+ * Single-buffer convenience overload: accepts a pre-assembled audio clip.
+ * Kept for backward compatibility with existing callers.
+ */
+export function transcribeStream(
+  audio: Uint8Array | string | ArrayBuffer,
+  options?: Partial<STTOptions>
+): AsyncIterable<STTPartialResult>;
+
+export function transcribeStream(
+  audio: AsyncIterable<Uint8Array> | Uint8Array | string | ArrayBuffer,
+  options: Partial<STTOptions> = {}
+): AsyncIterable<STTPartialResult> {
+  if (audio != null && typeof audio === 'object' && Symbol.asyncIterator in audio) {
+    return transcribeStreamFromAsyncIterable(audio as AsyncIterable<Uint8Array>, options);
+  }
+  return transcribeStreamFromBuffer(audio as Uint8Array | string | ArrayBuffer, options);
+}
+
+async function* transcribeStreamFromAsyncIterable(
+  chunks: AsyncIterable<Uint8Array>,
+  options: Partial<STTOptions>
+): AsyncIterable<STTPartialResult> {
+  const parts: Uint8Array[] = [];
+  let totalLength = 0;
+  for await (const chunk of chunks) {
+    parts.push(chunk);
+    totalLength += chunk.byteLength;
+  }
+  const accumulated = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    accumulated.set(part, offset);
+    offset += part.byteLength;
+  }
+  yield* transcribeStreamFromBuffer(accumulated, options);
+}
+
+function transcribeStreamFromBuffer(
   audio: Uint8Array | string | ArrayBuffer,
   options: Partial<STTOptions> = {}
 ): AsyncIterable<STTPartialResult> {
@@ -187,55 +234,60 @@ export function transcribeStream(
       const start = (): void => {
         if (started) return;
         started = true;
-        native
-          .sttTranscribeStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
-            try {
-              const event = STTStreamEvent.decode(arrayBufferToBytes(eventBytes));
-              const partial =
-                event.partial ??
-                (event.finalOutput
-                  ? STTPartialResultMessage.fromPartial({
-                      text: event.finalOutput.text,
-                      isFinal: true,
-                      confidence: event.finalOutput.confidence,
-                      language: event.finalOutput.language,
-                      timestampMs: event.finalOutput.timestampMs,
-                      requestId: event.requestId,
-                    })
-                  : null);
-              if (!partial) {
-                if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
-                  throw SDKException.generationFailedWith(
-                    event.errorMessage ?? 'STT stream failed'
-                  );
+        ensureServicesReady().then(() => {
+          native
+            .sttTranscribeStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
+              try {
+                const event = STTStreamEvent.decode(arrayBufferToBytes(eventBytes));
+                const partial =
+                  event.partial ??
+                  (event.finalOutput
+                    ? STTPartialResultMessage.fromPartial({
+                        text: event.finalOutput.text,
+                        isFinal: true,
+                        confidence: event.finalOutput.confidence,
+                        language: event.finalOutput.language,
+                        timestampMs: event.finalOutput.timestampMs,
+                        requestId: event.requestId,
+                      })
+                    : null);
+                if (!partial) {
+                  if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
+                    throw SDKException.generationFailedWith(
+                      event.errorMessage ?? 'STT stream failed'
+                    );
+                  }
+                  return;
                 }
-                return;
-              }
-              if (resolver) {
-                resolver({ value: partial, done: false });
-                resolver = null;
-              } else {
-                queue.push(partial);
-              }
-              if (
-                partial.isFinal ||
-                event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
-              ) {
+                if (resolver) {
+                  resolver({ value: partial, done: false });
+                  resolver = null;
+                } else {
+                  queue.push(partial);
+                }
+                if (
+                  partial.isFinal ||
+                  event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
+                ) {
+                  finish();
+                }
+              } catch (error) {
+                streamError = error instanceof Error ? error : new Error(String(error));
                 finish();
               }
-            } catch (error) {
-              streamError = error instanceof Error ? error : new Error(String(error));
+            })
+            .then(() => {
+              if (!done) finish();
+            })
+            .catch((err: Error) => {
+              streamError = err;
+              logger.warning(`sttTranscribeStreamProto rejected: ${err.message}`);
               finish();
-            }
-          })
-          .then(() => {
-            if (!done) finish();
-          })
-          .catch((err: Error) => {
-            streamError = err;
-            logger.warning(`sttTranscribeStreamProto rejected: ${err.message}`);
-            finish();
-          });
+            });
+        }).catch((err: Error) => {
+          streamError = err;
+          finish();
+        });
       };
 
       return {

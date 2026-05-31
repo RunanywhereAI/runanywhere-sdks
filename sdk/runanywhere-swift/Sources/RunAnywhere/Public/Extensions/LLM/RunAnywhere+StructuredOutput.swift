@@ -46,22 +46,30 @@ public extension RunAnywhere {
     /// translated into `.token` `RAStructuredOutputStreamEvent`s; on the
     /// final token the accumulated text is parsed via
     /// `extractStructuredOutput` and emitted as a `.completed` event with
-    /// the validated `RAStructuredOutputResult` attached. Decoding/validation
-    /// failures are surfaced as a terminal `.error` event.
-    /// (See comment record `swift-public-features-004`.)
+    /// the validated `RAStructuredOutputResult` attached.
+    ///
+    /// Pre-flight failures (e.g. uninitialised SDK) throw synchronously from
+    /// the `throws` caller; in-flight failures (LLM driver errors,
+    /// parse/validation errors) terminate the returned
+    /// `AsyncThrowingStream` so consumers receive them via `for try await`
+    /// or the iterator's `throw`, matching the cross-SDK contract (Kotlin
+    /// `Flow` exception propagation, Web `AsyncIterable` throw).
+    /// (See comment record `swift-public-features-007`.)
     static func generateStructuredStream(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
-    ) -> AsyncStream<RAStructuredOutputStreamEvent> {
-        guard isInitialized else { return errorStream("SDK not initialized") }
+    ) throws -> AsyncThrowingStream<RAStructuredOutputStreamEvent, Error> {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
 
         var internalOptions = options ?? RALLMGenerationOptions.defaults()
         internalOptions.structuredOutput = .defaults(schema: schema)
         var request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
         request.streamingEnabled = true
 
-        return AsyncStream { continuation in
+        return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
                     let stream = try await generateStream(request)
@@ -80,27 +88,15 @@ public extension RunAnywhere {
                         }
                     }
                     seq &+= 1
-                    do {
-                        let parsed = try extractStructuredOutput(text: accumulated, schema: schema)
-                        var terminal = RAStructuredOutputStreamEvent()
-                        terminal.kind = .completed
-                        terminal.result = parsed
-                        terminal.seq = seq
-                        continuation.yield(terminal)
-                    } catch {
-                        var failure = RAStructuredOutputStreamEvent()
-                        failure.kind = .error
-                        failure.errorMessage = error.localizedDescription
-                        failure.seq = seq
-                        continuation.yield(failure)
-                    }
+                    let parsed = try extractStructuredOutput(text: accumulated, schema: schema)
+                    var terminal = RAStructuredOutputStreamEvent()
+                    terminal.kind = .completed
+                    terminal.result = parsed
+                    terminal.seq = seq
+                    continuation.yield(terminal)
                     continuation.finish()
                 } catch {
-                    var failure = RAStructuredOutputStreamEvent()
-                    failure.kind = .error
-                    failure.errorMessage = error.localizedDescription
-                    continuation.yield(failure)
-                    continuation.finish()
+                    continuation.finish(throwing: error)
                 }
             }
             // Manual cancellation fallback (pass3-syn-058):
@@ -117,8 +113,8 @@ public extension RunAnywhere {
             // IMPORTANT: switch on `termination` and only fire the native
             // cancel on `.cancelled`. `.finished` means the producer Task
             // above already called `continuation.finish()` after the
-            // terminal `.completed` / `.error` event — calling
-            // `cancelGeneration()` there would invoke
+            // terminal `.completed` event (or `.finish(throwing:)` after an
+            // error) — calling `cancelGeneration()` there would invoke
             // `rac_llm_cancel_proto` on the lifecycle LLM handle and race
             // with any follow-up `RunAnywhere.generate(...)` the caller
             // kicks off immediately after the stream completes. See the
@@ -159,13 +155,4 @@ public extension RunAnywhere {
         return try await generate(request)
     }
 
-    private static func errorStream(_ message: String) -> AsyncStream<RAStructuredOutputStreamEvent> {
-        AsyncStream { continuation in
-            var event = RAStructuredOutputStreamEvent()
-            event.kind = .error
-            event.errorMessage = message
-            continuation.yield(event)
-            continuation.finish()
-        }
-    }
 }

@@ -66,6 +66,9 @@ yarn-error.*
 # TypeScript
 *.tsbuildinfo
 
+# Auto-generated from commons YAMLs by scripts/sync-solutions-yamls.js
+src/generated/
+
 # Environment
 .env
 .env.local

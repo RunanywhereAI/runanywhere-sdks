@@ -1,6 +1,8 @@
 syntax = "proto3";
 package runanywhere.v1;
 
+import "storage_types.proto"; // NPUChip enum
+
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
@@ -20,13 +22,14 @@ message HardwareProfile {
   uint32 efficiency_cores = 7;
   string architecture = 8; // "arm64", "x86_64"
   string platform = 9; // "ios", "android", "web", "macos", "linux", "windows"
+  NPUChip npu_chip = 10; // resolved NPU vendor family (commons-classified)
 }
 
 // ---------------------------------------------------------------------------
 // Hardware acceleration preference for inference. Canonical single enum —
 // previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
 // file and `AccelerationPreference` in model_types.proto. Consolidated here
-// (Wave H-2 / IDL-01) because it is a pure hardware concept and
+// because it is a pure hardware concept and
 // hardware_profile.proto has no imports (model_types.proto already imports
 // this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
 //   Web    enums.ts:165   (Auto / WebGPU / CPU)

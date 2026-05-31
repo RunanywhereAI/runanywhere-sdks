@@ -39,7 +39,7 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx.so")
     message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
-                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_onnx SHARED IMPORTED)
@@ -88,10 +88,12 @@ if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-jni.so")
         IMPORTED_NO_SONAME TRUE
     )
 endif()
-# B-RN-10-001 fix: link rac_backend_sherpa so the dynamic linker loads it
-# alongside librunanywhereonnx.so. Its __attribute__((constructor)) registers
-# Sherpa STT/TTS/VAD with the unified plugin registry. Previously the .so
-# shipped in the APK but was never dlopen-ed, so rac_plugin_route returned -423.
+# B-RN-10-001 fix: link rac_backend_sherpa so the dynamic linker emits an NEEDED
+# entry for librac_backend_sherpa.so and loads it before librunanywhereonnx.so
+# resolves rac_backend_sherpa_register at runtime. The .so used to auto-register
+# via a ctor; that ctor was removed upstream (rac_plugin_entry_sherpa.h) and
+# replaced with the explicit rac_backend_sherpa_register() call in
+# HybridRunAnywhereONNX.cpp::registerBackend.
 if(EXISTS "${JNILIB_DIR}/librac_backend_sherpa.so")
     add_library(rac_backend_sherpa SHARED IMPORTED)
     set_target_properties(rac_backend_sherpa PROPERTIES
@@ -200,9 +202,9 @@ endif()
 if(TARGET sherpa_onnx_jni)
     target_link_libraries(${PACKAGE_NAME} sherpa_onnx_jni)
 endif()
-# B-RN-10-001: rac_backend_sherpa registers itself via __attribute__((constructor))
-# on dlopen — linking it here forces the dynamic linker to load it alongside
-# librunanywhereonnx.so.
+# B-RN-10-001: link rac_backend_sherpa so the dynamic linker loads it alongside
+# librunanywhereonnx.so; rac_backend_sherpa_register() is called explicitly in
+# HybridRunAnywhereONNX.cpp::registerBackend (the old ctor was removed upstream).
 if(TARGET rac_backend_sherpa)
     target_link_libraries(${PACKAGE_NAME} rac_backend_sherpa)
 endif()

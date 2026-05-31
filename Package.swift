@@ -1,5 +1,5 @@
 // swift-tools-version: 5.9
-// T5.4: attempted bump to 6.0 was rolled back. Bumping the manifest tools
+// Attempted bump to 6.0 was rolled back. Bumping the manifest tools
 // version forces Swift 6 language mode on all targets, which turns several
 // pre-existing patterns in the SDK (mutable static registration flags,
 // closure-captured locals in AVAudioConverter / URLSession callbacks,
@@ -23,7 +23,7 @@ import Foundation
 //
 // FOR LOCAL DEVELOPMENT:
 //   1. Build native XCFrameworks from the repo root:
-//          ./scripts/build-core-xcframework.sh
+//          ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 //      This writes RACommons.xcframework, RABackendLLAMACPP.xcframework, and
 //      RABackendONNX.xcframework into sdk/runanywhere-swift/Binaries/.
 //   2. Ensure `useLocalNatives = true` below so the package resolves to
@@ -39,7 +39,7 @@ import Foundation
 //
 // useLocalNatives = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
 //                           For local development. Generate them with
-//                           `./scripts/build-core-xcframework.sh` at the repo
+//                           `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` at the repo
 //                           root before building the SDK.
 //
 // useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION).
@@ -47,28 +47,22 @@ import Foundation
 //
 // Toggling: this is a hand-edited flag. Release tooling sets it to `false`
 // before tagging a release; local devs flip it back to `true` and run
-// `./scripts/build-core-xcframework.sh` to regenerate the on-disk binaries.
+// `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` to regenerate the on-disk binaries.
 //
 // Historical name: this used to be called `useLocalBinaries`. The concept is
 // the same — it's been renamed to `useLocalNatives` for consistency with the
 // equivalent toggle in the other client SDKs (Kotlin, Flutter, React Native).
 // =============================================================================
-let useLocalNatives = true //  Toggle: true for local dev, false for release
+let useLocalNatives = false // Toggle: false for release (default committed to main); local devs flip to true and run ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases.
-//
-// v3.1.1: sdk minor bump. Remote XCFramework URLs expect
-// `RACommons-ios-v3.1.1.zip` at the v3.1.1 GitHub release; consumers
-// should set `useLocalNatives = true` until release automation publishes
-// the v3.1.0
-// artifacts.
 let sdkVersion = "0.19.13"
 
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
-        // T5.4: floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
+        // Floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
         // (latest minor of the same LTS line, matches Xcode 15.4 baseline).
         .iOS("17.5"),
         .macOS("14.5"),
@@ -100,26 +94,25 @@ let package = Package(
 
     ],
     dependencies: [
-        // T4.3: SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
+        // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
         // silent upstream major bump can't land in `Package.resolved` without
         // a Package.swift edit. Version floors are mirrored in
         // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift
-        // (RAVersions) — keep both in sync via scripts/sync-versions.sh.
-        // T5.4: floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
+        // (RAVersions) — keep both in sync via scripts/release/sync-versions.sh.
+        // Floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
-        // T5.4: floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
+        // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
         .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
-        // T5.4: floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
+        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
         .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
         // swift-protobuf for idl/*.proto generated types consumed by
-        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift
-        // (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md for rationale).
-        // T5.4: floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
+        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift.
+        // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
         // .upToNextMajor exception (needed because generated code uses
         // SwiftProtobuf._NameMap(bytecode:) from 1.28.0+) is now resolved by
         // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
-        // the T4.3 policy applied to the other deps.
+        // the policy applied to the other deps.
         .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
         //
         // grpc-swift intentionally NOT wired. The *.grpc.swift files under
@@ -128,7 +121,7 @@ let package = Package(
         // are not used at runtime. Frontends consume proto events via the
         // hand-written VoiceAgentStreamAdapter that wraps the in-process C
         // callback (see sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/
-        // VoiceAgentStreamAdapter.swift). v3.1 audit fix.
+        // VoiceAgentStreamAdapter.swift).
         //
     ],
     targets: [
@@ -194,7 +187,7 @@ let package = Package(
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: [
                 "CRACommons",
-                // SWF-grpc delete (Wave H-2): the previously-excluded
+                // The previously-excluded
                 // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
                 // files are no longer emitted by `idl/codegen/generate_swift.sh` and
                 // have been removed from the repo. Swift consumes the same services
@@ -282,7 +275,7 @@ func binaryTargets() -> [Target] {
         // =====================================================================
         // LOCAL DEVELOPMENT MODE
         // Use XCFrameworks from sdk/runanywhere-swift/Binaries/.
-        // Regenerate them via: `./scripts/build-core-xcframework.sh` at the
+        // Regenerate them via: `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` at the
         // repo root (builds iOS device + simulator + macOS slices into each
         // of the RACommons / RABackend* xcframeworks).
         // =====================================================================
@@ -318,14 +311,14 @@ func binaryTargets() -> [Target] {
         //
         // ONNXBackend / ONNXRuntime hard-depend on RABackendSherpaBinary, so
         // it MUST appear in this list with a real URL + checksum before tagging
-        // a release. `scripts/release-swift-binaries.sh` zips
+        // a release. `sdk/runanywhere-swift/scripts/release-swift-binaries.sh` zips
         // `RABackendSherpa.xcframework` into `RABackendSherpa-ios-v<version>.zip`
-        // and `scripts/sync-checksums.sh` patches the checksum below.
+        // and `sdk/runanywhere-swift/scripts/sync-checksums.sh` patches the checksum below.
         //
         // RELEASE PROCEDURE — checksums MUST be regenerated before tagging:
         //   1. Build XCFrameworks (CI native_ios job, or locally via
-        //      `./scripts/build-core-xcframework.sh`).
-        //   2. Run `scripts/sync-checksums.sh <zip_dir>` against the directory
+        //      `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh`).
+        //   2. Run `sdk/runanywhere-swift/scripts/sync-checksums.sh <zip_dir>` against the directory
         //      that holds the four `*-ios-v<version>.zip` artifacts. This
         //      overwrites each `checksum:` line below with the real SHA-256.
         //   3. The release workflow (`release.yml::publish`) runs the
@@ -338,7 +331,7 @@ func binaryTargets() -> [Target] {
         // refreshed by `sync-checksums.sh` will surface as a `swift package
         // resolve` "wrong checksum" error against the new release URL — which
         // means: the release tooling did not re-run on this tag commit. Re-run
-        // `scripts/sync-checksums.sh` and commit before re-tagging.
+        // `sdk/runanywhere-swift/scripts/sync-checksums.sh` and commit before re-tagging.
         // =====================================================================
         return [
             .binaryTarget(

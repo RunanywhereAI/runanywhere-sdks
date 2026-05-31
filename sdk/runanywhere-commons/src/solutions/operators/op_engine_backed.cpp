@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// op_engine_backed.cpp — CPP-06 engine-backed operator factories.
+// op_engine_backed.cpp — engine-backed operator factories.
 //
 // Materializes the six "engine-backed" `OperatorSpec.type` strings reachable
 // from `SolutionConfig` (voice_agent / rag / wake_word / agent_loop /
@@ -660,8 +660,9 @@ class RetrieveNode final : public OperatorNode {
         }
 #else
         (void)session;
-        set_error_detail(name(),
-                         "Solutions RetrieveNode requires RAG backend; rebuild with -DRAC_BACKEND_RAG=ON");
+        set_error_detail(
+            name(),
+            "Solutions RetrieveNode requires RAG backend; rebuild with -DRAC_BACKEND_RAG=ON");
         cancel_graph(this->cancel_token());
         return;
 #endif

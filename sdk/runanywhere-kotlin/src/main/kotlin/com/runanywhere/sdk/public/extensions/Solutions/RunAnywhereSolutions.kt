@@ -110,8 +110,9 @@ class SolutionHandle internal constructor(
 }
 
 class Solutions internal constructor() {
-    suspend fun run(yaml: String): SolutionHandle =
-        withContext(Dispatchers.IO) {
+    suspend fun run(yaml: String): SolutionHandle {
+        ensureReady()
+        return withContext(Dispatchers.IO) {
             ensureNativeReady()
             val handle = RunAnywhereBridge.racSolutionCreateFromYaml(yaml)
             if (handle == 0L) {
@@ -119,9 +120,11 @@ class Solutions internal constructor() {
             }
             SolutionHandle(handle)
         }
+    }
 
-    suspend fun run(configBytes: ByteArray): SolutionHandle =
-        withContext(Dispatchers.IO) {
+    suspend fun run(configBytes: ByteArray): SolutionHandle {
+        ensureReady()
+        return withContext(Dispatchers.IO) {
             ensureNativeReady()
             val handle = RunAnywhereBridge.racSolutionCreateFromProto(configBytes)
             if (handle == 0L) {
@@ -129,9 +132,25 @@ class Solutions internal constructor() {
             }
             SolutionHandle(handle)
         }
+    }
 
     suspend fun run(config: SolutionConfig): SolutionHandle =
         run(config.encode())
+
+    /**
+     * Mirror Swift's `Solutions.ensureReady()` —
+     * `RunAnywhere+Solutions.swift:223-228`. Block the cold-start caller until
+     * Phase 2 (services + HTTP) has completed so a `run(yaml=...)` issued
+     * immediately after `RunAnywhere.initialize(...)` does not race against a
+     * half-initialised HTTP client / model registry. Throws notInitialized if
+     * Phase 1 has not run.
+     */
+    private suspend fun ensureReady() {
+        if (!RunAnywhere.isInitialized) {
+            throw SDKException.notInitialized("SDK not initialized")
+        }
+        RunAnywhere.ensureServicesReady()
+    }
 
     private fun ensureNativeReady() {
         if (!RunAnywhereBridge.ensureNativeLibraryLoaded()) {

@@ -1,8 +1,8 @@
 /**
  * @file register_model_from_url.cpp
- * @brief Canonical "register a model from a URL" entry point (P2-T6).
+ * @brief Canonical "register a model from a URL" entry point.
  *
- * Composes rac_model_info_make_proto (P2-T4) with the existing registry
+ * Composes rac_model_info_make_proto with the existing registry
  * persistence path (rac_model_registry_register_proto_buffer) so SDKs replace
  * ~60 LOC of build-and-save glue (Swift's RunAnywhere.registerModel,
  * Kotlin/Flutter/RN/Web equivalents) with a single ABI call.
@@ -15,6 +15,13 @@
  * RegisterModelFromUrlRequest → ModelInfoMakeRequest (1:1 field mapping) and
  * then forward to the registry register_proto_buffer save path on the global
  * registry handle.
+ *
+ * Re-registration semantics: when a model_id already exists in the registry,
+ * rac_model_registry_register_proto preserves runtime fields the caller did
+ * not set (local_path, is_downloaded, checksum_sha256, expected_files,
+ * multi_file per-file local_path). Callers reseeding a curated catalog on app
+ * launch therefore retain previous download progress; no example-app
+ * workaround is needed to skip already-known IDs.
  */
 
 #include <cstdint>
@@ -94,8 +101,17 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
                                           "failed to parse RegisterModelFromUrlRequest");
     }
 
+    // The url drives every derived field (id, name, format, artifact). An empty
+    // url yields a model keyed by the empty-string id, which pollutes the
+    // registry and breaks subsequent get(id) lookups. Reject it up front —
+    // mirrors the non-empty-url precondition the SDK download path relies on.
+    if (request.url().empty()) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
+                                          "RegisterModelFromUrlRequest.url must not be empty");
+    }
+
     // -------------------------------------------------------------------------
-    // 1) Build a ModelInfo via the canonical factory (P2-T4).
+    // 1) Build a ModelInfo via the canonical factory.
     // -------------------------------------------------------------------------
     runanywhere::v1::ModelInfoMakeRequest make_request;
     translate_to_make_request(request, &make_request);
@@ -129,6 +145,14 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
         return rac_proto_buffer_set_error(out_proto, status, msg.c_str());
     }
 
+    runanywhere::v1::ModelInfo made_model;
+    if (!made_model.ParseFromArray(make_buffer.data, static_cast<int>(make_buffer.size))) {
+        rac_proto_buffer_free(&make_buffer);
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse ModelInfo produced by make()");
+    }
+    rac_proto_buffer_free(&make_buffer);
+
     // -------------------------------------------------------------------------
     // 2) Persist via the existing registry save path.
     //    rac_model_registry_register_proto_buffer accepts serialized ModelInfo
@@ -137,14 +161,57 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     // -------------------------------------------------------------------------
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (!registry) {
-        rac_proto_buffer_free(&make_buffer);
         return rac_proto_buffer_set_error(out_proto, RAC_ERROR_NOT_INITIALIZED,
                                           "global model registry is not available");
     }
 
-    rac_result_t save_rc = rac_model_registry_register_proto_buffer(registry, make_buffer.data,
-                                                                    make_buffer.size, out_proto);
-    rac_proto_buffer_free(&make_buffer);
+    // 1b) Merge-not-replace on re-seed. rac_model_info_make_proto always stamps
+    //     the factory defaults local_path="", is_downloaded=false,
+    //     is_available=false and carries no checksum (this entry point never
+    //     receives a localPath or download state from the caller). Registering
+    //     a curated catalog on every app launch must NOT clobber the download
+    //     progress a prior launch recorded, so when the model_id already exists
+    //     we carry its runtime fields forward onto the freshly-made ModelInfo
+    //     before saving. A genuine first registration finds no existing entry
+    //     and normalises to the not-downloaded defaults. Callers that need an
+    //     explicit reset use the lower-level rac_model_registry_register_proto
+    //     path with the fields populated.
+    {
+        uint8_t* existing_bytes = nullptr;
+        size_t existing_size = 0;
+        if (rac_model_registry_get_proto(registry, made_model.id().c_str(), &existing_bytes,
+                                         &existing_size) == RAC_SUCCESS) {
+            runanywhere::v1::ModelInfo existing;
+            if (existing.ParseFromArray(existing_bytes, static_cast<int>(existing_size))) {
+                if (!existing.local_path().empty()) {
+                    made_model.set_local_path(existing.local_path());
+                }
+                if (existing.has_is_downloaded()) {
+                    made_model.set_is_downloaded(existing.is_downloaded());
+                }
+                if (existing.has_is_available()) {
+                    made_model.set_is_available(existing.is_available());
+                }
+                if (existing.has_checksum_sha256()) {
+                    made_model.set_checksum_sha256(existing.checksum_sha256());
+                }
+                if (existing.has_registry_status()) {
+                    made_model.set_registry_status(existing.registry_status());
+                }
+            }
+            rac_model_registry_proto_free(existing_bytes);
+        }
+    }
+
+    std::string merged_bytes;
+    if (!made_model.SerializeToString(&merged_bytes)) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to re-serialize ModelInfo for registration");
+    }
+
+    rac_result_t save_rc = rac_model_registry_register_proto_buffer(
+        registry, reinterpret_cast<const uint8_t*>(merged_bytes.data()), merged_bytes.size(),
+        out_proto);
 
     if (save_rc != RAC_SUCCESS) {
         // out_proto already carries the canonical error envelope from the

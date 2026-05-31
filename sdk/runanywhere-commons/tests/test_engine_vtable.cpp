@@ -2,8 +2,6 @@
  * @file test_engine_vtable.cpp
  * @brief Unit tests for the unified engine plugin registry.
  *
- * GAP 02 Phase 10 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
- *
  * Nine scenarios required by the spec:
  *   1. Happy-path register → find → unregister.
  *   2. ABI version mismatch → RAC_ERROR_ABI_VERSION_MISMATCH.

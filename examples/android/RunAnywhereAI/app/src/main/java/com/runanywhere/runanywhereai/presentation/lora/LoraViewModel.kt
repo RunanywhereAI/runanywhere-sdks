@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.lora
 
-import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
@@ -213,20 +212,19 @@ class LoraViewModel(
                     withContext(Dispatchers.IO) {
                         RunAnywhere.registerLoraArtifact(entry)
                     }
-                var lastProgress: DownloadProgress? = null
-                RunAnywhere.downloadModel(artifact).collect { progress ->
-                    lastProgress = progress
-                    val fraction =
-                        if (progress.total_bytes > 0) {
-                            progress.bytes_downloaded.toFloat() / progress.total_bytes.toFloat()
-                        } else {
-                            progress.stage_progress
+                val terminal =
+                    RunAnywhere.downloadModel(artifact) { progress ->
+                        val fraction =
+                            if (progress.total_bytes > 0) {
+                                progress.bytes_downloaded.toFloat() / progress.total_bytes.toFloat()
+                            } else {
+                                progress.stage_progress
+                            }
+                        _uiState.update {
+                            it.copy(downloadProgress = fraction.coerceIn(0f, 1f))
                         }
-                    _uiState.update {
-                        it.copy(downloadProgress = fraction.coerceIn(0f, 1f))
                     }
-                }
-                val localPath = lastProgress?.local_path?.takeIf { it.isNotBlank() } ?: artifact.local_path
+                val localPath = terminal.local_path.takeIf { it.isNotBlank() } ?: artifact.local_path
                 if (localPath.isNullOrBlank()) {
                     throw IllegalStateException(
                         "LoRA adapter completion did not return a usable local path",
@@ -238,7 +236,7 @@ class LoraViewModel(
                             LoraAdapterDownloadCompletedRequest(
                                 adapter_id = entry.id,
                                 local_path = localPath,
-                                size_bytes = lastProgress?.bytes_downloaded?.takeIf { it > 0 },
+                                size_bytes = terminal.bytes_downloaded.takeIf { it > 0 },
                                 checksum_sha256 = entry.checksum_sha256,
                                 completed_at_unix_ms = System.currentTimeMillis(),
                                 imported = false,

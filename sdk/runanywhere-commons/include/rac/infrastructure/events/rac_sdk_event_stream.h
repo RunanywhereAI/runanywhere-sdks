@@ -7,6 +7,16 @@
  * valid only for the duration of the callback; retainers must copy it.
  * Polling returns an owned rac_proto_buffer_t that callers release with
  * rac_proto_buffer_free().
+ *
+ * Threading contract: subscribe-callbacks fire synchronously on whatever
+ * thread called rac_sdk_event_publish_proto (publishes may originate on
+ * background JNI/JSI/Dart-isolate threads, not only the public emit caller).
+ * Consumers MUST treat the callback as non-blocking and hop to their own
+ * dispatch queue / coroutine context for any heavy work (e.g. @MainActor
+ * Swift sinks must .receive(on:), Kotlin uses tryEmit then collects off-
+ * thread). Concurrent publishes are serialized by an internal mutex, so
+ * delivery order matches publish order for events emitted on a single
+ * thread; interleaving across threads is not deterministic.
  */
 
 #ifndef RAC_SDK_EVENT_STREAM_H
@@ -37,9 +47,31 @@ RAC_API uint64_t rac_sdk_event_subscribe(rac_sdk_event_callback_fn callback, voi
 RAC_API void rac_sdk_event_unsubscribe(uint64_t subscription_id);
 
 /**
+ * @brief Spin-wait until all in-flight rac_sdk_event_publish_proto callbacks
+ *        have returned. Mirrors rac_vad_proto_quiesce / rac_llm_proto_quiesce.
+ *
+ * @details rac_sdk_event_publish_proto snapshots the subscription list under
+ *          its internal mutex, releases the mutex, then invokes each
+ *          subscriber callback. rac_sdk_event_unsubscribe flips the
+ *          subscription's alive flag, but the publisher may already have
+ *          passed that check and be about to dereference the callback. SDKs
+ *          that free the host object backing @p user_data on unsubscribe
+ *          (Swift Unmanaged.release, Kotlin DeleteGlobalRef, Flutter/RN
+ *          equivalents) MUST quiesce to avoid a use-after-free:
+ *            (a) rac_sdk_event_unsubscribe(id) — no NEW dispatch sees alive;
+ *            (b) rac_sdk_event_quiesce()        — wait out in-flight callbacks;
+ *            (c) free the host object / user_data.
+ *          Safe to call from any thread.
+ */
+RAC_API void rac_sdk_event_quiesce(void);
+
+/**
  * @brief Publish serialized runanywhere.v1.SDKEvent bytes.
  *
  * The bytes are copied into the internal poll queue before callbacks run.
+ * Subscribe-callbacks are invoked synchronously on the calling thread before
+ * this returns; subscriber latency is publisher latency, so callbacks MUST be
+ * non-blocking (see the file-level threading contract above).
  */
 RAC_API rac_result_t rac_sdk_event_publish_proto(const uint8_t* proto_bytes, size_t proto_size);
 

@@ -88,7 +88,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --rag)
-            # CLUSTER-05 / WEB-RAG-001: --rag emits the rac_rag_*_proto symbols
+            # --rag emits the rac_rag_*_proto symbols
             # into every requested target (llamacpp, webgpu, onnx). The default
             # `--onnx` path already pulls in RAG via the ONNX embedding provider.
             # `--rag` without `--onnx` is the Docs/RAG path where the llamacpp
@@ -264,14 +264,14 @@ build_target() {
 
     echo ""
     echo ">>> Configuring CMake with Emscripten..."
-    # F3 (dep-bump 2026-05-19): zlib 1.3.2 introduced ZLIB_BUILD_SHARED as an
+    # dep-bump 2026-05-19: zlib 1.3.2 introduced ZLIB_BUILD_SHARED as an
     # independent option that defaults to ON and ignores BUILD_SHARED_LIBS.
     # Emscripten's wasm-ld rejects shared archives, so we must explicitly turn
     # it OFF here even though the commons CMake also forces BUILD_SHARED_LIBS
     # OFF for the zlib FetchContent block. Passing it as a CMake variable is
     # enough — the variable is read inside zlib's own CMakeLists.txt.
     #
-    # CLUSTER-14 / WEB-EXTRACT-001: also explicitly pass ZLIB_VERSION in its
+    # Also explicitly pass ZLIB_VERSION in its
     # purely-numeric form so libarchive's nested `FIND_PACKAGE(ZLIB 1.2.1)`
     # accepts it. The VERSIONS file holds `v1.3.2` (the GIT_TAG madler/zlib
     # uses); CMake's FindZLIB rejects 'v1.3.2' against the `>= 1.2.1` request
@@ -326,25 +326,25 @@ build_target() {
         echo "  ${out_name}.wasm: ${wasm_size}"
         echo "  ${out_name}.js:   ${js_size}"
 
-        # CLUSTER-14 / WEB-EXTRACT-001: assert the libarchive program() fallback
+        # Assert the libarchive program() fallback
         # is NOT linked into this artifact. The bug surface is libarchive's
         # filter_gzip.c registering archive_read_support_filter_program("gzip -d")
         # when HAVE_ZLIB_H is undefined; that pulls the string "gzip -d" plus
         # the symbol prefix `archive_read_support_filter_program` into the
-        # final .wasm. After the CLUSTER-02 + CLUSTER-14 fixes neither should
+        # final .wasm. With the in-process zlib filter linked, neither should
         # appear in the artifact. Fail the build if either is present so a
         # regression cannot ship to the npm packages.
         local _rac_libarchive_config_h="${build_dir}/_deps/libarchive-build/config.h"
         if [ -f "${_rac_libarchive_config_h}" ]; then
             if ! grep -q "^#define HAVE_ZLIB_H 1" "${_rac_libarchive_config_h}"; then
-                echo "ERROR: CLUSTER-14 regression — libarchive built WITHOUT HAVE_ZLIB_H."
+                echo "ERROR: libarchive built WITHOUT HAVE_ZLIB_H."
                 echo "  config.h: ${_rac_libarchive_config_h}"
                 echo "  libarchive will fall back to program(\"gzip -d\"); Emscripten can't fork+exec."
                 grep -E "HAVE_ZLIB_H|HAVE_LIBZ|HAVE_BZLIB_H" "${_rac_libarchive_config_h}" || true
                 exit 1
             fi
             if ! grep -q "^#define HAVE_BZLIB_H 1" "${_rac_libarchive_config_h}"; then
-                echo "ERROR: CLUSTER-14 regression — libarchive built WITHOUT HAVE_BZLIB_H."
+                echo "ERROR: libarchive built WITHOUT HAVE_BZLIB_H."
                 echo "  config.h: ${_rac_libarchive_config_h}"
                 exit 1
             fi
@@ -358,7 +358,7 @@ build_target() {
         # external-program fallback survived linking. Search both via strings.
         if command -v strings >/dev/null 2>&1; then
             if strings "${wasm_file}" | grep -q '^gzip -d$'; then
-                echo "ERROR: CLUSTER-14 regression — '${wasm_file}' contains literal 'gzip -d' string."
+                echo "ERROR: '${wasm_file}' contains literal 'gzip -d' string."
                 echo "       This indicates libarchive's archive_read_support_filter_program(\"gzip -d\")"
                 echo "       compiled into the final bundle. Emscripten/OPFS cannot fork+exec."
                 exit 1

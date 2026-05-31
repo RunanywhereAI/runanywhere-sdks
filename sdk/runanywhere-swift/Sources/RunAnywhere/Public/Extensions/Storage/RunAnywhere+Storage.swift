@@ -11,7 +11,7 @@ import Foundation
 public extension RunAnywhere {
     /// Register a remote model with the in-memory model registry from a
     /// download URL. Delegates the full build-and-save flow to the canonical
-    /// `rac_register_model_from_url_proto` C ABI (P2-T6); only the parameters
+    /// `rac_register_model_from_url_proto` C ABI; only the parameters
     /// the proto request does not yet model (id override, memory hint, thinking
     /// flag, LoRA flag, explicit artifact type) are patched onto the saved
     /// `RAModelInfo` and re-persisted through the registry's proto save path.
@@ -86,7 +86,7 @@ public extension RunAnywhere {
         name: String,
         framework: InferenceFramework,
         modality: ModelCategory = .language,
-        archive archiveType: RAArchiveType? = nil,
+        archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
         supportsLora: Bool = false

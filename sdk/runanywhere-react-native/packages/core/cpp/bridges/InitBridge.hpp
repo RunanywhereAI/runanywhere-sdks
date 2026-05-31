@@ -51,15 +51,6 @@ struct PlatformCallbacks {
 };
 
 /**
- * @brief SDK Environment enum matching Swift's SDKEnvironment
- */
-enum class SDKEnvironment {
-    Development = 0,
-    Staging = 1,
-    Production = 2
-};
-
-/**
  * @brief SDK initialization bridge singleton
  *
  * Manages the lifecycle of the runanywhere-commons SDK.
@@ -85,13 +76,13 @@ public:
      * 2. Configures logging for environment
      * 3. Initializes SDK state
      *
-     * @param environment SDK environment (development, staging, production)
+     * @param environment SDK environment (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION)
      * @param apiKey API key for authentication
      * @param baseURL Base URL for API requests
      * @param deviceId Persistent device identifier
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t initialize(SDKEnvironment environment,
+    rac_result_t initialize(rac_environment_t environment,
                            const std::string& apiKey,
                            const std::string& baseURL,
                            const std::string& deviceId);
@@ -105,6 +96,19 @@ public:
      * @return RAC_SUCCESS or error code
      */
     rac_result_t completeServicesInitialization();
+
+    /**
+     * @brief Retry HTTP/auth setup after an offline initialization.
+     *
+     * Drives the commons idempotency guard `rac_sdk_retry_http_proto`, which
+     * re-checks usable external config and reports whether HTTP is configured.
+     * Mirrors Swift CppBridge.SdkInit.retryHTTP(). The platform-side auth
+     * round-trip that this ABI defers stays in the TypeScript layer.
+     *
+     * @param outHttpConfigured Set to the proto `http_configured` flag.
+     * @return RAC_SUCCESS (incl. the feature-unavailable downgrade) or error.
+     */
+    rac_result_t retryHTTPSetup(bool& outHttpConfigured);
 
     /**
      * @brief Register device manager callbacks for commons services init
@@ -148,12 +152,7 @@ public:
     /**
      * @brief Get current environment
      */
-    SDKEnvironment getEnvironment() const { return environment_; }
-
-    /**
-     * @brief Convert SDK environment to RAC environment
-     */
-    static rac_environment_t toRacEnvironment(SDKEnvironment env);
+    rac_environment_t getEnvironment() const { return environment_; }
 
     // =========================================================================
     // Secure Storage Methods
@@ -275,9 +274,13 @@ public:
 
     /**
      * @brief Get SDK version
-     * Returns centralized version passed from TypeScript SDKConstants
+     *
+     * Single source of truth is `sdk/runanywhere-commons/VERSION`, exposed via
+     * `rac_sdk_get_version()` (never NULL, process-lifetime static). Matches the
+     * Swift `SDKConstants.version` so the value reported to telemetry / device
+     * registration can never drift or fall back to a stale literal.
      */
-    std::string getSdkVersion() const { return sdkVersion_.empty() ? "0.2.0" : sdkVersion_; }
+    std::string getSdkVersion() const { return rac_sdk_get_version(); }
 
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
@@ -315,7 +318,7 @@ private:
 
     bool initialized_ = false;
     bool adapterRegistered_ = false;
-    SDKEnvironment environment_ = SDKEnvironment::Development;
+    rac_environment_t environment_ = RAC_ENV_DEVELOPMENT;
 
     // Configuration stored at initialization
     std::string apiKey_;

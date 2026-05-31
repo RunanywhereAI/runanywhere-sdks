@@ -1,6 +1,6 @@
 /**
  * @file rac_tts_config_defaults.cpp
- * @brief Canonical TTSConfiguration defaults helper (P2-T14).
+ * @brief Canonical TTSConfiguration defaults helper.
  *
  * Commons-owned port of Swift's `RATTSConfiguration.defaults()`
  * (sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/

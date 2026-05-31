@@ -217,8 +217,8 @@ rac_result_t mock_diffusion_generate(void*, const rac_diffusion_options_t* optio
     out_result->seed_used = options->seed >= 0 ? options->seed : 42;
     out_result->generation_time_ms = 33;
     out_result->error_code = RAC_SUCCESS;
-    out_result->image_size = static_cast<size_t>(out_result->width) *
-                             static_cast<size_t>(out_result->height) * 4U;
+    out_result->image_size =
+        static_cast<size_t>(out_result->width) * static_cast<size_t>(out_result->height) * 4U;
     out_result->image_data = static_cast<uint8_t*>(std::malloc(out_result->image_size));
     if (!out_result->image_data)
         return RAC_ERROR_OUT_OF_MEMORY;

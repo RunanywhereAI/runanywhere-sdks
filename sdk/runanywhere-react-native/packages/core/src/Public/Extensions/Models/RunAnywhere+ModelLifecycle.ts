@@ -6,10 +6,11 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import {
   CurrentModelRequest,
   CurrentModelResult,
-  ModelFileRole,
+  ModelCategory,
   ModelLoadRequest,
   ModelLoadResult,
   ModelUnloadRequest,
@@ -18,7 +19,7 @@ import {
 import type {
   CurrentModelRequest as CurrentModelRequestMessage,
   CurrentModelResult as CurrentModelResultMessage,
-  ModelFileDescriptor,
+  ModelInfo,
   ModelLoadRequest as ModelLoadRequestMessage,
   ModelLoadResult as ModelLoadResultMessage,
   ModelUnloadRequest as ModelUnloadRequestMessage,
@@ -46,16 +47,6 @@ export type {
   ComponentLifecycleSnapshot,
 } from '@runanywhere/proto-ts/sdk_events';
 
-export interface LifecycleArtifactSource {
-  modelId?: string;
-  resolvedArtifacts: ModelFileDescriptor[];
-}
-
-export interface VLMResolvedLifecycleArtifacts {
-  primaryModelPath: string;
-  visionProjectorPath: string;
-}
-
 function encode<T>(
   message: T,
   codec: { encode(value: T, writer?: { finish(): Uint8Array }): { finish(): Uint8Array } }
@@ -72,38 +63,6 @@ function decode<T>(
   return bytes.byteLength === 0 ? fallback : codec.decode(bytes);
 }
 
-function nonEmptyPath(path?: string): string | undefined {
-  const trimmed = path?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : undefined;
-}
-
-export function getLifecycleResolvedArtifactPath(
-  source: LifecycleArtifactSource,
-  role: ModelFileRole
-): string | undefined {
-  const artifact = source.resolvedArtifacts.find((item) => item.role === role);
-  return nonEmptyPath(artifact?.localPath);
-}
-
-export function resolveVLMArtifactsFromLifecycleResult(
-  source: LifecycleArtifactSource
-): VLMResolvedLifecycleArtifacts | null {
-  const primaryModelPath = getLifecycleResolvedArtifactPath(
-    source,
-    ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
-  );
-  const visionProjectorPath = getLifecycleResolvedArtifactPath(
-    source,
-    ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR
-  );
-
-  if (!primaryModelPath || !visionProjectorPath) {
-    return null;
-  }
-
-  return { primaryModelPath, visionProjectorPath };
-}
-
 export async function loadModel(
   request: ModelLoadRequestMessage
 ): Promise<ModelLoadResultMessage> {
@@ -115,6 +74,7 @@ export async function loadModel(
     });
   }
 
+  await ensureServicesReady();
   const native = requireNativeModule();
   const buffer = await native.modelLifecycleLoadProto(
     encode(request, ModelLoadRequest)
@@ -140,6 +100,7 @@ export async function unloadModel(
     });
   }
 
+  await ensureServicesReady();
   const native = requireNativeModule();
   const buffer = await native.modelLifecycleUnloadProto(
     encode(request, ModelUnloadRequest)
@@ -169,6 +130,29 @@ export async function currentModel(
   return bytes.byteLength === 0 ? null : CurrentModelResult.decode(bytes);
 }
 
+/**
+ * Convenience wrapper around `currentModel(...)` that returns the full
+ * `ModelInfo` snapshot for the model currently loaded under the given
+ * category, or `null` when nothing is loaded.
+ *
+ * Mirrors the iOS surface used by view-models that need the loaded
+ * model's display name / framework without fabricating a stand-in
+ * `ModelInfo`. Forces `includeModelMetadata=true` so the commons
+ * lifecycle returns the full proto rather than just the id.
+ */
+export async function modelInfoForCategory(
+  category: ModelCategory
+): Promise<ModelInfo | null> {
+  const result = await currentModel(
+    CurrentModelRequest.fromPartial({
+      category,
+      includeModelMetadata: true,
+    })
+  );
+  if (!result || !result.found) return null;
+  return result.model ?? null;
+}
+
 export async function componentLifecycleSnapshot(
   component: SDKComponent
 ): Promise<ComponentLifecycleSnapshotMessage | null> {
@@ -183,7 +167,3 @@ export async function componentLifecycleSnapshot(
     ? null
     : ComponentLifecycleSnapshot.decode(bytes);
 }
-
-/**
- * Internal compatibility alias. Prefer `loadModel`.
- */

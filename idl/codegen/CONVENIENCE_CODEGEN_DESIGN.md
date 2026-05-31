@@ -19,7 +19,7 @@ following anchors:
 | `rac_*` field numbers 50001–50012                                   | `idl/rac_options.proto:97-135`                                                            |
 | Swift generator parses descriptor set via `protoc --include_imports`| `idl/codegen/generate_swift_convenience.py:678-690`                                       |
 | Swift generator emits one file (`RAConvenience.swift`)              | `idl/codegen/generate_swift_convenience.py:697-700`                                       |
-| Wire stamps `@RacDefaultOption("...")` on annotated fields          | `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/STTOptions.kt:50, :58, :87` |
+| Wire stamps `@RacDefaultOption("...")` on annotated fields          | `sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/STTOptions.kt:50, :58, :87` |
 | Wire emits a `public companion object` on every message             | `sdk/runanywhere-kotlin/.../generated/ai/runanywhere/proto/v1/STTConfiguration.kt:248`    |
 | Wire uses snake_case for the constructor parameter names            | `STTOptions.kt:66, :117, :140`; `STTConfiguration.kt:284-302`                             |
 | Wire ships annotation classes (`RacWireStringOption.kt`, etc.)      | `sdk/runanywhere-kotlin/.../generated/ai/runanywhere/proto/v1/RacWireStringOption.kt`     |
@@ -60,9 +60,10 @@ proto descriptor set and emits `RAConvenience.swift` with:
 Kotlin / Dart / TypeScript currently hand-write each of these helpers in
 the SDK source tree — for example:
 
-- `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RAAudioFormatExtensions.kt`
-  (44-line hand-written `wireString` + `audioFormatFromWireString`)
-- `sdk/runanywhere-kotlin/src/commonMain/.../public/configuration/SDKEnvironment.kt`
+- `sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
+  (generated `wireString` + `audioFormatFromWireString` replacing the prior
+  hand-written `RAAudioFormatExtensions.kt`)
+- `sdk/runanywhere-kotlin/src/main/.../public/configuration/SDKEnvironment.kt`
   (hand-written `wireString` + `sdkEnvironmentFromWireString`)
 - `sdk/runanywhere-flutter/.../public/extensions/stt/stt_options_helpers.dart`
   (hand-written `STTLanguageBcp47.bcp47` + `fromBcp47`)
@@ -78,7 +79,7 @@ finding (T3.3): Swift has codegen, no other SDK does.
 
 Square Wire (Kotlin generator) propagates the option-extension definitions
 into Kotlin source as runtime annotations
-(`sdk/runanywhere-kotlin/src/commonMain/.../v1/RacWireStringOption.kt`,
+(`sdk/runanywhere-kotlin/src/main/.../v1/RacWireStringOption.kt`,
 `RacDefaultOption.kt`, `RacRequiredOption.kt`, `RacMinOption.kt`, …),
 and stamps every annotated field / enum constant with the corresponding
 annotation:
@@ -137,7 +138,7 @@ module imported by all four generators including the existing Swift one).
    invocation in Section 5).
 
 2. The Wire-generated Kotlin output at
-   `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/`
+   `sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/ai/runanywhere/proto/v1/`
    for naming conformance verification only (not for parsing).
    The generator emits references to the Wire types; it does not
    import or read them at codegen time.
@@ -145,7 +146,7 @@ module imported by all four generators including the existing Swift one).
 ### 1.2 Output
 
 Single file:
-`sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
+`sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/generated/convenience/RAConvenience.kt`
 
 Single-file output (not one file per message) matches the Swift output
 shape, keeps the `generated/convenience/` subtree free of `*Client.kt`
@@ -771,7 +772,7 @@ Swift convenience file today.
 
 ### 5.4 Setup-toolchain note
 
-`scripts/setup-toolchain.sh` already installs Python 3 + the
+`scripts/setup/setup-toolchain.sh` already installs Python 3 + the
 `protobuf` Python package (required by `generate_swift_convenience.py`
 and `generate_swift_modality_abi.py`). No new toolchain dependency is
 introduced by the three new generators — they reuse the same
@@ -901,8 +902,8 @@ duplicate hand-written helpers are deleted in a follow-up.
 
 | Hand-written file                                                                                      | Helper        | Annotation backing  |
 | ------------------------------------------------------------------------------------------------------ | ------------- | ------------------- |
-| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RAAudioFormatExtensions.kt:33-65`                       | `wireString`, `audioFormatFromWireString` | `rac_wire_string` on `AudioFormat`     |
-| `sdk/runanywhere-kotlin/src/commonMain/.../public/configuration/SDKEnvironment.kt:41-74`               | `wireString`, `sdkEnvironmentFromWireString` | `rac_wire_string` on `SDKEnvironment` |
+| `sdk/runanywhere-kotlin/src/main/.../RAAudioFormatExtensions.kt` (retired; superseded by generated `RAConvenience.kt`) | `wireString`, `audioFormatFromWireString` | `rac_wire_string` on `AudioFormat`     |
+| `sdk/runanywhere-kotlin/src/main/.../public/configuration/SDKEnvironment.kt:41-74`                     | `wireString`, `sdkEnvironmentFromWireString` | `rac_wire_string` on `SDKEnvironment` |
 
 ### 7.2 Dart — confirmed duplicates
 

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
+import Combine
 @preconcurrency import AVFoundation
 import os.log
 
@@ -35,33 +36,21 @@ final class VLMViewModel: NSObject {
 
     // Auto-streaming mode
     var isAutoStreamingEnabled = false
-    // nonisolated(unsafe) so deinit can cancel the task (deinit is nonisolated in Swift 6)
-    nonisolated(unsafe) private var autoStreamTask: Task<Void, Never>?
-    private static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
+    static let autoStreamInterval: TimeInterval = 2.5 // seconds between auto-captures
 
     // Camera
     private(set) var captureSession: AVCaptureSession?
     private var currentFrame: CVPixelBuffer?
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VLM")
+    private var lifecycleCancellable: AnyCancellable?
 
     // MARK: - Init
 
     override init() {
         super.init()
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(vlmModelLoaded(_:)),
-            name: Notification.Name("VLMModelLoaded"),
-            object: nil
-        )
+        subscribeToModelLifecycle()
         Task { await checkModelStatus() }
-    }
-
-    deinit {
-        autoStreamTask?.cancel()
-        NotificationCenter.default.removeObserver(self)
-        // Note: Camera cleanup is handled by onDisappear in VLMCameraView
     }
 
     // MARK: - Model
@@ -72,15 +61,33 @@ final class VLMViewModel: NSObject {
         isModelLoaded = RunAnywhere.currentModel(req).found
     }
 
-    @objc
-    private func vlmModelLoaded(_ notification: Notification) {
-        Task {
-            if let model = notification.object as? RAModelInfo {
-                isModelLoaded = true
-                loadedModelName = model.name
-            } else {
-                await checkModelStatus()
+    /// Track the VLM model slot via the SDK event bus. Model loads route through
+    /// `RunAnywhere.loadModel(category: .multimodal)`, which publishes a
+    /// component-lifecycle event for SDK_COMPONENT_VLM — the single source of
+    /// truth, replacing the former "VLMModelLoaded" NotificationCenter post.
+    private func subscribeToModelLifecycle() {
+        lifecycleCancellable = RunAnywhere.events.events(for: .component)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                Task { @MainActor in self?.handleComponentLifecycleEvent(event) }
             }
+    }
+
+    private func handleComponentLifecycleEvent(_ event: RASDKEvent) {
+        let lifecycle = event.componentLifecycle
+        guard lifecycle.component == .vlm else { return }
+
+        switch lifecycle.currentState {
+        case .ready:
+            isModelLoaded = true
+            if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == lifecycle.modelID }) {
+                loadedModelName = model.name
+            }
+        case .notLoaded, .unloading, .shutdown, .deleting:
+            isModelLoaded = false
+            loadedModelName = nil
+        default:
+            break
         }
     }
 
@@ -268,37 +275,17 @@ final class VLMViewModel: NSObject {
 
     func toggleAutoStreaming() {
         isAutoStreamingEnabled.toggle()
-        if isAutoStreamingEnabled {
-            startAutoStreaming()
-        } else {
-            stopAutoStreaming()
-        }
     }
 
-    func startAutoStreaming() {
-        guard autoStreamTask == nil else { return }
-
-        autoStreamTask = Task {
-            while !Task.isCancelled && isAutoStreamingEnabled {
-                // Wait for any current processing to finish
-                while isProcessing {
-                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-                    if Task.isCancelled { return }
-                }
-
-                // Capture and describe
-                await describeCurrentFrameForAutoStream()
-
-                // Wait before next capture
-                try? await Task.sleep(nanoseconds: UInt64(Self.autoStreamInterval * 1_000_000_000))
+    func runAutoStreamLoop() async {
+        while !Task.isCancelled {
+            while isProcessing {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if Task.isCancelled { return }
             }
+            await describeCurrentFrameForAutoStream()
+            try? await Task.sleep(nanoseconds: UInt64(Self.autoStreamInterval * 1_000_000_000))
         }
-    }
-
-    func stopAutoStreaming() {
-        autoStreamTask?.cancel()
-        autoStreamTask = nil
-        isAutoStreamingEnabled = false
     }
 
     private func describeCurrentFrameForAutoStream() async {

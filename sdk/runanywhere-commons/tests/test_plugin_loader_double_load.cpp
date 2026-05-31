@@ -3,8 +3,6 @@
  * @brief Verifies double-load is idempotent (registry dedups by name; the
  *        loader's redundant dlopen is balanced by an extra dlclose so the
  *        OS reference count stays at 1 after one explicit unload).
- *
- * GAP 03 Phase 6.
  */
 
 #include <cstdio>

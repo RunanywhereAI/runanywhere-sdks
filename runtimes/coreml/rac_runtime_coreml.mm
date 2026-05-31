@@ -10,6 +10,7 @@
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
+#include "rac/runtime/rac_runtime_helpers.h"
 
 namespace {
 
@@ -25,71 +26,129 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_MLMODEL,
     RAC_MODEL_FORMAT_ID_MLPACKAGE,
 };
-const rac_primitive_t k_supported_primitives[] = {
-    RAC_PRIMITIVE_TRANSCRIBE,
-    RAC_PRIMITIVE_DIFFUSION,
-    RAC_PRIMITIVE_EMBED,
-};
 
 struct CoreMLSession {
     MLModel* model = nil;
 };
 
 rac_result_t coreml_init(void) {
-    Class model_class = NSClassFromString(@"MLModel");
-    return model_class != Nil ? RAC_SUCCESS : RAC_ERROR_CAPABILITY_UNSUPPORTED;
+    // NSClassFromString(@"MLModel") only proves the framework is linked, which
+    // is true on every host where this TU is compiled in -- so the registry
+    // accepts CoreML on iOS Simulator x86_64 / older OSes that cannot actually
+    // run a CoreML graph, and the failure surfaces much later at
+    // coreml_create_session as RAC_ERROR_MODEL_LOAD_FAILED, after the router
+    // has already pinned this runtime (runtimes-006). Mirror Metal's pattern
+    // and probe a real CoreML object: if MLModelConfiguration cannot be
+    // instantiated the runtime cannot run, so self-reject at registry time
+    // and let the router fall back to ONNX/llamacpp paths.
+    //
+    // commons-001: any NSException raised by Foundation/CoreML must be caught
+    // here -- this is the first .mm entry on the C registry path and an
+    // uncaught ObjC exception bridging into extern "C" aborts the process.
+    @autoreleasepool {
+        @try {
+            MLModelConfiguration* cfg = [[[MLModelConfiguration alloc] init] autorelease];
+            if (cfg == nil) {
+                return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+            }
+            cfg.computeUnits = MLComputeUnitsAll;
+        } @catch (NSException* e) {
+            RAC_LOG_ERROR(kLogCat, "CoreML init raised %s: %s",
+                          e.name ? [e.name UTF8String] : "NSException",
+                          e.reason ? [e.reason UTF8String] : "no reason");
+            return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+        }
+    }
+    return RAC_SUCCESS;
 }
 
 void coreml_destroy(void) {}
 
 rac_result_t coreml_create_session(const rac_runtime_session_desc_t* desc,
                                    rac_runtime_session_t** out) {
-    if (!desc || !out) return RAC_ERROR_NULL_POINTER;
+    if (!desc || !out)
+        return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
     if (!desc->model_path || desc->model_path[0] == '\0') {
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
+    // commons-001: +[MLModel modelWithContentsOfURL:configuration:error:] only
+    // surfaces user-recoverable conditions via NSError; catastrophic parse
+    // failures inside a corrupted .mlpackage's coremldata.bin raise
+    // NSInvalidArgumentException. Crossing extern "C" with an in-flight ObjC
+    // exception is undefined behavior under -fobjc-exceptions and aborts the
+    // host app. Wrap the whole pool in @try and convert any NSException into a
+    // structured RAC_ERROR_MODEL_LOAD_FAILED so the router falls back cleanly.
     @autoreleasepool {
-        NSString* path = [NSString stringWithUTF8String:desc->model_path];
-        if (!rac_coreml_file_exists(path)) {
-            return RAC_ERROR_MODEL_NOT_FOUND;
-        }
-        NSError* err = nil;
-        MLModelConfiguration* cfg = rac_coreml_default_model_configuration();
-        MLModel* model = [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:path]
-                                           configuration:cfg
-                                                   error:&err];
-        if (!model) {
-            RAC_LOG_ERROR(kLogCat,
-                          "CoreML create_session failed (%s): %s",
-                          desc->model_path,
-                          err ? [[err localizedDescription] UTF8String] : "unknown");
+        @try {
+            NSString* path = [NSString stringWithUTF8String:desc->model_path];
+            if (!rac_coreml_file_exists(path)) {
+                return RAC_ERROR_MODEL_NOT_FOUND;
+            }
+            NSError* err = nil;
+            MLModelConfiguration* cfg = rac_coreml_default_model_configuration();
+            MLModel* model = [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:path]
+                                               configuration:cfg
+                                                       error:&err];
+            if (!model) {
+                RAC_LOG_ERROR(kLogCat, "CoreML create_session failed (%s): %s", desc->model_path,
+                              err ? [[err localizedDescription] UTF8String] : "unknown");
+                return RAC_ERROR_MODEL_LOAD_FAILED;
+            }
+            auto* sess = new (std::nothrow) CoreMLSession();
+            if (!sess)
+                return RAC_ERROR_OUT_OF_MEMORY;
+            // `model` was returned autoreleased by +[MLModel modelWithContentsOfURL:].
+            // Without an explicit retain it dies when this @autoreleasepool drains,
+            // leaving CoreMLSession::model dangling for every subsequent prediction
+            // /model_description access (runtimes-001). MRC semantics — paired
+            // -release lives in coreml_destroy_session.
+            sess->model = [model retain];
+            *out = reinterpret_cast<rac_runtime_session_t*>(sess);
+            return RAC_SUCCESS;
+        } @catch (NSException* e) {
+            RAC_LOG_ERROR(kLogCat, "CoreML create_session raised %s on %s: %s",
+                          e.name ? [e.name UTF8String] : "NSException", desc->model_path,
+                          e.reason ? [e.reason UTF8String] : "no reason");
             return RAC_ERROR_MODEL_LOAD_FAILED;
         }
-        auto* sess = new (std::nothrow) CoreMLSession();
-        if (!sess) return RAC_ERROR_OUT_OF_MEMORY;
-        // `model` was returned autoreleased by +[MLModel modelWithContentsOfURL:].
-        // Without an explicit retain it dies when this @autoreleasepool drains,
-        // leaving CoreMLSession::model dangling for every subsequent prediction
-        // /model_description access (runtimes-001). MRC semantics — paired
-        // -release lives in coreml_destroy_session.
-        sess->model = [model retain];
-        *out = reinterpret_cast<rac_runtime_session_t*>(sess);
-        return RAC_SUCCESS;
     }
 }
 
 void coreml_destroy_session(rac_runtime_session_t* session) {
     auto* sess = reinterpret_cast<CoreMLSession*>(session);
-    if (!sess) return;
-    [sess->model release];
-    sess->model = nil;
+    if (!sess)
+        return;
+    // -[MLModel release] triggers Apple's dealloc, which autoreleases internal
+    // temporaries (compiled-model handles, NSError descriptors, metadata
+    // dictionaries). Callers may invoke us from threads without an outer pool
+    // (worker pthreads, libdispatch concurrent queues, Swift cooperative
+    // Tasks between hops), so wrap the release in our own pool to drain those
+    // temporaries at destroy time -- otherwise repeated load/unload cycles
+    // grow RSS unboundedly (runtimes-001). Matches the @autoreleasepool used
+    // by coreml_create_session above and diffusion_coreml_backend.mm.
+    //
+    // commons-001: a corrupted MLModel dealloc can raise NSException; swallow
+    // it so the C ABI caller (rac_runtime_registry destroy_session dispatch)
+    // never sees an in-flight ObjC exception. Even if release raises, we still
+    // null the slot and free the C++ struct so we don't double-release later.
+    @autoreleasepool {
+        @try {
+            [sess->model release];
+        } @catch (NSException* e) {
+            RAC_LOG_ERROR(kLogCat, "CoreML destroy_session raised %s: %s",
+                          e.name ? [e.name UTF8String] : "NSException",
+                          e.reason ? [e.reason UTF8String] : "no reason");
+        }
+        sess->model = nil;
+    }
     delete sess;
 }
 
 rac_result_t coreml_device_info(rac_runtime_device_info_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_device_info_t{};
     out->device_class = RAC_DEVICE_CLASS_NPU;
     out->device_id = "apple-coreml";
@@ -98,26 +157,25 @@ rac_result_t coreml_device_info(rac_runtime_device_info_t* out) {
 }
 
 rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
-    if (!out) return RAC_ERROR_NULL_POINTER;
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
     out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
-    // Capability shrunk: run_session is NULL; declare zero primitives until tensor execution path lands.
+    // Capability shrunk: run_session is NULL; declare zero primitives until tensor execution path
+    // lands.
     out->supported_primitives = nullptr;
     out->supported_primitives_count = 0;
     return RAC_SUCCESS;
 }
 
 void coreml_release_tensor(rac_runtime_tensor_t* tensor) {
-    if (!tensor) return;
-    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
-        std::free(tensor->data);
-    }
-    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape) {
-        std::free(tensor->shape);
-    }
-    *tensor = rac_runtime_tensor_t{};
+    // No runtime-owned buffer allocator on CoreML: pass nullptr so the helper
+    // matches the historical inline behavior of leaking RUNTIME-owned buffer
+    // slots (none are produced by this adapter today). Keeps CoreML on the
+    // same release path as CPU / ONNXRT (runtimes-003).
+    rac::runtime::rac_runtime_release_tensor(tensor, /*free_buffer=*/nullptr);
 }
 
 const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = {
@@ -149,9 +207,11 @@ const rac_runtime_vtable_t k_coreml_vtable = {
         /* .version                 = */ nullptr,
         /* .priority                = */ 90,
         /* .supported_formats       = */ k_supported_formats,
-        /* .supported_formats_count = */ sizeof(k_supported_formats) / sizeof(k_supported_formats[0]),
+        /* .supported_formats_count = */ sizeof(k_supported_formats) /
+            sizeof(k_supported_formats[0]),
         /* .supported_devices       = */ k_supported_devices,
-        /* .supported_devices_count = */ sizeof(k_supported_devices) / sizeof(k_supported_devices[0]),
+        /* .supported_devices_count = */ sizeof(k_supported_devices) /
+            sizeof(k_supported_devices[0]),
         /* .reserved_0              = */ 0,
         /* .reserved_1              = */ 0,
     },
@@ -177,50 +237,81 @@ const rac_runtime_vtable_t k_coreml_vtable = {
 MLModelConfiguration* rac_coreml_default_model_configuration(void) {
     // Return an autoreleased instance so MRC callers don't leak it on
     // error paths (clang-analyzer-osx.cocoa.RetainCount).
-    MLModelConfiguration* cfg = [[[MLModelConfiguration alloc] init] autorelease];
-    cfg.computeUnits = MLComputeUnitsAll;
-    return cfg;
+    //
+    // commons-001: -[MLModelConfiguration init] is documented to raise on
+    // OOM / framework misconfiguration; convert to a nil return so the C ABI
+    // boundary stays exception-free.
+    @try {
+        MLModelConfiguration* cfg = [[[MLModelConfiguration alloc] init] autorelease];
+        cfg.computeUnits = MLComputeUnitsAll;
+        return cfg;
+    } @catch (NSException* e) {
+        RAC_LOG_ERROR(kLogCat, "MLModelConfiguration init raised %s: %s",
+                      e.name ? [e.name UTF8String] : "NSException",
+                      e.reason ? [e.reason UTF8String] : "no reason");
+        return nil;
+    }
 }
 
 bool rac_coreml_file_exists(NSString* path) {
-    if (!path) return false;
-    return [[NSFileManager defaultManager] fileExistsAtPath:path];
+    if (!path)
+        return false;
+    // commons-001: NSFileManager fileExistsAtPath: shouldn't raise on a valid
+    // NSString, but a programmatic NSGenericException from a swizzled file
+    // manager (e.g. MDM agents on enterprise iOS) must not bubble up.
+    @try {
+        return [[NSFileManager defaultManager] fileExistsAtPath:path];
+    } @catch (NSException* e) {
+        RAC_LOG_ERROR(kLogCat, "NSFileManager fileExistsAtPath raised %s: %s",
+                      e.name ? [e.name UTF8String] : "NSException",
+                      e.reason ? [e.reason UTF8String] : "no reason");
+        return false;
+    }
 }
 
 NSString* rac_coreml_find_resource_dir(NSString* base_dir, NSString* required_model_name) {
     NSString* model_name = required_model_name ?: @"Unet";
-    NSString* direct_model = [base_dir stringByAppendingPathComponent:
-                                [model_name stringByAppendingString:@".mlmodelc"]];
-    if (rac_coreml_file_exists(direct_model)) {
+    // commons-001: directory enumeration touches the filesystem and can raise
+    // on permission errors / sandbox extensions. Fall back to base_dir on any
+    // exception so the caller still gets a usable (if pessimistic) path.
+    @try {
+        NSString* direct_model = [base_dir
+            stringByAppendingPathComponent:[model_name stringByAppendingString:@".mlmodelc"]];
+        if (rac_coreml_file_exists(direct_model)) {
+            return base_dir;
+        }
+
+        NSArray<NSURL*>* contents = [[NSFileManager defaultManager]
+              contentsOfDirectoryAtURL:[NSURL fileURLWithPath:base_dir]
+            includingPropertiesForKeys:@[ NSURLIsDirectoryKey ]
+                               options:0
+                                 error:nil];
+        for (NSURL* item in contents) {
+            NSNumber* is_dir = nil;
+            [item getResourceValue:&is_dir forKey:NSURLIsDirectoryKey error:nil];
+            if (![is_dir boolValue]) {
+                continue;
+            }
+            NSString* nested_model = [[item path]
+                stringByAppendingPathComponent:[model_name stringByAppendingString:@".mlmodelc"]];
+            if (rac_coreml_file_exists(nested_model)) {
+                return [item path];
+            }
+        }
+        return base_dir;
+    } @catch (NSException* e) {
+        RAC_LOG_ERROR(kLogCat, "find_resource_dir raised %s under %s: %s",
+                      e.name ? [e.name UTF8String] : "NSException",
+                      base_dir ? [base_dir UTF8String] : "<nil>",
+                      e.reason ? [e.reason UTF8String] : "no reason");
         return base_dir;
     }
-
-    NSArray<NSURL*>* contents =
-        [[NSFileManager defaultManager] contentsOfDirectoryAtURL:[NSURL fileURLWithPath:base_dir]
-                                      includingPropertiesForKeys:@[NSURLIsDirectoryKey]
-                                                         options:0
-                                                           error:nil];
-    for (NSURL* item in contents) {
-        NSNumber* is_dir = nil;
-        [item getResourceValue:&is_dir forKey:NSURLIsDirectoryKey error:nil];
-        if (![is_dir boolValue]) {
-            continue;
-        }
-        NSString* nested_model =
-            [[item path] stringByAppendingPathComponent:
-                [model_name stringByAppendingString:@".mlmodelc"]];
-        if (rac_coreml_file_exists(nested_model)) {
-            return [item path];
-        }
-    }
-    return base_dir;
 }
 
-MLModel* rac_coreml_load_model_in_dir(NSString* dir,
-                                      NSString* name,
-                                      bool required,
+MLModel* rac_coreml_load_model_in_dir(NSString* dir, NSString* name, bool required,
                                       const char* log_category) {
-    NSString* path = [dir stringByAppendingPathComponent:[name stringByAppendingString:@".mlmodelc"]];
+    NSString* path =
+        [dir stringByAppendingPathComponent:[name stringByAppendingString:@".mlmodelc"]];
     NSURL* url = [NSURL fileURLWithPath:path];
     const char* category = log_category ? log_category : kLogCat;
 
@@ -231,28 +322,37 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir,
         return nil;
     }
 
-    NSError* err = nil;
-    MLModelConfiguration* cfg = rac_coreml_default_model_configuration();
-    MLModel* model = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
-    if (!model) {
-        RAC_LOG_ERROR(category,
-                      "MLModel load failed (%s): %s",
-                      [name UTF8String],
-                      err ? [[err localizedDescription] UTF8String] : "unknown");
+    // commons-001: +[MLModel modelWithContentsOfURL:] can raise NSException on
+    // malformed mlpackage payloads (corrupted coremldata.bin); the error:
+    // out-param only catches user-recoverable failures. Return nil on any
+    // catch so callers (diffusion_coreml_backend.mm etc.) treat it as a
+    // missing optional model rather than crash the host process.
+    @try {
+        NSError* err = nil;
+        MLModelConfiguration* cfg = rac_coreml_default_model_configuration();
+        MLModel* model = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
+        if (!model) {
+            RAC_LOG_ERROR(category, "MLModel load failed (%s): %s", [name UTF8String],
+                          err ? [[err localizedDescription] UTF8String] : "unknown");
+            return nil;
+        }
+        // +modelWithContentsOfURL: returns an autoreleased instance — promote it
+        // to a retained reference so callers that store the pointer into
+        // long-lived engine state (e.g. diffusion_coreml_backend.mm) don't end
+        // up with a dangling reference after the enclosing @autoreleasepool
+        // drains. NS_RETURNS_RETAINED documents the matching -release contract.
+        return [model retain];
+    } @catch (NSException* e) {
+        RAC_LOG_ERROR(category, "MLModel load raised %s on %s: %s",
+                      e.name ? [e.name UTF8String] : "NSException", [name UTF8String],
+                      e.reason ? [e.reason UTF8String] : "no reason");
         return nil;
     }
-    // +modelWithContentsOfURL: returns an autoreleased instance — promote it
-    // to a retained reference so callers that store the pointer into
-    // long-lived engine state (e.g. diffusion_coreml_backend.mm) don't end
-    // up with a dangling reference after the enclosing @autoreleasepool
-    // drains. NS_RETURNS_RETAINED documents the matching -release contract.
-    return [model retain];
 }
 
 extern "C" rac_result_t rac_coreml_runtime_require_available(void) {
-    return rac_runtime_get_by_id(RAC_RUNTIME_COREML) != nullptr
-               ? RAC_SUCCESS
-               : RAC_ERROR_BACKEND_UNAVAILABLE;
+    return rac_runtime_get_by_id(RAC_RUNTIME_COREML) != nullptr ? RAC_SUCCESS
+                                                                : RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_coreml(void) {

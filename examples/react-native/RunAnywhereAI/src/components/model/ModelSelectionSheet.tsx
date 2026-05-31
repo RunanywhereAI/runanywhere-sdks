@@ -247,14 +247,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Load models from SDK
+      // Single canonical SDK query — category + (optional) framework
+      // filter applied registry-side. The previous triple-fallback
+      // (category → framework → all-models) papered over the registry
+      // catalog when chosen IDs didn't match the strict combination;
+      // empty results are now surfaced via the empty-state UI so the
+      // user sees that no model is registered for the selected mode.
       const allModels = await listModels();
       const categoryFilter = getCategoryForContext(context);
-
-      // Filter models based on context (using category field)
       const allowedFrameworks = getAllowedFrameworksForContext(context);
 
-      let filteredModels = categoryFilter
+      const filteredModels = categoryFilter
         ? allModels.filter((m: SDKModelInfo) => {
             const modelCategory = m.category;
             const categoryMatch =
@@ -263,70 +266,17 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 String(categoryFilter).toLowerCase();
             if (!categoryMatch) return false;
 
-            // Framework restriction (e.g., ONNX-only for embedding, LlamaCpp-only for RAG LLM)
+            // Framework restriction (e.g., ONNX-only for embedding,
+            // LlamaCpp-only for RAG LLM).
             if (allowedFrameworks) {
               const frameworks = getModelFrameworks(m);
               if (!frameworks.some((fw) => allowedFrameworks.has(fw))) {
                 return false;
               }
             }
-
             return true;
           })
         : allModels;
-
-      // Fallback: if no models found after filtering for LLM, show models with LlamaCpp framework
-      if (
-        filteredModels.length === 0 &&
-        context === ModelSelectionContext.LLM
-      ) {
-        console.warn(
-          '[ModelSelectionSheet] No category matches, trying framework fallback'
-        );
-        filteredModels = allModels.filter((m: SDKModelInfo) => {
-          return isModelCompatibleWithFramework(
-            m,
-            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-          );
-        });
-        console.warn(
-          '[ModelSelectionSheet] Framework fallback models:',
-          filteredModels.length
-        );
-      }
-
-      // VLM-specific fallback: if no models found with Multimodal category, try 'vision' category
-      if (
-        filteredModels.length === 0 &&
-        context === ModelSelectionContext.VLM
-      ) {
-        console.warn(
-          '[ModelSelectionSheet] VLM: No multimodal models, trying vision category fallback'
-        );
-        filteredModels = allModels.filter((m: SDKModelInfo) => {
-          const modelCategory = m.category;
-          return (
-            modelCategory === ModelCategory.MODEL_CATEGORY_VISION ||
-            String(modelCategory).toLowerCase() === 'vision'
-          );
-        });
-        console.warn(
-          '[ModelSelectionSheet] Vision category fallback models:',
-          filteredModels.length
-        );
-      }
-
-      // Ultimate fallback: just show all models for LLM context if nothing else works
-      if (
-        filteredModels.length === 0 &&
-        context === ModelSelectionContext.LLM &&
-        allModels.length > 0
-      ) {
-        console.warn(
-          '[ModelSelectionSheet] Using all models as final fallback'
-        );
-        filteredModels = allModels;
-      }
 
       setAvailableModels(filteredModels);
 

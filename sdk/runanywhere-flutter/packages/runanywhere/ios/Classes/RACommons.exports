@@ -6,15 +6,15 @@
 # Each entry must include the leading underscore (Apple linker convention).
 #
 # To audit drift vs. RAC_API-decorated declarations in the commons headers:
-#   scripts/validation/check_rac_api_exports.sh            # advisory report
-#   scripts/validation/check_rac_api_exports.sh --strict   # CI gate (exit 1)
+#   scripts/validation/commons/check_rac_api_exports.sh            # advisory report
+#   scripts/validation/commons/check_rac_api_exports.sh --strict   # CI gate (exit 1)
 #
 # TODO(v0.21): As of 2026-05-05 the include tree exposes 955 RAC_API-decorated
 # decls total; 465 are shipped via this exports list, and 490 remain as
 # internalization candidates not called by any SDK today. Those should either
 # have RAC_API stripped from the header or be relocated to `src/.../internal.h`.
 # Once that cleanup lands, wire `check_rac_api_exports.sh --strict` into
-# `scripts/validation/run_commons_proto_checks.sh` as a CI gate.
+# `scripts/validation/commons/run_commons_proto_checks.sh` as a CI gate.
 #
 # Note: backend-conditional symbols (rac_rag_*, rac_backend_rag_*,
 # rac_backend_whisperkit_coreml_*, rac_whisperkit_coreml_stt_set_callbacks)
@@ -50,8 +50,7 @@ _rac_get_current_time_ms
 # cross as runanywhere.v1.SDKError bytes inside SDKEvent envelopes.
 
 # Analytics Events — internal in-process telemetry sink (Sentry/HTTP
-# exporter, used by SDK telemetry shims tracked under SWF-04, KOT-11,
-# FLT-04, RN-04, WEB-04 migration backlog). SDK-facing events go through
+# exporter, used by SDK telemetry shims). SDK-facing events go through
 # rac_sdk_event_* below.
 _rac_analytics_events_set_callback
 _rac_analytics_event_emit
@@ -111,7 +110,7 @@ _rac_device_set_callbacks
 # STT Component — non-proto APIs are internal (still used by JNI during
 # migration). SDK-facing surface is rac_stt_*_proto / lifecycle proto.
 
-# CPP-03: STT lifecycle-owned proto-byte stream ABI
+# STT lifecycle-owned proto-byte stream ABI
 _rac_stt_set_stream_proto_callback
 _rac_stt_unset_stream_proto_callback
 _rac_stt_stream_start_proto
@@ -127,14 +126,14 @@ _rac_stt_stream_cancel_proto
 # SDK-facing surface is rac_tts_*_proto / rac_vad_*_proto / lifecycle
 # proto.
 
-# CPP-03: TTS lifecycle-owned proto-byte stream ABI
+# TTS lifecycle-owned proto-byte stream ABI
 _rac_tts_set_stream_proto_callback
 _rac_tts_unset_stream_proto_callback
 _rac_tts_stream_start_proto
 _rac_tts_stream_stop_proto
 _rac_tts_stream_cancel_proto
 
-# CPP-03: VAD lifecycle-owned proto-byte stream ABI
+# VAD lifecycle-owned proto-byte stream ABI
 _rac_vad_set_stream_proto_callback
 _rac_vad_unset_stream_proto_callback
 _rac_vad_stream_start_proto
@@ -147,8 +146,10 @@ _rac_vad_stream_cancel_proto
 # /transcribe/generate_response/synthesize_speech/detect_speech/
 # process_voice_turn/process_stream/cleanup/is_ready/get_*_model_id) and
 # struct event callbacks are now internal commons-only helpers.
-# GAP 09 Phase 15 / v3 Phase A4 — proto-byte streaming ABI.
+# Proto-byte streaming ABI.
 _rac_voice_agent_set_proto_callback
+# Caller-side shutdown helper.
+_rac_voice_agent_proto_quiesce
 
 # LLM Structured Output — SDK-facing surface is proto-byte only.
 # Legacy hand-written parse/validate/prepare helpers are now internal.
@@ -157,7 +158,7 @@ _rac_structured_output_generate_stream_proto
 _rac_structured_output_parse_proto
 _rac_structured_output_prepare_prompt_proto
 _rac_structured_output_validate_proto
-# P2-T15: JSONSchema-proto -> JSON Schema text canonical writer.
+# JSONSchema-proto -> JSON Schema text canonical writer.
 _rac_structured_output_schema_to_json_proto
 
 # LLM Tool Calling — SDK-facing surface is proto-byte only.
@@ -166,19 +167,21 @@ _rac_structured_output_schema_to_json_proto
 _rac_tool_call_parse_proto
 _rac_tool_call_validate_proto
 _rac_tool_call_format_prompt_proto
+# Derive tool-call format from RAModelInfo proto.
+_rac_tool_call_format_from_model_info_proto
 
-# G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK hand-written
+# ToolValue <-> JSON proto-byte ABI (replaces per-SDK hand-written
 # JSON walks over the ToolValue oneof tree).
 _rac_tool_value_to_json_proto
 _rac_tool_value_from_json_proto
 
-# Wave D-4: Tool-calling session state machine (collapses per-SDK
+# Tool-calling session state machine (collapses per-SDK
 # 200-400 LOC orchestration loop into one native session).
 _rac_tool_calling_session_create_proto
 _rac_tool_calling_session_step_with_result_proto
 _rac_tool_calling_session_destroy_proto
 
-# P2-T8: Synchronous single-call tool-calling loop. Mirrors the session
+# Synchronous single-call tool-calling loop. Mirrors the session
 # machinery but exposes one C ABI call instead of an outer-driven event
 # stream — Swift's generateWithTools collapses to ~10 LOC.
 _rac_tool_calling_run_loop_proto
@@ -190,7 +193,7 @@ _rac_tool_calling_run_loop_proto
 # rac_diffusion_tokenizer_*) are commons-internal — SDKs receive
 # model/storage/download state via generated protos.
 
-# CPP-03: Diffusion lifecycle-owned proto-byte stream ABI
+# Diffusion lifecycle-owned proto-byte stream ABI
 _rac_diffusion_set_stream_proto_callback
 _rac_diffusion_unset_stream_proto_callback
 _rac_diffusion_stream_start_proto
@@ -206,7 +209,7 @@ _rac_platform_diffusion_set_callbacks
 # Image Utilities — internal helpers used by VLM/diffusion preprocessing.
 # SDK-facing image/audio bytes always cross via generated proto results.
 
-# Hardware Profile ABI (round-1 CPP fix — G-C6 / Task 1)
+# Hardware Profile ABI
 _rac_hardware_profile_get
 _rac_hardware_profile_free
 _rac_hardware_get_accelerators
@@ -254,7 +257,7 @@ _rac_model_lifecycle_current_model_proto
 _rac_component_lifecycle_snapshot_proto
 _rac_model_lifecycle_reset
 
-# P2-T9: canonical two-phase SDK init surface (Phase 1 / Phase 2 / retry HTTP).
+# Canonical two-phase SDK init surface (Phase 1 / Phase 2 / retry HTTP).
 # Mirrors RunAnywhere.swift::initialize / completeServicesInitialization /
 # retryHTTPSetup so every SDK shares one step list.
 _rac_sdk_init_phase1_proto
@@ -285,7 +288,7 @@ _rac_stt_transcribe_lifecycle_proto
 _rac_stt_transcribe_stream_lifecycle_proto
 _rac_stt_component_transcribe_proto
 _rac_stt_component_transcribe_stream_proto
-# P2-T14: canonical STTConfiguration defaults helper.
+# Canonical STTConfiguration defaults helper.
 _rac_stt_configuration_defaults_proto
 _rac_tts_synthesize_lifecycle_proto
 _rac_tts_synthesize_stream_lifecycle_proto
@@ -294,7 +297,7 @@ _rac_tts_list_voices_lifecycle_proto
 _rac_tts_component_list_voices_proto
 _rac_tts_component_synthesize_proto
 _rac_tts_component_synthesize_stream_proto
-# P2-T14: canonical TTSConfiguration defaults helper.
+# Canonical TTSConfiguration defaults helper.
 _rac_tts_configuration_defaults_proto
 _rac_vad_process_lifecycle_proto
 _rac_vad_configure_lifecycle_proto
@@ -308,7 +311,7 @@ _rac_vad_component_set_activity_proto_callback
 _rac_voice_agent_initialize_proto
 _rac_voice_agent_component_states_proto
 _rac_voice_agent_process_voice_turn_proto
-# D-7: Full-session voice-agent ABI + per-helper proto wrappers.
+# Full-session voice-agent ABI + per-helper proto wrappers.
 _rac_voice_agent_process_turn_proto
 _rac_voice_agent_transcribe_proto
 _rac_voice_agent_synthesize_speech_proto
@@ -342,15 +345,14 @@ _rac_diffusion_generate_with_progress_proto
 _rac_diffusion_cancel_proto
 
 # ============================================================================
-# WAVE D-1 additions (2026-05-04): RAC_API symbols actively called by SDK
-# bridges that were missing from the curated list. These would link-fail the
-# moment commons ships as a dynamic library on Apple. See gaps/gaps/
-# inconsistencies/cpp-layer.md § CPP-EXPORTS-MISSING-SYMBOLS.
+# RAC_API symbols actively called by SDK bridges that were missing from the
+# curated list. These would link-fail the moment commons ships as a dynamic
+# library on Apple.
 # ============================================================================
 
 # Plugin loader / registry — ABI v3 plugin discovery and lifecycle.
 # Exposed as RAC_API and actively called by Swift (Public/Extensions/RunAnywhere+PluginLoader.swift)
-# and other SDKs. (CPP-EXPORTS-MISSING-SYMBOLS / Wave D-1.)
+# and other SDKs.
 _rac_plugin_api_version
 _rac_plugin_list
 _rac_registry_free_plugin_list
@@ -361,15 +363,14 @@ _rac_registry_unload_plugin
 
 # Runtime registry — L1 runtime plugin lifecycle (CPU, Metal, CoreML, ONNX,
 # CUDA, …). Mirrors the engine plugin loader but keyed by rac_runtime_id_t.
-# (SWIFT-CRACOMMONS-RUNTIME-UNLOAD-EXPORT / Wave 7 T24.)
 _rac_runtime_unload
 
 # Plugin router — primitive → vtable resolution. NOTE: declared in
-# include/rac/router/rac_route.h WITHOUT RAC_API today; see TODO in Wave D followup
-# to add the annotation. Keeping exported so commons built as dynamic lib works.
+# include/rac/router/rac_route.h WITHOUT RAC_API today; the annotation still
+# needs to be added. Keeping exported so commons built as dynamic lib works.
 _rac_plugin_route
 
-# Wave H-5 (KOT-12): SDKComponent → [InferenceFramework] query (proto ABI).
+# SDKComponent → [InferenceFramework] query (proto ABI).
 _rac_router_frameworks_for_capability_proto
 _rac_router_frameworks_for_capability_proto_free
 
@@ -457,7 +458,7 @@ _rac_device_manager_is_registered
 _rac_device_manager_register_if_needed
 _rac_device_manager_set_callbacks
 
-# P2-T13: persistent device-id resolution chain (Keychain ->
+# Persistent device-id resolution chain (Keychain ->
 # identifierForVendor -> generate UUID) collapsed from each platform SDK
 # into one C entry point.
 _rac_device_get_or_create_persistent_id
@@ -585,8 +586,8 @@ _rac_embeddings_embed
 _rac_embeddings_embed_batch
 _rac_embeddings_initialize
 
-# RAG pipeline non-proto ABI — still called by RN RAGBridge.cpp until Wave B-5
-# lands (CPP-RAG-PIPELINE-LEGACY blocker).
+# RAG pipeline non-proto ABI — still called by RN RAGBridge.cpp during the
+# proto-byte migration.
 
 # Voice agent orchestrator — legacy non-proto ABI kept live while platform
 # bridges migrate to the rac_voice_agent_*_proto surface.
@@ -669,6 +670,8 @@ _rac_model_info_alloc
 _rac_model_info_array_free
 _rac_model_info_free
 _rac_model_info_is_downloaded
+_rac_model_info_is_small_model_proto
+_rac_model_info_parameter_count_b_proto
 _rac_model_registry_create
 _rac_model_registry_discover_downloaded
 _rac_model_registry_get
@@ -705,6 +708,7 @@ _rac_model_assignment_set_callbacks
 
 # Model category / framework helpers (capability probes).
 _rac_framework_raw_value
+_rac_model_category_default_framework
 _rac_model_category_requires_context_length
 _rac_model_category_supports_thinking
 _rac_model_check_compatibility
@@ -725,7 +729,7 @@ _rac_inference_framework_display_name
 _rac_inference_framework_analytics_key
 _rac_inference_framework_from_string
 
-# Proto-int32 ↔ rac_*_t enum mappers (T15a / SWIFT-DUP-MODELTYPES-COMPUTED).
+# Proto-int32 ↔ rac_*_t enum mappers.
 # Centralize the per-SDK switch tables that translate between
 # runanywhere.v1.{InferenceFramework, ModelCategory, ModelFormat, ModelSource,
 # ArchiveType} proto integers and the rac_*_t C enum values.
@@ -769,7 +773,6 @@ _rac_download_manager_pause_all
 _rac_download_manager_resume_all
 _rac_download_manager_start
 _rac_download_manager_update_progress
-_rac_download_orchestrate
 _rac_download_requires_extraction
 _rac_download_task_ids_free
 

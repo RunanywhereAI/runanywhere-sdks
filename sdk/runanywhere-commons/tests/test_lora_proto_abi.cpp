@@ -123,8 +123,7 @@ void backend_destroy(void* impl) {
     delete static_cast<LifecycleBackend*>(impl);
 }
 
-const uint32_t g_supported_formats[] = {
-    static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+const uint32_t g_supported_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
 
 rac_llm_service_ops_t make_ops(bool supports_lora) {
     rac_llm_service_ops_t ops{};
@@ -234,8 +233,7 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_lora_apply_proto(precheck_bytes.data(), precheck_bytes.size(), &out);
+    rac_result_t rc = rac_lora_apply_proto(precheck_bytes.data(), precheck_bytes.size(), &out);
     runanywhere::v1::LoRAApplyResult precheck_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &precheck_result),
           "apply without lifecycle returns typed LoRAApplyResult");
@@ -252,8 +250,7 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "lifecycle lora plugin registers");
     CHECK(register_test_llm(registry, build_test_llm("lifecycle.lora", "Lifecycle LoRA")),
           "lifecycle.lora model registers");
-    CHECK(lifecycle_load(registry, "lifecycle.lora"),
-          "lifecycle service loads lifecycle.lora");
+    CHECK(lifecycle_load(registry, "lifecycle.lora"), "lifecycle service loads lifecycle.lora");
 
     runanywhere::v1::LoRAApplyRequest apply;
     apply.set_request_id("apply-lifecycle");
@@ -309,10 +306,8 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "lifecycle remove-by-id returns LoRAState");
     CHECK(state.loaded_adapters_size() == 1, "remove-by-id leaves remaining adapter");
-    CHECK(!state_carries(state, "primary", "/tmp/primary.gguf"),
-          "remove-by-id removes primary");
-    CHECK(state_carries(state, "secondary", "/tmp/secondary.gguf"),
-          "remove-by-id keeps secondary");
+    CHECK(!state_carries(state, "primary", "/tmp/primary.gguf"), "remove-by-id removes primary");
+    CHECK(state_carries(state, "secondary", "/tmp/secondary.gguf"), "remove-by-id keeps secondary");
     rac_proto_buffer_free(&out);
 
     // Remove by path then clear_all.
@@ -332,8 +327,7 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     rc = rac_lora_list_proto(state_bytes.data(), state_bytes.size(), &out);
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "lifecycle list returns LoRAState after full remove");
-    CHECK(state.loaded_adapters_size() == 0,
-          "lifecycle list reflects no remaining adapters");
+    CHECK(state.loaded_adapters_size() == 0, "lifecycle list reflects no remaining adapters");
     CHECK(state.base_model_id() == "lifecycle.lora", "list still reports base model id");
     rac_proto_buffer_free(&out);
 
@@ -451,28 +445,24 @@ int test_malformed_proto_bytes_return_decoding_error() {
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_lora_apply_proto(garbage, sizeof(garbage), &out);
-    CHECK(rc == RAC_ERROR_DECODING_ERROR,
-          "apply with malformed bytes returns DECODING_ERROR");
+    CHECK(rc == RAC_ERROR_DECODING_ERROR, "apply with malformed bytes returns DECODING_ERROR");
     CHECK(out.status == RAC_ERROR_DECODING_ERROR,
           "apply malformed-bytes propagates DECODING_ERROR to out.status");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_remove_proto(garbage, sizeof(garbage), &out);
-    CHECK(rc == RAC_ERROR_DECODING_ERROR,
-          "remove with malformed bytes returns DECODING_ERROR");
+    CHECK(rc == RAC_ERROR_DECODING_ERROR, "remove with malformed bytes returns DECODING_ERROR");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_list_proto(garbage, sizeof(garbage), &out);
-    CHECK(rc == RAC_ERROR_DECODING_ERROR,
-          "list with malformed bytes returns DECODING_ERROR");
+    CHECK(rc == RAC_ERROR_DECODING_ERROR, "list with malformed bytes returns DECODING_ERROR");
     rac_proto_buffer_free(&out);
 
     rac_proto_buffer_init(&out);
     rc = rac_lora_state_proto(garbage, sizeof(garbage), &out);
-    CHECK(rc == RAC_ERROR_DECODING_ERROR,
-          "state with malformed bytes returns DECODING_ERROR");
+    CHECK(rc == RAC_ERROR_DECODING_ERROR, "state with malformed bytes returns DECODING_ERROR");
     rac_proto_buffer_free(&out);
 
     reset_environment();
@@ -594,12 +584,9 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAState first_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &first_state),
           "first clear_all returns LoRAState");
-    CHECK(first_state.error_code() == 0,
-          "first clear_all carries no error");
-    CHECK(first_state.loaded_adapters_size() == 0,
-          "first clear_all empties tracked adapters");
-    CHECK(!first_state.has_active_adapters(),
-          "first clear_all sets has_active_adapters=false");
+    CHECK(first_state.error_code() == 0, "first clear_all carries no error");
+    CHECK(first_state.loaded_adapters_size() == 0, "first clear_all empties tracked adapters");
+    CHECK(!first_state.has_active_adapters(), "first clear_all sets has_active_adapters=false");
     rac_proto_buffer_free(&out);
 
     // Second clear_all on already-empty state must remain idempotent — no
@@ -609,12 +596,10 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAState second_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &second_state),
           "second clear_all returns LoRAState");
-    CHECK(second_state.error_code() == 0,
-          "second clear_all carries no error (idempotent)");
+    CHECK(second_state.error_code() == 0, "second clear_all carries no error (idempotent)");
     CHECK(second_state.loaded_adapters_size() == 0,
           "second clear_all leaves tracked adapters empty");
-    CHECK(!second_state.has_active_adapters(),
-          "second clear_all keeps has_active_adapters=false");
+    CHECK(!second_state.has_active_adapters(), "second clear_all keeps has_active_adapters=false");
     CHECK(second_state.base_model_id() == "double.clear",
           "second clear_all preserves base model id");
     rac_proto_buffer_free(&out);

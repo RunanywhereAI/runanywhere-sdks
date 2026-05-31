@@ -1,6 +1,6 @@
 /**
  * @file test_schema_to_json.cpp
- * @brief Parity tests for rac_structured_output_schema_to_json_proto (P2-T15).
+ * @brief Parity tests for rac_structured_output_schema_to_json_proto.
  *
  * Each case builds an RAJSONSchema via the generated proto, serializes it,
  * runs the C ABI, and compares the produced JSON Schema text to a fixture

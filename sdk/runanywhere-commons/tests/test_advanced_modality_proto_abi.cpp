@@ -598,7 +598,7 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(rac_plugin_register(&onnx) == RAC_SUCCESS, "RAG embeddings plugin registers");
     CHECK(rac_plugin_register(&llamacpp) == RAC_SUCCESS, "RAG LLM plugin registers");
 
-    // D-6: RAGConfiguration carries model ids. Register mock embedding / LLM
+    // RAGConfiguration carries model ids. Register mock embedding / LLM
     // models in the global model registry so the commons RAG session create
     // ABI can resolve the ids to filesystem paths.
     auto root = temp_root("rag");
@@ -655,7 +655,7 @@ int test_rag_ingest_query_mocked_path() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    // CPP-07: drain any preexisting events so we can assert canonical
+    // Drain any preexisting events so we can assert canonical
     // ingest/query lifecycle events without false positives from earlier
     // test sequences.
     rac_sdk_event_clear_queue();
@@ -665,7 +665,7 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &stats), "RAG ingest returns statistics");
     CHECK(stats.indexed_chunks() >= 1, "RAG ingest indexes chunks");
     rac_proto_buffer_free(&out);
-    // CPP-07: bespoke RAG ingestion publishes the canonical SDKEvent
+    // Bespoke RAG ingestion publishes the canonical SDKEvent
     // capability lifecycle (matches what an L5 solution composing
     // embed -> retrieve would emit on its event stream).
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED),
@@ -686,7 +686,7 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(result.answer() == "mock answer", "RAG query uses mocked LLM path");
     CHECK(result.retrieved_chunks_size() >= 1, "RAG query returns retrieved chunks");
     rac_proto_buffer_free(&out);
-    // CPP-07: bespoke RAG query path emits the canonical query lifecycle
+    // Bespoke RAG query path emits the canonical query lifecycle
     // events (equivalent to an L5 retrieve -> generate solution).
     CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED),
           "RAG query publishes RAG_QUERY_STARTED");
@@ -702,7 +702,7 @@ int test_rag_ingest_query_mocked_path() {
     return 0;
 }
 
-// D-6: RAGConfiguration.embedding_model_id that references an unknown model
+// RAGConfiguration.embedding_model_id that references an unknown model
 // must fail with RAC_ERROR_MODEL_NOT_FOUND (commons resolves ids through the
 // global registry; unknown ids must not silently fall through).
 int test_rag_unknown_embedding_model_id_fails() {
@@ -723,7 +723,7 @@ int test_rag_unknown_embedding_model_id_fails() {
     return 0;
 }
 
-// D-6: RAGConfiguration.embedding_model_id is required. Omitting it must
+// RAGConfiguration.embedding_model_id is required. Omitting it must
 // fail with RAC_ERROR_INVALID_ARGUMENT (before any registry lookup).
 int test_rag_missing_embedding_model_id_fails() {
     runanywhere::v1::RAGConfiguration config;
@@ -751,7 +751,7 @@ void write_gguf_adapter(const std::filesystem::path& path) {
     out.write(tail, sizeof(tail) - 1);
 }
 
-// MF-1: lifecycle-aware LoRA service ABI test. Replaces the legacy
+// Lifecycle-aware LoRA service ABI test. Replaces the legacy
 // rac_llm_component-based plumbing with the model-lifecycle registry +
 // rac_model_lifecycle_load_proto so the proto ABI is exercised exactly the
 // way the v2 SDK bridges call it.
@@ -792,10 +792,8 @@ bool lifecycle_load_lora_model(rac_model_registry_handle_t registry, const std::
     const rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS &&
-                    out.status == RAC_SUCCESS &&
-                    result.ParseFromArray(out.data, static_cast<int>(out.size)) &&
-                    result.success();
+    const bool ok = rc == RAC_SUCCESS && out.status == RAC_SUCCESS &&
+                    result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -845,8 +843,7 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(rac_plugin_register(&llamacpp) == RAC_SUCCESS, "LoRA-capable plugin registers");
     CHECK(register_lora_test_model(model_registry, build_lora_test_model("mock-llm", "Mock LLM")),
           "mock-llm registers in model registry");
-    CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"),
-          "lifecycle loads mock LLM model");
+    CHECK(lifecycle_load_lora_model(model_registry, "mock-llm"), "lifecycle loads mock LLM model");
 
     runanywhere::v1::LoRAAdapterConfig config;
     config.set_adapter_path(adapter_path.string());

@@ -34,7 +34,7 @@ import okio.ByteString
  * ---------------------------------------------------------------------------
  * RAGConfiguration — low-level pipeline config.
  *
- * As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+ * This message carries *model ids*, not filesystem paths.
  * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
  * for resolving those ids to on-disk paths through the canonical model
  * registry. SDK callers MUST register the embedding / LLM / reranker models
@@ -69,31 +69,34 @@ public class RAGConfiguration(
   /**
    * Embedding vector dimension — must match the embedding model.
    * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
+   * Optional so callers can distinguish "unset" (commons stamps the
+   * canonical default) from explicit zero / explicit override.
    */
   @RacDefaultOption("384")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "embeddingDimension",
     schemaIndex = 2,
   )
-  public val embedding_dimension: Int = 0,
+  public val embedding_dimension: Int? = null,
   /**
    * Number of top chunks to retrieve per query.
+   * Optional so callers can distinguish "unset" from an explicit value.
    */
   @RacDefaultOption("5")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "topK",
     schemaIndex = 3,
   )
-  public val top_k: Int = 0,
+  public val top_k: Int? = null,
   /**
    * Minimum cosine similarity threshold (0.0–1.0). Chunks below this
    * score are discarded before being passed to the LLM as context.
+   * Optional so callers can distinguish "unset" from explicit 0.0
+   * (accept-everything) without losing the canonical default.
    */
   @RacDefaultOption("0.7")
   @RacMinFloatOption(0.0)
@@ -101,46 +104,46 @@ public class RAGConfiguration(
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "similarityThreshold",
     schemaIndex = 4,
   )
-  public val similarity_threshold: Float = 0f,
+  public val similarity_threshold: Float? = null,
   /**
    * Tokens per chunk when splitting documents during ingestion.
+   * Optional so callers can distinguish "unset" from an explicit value.
    */
   @RacDefaultOption("512")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "chunkSize",
     schemaIndex = 5,
   )
-  public val chunk_size: Int = 0,
+  public val chunk_size: Int? = null,
   /**
    * Overlap tokens between consecutive chunks. Must be < chunk_size.
+   * Optional so callers can explicitly request zero overlap (no overlap)
+   * without it being silently replaced by the canonical default of 64.
    */
   @RacDefaultOption("64")
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "chunkOverlap",
     schemaIndex = 6,
   )
-  public val chunk_overlap: Int = 0,
+  public val chunk_overlap: Int? = null,
   /**
    * Maximum tokens of retrieved context passed to the LLM.
+   * Optional so callers can distinguish "unset" from an explicit value.
    */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxContextTokens",
     schemaIndex = 7,
   )
-  public val max_context_tokens: Int = 0,
+  public val max_context_tokens: Int? = null,
   /**
    * Prompt template with `{context}` and `{query}` placeholders.
    */
@@ -243,12 +246,12 @@ public class RAGConfiguration(
       result = unknownFields.hashCode()
       result = result * 37 + embedding_model_id.hashCode()
       result = result * 37 + llm_model_id.hashCode()
-      result = result * 37 + embedding_dimension.hashCode()
-      result = result * 37 + top_k.hashCode()
-      result = result * 37 + similarity_threshold.hashCode()
-      result = result * 37 + chunk_size.hashCode()
-      result = result * 37 + chunk_overlap.hashCode()
-      result = result * 37 + max_context_tokens.hashCode()
+      result = result * 37 + (embedding_dimension?.hashCode() ?: 0)
+      result = result * 37 + (top_k?.hashCode() ?: 0)
+      result = result * 37 + (similarity_threshold?.hashCode() ?: 0)
+      result = result * 37 + (chunk_size?.hashCode() ?: 0)
+      result = result * 37 + (chunk_overlap?.hashCode() ?: 0)
+      result = result * 37 + (max_context_tokens?.hashCode() ?: 0)
       result = result * 37 + (prompt_template?.hashCode() ?: 0)
       result = result * 37 + (embedding_config_json?.hashCode() ?: 0)
       result = result * 37 + (llm_config_json?.hashCode() ?: 0)
@@ -265,12 +268,12 @@ public class RAGConfiguration(
     val result = mutableListOf<String>()
     result += """embedding_model_id=${sanitize(embedding_model_id)}"""
     result += """llm_model_id=${sanitize(llm_model_id)}"""
-    result += """embedding_dimension=$embedding_dimension"""
-    result += """top_k=$top_k"""
-    result += """similarity_threshold=$similarity_threshold"""
-    result += """chunk_size=$chunk_size"""
-    result += """chunk_overlap=$chunk_overlap"""
-    result += """max_context_tokens=$max_context_tokens"""
+    if (embedding_dimension != null) result += """embedding_dimension=$embedding_dimension"""
+    if (top_k != null) result += """top_k=$top_k"""
+    if (similarity_threshold != null) result += """similarity_threshold=$similarity_threshold"""
+    if (chunk_size != null) result += """chunk_size=$chunk_size"""
+    if (chunk_overlap != null) result += """chunk_overlap=$chunk_overlap"""
+    if (max_context_tokens != null) result += """max_context_tokens=$max_context_tokens"""
     if (prompt_template != null) result += """prompt_template=${sanitize(prompt_template)}"""
     if (embedding_config_json != null) result += """embedding_config_json=${sanitize(embedding_config_json)}"""
     if (llm_config_json != null) result += """llm_config_json=${sanitize(llm_config_json)}"""
@@ -284,12 +287,12 @@ public class RAGConfiguration(
   public fun copy(
     embedding_model_id: String = this.embedding_model_id,
     llm_model_id: String = this.llm_model_id,
-    embedding_dimension: Int = this.embedding_dimension,
-    top_k: Int = this.top_k,
-    similarity_threshold: Float = this.similarity_threshold,
-    chunk_size: Int = this.chunk_size,
-    chunk_overlap: Int = this.chunk_overlap,
-    max_context_tokens: Int = this.max_context_tokens,
+    embedding_dimension: Int? = this.embedding_dimension,
+    top_k: Int? = this.top_k,
+    similarity_threshold: Float? = this.similarity_threshold,
+    chunk_size: Int? = this.chunk_size,
+    chunk_overlap: Int? = this.chunk_overlap,
+    max_context_tokens: Int? = this.max_context_tokens,
     prompt_template: String? = this.prompt_template,
     embedding_config_json: String? = this.embedding_config_json,
     llm_config_json: String? = this.llm_config_json,
@@ -318,24 +321,12 @@ public class RAGConfiguration(
         if (value.llm_model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.llm_model_id)
         }
-        if (value.embedding_dimension != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.embedding_dimension)
-        }
-        if (value.top_k != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.top_k)
-        }
-        if (!value.similarity_threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.similarity_threshold)
-        }
-        if (value.chunk_size != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.chunk_size)
-        }
-        if (value.chunk_overlap != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.chunk_overlap)
-        }
-        if (value.max_context_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.max_context_tokens)
-        }
+        size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.embedding_dimension)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.top_k)
+        size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.similarity_threshold)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.chunk_size)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.chunk_overlap)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.max_context_tokens)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.prompt_template)
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.embedding_config_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.llm_config_json)
@@ -357,24 +348,12 @@ public class RAGConfiguration(
         if (value.llm_model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.llm_model_id)
         }
-        if (value.embedding_dimension != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.embedding_dimension)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
-        }
-        if (!value.similarity_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.similarity_threshold)
-        }
-        if (value.chunk_size != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
-        }
-        if (value.chunk_overlap != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.chunk_overlap)
-        }
-        if (value.max_context_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_context_tokens)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 3, value.embedding_dimension)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.similarity_threshold)
+        ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
+        ProtoAdapter.INT32.encodeWithTag(writer, 7, value.chunk_overlap)
+        ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_context_tokens)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
@@ -402,24 +381,12 @@ public class RAGConfiguration(
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
-        if (value.max_context_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_context_tokens)
-        }
-        if (value.chunk_overlap != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.chunk_overlap)
-        }
-        if (value.chunk_size != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
-        }
-        if (!value.similarity_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.similarity_threshold)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
-        }
-        if (value.embedding_dimension != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.embedding_dimension)
-        }
+        ProtoAdapter.INT32.encodeWithTag(writer, 8, value.max_context_tokens)
+        ProtoAdapter.INT32.encodeWithTag(writer, 7, value.chunk_overlap)
+        ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_size)
+        ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.similarity_threshold)
+        ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
+        ProtoAdapter.INT32.encodeWithTag(writer, 3, value.embedding_dimension)
         if (value.llm_model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.llm_model_id)
         }
@@ -431,12 +398,12 @@ public class RAGConfiguration(
       override fun decode(reader: ProtoReader): RAGConfiguration {
         var embedding_model_id: String = ""
         var llm_model_id: String = ""
-        var embedding_dimension: Int = 0
-        var top_k: Int = 0
-        var similarity_threshold: Float = 0f
-        var chunk_size: Int = 0
-        var chunk_overlap: Int = 0
-        var max_context_tokens: Int = 0
+        var embedding_dimension: Int? = null
+        var top_k: Int? = null
+        var similarity_threshold: Float? = null
+        var chunk_size: Int? = null
+        var chunk_overlap: Int? = null
+        var max_context_tokens: Int? = null
         var prompt_template: String? = null
         var embedding_config_json: String? = null
         var llm_config_json: String? = null

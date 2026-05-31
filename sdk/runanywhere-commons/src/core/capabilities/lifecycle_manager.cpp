@@ -424,13 +424,24 @@ rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* ou
     }
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
+    // Lock to serialize with rac_lifecycle_unload / rac_lifecycle_load auto-unload,
+    // which both swap current_service -> nullptr before destroying the old handle.
+    // Without the lock, a concurrent unload between the state check and the load
+    // could hand the caller a stale or null handle while reporting RAC_SUCCESS.
+    std::lock_guard<std::mutex> lock(mgr->mutex);
 
-    if (mgr->state.load() != RAC_LIFECYCLE_STATE_LOADED || mgr->current_service.load() == nullptr) {
+    if (mgr->state.load() != RAC_LIFECYCLE_STATE_LOADED) {
         rac_error_set_details("Service not loaded - call load() first");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    *out_service = mgr->current_service.load();
+    rac_handle_t svc = mgr->current_service.load();
+    if (svc == nullptr) {
+        rac_error_set_details("Service not loaded - call load() first");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    *out_service = svc;
     return RAC_SUCCESS;
 }
 

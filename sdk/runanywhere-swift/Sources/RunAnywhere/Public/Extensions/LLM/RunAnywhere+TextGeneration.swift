@@ -7,10 +7,37 @@
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
+import Foundation
 
 // MARK: - Text Generation
 
 public extension RunAnywhere {
+
+    /// Generate text from a plain prompt — convenience overload that mirrors
+    /// the Kotlin `RunAnywhere.generate(prompt:options:)` signature.
+    /// Forwards to the proto-request variant after assembling the request
+    /// from `options ?? .defaults()`.
+    static func generate(
+        prompt: String,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> RALLMGenerationResult {
+        var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = false
+        return try await generate(request)
+    }
+
+    /// Stream text generation from a plain prompt — convenience overload that
+    /// mirrors the Kotlin `RunAnywhere.generateStream(prompt:options:)`
+    /// signature. Forwards to the proto-request variant after assembling
+    /// the request from `options ?? .defaults()` and enabling streaming.
+    static func generateStream(
+        prompt: String,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> AsyncStream<RALLMStreamEvent> {
+        var request = (options ?? .defaults()).toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = true
+        return try await generateStream(request)
+    }
 
     /// Generate text through the generated-proto C++ LLM service ABI.
     static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
@@ -74,6 +101,85 @@ public extension RunAnywhere {
         } catch {
             SDKLogger.llm.warning("cancelGeneration failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Build a canonical `RALLMGenerationResult` from a stream of
+    /// `RALLMStreamEvent`s and the currently-loaded LLM model.
+    ///
+    /// Example apps previously synthesised this struct themselves with a
+    /// hardcoded `framework = "llamacpp"` literal because the SDK exposed
+    /// only the per-token stream. The aggregation logic (concatenating
+    /// `event.token` text, counting tokens, computing TTFT/throughput from
+    /// timestamps) is now owned by the SDK and the framework string is
+    /// resolved from `currentModel(_:).framework.analyticsKey` so callers
+    /// stay aligned with the registry's canonical framework label.
+    ///
+    /// - Parameters:
+    ///   - prompt: Prompt text used to estimate `inputTokens` when the
+    ///     backend does not surface it directly.
+    ///   - events: AsyncStream of stream events from
+    ///     `generateStream(_:)`. The function consumes the stream until
+    ///     `isFinal == true` or the stream finishes.
+    ///   - onToken: Optional callback invoked for each non-empty
+    ///     `event.token` text. Receives the aggregated transcript so far
+    ///     (suitable for live UI updates).
+    /// - Returns: A populated `RALLMGenerationResult` whose `framework`
+    ///   field matches the loaded LLM model's analytics key; on terminal
+    ///   error events the `errorMessage` is propagated.
+    static func aggregateStream(
+        prompt: String,
+        events: AsyncStream<RALLMStreamEvent>,
+        onToken: ((String) async -> Void)? = nil
+    ) async -> RALLMGenerationResult {
+        var fullResponse = ""
+        var tokenCount = 0
+        var firstTokenTime: Date?
+        let startTime = Date()
+        var finishReason = ""
+        var terminalError = ""
+
+        for await event in events {
+            if !event.token.isEmpty {
+                if firstTokenTime == nil { firstTokenTime = Date() }
+                fullResponse += event.token
+                tokenCount += 1
+                if let onToken {
+                    await onToken(fullResponse)
+                }
+            }
+            if event.isFinal {
+                finishReason = event.finishReason
+                terminalError = event.errorMessage
+                break
+            }
+        }
+
+        let totalLatency = Date().timeIntervalSince(startTime) * 1000
+        let ttft = firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
+
+        var llmRequest = RACurrentModelRequest()
+        llmRequest.category = .language
+        let snapshot = RunAnywhere.currentModel(llmRequest)
+        let modelID = snapshot.found ? snapshot.modelID : ""
+        let framework = snapshot.found
+            ? snapshot.model.framework.analyticsKey
+            : InferenceFramework.unknown.analyticsKey
+
+        var result = RALLMGenerationResult()
+        result.text = fullResponse
+        result.inputTokens = Int32(max(1, prompt.count / 4))
+        result.tokensGenerated = Int32(tokenCount)
+        result.responseTokens = Int32(tokenCount)
+        result.modelUsed = modelID
+        result.generationTimeMs = totalLatency
+        result.framework = framework
+        result.tokensPerSecond = totalLatency > 0
+            ? Double(tokenCount) / (totalLatency / 1000)
+            : 0
+        if let ttft { result.ttftMs = ttft }
+        if !finishReason.isEmpty { result.finishReason = finishReason }
+        if !terminalError.isEmpty { result.errorMessage = terminalError }
+        return result
     }
 }
 

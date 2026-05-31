@@ -1,7 +1,6 @@
 /**
  * @file rac_http_internal.cpp
- * @brief Implementation of the internal C++ HTTP facade
- *        (v2 close-out Phase H, Stage 2).
+ * @brief Implementation of the internal C++ HTTP facade.
  *
  * Thin C++-friendly wrappers around the existing C ABI. Both entry
  * points inherit platform-transport routing for free because their

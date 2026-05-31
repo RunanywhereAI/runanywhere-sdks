@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as model_enum;
@@ -106,24 +107,20 @@ class DartBridgeModelPaths {
   Future<void> setBaseDirectory([String? path]) async {
     final dir = path ?? (await getApplicationDocumentsDirectory()).path;
 
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final setBase = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
-          int Function(Pointer<Utf8>)>('rac_model_paths_set_base_dir');
+    final lib = PlatformLoader.loadCommons();
+    final setBase = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
+        int Function(Pointer<Utf8>)>('rac_model_paths_set_base_dir');
 
-      final dirPtr = dir.toNativeUtf8();
-      try {
-        final result = setBase(dirPtr);
-        if (result == RacResultCode.success) {
-          _logger.debug('C++ base directory set to: $dir');
-        } else {
-          _logger.warning('Failed to set C++ base directory: $result');
-        }
-      } finally {
-        calloc.free(dirPtr);
+    final dirPtr = dir.toNativeUtf8();
+    try {
+      final result = setBase(dirPtr);
+      if (result != RacResultCode.success) {
+        throw SDKException.invalidConfiguration(
+            'rac_model_paths_set_base_dir failed: $result');
       }
-    } catch (e) {
-      _logger.warning('rac_model_paths_set_base_dir error: $e');
+      _logger.debug('C++ base directory set to: $dir');
+    } finally {
+      calloc.free(dirPtr);
     }
   }
 
@@ -349,6 +346,37 @@ class DartBridgeModelPaths {
       }
     } catch (e) {
       return false;
+    }
+  }
+
+  // MARK: - File Role Inference
+
+  /// Infer the descriptor role for a sidecar filename. Delegates to the shared
+  /// commons classifier `rac_infer_model_file_role` so the heuristic stays
+  /// byte-identical with the C++ resolver and every other SDK.
+  /// [modalityProto] / the return value are proto `ModelCategory` /
+  /// `ModelFileRole` int values. Returns the primary-model role (1) on any
+  /// FFI failure.
+  int inferFileRole(String filename, int modalityProto) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final inferFn = lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Int32, Pointer<Int32>),
+          int Function(Pointer<Utf8>, int,
+              Pointer<Int32>)>('rac_infer_model_file_role');
+
+      final filenamePtr = filename.toNativeUtf8();
+      final rolePtr = calloc<Int32>()..value = 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
+      try {
+        inferFn(filenamePtr, modalityProto, rolePtr);
+        return rolePtr.value;
+      } finally {
+        calloc.free(filenamePtr);
+        calloc.free(rolePtr);
+      }
+    } catch (e) {
+      _logger.debug('rac_infer_model_file_role error: $e');
+      return 1; // MODEL_FILE_ROLE_PRIMARY_MODEL
     }
   }
 

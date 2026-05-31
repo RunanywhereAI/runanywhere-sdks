@@ -134,7 +134,7 @@ RAC_API const char* rac_env_description(rac_environment_t env);
  * @brief Default HTTP request timeout (milliseconds) for control-plane
  *        calls in this environment.
  *
- * CLUSTER-12 (FLUTTER-IOS-007): development mode talks to an operator-side
+ * Development mode talks to an operator-side
  * DNS alias (e.g. `dev.runanywhere.local`) that often isn't reachable on
  * the developer's machine; the default 30 s URLSession timeout then burns
  * 30+ seconds per cold launch waiting for the SYSTEM resolver to give up.

@@ -2359,7 +2359,7 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text-secondary, #94a3b8);
 }
 
-/* Inline model-load error chip (B-WEB-4-001) */
+/* Inline model-load error chip */
 .model-row-error {
   margin-top: 6px;
   padding: 6px 10px;

@@ -2,8 +2,8 @@
 //
 // Every message and enum below is the *union* of cases currently declared by
 // hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
-// drift between the per-language storage definitions (see GAP_01_IDL_AND_CODEGEN.md
-// §"Why This Gap Matters") is what motivated this schema. Every SDK consumes
+// drift between the per-language storage definitions is what motivated this
+// schema. Every SDK consumes
 // generated output; nothing is hand-written.
 //
 // Pre-IDL drift table (canonicalized by this file):

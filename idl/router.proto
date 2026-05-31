@@ -1,6 +1,6 @@
 // RunAnywhere IDL — engine-router capability-query types.
 //
-// Wave H-5 (KOT-12): moves per-SDK SDKComponent → ModelCategory →
+// Moves per-SDK SDKComponent → ModelCategory →
 // framework mapping into commons. Frontends call
 // `rac_router_frameworks_for_capability_proto` with an
 // `SDKComponent` and receive the ordered list of `InferenceFramework`

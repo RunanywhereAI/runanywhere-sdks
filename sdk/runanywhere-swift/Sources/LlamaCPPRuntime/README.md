@@ -169,39 +169,28 @@ _ = await RunAnywhere.unloadModel(unload)
 ### LlamaCPP Module
 
 ```swift
-public enum LlamaCPP: RunAnywhereModule {
-    /// Module identifier
-    public static let moduleId = "llamacpp"
-
-    /// Human-readable module name
-    public static let moduleName = "LlamaCPP"
-
-    /// Capabilities provided by this module
-    public static let capabilities: Set<SDKComponent> = [.llm]
-
-    /// Default registration priority
-    public static let defaultPriority: Int = 100
-
-    /// Inference framework used
-    public static let inferenceFramework: InferenceFramework = .llamaCpp
-
+public enum LlamaCPP {
     /// Module version
     public static let version = "2.0.0"
 
     /// Underlying llama.cpp library version
     public static let llamaCppVersion = "b7199"
 
-    /// Register the module with the service registry
+    /// Register the module with the C++ service registry.
+    /// The unified llama.cpp plugin publishes a single vtable that fills
+    /// both LLM and VLM slots, so this single call covers both modalities.
     @MainActor
     public static func register(priority: Int = 100)
 
     /// Unregister the module
     public static func unregister()
 
-    /// Check if the module can handle a given model
-    public static func canHandle(modelId: String?) -> Bool
+    /// Trigger registration via property access (auto-registration helper)
+    public static let autoRegister: Void
 }
 ```
+
+`LlamaCPP` is a thin `public enum` namespace. Routing between models and the LlamaCPP backend is done by the C++ plugin router (`rac_router_*`) using the proto-typed `RAInferenceFramework` / `RAModelCategory` tables — there is no Swift-side `canHandle(modelId:)` or `capabilities` set.
 
 ### Model Compatibility
 

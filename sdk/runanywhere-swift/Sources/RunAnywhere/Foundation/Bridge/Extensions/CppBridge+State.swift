@@ -27,7 +27,15 @@ extension CppBridge {
 
         // MARK: - Initialization
 
-        /// Initialize C++ state manager
+        /// Populate the SDK config and wire Keychain auth-storage.
+        ///
+        /// `rac_state_initialize` (environment + cached api_key/base_url/
+        /// device_id) is already driven by `CppBridge.SdkInit.phase1` in
+        /// commons, so it is intentionally NOT repeated here — re-initializing
+        /// the same state would be redundant work. This bridge owns the two
+        /// concerns phase1 does not touch: `rac_sdk_init` (version/platform
+        /// metadata used by device registration) and the Keychain secure-storage
+        /// install that backs token persistence.
         /// - Parameters:
         ///   - environment: SDK environment
         ///   - apiKey: API key
@@ -39,19 +47,6 @@ extension CppBridge {
             baseURL: URL,
             deviceId: String
         ) {
-            apiKey.withCString { key in
-                baseURL.absoluteString.withCString { url in
-                    deviceId.withCString { did in
-                        _ = rac_state_initialize(
-                            Environment.toC(environment),
-                            key,
-                            url,
-                            did
-                        )
-                    }
-                }
-            }
-
             // Initialize SDK config with version (required for device registration)
             // This populates rac_sdk_get_config() which device registration uses
             let sdkVersion = SDKConstants.version
@@ -81,7 +76,7 @@ extension CppBridge {
             // restore any previously persisted tokens.
             installAuthSecureStorage()
 
-            SDKLogger(category: "CppBridge.State").debug("C++ state initialized")
+            SDKLogger(category: "CppBridge.State").debug("SDK config + auth secure storage initialized")
         }
 
         /// Check if state is initialized

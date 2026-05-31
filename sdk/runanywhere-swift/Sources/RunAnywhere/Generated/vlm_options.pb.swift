@@ -12,9 +12,8 @@
 //
 // Every enum / message below is the *union* of cases currently declared by
 // hand across Swift, Kotlin, Dart, React Native, Web SDKs, and the C ABI.
-// The pre-IDL drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap
-// Matters") is what motivated this schema. Every SDK consumes generated
-// output; nothing is hand-written.
+// The pre-IDL drift table is what motivated this schema. Every SDK consumes
+// generated output; nothing is hand-written.
 //
 // Drift sources (file:line):
 //   Swift   sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VLM/VLMTypes.swift:23
@@ -107,7 +106,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -130,7 +129,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// reserved here so we can disambiguate decoded vs encoded sources without a
 /// schema migration once a backend exposes container detection).
 /// ---------------------------------------------------------------------------
-public enum RAVLMImageFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVLMImageFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
@@ -211,7 +210,7 @@ public enum RAVLMImageFormat: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// VLM model family for chat-template selection.
 /// Mirrors rac_vlm_model_family_t.
 /// ---------------------------------------------------------------------------
-public enum RAVLMModelFamily: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVLMModelFamily: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case auto // = 1
@@ -261,7 +260,7 @@ public enum RAVLMModelFamily: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAVLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -315,7 +314,7 @@ public enum RAVLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Custom VLM chat template.
 /// Mirrors rac_vlm_chat_template_t.
 /// ---------------------------------------------------------------------------
-public struct RAVLMChatTemplate: Sendable {
+public nonisolated struct RAVLMChatTemplate: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -358,7 +357,7 @@ public struct RAVLMChatTemplate: Sendable {
 /// payloads (JPEG / PNG / WEBP) and explicitly tags raw / file-path / base64
 /// sources.
 /// ---------------------------------------------------------------------------
-public struct RAVLMImage: Sendable {
+public nonisolated struct RAVLMImage: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -437,7 +436,7 @@ public struct RAVLMImage: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Source: Equatable, Sendable {
+  public nonisolated enum OneOf_Source: Equatable, Sendable {
     /// VLM_IMAGE_FORMAT_FILE_PATH
     case filePath(String)
     /// VLM_IMAGE_FORMAT_{JPEG,PNG,WEBP} container bytes
@@ -470,7 +469,7 @@ public struct RAVLMImage: Sendable {
 /// Per-request sampling parameters live on VLMGenerationOptions; runtime
 /// streaming toggles and chat-template selection stay backend-private.
 /// ---------------------------------------------------------------------------
-public struct RAVLMConfiguration: Sendable {
+public nonisolated struct RAVLMConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -537,7 +536,7 @@ public struct RAVLMConfiguration: Sendable {
 /// (LLM / chat) even though no current VLM SDK exposes it; the C ABI's
 /// llama.cpp backend already supports top_k internally.
 /// ---------------------------------------------------------------------------
-public struct RAVLMGenerationOptions: @unchecked Sendable {
+public nonisolated struct RAVLMGenerationOptions: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -653,7 +652,7 @@ public struct RAVLMGenerationOptions: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAVLMGenerationRequest: Sendable {
+public nonisolated struct RAVLMGenerationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -717,7 +716,7 @@ public struct RAVLMGenerationRequest: Sendable {
 /// per-token deltas and terminal results; this aggregate result is carried on
 /// the unary Generate RPC and on terminal stream events.
 /// ---------------------------------------------------------------------------
-public struct RAVLMResult: Sendable {
+public nonisolated struct RAVLMResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -775,7 +774,7 @@ public struct RAVLMResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAVLMStreamEvent: @unchecked Sendable {
+public nonisolated struct RAVLMStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -850,7 +849,7 @@ public struct RAVLMStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAVLMServiceState: Sendable {
+public nonisolated struct RAVLMServiceState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -911,7 +910,7 @@ public struct RAVLMServiceState: Sendable {
 /// response carries the resulting native handle as an opaque uint64; callers
 /// store the handle and use it for subsequent process/cancel/destroy calls.
 /// ---------------------------------------------------------------------------
-public struct RAVLMLoadResolvedArtifactsRequest: Sendable {
+public nonisolated struct RAVLMLoadResolvedArtifactsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -936,7 +935,7 @@ public struct RAVLMLoadResolvedArtifactsRequest: Sendable {
   fileprivate var _mmprojPath: String? = nil
 }
 
-public struct RAVLMLoadResolvedArtifactsResponse: Sendable {
+public nonisolated struct RAVLMLoadResolvedArtifactsResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -965,21 +964,21 @@ public struct RAVLMLoadResolvedArtifactsResponse: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAVLMImageFormat: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMImageFormat: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_IMAGE_FORMAT_UNSPECIFIED\0\u{1}VLM_IMAGE_FORMAT_JPEG\0\u{1}VLM_IMAGE_FORMAT_PNG\0\u{1}VLM_IMAGE_FORMAT_WEBP\0\u{1}VLM_IMAGE_FORMAT_RAW_RGB\0\u{1}VLM_IMAGE_FORMAT_RAW_RGBA\0\u{1}VLM_IMAGE_FORMAT_BASE64\0\u{1}VLM_IMAGE_FORMAT_FILE_PATH\0")
 }
 
-extension RAVLMModelFamily: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMModelFamily: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_MODEL_FAMILY_UNSPECIFIED\0\u{1}VLM_MODEL_FAMILY_AUTO\0\u{1}VLM_MODEL_FAMILY_QWEN2_VL\0\u{1}VLM_MODEL_FAMILY_SMOLVLM\0\u{1}VLM_MODEL_FAMILY_LLAVA\0\u{2}_\u{1}VLM_MODEL_FAMILY_CUSTOM\0")
 }
 
-extension RAVLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}VLM_STREAM_EVENT_KIND_STARTED\0\u{1}VLM_STREAM_EVENT_KIND_IMAGE_ENCODED\0\u{1}VLM_STREAM_EVENT_KIND_TOKEN\0\u{1}VLM_STREAM_EVENT_KIND_COMPLETED\0\u{1}VLM_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RAVLMChatTemplate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMChatTemplate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMChatTemplate"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}template_text\0\u{3}image_marker\0\u{3}default_system_prompt\0")
 
@@ -1023,7 +1022,7 @@ extension RAVLMChatTemplate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMImage"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}file_path\0\u{1}encoded\0\u{3}raw_rgb\0\u{1}base64\0\u{1}width\0\u{1}height\0\u{1}format\0\u{3}media_type\0\u{1}name\0\u{3}size_bytes\0\u{1}metadata\0")
 
@@ -1139,7 +1138,7 @@ extension RAVLMImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}max_image_size_px\0\u{3}max_tokens\0\u{3}context_length\0\u{1}temperature\0\u{3}system_prompt\0\u{3}streaming_enabled\0\u{3}preferred_framework\0")
 
@@ -1208,7 +1207,7 @@ extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMGenerationOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}system_prompt\0\u{3}max_image_size\0\u{3}n_threads\0\u{3}use_gpu\0\u{3}model_family\0\u{3}custom_chat_template\0\u{3}image_marker_override\0\u{1}seed\0\u{3}repetition_penalty\0\u{3}min_p\0\u{3}emit_image_embeddings\0")
 
@@ -1397,7 +1396,7 @@ extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMGenerationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}images\0\u{1}options\0\u{3}model_id\0\u{1}metadata\0")
 
@@ -1451,7 +1450,7 @@ extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}processing_time_ms\0\u{3}tokens_per_second\0\u{3}image_tokens\0\u{3}time_to_first_token_ms\0\u{3}image_encode_time_ms\0\u{3}hardware_used\0\u{3}error_message\0\u{3}error_code\0\u{3}finish_reason\0\u{3}images_processed\0")
 
@@ -1550,7 +1549,7 @@ extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}token\0\u{3}token_index\0\u{3}is_final\0\u{3}tokens_per_second\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1690,7 +1689,7 @@ extension RAVLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAVLMServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{3}context_length\0\u{3}supports_streaming\0\u{3}supports_multiple_images\0\u{3}vision_encoder_type\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1759,7 +1758,7 @@ extension RAVLMServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RAVLMLoadResolvedArtifactsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMLoadResolvedArtifactsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMLoadResolvedArtifactsRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}primary_model_path\0\u{3}mmproj_path\0")
 
@@ -1803,7 +1802,7 @@ extension RAVLMLoadResolvedArtifactsRequest: SwiftProtobuf.Message, SwiftProtobu
   }
 }
 
-extension RAVLMLoadResolvedArtifactsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVLMLoadResolvedArtifactsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMLoadResolvedArtifactsResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}handle\0\u{3}result_code\0\u{3}error_message\0")
 

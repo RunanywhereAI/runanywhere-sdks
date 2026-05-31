@@ -13,7 +13,7 @@ typedef RacFreeNative = Void Function(Pointer<Void> ptr);
 typedef RacFreeDart = void Function(Pointer<Void> ptr);
 
 /// void* rac_alloc(size_t size)
-typedef RacAllocNative = Pointer<Void> Function(IntPtr size);
+typedef RacAllocNative = Pointer<Void> Function(Size size);
 typedef RacAllocDart = Pointer<Void> Function(int size);
 
 /// char* rac_strdup(const char* str)
@@ -54,7 +54,7 @@ typedef RacFileExistsCallbackNative = Int32 Function(
 typedef RacFileReadCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Pointer<Void>> outData,
-  Pointer<IntPtr> outSize,
+  Pointer<Size> outSize,
   Pointer<Void> userData,
 );
 
@@ -62,7 +62,7 @@ typedef RacFileReadCallbackNative = Int32 Function(
 typedef RacFileWriteCallbackNative = Int32 Function(
   Pointer<Utf8> path,
   Pointer<Void> data,
-  IntPtr size,
+  Size size,
   Pointer<Void> userData,
 );
 
@@ -159,7 +159,7 @@ typedef RacHttpDownloadCancelCallbackNative = Int32 Function(
 typedef RacFileListDirectoryCallbackNative = Int32 Function(
   Pointer<Utf8> dirPath,
   Pointer<Void> outEntries,
-  Pointer<IntPtr> inOutCount,
+  Pointer<Size> inOutCount,
   Pointer<Void> userData,
 );
 
@@ -172,13 +172,37 @@ typedef RacIsNonEmptyDirectoryCallbackNative = Int32 Function(
 /// Get vendor ID callback: rac_result_t (*get_vendor_id)(char* out_buffer, size_t buffer_size, void* user_data)
 typedef RacGetVendorIdCallbackNative = Int32 Function(
   Pointer<Utf8> outBuffer,
-  IntPtr bufferSize,
+  Size bufferSize,
   Pointer<Void> userData,
 );
 
 // =============================================================================
 // Structs (using FFI Struct for native memory layout)
 // =============================================================================
+
+/// Maximum byte length (including NUL) of a `rac_directory_entry_t::name`
+/// field. Mirrors `RAC_DIRECTORY_ENTRY_NAME_MAX` in
+/// `sdk/runanywhere-commons/include/rac/core/rac_platform_adapter.h`. Used to
+/// size the inline name buffer in `RacDirectoryEntryStruct`.
+const int RAC_DIRECTORY_ENTRY_NAME_MAX = 512;
+
+/// Directory entry struct matching `rac_directory_entry_t`. Plain-old-data
+/// layout written by `RacFileListDirectoryCallbackNative` implementations:
+///   - 512 bytes inline `name` (NUL-terminated UTF-8)
+///   - 4 bytes `is_dir` (Int32, RAC_TRUE/RAC_FALSE)
+///   - 8 bytes `size_bytes` (Int64; 0 for directories or unknown)
+/// Total = 520 bytes per entry (Int64 alignment ⇒ no trailing padding on the
+/// platforms Flutter targets — iOS/Android/macOS arm64+x86_64).
+base class RacDirectoryEntryStruct extends Struct {
+  @Array(RAC_DIRECTORY_ENTRY_NAME_MAX)
+  external Array<Uint8> name;
+
+  @Int32()
+  external int isDir;
+
+  @Int64()
+  external int sizeBytes;
+}
 
 /// Platform adapter struct matching rac_platform_adapter_t
 /// Note: This is a complex struct - for simplicity we use `Pointer<Void>` in FFI calls

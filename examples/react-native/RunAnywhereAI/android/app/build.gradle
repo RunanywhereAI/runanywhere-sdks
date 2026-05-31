@@ -12,7 +12,7 @@ react {
 }
 
 // =============================================================================
-// Auto-sync SDK native libraries into node_modules before each build (B-RN-Setup-001)
+// Auto-sync SDK native libraries into node_modules before each build
 // =============================================================================
 // node_modules/@runanywhere/<pkg> is a real copy (not symlink), so .so files from
 // the SDK source tree never automatically reach the Gradle modules that read from
@@ -73,6 +73,25 @@ task syncSdkNativeLibs {
 // Hook into the standard pre-build task so every assemble/install runs the sync.
 tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn syncSdkNativeLibs
+}
+
+// react-native-vision-camera 4.7.3 + Gradle 9.0
+// has a task-dependency race where :app:configureCMakeDebug[<abi>] tries to read
+// the vision-camera prefab directory before :react-native-vision-camera:prefabDebugPackage
+// has produced it. AGP only auto-wires prefabDebugConfigurePackage (which sets up the
+// publication metadata) but not prefabDebugPackage (which writes the actual prefab
+// dir under build/intermediates/prefab_package/debug/prefab/). Forcing the package
+// task as a hard dependency of every configureCMake variant resolves CXX1429 with
+// "directory ... is not readable".
+afterEvaluate {
+    def visionCameraProject = rootProject.findProject(":react-native-vision-camera")
+    if (visionCameraProject != null) {
+        tasks.matching { it.name.startsWith("configureCMakeDebug") || it.name.startsWith("configureCMakeRelWithDebInfo") || it.name.startsWith("configureCMakeRelease") }.configureEach { configTask ->
+            visionCameraProject.tasks.matching { it.name.startsWith("prefab") && it.name.endsWith("Package") }.configureEach { prefabTask ->
+                configTask.dependsOn prefabTask
+            }
+        }
+    }
 }
 
 /**

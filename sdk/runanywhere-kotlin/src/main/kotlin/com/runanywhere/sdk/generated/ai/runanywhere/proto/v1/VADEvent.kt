@@ -33,7 +33,7 @@ import okio.ByteString
 /**
  * Voice Activity Detection output. Frontends usually do not need this —
  * exposed for debugging and custom UIs (waveform highlighting, etc.).
- * IDL-18: `type` uses the canonical VADStreamEventKind enum from
+ * `type` uses the canonical VADStreamEventKind enum from
  * vad_options.proto (the hand-rolled VADEventType was deleted).
  */
 public class VADEvent(

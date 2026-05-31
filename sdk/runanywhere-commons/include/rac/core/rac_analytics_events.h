@@ -22,9 +22,9 @@
  *      `rac_sdk_event_publish_proto`. SDK subscribers see only the proto
  *      stream — they do not see the legacy struct callbacks.
  *
- * Migration trigger: when SWF-04, KOT-11, FLT-04, RN-04, WEB-04 land, the
- * remaining SDK-side telemetry shims migrate off this header. Once every SDK
- * is on the proto stream, this header may be moved to `src/internal/`.
+ * Migration trigger: once the remaining SDK-side telemetry shims migrate off
+ * this header and every SDK is on the proto stream, this header may be moved
+ * to `src/internal/`.
  */
 
 #ifndef RAC_ANALYTICS_EVENTS_H

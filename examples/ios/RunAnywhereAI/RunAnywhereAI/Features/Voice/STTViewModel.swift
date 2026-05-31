@@ -14,22 +14,22 @@ import os
 /// ViewModel for Speech-to-Text view
 /// Manages recording, transcription, model selection, and microphone permissions
 @MainActor
-class STTViewModel: ObservableObject {
-    private let logger = Logger(subsystem: "com.runanywhere", category: "STT")
+class STTViewModel: VoiceComponentViewModelBase {
     private let audioCapture = AudioCaptureManager()
-    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Component Identity
+
+    override var component: RASDKComponent { .stt }
+    override var eventCategory: RAEventCategory { .stt }
+    override var modelCategory: RAModelCategory { .speechRecognition }
 
     // MARK: - Published Properties (UI State)
 
-    @Published var selectedFramework: InferenceFramework?
-    @Published var selectedModelName: String?
-    @Published var selectedModelId: String?
     @Published var transcription: String = ""
     @Published var isRecording = false
     @Published var isProcessing = false
     @Published var isTranscribing = false
     @Published var audioLevel: Float = 0.0
-    @Published var errorMessage: String?
     @Published var selectedMode: STTMode = .batch {
         didSet {
             // Stop any active recording/transcription when mode changes
@@ -63,16 +63,12 @@ class STTViewModel: ObservableObject {
 
     // MARK: - Initialization State (for idempotency)
 
-    private var isInitialized = false
-    private var didAutoPrepareSTT = false
     private var hasSubscribedToAudioLevel = false
-    private var hasSubscribedToSDKEvents = false
-
-    private static let defaultSTTModelID = "sherpa-onnx-whisper-tiny.en"
 
     // MARK: - Initialization
 
     init() {
+        super.init(loggerCategory: "STT")
         logger.debug("STTViewModel initialized")
     }
 
@@ -81,11 +77,7 @@ class STTViewModel: ObservableObject {
     /// Initialize the ViewModel - request permissions and setup subscriptions
     /// This method is idempotent - calling it multiple times is safe
     func initialize() async {
-        guard !isInitialized else {
-            logger.debug("STT view model already initialized, skipping")
-            return
-        }
-        isInitialized = true
+        guard beginInitialization() else { return }
 
         logger.info("Initializing STT view model")
 
@@ -105,58 +97,6 @@ class STTViewModel: ObservableObject {
 
         // Check initial STT model state
         await checkInitialModelState()
-        await prepareDefaultSTTModelIfNeeded()
-    }
-
-    /// Download and load the default Sherpa STT model when the Transcribe tab opens.
-    /// Runs before the model picker sheet so simulator harness reaches download/load
-    /// os_log markers without brittle Get taps (SWIFT-IOS-001).
-    private func prepareDefaultSTTModelIfNeeded() async {
-        guard !didAutoPrepareSTT else { return }
-        didAutoPrepareSTT = true
-
-        logger.info("STT auto-prepare started (SWIFT-IOS-001)")
-
-        await ModelListViewModel.shared.loadModels()
-        let sttModels = ModelListViewModel.shared.availableModels.filter {
-            $0.category == .speechRecognition && !$0.isBuiltIn
-        }
-
-        let preferred = sttModels.first { $0.id == Self.defaultSTTModelID }
-        let readyOnDisk = preferred.flatMap { $0.localPathURL != nil ? $0 : nil }
-            ?? sttModels.first { $0.localPathURL != nil }
-        let downloadable = preferred.flatMap { $0.localPathURL == nil ? $0 : nil }
-            ?? sttModels.first { $0.localPathURL == nil }
-
-        if let readyOnDisk {
-            await loadModelFromSelection(readyOnDisk)
-            return
-        }
-
-        guard let downloadable else {
-            logger.error(
-                "STT auto-prepare skipped: no downloadable STT model (registry count=\(sttModels.count, privacy: .public))"
-            )
-            return
-        }
-
-        isProcessing = true
-        errorMessage = nil
-        defer { isProcessing = false }
-
-        do {
-            try await RunAnywhere.downloadModel(downloadable) { _ in }
-            await ModelListViewModel.shared.loadModels()
-            let refreshed = ModelListViewModel.shared.availableModels.first { $0.id == downloadable.id }
-                ?? downloadable
-            await loadModelFromSelection(refreshed)
-        } catch {
-            let message = (error as? SDKException)?.message ?? error.localizedDescription
-            logger.error("STT auto-prepare download failed: \(message, privacy: .public)")
-            errorMessage = message.isEmpty
-                ? "Failed to download \(downloadable.name)."
-                : "Failed to download \(downloadable.name): \(message)"
-        }
     }
 
     /// Load model from ModelSelectionSheet selection
@@ -223,60 +163,31 @@ class STTViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func subscribeToSDKEvents() {
-        guard !hasSubscribedToSDKEvents else {
-            logger.debug("Already subscribed to SDK events, skipping")
-            return
+    /// STT resolves the display name from the model catalog when available,
+    /// falling back to the id-derived name.
+    override func applyLoadedModel(_ model: RAModelInfo) {
+        selectedModelId = model.id
+        if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == model.id }) {
+            selectedModelName = matchingModel.name
+            selectedFramework = matchingModel.framework
+        } else {
+            selectedModelName = model.id.modelNameFromID()
+            selectedFramework = model.framework
         }
-        hasSubscribedToSDKEvents = true
-
-        RunAnywhere.events.events
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                // Defer state modifications to avoid "Publishing changes within view updates" warning
-                Task { @MainActor in
-                    self?.handleSDKEvent(event)
-                }
-            }
-            .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: RASDKEvent) {
-        guard event.category == .stt || event.component == .stt else { return }
-
+    override func handleSDKEvent(_ event: RASDKEvent) {
         let modelId = event.model.modelID
 
         switch event.model.kind {
         case .loadCompleted:
-            selectedModelId = modelId
-            // Look up the model name from available models
-            if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                selectedModelName = matchingModel.name
-                selectedFramework = matchingModel.framework
-            } else {
-                selectedModelName = modelId.modelNameFromID() // Look up proper name
-            }
+            applyCurrentModelSnapshot(reason: "loaded")
             logger.info("STT model loaded: \(modelId)")
         case .unloadCompleted:
-            selectedModelId = nil
-            selectedModelName = nil
-            selectedFramework = nil
+            clearLoadedModel()
             logger.info("STT model unloaded")
         default:
             break
-        }
-    }
-
-    private func checkInitialModelState() async {
-        var req = RACurrentModelRequest()
-        req.category = .speechRecognition
-        let snapshot = RunAnywhere.currentModel(req)
-        if snapshot.found {
-            let model = snapshot.model
-            selectedModelId = model.id
-            selectedModelName = model.name.modelNameFromID()
-            selectedFramework = model.framework
-            logger.info("STT model already loaded: \(model.name)")
         }
     }
 
@@ -454,13 +365,8 @@ class STTViewModel: ObservableObject {
         silenceCheckTask?.cancel()
         silenceCheckTask = nil
 
-        cancellables.removeAll()
-
-        // Reset initialization flags to allow re-initialization if needed
-        isInitialized = false
-        didAutoPrepareSTT = false
         hasSubscribedToAudioLevel = false
-        hasSubscribedToSDKEvents = false
+        cleanupBase()
     }
 }
 

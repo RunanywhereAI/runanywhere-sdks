@@ -3,27 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public proto-backed SDK event stream API.
- *
- * Mirrors Swift sdk/runanywhere-swift/.../Events/RunAnywhere+SDKEvents.swift.
+ * Mirrors Swift's RunAnywhere+SDKEvents.swift one-to-one.
  */
 
-package com.runanywhere.sdk.public.extensions
+package com.runanywhere.sdk.public.extensions.Events
 
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEventStream
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.events.SDKEvent
 
-fun RunAnywhere.subscribeSDKEvents(handler: (RASDKEvent) -> Boolean): Long =
+/** Imperative SDK-event surface for cross-SDK parity with Swift. */
+fun RunAnywhere.subscribeSDKEvents(handler: (SDKEvent) -> Unit): Long =
     CppBridgeSDKEventStream.subscribe(handler)
 
 fun RunAnywhere.unsubscribeSDKEvents(subscriptionId: Long) {
     CppBridgeSDKEventStream.unsubscribe(subscriptionId)
 }
 
-fun RunAnywhere.publishSDKEvent(event: RASDKEvent): Int =
-    CppBridgeSDKEventStream.publish(event)
+fun RunAnywhere.publishSDKEvent(event: SDKEvent): Boolean =
+    CppBridgeSDKEventStream.publish(event) == 0
 
-fun RunAnywhere.pollSDKEvent(): RASDKEvent? =
+fun RunAnywhere.pollSDKEvent(): SDKEvent? =
     CppBridgeSDKEventStream.poll()
 
 fun RunAnywhere.publishSDKFailure(
@@ -31,12 +31,6 @@ fun RunAnywhere.publishSDKFailure(
     message: String,
     component: String,
     operation: String,
-    recoverable: Boolean,
-): Int =
-    CppBridgeSDKEventStream.publishFailure(
-        errorCode = errorCode,
-        message = message,
-        component = component,
-        operation = operation,
-        recoverable = recoverable,
-    )
+    recoverable: Boolean = false,
+): Boolean =
+    CppBridgeSDKEventStream.publishFailure(errorCode, message, component, operation, recoverable) == 0

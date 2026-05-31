@@ -10,7 +10,7 @@
 # runanywhere-commons/                 Unified C++ library with backends
 #   scripts/build-ios.sh               Build commons C++ libraries for iOS
 #
-# scripts/build-core-xcframework.sh    Build / package native xcframeworks
+# sdk/runanywhere-swift/scripts/build-core-xcframework.sh    Build / package native xcframeworks
 #   (RACommons, RABackendONNX, RABackendLLAMACPP, RABackendSherpa) into
 #   sdk/runanywhere-swift/Binaries/. The Swift SDK itself is compiled by
 #   Xcode/SwiftPM directly and no longer has a per-SDK orchestrator script.
@@ -28,7 +28,7 @@
 #   --build-commons   Build runanywhere-commons C++ libraries (iOS)
 #   --build-sdk       Build native xcframeworks (RACommons + RABackend*) into
 #                     sdk/runanywhere-swift/Binaries/ via the consolidated
-#                     scripts/build-core-xcframework.sh
+#                     sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 #   --build-all       Build everything (commons C++ + native xcframeworks)
 #   --skip-app        Only build SDK components, skip Xcode app build
 #   --local           Use local builds
@@ -55,10 +55,10 @@ APP_DIR="$SCRIPT_DIR/.."
 
 # Build scripts
 # Per-SDK Swift orchestrator was removed; the canonical native build
-# entrypoint is the repo-root scripts/build-core-xcframework.sh which builds
+# entrypoint is the repo-root sdk/runanywhere-swift/scripts/build-core-xcframework.sh which builds
 # / packages all xcframeworks into sdk/runanywhere-swift/Binaries/.
 COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
-SWIFT_BUILD_SCRIPT="$WORKSPACE_ROOT/scripts/build-core-xcframework.sh"
+SWIFT_BUILD_SCRIPT="$WORKSPACE_ROOT/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 
 # Colors
 RED='\033[0;31m'

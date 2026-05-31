@@ -33,7 +33,7 @@ import okio.ByteString
 
 /**
  * Model-level thinking tag metadata uses the canonical ThinkingTagPattern from
- * thinking_tag_pattern.proto (Wave H-2 / IDL-02). Previously this file declared
+ * thinking_tag_pattern.proto. Previously this file declared
  * a separate ModelThinkingTagPattern because llm_options.proto owned a distinct
  * ThinkingTagPattern with different field names; that duplicate has been
  * collapsed into the single shared message.

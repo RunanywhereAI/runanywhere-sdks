@@ -2,7 +2,7 @@
  * @file rac_llm_thinking.cpp
  * @brief Implementation of the rac_llm_thinking C ABI.
  *
- * v2 close-out Phase 5. Behavioral equivalence target: Swift's
+ * Behavioral equivalence target: Swift's
  * ThinkingContentParser.{extract,splitTokens,strip} (RunAnywhere+TextGeneration.swift).
  * Same character-ratio heuristic for token splits, same trim semantics,
  * same handling of trailing unclosed <think> on streaming output.
@@ -11,15 +11,23 @@
 #include "rac/features/llm/rac_llm_thinking.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace {
 
-constexpr std::string_view kOpenTag = "<think>";
-constexpr std::string_view kCloseTag = "</think>";
+/* Both `<think>` and `<thinking>` are emitted by upstream models (Qwen3,
+ * Hermes variants). Same pair ordering as the streaming path's kOpenTags /
+ * kCloseTags in rac_llm_proto_service.cpp so blocking and streaming consumers
+ * agree on what a thinking block is. */
+constexpr std::array<std::pair<std::string_view, std::string_view>, 2> kThinkTagPairs = {{
+    {std::string_view{"<think>"}, std::string_view{"</think>"}},
+    {std::string_view{"<thinking>"}, std::string_view{"</thinking>"}},
+}};
 
 /* Thread-local storage for the C-string return values. The header contract
  * is "valid until next call on this thread"; one slot per output channel. */
@@ -41,6 +49,25 @@ std::string trim(std::string_view sv) {
     return std::string(sv.substr(b, e - b));
 }
 
+/** Earliest match of any open tag from kThinkTagPairs in @p sv starting at
+ * @p from. Returns npos when no tag matches; otherwise writes the matching
+ * pair index to @p out_pair_index. */
+size_t find_earliest_open_tag(std::string_view sv, size_t from, size_t* out_pair_index) {
+    size_t best = std::string_view::npos;
+    size_t best_idx = 0;
+    for (size_t i = 0; i < kThinkTagPairs.size(); ++i) {
+        const size_t pos = sv.find(kThinkTagPairs[i].first, from);
+        if (pos != std::string_view::npos && pos < best) {
+            best = pos;
+            best_idx = i;
+        }
+    }
+    if (best != std::string_view::npos && out_pair_index != nullptr) {
+        *out_pair_index = best_idx;
+    }
+    return best;
+}
+
 }  // namespace
 
 extern "C" {
@@ -54,12 +81,18 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
     }
 
     std::string_view sv(text);
-    auto open = sv.find(kOpenTag);
-    auto close = sv.find(kCloseTag);
+    size_t pair_idx = 0;
+    const size_t open = find_earliest_open_tag(sv, 0, &pair_idx);
+    const std::string_view open_tag =
+        (open != std::string_view::npos) ? kThinkTagPairs[pair_idx].first : std::string_view{};
+    const std::string_view close_tag =
+        (open != std::string_view::npos) ? kThinkTagPairs[pair_idx].second : std::string_view{};
+    const size_t close = (open != std::string_view::npos)
+                             ? sv.find(close_tag, open + open_tag.size())
+                             : std::string_view::npos;
 
-    if (open == std::string_view::npos || close == std::string_view::npos ||
-        open + kOpenTag.size() > close) {
-        // No (well-formed) <think> block.
+    if (open == std::string_view::npos || close == std::string_view::npos) {
+        // No (well-formed) thinking block.
         tl_response.assign(text);
         tl_thinking.clear();
         *out_response = tl_response.c_str();
@@ -70,9 +103,9 @@ rac_result_t rac_llm_extract_thinking(const char* text, const char** out_respons
     }
 
     std::string thinking =
-        trim(sv.substr(open + kOpenTag.size(), close - (open + kOpenTag.size())));
+        trim(sv.substr(open + open_tag.size(), close - (open + open_tag.size())));
     std::string before = trim(sv.substr(0, open));
-    std::string after = trim(sv.substr(close + kCloseTag.size()));
+    std::string after = trim(sv.substr(close + close_tag.size()));
 
     std::string response;
     if (!before.empty())
@@ -107,22 +140,38 @@ rac_result_t rac_llm_strip_thinking(const char* text, const char** out_stripped,
 
     std::string buf(text);
 
-    /* Remove all complete <think>...</think> blocks. */
+    /* Remove every complete thinking block. Either tag form is honored. */
     while (true) {
-        auto open = buf.find(kOpenTag);
+        size_t pair_idx = 0;
+        const size_t open = find_earliest_open_tag(buf, 0, &pair_idx);
         if (open == std::string::npos)
             break;
-        auto close = buf.find(kCloseTag, open + kOpenTag.size());
+        const std::string_view open_tag = kThinkTagPairs[pair_idx].first;
+        const std::string_view close_tag = kThinkTagPairs[pair_idx].second;
+        const size_t close = buf.find(close_tag, open + open_tag.size());
         if (close == std::string::npos)
             break;
-        buf.erase(open, (close + kCloseTag.size()) - open);
+        buf.erase(open, (close + close_tag.size()) - open);
     }
 
-    /* Drop trailing unclosed <think>... (still streaming). */
-    auto trailing_open = buf.rfind(kOpenTag);
+    /* Drop a trailing unclosed opening tag (still streaming). Pick the
+     * latest opening across both tag forms; only strip if no matching close
+     * appears after it. */
+    size_t trailing_open = std::string::npos;
+    size_t trailing_idx = 0;
+    for (size_t i = 0; i < kThinkTagPairs.size(); ++i) {
+        const size_t pos = buf.rfind(kThinkTagPairs[i].first);
+        if (pos == std::string::npos)
+            continue;
+        if (trailing_open == std::string::npos || pos > trailing_open) {
+            trailing_open = pos;
+            trailing_idx = i;
+        }
+    }
     if (trailing_open != std::string::npos) {
-        auto after_open = trailing_open + kOpenTag.size();
-        if (buf.find(kCloseTag, after_open) == std::string::npos) {
+        const std::string_view open_tag = kThinkTagPairs[trailing_idx].first;
+        const std::string_view close_tag = kThinkTagPairs[trailing_idx].second;
+        if (buf.find(close_tag, trailing_open + open_tag.size()) == std::string::npos) {
             buf.erase(trailing_open);
         }
     }

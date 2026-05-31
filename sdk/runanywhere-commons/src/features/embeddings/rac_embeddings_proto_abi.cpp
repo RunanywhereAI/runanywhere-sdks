@@ -13,8 +13,8 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
-#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -149,15 +149,22 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
                                           "failed to parse EmbeddingsRequest");
     }
 
+    if (request.texts_size() == 0) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "EmbeddingsRequest.texts is required");
+    }
+    // Proto contract: EmbeddingsResult.vectors carries one entry per input
+    // text in input order, so callers can index by position. Silently
+    // filtering empties would shift downstream indices; reject instead.
     std::vector<std::string> texts;
     texts.reserve(static_cast<size_t>(request.texts_size()));
     for (const auto& text : request.texts()) {
-        if (!text.empty())
-            texts.push_back(text);
-    }
-    if (texts.empty()) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "EmbeddingsRequest.texts is required");
+        if (text.empty()) {
+            return rac_proto_buffer_set_error(
+                out_result, RAC_ERROR_INVALID_ARGUMENT,
+                "EmbeddingsRequest.texts contains an empty entry");
+        }
+        texts.push_back(text);
     }
 
     rac_embeddings_options_t options = RAC_EMBEDDINGS_OPTIONS_DEFAULT;

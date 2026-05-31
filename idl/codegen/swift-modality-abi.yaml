@@ -429,16 +429,6 @@ modalities:
     handle: ~
     extension: ""   # top-level free function, not an extension method
     methods:
-      - swift_name: resolveRAGConfigurationDefaults
-        c_symbol: rac_rag_request_with_defaults_proto
-        request: RARAGConfiguration
-        response: RARAGConfiguration
-        kind: invoke
-        # Returns Optional<RARAGConfiguration>: returns nil instead of throwing
-        # when the symbol isn't exported (RAG backend disabled). Codegen needs
-        # to support an "optional_when_unsupported" tweak, or this entry stays
-        # hand-written.
-
       - swift_name: destroyRAGProtoSessionIfAvailable
         c_symbol: rac_rag_session_destroy_proto
         request: ~

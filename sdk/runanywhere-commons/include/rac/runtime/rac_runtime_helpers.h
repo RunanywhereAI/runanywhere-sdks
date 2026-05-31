@@ -2,16 +2,15 @@
  * @file rac_runtime_helpers.h
  * @brief Shared helpers for L1 runtime adapters.
  *
- * Wave H-3 cleanup (runtime-tensor-dup): consolidates the per-runtime
- * `release_tensor` and `copy_buffer` range-check boilerplate that used to be
+ * Consolidates the per-runtime `release_tensor` and `copy_buffer`
+ * range-check boilerplate that used to be
  * duplicated across every runtime adapter. Each runtime owns its private
  * buffer struct (CpuRuntimeBuffer, rac_runtime_buffer, …), so the helpers take
  * plain byte-level inputs (raw pointers + sizes) and, for tensor release, a
  * runtime-specific `free_buffer` function pointer for the buffer slot.
  *
  * Scope:
- *   - CPU + ONNXRT use these helpers today.
- *   - CoreML / Metal are explicitly skipped (DEC-01, Apple-only, deferred).
+ *   - CPU, ONNXRT, CoreML, and Metal all delegate `release_tensor` here.
  */
 
 #ifndef RAC_RUNTIME_HELPERS_H

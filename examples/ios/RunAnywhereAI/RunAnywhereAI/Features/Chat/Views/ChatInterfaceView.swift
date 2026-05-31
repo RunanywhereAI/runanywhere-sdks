@@ -2,10 +2,8 @@
 //  ChatInterfaceView.swift
 //  RunAnywhereAI
 //
-//  Chat interface view - UI only, all logic in LLMViewModel
+//  Chat interface shell + toolbar — all logic lives in LLMViewModel.
 //
-
-// swiftlint:disable file_length
 
 import SwiftUI
 import RunAnywhere
@@ -31,6 +29,7 @@ struct ChatInterfaceView: View {
     @State private var showingLoRAFilePicker = false
     @State private var showingLoRAScaleSheet = false
     @State private var showingLoRAManagement = false
+    @State private var openFilePickerAfterManagementDismiss = false
     @State private var pendingLoRAURL: URL?
     @State private var loraScale: Float = 1.0
     @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
@@ -68,20 +67,12 @@ struct ChatInterfaceView: View {
                 conversation: viewModel.currentConversation
             )
         }
-        .onAppear {
-            setupInitialState()
+        .task {
+            await viewModel.initialize()
         }
-        .onReceive(
-            NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))
-        ) { _ in
-            Task {
-                await viewModel.checkModelStatus()
-                // Show toast when model is loaded
-                if viewModel.isModelLoaded {
-                    await MainActor.run {
-                        showModelLoadedToast = true
-                    }
-                }
+        .onChange(of: viewModel.isModelLoaded) { wasLoaded, isLoaded in
+            if isLoaded && !wasLoaded {
+                showModelLoadedToast = true
             }
         }
         .alert("Debug Info", isPresented: $showDebugAlert) {
@@ -120,21 +111,32 @@ struct ChatInterfaceView: View {
             }
             .presentationDetents([.height(280)])
         }
-        .sheet(isPresented: $showingLoRAManagement) {
-            LoRAManagementSheetView(
-                viewModel: viewModel,
-                onOpenFilePicker: {
-                    showingLoRAManagement = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        showingLoRAFilePicker = true
-                    }
-                },
-                onDismiss: {
-                    showingLoRAManagement = false
-                }
-            )
-            .presentationDetents([.large])
+        .sheet(isPresented: $showingLoRAManagement, onDismiss: handleLoRAManagementDismiss) {
+            loraManagementSheet
         }
+    }
+
+    // Chain the file picker off the management sheet's dismissal instead of
+    // racing it behind a fixed delay.
+    private func handleLoRAManagementDismiss() {
+        if openFilePickerAfterManagementDismiss {
+            openFilePickerAfterManagementDismiss = false
+            showingLoRAFilePicker = true
+        }
+    }
+
+    private var loraManagementSheet: some View {
+        LoRAManagementSheetView(
+            viewModel: viewModel,
+            onOpenFilePicker: {
+                openFilePickerAfterManagementDismiss = true
+                showingLoRAManagement = false
+            },
+            onDismiss: {
+                showingLoRAManagement = false
+            }
+        )
+        .presentationDetents([.large])
     }
 }
 
@@ -223,7 +225,7 @@ extension ChatInterfaceView {
     }
 }
 
-// MARK: - View Components
+// MARK: - Toolbar + Content Shell
 
 extension ChatInterfaceView {
     var macOSToolbar: some View {
@@ -259,11 +261,23 @@ extension ChatInterfaceView {
         .background(AppColors.backgroundPrimary)
     }
 
-
     @ViewBuilder var contentArea: some View {
         if hasModelSelected {
-            chatMessagesView
-            inputArea
+            ChatMessageListView(
+                viewModel: viewModel,
+                isTextFieldFocused: $isTextFieldFocused,
+                showingLoRAManagement: $showingLoRAManagement,
+                settingsViewModel: settingsViewModel,
+                toolSettingsViewModel: toolSettingsViewModel
+            )
+            ChatInputAreaView(
+                viewModel: viewModel,
+                isTextFieldFocused: $isTextFieldFocused,
+                showingLoRAManagement: $showingLoRAManagement,
+                settingsViewModel: settingsViewModel,
+                toolSettingsViewModel: toolSettingsViewModel,
+                onSend: sendMessage
+            )
         } else {
             Spacer()
         }
@@ -280,7 +294,6 @@ extension ChatInterfaceView {
             showingModelSelection = true
         } label: {
             HStack(spacing: 6) {
-                // Model logo instead of cube icon
                 if let modelName = viewModel.loadedModelName {
                     Image(getModelLogo(for: modelName))
                         .resizable()
@@ -299,7 +312,6 @@ extension ChatInterfaceView {
                             .fontWeight(.medium)
                             .lineLimit(1)
 
-                        // Streaming indicator
                         HStack(spacing: 3) {
                             Image(systemName: viewModel.modelSupportsStreaming ? "bolt.fill" : "square.fill")
                                 .font(.system(size: 7))
@@ -318,544 +330,6 @@ extension ChatInterfaceView {
         .buttonStyle(.bordered)
         .tint(AppColors.primaryAccent)
         #endif
-    }
-}
-
-// MARK: - Chat Content Views
-
-extension ChatInterfaceView {
-    var chatMessagesView: some View {
-        ScrollViewReader { proxy in
-            VStack(spacing: 0) {
-                ScrollView {
-                    if viewModel.messages.isEmpty && !viewModel.isGenerating {
-                        emptyStateView
-                    } else {
-                        messageListView
-                    }
-                }
-                .scrollDisabled(viewModel.messages.isEmpty && !viewModel.isGenerating)
-                .defaultScrollAnchor(viewModel.messages.isEmpty && !viewModel.isGenerating ? .center : .bottom)
-            }
-            .background(AppColors.backgroundGrouped)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                isTextFieldFocused = false
-            }
-            .onChange(of: viewModel.messages.count) { _, _ in
-                scrollToBottom(proxy: proxy)
-            }
-            .onChange(of: viewModel.isGenerating) { _, isGenerating in
-                if isGenerating {
-                    scrollToBottom(proxy: proxy, animated: true)
-                }
-            }
-            .onChange(of: isTextFieldFocused) { _, focused in
-                if focused {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        scrollToBottom(proxy: proxy, animated: true)
-                    }
-                }
-            }
-            #if os(iOS)
-            .onReceive(
-                NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
-            ) { _ in
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    scrollToBottom(proxy: proxy, animated: true)
-                }
-            }
-            #endif
-            .onReceive(
-                NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))
-            ) { _ in
-                if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
-                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                }
-            }
-        }
-    }
-
-    var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
-            Image("runanywhere_logo")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
-
-            VStack(spacing: 8) {
-                Text("Start a conversation")
-                    .font(AppTypography.title2Semibold)
-                    .foregroundColor(AppColors.textPrimary)
-
-                Text("Type a message below to get started")
-                    .font(AppTypography.subheadline)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    var messageListView: some View {
-        LazyVStack(spacing: AppSpacing.large) {
-            Spacer(minLength: 20)
-                .id("top-spacer")
-
-            ForEach(viewModel.messages) { message in
-                MessageBubbleView(message: message, isGenerating: viewModel.isGenerating)
-                    .id(message.id)
-                    .transition(messageTransition)
-                    .animation(nil, value: message.content)
-            }
-
-            if viewModel.isGenerating, viewModel.messages.last?.content.isEmpty == true {
-                TypingIndicatorView()
-                    .id("typing")
-                    .transition(typingTransition)
-            }
-
-            Spacer(minLength: 20)
-                .id("bottom-spacer")
-        }
-        .padding(AppSpacing.large)
-        .animation(.default, value: viewModel.messages.count)
-    }
-
-    private var messageTransition: AnyTransition {
-        .asymmetric(
-            insertion: .scale(scale: 0.8)
-                .combined(with: .opacity)
-                .combined(with: .move(edge: .bottom)),
-            removal: .scale(scale: 0.9).combined(with: .opacity)
-        )
-    }
-
-    private var typingTransition: AnyTransition {
-        .asymmetric(
-            insertion: .scale(scale: 0.8).combined(with: .opacity),
-            removal: .scale(scale: 0.9).combined(with: .opacity)
-        )
-    }
-
-    var inputArea: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            // Status badges (thinking mode + tool calling + LoRA)
-            HStack(spacing: 8) {
-                if settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking {
-                    thinkingModeBadge
-                }
-
-                if viewModel.useToolCalling && !toolSettingsViewModel.registeredTools.isEmpty {
-                    toolCallingBadge
-                }
-
-                if !viewModel.loraAdapters.isEmpty {
-                    loraAdapterBadge
-                }
-
-                if hasModelSelected {
-                    loraAddButton
-                }
-            }
-            .padding(
-                .top,
-                ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking)
-                    || viewModel.useToolCalling
-                    || !viewModel.loraAdapters.isEmpty
-                    || hasModelSelected) ? 8 : 0
-            )
-
-            HStack(spacing: AppSpacing.mediumLarge) {
-                TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .lineLimit(1...4)
-                    .focused($isTextFieldFocused)
-                    .onSubmit {
-                        sendMessage()
-                    }
-                    .submitLabel(.send)
-
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(AppTypography.system28)
-                        .foregroundColor(
-                            viewModel.canSend ? AppColors.primaryAccent : AppColors.statusGray
-                        )
-                }
-                .disabled(!viewModel.canSend)
-                .background {
-                    if #available(iOS 26.0, macOS 26.0, *) {
-                        Circle()
-                            .fill(.clear)
-                            .glassEffect(.regular.interactive())
-                    }
-                }
-            }
-            .padding(AppSpacing.large)
-            .background(AppColors.backgroundPrimary)
-            .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
-        }
-    }
-
-    var thinkingModeBadge: some View {
-        Button {
-            settingsViewModel.thinkingModeEnabled.toggle()
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "lightbulb.min.fill")
-                    .font(.system(size: 10))
-                Text("Thinking")
-                    .font(AppTypography.caption2)
-            }
-            .foregroundColor(AppColors.primaryPurple)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(AppColors.primaryPurple.opacity(0.1))
-            .cornerRadius(6)
-        }
-    }
-
-    var toolCallingBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "wrench.and.screwdriver")
-                .font(.system(size: 10))
-            Text("Tools enabled")
-                .font(AppTypography.caption2)
-        }
-        .foregroundColor(AppColors.primaryAccent)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(AppColors.primaryAccent.opacity(0.1))
-        .cornerRadius(6)
-    }
-
-    var loraAdapterBadge: some View {
-        Button {
-            Task { await viewModel.refreshAvailableAdapters() }
-            showingLoRAManagement = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10))
-                Text("LoRA x\(viewModel.loraAdapters.count)")
-                    .font(AppTypography.caption2)
-            }
-            .foregroundColor(.purple)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Color.purple.opacity(0.1))
-            .cornerRadius(6)
-        }
-    }
-
-    var loraAddButton: some View {
-        Button {
-            Task { await viewModel.refreshAvailableAdapters() }
-            showingLoRAManagement = true
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "plus")
-                    .font(.system(size: 9, weight: .bold))
-                Text("LoRA")
-                    .font(AppTypography.caption2)
-            }
-            .foregroundColor(AppColors.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(AppColors.backgroundSecondary)
-            .cornerRadius(6)
-        }
-    }
-}
-
-// MARK: - LoRA Scale Sheet
-
-private struct LoRAScaleSheetView: View {
-    let url: URL?
-    @Binding var scale: Float
-    let isLoading: Bool
-    let onLoad: () -> Void
-    let onCancel: () -> Void
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                VStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 32))
-                        .foregroundColor(.purple)
-
-                    Text(url?.lastPathComponent ?? "LoRA Adapter")
-                        .font(.headline)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                }
-
-                VStack(spacing: 8) {
-                    Text("Scale: \(String(format: "%.1f", scale))")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    Slider(value: $scale, in: 0...2, step: 0.1)
-                        .tint(.purple)
-
-                    HStack {
-                        Text("0.0")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("1.0")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("2.0")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal)
-
-                HStack(spacing: 16) {
-                    Button("Cancel") { onCancel() }
-                        .buttonStyle(.bordered)
-
-                    Button {
-                        onLoad()
-                    } label: {
-                        if isLoading {
-                            ProgressView()
-                                .frame(width: 60)
-                        } else {
-                            Text("Load")
-                                .frame(width: 60)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
-                    .disabled(isLoading)
-                }
-            }
-            .padding()
-            .navigationTitle("Load LoRA Adapter")
-            .navigationBarTitleDisplayModeCompat(.inline)
-        }
-    }
-}
-
-// MARK: - LoRA Management Sheet (Redesigned)
-
-private struct LoRAManagementSheetView: View {
-    @Bindable var viewModel: LLMViewModel
-    let onOpenFilePicker: () -> Void
-    let onDismiss: () -> Void
-
-    @State private var selectedAdapterScale: [String: Float] = [:]
-
-    var body: some View {
-        NavigationView {
-            List {
-                availableAdaptersSection
-                loadedAdaptersSection
-                customAdapterSection
-            }
-            .navigationTitle("LoRA Adapters")
-            .navigationBarTitleDisplayModeCompat(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { onDismiss() }
-                }
-            }
-        }
-    }
-
-    // MARK: - Available Adapters (from SDK Registry)
-
-    @ViewBuilder private var availableAdaptersSection: some View {
-        if !viewModel.availableAdapters.isEmpty {
-            Section {
-                ForEach(viewModel.availableAdapters, id: \.id) { adapter in
-                    availableAdapterRow(adapter)
-                }
-            } header: {
-                Text("Available for This Model")
-            } footer: {
-                Text("Downloaded adapters are stored locally.")
-            }
-        }
-    }
-
-    // swiftlint:disable:next function_body_length
-    private func availableAdapterRow(_ adapter: RALoraAdapterCatalogEntry) -> some View {
-        let isDownloaded = viewModel.isAdapterDownloaded(adapter)
-        let scale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
-        let isAlreadyApplied = viewModel.loraAdapters.contains {
-            $0.adapterPath == viewModel.localPath(for: adapter)
-        }
-        let fileSizeText = ByteCountFormatter.string(fromByteCount: adapter.sizeBytes, countStyle: .file)
-
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(adapter.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    Text(adapter.description_p)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(fileSizeText)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                if isAlreadyApplied {
-                    Label("Applied", systemImage: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                } else if isDownloaded {
-                    Label("Downloaded", systemImage: "checkmark.circle")
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                }
-            }
-
-            if !isAlreadyApplied {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Scale: \(String(format: "%.1f", scale))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Slider(
-                            value: Binding(
-                                get: { selectedAdapterScale[adapter.id] ?? adapter.defaultScale },
-                                set: { selectedAdapterScale[adapter.id] = $0 }
-                            ),
-                            in: 0...2,
-                            step: 0.1
-                        )
-                        .tint(.purple)
-                    }
-
-                    Button {
-                        let applyScale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
-                        Task {
-                            await viewModel.downloadAndLoadAdapter(adapter, scale: applyScale)
-                        }
-                    } label: {
-                        Text(isDownloaded ? "Apply" : "Download")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .frame(minWidth: 60)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
-                    .disabled(viewModel.isLoadingLoRA)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    // MARK: - Loaded Adapters
-
-    @ViewBuilder private var loadedAdaptersSection: some View {
-        if !viewModel.loraAdapters.isEmpty {
-            Section("Loaded Adapters") {
-                ForEach(viewModel.loraAdapters, id: \.adapterPath) { adapter in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(URL(fileURLWithPath: adapter.adapterPath).lastPathComponent)
-                                    .font(.subheadline)
-                                    .lineLimit(1)
-                                HStack(spacing: 8) {
-                                    Text("Scale: \(String(format: "%.1f", adapter.scale))")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    if adapter.applied {
-                                        Text("Applied")
-                                            .font(.caption)
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                            }
-
-                            Spacer()
-
-                            Button {
-                                Task { await viewModel.removeLoraAdapter(path: adapter.adapterPath) }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        let prompts = LoraExamplePrompts.forAdapterPath(adapter.adapterPath)
-                        if !prompts.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Try it out:")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                ForEach(prompts, id: \.self) { prompt in
-                                    Button {
-                                        #if os(iOS)
-                                        UIPasteboard.general.string = prompt
-                                        #else
-                                        NSPasteboard.general.setString(prompt, forType: .string)
-                                        #endif
-                                    } label: {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "doc.on.doc")
-                                                .font(.caption2)
-                                            Text(prompt)
-                                                .font(.caption)
-                                                .lineLimit(2)
-                                                .multilineTextAlignment(.leading)
-                                        }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(Color.purple.opacity(0.15))
-                                        .foregroundColor(.purple)
-                                        .cornerRadius(8)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Button(role: .destructive) {
-                    Task {
-                        await viewModel.clearLoraAdapters()
-                    }
-                } label: {
-                    Label("Clear All Adapters", systemImage: "trash")
-                }
-            }
-        }
-    }
-
-    // MARK: - Custom File Picker
-
-    private var customAdapterSection: some View {
-        Section {
-            Button {
-                onOpenFilePicker()
-            } label: {
-                Label("Load from Files...", systemImage: "folder")
-            }
-        } footer: {
-            Text("Select a .gguf LoRA adapter file from your device.")
-        }
     }
 }
 
@@ -881,36 +355,11 @@ extension ChatInterfaceView {
         }
     }
 
-    func setupInitialState() {
-        Task {
-            await viewModel.checkModelStatus()
-        }
-    }
-
     func handleModelSelected(_ model: RAModelInfo) async {
         await MainActor.run {
             ModelListViewModel.shared.setCurrentModel(model)
         }
 
         await viewModel.checkModelStatus()
-    }
-
-    func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
-        let scrollToId: String
-        if viewModel.isGenerating {
-            scrollToId = "typing"
-        } else if let lastMessage = viewModel.messages.last {
-            scrollToId = lastMessage.id.uuidString
-        } else {
-            scrollToId = "bottom-spacer"
-        }
-
-        if animated {
-            withAnimation(.easeInOut(duration: 0.5)) {
-                proxy.scrollTo(scrollToId, anchor: .bottom)
-            }
-        } else {
-            proxy.scrollTo(scrollToId, anchor: .bottom)
-        }
     }
 }

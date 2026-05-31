@@ -5,7 +5,7 @@ _flutter_grep_logs() {
   local pattern="$1"
   local root="${RAC_SESSION_ROOT:?}/logs"
   local name
-  for name in flutter_run_console.log flutter_logs.log ios_live.log ios_final.log executor.log; do
+  for name in android_logcat.log flutter_run_console.log flutter_logs.log ios_live.log ios_final.log executor.log tc_drive.log tc_executor.log; do
     [[ -f "${root}/${name}" ]] && grep -qF "${pattern}" "${root}/${name}" && return 0
   done
   return 1

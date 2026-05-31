@@ -2,14 +2,15 @@
 //  ToolCallingTypes.swift — Swift-side helpers for generated tool-calling protos.
 //
 //  Keep: closures (`ToolExecutor`, `RegisteredTool`), JSON bridge for
-//  `argumentsJson` / `resultJson` (IDL-13 oneof tree), and tight RA*
+//  `argumentsJson` / `resultJson` (oneof tree), and tight RA*
 //  convenience inits/getters consumed by the example app or SDK internals.
 //
-//  G3: the recursive ToolValue <-> JSON walk now lives in commons behind
+//  The recursive ToolValue <-> JSON walk now lives in commons behind
 //  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`. Swift
 //  no longer hand-rolls it. Public API shape is preserved.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - Tool Executor Types
@@ -58,9 +59,9 @@ public extension RAToolValue {
     var array: [RAToolValue]? { if case .arrayValue(let value)? = kind { return value.values }; return nil }
     var object: [String: RAToolValue]? { if case .objectValue(let value)? = kind { return value.fields }; return nil }
 
-    // JSON bridge — required by IDL-13 (`argumentsJson` / `resultJson`).
+    // JSON bridge — required by `argumentsJson` / `resultJson`.
     // Swift consumers see `[String: RAToolValue]`; the wire shape is JSON.
-    // The recursive walk lives in commons (G3); Swift only marshals bytes.
+    // The recursive walk lives in commons; Swift only marshals bytes.
 
     func toJSONString(pretty: Bool = false) -> String? {
         guard let wrapper: RAToolValueJSON = try? NativeProtoABI.invoke(
@@ -82,16 +83,30 @@ public extension RAToolValue {
         return String(data: pretty, encoding: .utf8) ?? wrapper.json
     }
 
-    static func parseObjectJSON(_ json: String) -> [String: RAToolValue] {
+    /// Parse a JSON object string into a `[String: RAToolValue]` map.
+    ///
+    /// Throws an `SDKException` (category `.internal`) when the input is not
+    /// valid JSON, the commons bridge cannot decode the payload, or the JSON
+    /// root is not an object (e.g. an array or scalar). Callers that
+    /// previously relied on the silent-empty-dict fallback must now translate
+    /// the thrown error into their own failure surface (e.g.
+    /// `RAToolResult.success = false`).
+    static func parseObjectJSON(_ json: String) throws -> [String: RAToolValue] {
         var wrapper = RAToolValueJSON(); wrapper.json = json
-        guard let value: RAToolValue = try? NativeProtoABI.invoke(
+        let value: RAToolValue = try NativeProtoABI.invoke(
             wrapper,
             symbol: ToolValueJSONABI.fromJSON,
             symbolName: ToolValueJSONABI.fromJSONName,
             responseType: RAToolValue.self
-        ) else { return [:] }
-        if case .objectValue(let obj)? = value.kind { return obj.fields }
-        return [:]
+        )
+        guard case .objectValue(let obj)? = value.kind else {
+            throw SDKException(
+                code: .invalidInput,
+                message: "ToolCall.argumentsJson must decode to a JSON object, got \(String(describing: value.kind))",
+                category: .internal
+            )
+        }
+        return obj.fields
     }
 
     static func jsonString(from object: [String: RAToolValue]) -> String {
@@ -146,14 +161,10 @@ extension RAToolCallingOptions {
     }
 
     var resolvedFormatName: String {
+        // Delegate the proto-enum -> hint-string mapping to commons so every SDK
+        // shares one source of truth (rac_tool_call_format_hint_from_format_name).
         if hasFormat {
-            switch format {
-            case .json: return "default"
-            case .openaiFunctions: return "openai"
-            case .hermes: return "hermes"
-            case .pythonic: return "lfm2"
-            default: break
-            }
+            return String(cString: rac_tool_call_format_hint_from_format_name(Int32(format.rawValue)))
         }
         return formatHint.isEmpty ? "default" : formatHint
     }

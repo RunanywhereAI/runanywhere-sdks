@@ -205,7 +205,7 @@ RAC_API rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* au
                                              char** out_language);
 
 // =============================================================================
-// CANONICAL DEFAULTS (P2-T14)
+// CANONICAL DEFAULTS
 // =============================================================================
 
 /**

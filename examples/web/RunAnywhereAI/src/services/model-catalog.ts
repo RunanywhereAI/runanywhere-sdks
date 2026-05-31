@@ -1,16 +1,16 @@
 /**
- * Model Catalog — registers a small fixed catalog of known models with the
- * SDK's proto-byte registry.
+ * Model Catalog — example-app catalog seeded through the SDK's
+ * `RunAnywhere.registerModel*` facades.
  *
- * After the V2 cleanup there is no app-side registration facade. Models are
- * registered directly via `RunAnywhere.modelRegistry.registerModel(...)`, which
- * speaks proto bytes to the commons C++ registry. The entries here are
- * purposefully minimal: canonical `ModelInfo` proto messages populated with
- * just enough fields to drive the model-selection UI and `RunAnywhere.loadModel()`.
+ * Mirrors the iOS / Android / Flutter / RN example apps, which all delegate
+ * proto-message assembly (full `ModelInfo`, `MultiFileArtifact`,
+ * `ExpectedModelFiles`) to the SDK facade. Per AGENTS.md, example apps must
+ * not hand-construct cross-cutting proto types — that is SDK business logic.
  *
- * The catalog is registered best-effort — if the proto registry adapter is
- * not installed (e.g. the llamacpp WASM failed to load on a fresh dev
- * cold-start) the call returns `false` and the app shell still renders.
+ * Catalog seeding is best-effort. If the proto registry adapter is not
+ * installed yet (e.g. backend WASM still loading) the SDK facade throws
+ * `SDKException(BackendNotAvailable)`; we log and continue so the app shell
+ * still renders.
  */
 
 import {
@@ -23,15 +23,13 @@ import {
   ModelCategory,
   ModelFileRole,
   ModelFormat,
-  ModelSource,
 } from '@runanywhere/proto-ts/model_types';
 import { formatError } from './format-error';
 
 /**
- * A flat, app-local description of a catalog entry that gets promoted to a
- * full proto `ModelInfo` at registration time. Keeping this shape simple
- * means the catalog reads as a declarative list rather than a pile of
- * boilerplate proto messages.
+ * Declarative description of a single catalog entry. Promoted to a full
+ * `ModelInfo` proto by the SDK's `RunAnywhere.registerModel*` facades — never
+ * by this file. Kept as a flat shape so the catalog list reads as data.
  */
 export interface CatalogEntry {
   id: string;
@@ -57,16 +55,6 @@ export interface CatalogFileEntry {
   isRequired?: boolean;
 }
 
-/**
- * The fixed catalog registered at app startup. The set here is deliberately
- * a small, representative cross-section — one small LLM that runs in the
- * browser WASM build, one VLM, one STT/TTS/VAD each for when ONNX WASM
- * ships, and one embedding.
- *
- * Other example apps (iOS, Android, Flutter) use a similar shape via their
- * respective registerModel-equivalents; pick the smallest viable model in
- * each modality to keep the example app fast to cold-start.
- */
 const CATALOG: readonly CatalogEntry[] = [
   // ---------- Language (LLM) ----------
   {
@@ -78,7 +66,7 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_GGUF,
     downloadUrl:
       'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-    downloadSizeBytes: 400_000_000,
+    downloadSizeBytes: 386_404_416,
     memoryRequiredBytes: 500_000_000,
     contextLength: 2048,
   },
@@ -136,7 +124,7 @@ const CATALOG: readonly CatalogEntry[] = [
     supportsThinking: true,
   },
   {
-    // pass3-syn-097: parity with Android/iOS/Flutter/RN catalogs.
+    // Parity with Android/iOS/Flutter/RN catalogs.
     id: 'qwen3-4b-q4_k_m',
     name: 'Qwen3 4B Q4_K_M',
     description: 'Qwen3 series larger LLM with thinking-mode support.',
@@ -220,7 +208,9 @@ const CATALOG: readonly CatalogEntry[] = [
     format: ModelFormat.MODEL_FORMAT_ONNX,
     downloadUrl:
       'https://raw.githubusercontent.com/snakers4/silero-vad/master/src/silero_vad/data/silero_vad.onnx',
-    downloadSizeBytes: 2_100_000,
+    // Actual silero_vad.onnx artifact size (verified Content-Length). Feeds the
+    // post-finalize download size guard.
+    downloadSizeBytes: 2_327_524,
     memoryRequiredBytes: 5_000_000,
   },
 
@@ -254,17 +244,15 @@ const CATALOG: readonly CatalogEntry[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Registration
+// Registration — delegated to the SDK's `RunAnywhere.registerModel*` facades.
 // ---------------------------------------------------------------------------
 
 /**
- * Registers the catalog with the proto-byte model registry. Idempotent —
- * re-registration overwrites the previous entry without error, mirroring the
- * behavior in the other example apps.
- *
- * Returns the count of successfully registered entries. `0` means the
- * registry adapter is not installed (typically because no backend WASM has
- * loaded yet).
+ * Seed the catalog through the SDK facade. Multi-file entries go to
+ * `registerModelMultiFile`, archive entries to `registerModelArchive`, and
+ * single-file entries to `registerModel`. Returns the count successfully
+ * registered. `0` means the registry adapter is not installed yet (typically
+ * because no backend WASM has loaded).
  */
 export function registerModelCatalog(): number {
   const availability = RunAnywhere.modelRegistry.availability();
@@ -278,18 +266,8 @@ export function registerModelCatalog(): number {
 
   let registered = 0;
   for (const entry of CATALOG) {
-    const info = toModelInfo(entry);
-    try {
-      if (RunAnywhere.modelRegistry.registerModel(info)) {
-        registered += 1;
-      } else {
-        console.warn(`[model-catalog] register(${entry.id}) returned false`);
-      }
-    } catch (err) {
-      console.warn(
-        `[model-catalog] register(${entry.id}) threw:`,
-        formatError(err),
-      );
+    if (tryRegister(entry)) {
+      registered += 1;
     }
   }
 
@@ -310,48 +288,61 @@ export function getCatalog(): readonly CatalogEntry[] {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function toModelInfo(entry: CatalogEntry): ModelInfo {
-  const now = Date.now();
-  const files = entry.files?.map((file) => ({
-    url: file.url,
-    filename: file.filename,
-    isRequired: file.isRequired ?? true,
-    sizeBytes: file.sizeBytes,
-    relativePath: file.filename,
-    destinationPath: file.filename,
-    role: file.role,
-  }));
-  return {
+function tryRegister(entry: CatalogEntry): boolean {
+  try {
+    const result = registerViaFacade(entry);
+    return result !== null;
+  } catch (err) {
+    console.warn(
+      `[model-catalog] register(${entry.id}) threw:`,
+      formatError(err),
+    );
+    return false;
+  }
+}
+
+function registerViaFacade(entry: CatalogEntry): ModelInfo | null {
+  if (entry.files && entry.files.length > 0) {
+    return RunAnywhere.registerModelMultiFile({
+      id: entry.id,
+      name: entry.name,
+      framework: entry.framework,
+      files: entry.files,
+      description: entry.description,
+      format: entry.format,
+      modality: entry.category,
+      memoryRequirement: entry.memoryRequiredBytes,
+      downloadSizeBytes: entry.downloadSizeBytes,
+      contextLength: entry.contextLength,
+      supportsThinking: entry.supportsThinking,
+    });
+  }
+
+  const options = {
     id: entry.id,
-    name: entry.name,
-    category: entry.category,
-    format: entry.format,
-    framework: entry.framework,
-    downloadUrl: entry.downloadUrl,
-    localPath: '',
-    downloadSizeBytes: entry.downloadSizeBytes,
-    contextLength: entry.contextLength ?? 0,
-    supportsThinking: entry.supportsThinking ?? false,
-    supportsLora: false,
     description: entry.description,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
-    createdAtUnixMs: now,
-    updatedAtUnixMs: now,
-    memoryRequiredBytes: entry.memoryRequiredBytes,
-    ...(files
-      ? {
-        multiFile: { files },
-        artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
-        expectedFiles: {
-          files,
-          rootDirectory: entry.id,
-          requiredPatterns: files.map((file) => file.filename),
-          optionalPatterns: [],
-          description: `${entry.name} primary model and companion artifacts`,
-        },
-      }
-      : {
-        artifactType: entry.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
-      }),
+    format: entry.format,
+    modality: entry.category,
+    memoryRequirement: entry.memoryRequiredBytes,
+    downloadSizeBytes: entry.downloadSizeBytes,
+    contextLength: entry.contextLength,
+    supportsThinking: entry.supportsThinking,
   };
+
+  if (entry.artifactType && entry.artifactType !== ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE) {
+    return RunAnywhere.registerModelArchive(
+      entry.downloadUrl,
+      entry.name,
+      entry.framework,
+      entry.artifactType,
+      options,
+    );
+  }
+
+  return RunAnywhere.registerModel(
+    entry.downloadUrl,
+    entry.name,
+    entry.framework,
+    options,
+  );
 }

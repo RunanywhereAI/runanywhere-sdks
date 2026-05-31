@@ -58,11 +58,11 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0
 
         try {
-            // v2 close-out Phase G-2: generateStream returns Flow<LLMStreamEvent>;
+            // generateStream returns Flow<LLMStreamEvent>;
             // compute TTFT + tokens/sec from the event sequence directly.
             val warmupStart = System.nanoTime()
             val warmupOptions = RALLMGenerationOptions(max_tokens = 5, temperature = 0.0f)
-            // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
+            // takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
             withTimeoutOrNull(10_000L) {
                 RunAnywhere
                     .generateStream("Hello", warmupOptions)
@@ -80,7 +80,7 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
 
             var tokenCount = 0
             var firstTokenTimeNs: Long? = null
-            // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
+            // takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
             withTimeoutOrNull(60_000L) {
                 RunAnywhere
                     .generateStream(prompt, options)

@@ -424,4 +424,5 @@ extension SDKLogger {
     public static let tts = SDKLogger(category: "TTS")
     public static let download = SDKLogger(category: "Download")
     public static let models = SDKLogger(category: "Models")
+    public static let voiceAgent = SDKLogger(category: "VoiceAgent")
 }

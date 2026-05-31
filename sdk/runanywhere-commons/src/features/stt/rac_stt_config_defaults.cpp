@@ -1,6 +1,6 @@
 /**
  * @file rac_stt_config_defaults.cpp
- * @brief Canonical STTConfiguration defaults helper (P2-T14).
+ * @brief Canonical STTConfiguration defaults helper.
  *
  * Commons-owned port of Swift's `RASTTConfiguration.defaults()`
  * (sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/STT/

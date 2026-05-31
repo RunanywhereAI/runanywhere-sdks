@@ -25,30 +25,29 @@ namespace rag {
  * all-MiniLM-L6-v2). Thread-safe after initialization.
  */
 class ONNXEmbeddingProvider {
-public:
-  explicit ONNXEmbeddingProvider(const std::string &model_path,
-                                 const std::string &config_json = "");
+   public:
+    explicit ONNXEmbeddingProvider(const std::string& model_path,
+                                   const std::string& config_json = "");
 
-  ~ONNXEmbeddingProvider();
+    ~ONNXEmbeddingProvider();
 
-  ONNXEmbeddingProvider(const ONNXEmbeddingProvider &) = delete;
-  ONNXEmbeddingProvider &operator=(const ONNXEmbeddingProvider &) = delete;
-  ONNXEmbeddingProvider(ONNXEmbeddingProvider &&) noexcept;
-  ONNXEmbeddingProvider &operator=(ONNXEmbeddingProvider &&) noexcept;
+    ONNXEmbeddingProvider(const ONNXEmbeddingProvider&) = delete;
+    ONNXEmbeddingProvider& operator=(const ONNXEmbeddingProvider&) = delete;
+    ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept;
+    ONNXEmbeddingProvider& operator=(ONNXEmbeddingProvider&&) noexcept;
 
-  std::vector<float> embed(const std::string &text);
-  std::vector<std::vector<float>>
-  embed_batch(const std::vector<std::string> &texts);
-  size_t dimension() const noexcept;
-  bool is_ready() const noexcept;
-  const char *name() const noexcept;
+    std::vector<float> embed(const std::string& text);
+    std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts);
+    size_t dimension() const noexcept;
+    bool is_ready() const noexcept;
+    const char* name() const noexcept;
 
-private:
-  class Impl;
-  std::unique_ptr<Impl> impl_;
+   private:
+    class Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H
+#endif  // RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H

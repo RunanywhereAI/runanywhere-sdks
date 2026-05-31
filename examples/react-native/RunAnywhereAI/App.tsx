@@ -70,7 +70,6 @@ function hasUsableBackendConfig(options: {
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP as OptionalBackend;
 } catch {
   logDiagnostic(
@@ -81,7 +80,6 @@ try {
 // Make Genie optional (Android/Snapdragon only)
 let Genie: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   Genie = require('@runanywhere/genie').Genie as OptionalBackend;
 } catch {
   logDiagnostic('[App] Genie NPU backend not available');
@@ -89,7 +87,6 @@ try {
 
 let ONNX: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
   ONNX = require('@runanywhere/onnx').ONNX as OptionalBackend;
 } catch {
   logDiagnostic('[App] ONNX backend not available - speech features disabled');
@@ -172,7 +169,7 @@ async function registerModulesAndModels(): Promise<void> {
         name: 'SmolLM2 360M Q8_0',
         url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        memoryRequirement: 500_000_000,
+        memoryRequirement: 386_404_416,
       }),
       registerModel({
         id: 'llama-2-7b-chat-q4_k_m',
@@ -333,22 +330,18 @@ async function registerModulesAndModels(): Promise<void> {
   }
 
   // =========================================================================
-  // Genie NPU backend (Android/Snapdragon only)
+  // Genie NPU backend (Android / Snapdragon only)
   //
-  // Per-chip model registration was previously driven by legacy chip-specific
-  // URL helpers. That selection now belongs in the public hardware namespace /
-  // registry flow, so the example avoids registering ad-hoc NPU variants.
-  // V2 dead-code purge — the canonical SDK now exposes only `getChip(): string`
-  // (returning a chip name, not the structured chip identifier object the
-  // Genie URL builder needed). Until the proto-canonical Genie catalog
-  // replacement lands, the example app simply registers the backend so
-  // native backend availability exists without enumerating NPU models here.
+  // Mirrors the Flutter example's Genie registration: register the backend
+  // when available and let the SDK own NPU model selection. Per-chip model
+  // catalogs (Qualcomm SoC slug → Genie model bundle URL) are SDK-internal
+  // knowledge per AGENTS.md "Business Logic Layering Rules" and belong in
+  // `@runanywhere/genie`, not in this example.
   // =========================================================================
   if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
-    Genie.register();
-    // eslint-disable-next-line no-console -- demo app bootstrap diagnostic
-    console.log(
-      'ℹ️ Genie NPU backend registered (model catalog disabled — pending proto-canonical chip helper)'
+    await Genie.register();
+    logDiagnostic(
+      '[App] Genie backend registered; NPU model catalog is pending generated registry/catalog support'
     );
   }
 
@@ -408,7 +401,11 @@ async function registerModulesAndModels(): Promise<void> {
       url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-      memoryRequirement: 5_000_000,
+      // Actual silero_vad.onnx artifact size (verified Content-Length).
+      // memoryRequirement doubles as downloadSizeBytes, which feeds the
+      // post-finalize download size guard. An over-stated 5 MB
+      // tripped the guard on a valid ~2.3 MB download.
+      memoryRequirement: 2_327_524,
     }),
     // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
     // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)

@@ -10,7 +10,7 @@
 
 // RunAnywhere IDL — shared component-lifecycle types.
 //
-// Extracted into its own proto file (Wave H-2 / IDL-04) to break the
+// Extracted into its own proto file to break the
 // `sdk_events.proto` ↔ `voice_events.proto` import cycle. Both files need the
 // canonical ComponentLifecycleState enum, so it lives here and is imported
 // from either side without circularity.
@@ -22,7 +22,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -33,7 +33,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// (also used by voice_events.proto's VoiceAgentComponentStates after the
 /// former hand-rolled `ComponentLoadState` was consolidated into this single
 /// richer taxonomy).
-public enum RAComponentLifecycleState: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAComponentLifecycleState: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case notLoaded // = 1
@@ -106,8 +106,8 @@ public enum RAComponentLifecycleState: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// Canonical event category carried by every SDKEvent envelope. Lives here
 /// (instead of sdk_events.proto) so voice_events.proto and voice_agent_service
 /// .proto can reference it without importing sdk_events.proto (which itself
-/// imports voice_events.proto — IDL-07 cycle resolution).
-public enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
+/// imports voice_events.proto — cycle resolution).
+public nonisolated enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case sdk // = 1
@@ -148,7 +148,7 @@ public enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
   case network // = 34
   case error // = 35
 
-  /// IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+  /// Absorbed from former VoiceEventCategory (voice_events.proto).
   /// AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
   /// previously only on the voice-pipeline side.
   case audio // = 36
@@ -297,10 +297,10 @@ public enum RAEventCategory: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-extension RAComponentLifecycleState: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAComponentLifecycleState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_LIFECYCLE_STATE_UNSPECIFIED\0\u{1}COMPONENT_LIFECYCLE_STATE_NOT_LOADED\0\u{1}COMPONENT_LIFECYCLE_STATE_LOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_READY\0\u{1}COMPONENT_LIFECYCLE_STATE_UNLOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_ERROR\0\u{1}COMPONENT_LIFECYCLE_STATE_SHUTDOWN\0\u{1}COMPONENT_LIFECYCLE_STATE_DOWNLOADING\0\u{1}COMPONENT_LIFECYCLE_STATE_DELETING\0\u{1}COMPONENT_LIFECYCLE_STATE_PAUSED\0\u{1}COMPONENT_LIFECYCLE_STATE_UPDATING\0")
 }
 
-extension RAEventCategory: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEventCategory: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EVENT_CATEGORY_UNSPECIFIED\0\u{1}EVENT_CATEGORY_SDK\0\u{1}EVENT_CATEGORY_INITIALIZATION\0\u{1}EVENT_CATEGORY_SHUTDOWN\0\u{1}EVENT_CATEGORY_SESSION\0\u{1}EVENT_CATEGORY_AUTH\0\u{1}EVENT_CATEGORY_DEVICE\0\u{1}EVENT_CATEGORY_REGISTRY\0\u{1}EVENT_CATEGORY_ASSIGNMENT\0\u{1}EVENT_CATEGORY_IMPORT\0\u{1}EVENT_CATEGORY_DISCOVERY\0\u{1}EVENT_CATEGORY_DOWNLOAD\0\u{1}EVENT_CATEGORY_STORAGE\0\u{1}EVENT_CATEGORY_HARDWARE\0\u{1}EVENT_CATEGORY_ROUTING\0\u{1}EVENT_CATEGORY_FRAMEWORK\0\u{1}EVENT_CATEGORY_MODEL\0\u{1}EVENT_CATEGORY_COMPONENT\0\u{1}EVENT_CATEGORY_LLM\0\u{1}EVENT_CATEGORY_STT\0\u{1}EVENT_CATEGORY_ASR\0\u{1}EVENT_CATEGORY_TTS\0\u{1}EVENT_CATEGORY_VAD\0\u{1}EVENT_CATEGORY_STD\0\u{1}EVENT_CATEGORY_VOICE_AGENT\0\u{1}EVENT_CATEGORY_VLM\0\u{1}EVENT_CATEGORY_DIFFUSION\0\u{1}EVENT_CATEGORY_EMBEDDINGS\0\u{1}EVENT_CATEGORY_RAG\0\u{1}EVENT_CATEGORY_LORA\0\u{1}EVENT_CATEGORY_TELEMETRY\0\u{1}EVENT_CATEGORY_PERFORMANCE\0\u{1}EVENT_CATEGORY_CANCELLATION\0\u{1}EVENT_CATEGORY_FAILURE\0\u{1}EVENT_CATEGORY_NETWORK\0\u{1}EVENT_CATEGORY_ERROR\0\u{1}EVENT_CATEGORY_AUDIO\0\u{1}EVENT_CATEGORY_METRICS\0\u{1}EVENT_CATEGORY_WAKEWORD\0")
 }

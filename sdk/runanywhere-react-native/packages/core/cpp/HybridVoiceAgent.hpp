@@ -1,7 +1,7 @@
 /**
  * HybridVoiceAgent.hpp
  *
- * v3-readiness Phase A3 / GAP 09 #6. Nitro HybridObject that wraps the
+ * Nitro HybridObject that wraps the
  * commons `rac_voice_agent_set_proto_callback` C ABI as a
  * subscribe-style JS function returning an unsubscribe closure.
  *

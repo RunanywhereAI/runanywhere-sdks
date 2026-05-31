@@ -16,6 +16,8 @@ import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/download_service.pb.dart'
+    show DownloadProgress;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
@@ -29,6 +31,8 @@ import 'package:runanywhere/generated/model_types.pb.dart'
         ModelLoadResult,
         ModelUnloadRequest,
         ModelUnloadResult;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show ModelCategory;
 import 'package:runanywhere/generated/rag.pb.dart'
     show
         RAGConfiguration,
@@ -60,6 +64,7 @@ import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
@@ -104,6 +109,15 @@ abstract final class RunAnywhere {
   static bool get areServicesReady =>
       DartBridge.isInitialized && DartBridge.servicesInitialized;
 
+  /// True once Phase 2 HTTP/auth setup succeeded. Tracked separately from
+  /// [areServicesReady] so an SDK that initialized offline (no connectivity)
+  /// can still report `areServicesReady=true` (local models stay usable)
+  /// while leaving this latch `false` for the next [ensureServicesReady]
+  /// call to retry via `rac_sdk_retry_http_proto`. Mirrors Swift's
+  /// `hasCompletedHTTPSetup` (RunAnywhere.swift:35) and Kotlin's
+  /// `_hasCompletedHTTPSetup` (RunAnywhere.kt:121).
+  static bool get hasCompletedHTTPSetup => _hasCompletedHTTPSetup;
+
   /// Cached device id — populated during initialization. Mirrors Swift's
   /// `deviceId: String`.
   static String get deviceId =>
@@ -140,6 +154,36 @@ abstract final class RunAnywhere {
     return _servicesInitFuture ?? Future<void>.value();
   }
 
+  /// One-call "wait until everything is ready" entry point. Mirrors Swift's
+  /// `RunAnywhere.ensureServicesReady()` (RunAnywhere.swift:321) and Kotlin's
+  /// `ensureServicesReady` (RunAnywhere.kt:494): three paths so an
+  /// offline-first Phase 2 (services ready, HTTP/auth deferred) can still
+  /// retry the HTTP/auth round-trip without re-running the full step list.
+  ///
+  ///  - Fast path: services ready + HTTP configured → return (O(1)).
+  ///  - Recovery path: services ready but HTTP failed (offline init) →
+  ///    retry HTTP via `rac_sdk_retry_http_proto` without re-running Phase 2.
+  ///  - Cold start path: services not ready → await the in-flight Phase-2
+  ///    future (or a fresh one if Phase 2 hasn't started yet).
+  ///
+  /// Concurrent callers share the same Phase-2 future, so the work executes
+  /// at most once.
+  static Future<void> ensureServicesReady() async {
+    if (!isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    // Fast path — services ready + HTTP/auth done.
+    if (areServicesReady && _hasCompletedHTTPSetup) return;
+    // Recovery path — services ready, HTTP/auth failed (offline init).
+    if (areServicesReady && !_hasCompletedHTTPSetup) {
+      await _retryHTTPSetup();
+      return;
+    }
+    // Cold start path — Phase 1 done but Phase 2 still running (or never
+    // dispatched). Await the in-flight future; concurrent callers share it.
+    await (_servicesInitFuture ?? Future<void>.value());
+  }
+
   /// Initialization params (apiKey, baseURL, environment) — null
   /// until [initialize] runs. Cached from the most recent
   /// `initializeWithParams` call so callers can introspect what was
@@ -162,6 +206,12 @@ abstract final class RunAnywhere {
   // commons and is read through DartBridge. Only Dart scheduling state
   // belongs here.
   static bool _hasRunDiscovery = false;
+
+  // Latched HTTP/auth completion flag — see [hasCompletedHTTPSetup]. Phase 2
+  // sets this from the C++ `SdkInitResult.http_configured` snapshot;
+  // [_retryHTTPSetup] re-latches on a successful `rac_sdk_retry_http_proto`
+  // round-trip so subsequent `ensureServicesReady()` calls short-circuit.
+  static bool _hasCompletedHTTPSetup = false;
 
   // Shared Phase-2 future. Mirrors Swift's `_servicesInitTask`. Stored at
   // detach time inside [initializeWithParams]; replayed by
@@ -253,6 +303,7 @@ abstract final class RunAnywhere {
       // Phase-1 failures (invalid env, library load) propagate to the
       // caller via the surrounding try / rethrow.
       DartBridge.initialize(params.environment);
+      DartBridge.registerEnsureServicesReadyHook(ensureServicesReady);
 
       logger.info(
         'Phase 1 complete (${params.environment.description}); '
@@ -267,13 +318,16 @@ abstract final class RunAnywhere {
       // here (non-critical) but still observable to direct awaiters.
       final phase2 = _runPhase2(params, logger);
       _servicesInitFuture = phase2;
-      unawaited(phase2.catchError((Object error, StackTrace _) {
-        logger.warning('Phase 2 failed (non-critical): $error');
-      }));
+      unawaited(
+        phase2.catchError((Object error, StackTrace _) {
+          logger.warning('Phase 2 failed (non-critical): $error');
+        }),
+      );
     } catch (e) {
       logger.error('SDK initialization failed: $e');
       _cachedInitParams = null;
       _hasRunDiscovery = false;
+      _hasCompletedHTTPSetup = false;
       _servicesInitFuture = null;
       // Commons auto-emits INITIALIZATION_STAGE_FAILED via
       // `event_publisher.cpp:557`; failure telemetry flows through
@@ -315,7 +369,7 @@ abstract final class RunAnywhere {
       }
     }
 
-    // Step 4: Telemetry sync + async device-info wiring.
+    // Step 3: Telemetry sync + async device-info wiring.
     DartBridgeTelemetry.initializeSync(environment: params.environment);
     final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
     await DartBridgeTelemetry.initialize(
@@ -326,24 +380,141 @@ abstract final class RunAnywhere {
           : null,
     );
 
-    // Step 5: Model registry.
+    // Step 4: Model registry.
     await DartBridgeModelRegistry.instance.initialize();
 
     // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
     // INITIALIZATION_STAGE_COMPLETED SDKEvent from the C++ init path
     // (`event_publisher.cpp:544`), so Dart does not re-emit duplicates.
-    unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
-      durationMs: 0,
-      environment: params.environment.name,
-    ));
+    unawaited(
+      DartBridgeTelemetry.instance.emitSDKInitialized(
+        durationMs: 0,
+        environment: params.environment.name,
+      ),
+    );
 
-    // Step 6: Background services — device registration + auth. Failures
+    // Step 5: Background services — device registration + auth. Failures
     // here are non-critical (offline inference still works), so they are
     // logged and swallowed individually inside the helpers.
     await _registerDeviceIfNeeded(params, logger);
     await _authenticateWithBackend(params, logger);
 
+    // Latch the HTTP/auth completion flag. Decoupled from
+    // `areServicesReady` so an offline Phase 2 (no connectivity) still
+    // leaves `_hasCompletedHTTPSetup=false` and the next
+    // [ensureServicesReady] call hits the retry path. Mirrors Swift's
+    // `hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured`
+    // (RunAnywhere.swift:270 / :366) and Kotlin's `_hasCompletedHTTPSetup =
+    // httpConfigured` (RunAnywhere.kt:460).
+    _hasCompletedHTTPSetup = _resolveHasCompletedHTTPSetup(params);
+
+    // Flush buffered telemetry events now that HTTP is configured. Events
+    // that were queued before the auth round-trip (cold-start metrics) would
+    // otherwise sit in C++ and only flush on the next emit. Mirrors Swift
+    // `CppBridge.Telemetry.flush()` after HTTP becomes configured
+    // (RunAnywhere.swift:277).
+    if (_hasCompletedHTTPSetup) {
+      DartBridgeTelemetry.flush();
+    }
+
+    // Discover downloaded models using the registry handle the SDK already
+    // owns. Models linked via Phase-2 model assignments won't appear in
+    // `RunAnywhere.models.available()` without this pass. Mirrors Swift
+    // Step 5: `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
+    // (RunAnywhere.swift:310).
+    if (!_hasRunDiscovery) {
+      final discoveryResult =
+          await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+      if (discoveryResult.discoveredModels.isNotEmpty) {
+        logger.info(
+          'Discovered ${discoveryResult.discoveredModels.length} downloaded '
+          'models on startup',
+        );
+      }
+      _hasRunDiscovery = true;
+    }
+
     logger.info('Phase 2 complete (${params.environment.description})');
+  }
+
+  /// Whether HTTP/auth setup actually succeeded for the given environment.
+  /// Development mode is considered "complete" once `HTTPClientAdapter` is
+  /// configured (Supabase URL wired up — no auth round-trip required);
+  /// staging / production require both the configured HTTP transport AND a
+  /// successful auth round-trip. Mirrors Swift's distinction between
+  /// `CppBridge.Environment.requiresAuth` + `CppBridge.HTTP.shared.isConfigured`
+  /// (RunAnywhere.swift:386-405).
+  static bool _resolveHasCompletedHTTPSetup(SDKInitParams params) {
+    final httpConfigured = HTTPClientAdapter.shared.isConfigured;
+    if (!httpConfigured) return false;
+    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      // Dev mode: HTTP wired (typically Supabase) is sufficient — no
+      // auth round-trip required to consider HTTP setup complete.
+      return true;
+    }
+    // Staging / production require a successful auth round-trip too.
+    return DartBridgeAuth.instance.isAuthenticated();
+  }
+
+  /// Retry HTTP/auth after an offline initialization. Mirrors Swift's
+  /// `retryHTTPSetup()` (RunAnywhere.swift:335-374) and Kotlin's
+  /// `retryHTTPSetup()` (RunAnywhere.kt:520-535): combines the C ABI
+  /// idempotency guard (`rac_sdk_retry_http_proto`) with the Dart-side auth
+  /// round-trip the proto explicitly defers. Failures are logged and
+  /// swallowed so the next call can retry again.
+  static Future<void> _retryHTTPSetup() async {
+    final params = _cachedInitParams;
+    if (params == null) return;
+    final logger = SDKLogger('RunAnywhere.HTTPRetry');
+
+    // Idempotent fast path + config sanity check, owned by C++.
+    try {
+      final proto = DartBridgeSdkInit.retryHTTP();
+      if (proto.httpConfigured) {
+        _hasCompletedHTTPSetup = true;
+        return;
+      }
+      if (proto.hasWarning()) {
+        logger.debug('HTTP retry warning: ${proto.warning}');
+      }
+    } catch (e) {
+      logger.debug('HTTP retry proto failed: $e');
+      return;
+    }
+
+    // Already-configured fast path on the Dart side (e.g. a concurrent
+    // caller raced ahead through [_runPhase2]).
+    if (HTTPClientAdapter.shared.isConfigured &&
+        _resolveHasCompletedHTTPSetup(params)) {
+      _hasCompletedHTTPSetup = true;
+      return;
+    }
+
+    // Re-run the Dart-side HTTP/auth setup. Failures are non-critical —
+    // the next [ensureServicesReady] call will retry.
+    HTTPClientAdapter.shared.configure(
+      baseURL: params.baseURL.toString(),
+      apiKey: params.apiKey,
+      environment: params.environment,
+    );
+    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      final supabaseConfig = SupabaseConfig.configuration(params.environment);
+      if (supabaseConfig != null) {
+        HTTPClientAdapter.shared.configureDev(
+          supabaseURL: supabaseConfig.projectURL.toString(),
+          supabaseKey: supabaseConfig.anonKey,
+        );
+      }
+    }
+    await _authenticateWithBackend(params, logger);
+
+    _hasCompletedHTTPSetup = _resolveHasCompletedHTTPSetup(params);
+    if (_hasCompletedHTTPSetup) {
+      logger.info('HTTP/Auth setup succeeded on retry');
+      DartBridgeTelemetry.flush();
+    } else {
+      logger.debug('HTTP/Auth retry still missing usable config');
+    }
   }
 
   /// Register device with backend. Mirrors Swift
@@ -417,8 +588,8 @@ abstract final class RunAnywhere {
   static Future<void> runDiscoveryIfNeeded() async {
     if (_hasRunDiscovery) return;
     final logger = SDKLogger('RunAnywhere.Discovery');
-    final result =
-        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+    final result = await DartBridgeModelRegistry.instance
+        .discoverDownloadedModels();
     if (result.discoveredModels.isNotEmpty) {
       logger.info(
         'Discovered ${result.discoveredModels.length} downloaded models',
@@ -443,6 +614,7 @@ abstract final class RunAnywhere {
 
     DartBridge.modelLifecycle.reset();
     _hasRunDiscovery = false;
+    _hasCompletedHTTPSetup = false;
     _cachedInitParams = null;
     _servicesInitFuture = null;
     DartBridgeModelRegistry.instance.shutdown();
@@ -571,32 +743,49 @@ abstract final class RunAnywhere {
   static Future<void> refreshModelRegistry() =>
       RunAnywhereModels.shared.refreshModelRegistry();
 
-  /// Proto-backed model lifecycle load.
-  static Future<ModelLoadResult> loadModelLifecycle(ModelLoadRequest request) =>
+  /// Proto-backed model lifecycle load. Matches the universal
+  /// `RunAnywhere.loadModel(request)` name on Swift, Kotlin, RN, and Web.
+  static Future<ModelLoadResult> loadModel(ModelLoadRequest request) =>
       RunAnywhereModelLifecycle.shared.load(request);
 
-  /// Proto-backed model lifecycle unload.
-  static Future<ModelUnloadResult> unloadModelLifecycle(
-          ModelUnloadRequest request) =>
+  /// Proto-backed model lifecycle unload. Matches the universal
+  /// `RunAnywhere.unloadModel(request)` name on Swift, Kotlin, RN, and Web.
+  static Future<ModelUnloadResult> unloadModel(ModelUnloadRequest request) =>
       RunAnywhereModelLifecycle.shared.unload(request);
 
+  /// Polymorphic load — dispatch on [ModelInfo.category]. Drop-in replacement
+  /// for the per-capability `llm.load` / `stt.load` / `tts.loadVoice` /
+  /// `vlm.load` / `vad.loadModel` switch ladders that example view-models
+  /// otherwise hand-roll. Named `loadModelByInfo` to avoid collision with the
+  /// proto-backed [loadModel] overload (Dart has no method overloading).
+  static Future<void> loadModelByInfo(ModelInfo model) =>
+      RunAnywhereModels.shared.loadModel(model);
+
+  /// Polymorphic unload — dispatch on [ModelInfo.category]. Named
+  /// `unloadModelByInfo` to avoid collision with the proto-backed [unloadModel].
+  static Future<void> unloadModelByInfo(ModelInfo model) =>
+      RunAnywhereModels.shared.unloadModel(model);
+
   /// Proto-backed current-model query.
-  static Future<CurrentModelResult> currentModel(
-          [CurrentModelRequest? request]) =>
-      RunAnywhereModelLifecycle.shared.current(request);
+  static Future<CurrentModelResult> currentModel([
+    CurrentModelRequest? request,
+  ]) => RunAnywhereModelLifecycle.shared.current(request);
+
+  /// Full [ModelInfo] for the model currently loaded under [category], or
+  /// `null` when nothing is loaded for it.
+  static Future<ModelInfo?> modelInfoForCategory(ModelCategory category) =>
+      RunAnywhereModelLifecycle.shared.modelInfoForCategory(category);
 
   /// Proto-backed component lifecycle snapshot.
   static sdk_events_pb.ComponentLifecycleSnapshot? componentLifecycleSnapshot(
     SDKComponent component,
-  ) =>
-      RunAnywhereModelLifecycle.shared.componentSnapshot(component);
+  ) => RunAnywhereModelLifecycle.shared.componentSnapshot(component);
 
   // --- Canonical flat methods (§3-§10 of spec) --------------------------------
 
   /// Canonical flat method — cancel any in-flight LLM generation.
   /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.
-  static Future<void> cancelGeneration() async =>
-      RunAnywhereLLM.shared.cancelGeneration();
+  static void cancelGeneration() => RunAnywhereLLM.shared.cancelGeneration();
 
   /// True when an LLM model is currently loaded. Mirrors Swift's
   /// `isLLMModelLoaded: Bool` property.
@@ -622,9 +811,10 @@ abstract final class RunAnywhere {
 
   /// Flat streaming alias — real FFI-backed streaming STT.
   /// Mirrors Swift / RN / Web `RunAnywhere.transcribeStream`.
-  static Stream<STTPartialResult> transcribeStream(Uint8List audio,
-          {STTOptions? options}) =>
-      RunAnywhereSTT.shared.transcribeStream(audio, options: options);
+  static Stream<STTPartialResult> transcribeStream(
+    Uint8List audio, {
+    STTOptions? options,
+  }) => RunAnywhereSTT.shared.transcribeStream(audio, options: options);
 
   /// Flat alias — synthesize text to proto [TTSOutput].
   /// Mirrors Swift / RN / Web `RunAnywhere.synthesize(text:options:)`.
@@ -658,28 +848,24 @@ abstract final class RunAnywhere {
   static Future<LLMGenerationResult> generate(
     String prompt, [
     LLMGenerationOptions? options,
-  ]) =>
-      RunAnywhereLLM.shared.generate(prompt, options);
+  ]) => RunAnywhereLLM.shared.generate(prompt, options);
 
   /// Flat generated-proto LLM request.
   static Future<LLMGenerationResult> generateRequest(
     LLMGenerateRequest request,
-  ) =>
-      RunAnywhereLLM.shared.generateRequest(request);
+  ) => RunAnywhereLLM.shared.generateRequest(request);
 
   /// Flat streaming generate.
   /// Mirrors Swift / RN / Web `RunAnywhere.generateStream(prompt:options:)`.
   static Stream<LLMStreamEvent> generateStream(
     String prompt, [
     LLMGenerationOptions? options,
-  ]) =>
-      RunAnywhereLLM.shared.generateStream(prompt, options);
+  ]) => RunAnywhereLLM.shared.generateStream(prompt, options);
 
   /// Flat generated-proto streaming LLM request.
   static Stream<LLMStreamEvent> generateStreamRequest(
     LLMGenerateRequest request,
-  ) =>
-      RunAnywhereLLM.shared.generateStreamRequest(request);
+  ) => RunAnywhereLLM.shared.generateStreamRequest(request);
 
   /// Extract structured output from raw model text using a typed schema.
   static StructuredOutputResult extractStructuredOutput({
@@ -693,36 +879,33 @@ abstract final class RunAnywhere {
     required String prompt,
     required JSONSchema schema,
     LLMGenerationOptions? options,
-  }) =>
-      RunAnywhereStructuredOutput.generateStructured(
-        prompt: prompt,
-        schema: schema,
-        options: options,
-      );
+  }) => RunAnywhereStructuredOutput.generateStructured(
+    prompt: prompt,
+    schema: schema,
+    options: options,
+  );
 
   /// Stream structured output events.
   static Stream<StructuredOutputStreamEvent> generateStructuredStream({
     required String prompt,
     required JSONSchema schema,
     LLMGenerationOptions? options,
-  }) =>
-      RunAnywhereStructuredOutput.generateStructuredStream(
-        prompt: prompt,
-        schema: schema,
-        options: options,
-      );
+  }) => RunAnywhereStructuredOutput.generateStructuredStream(
+    prompt: prompt,
+    schema: schema,
+    options: options,
+  );
 
   /// Generate raw LLM text with a structured-output configuration.
   static Future<LLMGenerationResult> generateWithStructuredOutput({
     required String prompt,
     required StructuredOutputOptions structuredOutput,
     LLMGenerationOptions? options,
-  }) =>
-      RunAnywhereStructuredOutput.generateWithStructuredOutput(
-        prompt: prompt,
-        structuredOutput: structuredOutput,
-        options: options,
-      );
+  }) => RunAnywhereStructuredOutput.generateWithStructuredOutput(
+    prompt: prompt,
+    structuredOutput: structuredOutput,
+    options: options,
+  );
 
   /// Register a tool executor.
   static void registerTool(ToolDefinition definition, ToolExecutor executor) =>
@@ -732,8 +915,7 @@ abstract final class RunAnywhere {
   static void registerTypedTool(
     ToolDefinition definition,
     TypedToolExecutor executor,
-  ) =>
-      RunAnywhereTools.shared.registerTypedTool(definition, executor);
+  ) => RunAnywhereTools.shared.registerTypedTool(definition, executor);
 
   /// Unregister a tool by name.
   static void unregisterTool(String toolName) =>
@@ -754,32 +936,29 @@ abstract final class RunAnywhere {
   static Future<ToolCallingResult> generateWithTools(
     String prompt, {
     ToolCallingOptions? options,
-  }) =>
-      RunAnywhereTools.shared.generateWithTools(prompt, options: options);
+  }) => RunAnywhereTools.shared.generateWithTools(prompt, options: options);
 
   /// Continue generation after a manual tool result.
   static Future<ToolCallingResult> continueWithToolResult(
     String originalPrompt,
     ToolResult toolResult, {
     ToolCallingOptions? options,
-  }) =>
-      RunAnywhereTools.shared.continueWithToolResult(
-        originalPrompt,
-        toolResult,
-        options: options,
-      );
+  }) => RunAnywhereTools.shared.continueWithToolResult(
+    originalPrompt,
+    toolResult,
+    options: options,
+  );
 
   /// RAG lifecycle-resolution helper.
   static Future<RAGConfiguration> ragResolvedConfiguration({
     required ModelInfo embeddingModel,
     required ModelInfo llmModel,
     RAGConfiguration? baseConfiguration,
-  }) =>
-      RunAnywhereRAG.shared.ragResolvedConfiguration(
-        embeddingModel: embeddingModel,
-        llmModel: llmModel,
-        baseConfiguration: baseConfiguration,
-      );
+  }) => RunAnywhereRAG.shared.ragResolvedConfiguration(
+    embeddingModel: embeddingModel,
+    llmModel: llmModel,
+    baseConfiguration: baseConfiguration,
+  );
 
   /// Create a RAG pipeline from generated config.
   static Future<void> ragCreatePipeline(RAGConfiguration config) =>
@@ -790,12 +969,11 @@ abstract final class RunAnywhere {
     required ModelInfo embeddingModel,
     required ModelInfo llmModel,
     RAGConfiguration? baseConfiguration,
-  }) =>
-      RunAnywhereRAG.shared.ragCreatePipelineForModels(
-        embeddingModel: embeddingModel,
-        llmModel: llmModel,
-        baseConfiguration: baseConfiguration,
-      );
+  }) => RunAnywhereRAG.shared.ragCreatePipelineForModels(
+    embeddingModel: embeddingModel,
+    llmModel: llmModel,
+    baseConfiguration: baseConfiguration,
+  );
 
   /// Destroy the RAG pipeline.
   static Future<void> ragDestroyPipeline() =>
@@ -828,6 +1006,32 @@ abstract final class RunAnywhere {
   /// Query the RAG pipeline.
   static Future<RAGResult> ragQuery(RAGQueryOptions options) =>
       RunAnywhereRAG.shared.ragQuery(options);
+
+  /// Download a registered model by id. Drains the commons-backed progress
+  /// stream, forwarding each event to [onProgress], and returns the terminal
+  /// [DownloadProgress] on completion.
+  ///
+  /// Mirrors Swift `RunAnywhere.downloadModel(_:onProgress:) async throws ->
+  /// RADownloadProgress`: callers await the final result and observe progress
+  /// via the optional callback — they do not need to manage the stream
+  /// themselves. Throws [SDKException] on failure or cancellation.
+  static Future<DownloadProgress> downloadModel(
+    String modelId, {
+    Future<void> Function(DownloadProgress)? onProgress,
+  }) async {
+    DownloadProgress? last;
+    await for (final progress in RunAnywhereDownloads.shared.start(modelId)) {
+      last = progress;
+      if (onProgress != null) {
+        await onProgress(progress);
+      }
+    }
+    return last ??
+        DownloadProgress(
+          modelId: modelId,
+          errorMessage: 'No progress events received for model: $modelId',
+        );
+  }
 
   /// Flat streaming voice agent events.
   /// Mirrors Swift `RunAnywhere.streamVoiceAgent()`.

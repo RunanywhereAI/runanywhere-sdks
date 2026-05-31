@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Generate Swift bindings via apple/swift-protobuf + (GAP 09) grpc-swift.
+# Generate Swift bindings via apple/swift-protobuf + grpc-swift.
 #
 # Requirements:
 #   brew install protobuf swift-protobuf
-#   GAP 09 streaming services additionally need:
+#   Streaming services additionally need:
 #     brew install grpc-swift   # provides protoc-gen-grpc-swift
 #
 # Output:
@@ -20,7 +20,7 @@ OUT_DIR="${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Generated"
 mkdir -p "${OUT_DIR}"
 
 if ! command -v protoc >/dev/null 2>&1; then
-    echo "error: protoc not found. Run scripts/setup-toolchain.sh." >&2
+    echo "error: protoc not found. Run scripts/setup/setup-toolchain.sh." >&2
     exit 127
 fi
 if ! command -v protoc-gen-swift >/dev/null 2>&1; then
@@ -29,9 +29,9 @@ if ! command -v protoc-gen-swift >/dev/null 2>&1; then
     exit 127
 fi
 
-# IDL-19c: canonical proto-file list from generate_all.sh, with fallback to
+# Canonical proto-file list from generate_all.sh, with fallback to
 # filesystem discovery when invoked standalone.
-# IDL-19b: router.proto is now included (empty exclusion list) so Swift has
+# router.proto is now included (empty exclusion list) so Swift has
 # future-proof parity with Kotlin / C++; no active Swift consumer today, but
 # generated RAFrameworksForCapabilityRequest/Response exist for symmetry with
 # Kotlin's positive-list semantic (prior commit 769ceccff).
@@ -67,7 +67,7 @@ protoc \
 
 echo "✓ Swift proto codegen → ${OUT_DIR}"
 
-# SWF-grpc delete (Wave H-2): the `*.grpc.swift` stubs require GRPCCore /
+# The `*.grpc.swift` stubs require GRPCCore /
 # GRPCProtobuf and therefore macOS 15 / iOS 18 — above our supported
 # minimums (macOS 14 / iOS 17). Swift consumes streaming services through
 # hand-written AsyncStream adapters (VoiceAgentStreamAdapter,
@@ -83,20 +83,20 @@ echo "✓ Swift proto codegen → ${OUT_DIR}"
 # any future ones, so this gate stays correct without per-service updates.
 rm -f "${OUT_DIR}"/*.grpc.swift
 
-# P4-T2: emit RAConvenience.swift from rac_options.proto annotations
+# Emit RAConvenience.swift from rac_options.proto annotations
 # (rac_display_name / rac_analytics_key / rac_wire_string + future rac_default /
 # rac_required / rac_min / rac_max). The post-processor reads idl/*.proto via
 # protoc --descriptor_set_out and writes hand-friendly accessor extensions onto
 # the RA* swift-protobuf types in the same module.
 if command -v python3 >/dev/null 2>&1; then
     python3 "${SCRIPT_DIR}/generate_swift_convenience.py"
-    # Phase B (P4-T13): generate `ModalityProtoABI+Generated.swift` from the
+    # Generate `ModalityProtoABI+Generated.swift` from the
     # manifest at swift-modality-abi.yaml. Owns the dlsym table for the 7
     # fully-equivalent modality-ABI methods.
     python3 "${SCRIPT_DIR}/generate_swift_modality_abi.py"
 else
     echo "warning: python3 not found — skipping RAConvenience.swift + ModalityProtoABI codegen." >&2
-    echo "         Install python3 (https://www.python.org) to enable P4-T2/P4-T13 annotations." >&2
+    echo "         Install python3 (https://www.python.org) to enable annotations." >&2
 fi
 
 ls -1 "${OUT_DIR}"

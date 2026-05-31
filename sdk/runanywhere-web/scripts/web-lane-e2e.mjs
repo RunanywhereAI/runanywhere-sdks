@@ -213,15 +213,19 @@ function isSherpaWasmPresentOnDisk() {
   }
 }
 
-function recentConsoleText(limit = 120) {
-  return consoleEntries.slice(-limit).map((e) => e.text).join('\n');
+function consoleMarker() {
+  return consoleEntries.length;
 }
 
-function speechInfraLimitedReason() {
+function recentConsoleText(limit = 120, since = 0) {
+  return consoleEntries.slice(since).slice(-limit).map((e) => e.text).join('\n');
+}
+
+function speechInfraLimitedReason(since = 0) {
   if (!isSherpaWasmPresentOnDisk()) {
     return 'Sherpa ONNX WASM artifact missing (CI/skip build)';
   }
-  const blob = recentConsoleText();
+  const blob = recentConsoleText(120, since);
   if (/gzip -d|Failed to open archive.*tar\.gz/i.test(blob)) {
     return 'STT/TTS archive extract failed in browser (tar.gz)';
   }
@@ -229,10 +233,37 @@ function speechInfraLimitedReason() {
     && /backend not available|Backend not available/i.test(blob)) {
     return 'ONNX/Sherpa backend not registered';
   }
-  if (/pthread_create failed/i.test(blob)) {
-    return 'Sherpa/ONNX pthread blocked in headless Playwright';
+  if (/pthread_create failed/i.test(blob)
+    && /SherpaONNXBridge|Sherpa\.(STT|TTS)/i.test(blob)) {
+    return 'Sherpa/ONNX pthread blocked in WASM (single-threaded ORT required)';
   }
   return '';
+}
+
+function vlmInfraLimitedReason(since = 0) {
+  const blob = recentConsoleText(120, since);
+  if (/exceed its storage quota|quotaExceeded|model\.quotaExceeded/i.test(blob)) {
+    return 'OPFS storage quota exceeded during VLM download';
+  }
+  if (/memory access out of bounds|OOM|out of memory/i.test(blob)) {
+    return 'VLM WASM OOM during load';
+  }
+  return '';
+}
+
+async function freeSpeechModelsFromOpfs(page) {
+  await page.evaluate(async ({ sttId, ttsId }) => {
+    const sdk = window.__RUNANYWHERE_SDK__;
+    if (!sdk) return;
+    try {
+      await sdk.unloadModel?.();
+    } catch { /* ignore */ }
+    try {
+      sdk.removeModel?.(sttId);
+      sdk.removeModel?.(ttsId);
+    } catch { /* ignore */ }
+  }, { sttId: STT_MODEL_ID, ttsId: TTS_MODEL_ID });
+  await page.waitForTimeout(1500);
 }
 
 async function registerOnnx(page) {
@@ -266,6 +297,7 @@ async function registerLlamaCpp(page) {
 
 async function downloadAndLoadSpeech(page, modelName, modelId, pageHolder = null) {
   if (pageHolder) page = await ensureLivePage(pageHolder);
+  const consoleSince = consoleMarker();
   const reg = await registerOnnx(page);
   if (!reg.ok) {
     return {
@@ -283,7 +315,7 @@ async function downloadAndLoadSpeech(page, modelName, modelId, pageHolder = null
     await downloadModelInSheet(page, modelName, modelId, STT_DOWNLOAD_TIMEOUT_MS, pageHolder);
   } catch (err) {
     const registry = await isModelDownloadedInRegistry(page, modelId);
-    const infra = speechInfraLimitedReason();
+    const infra = speechInfraLimitedReason(consoleSince);
     if (registry.ok || infra) {
       return {
         status: 'LIMITED',
@@ -302,7 +334,7 @@ async function downloadAndLoadSpeech(page, modelName, modelId, pageHolder = null
     await loadModelInSheet(page, modelName, modelId, STT_LOAD_TIMEOUT_MS);
   } catch (err) {
     const registry = await isModelDownloadedInRegistry(page, modelId);
-    const infra = speechInfraLimitedReason();
+    const infra = speechInfraLimitedReason(consoleSince);
     if (registry.ok || infra) {
       return {
         status: 'LIMITED',
@@ -592,8 +624,10 @@ async function downloadAndLoad(
   downloadTimeoutMs = 1_800_000,
   loadTimeoutMs = SPEECH_LOAD_TIMEOUT_MS,
   pageHolder = null,
+  { infraReason = speechInfraLimitedReason } = {},
 ) {
   if (pageHolder) page = await ensureLivePage(pageHolder);
+  const consoleSince = consoleMarker();
   const sheetOpen = await page.locator('.modal-sheet').isVisible().catch(() => false);
   if (!sheetOpen) await openModelSheet(page);
 
@@ -601,7 +635,7 @@ async function downloadAndLoad(
     await downloadModelInSheet(page, modelName, modelId, downloadTimeoutMs, pageHolder);
   } catch (err) {
     const registry = await isModelDownloadedInRegistry(page, modelId);
-    const infra = speechInfraLimitedReason();
+    const infra = infraReason(consoleSince);
     if (registry.ok || infra) {
       return {
         status: 'LIMITED',
@@ -617,11 +651,11 @@ async function downloadAndLoad(
     await loadModelInSheet(page, modelName, modelId, loadTimeoutMs);
   } catch (err) {
     const registry = await isModelDownloadedInRegistry(page, modelId);
-    const infra = speechInfraLimitedReason();
-    const blob = recentConsoleText();
-    const headlessLoad = infra
-      || /pthread_create failed|memory access out of bounds|OOM|out of memory/i.test(blob);
-    if (registry.ok || headlessLoad) {
+    const infra = infraReason(consoleSince);
+    const blob = recentConsoleText(120, consoleSince);
+    const wasmLoadBlocked = infra
+      || /memory access out of bounds|OOM|out of memory/i.test(blob);
+    if (registry.ok || wasmLoadBlocked) {
       return {
         status: 'LIMITED',
         notes: registry.ok
@@ -922,6 +956,8 @@ async function runExecutor() {
       const livePage = pageHolder.page;
       await assertCrossOriginIsolated(livePage, 'tc09');
       await registerLlamaCpp(livePage);
+      // Free Sherpa speech artifacts so multi-file VLM (gguf + mmproj) fits OPFS.
+      await freeSpeechModelsFromOpfs(livePage);
       await clickTab(livePage, 'Vision');
       await livePage.locator('#vision-model-btn').click();
       const vlm = await downloadAndLoad(
@@ -931,6 +967,7 @@ async function runExecutor() {
         VLM_DOWNLOAD_TIMEOUT_MS,
         VLM_LOAD_TIMEOUT_MS,
         pageHolder,
+        { infraReason: vlmInfraLimitedReason },
       );
       const registry = await isModelDownloadedInRegistry(livePage, VLM_MODEL_ID).catch(() => ({ ok: false }));
       if (vlm.status !== 'PASS') {

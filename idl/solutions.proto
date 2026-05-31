@@ -97,7 +97,7 @@ message VoiceAgentConfig {
     string audio_file_path = 15;
 
     // Barge-in behavior.
-    bool   enable_barge_in = 8;  // default true
+    optional bool enable_barge_in = 8;  // default true when unset
     int32  barge_in_threshold_ms = 9;  // default 200
 
     // LLM behavior.

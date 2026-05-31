@@ -294,6 +294,8 @@ class ErrorCode extends $pb.ProtobufEnum {
       ErrorCode._(260, _omitEnumNames ? '' : 'ERROR_CODE_NULL_POINTER');
   static const ErrorCode ERROR_CODE_BUFFER_TOO_SMALL =
       ErrorCode._(261, _omitEnumNames ? '' : 'ERROR_CODE_BUFFER_TOO_SMALL');
+  static const ErrorCode ERROR_CODE_OUTPUT_TRUNCATED =
+      ErrorCode._(262, _omitEnumNames ? '' : 'ERROR_CODE_OUTPUT_TRUNCATED');
 
   /// -- Audio (-280..-299) -------------------------------------------------
   static const ErrorCode ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED = ErrorCode._(
@@ -393,6 +395,8 @@ class ErrorCode extends $pb.ProtobufEnum {
       ErrorCode._(603, _omitEnumNames ? '' : 'ERROR_CODE_BACKEND_BUSY');
   static const ErrorCode ERROR_CODE_BACKEND_UNAVAILABLE =
       ErrorCode._(604, _omitEnumNames ? '' : 'ERROR_CODE_BACKEND_UNAVAILABLE');
+  static const ErrorCode ERROR_CODE_RUNTIME_UNAVAILABLE =
+      ErrorCode._(605, _omitEnumNames ? '' : 'ERROR_CODE_RUNTIME_UNAVAILABLE');
   static const ErrorCode ERROR_CODE_INVALID_HANDLE =
       ErrorCode._(610, _omitEnumNames ? '' : 'ERROR_CODE_INVALID_HANDLE');
 
@@ -418,7 +422,7 @@ class ErrorCode extends $pb.ProtobufEnum {
   static const ErrorCode ERROR_CODE_INTERNAL =
       ErrorCode._(805, _omitEnumNames ? '' : 'ERROR_CODE_INTERNAL');
 
-  /// -- Plugin (GAP 02 / GAP 03; -810..-829) -------------------------------
+  /// -- Plugin (-810..-829) ------------------------------------------------
   static const ErrorCode ERROR_CODE_ABI_VERSION_MISMATCH =
       ErrorCode._(810, _omitEnumNames ? '' : 'ERROR_CODE_ABI_VERSION_MISMATCH');
   static const ErrorCode ERROR_CODE_CAPABILITY_UNSUPPORTED = ErrorCode._(
@@ -514,6 +518,7 @@ class ErrorCode extends $pb.ProtobufEnum {
     ERROR_CODE_INVALID_ARGUMENT,
     ERROR_CODE_NULL_POINTER,
     ERROR_CODE_BUFFER_TOO_SMALL,
+    ERROR_CODE_OUTPUT_TRUNCATED,
     ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED,
     ERROR_CODE_AUDIO_SESSION_FAILED,
     ERROR_CODE_MICROPHONE_PERMISSION_DENIED,
@@ -553,6 +558,7 @@ class ErrorCode extends $pb.ProtobufEnum {
     ERROR_CODE_BACKEND_INIT_FAILED,
     ERROR_CODE_BACKEND_BUSY,
     ERROR_CODE_BACKEND_UNAVAILABLE,
+    ERROR_CODE_RUNTIME_UNAVAILABLE,
     ERROR_CODE_INVALID_HANDLE,
     ERROR_CODE_EVENT_INVALID_CATEGORY,
     ERROR_CODE_EVENT_SUBSCRIPTION_FAILED,

@@ -108,7 +108,7 @@ int main() {
 
     {
         auto fallback = make_vt("fallback_diffusion", 10, RAC_PRIMITIVE_DIFFUSION);
-        auto generate_unavailable = make_vt("diffusion-coreml", 200, RAC_PRIMITIVE_UNSPECIFIED);
+        auto generate_unavailable = make_vt("diffusion_coreml", 200, RAC_PRIMITIVE_UNSPECIFIED);
 
         CHECK(rac_plugin_register(&fallback) == RAC_SUCCESS, "diffusion fallback registers");
         CHECK(rac_plugin_register(&generate_unavailable) == RAC_SUCCESS,
@@ -118,9 +118,9 @@ int main() {
         CHECK(route_is(router, RAC_PRIMITIVE_DIFFUSION, &fallback),
               "diffusion route skips CoreML shell with no generate op");
 
-        cleanup("diffusion-coreml");
+        cleanup("diffusion_coreml");
 
-        auto no_bundle = make_vt("diffusion-coreml", 200, RAC_PRIMITIVE_DIFFUSION,
+        auto no_bundle = make_vt("diffusion_coreml", 200, RAC_PRIMITIVE_DIFFUSION,
                                  backend_unavailable_capability_check);
         CHECK(rac_plugin_register(&no_bundle) == RAC_ERROR_CAPABILITY_UNSUPPORTED,
               "CoreML diffusion without a usable bundle is rejected");
@@ -128,7 +128,7 @@ int main() {
               "diffusion route keeps fallback when CoreML bundle is unavailable");
 
         cleanup("fallback_diffusion");
-        cleanup("diffusion-coreml");
+        cleanup("diffusion_coreml");
     }
 
     struct SpeechCase {

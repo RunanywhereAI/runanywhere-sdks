@@ -255,6 +255,63 @@ static rac_resolved_model_file_role_t infer_file_role(const fs::path& path,
     return RAC_RESOLVED_MODEL_FILE_ROLE_COMPANION;
 }
 
+// Public single-file role inference. Mirrors the Swift reference
+// RAModelFileRole+Inference.swift::inferModelFileRole(filename:modality:): a
+// modality-keyed filename classifier returning a descriptor-role
+// (rac_model_file_role_t / proto RAModelFileRole), distinct from the
+// format-keyed scan-time infer_file_role() above which returns the
+// resolved-role enum. Keyed on the proto ModelCategory value (so every SDK
+// passes its generated ModelCategory raw value directly); the returned int is
+// the proto RAModelFileRole value (identical to the rac_model_file_role_t
+// ordinal). The vision-projector (mmproj) branch only fires for the
+// multimodal category, matching the Swift source.
+rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_proto,
+                                       int32_t* out_role_proto) {
+    if (!filename || !out_role_proto) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    const std::string name = to_lower(filename_of(fs::path(filename)));
+
+    rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+    (void)rac_model_category_from_proto(modality_proto, &category);
+
+    if (category == RAC_MODEL_CATEGORY_MULTIMODAL &&
+        (name.find("mmproj") != std::string::npos || name.find("mm-proj") != std::string::npos ||
+         name.find("vision-projector") != std::string::npos ||
+         name.find("vision_projector") != std::string::npos ||
+         name.find("multimodal_projector") != std::string::npos ||
+         name.find("multi-modal-projector") != std::string::npos) &&
+        has_extension(fs::path(name), "gguf")) {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_VISION_PROJECTOR;
+        return RAC_SUCCESS;
+    }
+
+    if (name_equals_any(name, {"tokenizer.json", "tokenizer.model", "tokenizer_config.json",
+                               "special_tokens_map.json", "added_tokens.json", "tokens.txt",
+                               "sentencepiece.bpe.model", "spm.model"})) {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_TOKENIZER;
+        return RAC_SUCCESS;
+    }
+    if (name_equals_any(name, {"vocab.txt", "vocab.json"})) {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_VOCABULARY;
+        return RAC_SUCCESS;
+    }
+    if (name == "merges.txt") {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_MERGES;
+        return RAC_SUCCESS;
+    }
+    if (name_equals_any(name, {"config.json", "generation_config.json", "preprocessor_config.json",
+                               "processor_config.json", "image_processor_config.json",
+                               "model_config.json"})) {
+        *out_role_proto = RAC_MODEL_FILE_ROLE_CONFIG;
+        return RAC_SUCCESS;
+    }
+
+    *out_role_proto = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+    return RAC_SUCCESS;
+}
+
 static bool glob_match_ci(const std::string& pattern_raw, const std::string& value_raw) {
     std::string pattern = to_lower(normalize_slashes(pattern_raw));
     std::string value = to_lower(normalize_slashes(value_raw));

@@ -161,15 +161,33 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    std::string source_preview = text.substr(0, 100);
+    // Truncate the source preview at a UTF-8 character boundary, not a raw
+    // byte offset: a mid-sequence cut emits invalid UTF-8, which strict proto
+    // decoders (e.g. SwiftProtobuf) reject when this flows into RAGResult's
+    // string fields. Lenient decoders (Android/Wire, Flutter/dart) tolerated
+    // it via U+FFFD substitution, masking the corruption on those platforms.
+    size_t preview_len = text.size() < 100 ? text.size() : 100;
+    while (preview_len > 0 && preview_len < text.size() &&
+           (static_cast<unsigned char>(text[preview_len]) & 0xC0) == 0x80) {
+        --preview_len;
+    }
+    std::string source_preview = text.substr(0, preview_len);
     std::vector<DocumentChunk> doc_chunks;
     doc_chunks.reserve(chunks.size());
 
     for (size_t i = 0; i < chunks.size(); ++i) {
+        // Atomic ingest: if any chunk failed to embed (empty vector from
+        // embed_text fallback) or returned the wrong dimension, abort the
+        // whole document instead of silently skipping. Skipping leaves the
+        // caller's RAGStatistics looking like a successful ingest while
+        // future queries against those chunks silently never match — data
+        // loss without notification. Callers see this as
+        // RAC_ERROR_PROCESSING_FAILED via rac_rag_ingest_proto.
         if (embeddings[i].size() != embedding_dimension) {
-            LOGE("Embedding dimension mismatch at chunk %zu: got %zu, expected %zu", i,
-                 embeddings[i].size(), embedding_dimension);
-            continue;
+            LOGE("Embedding dimension mismatch at chunk %zu: got %zu, expected %zu; aborting "
+                 "document ingest",
+                 i, embeddings[i].size(), embedding_dimension);
+            return false;
         }
 
         DocumentChunk chunk;
@@ -355,7 +373,7 @@ RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
 // Query — GraphScheduler-driven DAG
 // =============================================================================
 //
-// GAP 05 / T4.6: the entire orchestration (embed → retrieve → assemble →
+// The entire orchestration (embed → retrieve → assemble →
 // generate) now lives in `run_rag_query()` which builds and runs a typed
 // `GraphScheduler` per call. This method is just the snapshot+dispatch
 // shim that hands the right inputs to the graph and translates its

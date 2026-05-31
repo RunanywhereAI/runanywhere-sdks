@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// test_voice_agent_pipeline.cpp — GAP 05 Phase 2 unit tests for the
+// test_voice_agent_pipeline.cpp — unit tests for the
 // VoiceAgent's GraphScheduler-driven pipeline (voice_agent_pipeline.cpp).
 //
 // These tests do NOT require backends or model files — they exercise the

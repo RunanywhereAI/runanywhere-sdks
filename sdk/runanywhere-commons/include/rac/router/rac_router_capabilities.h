@@ -2,7 +2,7 @@
  * @file rac_router_capabilities.h
  * @brief Proto-byte C ABI for engine-router capability queries.
  *
- * Wave H-5 (KOT-12). Replaces the per-SDK Kotlin / Swift / Dart / RN / Web
+ * Replaces the per-SDK Kotlin / Swift / Dart / RN / Web
  * `SDKComponent → ModelCategory → framework` mapping with a single
  * commons-owned lookup backed by the engine-router plugin registry.
  *

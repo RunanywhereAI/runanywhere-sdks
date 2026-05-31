@@ -88,6 +88,19 @@ RAC_API rac_bool_t rac_is_initialized(void);
 RAC_API rac_version_t rac_get_version(void);
 
 /**
+ * Gets the canonical SDK version string.
+ *
+ * Returns the value of `sdk/runanywhere-commons/VERSION`, injected at build
+ * time via the RAC_VERSION_STRING compile define. This is the single source of
+ * truth every platform SDK delegates to for its public `version` constant
+ * instead of hand-maintaining a copy that can drift.
+ *
+ * @return Static, NUL-terminated version string (e.g. "0.19.13"); never NULL,
+ *         valid for the lifetime of the process. Do not free.
+ */
+RAC_API const char* rac_sdk_get_version(void);
+
+/**
  * Configures logging based on the environment.
  *
  * This configures C++ local logging (stderr) based on the environment:
@@ -176,7 +189,7 @@ RAC_API rac_result_t rac_modules_for_capability(rac_capability_t capability,
 RAC_API rac_result_t rac_module_get_info(const char* module_id, const rac_module_info_t** out_info);
 
 // =============================================================================
-// v3 NOTE: The legacy service-registry surface (rac_service_request_t,
+// NOTE: The legacy service-registry surface (rac_service_request_t,
 // rac_service_provider_t, rac_service_can_handle_fn, rac_service_create_fn,
 // rac_service_register_provider, rac_service_unregister_provider,
 // rac_service_create, rac_service_list_providers, RAC_DEPRECATED_LEGACY_SVC)

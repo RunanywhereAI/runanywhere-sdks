@@ -37,29 +37,31 @@ object SecureStorageManager {
     fun getContext(): Context? = context
 
     /**
-     * Initialize with application context
-     * Must be called before any other operations
+     * Initialize with application context.
+     * Thread-safe: guards against concurrent first-call races from JNI threads and NitroModules init.
      */
     @JvmStatic
     fun initialize(applicationContext: Context) {
         if (context != null) return
+        synchronized(this) {
+            if (context != null) return
+            context = applicationContext.applicationContext
+            try {
+                val masterKey = MasterKey.Builder(context!!)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
 
-        context = applicationContext.applicationContext
-        try {
-            val masterKey = MasterKey.Builder(context!!)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-
-            encryptedPrefs = EncryptedSharedPreferences.create(
-                context!!,
-                PREFS_NAME,
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-            Log.i(TAG, "SecureStorageManager initialized")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize EncryptedSharedPreferences", e)
+                encryptedPrefs = EncryptedSharedPreferences.create(
+                    context!!,
+                    PREFS_NAME,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+                Log.i(TAG, "SecureStorageManager initialized")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize EncryptedSharedPreferences", e)
+            }
         }
     }
 

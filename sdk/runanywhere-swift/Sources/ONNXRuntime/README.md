@@ -237,45 +237,31 @@ try await RunAnywhere.resetVAD()
 ### ONNX Module
 
 ```swift
-public enum ONNX: RunAnywhereModule {
-    /// Module identifier
-    public static let moduleId = "onnx"
-
-    /// Human-readable module name
-    public static let moduleName = "ONNX Runtime"
-
-    /// Capabilities provided by this module
-    public static let capabilities: Set<SDKComponent> = [.stt, .tts, .vad]
-
-    /// Default registration priority
-    public static let defaultPriority: Int = 100
-
-    /// Inference framework used
-    public static let inferenceFramework: InferenceFramework = .onnx
-
+public enum ONNX {
     /// Module version
     public static let version = "2.0.0"
 
     /// Underlying ONNX Runtime version
     public static let onnxRuntimeVersion = "1.23.2"
 
-    /// Register the module with the service registry
+    /// Register the ONNX backend with the C++ service registry.
+    /// Registers the generic ONNX module (embeddings + Silero VAD) and the
+    /// Sherpa-ONNX engine plugin (STT: Whisper / Zipformer / Paraformer,
+    /// TTS: Piper / VITS) so `framework == .sherpa` resolves through the
+    /// unified C++ plugin router.
     @MainActor
     public static func register(priority: Int = 100)
 
-    /// Unregister the module
+    /// Unregister the ONNX backend (also unregisters the Sherpa-ONNX plugin)
+    @MainActor
     public static func unregister()
 
-    /// Check if the module can handle a given STT model
-    public static func canHandleSTT(modelId: String?) -> Bool
-
-    /// Check if the module can handle a given TTS model
-    public static func canHandleTTS(modelId: String?) -> Bool
-
-    /// Check if the module can handle VAD
-    public static func canHandleVAD(modelId: String?) -> Bool
+    /// Trigger registration via property access (auto-registration helper)
+    public static let autoRegister: Void
 }
 ```
+
+`ONNX` is a thin `public enum` namespace. Model-to-backend routing (STT / TTS / VAD) is performed by the C++ plugin router (`rac_router_*` / `rac_plugin_route`) using the proto-typed `RAInferenceFramework` / `RAModelCategory` tables — there are no Swift-side `canHandleSTT` / `canHandleTTS` / `canHandleVAD` methods or `capabilities` set.
 
 ### Model Compatibility
 

@@ -31,8 +31,8 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * Inputs for the canonical "register a model from a URL" entry point (P2-T6).
- * Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+ * Inputs for the canonical "register a model from a URL" entry point.
+ * Composes ModelInfoMakeRequest with the existing registry save path
  * so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
  * Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
  * shape).

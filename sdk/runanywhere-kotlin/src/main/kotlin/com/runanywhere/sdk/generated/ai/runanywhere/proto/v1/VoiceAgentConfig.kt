@@ -142,16 +142,15 @@ public class VoiceAgentConfig(
   public val audio_file_path: String = "",
   /**
    * Barge-in behavior.
-   * default true
+   * default true when unset
    */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "enableBargeIn",
     schemaIndex = 9,
   )
-  public val enable_barge_in: Boolean = false,
+  public val enable_barge_in: Boolean? = null,
   /**
    * default 200
    */
@@ -268,7 +267,7 @@ public class VoiceAgentConfig(
       result = result * 37 + chunk_ms.hashCode()
       result = result * 37 + audio_source.hashCode()
       result = result * 37 + audio_file_path.hashCode()
-      result = result * 37 + enable_barge_in.hashCode()
+      result = result * 37 + (enable_barge_in?.hashCode() ?: 0)
       result = result * 37 + barge_in_threshold_ms.hashCode()
       result = result * 37 + system_prompt.hashCode()
       result = result * 37 + max_context_tokens.hashCode()
@@ -292,7 +291,7 @@ public class VoiceAgentConfig(
     result += """chunk_ms=$chunk_ms"""
     result += """audio_source=$audio_source"""
     result += """audio_file_path=${sanitize(audio_file_path)}"""
-    result += """enable_barge_in=$enable_barge_in"""
+    if (enable_barge_in != null) result += """enable_barge_in=$enable_barge_in"""
     result += """barge_in_threshold_ms=$barge_in_threshold_ms"""
     result += """system_prompt=${sanitize(system_prompt)}"""
     result += """max_context_tokens=$max_context_tokens"""
@@ -313,7 +312,7 @@ public class VoiceAgentConfig(
     chunk_ms: Int = this.chunk_ms,
     audio_source: AudioSource = this.audio_source,
     audio_file_path: String = this.audio_file_path,
-    enable_barge_in: Boolean = this.enable_barge_in,
+    enable_barge_in: Boolean? = this.enable_barge_in,
     barge_in_threshold_ms: Int = this.barge_in_threshold_ms,
     system_prompt: String = this.system_prompt,
     max_context_tokens: Int = this.max_context_tokens,
@@ -363,9 +362,7 @@ public class VoiceAgentConfig(
         if (value.audio_file_path != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.audio_file_path)
         }
-        if (value.enable_barge_in != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.enable_barge_in)
-        }
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.enable_barge_in)
         if (value.barge_in_threshold_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.barge_in_threshold_ms)
         }
@@ -416,9 +413,7 @@ public class VoiceAgentConfig(
         if (value.audio_file_path != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 15, value.audio_file_path)
         }
-        if (value.enable_barge_in != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.enable_barge_in)
-        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.enable_barge_in)
         if (value.barge_in_threshold_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.barge_in_threshold_ms)
         }
@@ -462,9 +457,7 @@ public class VoiceAgentConfig(
         if (value.barge_in_threshold_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.barge_in_threshold_ms)
         }
-        if (value.enable_barge_in != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.enable_barge_in)
-        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.enable_barge_in)
         if (value.audio_file_path != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 15, value.audio_file_path)
         }
@@ -504,7 +497,7 @@ public class VoiceAgentConfig(
         var chunk_ms: Int = 0
         var audio_source: AudioSource = AudioSource.AUDIO_SOURCE_UNSPECIFIED
         var audio_file_path: String = ""
-        var enable_barge_in: Boolean = false
+        var enable_barge_in: Boolean? = null
         var barge_in_threshold_ms: Int = 0
         var system_prompt: String = ""
         var max_context_tokens: Int = 0

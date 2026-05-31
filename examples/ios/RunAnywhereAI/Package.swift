@@ -6,7 +6,7 @@
 // This example app demonstrates how to use the RunAnywhere SDK.
 //
 // SETUP (first time):
-//   ./scripts/build-core-xcframework.sh
+//   ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 //
 // Then open this project in Xcode and build.
 //
@@ -46,11 +46,11 @@ let package = Package(
             name: "RunAnywhereAI",
             dependencies: [
                 // Core SDK (always needed)
-                .product(name: "RunAnywhere", package: "runanywhere-sdks-main"),
+                .product(name: "RunAnywhere", package: "runanywhere-sdks"),
 
                 // Optional modules - pick what you need:
-                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks-main"),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
-                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks-main"),     // LLM
+                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
+                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),     // LLM
             ],
             path: "RunAnywhereAI",
             exclude: [

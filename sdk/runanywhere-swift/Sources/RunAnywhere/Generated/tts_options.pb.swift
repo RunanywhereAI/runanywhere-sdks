@@ -74,7 +74,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -85,7 +85,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   RN     TTSTypes.ts:117    ('male' | 'female' | 'neutral')
 /// (Other SDKs did not expose voice listing pre-IDL; canonicalized here.)
 /// ---------------------------------------------------------------------------
-public enum RATTSVoiceGender: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RATTSVoiceGender: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case male // = 1
@@ -127,7 +127,7 @@ public enum RATTSVoiceGender: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -199,7 +199,7 @@ public enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   enable_neural_voice= true
 ///   enable_ssml        = false
 /// ---------------------------------------------------------------------------
-public struct RATTSConfiguration: Sendable {
+public nonisolated struct RATTSConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -266,7 +266,7 @@ public struct RATTSConfiguration: Sendable {
 /// NULL`). On the wire, an empty string MUST be interpreted as "use the
 /// component's configured voice".
 /// ---------------------------------------------------------------------------
-public struct RATTSOptions: Sendable {
+public nonisolated struct RATTSOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -325,7 +325,7 @@ public struct RATTSOptions: Sendable {
   fileprivate var _style: String? = nil
 }
 
-public struct RATTSSynthesisRequest: Sendable {
+public nonisolated struct RATTSSynthesisRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -369,7 +369,7 @@ public struct RATTSSynthesisRequest: Sendable {
 /// **milliseconds** on the wire (matches C ABI). Swift / Kotlin / Dart bindings
 /// expose seconds (double) and convert at the binding boundary.
 /// ---------------------------------------------------------------------------
-public struct RATTSPhonemeTimestamp: Sendable {
+public nonisolated struct RATTSPhonemeTimestamp: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -394,7 +394,7 @@ public struct RATTSPhonemeTimestamp: Sendable {
 /// Mirrors the C ABI rac_tts_synthesis_metadata_t. Time units in milliseconds
 /// and durations as int64 to match the C ABI.
 /// ---------------------------------------------------------------------------
-public struct RATTSSynthesisMetadata: Sendable {
+public nonisolated struct RATTSSynthesisMetadata: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -435,7 +435,7 @@ public struct RATTSSynthesisMetadata: Sendable {
 /// JS ArrayBuffer/Float32Array, C void*). Sample rate is required because PCM
 /// payloads are otherwise unparseable.
 /// ---------------------------------------------------------------------------
-public struct RATTSOutput: @unchecked Sendable {
+public nonisolated struct RATTSOutput: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -537,7 +537,7 @@ public struct RATTSOutput: @unchecked Sendable {
 /// `audio_data` and `phoneme_timestamps`; `audio_size_bytes` is retained for
 /// callers that want to know how much was synthesized.
 /// ---------------------------------------------------------------------------
-public struct RATTSSpeakResult: Sendable {
+public nonisolated struct RATTSSpeakResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -594,7 +594,7 @@ public struct RATTSSpeakResult: Sendable {
 /// SDKs gain a typed voice-listing API. `gender` uses an enum to avoid the
 /// string-typed drift that RN had ('male' | 'female' | 'neutral').
 /// ---------------------------------------------------------------------------
-public struct RATTSVoiceInfo: Sendable {
+public nonisolated struct RATTSVoiceInfo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -632,7 +632,7 @@ public struct RATTSVoiceInfo: Sendable {
 /// Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
 /// per-voice callback pattern used by the legacy handle-based ABI so the
 /// lifecycle-driven listing call returns a single serialized message.
-public struct RATTSVoiceList: Sendable {
+public nonisolated struct RATTSVoiceList: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -644,7 +644,7 @@ public struct RATTSVoiceList: Sendable {
   public init() {}
 }
 
-public struct RATTSStreamEvent: @unchecked Sendable {
+public nonisolated struct RATTSStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -744,7 +744,7 @@ public struct RATTSStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RATTSServiceState: Sendable {
+public nonisolated struct RATTSServiceState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -785,17 +785,17 @@ public struct RATTSServiceState: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RATTSVoiceGender: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSVoiceGender: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TTS_VOICE_GENDER_UNSPECIFIED\0\u{1}TTS_VOICE_GENDER_MALE\0\u{1}TTS_VOICE_GENDER_FEMALE\0\u{1}TTS_VOICE_GENDER_NEUTRAL\0")
 }
 
-extension RATTSStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TTS_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}TTS_STREAM_EVENT_KIND_STARTED\0\u{1}TTS_STREAM_EVENT_KIND_AUDIO_CHUNK\0\u{1}TTS_STREAM_EVENT_KIND_PHONEME\0\u{1}TTS_STREAM_EVENT_KIND_COMPLETED\0\u{1}TTS_STREAM_EVENT_KIND_ERROR\0\u{1}TTS_STREAM_EVENT_KIND_PROGRESS\0")
 }
 
-extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}enable_neural_voice\0\u{3}enable_ssml\0\u{3}preferred_framework\0")
 
@@ -879,7 +879,7 @@ extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}speaker_id\0\u{1}speed\0\u{1}style\0")
 
@@ -963,7 +963,7 @@ extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RATTSSynthesisRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSSynthesisRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSSynthesisRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}text\0\u{1}ssml\0\u{1}options\0\u{1}metadata\0")
 
@@ -1017,7 +1017,7 @@ extension RATTSSynthesisRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RATTSPhonemeTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSPhonemeTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSPhonemeTimestamp"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phoneme\0\u{3}start_ms\0\u{3}end_ms\0")
 
@@ -1057,7 +1057,7 @@ extension RATTSPhonemeTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSSynthesisMetadata"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_id\0\u{3}language_code\0\u{3}processing_time_ms\0\u{3}character_count\0\u{3}audio_duration_ms\0\u{3}characters_per_second\0")
 
@@ -1112,7 +1112,7 @@ extension RATTSSynthesisMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOutput"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}duration_ms\0\u{3}phoneme_timestamps\0\u{1}metadata\0\u{3}timestamp_ms\0\u{3}chunk_index\0\u{3}is_final\0\u{3}audio_size_bytes\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1259,7 +1259,7 @@ extension RATTSOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RATTSSpeakResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSSpeakResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSSpeakResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}duration_ms\0\u{3}audio_size_bytes\0\u{1}metadata\0\u{3}timestamp_ms\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1328,7 +1328,7 @@ extension RATTSSpeakResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSVoiceInfo"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}display_name\0\u{3}language_code\0\u{1}gender\0\u{1}description\0\u{3}is_neural\0\u{3}is_system\0\u{3}sample_rate\0\u{3}supported_styles\0")
 
@@ -1398,7 +1398,7 @@ extension RATTSVoiceInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RATTSVoiceList: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSVoiceList: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSVoiceList"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voices\0")
 
@@ -1428,7 +1428,7 @@ extension RATTSVoiceList: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension RATTSStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}output\0\u{1}phoneme\0\u{3}speak_result\0\u{3}error_message\0\u{3}error_code\0\u{1}progress\0\u{3}chunk_index\0\u{3}total_chunks\0\u{3}elapsed_ms\0\u{3}status_message\0")
 
@@ -1589,7 +1589,7 @@ extension RATTSStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RATTSServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RATTSServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_voice\0\u{1}voices\0\u{3}supported_language_codes\0\u{3}error_message\0\u{3}error_code\0")
 

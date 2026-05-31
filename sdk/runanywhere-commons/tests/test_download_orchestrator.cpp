@@ -938,8 +938,7 @@ static TestResult test_proto_plan_rejects_path_traversal_destination() {
                     "Planned destination must remain rooted under model_folder");
         // Sanity: the original malicious string must not survive verbatim.
         if (!bad_path.empty()) {
-            ASSERT_TRUE(planned != bad_path,
-                        "Planner must not echo the malicious path verbatim");
+            ASSERT_TRUE(planned != bad_path, "Planner must not echo the malicious path verbatim");
             ASSERT_TRUE(planned.find("escape.gguf") == std::string::npos ||
                             planned.rfind(folder, 0) == 0,
                         "If escape.gguf survives, it must be inside model_folder");
@@ -986,7 +985,7 @@ static TestResult test_proto_start_skips_traversal_unsafe_plan_entry() {
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
     ASSERT_TRUE(rac_download_start_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
-                                          bytes.size(), &buffer) == RAC_SUCCESS,
+                                         bytes.size(), &buffer) == RAC_SUCCESS,
                 "Start call should succeed");
     rav1::DownloadStartResult start;
     ASSERT_TRUE(parse_start(buffer, &start), "Start result should parse");

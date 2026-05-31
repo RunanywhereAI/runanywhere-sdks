@@ -170,6 +170,13 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
 // to a Session struct which owns the underlying RAGBackend (which owns the
 // LLM + Embeddings service handles). The Session is created by
 // rac_rag_session_create_proto and freed by rac_rag_session_destroy_proto.
+//
+// Multi-session is the deliberate contract here: each handle is a fully
+// independent Session with its own RAGBackend (its own vector store + BM25
+// index + service handles) and no shared global state, so an app can keep
+// several RAG indexes live at once. Mobile SDK bridges currently expose only
+// one session for convenience, but that is a frontend choice, not an ABI
+// limitation -- the commons layer imposes no single-session restriction.
 // ---------------------------------------------------------------------------
 struct Session {
     std::unique_ptr<RAGBackend> backend;
@@ -181,17 +188,20 @@ Session* as_session(rac_handle_t handle) {
 
 RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& proto) {
     RAGBackendConfig bc;
-    if (proto.embedding_dimension() > 0)
+    // Numeric fields are proto3 `optional`, so presence == "caller-supplied
+    // override". This preserves explicit-zero values (e.g. chunk_overlap=0
+    // = no overlap) instead of silently re-applying the struct's defaults.
+    if (proto.has_embedding_dimension())
         bc.embedding_dimension = static_cast<size_t>(proto.embedding_dimension());
-    if (proto.top_k() > 0)
+    if (proto.has_top_k())
         bc.top_k = static_cast<size_t>(proto.top_k());
-    if (proto.similarity_threshold() > 0.0f)
+    if (proto.has_similarity_threshold())
         bc.similarity_threshold = proto.similarity_threshold();
-    if (proto.max_context_tokens() > 0)
+    if (proto.has_max_context_tokens())
         bc.max_context_tokens = static_cast<size_t>(proto.max_context_tokens());
-    if (proto.chunk_size() > 0)
+    if (proto.has_chunk_size())
         bc.chunk_size = static_cast<size_t>(proto.chunk_size());
-    if (proto.chunk_overlap() >= 0)
+    if (proto.has_chunk_overlap())
         bc.chunk_overlap = static_cast<size_t>(proto.chunk_overlap());
     if (proto.has_prompt_template() && !proto.prompt_template().empty())
         bc.prompt_template = proto.prompt_template();
@@ -269,13 +279,28 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // handing them to rac_embeddings_create_with_config / rac_llm_create.
     const std::string embedding_model_id = proto.embedding_model_id();
     const std::string llm_model_id = proto.llm_model_id();
-    const std::string reranker_model_id =
-        proto.has_reranker_model_id() ? proto.reranker_model_id() : std::string();
 
     if (embedding_model_id.empty()) {
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate",
                         "RAGConfiguration.embedding_model_id is required");
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Reranking is part of the public RAGConfiguration surface (rag.proto:128,
+    // rag.proto:130) but no rerank backend is wired up: rag_pipeline_graph
+    // skips the rerank step (rag_pipeline_graph.h:20-25) and every engine sets
+    // rac_engine_vtable_t::rerank_ops = nullptr. Silently honoring the request
+    // would let callers ship "reranked" RAG that is plain RRF fusion. Fail
+    // fast until the rerank vtable lands so misconfiguration surfaces at
+    // session-create instead of looking exactly like a working baseline.
+    const bool rerank_requested =
+        proto.rerank_results() ||
+        (proto.has_reranker_model_id() && !proto.reranker_model_id().empty());
+    if (rerank_requested) {
+        const char* msg =
+            "reranking is not yet implemented; unset rerank_results and reranker_model_id";
+        publish_failure(RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag.sessionCreate", msg);
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
 
     std::string err_message;
@@ -289,18 +314,6 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     if (!llm_model_id.empty()) {
         llm_path = resolve_rag_model_id_to_path(llm_model_id, &err_message);
         if (llm_path.empty()) {
-            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
-            return RAC_ERROR_MODEL_NOT_FOUND;
-        }
-    }
-
-    // Reranker is optional. When set but not resolvable, we fail the same way
-    // as missing LLM/embedding ids. RAGBackend does not consume the reranker
-    // path yet (see the separate reranker-wiring task), so we validate and
-    // discard.
-    if (!reranker_model_id.empty()) {
-        std::string reranker_path = resolve_rag_model_id_to_path(reranker_model_id, &err_message);
-        if (reranker_path.empty()) {
             publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate", err_message.c_str());
             return RAC_ERROR_MODEL_NOT_FOUND;
         }
@@ -473,10 +486,16 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     const std::string system_prompt =
         query_proto.has_system_prompt() ? query_proto.system_prompt() : std::string();
 
-    rac_llm_options_t opts = {};
+    // Base off RAC_LLM_OPTIONS_DEFAULT so the sampling fields RAGQueryOptions
+    // does not expose (repetition_penalty, min_p, seed, grammar, ...) carry the
+    // proto-documented disabled/default sentinels instead of a raw zero-init.
+    rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
     opts.temperature = query_proto.temperature() > 0.0f ? query_proto.temperature() : 0.7f;
     opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
+    // commons-030-A: RAGQueryOptions.top_k (idl/rag.proto:55) was silently
+    // dropped; thread it through. 0 = disabled (engine default).
+    opts.top_k = query_proto.top_k();
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     // Per-query retrieval overrides from RAGQueryOptions (idl/rag.proto:180-183).

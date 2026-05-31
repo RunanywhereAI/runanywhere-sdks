@@ -12,13 +12,13 @@
 //
 // Every message below is the *union* of fields currently declared by hand
 // across Swift, Kotlin, Dart, React Native, Web, and the C ABI. The pre-IDL
-// drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is
+// drift table is
 // what motivated this schema. Every SDK consumes generated output; nothing
 // is hand-written.
 //
 // Note: this file does NOT redefine VADEvent — that lives in
 // voice_events.proto and is imported here when needed. VADStreamEventKind
-// below is the canonical VAD event enum (IDL-18 absorbed the deleted
+// below is the canonical VAD event enum (it absorbed the deleted
 // VADEventType from voice_events.proto).
 
 #if canImport(FoundationEssentials)
@@ -33,7 +33,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -49,7 +49,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   C ABI  rac_vad_types.h:107              (RAC_SPEECH_STARTED, RAC_SPEECH_ENDED, RAC_SPEECH_ONGOING)
 /// Canonical union: STARTED, ENDED, ONGOING.
 /// ---------------------------------------------------------------------------
-public enum RASpeechActivityKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASpeechActivityKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
 
   /// Reserved (proto3 default)
@@ -93,7 +93,7 @@ public enum RASpeechActivityKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAVADAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVADAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case pcmF32Le // = 1
@@ -131,7 +131,7 @@ public enum RAVADAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case started // = 1
@@ -141,7 +141,7 @@ public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   case stopped // = 5
   case error // = 6
 
-  /// IDL-18 fold: pipeline-level barge-in signal previously carried by the
+  /// Pipeline-level barge-in signal previously carried by the
   /// deleted VADEventType enum. Emitted when the VAD detects speech that
   /// interrupts active assistant playback; downstream pipeline typically
   /// routes this through InterruptedEvent/InterruptReason as well.
@@ -213,7 +213,7 @@ public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 /// seconds (float), but ms is more interoperable across protobuf consumers.
 /// Generators must convert when binding to per-platform types.
 /// ---------------------------------------------------------------------------
-public struct RAVADConfiguration: Sendable {
+public nonisolated struct RAVADConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -296,7 +296,7 @@ public struct RAVADConfiguration: Sendable {
 ///   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
 /// Surfacing them as fields lets callers tune debouncing without a rebuild.
 /// ---------------------------------------------------------------------------
-public struct RAVADOptions: Sendable {
+public nonisolated struct RAVADOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -327,7 +327,7 @@ public struct RAVADOptions: Sendable {
   public init() {}
 }
 
-public struct RAVADAudioSource: Sendable {
+public nonisolated struct RAVADAudioSource: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -360,7 +360,7 @@ public struct RAVADAudioSource: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  public enum OneOf_Source: Equatable, Sendable {
+  public nonisolated enum OneOf_Source: Equatable, Sendable {
     case audioData(Data)
     case adapterHandle(String)
 
@@ -369,7 +369,7 @@ public struct RAVADAudioSource: Sendable {
   public init() {}
 }
 
-public struct RAVADProcessRequest: Sendable {
+public nonisolated struct RAVADProcessRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -423,7 +423,7 @@ public struct RAVADProcessRequest: Sendable {
 ///     analyzed frame). Wall-clock timestamps belong on the carrying envelope
 ///     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
 /// ---------------------------------------------------------------------------
-public struct RAVADResult: @unchecked Sendable {
+public nonisolated struct RAVADResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -520,7 +520,7 @@ public struct RAVADResult: @unchecked Sendable {
 /// used. The richer C ABI fields (segment counts, totals) belong on a future
 /// VADAnalytics message and are intentionally NOT included here.
 /// ---------------------------------------------------------------------------
-public struct RAVADStatistics: Sendable {
+public nonisolated struct RAVADStatistics: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -573,7 +573,7 @@ public struct RAVADStatistics: Sendable {
 /// `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
 /// component-level transition.
 /// ---------------------------------------------------------------------------
-public struct RASpeechActivityEvent: Sendable {
+public nonisolated struct RASpeechActivityEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -618,7 +618,7 @@ public struct RASpeechActivityEvent: Sendable {
   fileprivate var _segmentID: String? = nil
 }
 
-public struct RAVADStreamEvent: @unchecked Sendable {
+public nonisolated struct RAVADStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -691,7 +691,7 @@ public struct RAVADStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public struct RAVADServiceState: Sendable {
+public nonisolated struct RAVADServiceState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -736,21 +736,21 @@ public struct RAVADServiceState: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RASpeechActivityKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASpeechActivityKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SPEECH_ACTIVITY_KIND_UNSPECIFIED\0\u{1}SPEECH_ACTIVITY_KIND_SPEECH_STARTED\0\u{1}SPEECH_ACTIVITY_KIND_SPEECH_ENDED\0\u{1}SPEECH_ACTIVITY_KIND_ONGOING\0")
 }
 
-extension RAVADAudioEncoding: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADAudioEncoding: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_AUDIO_ENCODING_UNSPECIFIED\0\u{1}VAD_AUDIO_ENCODING_PCM_F32_LE\0\u{1}VAD_AUDIO_ENCODING_PCM_S16_LE\0")
 }
 
-extension RAVADStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}VAD_STREAM_EVENT_KIND_STARTED\0\u{1}VAD_STREAM_EVENT_KIND_FRAME\0\u{1}VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY\0\u{1}VAD_STREAM_EVENT_KIND_STATISTICS\0\u{1}VAD_STREAM_EVENT_KIND_STOPPED\0\u{1}VAD_STREAM_EVENT_KIND_ERROR\0\u{1}VAD_STREAM_EVENT_KIND_BARGE_IN\0")
 }
 
-extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADConfiguration"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{1}threshold\0\u{3}enable_auto_calibration\0\u{3}calibration_multiplier\0\u{3}preferred_framework\0\u{3}model_path\0\u{3}window_size_samples\0\u{3}max_speech_duration_ms\0")
 
@@ -829,7 +829,7 @@ extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}threshold\0\u{3}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0\u{3}include_statistics\0")
 
@@ -879,7 +879,7 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAVADAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADAudioSource"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}adapter_handle\0\u{1}encoding\0\u{3}sample_rate\0\u{1}channels\0\u{3}frame_offset_ms\0")
 
@@ -956,7 +956,7 @@ extension RAVADAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAVADProcessRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADProcessRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADProcessRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}audio\0\u{1}options\0\u{1}metadata\0")
 
@@ -1005,7 +1005,7 @@ extension RAVADProcessRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0\u{3}timestamp_ms\0\u{3}start_time_ms\0\u{3}end_time_ms\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1138,7 +1138,7 @@ extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADStatistics"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}current_energy\0\u{3}current_threshold\0\u{3}ambient_level\0\u{3}recent_avg\0\u{3}recent_max\0\u{3}total_speech_segments\0\u{3}total_speech_duration_ms\0\u{3}average_energy\0\u{3}peak_energy\0")
 
@@ -1208,7 +1208,7 @@ extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SpeechActivityEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_type\0\u{3}timestamp_ms\0\u{3}duration_ms\0\u{1}confidence\0\u{1}result\0\u{3}segment_id\0")
 
@@ -1267,7 +1267,7 @@ extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}result\0\u{1}activity\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1393,7 +1393,7 @@ extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension RAVADServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAVADServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADServiceState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}is_speech_active\0\u{3}energy_threshold\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{3}current_model\0\u{3}error_message\0\u{3}error_code\0")
 

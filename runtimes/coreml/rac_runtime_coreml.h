@@ -6,7 +6,7 @@
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
 
-MLModelConfiguration *rac_coreml_default_model_configuration(void);
+MLModelConfiguration* rac_coreml_default_model_configuration(void);
 
 /**
  * @brief Load a CoreML model bundle from `<dir>/<name>.mlmodelc`.
@@ -21,12 +21,10 @@ MLModelConfiguration *rac_coreml_default_model_configuration(void);
  *
  * Returns `nil` on missing/failed load; nil returns require no release.
  */
-MLModel *rac_coreml_load_model_in_dir(NSString *dir, NSString *name,
-                                      bool required, const char *log_category)
-    NS_RETURNS_RETAINED;
-bool rac_coreml_file_exists(NSString *path);
-NSString *rac_coreml_find_resource_dir(NSString *base_dir,
-                                       NSString *required_model_name);
+MLModel* rac_coreml_load_model_in_dir(NSString* dir, NSString* name, bool required,
+                                      const char* log_category) NS_RETURNS_RETAINED;
+bool rac_coreml_file_exists(NSString* path);
+NSString* rac_coreml_find_resource_dir(NSString* base_dir, NSString* required_model_name);
 #endif
 
 extern "C" {

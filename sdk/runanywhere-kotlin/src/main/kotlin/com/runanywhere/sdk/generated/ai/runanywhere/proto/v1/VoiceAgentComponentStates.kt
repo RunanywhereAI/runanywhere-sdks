@@ -31,20 +31,20 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * v3.2: VoiceAgent component-load lifecycle.
+ * VoiceAgent component-load lifecycle.
  *
  * Describes whether each sub-component (STT, LLM, TTS, VAD, wake-word) of the
  * voice agent has been loaded yet. Emitted on the
  * `VoiceEvent.component_state_changed` oneof arm whenever any component
  * transitions. Uses the canonical `ComponentLifecycleState` enum from
- * component_types.proto (IDL-04).
+ * component_types.proto.
  * ---------------------------------------------------------------------------
  * Aggregate load state across all four voice-agent components. Mirrors Swift
  * `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
  * `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
  * `VoiceAgentComponentStates`.
  *
- * IDL-04: The former `ComponentLoadState` enum was consolidated into the
+ * The former `ComponentLoadState` enum was consolidated into the
  * canonical richer `ComponentLifecycleState` (component_types.proto). Where
  * the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
  * component is ready to use", callers now use

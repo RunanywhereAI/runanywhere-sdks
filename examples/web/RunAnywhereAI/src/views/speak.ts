@@ -24,6 +24,7 @@ import {
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
+import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
 const TTS_PICKER_FILTER: readonly ModelCategory[] = [
@@ -97,7 +98,7 @@ function renderSpeak(): void {
     <div class="toolbar">
       <div class="toolbar-title">Speak</div>
       <div class="toolbar-actions">
-        <button class="btn btn-secondary" id="speak-model-btn">${escape(modelLabel)}</button>
+        <button class="btn btn-secondary" id="speak-model-btn">${escapeHtml(modelLabel)}</button>
         <button class="btn btn-secondary" id="onnx-register-btn">${
           status.registered ? 'Re-register ONNX' : 'Register ONNX backend'
         }</button>
@@ -113,7 +114,7 @@ function renderSpeak(): void {
           <li><code>RunAnywhere.tts.supportsProtoTTS()</code>: <strong>${
             status.supportsProto ? 'yes' : 'no'
           }</strong></li>
-          <li><code>TTS model loaded</code>: <strong>${loadedModel ? escape(loadedModel.id) : 'no'}</strong></li>
+          <li><code>TTS model loaded</code>: <strong>${loadedModel ? escapeHtml(loadedModel.id) : 'no'}</strong></li>
         </ul>
         <div id="onnx-register-status" class="docs-status"></div>
       </div>
@@ -125,7 +126,7 @@ function renderSpeak(): void {
             <p class="text-secondary">Type some text and let on-device TTS render it. Audio is decoded as PCM and played through <code>AudioPlayback</code>.</p>
             <textarea class="chat-input" id="speak-text" rows="3" ${
               isSynthesizing ? 'disabled' : ''
-            }>${escape(DEFAULT_TEXT)}</textarea>
+            }>${escapeHtml(DEFAULT_TEXT)}</textarea>
             <div class="toolbar-actions">
               <button class="btn btn-primary" id="speak-btn" ${
                 isSynthesizing || !canRunInference ? 'disabled' : ''
@@ -137,7 +138,7 @@ function renderSpeak(): void {
             <div id="speak-status" class="docs-status">${
               !canRunInference ? 'Load a TTS model first.' : ''
             }${
-              lastError ? `Error: ${escape(lastError)}` : ''
+              lastError ? `Error: ${escapeHtml(lastError)}` : ''
             }${
               lastDurationMs != null && !lastError && canRunInference
                 ? `Last synthesis: ${(lastDurationMs / 1000).toFixed(2)}s of audio.`
@@ -235,12 +236,4 @@ function pcmBytesToFloat32(bytes: Uint8Array): Float32Array {
 function formatErr(err: unknown): string {
   if (isSDKException(err)) return err.message;
   return formatError(err);
-}
-
-function escape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

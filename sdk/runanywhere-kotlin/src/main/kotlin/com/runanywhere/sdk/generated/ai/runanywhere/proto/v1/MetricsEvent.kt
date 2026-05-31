@@ -95,7 +95,7 @@ public class MetricsEvent(
   )
   public val is_over_budget: Boolean = false,
   /**
-   * v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+   * Monotonic producer-side timestamp in nanoseconds. Set by the
    * producer (C++ dispatcher) at event-emit time; read by consumers
    * (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
    * latency without relying on wall-clock sync. Encoded as int64 so

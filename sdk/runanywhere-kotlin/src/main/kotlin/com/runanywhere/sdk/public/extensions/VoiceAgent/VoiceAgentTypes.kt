@@ -11,7 +11,7 @@
 
 package com.runanywhere.sdk.public.extensions.VoiceAgent
 
-// IDL-04: VoiceAgentComponentStates now uses the richer canonical
+// VoiceAgentComponentStates now uses the richer canonical
 // `ComponentLifecycleState` (shared with SDKEvent). The former
 // `ComponentLoadState.LOADED` case maps to
 // `ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY`.

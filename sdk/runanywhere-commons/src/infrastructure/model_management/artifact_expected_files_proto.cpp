@@ -1,12 +1,12 @@
 /**
  * @file artifact_expected_files_proto.cpp
- * @brief Canonical ExpectedModelFiles helper (P2-T7).
+ * @brief Canonical ExpectedModelFiles helper.
  *
  * Commons-owned port of Swift's RAModelInfo.expectedArtifactFiles and the
  * underlying RAModelInfo.OneOf_Artifact.expectedFiles computed property
  * (sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/
  * ModelTypes+Artifacts.swift). Every field-set in this file mirrors the
- * Swift implementation 1:1 so the Swift extension can be deleted in P3-T3.
+ * Swift implementation 1:1 so the Swift extension can be deleted.
  *
  * Lives in a NEW source file (rather than appending to model_types.cpp or
  * model_registry.cpp) to stay merge-safe while concurrent agents edit

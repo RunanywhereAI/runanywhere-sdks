@@ -42,13 +42,26 @@ public extension RunAnywhere {
     /// Each element in `audio` must be `Data` holding IEEE-754 single-precision
     /// PCM samples at 16 kHz mono. The returned `AsyncStream` yields one
     /// `RAVADResult` per input chunk.
+    ///
+    /// When the underlying detector throws, the failure is surfaced as an
+    /// error-marked `RAVADResult` (non-empty `errorMessage`, non-zero
+    /// `errorCode`) and the stream finishes so callers do not silently keep
+    /// pumping audio into a dead detector.
     static func streamVAD(audio: AsyncStream<Data>) -> AsyncStream<RAVADResult> {
         AsyncStream<RAVADResult> { continuation in
             let task = Task {
                 for await chunk in audio {
                     guard !Task.isCancelled else { break }
-                    if let vadResult = try? await detectVoiceActivity(chunk) {
+                    do {
+                        let vadResult = try await detectVoiceActivity(chunk)
                         continuation.yield(vadResult)
+                    } catch {
+                        let sdkError = SDKException.from(error, category: .component)
+                        var failure = RAVADResult()
+                        failure.errorMessage = "VAD stream failed: \(sdkError.message)"
+                        failure.errorCode = Int32(sdkError.code.rawValue)
+                        continuation.yield(failure)
+                        break
                     }
                 }
                 continuation.finish()

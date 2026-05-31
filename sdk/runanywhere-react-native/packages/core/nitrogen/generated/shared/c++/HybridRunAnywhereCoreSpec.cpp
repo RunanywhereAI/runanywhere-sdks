@@ -16,6 +16,7 @@ namespace margelo::nitro::runanywhere {
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("initialize", &HybridRunAnywhereCoreSpec::initialize);
       prototype.registerHybridMethod("completeServicesInitialization", &HybridRunAnywhereCoreSpec::completeServicesInitialization);
+      prototype.registerHybridMethod("retryHTTPSetupProto", &HybridRunAnywhereCoreSpec::retryHTTPSetupProto);
       prototype.registerHybridMethod("destroy", &HybridRunAnywhereCoreSpec::destroy);
       prototype.registerHybridMethod("isInitialized", &HybridRunAnywhereCoreSpec::isInitialized);
       prototype.registerHybridMethod("pluginLoaderApiVersion", &HybridRunAnywhereCoreSpec::pluginLoaderApiVersion);
@@ -34,6 +35,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("getAvailableModelsProto", &HybridRunAnywhereCoreSpec::getAvailableModelsProto);
       prototype.registerHybridMethod("getModelInfoProto", &HybridRunAnywhereCoreSpec::getModelInfoProto);
       prototype.registerHybridMethod("registerModelProto", &HybridRunAnywhereCoreSpec::registerModelProto);
+      prototype.registerHybridMethod("registerModelFromUrlProto", &HybridRunAnywhereCoreSpec::registerModelFromUrlProto);
       prototype.registerHybridMethod("updateModelProto", &HybridRunAnywhereCoreSpec::updateModelProto);
       prototype.registerHybridMethod("removeModelProto", &HybridRunAnywhereCoreSpec::removeModelProto);
       prototype.registerHybridMethod("queryModelsProto", &HybridRunAnywhereCoreSpec::queryModelsProto);

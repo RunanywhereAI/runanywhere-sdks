@@ -5,7 +5,7 @@
 ///
 /// Mirrors Swift's ModelTypes+CppBridge.swift exactly. Enum mappers
 /// (proto integer ↔ C integer) delegate to commons' `rac_*_from_proto` /
-/// `rac_*_to_proto` ABIs (T15a + Wave 7A) so the conversion logic stays
+/// `rac_*_to_proto` ABIs so the conversion logic stays
 /// single-sourced in C++.
 library;
 
@@ -24,54 +24,9 @@ import 'package:runanywhere/native/types/basic_types.dart';
 // C++ Constants (from rac_model_types.h)
 // =============================================================================
 
-/// Model category constants (rac_model_category_t)
-abstract class RacModelCategory {
-  static const int language = 0;
-  static const int speechRecognition = 1;
-  static const int speechSynthesis = 2;
-  static const int vision = 3;
-  static const int imageGeneration = 4;
-  static const int multimodal = 5;
-  static const int audio = 6;
-  static const int embedding = 7;
-  static const int voiceActivityDetection = 8;
-  static const int unknown = 99;
-}
-
-/// Model format constants (rac_model_format_t)
-abstract class RacModelFormat {
-  static const int onnx = 0;
-  static const int ort = 1;
-  static const int gguf = 2;
-  static const int bin = 3;
-  static const int unknown = 99;
-}
-
-/// Inference framework constants (rac_inference_framework_t)
-abstract class RacInferenceFramework {
-  static const int onnx = 0;
-  static const int llamaCpp = 1;
-  static const int foundationModels = 2;
-  static const int systemTts = 3;
-  static const int fluidAudio = 4;
-  static const int builtIn = 5;
-  static const int none = 6;
-  static const int mlx = 7;
-  static const int coreml = 8;
-  static const int whisperkitCoreml = 9;
-  static const int metalrt = 10; // RAC_FRAMEWORK_METALRT
-  static const int genie = 11; // RAC_FRAMEWORK_GENIE
-  static const int sherpa = 12; // RAC_FRAMEWORK_SHERPA
-  static const int unknown = 99;
-}
-
-/// Model source constants (rac_model_source_t)
-abstract class RacModelSource {
-  static const int remote = 0;
-  static const int local = 1;
-}
-
-/// Artifact kind constants (rac_artifact_type_kind_t)
+/// Artifact kind constants (rac_artifact_type_kind_t).
+/// Values mirror commons' `rac_artifact_type_kind_t` enum:
+///   SINGLE_FILE = 0, ARCHIVE = 1, MULTI_FILE = 2, CUSTOM = 3, BUILT_IN = 4.
 abstract class RacArtifactKind {
   static const int singleFile = 0;
   static const int archive = 1;
@@ -80,31 +35,8 @@ abstract class RacArtifactKind {
   static const int builtIn = 4;
 }
 
-/// Archive type constants (rac_archive_type_t).
-/// Values mirror commons' `rac_archive_type_t` enum:
-///   `RAC_ARCHIVE_TYPE_NONE = -1` (no archive / direct file),
-///   ZIP = 0, TAR_BZ2 = 1, TAR_GZ = 2, TAR_XZ = 3.
-abstract class RacArchiveType {
-  static const int none = -1;
-  static const int zip = 0;
-  static const int tarBz2 = 1;
-  static const int tarGz = 2;
-  static const int tarXz = 3;
-}
-
-/// Archive structure constants (rac_archive_structure_t).
-/// Values mirror commons' `rac_archive_structure_t` enum:
-///   SINGLE_FILE_NESTED = 0, DIRECTORY_BASED = 1, NESTED_DIRECTORY = 2,
-///   UNKNOWN = 99.
-abstract class RacArchiveStructure {
-  static const int singleFileNested = 0;
-  static const int directoryBased = 1;
-  static const int nestedDirectory = 2;
-  static const int unknown = 99;
-}
-
 // =============================================================================
-// FFI bindings for commons enum mappers (T15a + Wave 7A)
+// FFI bindings for commons enum mappers
 //
 // Each pair maps a Dart proto enum integer (e.g.
 // `pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP.value`) to/from the
@@ -200,7 +132,7 @@ extension ProtoModelCategoryCppBridge on pb.ModelCategory {
   int toC() => _invokeEnumMapper(
         'rac_model_category_from_proto',
         value,
-        RacModelCategory.unknown,
+        99, // RAC_MODEL_CATEGORY_UNKNOWN
       );
 
   String get displayName {
@@ -236,7 +168,7 @@ extension ProtoModelFormatCppBridge on pb.ModelFormat {
   int toC() => _invokeEnumMapper(
         'rac_model_format_from_proto',
         value,
-        RacModelFormat.unknown,
+        99, // RAC_MODEL_FORMAT_UNKNOWN
       );
 
   String get rawValue {
@@ -267,7 +199,7 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
   int toC() => _invokeEnumMapper(
         'rac_inference_framework_from_proto',
         value,
-        RacInferenceFramework.unknown,
+        99, // RAC_FRAMEWORK_UNKNOWN
       );
 
   String get displayName {
@@ -310,7 +242,7 @@ extension ProtoModelSourceCppBridge on pb.ModelSource {
   int toC() => _invokeEnumMapper(
         'rac_model_source_from_proto',
         value,
-        RacModelSource.remote,
+        0, // RAC_MODEL_SOURCE_REMOTE
       );
 }
 
@@ -400,7 +332,7 @@ extension ProtoArchiveTypeCppBridge on pb.ArchiveType {
   int toC() => _invokeEnumMapper(
         'rac_archive_type_from_proto',
         value,
-        RacArchiveType.none,
+        -1, // RAC_ARCHIVE_TYPE_NONE
       );
 }
 
@@ -412,6 +344,6 @@ extension ProtoArchiveStructureCppBridge on pb.ArchiveStructure {
   int toC() => _invokeEnumMapper(
         'rac_archive_structure_from_proto',
         value,
-        RacArchiveStructure.unknown,
+        99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN
       );
 }

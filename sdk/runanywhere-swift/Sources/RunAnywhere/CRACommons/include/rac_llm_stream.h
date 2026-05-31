@@ -2,8 +2,6 @@
  * @file rac_llm_stream.h
  * @brief Proto-encoded LLMStreamEvent callback ABI for LLM token streaming.
  *
- * v2 close-out Phase G-2 — see docs/v2_closeout_phase_g2_report.md.
- *
  * Unified replacement for the per-SDK hand-rolled LLM streaming shims
  * (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
  * RN tokenQueue, Web HEAPU8 copy). Mirrors the proto-byte voice agent

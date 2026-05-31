@@ -245,9 +245,6 @@ dependencies {
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
 
-    // File Management & Storage
-    implementation(libs.commons.io)
-
     // ========================================
     // PDF Text Extraction (RAG document ingestion)
     // ========================================
@@ -255,11 +252,6 @@ dependencies {
 
     // Background Work
     implementation(libs.androidx.work.runtime.ktx)
-
-    // Speech Recognition & Audio Processing
-    implementation(libs.whisper.jni)
-    implementation(libs.android.vad.webrtc)
-    implementation(libs.prdownloader)
 
     // Security
     implementation(libs.androidx.security.crypto)

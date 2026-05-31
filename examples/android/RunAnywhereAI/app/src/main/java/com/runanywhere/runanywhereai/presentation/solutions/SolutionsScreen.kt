@@ -28,7 +28,7 @@ import com.runanywhere.sdk.public.extensions.solutions
 import kotlinx.coroutines.launch
 
 /**
- * Wave 3 Step 3.3 (G-E6): demo for `RunAnywhere.solutions.run(yaml = ...)`.
+ * Demo for `RunAnywhere.solutions.run(yaml = ...)`.
  *
  * Embeds the canonical voice_agent.yaml + rag.yaml from
  * sdk/runanywhere-commons/examples/solutions/ as inline string constants
@@ -86,7 +86,7 @@ private val RAG_YAML =
       bm25_b: 0.75
       rrf_k: 60
 
-      prompt_template: "Use the context below to answer.\nContext:\n{{context}}\n\nQuestion: {{query}}"
+      prompt_template: "Use the context below to answer.\n\nContext:\n{{context}}\n\nQuestion: {{query}}"
     """.trimIndent()
 
 @Composable

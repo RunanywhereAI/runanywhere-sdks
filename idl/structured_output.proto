@@ -2,7 +2,7 @@
 //
 // Every message and enum below is the *union* of cases currently declared by
 // hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
-// drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is what
+// drift table is what
 // motivated this schema. Every SDK consumes generated output; nothing is
 // hand-written.
 //

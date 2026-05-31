@@ -14,6 +14,7 @@ import com.runanywhere.sdk.public.extensions.cleanTempFiles
 import com.runanywhere.sdk.public.extensions.clearCache
 import com.runanywhere.sdk.public.extensions.deleteStorage
 import com.runanywhere.sdk.public.extensions.getStorageInfo
+import com.runanywhere.sdk.public.extensions.resetDeviceRegistration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -107,7 +108,6 @@ class SettingsViewModel(
         private const val SETTINGS_PREFS = "runanywhere_settings"
         private const val KEY_API_KEY = "runanywhere_api_key"
         private const val KEY_BASE_URL = "runanywhere_base_url"
-        private const val KEY_DEVICE_REGISTERED = "com.runanywhere.sdk.deviceRegistered"
         private const val KEY_ANALYTICS_LOG_LOCAL = "analyticsLogToLocal"
 
         // Generation settings constants (match iOS key names)
@@ -616,15 +616,14 @@ class SettingsViewModel(
     }
 
     /**
-     * Clear device registration status (forces re-registration on next launch)
+     * Clear device registration status (forces re-registration on next launch).
+     * Routes through the canonical `RunAnywhere.resetDeviceRegistration()`
+     * public API instead of poking the app-private SharedPreferences file
+     * `"runanywhere_sdk"` directly — that key never shadowed the real SDK
+     * flag and the old code was a no-op layering violation.
      */
     private fun clearDeviceRegistration() {
-        val context = getApplication<Application>()
-        context
-            .getSharedPreferences("runanywhere_sdk", Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_DEVICE_REGISTERED)
-            .apply()
+        RunAnywhere.resetDeviceRegistration()
         Timber.d("Device registration cleared - will re-register on next launch")
     }
 

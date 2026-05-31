@@ -4,7 +4,7 @@
  *
  * Mirrors Swift's CppBridge+ModelRegistry.swift pattern.
  *
- * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
+ * Bridge classification (see docs/CPP_PROTO_OWNERSHIP.md
  * "Bridge Layer Audit"):
  *   - `initialize()`, `shutdown()`, `getHandle()` stay as `internal`
  *     adapter glue — the proto wrappers in

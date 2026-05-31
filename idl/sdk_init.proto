@@ -1,6 +1,6 @@
 // RunAnywhere IDL — two-phase SDK initialization.
 //
-// P2-T9: Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
+// Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
 // list that lives in every SDK (RunAnywhere.swift, Kotlin RunAnywhere object,
 // Flutter RunAnywhereSDK, RN RunAnywhere, Web RunAnywhere) into a single C
 // ABI surface owned by commons. Platform SDKs still spawn their own
@@ -54,6 +54,19 @@ enum SdkInitPhase {
 // sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
 // (development=0, staging=1, production=2). Numeric values are part of the
 // wire format; do not reorder.
+//
+// The prior attempt to
+// add SDK_INIT_ENVIRONMENT_UNSPECIFIED=0 and bump the tristate to 1/2/3 broke
+// Swift iOS at runtime — the shipped librac_commons.a in
+// sdk/runanywhere-swift/Binaries/RACommons.xcframework was compiled with the
+// original 0/1/2 layout, so Swift sending the regenerated enum value 1
+// (DEVELOPMENT) was decoded as STAGING by the old C++ side, which then failed
+// validation with RAC_ERROR_INVALID_ARGUMENT ("API key required"). The other
+// SDKs (Kotlin / Flutter / RN / Web) were never regenerated for the bumped
+// layout either, so reverting to the original 0/1/2 wire-format restores
+// cross-SDK consistency without requiring a coordinated xcframework rebuild.
+// Re-introducing UNSPECIFIED=0 must be paired with a synchronized rebuild of
+// every prebuilt commons binary AND regeneration of all five SDK bindings.
 // ---------------------------------------------------------------------------
 enum SdkInitEnvironment {
     SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0;
@@ -109,4 +122,18 @@ message SdkInitResult {
     uint32       discovered_orphans     = 7;  // Phase 2: count of on-disk folders without registry rows.
     string       warning                = 8;  // Optional non-fatal note (e.g. "offline mode", "auth deferred").
     int64        duration_ms            = 9;  // Wall-clock duration for this phase.
+
+    // Explicit two-phase HTTP-setup completion flag,
+    // decoupled from services-init completion so SDKs that initialize
+    // offline (no connectivity) can still report success=true with
+    // has_completed_http_setup=false and retry HTTP later via the
+    // SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
+    // (`internal static var hasCompletedHTTPSetup`) and is the canonical
+    // signal Flutter / Web / RN consume to decide whether the next
+    // download/authenticated call can proceed without a retryHTTP step.
+    //
+    // Distinct from `http_configured` (field 4) which historically meant
+    // "HTTP transport wired up at this phase's call site"; this field is
+    // the cross-phase latched bit that survives between phase calls.
+    bool         has_completed_http_setup = 10;
 }

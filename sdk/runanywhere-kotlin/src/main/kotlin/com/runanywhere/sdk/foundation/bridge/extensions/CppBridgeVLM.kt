@@ -12,13 +12,13 @@
  * scaffold that mirrors the sibling modalities (LLM / STT / TTS / VAD)
  * for shape uniformity — the canonical VLM model state is owned by the
  * C++ lifecycle (`rac_model_lifecycle_load_proto`), and the proto
- * inference helpers route through the lifecycle whenever it is loaded
- * (Phase 6j / Wave 7 / T23). The vtable's `createFn` returns 0L by
+ * inference helpers route through the lifecycle whenever it is loaded.
+ * The vtable's `createFn` returns 0L by
  * design (see `ComponentVTable.jvmAndroid.kt`), so `getHandle()` on the
  * actor is intentionally non-functional; callers pass handle `0L` into
  * the proto ABI and commons acquires the lifecycle-owned VLM service.
  *
- * VLM-specific surfaces kept here (mirrors Swift's slim post-Wave-7
+ * VLM-specific surfaces kept here (mirrors Swift's slim
  * CppBridge+VLM.swift):
  *   - [cancel] — routes through `rac_vlm_cancel_lifecycle_proto` (no
  *     handle threaded), with a handle-based fallback for the transition
@@ -42,7 +42,6 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.types.RASDKEvent
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import com.runanywhere.sdk.public.types.RAVLMResult
@@ -85,6 +84,7 @@ object CppBridgeVLM {
      * Do not route through [ComponentActor.getHandle]: the VLM vtable
      * `createFn` returns `0L` by design and the actor rejects that as failure.
      */
+    @Suppress("FunctionOnlyReturningConstant")
     suspend fun getHandle(): Long = 0L
 
     suspend fun destroy() {
@@ -94,8 +94,8 @@ object CppBridgeVLM {
     /**
      * Cancel ongoing generation via the lifecycle cancel proto.
      *
-     * Replaces the legacy handle-based `rac_vlm_component_cancel` path
-     * (Wave 7 / T23). The lifecycle ABI acquires the lifecycle-owned
+     * Replaces the legacy handle-based `rac_vlm_component_cancel` path.
+     * The lifecycle ABI acquires the lifecycle-owned
      * VLM service internally, dispatches `cancel` on its vtable, and
      * emits canonical `CANCELLATION_EVENT_KIND_*` SDKEvents — keeping
      * the cancel path consistent with LLM cancellation semantics.
@@ -155,7 +155,7 @@ object CppBridgeVLM {
         )
 
     /**
-     * Stream VLM output as canonical [RASDKEvent] envelopes.
+     * Stream VLM output as canonical [SDKEvent] envelopes.
      *
      * Mirrors Swift `CppBridge.VLM.processStream` — the native call delivers
      * token events through the callback; the aggregate [VLMResult] returned
@@ -165,7 +165,7 @@ object CppBridgeVLM {
     suspend fun processStream(
         image: RAVLMImage,
         options: RAVLMGenerationOptions,
-        onEvent: (RASDKEvent) -> Boolean,
+        onEvent: (SDKEvent) -> Boolean,
     ): RAVLMResult {
         val handle = getHandle()
         return decodeOrThrow(

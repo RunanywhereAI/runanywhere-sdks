@@ -20,6 +20,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASTTOptions
 import com.runanywhere.sdk.public.types.RASTTOutput
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -95,54 +96,44 @@ fun RunAnywhere.transcribeStream(
         val streamJob =
             launch {
                 try {
-                    audio.collect { chunk ->
-                        CppBridgeSTT.transcribeStream(chunk, effectiveOptions) { event ->
-                            // Map internal STTStreamEvent envelopes to the
-                            // narrower RASTTPartialResult surface Swift
-                            // exposes. STARTED has no payload — skip.
-                            // PARTIAL carries a `partial` payload; forward
-                            // it verbatim. FINAL carries `final_output` —
-                            // synthesise a terminal partial-result with
-                            // is_final=true plus the embedded final output
-                            // so downstream consumers see the closing
-                            // envelope. ERROR maps to a final partial with
-                            // is_final=true and the error text inlined
-                            // (mirrors Swift's onError fallback in
-                            // `ProtoStreamContext`).
-                            when (event.kind) {
-                                STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL -> {
-                                    val partial = event.partial
-                                    if (partial != null) {
-                                        trySend(partial).isSuccess
-                                    } else {
-                                        true
-                                    }
+                    // Accumulate all chunks before invoking the bridge — mirrors
+                    // Swift's `var accumulated = Data()` pattern. Single bridge
+                    // call produces contiguous audio, preserving native decoder
+                    // state and matching Swift's canonical contract.
+                    val buffer = ByteArrayOutputStream()
+                    audio.collect { chunk -> buffer.write(chunk) }
+
+                    CppBridgeSTT.transcribeStream(buffer.toByteArray(), effectiveOptions) { event ->
+                        when (event.kind) {
+                            STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL -> {
+                                val partial = event.partial
+                                if (partial != null) {
+                                    trySend(partial).isSuccess
+                                } else {
+                                    true
                                 }
-                                STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL -> {
-                                    val basis = event.partial ?: RASTTPartialResult()
-                                    trySend(
-                                        basis.copy(
-                                            is_final = true,
-                                            final_output = event.final_output ?: basis.final_output,
-                                        ),
-                                    ).isSuccess
-                                }
-                                STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR -> {
-                                    val message = event.error_message ?: "STT stream error"
-                                    trySend(
-                                        RASTTPartialResult(
-                                            text = "STT stream failed: $message",
-                                            is_final = true,
-                                        ),
-                                    ).isSuccess
-                                }
-                                else -> true // STARTED / ENDPOINT / UNSPECIFIED — no partial-result envelope to emit.
                             }
+                            STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL -> {
+                                val basis = event.partial ?: RASTTPartialResult()
+                                trySend(
+                                    basis.copy(
+                                        is_final = true,
+                                        final_output = event.final_output ?: basis.final_output,
+                                    ),
+                                ).isSuccess
+                            }
+                            STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR -> {
+                                val message = event.error_message ?: "STT stream error"
+                                trySend(
+                                    RASTTPartialResult(
+                                        text = "STT stream failed: $message",
+                                        is_final = true,
+                                    ),
+                                ).isSuccess
+                            }
+                            else -> true // STARTED / ENDPOINT / UNSPECIFIED — no partial-result envelope to emit.
                         }
                     }
-                    // Mirror Swift's `transcribeStream` which emits a final
-                    // sentinel partial result after the audio source
-                    // completes.
                     trySend(RASTTPartialResult(is_final = true))
                     close()
                 } catch (e: Throwable) {

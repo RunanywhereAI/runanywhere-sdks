@@ -14,13 +14,14 @@
  *   plug in retries / caching / service-worker interception without a
  *   round trip through the C++ layer.
  *
- *   This module implements the `request_stream` and `request_resume`
- *   ops directly in TypeScript using synchronous XMLHttpRequest (the
- *   only browser API that can satisfy the synchronous C ABI without
- *   JSPI / ASYNCIFY — sync `fetch()` is not available from JS). The
- *   `request_send` op is registered as null so the C fallback path uses
- *   `emscripten_fetch` (which has its own async-to-sync bridge inside
- *   emscripten's runtime glue).
+ *   This module implements all three ops (`request_send`, `request_stream`,
+ *   `request_resume`) directly in TypeScript using synchronous
+ *   XMLHttpRequest — the only browser API that can satisfy the synchronous
+ *   C ABI without JSPI / ASYNCIFY (sync `fetch()` is not available from JS).
+ *   `request_send` buffers the full response body into `body_bytes`/`body_len`;
+ *   `request_stream` and `request_resume` deliver the body through the
+ *   C-side chunk callback and leave `body_bytes`/`body_len` at zero, per
+ *   the `rac_http_request_stream` contract.
  *
  * Synchrony note:
  *   Sync XHR is deprecated on the main thread (browsers emit a console
@@ -43,6 +44,17 @@ const RAC_ERROR_NETWORK_ERROR = -150;
 const RAC_ERROR_CANCELLED = -233;
 const RAC_TRUE = 1;
 const RAC_FALSE = 0;
+
+/**
+ * Chunk size used to fan a fully-received body out through the C-side
+ * `rac_http_body_chunk_fn` callback. Sync XHR cannot expose a true network
+ * stream (the browser holds the response until completion), but splitting
+ * the in-memory buffer into bounded chunks keeps the WASM heap-scratch
+ * footprint small and gives the C-side progress callback meaningful
+ * granularity. Mirrors the commons-side `RAC_HTTP_DEFAULT_CHUNK_SIZE_BYTES`
+ * default in `rac_http_transport.h`. 1 MiB matches the commons producer.
+ */
+const STREAM_CHUNK_SIZE = 1 * 1024 * 1024;
 
 function i64ToNumber(value: number | bigint): number {
   return typeof value === 'bigint' ? Number(value) : value;
@@ -144,17 +156,21 @@ export class FetchHttpTransport {
   private doInstall(): void {
     // Signatures (i=i32 pointer, j=i64, v=void):
     //   request_send:   (user_data*, req*, out_resp*) -> i32          sig 'iiii'
-    //     — registered as 0 (null); C fallback reaches emscripten_fetch.
     //   request_stream: (user_data*, req*, cb*, cb_ud*, out_meta*) -> i32
     //                                                                 sig 'iiiiii'
     //   request_resume: (user_data*, req*, resume_byte_j, cb*, cb_ud*, out_meta*) -> i32
     //                                                                 sig 'iiijiii'
-    //
-    // Only stream+resume are implemented via JS; send stays on the
-    // emscripten_fetch path so synchronous blocking send continues to
-    // work without requiring JSPI / ASYNCIFY in the WASM build.
 
-    this.requestSendPtr = 0;
+    this.requestSendPtr = this.m.addFunction(
+      (
+        userData: number | bigint,
+        reqPtr: number | bigint,
+        outRespPtr: number | bigint,
+      ) => {
+        return this.runSend(Number(userData), Number(reqPtr), Number(outRespPtr));
+      },
+      'iiii',
+    );
 
     this.requestStreamPtr = this.m.addFunction(
       (
@@ -215,10 +231,93 @@ export class FetchHttpTransport {
       this.uninstall();
       return;
     }
-    logger.debug(
-      `FetchHttpTransport: JS HTTP transport activated ` +
-        `(send=emscripten_fetch, stream=XHR, resume=XHR)`,
-    );
+    logger.debug('FetchHttpTransport: JS HTTP transport activated (send=XHR, stream=XHR, resume=XHR)');
+  }
+
+  /**
+   * Implementation for `request_send` — single-shot blocking request that
+   * buffers the full response body into `body_bytes`/`body_len`.
+   *
+   * Mirrors the `request_stream` XHR path but populates the response body
+   * in the C struct instead of delivering it through a chunk callback,
+   * matching the `rac_http_request_send` contract and Swift's
+   * `URLSessionHttpTransport.RequestExecutor.send`.
+   */
+  private runSend(userData: number, reqPtr: number, outRespPtr: number): number {
+    void userData;
+    try {
+      const req = this.readRequest(reqPtr);
+      const xhr = new XMLHttpRequest();
+      xhr.open(req.method, req.url, /*async=*/ false);
+      let useBinaryTextFallback = false;
+      try {
+        xhr.responseType = 'arraybuffer';
+      } catch {
+        useBinaryTextFallback = true;
+        xhr.overrideMimeType('text/plain; charset=x-user-defined');
+      }
+
+      for (const h of req.headers) {
+        try {
+          xhr.setRequestHeader(h.name, h.value);
+        } catch {
+          /* browsers forbid setting a few reserved headers; ignore. */
+        }
+      }
+      if (req.timeoutMs > 0) {
+        xhr.timeout = req.timeoutMs;
+      }
+
+      const t0 =
+        typeof performance !== 'undefined' && typeof performance.now === 'function'
+          ? performance.now()
+          : Date.now();
+      const sendBody: BodyInit | null =
+        req.body && req.body.length > 0
+          ? (req.body.buffer.slice(
+              req.body.byteOffset,
+              req.body.byteOffset + req.body.byteLength,
+            ) as ArrayBuffer)
+          : null;
+      xhr.send(sendBody as XMLHttpRequestBodyInit | null);
+      const elapsedMs = Math.max(
+        0,
+        Math.round(
+          (typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now()) - t0,
+        ),
+      );
+
+      const status = xhr.status | 0;
+      if (status === 0) {
+        this.writeResponse(outRespPtr, { status: 0, redirectedUrl: req.url, headers: [], elapsedMs });
+        return RAC_ERROR_NETWORK_ERROR;
+      }
+
+      const body =
+        xhr.response instanceof ArrayBuffer
+          ? new Uint8Array(xhr.response)
+          : useBinaryTextFallback
+            ? this.binaryTextToBytes(xhr.responseText)
+            : new Uint8Array(0);
+
+      const responseHeaders = this.parseResponseHeaders(xhr.getAllResponseHeaders());
+      const redirectedUrl = xhr.responseURL && xhr.responseURL.length > 0 ? xhr.responseURL : req.url;
+
+      this.writeResponse(outRespPtr, { status, redirectedUrl, headers: responseHeaders, elapsedMs, bodyBytes: body });
+      return RAC_SUCCESS;
+    } catch (err) {
+      logger.warning(
+        `FetchHttpTransport.runSend failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      try {
+        this.writeResponse(outRespPtr, { status: 0, redirectedUrl: '', headers: [], elapsedMs: 0 });
+      } catch {
+        /* noop */
+      }
+      return RAC_ERROR_NETWORK_ERROR;
+    }
   }
 
   /**
@@ -310,22 +409,56 @@ export class FetchHttpTransport {
           : useBinaryTextFallback
             ? this.binaryTextToBytes(xhr.responseText)
           : new Uint8Array(0);
-      const total = body.length;
+      const bodyLength = body.length;
 
-      // Deliver the whole buffer in a single callback (matching the
-      // coarse-granularity behaviour of the emscripten_fetch path). A
-      // future refactor can split into multiple chunks for large
-      // downloads if fine-grained progress is needed.
+      // When the server honored the Range request (206) the body contains
+      // only the remaining bytes; fold resumeFromByte into the counters so
+      // the C-side chunk callback sees a monotonic absolute file position
+      // for `total_written` and a correct `content_length`. Mirrors
+      // URLSessionHttpTransport.swift:627-632 and OkHttpHttpTransport.kt:505-513.
+      const honoredRange = status === 206 && resumeFromByte > 0;
+      const baseOffset = honoredRange ? resumeFromByte : 0;
+      const total = honoredRange ? bodyLength + resumeFromByte : bodyLength;
+
+      // Deliver the body through `STREAM_CHUNK_SIZE`-sized callbacks so the
+      // C-side `rac_http_body_chunk_fn` sees meaningful progress and the
+      // WASM heap-scratch buffer (allocated inside `invokeChunkCallback`)
+      // stays bounded — without this, a multi-GB GGUF download would
+      // malloc the entire body twice (once in `xhr.response`, once in the
+      // heap scratch) and trip the engine's quota.
+      //
+      // Note: sync XHR cannot expose a true network stream; the browser
+      // already holds the full body in memory by this point. The chunk
+      // fan-out below recovers progress granularity and bounds the
+      // scratch allocation, which is the part of the OOM risk the SDK
+      // can address from JS land. Truly streaming network reads require
+      // an async transport (fetch + ReadableStream) and JSPI/ASYNCIFY in
+      // the WASM build — tracked separately.
       let cancelled = false;
-      if (cbPtr !== 0 && total > 0) {
-        const keepGoing = this.invokeChunkCallback(cbPtr, body, total, total, cbUd);
-        if (keepGoing === RAC_FALSE) {
-          cancelled = true;
+      if (cbPtr !== 0 && bodyLength > 0) {
+        let offset = 0;
+        while (offset < bodyLength) {
+          const end = Math.min(offset + STREAM_CHUNK_SIZE, bodyLength);
+          const chunk = body.subarray(offset, end);
+          const keepGoing = this.invokeChunkCallback(cbPtr, chunk, baseOffset + end, total, cbUd);
+          if (keepGoing === RAC_FALSE) {
+            cancelled = true;
+            break;
+          }
+          offset = end;
         }
       }
 
       const responseHeaders = this.parseResponseHeaders(xhr.getAllResponseHeaders());
       const redirectedUrl = xhr.responseURL && xhr.responseURL.length > 0 ? xhr.responseURL : req.url;
+
+      // Emit X-RAC-Range-Honored so the commons download orchestrator can
+      // distinguish a genuine 206 partial-content reply from a CDN that
+      // wraps a full body in 206. Mirrors URLSessionHttpTransport.swift:503-506
+      // and OkHttpHttpTransport.kt:687-703.
+      if (resumeFromByte > 0) {
+        responseHeaders.push({ name: 'X-RAC-Range-Honored', value: honoredRange ? 'true' : 'false' });
+      }
 
       this.writeResponse(outMetaPtr, {
         status,
@@ -477,8 +610,9 @@ export class FetchHttpTransport {
    * buffers inside the WASM heap using `_malloc`/`strdup`-compatible
    * routines so the caller's `rac_http_response_free` can release them.
    *
-   * For streaming calls `body_bytes` stays 0 / `body_len` stays 0 —
-   * callers deliver the body through the chunk callback above.
+   * Pass `bodyBytes` for `request_send` calls that buffer the full response.
+   * Streaming calls omit it; `body_bytes`/`body_len` are left at zero per
+   * the `rac_http_request_stream` contract.
    */
   private writeResponse(
     outMetaPtr: number,
@@ -487,6 +621,7 @@ export class FetchHttpTransport {
       redirectedUrl: string;
       headers: HTTPHeader[];
       elapsedMs: number;
+      bodyBytes?: Uint8Array;
     },
   ): void {
     const m = this.m;
@@ -555,9 +690,6 @@ export class FetchHttpTransport {
       m.setValue(outMetaPtr + offHeaderCount, 0, 'i32');
     }
 
-    // body_bytes / body_len intentionally unset — streaming calls leave
-    // the body out of the response struct (see rac_http_response_t doc
-    // comment).
     const offBody = getOffset(
       m._rac_wasm_offsetof_http_response_body_bytes,
       'http_response_body_bytes',
@@ -566,8 +698,21 @@ export class FetchHttpTransport {
       m._rac_wasm_offsetof_http_response_body_len,
       'http_response_body_len',
     );
-    m.setValue(outMetaPtr + offBody, 0, '*');
-    m.setValue(outMetaPtr + offBodyLen, 0, 'i32');
+    if (resp.bodyBytes && resp.bodyBytes.length > 0) {
+      const bodyPtr = m._malloc(resp.bodyBytes.length);
+      if (m.HEAPU8) {
+        m.HEAPU8.set(resp.bodyBytes, bodyPtr);
+      } else {
+        for (let i = 0; i < resp.bodyBytes.length; i++) {
+          m.setValue(bodyPtr + i, resp.bodyBytes[i], 'i8');
+        }
+      }
+      m.setValue(outMetaPtr + offBody, bodyPtr, '*');
+      m.setValue(outMetaPtr + offBodyLen, resp.bodyBytes.length, 'i32');
+    } else {
+      m.setValue(outMetaPtr + offBody, 0, '*');
+      m.setValue(outMetaPtr + offBodyLen, 0, 'i32');
+    }
   }
 
   /**

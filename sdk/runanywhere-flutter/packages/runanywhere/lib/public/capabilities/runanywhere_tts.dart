@@ -73,6 +73,7 @@ class RunAnywhereTTS {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
 
     final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
     logger.info('Loading TTS voice: $voiceId');
@@ -141,6 +142,7 @@ class RunAnywhereTTS {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    await DartBridge.ensureServicesReady();
     final voiceId = await _requireLoadedVoiceId();
     final opts = _effectiveOptions(options ?? TTSOptions());
     final request = TTSSynthesisRequest(

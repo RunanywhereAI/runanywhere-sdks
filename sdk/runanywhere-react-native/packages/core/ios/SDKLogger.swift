@@ -324,6 +324,4 @@ import os
     /// Logger for archive/extraction operations. Category: "Archive"
     @objc public static let archive = SDKLogger(category: "Archive")
 
-    /// Logger for audio decoding operations. Category: "AudioDecoder"
-    @objc public static let audioDecoder = SDKLogger(category: "AudioDecoder")
 }

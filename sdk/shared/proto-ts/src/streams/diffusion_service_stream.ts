@@ -3,7 +3,7 @@
  * Source: idl/diffusion_options.proto
  * Template: idl/codegen/templates/ts_async_iterable.njk
  *
- * GAP 09 Phase 14. Provides an AsyncIterable<DiffusionStreamEvent> client
+ * Provides an AsyncIterable<DiffusionStreamEvent> client
  * over an in-process server-streaming callback. The transport ("how a token
  * arrives in the JS heap") is platform-specific:
  *   - React Native: a Nitro HybridObject method whose callback fires once
@@ -14,63 +14,15 @@
  * function; this generated wrapper turns it into an AsyncIterable.
  */
 
+import { streamFactory, type StreamTransport } from "./_streamFactory";
 import type { DiffusionGenerationRequest } from "../diffusion_options";
 import type { DiffusionStreamEvent } from "../diffusion_options";
 
-export interface DiffusionStreamTransport {
-    subscribe(
-        req: DiffusionGenerationRequest,
-        onMessage: (msg: DiffusionStreamEvent) => void,
-        onError:   (err: Error) => void,
-        onDone:    () => void,
-    ): () => void;   // returns a cancel function
-}
+export interface DiffusionStreamTransport extends StreamTransport<DiffusionGenerationRequest, DiffusionStreamEvent> {}
 
-/**
- * Wrap the platform `transport.subscribe` callback into an
- * `AsyncIterable<DiffusionStreamEvent>`. Cancellation is propagated by
- * `break`-ing out of `for await` (the iterator's `return()` calls the
- * transport's cancel function).
- */
 export function streamDiffusion(
     transport: DiffusionStreamTransport,
     req: DiffusionGenerationRequest,
 ): AsyncIterable<DiffusionStreamEvent> {
-    return {
-        [Symbol.asyncIterator](): AsyncIterator<DiffusionStreamEvent> {
-            const queue: DiffusionStreamEvent[] = [];
-            let resolve: ((v: IteratorResult<DiffusionStreamEvent>) => void) | null = null;
-            let error: Error | null = null;
-            let done = false;
-
-            const cancel = transport.subscribe(
-                req,
-                (msg) => {
-                    if (resolve) { resolve({ value: msg, done: false }); resolve = null; }
-                    else queue.push(msg);
-                },
-                (err) => {
-                    error = err;
-                    if (resolve) { resolve({ value: undefined as any, done: true }); resolve = null; }
-                },
-                () => {
-                    done = true;
-                    if (resolve) { resolve({ value: undefined as any, done: true }); resolve = null; }
-                },
-            );
-
-            return {
-                next(): Promise<IteratorResult<DiffusionStreamEvent>> {
-                    if (queue.length > 0) return Promise.resolve({ value: queue.shift()!, done: false });
-                    if (error) return Promise.reject(error);
-                    if (done)  return Promise.resolve({ value: undefined as any, done: true });
-                    return new Promise((r) => { resolve = r; });
-                },
-                return(): Promise<IteratorResult<DiffusionStreamEvent>> {
-                    cancel();
-                    return Promise.resolve({ value: undefined as any, done: true });
-                },
-            };
-        },
-    };
+    return streamFactory(transport, req);
 }

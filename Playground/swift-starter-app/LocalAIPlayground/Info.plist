@@ -38,7 +38,7 @@
 	<array>
 		<string>arm64</string>
 	</array>
-
+	
 	<!--
 	=============================================================================
 	PRIVACY PERMISSIONS
@@ -47,15 +47,15 @@
 	iOS will show these descriptions to users when requesting permission.
 	=============================================================================
 	-->
-
+	
 	<!-- Microphone Access - Required for Speech-to-Text -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>LocalAI Playground needs microphone access to transcribe your speech using on-device AI. All audio is processed locally and never leaves your device.</string>
-
+	
 	<!-- Speech Recognition - Optional, for system STT fallback -->
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Speech recognition is used to convert your voice to text. All processing happens on your device for complete privacy.</string>
-
+	
 	<!--
 	=============================================================================
 	APP TRANSPORT SECURITY
@@ -69,7 +69,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-
+	
 	<!--
 	=============================================================================
 	BACKGROUND MODES (Optional)

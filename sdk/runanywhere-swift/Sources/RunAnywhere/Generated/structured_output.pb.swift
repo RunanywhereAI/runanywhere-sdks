@@ -12,7 +12,7 @@
 //
 // Every message and enum below is the *union* of cases currently declared by
 // hand across Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL
-// drift table (see GAP_01_IDL_AND_CODEGEN.md §"Why This Gap Matters") is what
+// drift table is what
 // motivated this schema. Every SDK consumes generated output; nothing is
 // hand-written.
 //
@@ -47,7 +47,7 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
@@ -61,7 +61,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 ///   Swift / Kotlin / Dart represent schema as a serialized JSON string today,
 ///     so this enum canonicalizes the RN-defined union.
 /// ---------------------------------------------------------------------------
-public enum RAJSONSchemaType: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAJSONSchemaType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case object // = 1
@@ -126,7 +126,7 @@ public enum RAJSONSchemaType: SwiftProtobuf.Enum, Swift.CaseIterable {
 ///   (Other SDKs do not yet define a Sentiment type; MIXED is added for
 ///    completeness — common in industry sentiment APIs.)
 /// ---------------------------------------------------------------------------
-public enum RASentiment: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RASentiment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case positive // = 1
@@ -172,7 +172,7 @@ public enum RASentiment: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAStructuredOutputMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAStructuredOutputMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case jsonSchema // = 1
@@ -218,7 +218,7 @@ public enum RAStructuredOutputMode: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAStructuredOutputStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+public nonisolated enum RAStructuredOutputStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
   case token // = 1
@@ -283,7 +283,7 @@ public enum RAStructuredOutputStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIte
 /// inside the referenced JSONSchema. Very deep schemas are uncommon and
 /// supported by chaining these handles.
 /// ---------------------------------------------------------------------------
-public struct RAJSONSchemaProperty: @unchecked Sendable {
+public nonisolated struct RAJSONSchemaProperty: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -429,7 +429,7 @@ public struct RAJSONSchemaProperty: @unchecked Sendable {
 ///                                       with $schema, $id, title, definitions,
 ///                                       $ref, allOf/anyOf/oneOf/not)
 /// ---------------------------------------------------------------------------
-public struct RAJSONSchema: @unchecked Sendable {
+public nonisolated struct RAJSONSchema: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -573,7 +573,7 @@ public struct RAJSONSchema: @unchecked Sendable {
 ///   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
 ///   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
 /// ---------------------------------------------------------------------------
-public struct RAStructuredOutputOptions: Sendable {
+public nonisolated struct RAStructuredOutputOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -675,7 +675,7 @@ public struct RAStructuredOutputOptions: Sendable {
 ///   Kotlin LLMTypes.kt:278              StructuredOutputValidation
 ///   Dart   structured_output_types.dart StructuredOutputValidation
 /// ---------------------------------------------------------------------------
-public struct RAStructuredOutputValidation: Sendable {
+public nonisolated struct RAStructuredOutputValidation: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -740,7 +740,7 @@ public struct RAStructuredOutputValidation: Sendable {
 ///   Dart   structured_output_types.dart StructuredOutputResult<T> (result,
 ///                                       rawText, metrics)
 /// ---------------------------------------------------------------------------
-public struct RAStructuredOutputResult: Sendable {
+public nonisolated struct RAStructuredOutputResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -788,7 +788,7 @@ public struct RAStructuredOutputResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAStructuredOutputParseRequest: Sendable {
+public nonisolated struct RAStructuredOutputParseRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -815,7 +815,7 @@ public struct RAStructuredOutputParseRequest: Sendable {
   fileprivate var _options: RAStructuredOutputOptions? = nil
 }
 
-public struct RAStructuredOutputValidationRequest: Sendable {
+public nonisolated struct RAStructuredOutputValidationRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -838,7 +838,7 @@ public struct RAStructuredOutputValidationRequest: Sendable {
   fileprivate var _options: RAStructuredOutputOptions? = nil
 }
 
-public struct RAStructuredOutputPromptResult: Sendable {
+public nonisolated struct RAStructuredOutputPromptResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -903,7 +903,7 @@ public struct RAStructuredOutputPromptResult: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
-public struct RAStructuredOutputRequest: Sendable {
+public nonisolated struct RAStructuredOutputRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -930,7 +930,7 @@ public struct RAStructuredOutputRequest: Sendable {
   fileprivate var _options: RAStructuredOutputOptions? = nil
 }
 
-public struct RAStructuredOutputStreamEvent: @unchecked Sendable {
+public nonisolated struct RAStructuredOutputStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1014,7 +1014,7 @@ public struct RAStructuredOutputStreamEvent: @unchecked Sendable {
 ///   RN  StructuredOutputTypes.ts:143    NamedEntity (text, type, startOffset,
 ///                                       endOffset, confidence)
 /// ---------------------------------------------------------------------------
-public struct RANamedEntity: Sendable {
+public nonisolated struct RANamedEntity: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1047,7 +1047,7 @@ public struct RANamedEntity: Sendable {
 /// Note: RN's per-result `confidence` is dropped in favor of per-entity
 /// confidence on `NamedEntity`, which is the more granular and useful form.
 /// ---------------------------------------------------------------------------
-public struct RAEntityExtractionResult: Sendable {
+public nonisolated struct RAEntityExtractionResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1064,7 +1064,7 @@ public struct RAEntityExtractionResult: Sendable {
 /// Sources pre-IDL:
 ///   RN  StructuredOutputTypes.ts:118    ClassificationResult.alternatives item
 /// ---------------------------------------------------------------------------
-public struct RAClassificationCandidate: Sendable {
+public nonisolated struct RAClassificationCandidate: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1086,7 +1086,7 @@ public struct RAClassificationCandidate: Sendable {
 /// Note: RN names the field `category`; canonicalized here to `label`, which
 /// matches industry classifier APIs (HuggingFace, OpenAI, etc.).
 /// ---------------------------------------------------------------------------
-public struct RAClassificationResult: Sendable {
+public nonisolated struct RAClassificationResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1108,7 +1108,7 @@ public struct RAClassificationResult: Sendable {
 ///   RN  StructuredOutputTypes.ts:130    SentimentResult (sentiment, score,
 ///                                       aspects)
 /// ---------------------------------------------------------------------------
-public struct RASentimentResult: Sendable {
+public nonisolated struct RASentimentResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1163,7 +1163,7 @@ public struct RASentimentResult: Sendable {
 /// Sources pre-IDL:
 ///   RN  StructuredOutputTypes.ts:154    NERResult (entities)
 /// ---------------------------------------------------------------------------
-public struct RANERResult: Sendable {
+public nonisolated struct RANERResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1177,25 +1177,25 @@ public struct RANERResult: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-fileprivate let _protobuf_package = "runanywhere.v1"
+fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
-extension RAJSONSchemaType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAJSONSchemaType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0JSON_SCHEMA_TYPE_UNSPECIFIED\0\u{1}JSON_SCHEMA_TYPE_OBJECT\0\u{1}JSON_SCHEMA_TYPE_ARRAY\0\u{1}JSON_SCHEMA_TYPE_STRING\0\u{1}JSON_SCHEMA_TYPE_NUMBER\0\u{1}JSON_SCHEMA_TYPE_INTEGER\0\u{1}JSON_SCHEMA_TYPE_BOOLEAN\0\u{1}JSON_SCHEMA_TYPE_NULL\0")
 }
 
-extension RASentiment: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASentiment: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SENTIMENT_UNSPECIFIED\0\u{1}SENTIMENT_POSITIVE\0\u{1}SENTIMENT_NEGATIVE\0\u{1}SENTIMENT_NEUTRAL\0\u{1}SENTIMENT_MIXED\0")
 }
 
-extension RAStructuredOutputMode: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputMode: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STRUCTURED_OUTPUT_MODE_UNSPECIFIED\0\u{1}STRUCTURED_OUTPUT_MODE_JSON_SCHEMA\0\u{1}STRUCTURED_OUTPUT_MODE_JSON_OBJECT\0\u{1}STRUCTURED_OUTPUT_MODE_REGEX\0\u{1}STRUCTURED_OUTPUT_MODE_GRAMMAR\0")
 }
 
-extension RAStructuredOutputStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED\0\u{1}STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR\0")
 }
 
-extension RAJSONSchemaProperty: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAJSONSchemaProperty: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".JSONSchemaProperty"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}description\0\u{3}enum_values\0\u{1}format\0\u{3}items_schema\0\u{3}object_schema\0\u{1}minimum\0\u{1}maximum\0\u{3}min_length\0\u{3}max_length\0\u{1}pattern\0\u{3}min_items\0\u{3}max_items\0\u{3}default_json\0")
 
@@ -1356,7 +1356,7 @@ extension RAJSONSchemaProperty: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".JSONSchema"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}properties\0\u{1}required\0\u{1}items\0\u{3}additional_properties\0\u{5}schema_uri\0$schema\0\u{5}id_uri\0$id\0\u{1}title\0\u{1}description\0\u{1}definitions\0\u{5}ref\0$ref\0\u{3}all_of\0\u{3}any_of\0\u{3}one_of\0\u{3}not_schema\0\u{3}raw_json\0")
 
@@ -1531,7 +1531,7 @@ extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputOptions"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schema\0\u{3}include_schema_in_prompt\0\u{3}strict_mode\0\u{3}json_schema\0\u{3}type_name\0\u{1}name\0\u{1}mode\0\u{3}regex_pattern\0\u{1}grammar\0\u{3}repair_json\0\u{3}max_retries\0")
 
@@ -1615,7 +1615,7 @@ extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputValidation"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_valid\0\u{3}contains_json\0\u{3}error_message\0\u{3}raw_output\0\u{3}extracted_json\0\u{3}validation_errors\0\u{3}validation_time_ms\0")
 
@@ -1679,7 +1679,7 @@ extension RAStructuredOutputValidation: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension RAStructuredOutputResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parsed_json\0\u{1}validation\0\u{3}raw_text\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1733,7 +1733,7 @@ extension RAStructuredOutputResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAStructuredOutputParseRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputParseRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputParseRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}text\0\u{1}options\0\u{1}metadata\0")
 
@@ -1782,7 +1782,7 @@ extension RAStructuredOutputParseRequest: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension RAStructuredOutputValidationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputValidationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputValidationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}options\0")
 
@@ -1821,7 +1821,7 @@ extension RAStructuredOutputValidationRequest: SwiftProtobuf.Message, SwiftProto
   }
 }
 
-extension RAStructuredOutputPromptResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputPromptResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputPromptResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}prepared_prompt\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}regex_pattern\0\u{1}grammar\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -1885,7 +1885,7 @@ extension RAStructuredOutputPromptResult: SwiftProtobuf.Message, SwiftProtobuf._
   }
 }
 
-extension RAStructuredOutputRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}prompt\0\u{1}options\0\u{1}metadata\0")
 
@@ -1934,7 +1934,7 @@ extension RAStructuredOutputRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAStructuredOutputStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAStructuredOutputStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputStreamEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}token\0\u{3}partial_json\0\u{1}validation\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
 
@@ -2067,7 +2067,7 @@ extension RAStructuredOutputStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-extension RANamedEntity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RANamedEntity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".NamedEntity"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}entity_type\0\u{3}start_offset\0\u{3}end_offset\0\u{1}confidence\0")
 
@@ -2117,7 +2117,7 @@ extension RANamedEntity: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension RAEntityExtractionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAEntityExtractionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".EntityExtractionResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entities\0")
 
@@ -2147,7 +2147,7 @@ extension RAEntityExtractionResult: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension RAClassificationCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAClassificationCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ClassificationCandidate"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}label\0\u{1}confidence\0")
 
@@ -2182,7 +2182,7 @@ extension RAClassificationCandidate: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension RAClassificationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RAClassificationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ClassificationResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}label\0\u{1}confidence\0\u{1}alternatives\0")
 
@@ -2222,7 +2222,7 @@ extension RAClassificationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension RASentimentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RASentimentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SentimentResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sentiment\0\u{1}confidence\0\u{3}positive_score\0\u{3}negative_score\0\u{3}neutral_score\0")
 
@@ -2276,7 +2276,7 @@ extension RASentimentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension RANERResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension RANERResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".NERResult"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}entities\0")
 

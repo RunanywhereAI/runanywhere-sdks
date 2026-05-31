@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.presentation.rag
 
 import ai.runanywhere.proto.v1.RAGConfiguration
 import android.net.Uri
+import com.runanywhere.sdk.public.extensions.defaults
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -687,10 +688,6 @@ private fun InputBar(
 
 // MARK: - RAG Configuration
 
-/**
- * Build a generated RAGConfiguration from selected model ids.
- * Registry-backed descriptor resolution happens inside the SDK RAG helper.
- */
 private fun buildRAGConfig(
     embeddingModel: RAModelInfo?,
     llmModel: RAModelInfo?,
@@ -698,8 +695,8 @@ private fun buildRAGConfig(
     val embedding = embeddingModel ?: return null
     val llm = llmModel ?: return null
 
-    return RAGConfiguration(
-        embedding_model_id = embedding.id,
-        llm_model_id = llm.id,
+    return RAGConfiguration.defaults(
+        embeddingModelId = embedding.id,
+        llmModelId = llm.id,
     )
 }

@@ -3,7 +3,7 @@
  * @brief Behavioral parity test for rac_llm_thinking C ABI vs Swift
  *        ThinkingContentParser (the type it replaces).
  *
- * v2 close-out Phase 5. Each test mirrors a unit-test scenario from the
+ * Each test mirrors a unit-test scenario from the
  * Swift implementation to lock in byte-equivalent behavior across SDKs.
  */
 
@@ -79,6 +79,43 @@ int test_extract_only_thinking() {
     ASSERT_EQ_INT(rc, RAC_SUCCESS);
     ASSERT_EQ_STR(response, "");
     ASSERT_EQ_STR(thinking, "just thinking");
+    return 0;
+}
+
+int test_extract_thinking_long_tag() {
+    // commons-102: <thinking>...</thinking> must be parsed identically to
+    // <think>...</think>, matching the streaming proto path's kOpenTags.
+    const char* response = nullptr;
+    size_t resp_len = 0;
+    const char* thinking = nullptr;
+    size_t think_len = 0;
+    rac_result_t rc = rac_llm_extract_thinking("Hello <thinking>think</thinking> world", &response,
+                                               &resp_len, &thinking, &think_len);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_STR(response, "Hello\nworld");
+    ASSERT_EQ_STR(thinking, "think");
+    return 0;
+}
+
+int test_strip_thinking_long_tag() {
+    // commons-102: strip must also recognize <thinking>...</thinking>.
+    const char* stripped = nullptr;
+    size_t slen = 0;
+    rac_result_t rc = rac_llm_strip_thinking("first <thinking>a</thinking> middle <think>b</think>",
+                                             &stripped, &slen);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_STR(stripped, "first  middle");
+    return 0;
+}
+
+int test_strip_trailing_unclosed_long_tag() {
+    // commons-102: trailing unclosed <thinking>... must also be dropped.
+    const char* stripped = nullptr;
+    size_t slen = 0;
+    rac_result_t rc =
+        rac_llm_strip_thinking("answer here <thinking>still streaming", &stripped, &slen);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_STR(stripped, "answer here");
     return 0;
 }
 
@@ -177,6 +214,9 @@ int main() {
     RUN(test_extract_no_think_block);
     RUN(test_extract_basic_block);
     RUN(test_extract_only_thinking);
+    RUN(test_extract_thinking_long_tag);
+    RUN(test_strip_thinking_long_tag);
+    RUN(test_strip_trailing_unclosed_long_tag);
     RUN(test_extract_malformed_keeps_text);
     RUN(test_strip_multiple_blocks);
     RUN(test_strip_trailing_unclosed);

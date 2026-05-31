@@ -37,21 +37,38 @@ export interface RAGConfiguration {
     /**
      * Embedding vector dimension — must match the embedding model.
      * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
+     * Optional so callers can distinguish "unset" (commons stamps the
+     * canonical default) from explicit zero / explicit override.
      */
-    embeddingDimension: number;
-    /** Number of top chunks to retrieve per query. */
-    topK: number;
+    embeddingDimension?: number | undefined;
+    /**
+     * Number of top chunks to retrieve per query.
+     * Optional so callers can distinguish "unset" from an explicit value.
+     */
+    topK?: number | undefined;
     /**
      * Minimum cosine similarity threshold (0.0–1.0). Chunks below this
      * score are discarded before being passed to the LLM as context.
+     * Optional so callers can distinguish "unset" from explicit 0.0
+     * (accept-everything) without losing the canonical default.
      */
-    similarityThreshold: number;
-    /** Tokens per chunk when splitting documents during ingestion. */
-    chunkSize: number;
-    /** Overlap tokens between consecutive chunks. Must be < chunk_size. */
-    chunkOverlap: number;
-    /** Maximum tokens of retrieved context passed to the LLM. */
-    maxContextTokens: number;
+    similarityThreshold?: number | undefined;
+    /**
+     * Tokens per chunk when splitting documents during ingestion.
+     * Optional so callers can distinguish "unset" from an explicit value.
+     */
+    chunkSize?: number | undefined;
+    /**
+     * Overlap tokens between consecutive chunks. Must be < chunk_size.
+     * Optional so callers can explicitly request zero overlap (no overlap)
+     * without it being silently replaced by the canonical default of 64.
+     */
+    chunkOverlap?: number | undefined;
+    /**
+     * Maximum tokens of retrieved context passed to the LLM.
+     * Optional so callers can distinguish "unset" from an explicit value.
+     */
+    maxContextTokens?: number | undefined;
     /** Prompt template with `{context}` and `{query}` placeholders. */
     promptTemplate?: string | undefined;
     /** Backend-specific config JSON passed to the embedding model/provider. */

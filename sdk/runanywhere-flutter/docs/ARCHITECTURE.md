@@ -333,8 +333,8 @@ Native libraries come from `runanywhere-commons` (the shared C++ core). The
 top-level repo provides:
 
 ```
-scripts/build-core-xcframework.sh   # iOS XCFrameworks → packages/*/ios/Frameworks/
-scripts/build-core-android.sh       # Android .so → packages/*/android/src/main/jniLibs/
+sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS XCFrameworks → packages/*/ios/Frameworks/
+scripts/build/build-core-android.sh       # Android .so → packages/*/android/src/main/jniLibs/
 ```
 
 ### Melos Workflow
