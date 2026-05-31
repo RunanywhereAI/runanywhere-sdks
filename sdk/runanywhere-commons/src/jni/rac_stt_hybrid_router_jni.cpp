@@ -21,10 +21,16 @@
 #include <string>
 #include <vector>
 
+// Errors always log. The verbose INFO trace is gated to debug builds (NDEBUG is
+// defined in release) so production stays quiet.
 #ifdef __ANDROID__
 #include <android/log.h>
-#define STTJNI_LOG(...)   __android_log_print(ANDROID_LOG_INFO,  "stt_router_jni", __VA_ARGS__)
 #define STTJNI_LOG_E(...) __android_log_print(ANDROID_LOG_ERROR, "stt_router_jni", __VA_ARGS__)
+#if !defined(NDEBUG) || defined(RAC_JNI_VERBOSE)
+#define STTJNI_LOG(...)   __android_log_print(ANDROID_LOG_INFO,  "stt_router_jni", __VA_ARGS__)
+#else
+#define STTJNI_LOG(...)   ((void)0)
+#endif
 #else
 #define STTJNI_LOG(...)   ((void)0)
 #define STTJNI_LOG_E(...) ((void)0)

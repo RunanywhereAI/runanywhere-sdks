@@ -34,8 +34,9 @@
 // Direct logcat tag for confidence diagnostics. RAC_LOG_* routes through the
 // platform adapter to System.out and is easy to miss / filter; __android_log
 // puts these under a clean "SherpaConf" tag so `adb logcat -s SherpaConf`
-// shows them reliably.
-#ifdef __ANDROID__
+// shows them reliably. Gated to debug builds (NDEBUG is defined in release) so
+// production stays quiet; flip on by building Debug or defining SHERPA_CONF_VERBOSE.
+#if defined(__ANDROID__) && (!defined(NDEBUG) || defined(SHERPA_CONF_VERBOSE))
 #include <android/log.h>
 #define SHERPA_CONF_LOG(...) \
   __android_log_print(ANDROID_LOG_INFO, "SherpaConf", __VA_ARGS__)

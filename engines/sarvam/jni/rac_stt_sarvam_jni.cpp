@@ -9,10 +9,16 @@
 #include <jni.h>
 #include <string>
 
+// Errors always log. The verbose INFO trace is gated to debug builds (NDEBUG is
+// defined in release) so production stays quiet.
 #ifdef __ANDROID__
 #include <android/log.h>
-#define SARVAM_JNI_LOG(...)   __android_log_print(ANDROID_LOG_INFO,  "sarvam", __VA_ARGS__)
 #define SARVAM_JNI_LOG_E(...) __android_log_print(ANDROID_LOG_ERROR, "sarvam", __VA_ARGS__)
+#if !defined(NDEBUG) || defined(RAC_JNI_VERBOSE)
+#define SARVAM_JNI_LOG(...)   __android_log_print(ANDROID_LOG_INFO,  "sarvam", __VA_ARGS__)
+#else
+#define SARVAM_JNI_LOG(...)   ((void)0)
+#endif
 #else
 #define SARVAM_JNI_LOG(...)   ((void)0)
 #define SARVAM_JNI_LOG_E(...) ((void)0)
