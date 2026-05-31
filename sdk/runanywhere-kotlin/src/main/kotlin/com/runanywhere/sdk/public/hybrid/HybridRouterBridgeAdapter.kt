@@ -36,7 +36,10 @@ internal object HybridRouterBridgeAdapter {
     fun createService(backend: BackendId, model: RACModel): Long {
         val key = backend.family to backend.capability
         val handle = when (key) {
-            "SHERPA" to "STT" -> RunAnywhereBridge.racSttServiceCreate(model.id)
+            "SHERPA" to "STT" -> {
+                requireSherpaRegistered()
+                RunAnywhereBridge.racSttServiceCreate(model.id)
+            }
             "SARVAM" to "STT" -> createSarvamService(model.id)
             else -> error("Unknown backend: ${backend.family}.${backend.capability}")
         }
@@ -44,6 +47,26 @@ internal object HybridRouterBridgeAdapter {
             "Failed to create native service for ${backend.family}.${backend.capability} model=${model.id}"
         }
         return handle
+    }
+
+    /**
+     * Fail early with an actionable message when the on-device sherpa plugin
+     * isn't in the native plugin registry yet. Without this guard the offline
+     * service create bottoms out in an opaque `rac_plugin_route` failure
+     * (handle == 0) that gives no hint about the missing prerequisite.
+     *
+     * The sherpa engine registers under the name "sherpa" when its native
+     * library is loaded — on Android that happens via the ONNX/sherpa module
+     * (`ONNX.register()` → `System.loadLibrary("rac_backend_sherpa")`), which
+     * must run before `RACRouter.stt.init(...)`.
+     */
+    private fun requireSherpaRegistered() {
+        val names = RunAnywhereBridge.racRegistryGetRegisteredNames()?.toList().orEmpty()
+        check(names.any { it.equals("sherpa", ignoreCase = true) }) {
+            "sherpa STT backend is not registered. Load the on-device backend first " +
+                "(e.g. ONNX.register() on Android) before RACRouter.stt.init(...). " +
+                "Registered plugins: ${names.joinToString().ifEmpty { "(none)" }}"
+        }
     }
 
     /**
