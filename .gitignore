@@ -142,7 +142,6 @@ gradle.properties
 !examples/flutter/RunAnywhereAI/android/gradle.properties
 
 # Also ignore .idea folders in subdirectories
-examples/intellij-plugin-demo/plugin/.idea/
 sdk/runanywhere-kotlin/.idea/
 
 # Other IDE files
@@ -261,17 +260,6 @@ dist/
 !sdk/shared/proto-ts/dist/
 !sdk/shared/proto-ts/dist/**
 
-# MLC-LLM submodule build artifacts (submodule is inside MLC module, similar to llama.cpp)
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/build/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/*.jar
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/arm64-v8a/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/armeabi-v7a/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/x86/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/x86_64/
-
-# Keep the output README for documentation
-!sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/README.md
-
 # Configuration files with real values
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.staging.json
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json
@@ -302,11 +290,6 @@ sdk/runanywhere-kotlin/build/generated/config/
 !sdk/runanywhere-kotlin/config/*.example.json
 !sdk/runanywhere-kotlin/config/template.json
 !sdk/runanywhere-kotlin/config/README.md
-
-# Native build artifacts (llama.cpp)
-sdk/runanywhere-kotlin/native/llama-jni/build/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/androidMain/jniLibs/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/native/
 
 # llama.cpp is a submodule - tracked in .gitmodules
 # Build artifacts from llama.cpp
@@ -363,14 +346,9 @@ sdk/runanywhere-react-native/packages/*/android/src/main/jniLibs/
 sdk/runanywhere-react-native/packages/*/ios/Frameworks/*.xcframework
 
 # Backup directories
-examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
 comments/
 
-# Flutter/Dart
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-pubspec.lock
+# Flutter iOS ephemeral build dir
 **/ios/Flutter/ephemeral/
 
 # Flutter auto-generated files (contain developer-specific local paths)
@@ -393,7 +371,7 @@ sdk/runanywhere-swift/Binaries/*.xcframework
 sdk/runanywhere-swift/vendor/
 
 # Kotlin SDK - Local JNI libs
-sdk/runanywhere-kotlin/src/androidMain/jniLibs/
+sdk/runanywhere-kotlin/src/main/jniLibs/
 
 # Commons - Build artifacts and third-party dependencies
 sdk/runanywhere-commons/build/
@@ -417,8 +395,6 @@ sdk/runanywhere-flutter/android/*.aar
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
 tools/
-sdk/runanywhere-react-native/packages/rag/ios/.testlocal
-
 
 # Python virtual environments
 .venv*/
@@ -426,10 +402,6 @@ venv*/
 __pycache__/
 *.pyc
 
-# Node
-node_modules/
-node_modules
-/tools/
 *.trace
 
 # Local detailed validation runs and MCP evidence
