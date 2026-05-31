@@ -201,6 +201,14 @@ object CppBridgePlatformAdapter {
         val (cleanMessage, metadata) = parseLogMetadata(message)
         val category = if (tag.isNotEmpty()) tag else "RAC"
 
+        // Native ERROR/FATAL goes directly to logcat too. SDKLogger routes
+        // through println(System.out) which is unreliable on release builds
+        // and gated by enableLocalLogging — this guarantees diagnostic logs
+        // survive config or redirection issues.
+        if (level >= LogLevel.ERROR) {
+            android.util.Log.e(category, cleanMessage)
+        }
+
         // Create logger with proper category for destination routing
         val logger = SDKLogger(category)
 

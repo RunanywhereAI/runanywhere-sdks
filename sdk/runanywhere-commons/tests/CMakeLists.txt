@@ -1155,6 +1155,16 @@ rac_link_archive_deps(test_core)
 target_compile_features(test_core PRIVATE cxx_std_20)
 add_test(NAME core_tests COMMAND test_core --run-all)
 
+add_executable(test_hybrid_router test_hybrid_router.cpp)
+target_include_directories(test_hybrid_router PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_hybrid_router PRIVATE rac_commons)
+rac_link_archive_deps(test_hybrid_router)
+target_compile_features(test_hybrid_router PRIVATE cxx_std_17)
+add_test(NAME hybrid_router_tests COMMAND test_hybrid_router)
+
 # --- test_extraction: Always built (no backend dependency) ---
 add_executable(test_extraction test_extraction.cpp)
 target_include_directories(test_extraction PRIVATE

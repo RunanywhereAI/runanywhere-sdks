@@ -138,11 +138,11 @@ public class StoredModel(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<StoredModel> = object : ProtoAdapter<StoredModel>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StoredModel::class,
-      "type.googleapis.com/runanywhere.v1.StoredModel",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StoredModel::class, 
+      "type.googleapis.com/runanywhere.v1.StoredModel", 
+      PROTO_3, 
+      null, 
       "storage_types.proto"
     ) {
       override fun encodedSize(`value`: StoredModel): Int {

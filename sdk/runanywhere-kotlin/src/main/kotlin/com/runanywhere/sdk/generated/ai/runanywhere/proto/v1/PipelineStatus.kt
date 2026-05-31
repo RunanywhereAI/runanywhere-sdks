@@ -32,8 +32,8 @@ public enum class PipelineStatus(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<PipelineStatus> = object : EnumAdapter<PipelineStatus>(
-      PipelineStatus::class,
-      PROTO_3,
+      PipelineStatus::class, 
+      PROTO_3, 
       PipelineStatus.PIPELINE_STATUS_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): PipelineStatus? = PipelineStatus.fromValue(`value`)

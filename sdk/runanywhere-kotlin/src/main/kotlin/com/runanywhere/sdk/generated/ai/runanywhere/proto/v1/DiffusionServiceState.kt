@@ -146,11 +146,11 @@ public class DiffusionServiceState(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionServiceState> =
         object : ProtoAdapter<DiffusionServiceState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiffusionServiceState::class,
-      "type.googleapis.com/runanywhere.v1.DiffusionServiceState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiffusionServiceState::class, 
+      "type.googleapis.com/runanywhere.v1.DiffusionServiceState", 
+      PROTO_3, 
+      null, 
       "diffusion_options.proto"
     ) {
       override fun encodedSize(`value`: DiffusionServiceState): Int {

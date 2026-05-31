@@ -146,11 +146,11 @@ public class RegisterModelFromUrlRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<RegisterModelFromUrlRequest> =
         object : ProtoAdapter<RegisterModelFromUrlRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RegisterModelFromUrlRequest::class,
-      "type.googleapis.com/runanywhere.v1.RegisterModelFromUrlRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RegisterModelFromUrlRequest::class, 
+      "type.googleapis.com/runanywhere.v1.RegisterModelFromUrlRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: RegisterModelFromUrlRequest): Int {

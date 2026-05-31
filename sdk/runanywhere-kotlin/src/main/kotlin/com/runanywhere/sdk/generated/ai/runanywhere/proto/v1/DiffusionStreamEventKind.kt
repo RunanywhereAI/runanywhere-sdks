@@ -31,8 +31,8 @@ public enum class DiffusionStreamEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionStreamEventKind> =
         object : EnumAdapter<DiffusionStreamEventKind>(
-      DiffusionStreamEventKind::class,
-      PROTO_3,
+      DiffusionStreamEventKind::class, 
+      PROTO_3, 
       DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiffusionStreamEventKind? = DiffusionStreamEventKind.fromValue(`value`)

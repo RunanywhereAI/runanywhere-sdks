@@ -61,8 +61,8 @@ public enum class AudioFormat(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AudioFormat> = object : EnumAdapter<AudioFormat>(
-      AudioFormat::class,
-      PROTO_3,
+      AudioFormat::class, 
+      PROTO_3, 
       AudioFormat.AUDIO_FORMAT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): AudioFormat? = AudioFormat.fromValue(`value`)

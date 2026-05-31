@@ -155,11 +155,11 @@ public class VADEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADEvent> = object : ProtoAdapter<VADEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VADEvent::class,
-      "type.googleapis.com/runanywhere.v1.VADEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VADEvent::class, 
+      "type.googleapis.com/runanywhere.v1.VADEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: VADEvent): Int {

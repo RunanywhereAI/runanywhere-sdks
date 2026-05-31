@@ -438,11 +438,11 @@ public class LLMGenerationOptions(
     @JvmField
     public val ADAPTER: ProtoAdapter<LLMGenerationOptions> =
         object : ProtoAdapter<LLMGenerationOptions>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LLMGenerationOptions::class,
-      "type.googleapis.com/runanywhere.v1.LLMGenerationOptions",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LLMGenerationOptions::class, 
+      "type.googleapis.com/runanywhere.v1.LLMGenerationOptions", 
+      PROTO_3, 
+      null, 
       "llm_options.proto"
     ) {
       override fun encodedSize(`value`: LLMGenerationOptions): Int {

@@ -4,7 +4,7 @@
 # build-core-android.sh — wraps the android-{arm64,armv7,x86_64} CMake presets
 # and stages the resulting native artifacts into the SDKs that consume them
 # directly from source:
-#   - Kotlin (`src/androidMain/jniLibs`)
+#   - Kotlin (`src/main/jniLibs`)
 #   - React Native core/llamacpp/onnx (`android/src/main/jniLibs`)
 #   - Flutter runanywhere/runanywhere_llamacpp/runanywhere_onnx/runanywhere_genie
 #     (`android/src/main/jniLibs`)
@@ -27,9 +27,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 # Kotlin + React Native destinations (existing).
-KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/androidMain/jniLibs"
-KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs"
-KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/androidMain/jniLibs"
+KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/jniLibs"
+KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs"
+KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/jniLibs"
 RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs"
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"

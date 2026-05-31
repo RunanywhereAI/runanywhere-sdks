@@ -160,11 +160,11 @@ public class TurnLifecycleEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<TurnLifecycleEvent> =
         object : ProtoAdapter<TurnLifecycleEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TurnLifecycleEvent::class,
-      "type.googleapis.com/runanywhere.v1.TurnLifecycleEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TurnLifecycleEvent::class, 
+      "type.googleapis.com/runanywhere.v1.TurnLifecycleEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: TurnLifecycleEvent): Int {

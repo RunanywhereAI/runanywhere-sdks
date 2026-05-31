@@ -72,7 +72,14 @@ set(JNI_SOURCES
     # consumers get the system trust store + NetworkSecurityConfig +
     # proxy support for free. Fixes rc=77 SSL errors permanently.
     okhttp_transport_adapter.cpp
+    rac_hybrid_router_jni.cpp
+    rac_stt_hybrid_router_jni.cpp
 )
+
+# OpenRouter JNI thunks are attached by engines/openrouter/CMakeLists.txt via
+# target_sources(runanywhere_commons_jni ...) — that subdir is processed
+# AFTER this one, so the conditional that used to live here always saw
+# RAC_BACKEND_OPENROUTER undefined and silently dropped the symbols.
 
 # Create shared library
 add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})

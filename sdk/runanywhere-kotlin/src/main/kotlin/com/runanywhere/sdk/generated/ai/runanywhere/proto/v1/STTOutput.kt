@@ -260,11 +260,11 @@ public class STTOutput(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTOutput> = object : ProtoAdapter<STTOutput>(
-      FieldEncoding.LENGTH_DELIMITED,
-      STTOutput::class,
-      "type.googleapis.com/runanywhere.v1.STTOutput",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      STTOutput::class, 
+      "type.googleapis.com/runanywhere.v1.STTOutput", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: STTOutput): Int {

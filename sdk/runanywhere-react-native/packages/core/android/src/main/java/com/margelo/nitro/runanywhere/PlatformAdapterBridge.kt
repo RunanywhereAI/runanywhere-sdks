@@ -5,7 +5,7 @@
  * and platform-adapter download fallback).
  * Called from C++ via JNI.
  *
- * Reference: sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
+ * Reference: sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
  */
 
 package com.margelo.nitro.runanywhere

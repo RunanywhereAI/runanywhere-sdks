@@ -140,11 +140,11 @@ public class VoiceAgentTranscribeProtoRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceAgentTranscribeProtoRequest> =
         object : ProtoAdapter<VoiceAgentTranscribeProtoRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceAgentTranscribeProtoRequest::class,
-      "type.googleapis.com/runanywhere.v1.VoiceAgentTranscribeProtoRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceAgentTranscribeProtoRequest::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceAgentTranscribeProtoRequest", 
+      PROTO_3, 
+      null, 
       "voice_agent_service.proto"
     ) {
       override fun encodedSize(`value`: VoiceAgentTranscribeProtoRequest): Int {

@@ -152,11 +152,11 @@ public class SpeechTurnDetectionEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<SpeechTurnDetectionEvent> =
         object : ProtoAdapter<SpeechTurnDetectionEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SpeechTurnDetectionEvent::class,
-      "type.googleapis.com/runanywhere.v1.SpeechTurnDetectionEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SpeechTurnDetectionEvent::class, 
+      "type.googleapis.com/runanywhere.v1.SpeechTurnDetectionEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: SpeechTurnDetectionEvent): Int {

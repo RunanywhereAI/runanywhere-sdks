@@ -140,11 +140,11 @@ public class DiscoveredModel(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DiscoveredModel> = object : ProtoAdapter<DiscoveredModel>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiscoveredModel::class,
-      "type.googleapis.com/runanywhere.v1.DiscoveredModel",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiscoveredModel::class, 
+      "type.googleapis.com/runanywhere.v1.DiscoveredModel", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: DiscoveredModel): Int {

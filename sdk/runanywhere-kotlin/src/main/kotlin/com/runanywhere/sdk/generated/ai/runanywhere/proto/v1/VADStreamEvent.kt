@@ -165,11 +165,11 @@ public class VADStreamEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADStreamEvent> = object : ProtoAdapter<VADStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VADStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.VADStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VADStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.VADStreamEvent", 
+      PROTO_3, 
+      null, 
       "vad_options.proto"
     ) {
       override fun encodedSize(`value`: VADStreamEvent): Int {

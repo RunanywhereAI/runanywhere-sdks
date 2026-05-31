@@ -102,8 +102,8 @@ public enum class VoiceEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceEventKind> = object : EnumAdapter<VoiceEventKind>(
-      VoiceEventKind::class,
-      PROTO_3,
+      VoiceEventKind::class, 
+      PROTO_3, 
       VoiceEventKind.VOICE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VoiceEventKind? = VoiceEventKind.fromValue(`value`)

@@ -179,11 +179,11 @@ public class StructuredOutputStreamEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputStreamEvent> =
         object : ProtoAdapter<StructuredOutputStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StructuredOutputStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.StructuredOutputStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StructuredOutputStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.StructuredOutputStreamEvent", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: StructuredOutputStreamEvent): Int {

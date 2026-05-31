@@ -32,8 +32,8 @@ public enum class AuthEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AuthEventKind> = object : EnumAdapter<AuthEventKind>(
-      AuthEventKind::class,
-      PROTO_3,
+      AuthEventKind::class, 
+      PROTO_3, 
       AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): AuthEventKind? = AuthEventKind.fromValue(`value`)

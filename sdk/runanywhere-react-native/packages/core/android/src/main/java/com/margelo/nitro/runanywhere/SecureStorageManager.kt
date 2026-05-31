@@ -4,7 +4,7 @@
  * Android secure storage using EncryptedSharedPreferences.
  * Provides hardware-backed encryption when available (Android Keystore).
  *
- * Reference: sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
+ * Reference: sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
  */
 
 package com.margelo.nitro.runanywhere

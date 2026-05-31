@@ -183,11 +183,11 @@ public class SDKEventFilter(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SDKEventFilter> = object : ProtoAdapter<SDKEventFilter>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SDKEventFilter::class,
-      "type.googleapis.com/runanywhere.v1.SDKEventFilter",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SDKEventFilter::class, 
+      "type.googleapis.com/runanywhere.v1.SDKEventFilter", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: SDKEventFilter): Int {

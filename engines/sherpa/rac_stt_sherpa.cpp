@@ -143,7 +143,7 @@ rac_result_t rac_stt_sherpa_transcribe(rac_handle_t handle,
   }
   out_result->words = nullptr;
   out_result->num_words = 0;
-  out_result->confidence = 1.0f;
+  out_result->confidence = result.confidence;
   out_result->processing_time_ms = result.inference_time_ms;
 
   rac_event_track("stt.transcription.completed", RAC_EVENT_CATEGORY_STT,

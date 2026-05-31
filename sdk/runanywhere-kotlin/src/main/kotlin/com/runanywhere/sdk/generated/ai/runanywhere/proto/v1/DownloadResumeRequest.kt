@@ -127,11 +127,11 @@ public class DownloadResumeRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadResumeRequest> =
         object : ProtoAdapter<DownloadResumeRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadResumeRequest::class,
-      "type.googleapis.com/runanywhere.v1.DownloadResumeRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadResumeRequest::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadResumeRequest", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadResumeRequest): Int {

@@ -45,8 +45,8 @@ public enum class ModelRegistryEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelRegistryEventKind> =
         object : EnumAdapter<ModelRegistryEventKind>(
-      ModelRegistryEventKind::class,
-      PROTO_3,
+      ModelRegistryEventKind::class, 
+      PROTO_3, 
       ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelRegistryEventKind? = ModelRegistryEventKind.fromValue(`value`)

@@ -240,11 +240,11 @@ public class RAGResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGResult> = object : ProtoAdapter<RAGResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RAGResult::class,
-      "type.googleapis.com/runanywhere.v1.RAGResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RAGResult::class, 
+      "type.googleapis.com/runanywhere.v1.RAGResult", 
+      PROTO_3, 
+      null, 
       "rag.proto"
     ) {
       override fun encodedSize(`value`: RAGResult): Int {

@@ -110,11 +110,11 @@ public class FailureEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<FailureEvent> = object : ProtoAdapter<FailureEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      FailureEvent::class,
-      "type.googleapis.com/runanywhere.v1.FailureEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      FailureEvent::class, 
+      "type.googleapis.com/runanywhere.v1.FailureEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: FailureEvent): Int {

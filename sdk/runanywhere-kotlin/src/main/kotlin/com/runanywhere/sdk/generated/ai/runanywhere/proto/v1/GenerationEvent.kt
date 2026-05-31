@@ -395,11 +395,11 @@ public class GenerationEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<GenerationEvent> = object : ProtoAdapter<GenerationEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      GenerationEvent::class,
-      "type.googleapis.com/runanywhere.v1.GenerationEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      GenerationEvent::class, 
+      "type.googleapis.com/runanywhere.v1.GenerationEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: GenerationEvent): Int {

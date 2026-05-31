@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 #include "rac/audio/rac_audio_convert.h"
@@ -66,10 +67,12 @@ static rac_result_t sherpa_stt_vtable_transcribe(
   if (!audio_data || audio_size == 0 || !out_result) {
     return RAC_ERROR_INVALID_ARGUMENT;
   }
-  // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input
+  // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input.
+  // Emit NaN (not 0.0f) so the hybrid router treats this as "no confidence
+  // signal" and does not wrongly cascade on a too-short clip.
   if (audio_size < 1600) {
     out_result->text = nullptr;
-    out_result->confidence = 0.0f;
+    out_result->confidence = std::numeric_limits<float>::quiet_NaN();
     return RAC_SUCCESS;
   }
   std::vector<float> float_samples =

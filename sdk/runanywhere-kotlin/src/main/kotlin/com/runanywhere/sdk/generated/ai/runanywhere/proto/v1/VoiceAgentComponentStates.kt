@@ -196,11 +196,11 @@ public class VoiceAgentComponentStates(
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceAgentComponentStates> =
         object : ProtoAdapter<VoiceAgentComponentStates>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceAgentComponentStates::class,
-      "type.googleapis.com/runanywhere.v1.VoiceAgentComponentStates",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceAgentComponentStates::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceAgentComponentStates", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: VoiceAgentComponentStates): Int {

@@ -199,11 +199,11 @@ public class RAGSearchResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGSearchResult> = object : ProtoAdapter<RAGSearchResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RAGSearchResult::class,
-      "type.googleapis.com/runanywhere.v1.RAGSearchResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RAGSearchResult::class, 
+      "type.googleapis.com/runanywhere.v1.RAGSearchResult", 
+      PROTO_3, 
+      null, 
       "rag.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

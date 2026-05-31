@@ -143,11 +143,11 @@ public class ExpectedModelFiles(
     @JvmField
     public val ADAPTER: ProtoAdapter<ExpectedModelFiles> =
         object : ProtoAdapter<ExpectedModelFiles>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ExpectedModelFiles::class,
-      "type.googleapis.com/runanywhere.v1.ExpectedModelFiles",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ExpectedModelFiles::class, 
+      "type.googleapis.com/runanywhere.v1.ExpectedModelFiles", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ExpectedModelFiles): Int {

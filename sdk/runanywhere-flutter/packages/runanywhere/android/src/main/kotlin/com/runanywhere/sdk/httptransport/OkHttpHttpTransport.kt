@@ -5,7 +5,7 @@
  * Platform HTTP transport adapter — Flutter plugin copy.
  *
  * This file is BYTE-FOR-BYTE COMPATIBLE with the Kotlin SDK's canonical
- *   sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt
+ *   sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/httptransport/OkHttpHttpTransport.kt
  * minus the Kotlin-SDK-only `SDKLogger` dependency (we use android.util.Log).
  *
  * Why duplicate? The Flutter plugin does NOT depend on the Kotlin SDK module —

@@ -164,11 +164,11 @@ public class ModelDeleteResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelDeleteResult> = object : ProtoAdapter<ModelDeleteResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelDeleteResult::class,
-      "type.googleapis.com/runanywhere.v1.ModelDeleteResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelDeleteResult::class, 
+      "type.googleapis.com/runanywhere.v1.ModelDeleteResult", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelDeleteResult): Int {

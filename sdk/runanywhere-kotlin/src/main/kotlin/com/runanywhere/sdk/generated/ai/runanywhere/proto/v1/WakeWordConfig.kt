@@ -159,11 +159,11 @@ public class WakeWordConfig(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<WakeWordConfig> = object : ProtoAdapter<WakeWordConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      WakeWordConfig::class,
-      "type.googleapis.com/runanywhere.v1.WakeWordConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      WakeWordConfig::class, 
+      "type.googleapis.com/runanywhere.v1.WakeWordConfig", 
+      PROTO_3, 
+      null, 
       "solutions.proto"
     ) {
       override fun encodedSize(`value`: WakeWordConfig): Int {

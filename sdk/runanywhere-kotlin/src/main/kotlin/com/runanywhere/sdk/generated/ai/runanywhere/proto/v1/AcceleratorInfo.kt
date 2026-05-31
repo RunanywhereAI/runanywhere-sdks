@@ -100,11 +100,11 @@ public class AcceleratorInfo(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AcceleratorInfo> = object : ProtoAdapter<AcceleratorInfo>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AcceleratorInfo::class,
-      "type.googleapis.com/runanywhere.v1.AcceleratorInfo",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AcceleratorInfo::class, 
+      "type.googleapis.com/runanywhere.v1.AcceleratorInfo", 
+      PROTO_3, 
+      null, 
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: AcceleratorInfo): Int {

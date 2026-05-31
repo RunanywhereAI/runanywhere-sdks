@@ -270,11 +270,11 @@ public class VLMResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMResult> = object : ProtoAdapter<VLMResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VLMResult::class,
-      "type.googleapis.com/runanywhere.v1.VLMResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VLMResult::class, 
+      "type.googleapis.com/runanywhere.v1.VLMResult", 
+      PROTO_3, 
+      null, 
       "vlm_options.proto"
     ) {
       override fun encodedSize(`value`: VLMResult): Int {

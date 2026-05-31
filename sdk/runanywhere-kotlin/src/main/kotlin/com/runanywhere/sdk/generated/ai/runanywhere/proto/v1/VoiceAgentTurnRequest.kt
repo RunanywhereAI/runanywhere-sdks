@@ -164,11 +164,11 @@ public class VoiceAgentTurnRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceAgentTurnRequest> =
         object : ProtoAdapter<VoiceAgentTurnRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceAgentTurnRequest::class,
-      "type.googleapis.com/runanywhere.v1.VoiceAgentTurnRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceAgentTurnRequest::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceAgentTurnRequest", 
+      PROTO_3, 
+      null, 
       "voice_agent_service.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

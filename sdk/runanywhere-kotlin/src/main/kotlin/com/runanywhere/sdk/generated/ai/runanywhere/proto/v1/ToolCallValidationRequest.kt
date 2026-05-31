@@ -92,11 +92,11 @@ public class ToolCallValidationRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallValidationRequest> =
         object : ProtoAdapter<ToolCallValidationRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolCallValidationRequest::class,
-      "type.googleapis.com/runanywhere.v1.ToolCallValidationRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolCallValidationRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ToolCallValidationRequest", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolCallValidationRequest): Int {

@@ -183,11 +183,11 @@ public class ModelRegistryRefreshRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelRegistryRefreshRequest> =
         object : ProtoAdapter<ModelRegistryRefreshRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelRegistryRefreshRequest::class,
-      "type.googleapis.com/runanywhere.v1.ModelRegistryRefreshRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelRegistryRefreshRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ModelRegistryRefreshRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelRegistryRefreshRequest): Int {

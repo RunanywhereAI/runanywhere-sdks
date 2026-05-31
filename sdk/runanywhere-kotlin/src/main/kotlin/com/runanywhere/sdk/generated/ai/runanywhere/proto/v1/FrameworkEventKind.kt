@@ -38,8 +38,8 @@ public enum class FrameworkEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<FrameworkEventKind> = object : EnumAdapter<FrameworkEventKind>(
-      FrameworkEventKind::class,
-      PROTO_3,
+      FrameworkEventKind::class, 
+      PROTO_3, 
       FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): FrameworkEventKind? = FrameworkEventKind.fromValue(`value`)

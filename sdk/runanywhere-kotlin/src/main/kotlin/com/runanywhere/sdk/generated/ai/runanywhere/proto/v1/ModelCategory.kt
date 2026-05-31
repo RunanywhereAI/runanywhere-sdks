@@ -57,8 +57,8 @@ public enum class ModelCategory(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelCategory> = object : EnumAdapter<ModelCategory>(
-      ModelCategory::class,
-      PROTO_3,
+      ModelCategory::class, 
+      PROTO_3, 
       ModelCategory.MODEL_CATEGORY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelCategory? = ModelCategory.fromValue(`value`)

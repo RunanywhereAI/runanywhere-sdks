@@ -215,11 +215,11 @@ public class DiffusionProgress(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionProgress> = object : ProtoAdapter<DiffusionProgress>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiffusionProgress::class,
-      "type.googleapis.com/runanywhere.v1.DiffusionProgress",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiffusionProgress::class, 
+      "type.googleapis.com/runanywhere.v1.DiffusionProgress", 
+      PROTO_3, 
+      null, 
       "diffusion_options.proto"
     ) {
       override fun encodedSize(`value`: DiffusionProgress): Int {

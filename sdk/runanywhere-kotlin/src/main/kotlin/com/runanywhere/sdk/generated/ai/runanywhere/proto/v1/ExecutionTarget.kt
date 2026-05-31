@@ -37,8 +37,8 @@ public enum class ExecutionTarget(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ExecutionTarget> = object : EnumAdapter<ExecutionTarget>(
-      ExecutionTarget::class,
-      PROTO_3,
+      ExecutionTarget::class, 
+      PROTO_3, 
       ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ExecutionTarget? = ExecutionTarget.fromValue(`value`)

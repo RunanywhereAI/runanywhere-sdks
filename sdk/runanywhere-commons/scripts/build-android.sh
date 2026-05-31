@@ -63,9 +63,9 @@ echo "▶ Delegating Android build to scripts/build-core-android.sh ${ABI}"
 # Stage the produced .so artifacts into the legacy
 # dist/android/<sub>/<abi>/ layout that the release workflow's
 # dist/android-staging packaging step still references.
-KOTLIN_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/src/androidMain/jniLibs/${ABI}"
-KOTLIN_LLAMA_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/${ABI}"
-KOTLIN_ONNX_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/androidMain/jniLibs/${ABI}"
+KOTLIN_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/jniLibs/${ABI}"
+KOTLIN_LLAMA_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/main/jniLibs/${ABI}"
+KOTLIN_ONNX_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/main/jniLibs/${ABI}"
 
 DIST_BASE="${COMMONS_ROOT}/dist/android"
 mkdir -p \

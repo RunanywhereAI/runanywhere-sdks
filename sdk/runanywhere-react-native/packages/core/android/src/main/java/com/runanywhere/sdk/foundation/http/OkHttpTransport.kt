@@ -5,7 +5,7 @@
  * Platform HTTP transport adapter — React Native copy (v2 close-out Phase H6 + R3).
  *
  * This is a NEAR-DUPLICATE of the Kotlin SDK's file at
- *   sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/http/OkHttpTransport.kt
+ *   sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/http/OkHttpTransport.kt
  *
  * Why duplicate? React Native Android does NOT depend on the Kotlin SDK —
  * it loads `librac_commons.so` directly via its own `librunanywherecore.so`

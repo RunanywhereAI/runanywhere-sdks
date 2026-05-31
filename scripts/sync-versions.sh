@@ -193,7 +193,7 @@ if [ -f "$KOTLIN_PROPS" ]; then
     fi
 fi
 # Kotlin public `RunAnywhere.version` surface (mirrors Swift SDKConstants.version).
-bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
+bump_line "${REPO_ROOT}/sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/foundation/constants/SDKConstants.kt" \
     'const val VERSION = "[^"]+"' \
     "const val VERSION = \"${NEW_VERSION}\""
 

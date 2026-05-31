@@ -304,11 +304,11 @@ public class VoiceAgentResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceAgentResult> = object : ProtoAdapter<VoiceAgentResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceAgentResult::class,
-      "type.googleapis.com/runanywhere.v1.VoiceAgentResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceAgentResult::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceAgentResult", 
+      PROTO_3, 
+      null, 
       "voice_agent_service.proto"
     ) {
       override fun encodedSize(`value`: VoiceAgentResult): Int {

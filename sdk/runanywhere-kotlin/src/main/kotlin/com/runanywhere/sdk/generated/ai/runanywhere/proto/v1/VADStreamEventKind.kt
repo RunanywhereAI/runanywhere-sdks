@@ -38,8 +38,8 @@ public enum class VADStreamEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADStreamEventKind> = object : EnumAdapter<VADStreamEventKind>(
-      VADStreamEventKind::class,
-      PROTO_3,
+      VADStreamEventKind::class, 
+      PROTO_3, 
       VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VADStreamEventKind? = VADStreamEventKind.fromValue(`value`)

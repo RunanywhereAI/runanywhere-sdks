@@ -31,8 +31,8 @@ public enum class RAGStreamEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGStreamEventKind> = object : EnumAdapter<RAGStreamEventKind>(
-      RAGStreamEventKind::class,
-      PROTO_3,
+      RAGStreamEventKind::class, 
+      PROTO_3, 
       RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): RAGStreamEventKind? = RAGStreamEventKind.fromValue(`value`)

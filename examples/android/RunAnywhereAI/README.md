@@ -67,7 +67,7 @@ This sample app uses `settings.gradle.kts` with `includeBuild()` to reference th
 ```
 This Sample App → Local Kotlin SDK (sdk/runanywhere-kotlin/)
                           ↓
-              Local JNI Libraries (sdk/runanywhere-kotlin/src/androidMain/jniLibs/)
+              Local JNI Libraries (sdk/runanywhere-kotlin/src/main/jniLibs/)
                           ↑
            Built by: ./scripts/build-kotlin.sh --setup
 ```
@@ -75,7 +75,7 @@ This Sample App → Local Kotlin SDK (sdk/runanywhere-kotlin/)
 The `build-kotlin.sh --setup` script:
 1. Downloads dependencies (Sherpa-ONNX, ~500MB)
 2. Builds the native C++ libraries from `runanywhere-commons`
-3. Copies JNI `.so` files to `sdk/runanywhere-kotlin/src/androidMain/jniLibs/`
+3. Copies JNI `.so` files to `sdk/runanywhere-kotlin/src/main/jniLibs/`
 4. Sets `runanywhere.useLocalNatives=true` in `gradle.properties`
 
 ### After Modifying the SDK
