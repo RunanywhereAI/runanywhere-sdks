@@ -65,8 +65,8 @@ npm install
 echo ">> npm run build:ts"
 npm run build:ts
 
-echo ">> npm run typecheck"
-npm run typecheck
+# Packaging emits the npm tarballs only. Typecheck is pr-build.yml's gate —
+# running it here is redundant and not part of producing the artifact.
 
 DIST_DIR="${WEB_ROOT}/dist/sdk-web"
 rm -rf "$DIST_DIR"

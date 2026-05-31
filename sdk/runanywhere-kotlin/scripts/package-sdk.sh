@@ -76,9 +76,9 @@ cd "$KOTLIN_ROOT"
 GRADLE_FLAGS="--no-daemon"
 [ -n "$NATIVES_FROM" ] && GRADLE_FLAGS="$GRADLE_FLAGS -Prunanywhere.useLocalNatives=true"
 
-echo ">> ./gradlew build $GRADLE_FLAGS -x test"
-./gradlew build $GRADLE_FLAGS -x test
-
+# Packaging builds only the release deliverables. Compilation/lint/test gating
+# is pr-build.yml's job — running `gradlew build` here would recompile drifted
+# test sources and is redundant with the PR gate.
 echo ">> ./gradlew assembleRelease jvmJar $GRADLE_FLAGS"
 ./gradlew assembleRelease jvmJar $GRADLE_FLAGS
 

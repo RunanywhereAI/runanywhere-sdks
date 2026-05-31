@@ -13,9 +13,9 @@
 #      --include-macos / --package — accepted but currently ignored, since
 #      build-core-xcframework.sh always builds the canonical Apple slice
 #      set) to the repo-root xcframework build.
-#   2. Staging the resulting `.xcframework` bundles into
-#      `sdk/runanywhere-commons/dist/packages/*.zip` so the release
-#      workflow's checksum + upload steps continue to find their inputs.
+#   2. Packaging the resulting `.xcframework` bundles into the versioned
+#      `sdk/runanywhere-commons/dist/packages/<Framework>-ios-v<version>.zip`
+#      (+ .sha256) that release.yml uploads and `publish` asserts on.
 #
 # This wrapper exists so we can collapse the legacy CLI without forcing a
 # release-CI rewrite in the same change. Long-term, callers should migrate
@@ -46,12 +46,18 @@ echo "▶ Delegating iOS/macOS xcframework build to sdk/runanywhere-swift/script
 echo "  legacy args (forwarded for log fidelity, ignored by repo-root script): ${LEGACY_ARGS[*]:-<none>}"
 "${XCFRAMEWORK_SCRIPT}"
 
-# Stage the produced xcframeworks into the legacy dist/packages/*.zip layout
-# so release.yml's checksum + upload steps continue to find their inputs.
+# Stage the produced xcframeworks into dist/packages/ as the versioned release
+# archives (<Framework>-ios-v<version>.zip + .sha256) that release.yml's upload
+# step, sync-checksums.sh, and the Package.swift binary targets all expect.
+# Version: RAC_RELEASE_VERSION (the release tag, passed by release.yml) or the
+# canonical PROJECT_VERSION from VERSIONS for standalone/local runs.
+source "${SCRIPT_DIR}/load-versions.sh" >/dev/null
+VERSION="${RAC_RELEASE_VERSION:-${PROJECT_VERSION}}"
+
 SRC_DIR="${REPO_ROOT}/sdk/runanywhere-swift/Binaries"
 DEST_DIR="${COMMONS_ROOT}/dist/packages"
 mkdir -p "${DEST_DIR}"
-rm -f "${DEST_DIR}"/*.zip
+rm -f "${DEST_DIR}"/*.zip "${DEST_DIR}"/*.sha256
 
 if [ ! -d "${SRC_DIR}" ]; then
     echo "error: expected xcframework output directory ${SRC_DIR} is missing" >&2
@@ -67,9 +73,10 @@ fi
 
 for fw in "${xcframeworks[@]}"; do
     fw_name="$(basename "${fw}")"
-    zip_path="${DEST_DIR}/${fw_name%.xcframework}.zip"
+    zip_path="${DEST_DIR}/${fw_name%.xcframework}-ios-v${VERSION}.zip"
     echo "▶ Packaging ${fw_name} → ${zip_path}"
     (cd "${SRC_DIR}" && zip -ry "${zip_path}" "${fw_name}")
 done
+(cd "${DEST_DIR}" && for f in *.zip; do shasum -a 256 "$f" > "$f.sha256"; done)
 
-echo "✓ build-ios.sh wrapper complete; staged $(ls -1 "${DEST_DIR}" | wc -l | tr -d ' ') artifact(s) under ${DEST_DIR}"
+echo "✓ build-ios.sh complete; staged $(ls -1 "${DEST_DIR}"/*.zip 2>/dev/null | wc -l | tr -d ' ') versioned archive(s) under ${DEST_DIR}"
