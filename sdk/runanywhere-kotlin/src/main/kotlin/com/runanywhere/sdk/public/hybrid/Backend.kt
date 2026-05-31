@@ -5,10 +5,10 @@
  * Public backend identifiers used by RACRouter.<capability>.init(...).
  * Mirrors HybridBackendKind in idl/hybrid_router.proto.
  *
- * Cloud backends (OpenRouter) also expose a register/lookup table so the
- * caller can pre-register model entries at app startup and refer to them
- * by registry id from the router — matching the offline-model registry
- * pattern (rac_register_model in core commons).
+ * Cloud backends (Sarvam) also expose a register/lookup table so the caller
+ * can pre-register model entries at app startup and refer to them by
+ * registry id from the router — matching the offline-model registry pattern
+ * (rac_register_model in core commons).
  */
 
 package com.runanywhere.sdk.public.hybrid
@@ -18,117 +18,19 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Catalog of supported backend families.
  *
- * Each nested object is a backend family (LLAMACPP, OPENROUTER, ...) that
- * exposes one [BackendId] per capability (TEXTGEN, embedding, ...). The
- * router pairs two [BackendId] values — one on-device and one cloud — at
- * `RACRouter.llm.init(...)` time:
+ * Each nested object is a backend family (SHERPA, SARVAM, ...) that exposes
+ * one [BackendId] per capability. The STT router pairs two [BackendId]
+ * values — one on-device and one cloud — at `RACRouter.stt.init(...)` time:
  *
- *     RACRouter.llm.init(
- *         backendOffline = BACKEND.LLAMACPP.TEXTGEN,
- *         backendOnline  = BACKEND.OPENROUTER.TEXTGEN,
+ *     RACRouter.stt.init(
+ *         backendOffline = BACKEND.SHERPA.STT,
+ *         backendOnline  = BACKEND.SARVAM.STT,
  *     )
  *
  * Cloud backends additionally expose a registration table for credentials
- * + model strings — see [OPENROUTER.register].
+ * + model strings — see [SARVAM.register].
  */
 object BACKEND {
-    /** llama.cpp family (on-device). */
-    object LLAMACPP {
-        /** Text-generation capability. */
-        val TEXTGEN: BackendId = BackendId(kind = 1, family = "LLAMACPP", capability = "TEXTGEN")
-    }
-
-    /**
-     * OpenRouter family (cloud). Also acts as the in-process credential
-     * + model registry — see [register].
-     */
-    object OPENROUTER {
-        /** Text-generation capability over OpenRouter. */
-        val TEXTGEN: BackendId = BackendId(kind = 2, family = "OPENROUTER", capability = "TEXTGEN")
-
-        private val registry = ConcurrentHashMap<String, OpenRouterModelEntry>()
-
-        /**
-         * Register an OpenRouter model under [id]. Once registered, the
-         * router can refer to it by [id] alone:
-         *
-         *     BACKEND.OPENROUTER.register(
-         *         id = "claude-haiku",
-         *         model = "anthropic/claude-haiku-4",
-         *         apiKey = "sk-or-...",
-         *     )
-         *     ...
-         *     router.llm.addPair(
-         *         model2 = RACModel(id = "claude-haiku", modelType = ROUTER.ONLINE),
-         *         ...
-         *     )
-         *
-         * The registry is in-memory and thread-safe ([ConcurrentHashMap]).
-         * Registrations live for the process lifetime unless explicitly
-         * removed via [unregister] or [clear].
-         *
-         * @param id          App-chosen registry id (the value the router sees).
-         * @param model       OpenRouter model string (e.g. "openai/gpt-4o-mini").
-         * @param apiKey      OpenRouter API key.
-         * @param baseUrl     Optional base URL override.
-         * @param timeoutMs   Optional request timeout in milliseconds.
-         * @param httpReferer Optional HTTP-Referer header for attribution.
-         * @param xTitle      Optional X-Title header for attribution.
-         * @throws IllegalArgumentException if any required field is blank.
-         */
-        @JvmStatic
-        @JvmOverloads
-        fun register(
-            id: String,
-            model: String,
-            apiKey: String,
-            baseUrl: String? = null,
-            timeoutMs: Int? = null,
-            httpReferer: String? = null,
-            xTitle: String? = null,
-        ) {
-            require(id.isNotBlank()) { "OpenRouter registry id must be non-blank" }
-            require(model.isNotBlank()) { "OpenRouter model string must be non-blank" }
-            require(apiKey.isNotBlank()) { "OpenRouter apiKey must be non-blank" }
-            registry[id] = OpenRouterModelEntry(
-                id = id,
-                model = model,
-                apiKey = apiKey,
-                baseUrl = baseUrl,
-                timeoutMs = timeoutMs,
-                httpReferer = httpReferer,
-                xTitle = xTitle,
-            )
-        }
-
-        /**
-         * Remove a previously registered entry.
-         *
-         * @return `true` if [id] was registered (and is now gone), `false`
-         *         otherwise.
-         */
-        @JvmStatic
-        fun unregister(id: String): Boolean = registry.remove(id) != null
-
-        /**
-         * Resolve a registered entry. Returns `null` if [id] was never
-         * registered. The router uses this internally before creating the
-         * native OpenRouter service.
-         */
-        @JvmStatic
-        fun lookup(id: String): OpenRouterModelEntry? = registry[id]
-
-        /** Whether [id] is currently registered. */
-        @JvmStatic
-        fun isRegistered(id: String): Boolean = registry.containsKey(id)
-
-        /** Remove every registered entry. Useful in tests. */
-        @JvmStatic
-        fun clear() {
-            registry.clear()
-        }
-    }
-
     /**
      * Sherpa family (on-device STT). No credentials registry needed —
      * sherpa resolves its model via the standard model registry by id
@@ -140,7 +42,7 @@ object BACKEND {
     }
 
     /**
-     * Sarvam family (cloud). Also acts as the in-process credential
+     * Sarvam family (cloud STT). Also acts as the in-process credential
      * + model registry — see [register].
      */
     object SARVAM {
@@ -166,7 +68,7 @@ object BACKEND {
          *
          * @param id           App-chosen registry id.
          * @param model        Saarika model id (e.g. "saarika:v2.5").
-         * @param apiKey       Sarvam API subscription key.
+         * @param apiKey        Sarvam API subscription key.
          * @param languageCode Optional BCP-47 language hint ("en-IN", "hi-IN", …).
          *                     Pass `null` (or omit) to let Sarvam auto-detect; the
          *                     engine then omits the `language_code` form field
@@ -222,36 +124,14 @@ object BACKEND {
  *
  * @property kind        Wire value matching `HybridBackendKind` in the
  *                       hybrid_router.proto schema.
- * @property family      Backend family name ("LLAMACPP", "OPENROUTER", ...).
+ * @property family      Backend family name ("SHERPA", "SARVAM", ...).
  *                       The Kotlin adapter dispatches on this string.
- * @property capability  Capability name ("TEXTGEN", "EMBEDDING", ...).
+ * @property capability  Capability name ("STT", ...).
  */
 class BackendId internal constructor(
     val kind: Int,
     val family: String,
     val capability: String,
-)
-
-/**
- * Frozen view of an OpenRouter model registered via
- * [BACKEND.OPENROUTER.register]. Returned by [BACKEND.OPENROUTER.lookup].
- *
- * @property id          App-supplied registry id.
- * @property model       OpenRouter model string used on the wire.
- * @property apiKey      OpenRouter API key. Sensitive; never log.
- * @property baseUrl     Override of the OpenRouter endpoint, if set.
- * @property timeoutMs   Request timeout override (milliseconds), if set.
- * @property httpReferer HTTP-Referer header value, if set.
- * @property xTitle      X-Title header value, if set.
- */
-data class OpenRouterModelEntry(
-    val id: String,
-    val model: String,
-    val apiKey: String,
-    val baseUrl: String? = null,
-    val timeoutMs: Int? = null,
-    val httpReferer: String? = null,
-    val xTitle: String? = null,
 )
 
 /**

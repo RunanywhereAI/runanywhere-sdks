@@ -443,6 +443,22 @@ else()
     set(_HAD_BUILD_SHARED_LIBS FALSE)
 endif()
 set(BUILD_SHARED_LIBS OFF)
+
+# Android bionic exports futimesat()/lutimes() symbols in libc.so for legacy
+# ABI compatibility but does NOT declare them in any header. libarchive's
+# check_function_exists() links against libc.so, so the check false-passes and
+# defines HAVE_FUTIMESAT / HAVE_LUTIMES — then archive_read_disk_posix.c calls
+# them with no declaration, which NDK r28's clang rejects as a hard error
+# (-Werror=implicit-function-declaration). Pre-seed the result cache vars to 0
+# so libarchive skips the bogus checks and #ifdef's those code paths out. These
+# functions genuinely don't exist on Android, so disabling them is correct.
+if(ANDROID)
+    set(HAVE_FUTIMESAT 0 CACHE INTERNAL "futimesat not declared in Android bionic headers")
+    set(HAVE_LUTIMES 0 CACHE INTERNAL "lutimes not declared in Android bionic headers")
+    set(HAVE_NL_LANGINFO 0 CACHE INTERNAL "nl_langinfo not declared in Android bionic (<API 26)")
+    set(HAVE_LCHMOD 0 CACHE INTERNAL "lchmod not provided by Android bionic")
+endif()
+
 FetchContent_MakeAvailable(libarchive)
 if(_HAD_BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${_SAVED_BUILD_SHARED_LIBS}")
@@ -911,8 +927,6 @@ set(RAC_FEATURES_SOURCES
     # backpressure + hierarchical CancelToken propagation.
     src/features/voice_agent/voice_agent_pipeline.cpp
     # Hybrid router — per-request offline/online dispatch.
-    src/routing/rac_llm_hybrid_router.cpp
-    src/routing/rac_llm_hybrid_router_proto.cpp
     src/routing/rac_stt_hybrid_router.cpp
     src/routing/rac_stt_hybrid_router_proto.cpp
     src/routing/rac_hybrid_device_state.cpp

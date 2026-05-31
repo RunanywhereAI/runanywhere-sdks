@@ -3,18 +3,22 @@
  * @brief STT hybrid router — owns one offline + one online rac_stt_service_t
  *        and dispatches each transcribe request between them.
  *
- * Algorithm (identical to the LLM router):
+ * Algorithm:
  *   1. Build candidates = [offline?, online?].
  *   2. Filter candidates against rac_hybrid_routing_policy_t.hard_filters,
  *      using the per-request rac_hybrid_routing_context_t for runtime
  *      state (is_online, battery).
  *   3. Rank surviving candidates by rac_hybrid_rank_t.
- *   4. Invoke primary. If primary fails AND a secondary candidate exists,
- *      try the secondary (failure fallback). Return secondary result with
- *      was_fallback=true on success; otherwise return primary's error.
- *   5. Confidence-based cascade is intentionally NOT wired here — when
- *      added it will be sherpa-only (cloud has no transcript-quality
- *      signal we trust).
+ *   4. Invoke primary. If it succeeds with a real (non-NaN) confidence below
+ *      RAC_HYBRID_STT_CONFIDENCE_THRESHOLD and a secondary exists, cascade to
+ *      the secondary (confidence cascade). If it fails outright and a
+ *      secondary exists, try the secondary (failure fallback). Either way the
+ *      secondary result is returned with was_fallback=true on success;
+ *      otherwise the primary's result/error stands.
+ *
+ * Confidence only flows from the offline (sherpa) side — the cloud (Sarvam)
+ * does not surface a transcript-quality signal, so its confidence is NaN and
+ * never triggers a cascade.
  */
 
 #include "rac/routing/rac_stt_hybrid_router.h"

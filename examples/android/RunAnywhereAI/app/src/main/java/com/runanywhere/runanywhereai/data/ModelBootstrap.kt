@@ -136,12 +136,6 @@ object ModelBootstrap {
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
 
-        BACKEND.OPENROUTER.register(
-            id = "gemma4",
-            model = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-            apiKey = "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",
-        )
-
         // Sarvam STT — test key, auto-detect language (no languageCode).
         BACKEND.SARVAM.register(
             id = "saaras",

@@ -27,10 +27,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llamacpp/CMakeLists.txt")
     add_subdirectory(llamacpp)
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/openrouter/CMakeLists.txt")
-    add_subdirectory(openrouter)
-endif()
-
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sarvam/CMakeLists.txt")
     add_subdirectory(sarvam)
 endif()

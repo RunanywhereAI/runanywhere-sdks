@@ -4,7 +4,7 @@
  *
  * C mirrors of the messages declared in idl/hybrid_router.proto. The router
  * uses a single capability-agnostic set of filter / cascade / rank types;
- * per-capability handles (rac_llm_hybrid_router.h, etc.) wrap these in a
+ * per-capability handles (rac_stt_hybrid_router.h, etc.) wrap these in a
  * typed public API.
  *
  * All enum values are explicit and match the proto wire numbers — Kotlin /

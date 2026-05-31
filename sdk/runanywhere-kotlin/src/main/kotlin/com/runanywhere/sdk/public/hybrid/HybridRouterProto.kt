@@ -1,18 +1,15 @@
-/* 
-   * Copyright 2026 RunAnywhere SDK
-   * SPDX-License-Identifier: Apache-2.0
-   *
-   * Protobuf marshalling for the hybrid router JNI ABI. Replaces the
-   * earlier JSON marshalling (HybridRouterJson.kt, deleted in #25).
-   *
-   * Pairs with rac_hybrid_router_jni.cpp which decodes/encodes the same
-   * runanywhere.v1.* messages on the C++ side using the protobuf-generated
-   * types under sdk/runanywhere-commons/src/generated/proto/hybrid_router.pb.h.
-   *
-   * All four functions are pure — no state, no I/O. Custom filter callbacks
-   * are extracted into PackedPolicy.customFilters for host-side evaluation
-   * since function pointers can't cross JNI.
-   */
+/*
+ * Copyright 2026 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Shared protobuf marshalling for the hybrid router — the descriptor and
+ * routing-policy encoders are capability-agnostic and reused by the STT
+ * router (see HybridSttRouterProto for the STT request/response shapes).
+ *
+ * Both functions are pure — no state, no I/O. Custom filter callbacks are
+ * extracted into PackedPolicy.customFilters for host-side evaluation since
+ * function pointers can't cross JNI.
+ */
 
 package com.runanywhere.sdk.public.hybrid
 
@@ -22,13 +19,9 @@ import ai.runanywhere.proto.v1.CustomFilter
 import ai.runanywhere.proto.v1.HybridBackendKind
 import ai.runanywhere.proto.v1.HybridCascade
 import ai.runanywhere.proto.v1.HybridFilter
-import ai.runanywhere.proto.v1.HybridLlmGenerateOptions
-import ai.runanywhere.proto.v1.HybridLlmGenerateRequest
-import ai.runanywhere.proto.v1.HybridLlmGenerateResponse
 import ai.runanywhere.proto.v1.HybridModelDescriptor
 import ai.runanywhere.proto.v1.HybridModelType
 import ai.runanywhere.proto.v1.HybridRank
-import ai.runanywhere.proto.v1.HybridRoutingContext
 import ai.runanywhere.proto.v1.HybridRoutingPolicy
 
 
@@ -111,52 +104,6 @@ internal object HybridRouterProto {
         )
     }
 
-    /**
-     * Build a HybridLlmGenerateRequest carrying the prompt, the per-request
-     * routing context, and the generation options.
-     *
-     * Device-state fields (is_online, battery_percent, thermal_throttled)
-     * live behind the cross-SDK `rac_hybrid_device_state` C ABI vtable
-     * (task #22). HybridRoutingContext currently carries no fields; it
-     * remains in the wire shape so future per-call hints can be added
-     * without changing every caller.
-     */
-    fun request(prompt: String): ByteArray {
-        val context = HybridRoutingContext()
-        val options = HybridLlmGenerateOptions(
-            max_tokens = 256,
-            temperature = 0.7f,
-            top_p = 1.0f,
-            streaming_enabled = false,
-            system_prompt = "",
-        )
-        val msg = HybridLlmGenerateRequest(
-            prompt = prompt,
-            context = context,
-            options = options,
-        )
-        return HybridLlmGenerateRequest.ADAPTER.encode(msg)
-    }
-
-    /**
-     * Decode a HybridLlmGenerateResponse returned by the JNI generate
-     * thunk into the public [GenerateResult] shape.
-     */
-    fun parseResponse(bytes: ByteArray): GenerateResult {
-        val msg = HybridLlmGenerateResponse.ADAPTER.decode(bytes)
-        val routing = msg.routing
-        return GenerateResult(
-            text = msg.text,
-            routing = RoutedMetadata(
-                chosenModelId = routing?.chosen_model_id.orEmpty(),
-                wasFallback = routing?.was_fallback ?: false,
-                attemptCount = routing?.attempt_count ?: 0,
-                primaryErrorCode = routing?.primary_error_code ?: 0,
-                primaryErrorMessage = routing?.primary_error_message.orEmpty(),
-            ),
-        )
-    }
-
     // ----------------------------------------------------------------------
     // Internal mappers
     // ----------------------------------------------------------------------
@@ -195,8 +142,8 @@ internal object HybridRouterProto {
     }
 
     private fun backendKindFromInt(kind: Int): HybridBackendKind = when (kind) {
-        1 -> HybridBackendKind.HYBRID_BACKEND_LLAMACPP
-        2 -> HybridBackendKind.HYBRID_BACKEND_OPENROUTER
+        3 -> HybridBackendKind.HYBRID_BACKEND_SHERPA
+        4 -> HybridBackendKind.HYBRID_BACKEND_SARVAM
         else -> HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
     }
 }

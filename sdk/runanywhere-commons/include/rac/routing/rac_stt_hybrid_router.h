@@ -14,10 +14,10 @@
  * call set_*_service(handle, NULL) BEFORE destroying either underlying
  * service to avoid use-after-free on the next route.
  *
- * Mirrors rac_llm_hybrid_router.h 1:1 except for service type and the
- * transcribe() entry point. Confidence cascade is intentionally NOT in
- * this header — when added it will be sherpa-only (the cloud side does
- * not surface transcript-quality confidence).
+ * Confidence cascade is intentionally NOT exposed in this header — it is
+ * evaluated inside the router on the per-token confidence the offline
+ * (sherpa) engine reports; the cloud side does not surface
+ * transcript-quality confidence.
  */
 
 #ifndef RAC_STT_HYBRID_ROUTER_H
@@ -100,15 +100,13 @@ RAC_API rac_result_t rac_stt_hybrid_router_transcribe(
 
 /**
  * @brief Cancel the in-flight transcribe call on @p handle, if any.
- *        Forwards to the active service's ops->cancel when present.
  *
  * Safe to call from any thread; uses an atomic to track the currently
- * invoked service. No-op when no call is in flight. The cloud (Sarvam)
- * service does not currently expose a cancel op, so cancellation only
- * has effect against the offline (sherpa) side mid-batch.
+ * invoked service. rac_stt_service_ops_t exposes no cancel op today, so this
+ * is effectively a no-op — it exists so callers can wire cancellation now and
+ * have it take effect automatically once an engine adds a cancel op.
  *
- * @return RAC_SUCCESS when forwarded (or no-op); the service's cancel rc
- *         otherwise.
+ * @return RAC_SUCCESS.
  */
 RAC_API rac_result_t rac_stt_hybrid_router_cancel(rac_handle_t handle);
 

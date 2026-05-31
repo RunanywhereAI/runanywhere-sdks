@@ -26,10 +26,10 @@ target_compile_features(rac_backend_sarvam PRIVATE cxx_std_17)
 set_target_properties(rac_backend_sarvam PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(TARGET runanywhere_commons_jni)
-    # Same pattern as engines/openrouter: attach JNI thunks here because the
-    # commons JNI CMakeLists is processed before engines/ and cannot see
-    # RAC_BACKEND_SARVAM. Guarantees racSttSarvam* symbols end up in
-    # librunanywhere_jni.so whenever this engine is built.
+    # Attach JNI thunks here because the commons JNI CMakeLists is processed
+    # before engines/ and cannot see RAC_BACKEND_SARVAM. Guarantees the
+    # racSttSarvam* symbols end up in librunanywhere_jni.so whenever this
+    # engine is built.
     target_sources(runanywhere_commons_jni PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/jni/rac_stt_sarvam_jni.cpp
     )

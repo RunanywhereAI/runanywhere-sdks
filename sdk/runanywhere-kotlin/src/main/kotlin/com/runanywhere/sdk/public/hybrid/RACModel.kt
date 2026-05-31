@@ -14,10 +14,10 @@ package com.runanywhere.sdk.public.hybrid
  * `id` is the lookup key the SDK uses to resolve the concrete backend
  * resource:
  *   - For [ModelType.OFFLINE]: forwarded to the C model registry
- *     (`rac_get_model`) so the underlying engine (e.g. llama.cpp) can
- *     load the corresponding gguf.
- *   - For [ModelType.ONLINE]: looked up in `BACKEND.OPENROUTER` to fetch
- *     the OpenRouter model string + credentials.
+ *     (`rac_get_model`) so the underlying engine (e.g. sherpa) can load
+ *     the corresponding model files.
+ *   - For [ModelType.ONLINE]: looked up in the cloud backend registry
+ *     (e.g. `BACKEND.SARVAM`) to fetch the model string + credentials.
  *
  * Construct via the [offline] / [online] convenience properties on
  * `ROUTER` to keep [modelType] correct by construction.
