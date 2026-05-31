@@ -1,9 +1,9 @@
 // RunAnywhere IDL — Hybrid router schema.
 //
 // Per-request routing between an on-device (offline) backend and a cloud
-// (online) backend for any capability. POC scope: LLM text generation with
-// llama.cpp as offline and OpenRouter as online. The schema is capability-
-// agnostic; cascade/filter/rank semantics are identical across capabilities.
+// (online) backend. Wired today for STT: sherpa-onnx offline ↔ Sarvam online.
+// The schema is capability-agnostic; cascade/filter/rank semantics are
+// identical across capabilities.
 //
 // Schema is consumed by Square Wire (Kotlin) and protobuf (C++/Swift) via
 // the codegen scripts in idl/codegen/. The JNI boundary between the Kotlin
@@ -23,7 +23,7 @@ option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 // ---------------------------------------------------------------------------
-// Capability under hybrid routing. POC only implements LLM.
+// Capability under hybrid routing. Only STT is wired today.
 // ---------------------------------------------------------------------------
 enum HybridCapability {
     HYBRID_CAPABILITY_UNSPECIFIED = 0;
@@ -177,43 +177,6 @@ message HybridRoutedMetadata {
 message HybridRoutingContext {
     reserved 1, 2, 3, 4;
     reserved "is_online", "input_is_sensitive", "battery_percent", "thermal_throttled";
-}
-
-// ---------------------------------------------------------------------------
-// Generation options for an LLM-capability request through the router.
-// Matches the knobs the existing LLMGenerationOptions surface exposes —
-// kept here as a separate proto to keep the hybrid-router schema free of
-// cross-file imports.
-// ---------------------------------------------------------------------------
-message HybridLlmGenerateOptions {
-    int32  max_tokens        = 1;
-    float  temperature       = 2;
-    float  top_p             = 3;
-    bool   streaming_enabled = 4;
-    string system_prompt     = 5;
-}
-
-// ---------------------------------------------------------------------------
-// Request handed to the JNI generate thunk. Wraps the prompt, the per-request
-// routing context, and the per-request generation options into one proto so
-// the wire shape is a single ByteArray instead of several String parameters.
-// ---------------------------------------------------------------------------
-message HybridLlmGenerateRequest {
-    string                   prompt  = 1;
-    HybridRoutingContext     context = 2;
-    HybridLlmGenerateOptions options = 3;
-}
-
-// ---------------------------------------------------------------------------
-// Response returned by the JNI generate thunk. Carries the LLM text, the
-// routing decision metadata, the native rc, and a human-readable error
-// message when rc != 0.
-// ---------------------------------------------------------------------------
-message HybridLlmGenerateResponse {
-    int32                rc        = 1;
-    string               text      = 2;
-    HybridRoutedMetadata routing   = 3;
-    string               error_msg = 4;
 }
 
 // ---------------------------------------------------------------------------
