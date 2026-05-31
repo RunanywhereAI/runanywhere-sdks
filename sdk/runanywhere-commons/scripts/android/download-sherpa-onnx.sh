@@ -34,8 +34,9 @@ if [ -z "${SHERPA_ONNX_VERSION_ANDROID:-}" ]; then
     exit 1
 fi
 SHERPA_VERSION="${SHERPA_ONNX_VERSION_ANDROID}"
-# Official Sherpa-ONNX Android release
-DOWNLOAD_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-android.tar.bz2"
+# RunAnywhere Sherpa-ONNX fork (whisper per-token confidence); repo from VERSIONS
+SHERPA_ONNX_REPO="${SHERPA_ONNX_REPO_ANDROID}"
+DOWNLOAD_URL="https://github.com/${SHERPA_ONNX_REPO}/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-android.tar.bz2"
 
 # Colors
 RED='\033[0;31m'
@@ -178,9 +179,9 @@ download_header() {
 download_sherpa_headers() {
     mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
     echo "Downloading headers from Sherpa-ONNX source (v${SHERPA_VERSION})..."
-    download_header "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
+    download_header "https://raw.githubusercontent.com/${SHERPA_ONNX_REPO}/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
         "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
-    download_header "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
+    download_header "https://raw.githubusercontent.com/${SHERPA_ONNX_REPO}/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
         "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
     echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
 }
