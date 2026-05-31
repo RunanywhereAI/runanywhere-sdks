@@ -9,10 +9,11 @@
  *      using the per-request rac_hybrid_routing_context_t for runtime
  *      state (is_online, battery).
  *   3. Rank surviving candidates by rac_hybrid_rank_t.
- *   4. Invoke primary. If it succeeds with a real (non-NaN) confidence below
- *      RAC_HYBRID_STT_CONFIDENCE_THRESHOLD and a secondary exists, cascade to
- *      the secondary (confidence cascade). If it fails outright and a
- *      secondary exists, try the secondary (failure fallback). Either way the
+ *   4. Invoke primary. If the policy installed a confidence cascade and the
+ *      primary succeeds with a real (non-NaN) confidence below that cascade's
+ *      threshold and a secondary exists, cascade to the secondary. If it
+ *      fails outright and a secondary exists, try the secondary (failure
+ *      fallback — always on, independent of the cascade). Either way the
  *      secondary result is returned with was_fallback=true on success;
  *      otherwise the primary's result/error stands.
  *
@@ -271,9 +272,11 @@ rac_result_t rac_stt_hybrid_router_transcribe(
     }
 
     std::vector<Candidate> ordered;
+    rac_hybrid_cascade_t   cascade{};
     {
         std::lock_guard<std::mutex> lock(r->mutex);
         ordered = collect_eligible(*r, *ctx);
+        cascade = r->cascade;
     }
     if (ordered.empty()) {
         return RAC_ERROR_BACKEND_UNAVAILABLE;
@@ -297,12 +300,17 @@ rac_result_t rac_stt_hybrid_router_transcribe(
 
     if (primary_rc == RAC_SUCCESS) {
         const float primary_conf = primary_result.confidence;
-        // Confidence cascade: when the primary returned a real (non-NaN)
-        // confidence below the threshold AND a secondary candidate exists,
-        // try the secondary. NaN means "no signal" — accept the primary.
+        // Confidence cascade: only when the policy installed one
+        // (cascade.kind == CONFIDENCE). It fires when the primary returned a
+        // real (non-NaN) confidence below the policy's threshold AND a
+        // secondary candidate exists. NaN means "no signal" — accept the
+        // primary. With no cascade configured the primary result stands.
+        const bool confidence_cascade_enabled =
+            cascade.kind == RAC_HYBRID_CASCADE_CONFIDENCE;
         const bool low_confidence =
+            confidence_cascade_enabled &&
             !std::isnan(primary_conf) &&
-            primary_conf < RAC_HYBRID_STT_CONFIDENCE_THRESHOLD;
+            primary_conf < cascade.data.confidence.threshold;
 
         if (low_confidence && has_secondary) {
             rac_stt_result_t secondary_result{};

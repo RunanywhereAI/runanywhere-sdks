@@ -194,9 +194,11 @@ typedef struct rac_hybrid_routed_metadata {
     float   primary_confidence;
 } rac_hybrid_routed_metadata_t;
 
-/* Confidence threshold below which the STT hybrid router cascades from the
-   primary (offline) candidate to the secondary (cloud) candidate. NaN
-   confidence (no signal) is treated as "accept primary, no cascade". */
+/* Suggested default confidence threshold for an STT confidence cascade. The
+   router uses the threshold carried in the installed policy's
+   rac_hybrid_cascade_t (HybridCascade.confidence); this constant is only the
+   recommended value callers pass when building that policy. NaN confidence
+   (no signal) is always treated as "accept primary, no cascade". */
 #define RAC_HYBRID_STT_CONFIDENCE_THRESHOLD 0.5f
 
 #ifdef __cplusplus
