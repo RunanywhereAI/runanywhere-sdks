@@ -46,9 +46,9 @@ RUN_IOS=1 ./scripts/verify.sh
 
 # Rebuild native binaries if C++ layer changed (run from repo root)
 # Android:
-../../../scripts/build-core-android.sh arm64-v8a
+../../../scripts/build/build-core-android.sh arm64-v8a
 # iOS:
-../../../scripts/build-core-xcframework.sh
+../../../sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
 For iOS, after `flutter pub get`, you may need `cd ios && pod install && cd ..` if Pods are stale.

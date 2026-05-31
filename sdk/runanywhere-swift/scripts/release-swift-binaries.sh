@@ -15,15 +15,15 @@
 #      this script does NOT perform — see "Next steps" at the end).
 #
 # Usage:
-#   scripts/release-swift-binaries.sh <version>          # builds + checksums
-#   scripts/release-swift-binaries.sh 0.20.0
+#   sdk/runanywhere-swift/scripts/release-swift-binaries.sh <version>          # builds + checksums
+#   sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
 #
 # Dry-run (no cmake/xcodebuild actually invoked, zips are generated from
 # placeholders — only used to validate the pipeline end-to-end in CI):
-#   DRY_RUN=1 scripts/release-swift-binaries.sh 0.20.0
+#   DRY_RUN=1 sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
 #
 # Skip ONNX (for dev iteration when onnxruntime-ios isn't extracted):
-#   RAC_BACKEND_ONNX=OFF scripts/release-swift-binaries.sh 0.20.0
+#   RAC_BACKEND_ONNX=OFF sdk/runanywhere-swift/scripts/release-swift-binaries.sh 0.20.0
 #
 # Outputs:
 #   release-artifacts/native-ios-macos/RACommons-ios-v${VERSION}.zip
@@ -42,7 +42,7 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 VERSION="$1"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/release-artifacts/native-ios-macos"
 
 DRY_RUN="${DRY_RUN:-0}"
@@ -88,7 +88,7 @@ mkdir -p "${DEST}"
 # 1. Build all three xcframeworks (RACommons + per-backend).
 # ────────────────────────────────────────────────────────────────────────────
 echo "▶ [1/3] Building iOS xcframeworks (DRY_RUN=${DRY_RUN}, RAC_BACKEND_ONNX=${RAC_BACKEND_ONNX})"
-"${REPO_ROOT}/scripts/build-core-xcframework.sh"
+"${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 
 # ────────────────────────────────────────────────────────────────────────────
 # 2. Zip each xcframework. Filenames match what sync-checksums.sh + the
@@ -148,7 +148,7 @@ fi
 # 3. Patch Package.swift checksums.
 # ────────────────────────────────────────────────────────────────────────────
 echo "▶ [3/3] Patching Package.swift checksums via sync-checksums.sh"
-"${REPO_ROOT}/scripts/sync-checksums.sh" "${DEST}"
+"${REPO_ROOT}/sdk/runanywhere-swift/scripts/sync-checksums.sh" "${DEST}"
 
 # ────────────────────────────────────────────────────────────────────────────
 # 4. Operator handoff. We INTENTIONALLY do not run `gh release upload`;

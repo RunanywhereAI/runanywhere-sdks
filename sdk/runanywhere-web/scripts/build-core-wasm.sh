@@ -12,7 +12,7 @@
 #   sdk/runanywhere-web/packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/sdk/runanywhere-web/packages/llamacpp/wasm"
 OUTPUT_NAME="${RAC_WASM_OUTPUT_NAME:-racommons-llamacpp}"
 BUILD_DIR="${REPO_ROOT}/build/wasm"

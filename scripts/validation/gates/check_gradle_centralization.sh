@@ -35,7 +35,7 @@
 #   2 - usage / environment error
 #
 # Usage:
-#   scripts/validation/check_gradle_centralization.sh
+#   scripts/validation/gates/check_gradle_centralization.sh
 #
 # CI wiring: invoke this from the Kotlin / lint job; it is a fast pure-bash
 # gate with no Gradle/JDK dependency.
@@ -43,7 +43,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 cd "${REPO_ROOT}"
 

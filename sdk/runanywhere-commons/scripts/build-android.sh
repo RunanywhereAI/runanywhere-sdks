@@ -4,7 +4,7 @@
 # build-android.sh — package-local compatibility wrapper.
 #
 # The original per-package Android build entry
-# point was deleted in favour of repo-root scripts/build-core-android.sh,
+# point was deleted in favour of repo-root scripts/build/build-core-android.sh,
 # but `.github/workflows/release.yml` (native_android matrix job) and the
 # README/CLAUDE.md docs continue to invoke this path. This shim restores
 # the workflow contract by:
@@ -20,7 +20,7 @@
 #      continues to see the expected layout.
 #
 # Long-term, callers should migrate to invoking
-# scripts/build-core-android.sh directly.
+# scripts/build/build-core-android.sh directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,13 +51,13 @@ if [[ ! "${ABI}" =~ ^(arm64-v8a|armeabi-v7a|x86_64)$ ]]; then
     exit 2
 fi
 
-CORE_SCRIPT="${REPO_ROOT}/scripts/build-core-android.sh"
+CORE_SCRIPT="${REPO_ROOT}/scripts/build/build-core-android.sh"
 if [ ! -x "${CORE_SCRIPT}" ]; then
     echo "error: ${CORE_SCRIPT} not found or not executable" >&2
     exit 1
 fi
 
-echo "▶ Delegating Android build to scripts/build-core-android.sh ${ABI}"
+echo "▶ Delegating Android build to scripts/build/build-core-android.sh ${ABI}"
 "${CORE_SCRIPT}" "${ABI}"
 
 # Stage the produced .so artifacts into the legacy

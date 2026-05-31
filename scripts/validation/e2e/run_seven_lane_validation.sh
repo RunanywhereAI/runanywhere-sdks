@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/_validation_lib.sh"
+source "${SCRIPT_DIR}/../_validation_lib.sh"
 
 lane_data() {
   cat <<'LANES'
@@ -18,7 +18,7 @@ LANES
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/validation/run_seven_lane_validation.sh [options]
+Usage: scripts/validation/e2e/run_seven_lane_validation.sh [options]
 
 Creates the standard seven-lane evidence folder under test_workflows/logs/.
 The shell wrapper cannot drive Mobile MCP or browser MCP by itself; target
@@ -662,7 +662,7 @@ if [[ "${WITH_PREFLIGHT}" -eq 1 ]]; then
     "${SCRIPT_DIR}/run_global_source_checks.sh"
   VALIDATION_RUN_DIR="${RUN_DIR}/global/commons-proto-checks" \
     VALIDATION_BUILD_ROOT="${VALIDATION_BUILD_ROOT}" \
-    "${SCRIPT_DIR}/run_commons_proto_checks.sh"
+    "${SCRIPT_DIR}/../commons/run_commons_proto_checks.sh"
 fi
 
 if [[ "${SELF_CHECK}" -eq 1 ]]; then

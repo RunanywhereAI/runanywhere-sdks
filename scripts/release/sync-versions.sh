@@ -6,11 +6,11 @@
 # carries a version string so they all match the requested release version.
 #
 # Usage:
-#   scripts/sync-versions.sh <new_version>
+#   scripts/release/sync-versions.sh <new_version>
 #
 # Example:
-#   scripts/sync-versions.sh 0.20.0
-#   scripts/sync-versions.sh v0.20.0      # 'v' prefix is stripped
+#   scripts/release/sync-versions.sh 0.20.0
+#   scripts/release/sync-versions.sh v0.20.0      # 'v' prefix is stripped
 #
 # What it touches:
 #   sdk/runanywhere-commons/VERSION                        (single line)
@@ -68,7 +68,7 @@ if ! [[ "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]]; then
     exit 1
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 bump_line() {
     # Replaces a line matching $pattern with $replacement, in $file.
@@ -173,7 +173,7 @@ fi
 # truth = sdk/runanywhere-commons/VERSION above), so there is no string literal
 # to rewrite. See commons-130.
 # Versions.swift — RAVersions.sdkVersion (centralized version constant whose
-# file header explicitly states `Do not hand-edit; run scripts/sync-versions.sh
+# file header explicitly states `Do not hand-edit; run scripts/release/sync-versions.sh
 # to refresh.`). The other RAVersions literals (swiftToolsVersion, dep floors)
 # track Package.swift's `.upToNextMinor(from:)` constraints and are managed
 # alongside dep bumps in the same commit — not by this release-version script.

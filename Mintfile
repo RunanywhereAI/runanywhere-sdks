@@ -4,7 +4,7 @@ apple/swift-format@602.0.0
 apple/swift-protobuf@1.38.0
 # Mintfile covers Swift-package tooling only. The rest of the toolchain —
 # Homebrew formulas (protobuf, protoc-gen-grpc-swift) and Python codegen deps
-# (grpcio-tools, protobuf, pyyaml) — is installed by scripts/setup-toolchain.sh,
+# (grpcio-tools, protobuf, pyyaml) — is installed by scripts/setup/setup-toolchain.sh,
 # the executable source of truth, and by the CI workflows directly.
 #
 # docs/dependencies/CENTRALIZATION.md §5 documents the Swift/iOS centralization

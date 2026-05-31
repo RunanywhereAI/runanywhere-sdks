@@ -527,4 +527,4 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 - ONNX Runtime: `1.23.2`.
 
 All four Flutter packages share the same version, bumped together via the
-root `scripts/sync-versions.sh`.
+root `scripts/release/sync-versions.sh`.

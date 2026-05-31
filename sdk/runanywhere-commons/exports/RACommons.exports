@@ -6,15 +6,15 @@
 # Each entry must include the leading underscore (Apple linker convention).
 #
 # To audit drift vs. RAC_API-decorated declarations in the commons headers:
-#   scripts/validation/check_rac_api_exports.sh            # advisory report
-#   scripts/validation/check_rac_api_exports.sh --strict   # CI gate (exit 1)
+#   scripts/validation/commons/check_rac_api_exports.sh            # advisory report
+#   scripts/validation/commons/check_rac_api_exports.sh --strict   # CI gate (exit 1)
 #
 # TODO(v0.21): As of 2026-05-05 the include tree exposes 955 RAC_API-decorated
 # decls total; 465 are shipped via this exports list, and 490 remain as
 # internalization candidates not called by any SDK today. Those should either
 # have RAC_API stripped from the header or be relocated to `src/.../internal.h`.
 # Once that cleanup lands, wire `check_rac_api_exports.sh --strict` into
-# `scripts/validation/run_commons_proto_checks.sh` as a CI gate.
+# `scripts/validation/commons/run_commons_proto_checks.sh` as a CI gate.
 #
 # Backend-conditional symbols are split into
 # sibling exports files and appended to this list by CMake when the matching
@@ -845,7 +845,7 @@ _rac_log_metadata_should_redact
 # ============================================================================
 # Bulk sync of RAC_API-decorated decls
 # missing from the curated exports list. These 477 symbols were reported by
-# scripts/validation/check_rac_api_exports.sh --strict and are unconditional
+# scripts/validation/commons/check_rac_api_exports.sh --strict and are unconditional
 # core symbols (no backend gating). Sorted alphabetically; backend-conditional
 # symbols live in sibling files (RACommons.rag.exports) and are appended by
 # CMake when the matching RAC_BACKEND_* flag is ON.

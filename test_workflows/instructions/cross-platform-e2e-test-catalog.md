@@ -399,8 +399,8 @@ Mark **LIMITED** on Chat if only VLM/Web cancel tested — note in report.
 
 ```bash
 # From repo root
-scripts/validation/run_global_source_checks.sh
-scripts/validation/run_commons_proto_checks.sh
+scripts/validation/e2e/run_global_source_checks.sh
+scripts/validation/commons/run_commons_proto_checks.sh
 
 cd examples/android/RunAnywhereAI
 ./gradlew :app:assembleDebug -Prunanywhere.useLocalNatives=false
@@ -1432,8 +1432,8 @@ Output: `test_workflows/logs/commons-<run-id>/logs/{cmake_configure,cmake_build,
 ### Preflight scripts (repo root)
 
 ```bash
-scripts/validation/run_global_source_checks.sh
-scripts/validation/run_commons_proto_checks.sh
+scripts/validation/e2e/run_global_source_checks.sh
+scripts/validation/commons/run_commons_proto_checks.sh
 ```
 
 ### Pass criteria

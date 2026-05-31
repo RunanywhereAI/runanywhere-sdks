@@ -32,7 +32,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 COMMONS_SRC="${REPO_ROOT}/sdk/runanywhere-commons/src"
 
 if [[ ! -d "${COMMONS_SRC}" ]]; then

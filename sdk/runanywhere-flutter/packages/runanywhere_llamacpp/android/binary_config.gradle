@@ -49,7 +49,7 @@ ext {
     //   1. Explicit override: respect `runanywhere.useLocalNatives` Gradle
     //      property when set (true/false).
     //   2. Otherwise auto-detect: use local .so files when monorepo's
-    //      `scripts/build-core-android.sh` has staged them under
+    //      `scripts/build/build-core-android.sh` has staged them under
     //      `android/src/main/jniLibs/` (the only location the local branch
     //      consumes). Fall back to the remote download branch otherwise so
     //      clean Flutter Android consumer builds (which have no plugin-local

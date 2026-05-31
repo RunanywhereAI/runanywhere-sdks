@@ -42,7 +42,7 @@ cd examples/ios/RunAnywhereAI
 
 # Build or refresh local Swift SDK binary targets.
 cd ../../..
-./scripts/build-core-xcframework.sh
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 cd examples/ios/RunAnywhereAI
 
 # Resolve local Swift package dependencies.
@@ -77,7 +77,7 @@ This Sample App → Local Swift SDK (sdk/runanywhere-swift/)
                           ↓
               Local XCFrameworks (sdk/runanywhere-swift/Binaries/)
                           ↑
-           Built by: ./scripts/build-core-xcframework.sh
+           Built by: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
 The `build-core-xcframework.sh` script:
@@ -89,7 +89,7 @@ The `build-core-xcframework.sh` script:
 - **Swift SDK code changes**: Xcode picks them up automatically
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
-  ./scripts/build-core-xcframework.sh
+  ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
   ```
 
 ---

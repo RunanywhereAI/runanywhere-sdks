@@ -4,7 +4,7 @@
 # build-ios.sh — package-local compatibility wrapper.
 #
 # The original per-package iOS/macOS build entry
-# point was deleted in favour of repo-root scripts/build-core-xcframework.sh,
+# point was deleted in favour of repo-root sdk/runanywhere-swift/scripts/build-core-xcframework.sh,
 # but `.github/workflows/release.yml` (native_ios job) and the
 # README/CLAUDE.md docs continue to invoke this path. This shim restores
 # the workflow contract by:
@@ -19,7 +19,7 @@
 #
 # This wrapper exists so we can collapse the legacy CLI without forcing a
 # release-CI rewrite in the same change. Long-term, callers should migrate
-# to invoking scripts/build-core-xcframework.sh directly.
+# to invoking sdk/runanywhere-swift/scripts/build-core-xcframework.sh directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,13 +36,13 @@ fi
 # remains byte-identical.
 LEGACY_ARGS=("$@")
 
-XCFRAMEWORK_SCRIPT="${REPO_ROOT}/scripts/build-core-xcframework.sh"
+XCFRAMEWORK_SCRIPT="${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 if [ ! -x "${XCFRAMEWORK_SCRIPT}" ]; then
     echo "error: ${XCFRAMEWORK_SCRIPT} not found or not executable" >&2
     exit 1
 fi
 
-echo "▶ Delegating iOS/macOS xcframework build to scripts/build-core-xcframework.sh"
+echo "▶ Delegating iOS/macOS xcframework build to sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 echo "  legacy args (forwarded for log fidelity, ignored by repo-root script): ${LEGACY_ARGS[*]:-<none>}"
 "${XCFRAMEWORK_SCRIPT}"
 

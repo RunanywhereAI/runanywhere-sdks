@@ -2508,7 +2508,7 @@ swift test
 xcodebuild test -scheme RunAnywhere -destination 'platform=iOS Simulator,name=iPhone 16 Pro' CODE_SIGNING_REQUIRED=NO
 ```
 
-Tests require the `Binaries/` XCFrameworks (built locally via `scripts/build-core-xcframework.sh` or copied from CI artifacts).
+Tests require the `Binaries/` XCFrameworks (built locally via `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` or copied from CI artifacts).
 
 ---
 

@@ -28,7 +28,7 @@ done
 # Each language script does its own lookup; this is just the base gate.
 if ! command -v protoc >/dev/null 2>&1; then
     echo "error: protoc not on PATH." >&2
-    echo "       Run scripts/setup-toolchain.sh first, or install manually:" >&2
+    echo "       Run scripts/setup/setup-toolchain.sh first, or install manually:" >&2
     echo "         brew install protobuf            # macOS" >&2
     echo "         apt-get install protobuf-compiler   # Ubuntu" >&2
     exit 127

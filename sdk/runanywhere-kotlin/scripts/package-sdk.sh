@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 KOTLIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-source "${REPO_ROOT}/scripts/detect-mode.sh"
+source "${REPO_ROOT}/scripts/setup/detect-mode.sh"
 
 NATIVES_FROM=""
 
@@ -101,11 +101,11 @@ for f in "$DIST_DIR"/*; do
     echo "  $(basename "$f")"
 done
 
-if [ -x "${REPO_ROOT}/scripts/validate-artifact.sh" ]; then
+if [ -x "${REPO_ROOT}/scripts/release/validate-artifact.sh" ]; then
     echo ""
     if [ "$RAC_BUILD_MODE" = "ci" ]; then
-        "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null
+        "${REPO_ROOT}/scripts/release/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null
     else
-        "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null || true
+        "${REPO_ROOT}/scripts/release/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null || true
     fi
 fi

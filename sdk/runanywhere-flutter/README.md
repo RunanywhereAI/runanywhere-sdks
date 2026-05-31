@@ -553,7 +553,7 @@ await RunAnywhere.downloads.delete('old-model-id');
 **Solutions:**
 1. Ensure NDK is properly installed
 2. Check that `jniLibs` folder contains `.so` files
-3. Rebuild native libraries with `./scripts/build-core-android.sh <ABI>` from the repo root
+3. Rebuild native libraries with `./scripts/build/build-core-android.sh <ABI>` from the repo root
 
 ### Model Not Found After Download
 
@@ -613,8 +613,8 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks
 
 # 2. Build the native artifacts (from repo root)
-./scripts/build-core-xcframework.sh                # iOS XCFrameworks
-./scripts/build-core-android.sh arm64-v8a          # Android .so files
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh                # iOS XCFrameworks
+./scripts/build/build-core-android.sh arm64-v8a          # Android .so files
 
 # 3. Bootstrap the Flutter workspace
 cd sdk/runanywhere-flutter
@@ -623,10 +623,10 @@ melos bootstrap
 
 **What the build scripts do:**
 
-- `scripts/build-core-xcframework.sh` builds `RACommons`, `RABackendLLAMACPP`,
+- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` builds `RACommons`, `RABackendLLAMACPP`,
   `RABackendONNX`, and `RABackendSherpa` XCFrameworks and stages them into
   `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
-- `scripts/build-core-android.sh <ABI>` builds `librac_commons.so` +
+- `scripts/build/build-core-android.sh <ABI>` builds `librac_commons.so` +
   per-backend `.so` libraries and stages them into
   `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
 
@@ -665,7 +665,7 @@ The sample app's `pubspec.yaml` uses path dependencies to reference the local SD
 ```
 Sample App → Local Flutter SDK Packages → Local Frameworks/JNI libs
                                                 ↑
-                               Built by scripts/build-core-*.sh
+                               Built by scripts/build/build-core-*.sh
 ```
 
 ### Development Workflow
@@ -677,17 +677,17 @@ Sample App → Local Flutter SDK Packages → Local Frameworks/JNI libs
 
 ```bash
 # From repo root
-./scripts/build-core-xcframework.sh
-./scripts/build-core-android.sh arm64-v8a
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+./scripts/build/build-core-android.sh arm64-v8a
 ```
 
 ### Build Script Reference
 
 | Script | Description |
 |--------|-------------|
-| `scripts/build-core-xcframework.sh` | iOS: builds `RACommons`/`RABackendLLAMACPP`/`RABackendONNX`/`RABackendSherpa` XCFrameworks and stages into Flutter packages' `ios/Frameworks/`. |
-| `scripts/build-core-android.sh <ABI>` | Android: builds backend `.so` files and stages into Flutter packages' `android/src/main/jniLibs/<ABI>/`. |
-| `scripts/build-core-wasm.sh` | (Not used by Flutter; targets the Web SDK.) |
+| `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` | iOS: builds `RACommons`/`RABackendLLAMACPP`/`RABackendONNX`/`RABackendSherpa` XCFrameworks and stages into Flutter packages' `ios/Frameworks/`. |
+| `scripts/build/build-core-android.sh <ABI>` | Android: builds backend `.so` files and stages into Flutter packages' `android/src/main/jniLibs/<ABI>/`. |
+| `sdk/runanywhere-web/scripts/build-core-wasm.sh` | (Not used by Flutter; targets the Web SDK.) |
 | `sdk/runanywhere-flutter/scripts/package-sdk.sh` | Validate all 4 Flutter packages via `pub publish --dry-run`. |
 
 ### Code Style

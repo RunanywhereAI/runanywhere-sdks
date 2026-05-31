@@ -23,7 +23,7 @@
 # the same string.
 #
 # Usage:
-#   scripts/validation/check_flutter_centralization.sh                # warn
+#   scripts/validation/gates/check_flutter_centralization.sh                # warn
 #   FLUTTER_CENTRALIZATION_STRICT=1 ... check_flutter_centralization.sh  # fail on warn
 #
 # Scope:
@@ -35,7 +35,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WORKSPACE_ROOT_PUBSPEC="${REPO_ROOT}/sdk/runanywhere-flutter/pubspec.yaml"
 # Source-of-truth package (per pass2-syn-121: melos.dependencies block was
 # removed because Pub does not read it; the `packages/runanywhere` pubspec

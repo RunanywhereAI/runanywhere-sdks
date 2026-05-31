@@ -36,7 +36,7 @@ for arg in "$@"; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 COMMONS_INCLUDE="${REPO_ROOT}/sdk/runanywhere-commons/include"
 EXPORTS_DIR="${REPO_ROOT}/sdk/runanywhere-commons/exports"

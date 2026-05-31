@@ -15,7 +15,7 @@
 #   ./scripts/build-core-android.sh --release        # forwards to ctest preset
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Anchor cwd to the repo root so CMake presets resolve correctly regardless
 # of where the script is invoked from (e.g., Gradle's buildLocalJniLibs task

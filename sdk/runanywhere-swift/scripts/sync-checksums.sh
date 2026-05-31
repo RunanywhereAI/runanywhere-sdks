@@ -7,11 +7,11 @@
 # iOS/macOS builds have produced the zips and before cutting a release tag.
 #
 # Usage:
-#   scripts/sync-checksums.sh ZIP_DIR
+#   sdk/runanywhere-swift/scripts/sync-checksums.sh ZIP_DIR
 #
 # Example:
-#   scripts/sync-checksums.sh sdk/runanywhere-commons/dist
-#   scripts/sync-checksums.sh release-artifacts/native-ios-macos
+#   sdk/runanywhere-swift/scripts/sync-checksums.sh sdk/runanywhere-commons/dist
+#   sdk/runanywhere-swift/scripts/sync-checksums.sh release-artifacts/native-ios-macos
 #
 # Looks for files of the form:
 #   {name}-v{version}.zip
@@ -30,7 +30,7 @@ if [ $# -ne 1 ]; then
 fi
 
 ZIP_DIR="$1"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PACKAGE_SWIFT="${REPO_ROOT}/Package.swift"
 
 if [ ! -f "$PACKAGE_SWIFT" ]; then

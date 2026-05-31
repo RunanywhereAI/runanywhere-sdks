@@ -24,8 +24,8 @@
 #                                    note about KMP commonMain incompatibility.
 #
 # Usage:
-#   ./scripts/setup-toolchain.sh          # install / upgrade
-#   ./scripts/setup-toolchain.sh --check  # verify present + versions; no install
+#   ./scripts/setup/setup-toolchain.sh          # install / upgrade
+#   ./scripts/setup/setup-toolchain.sh --check  # verify present + versions; no install
 
 set -euo pipefail
 
@@ -47,7 +47,7 @@ done
 # documented defaults if anything is missing so the script still works on a
 # minimal checkout.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 VERSIONS_FILE="${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS"
 if [ -f "${VERSIONS_FILE}" ]; then
     # shellcheck disable=SC1090

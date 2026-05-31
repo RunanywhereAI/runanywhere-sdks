@@ -225,7 +225,7 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
 }
 
-val buildCoreAndroidScript = projectDir.resolve("../../scripts/build-core-android.sh").canonicalFile
+val buildCoreAndroidScript = projectDir.resolve("../../scripts/build/build-core-android.sh").canonicalFile
 
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
@@ -280,7 +280,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
                 Local JNI build failed: No .so files found in $jniLibsDir
 
                 Run first-time setup:
-                  ./scripts/build-core-android.sh
+                  ./scripts/build/build-core-android.sh
 
                 Or download from releases:
                   ./gradlew -Prunanywhere.useLocalNatives=false assembleDebug

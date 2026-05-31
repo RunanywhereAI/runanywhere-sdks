@@ -25,7 +25,7 @@
 #                            the `release-swift-binaries.sh DRY_RUN=1` path.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 DEST="${REPO_ROOT}/sdk/runanywhere-swift/Binaries"
 
 if [ "$(uname -s)" != "Darwin" ]; then

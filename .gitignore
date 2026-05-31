@@ -5,6 +5,8 @@
 ## Build generated
 build/
 build-*/
+# scripts/build/ holds tracked native-build scripts (not CMake output) — keep it tracked
+!scripts/build/
 DerivedData/
 CMakeFiles/
 CMakeCache.txt

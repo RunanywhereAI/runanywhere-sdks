@@ -332,7 +332,7 @@ Concurrency budget per iteration:
 
 Spawn **one** Preflight Agent (Agent Mode, write access). Its responsibilities:
 
-1. Run `scripts/validation/run_global_source_checks.sh` and `scripts/validation/run_commons_proto_checks.sh`. Capture exit codes + logs under `$LOOP_ROOT/preflight/`.
+1. Run `scripts/validation/e2e/run_global_source_checks.sh` and `scripts/validation/commons/run_commons_proto_checks.sh`. Capture exit codes + logs under `$LOOP_ROOT/preflight/`.
 2. Verify devices: `adb devices -l` (exactly 1), `xcrun simctl list devices booted` (exactly 1), Node ≥ 18, `cmake` + `ninja` present.
 3. For each platform, run the **lightweight build sanity check** in §8 (typecheck/analyze level — NOT full app build):
    - Commons: `cmake --preset macos-debug` configure only.
@@ -592,7 +592,7 @@ Reference:
 
 Steps:
 1. Append PHASE_START phase0_preflight to LOOP_TIMELINE.tsv.
-2. Run scripts/validation/run_global_source_checks.sh and run_commons_proto_checks.sh; copy outputs under $LOOP_ROOT/preflight/.
+2. Run scripts/validation/e2e/run_global_source_checks.sh and run_commons_proto_checks.sh; copy outputs under $LOOP_ROOT/preflight/.
 3. Verify devices and toolchains per §0.1. Missing toolchain → ESCALATION (do not install).
 4. Run per-platform typecheck/analyze per §8 build/lint matrix.
 5. Run pre-commit run --all-files; if it modifies files, re-run, then commit using §9 policy. Run ktlint-fix/swiftlint-fix/flutter format if drift detected.
@@ -631,8 +631,8 @@ Reference docs (read fully before acting):
 Setup:
 1. <DEVICE_BLOCK> — record identity for lane RUN_MANIFEST.md.
 2. Preflight from repo root (skip if Phase 0 already passed this iteration):
-     scripts/validation/run_global_source_checks.sh
-     scripts/validation/run_commons_proto_checks.sh
+     scripts/validation/e2e/run_global_source_checks.sh
+     scripts/validation/commons/run_commons_proto_checks.sh
 3. Use the parent run folder: export RAC_RUN_ID=<rac-run-id>.
      test_workflows/scripts/session-manage.sh lane <PLATFORM> [<LANE_TARGET>]
      export RAC_SESSION_ROOT=$(test_workflows/scripts/session-manage.sh path <PLATFORM> [<LANE_TARGET>])
@@ -1177,7 +1177,7 @@ All of:
 2. `ISSUE_LEDGER.tsv` has **zero rows** with `status IN (OPEN, IN_PROGRESS, REGRESSED)`.
 3. Every platform passes the full build + lint + typecheck matrix in §8.
 4. `pre-commit run --all-files` exits 0.
-5. `scripts/validation/run_global_source_checks.sh` and `run_commons_proto_checks.sh` both exit 0.
+5. `scripts/validation/e2e/run_global_source_checks.sh` and `run_commons_proto_checks.sh` both exit 0.
 6. IDL drift check (`./idl/codegen/generate_all.sh && git diff --exit-code`) clean.
 
 When all six are true:

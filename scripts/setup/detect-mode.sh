@@ -6,7 +6,7 @@
 # caller already set it. Other build scripts can `source` this to share the
 # same detection logic:
 #
-#   source "$(dirname "$0")/../../../scripts/detect-mode.sh"
+#   source "$(dirname "$0")/../../../scripts/setup/detect-mode.sh"
 #
 # Contract:
 #   RAC_BUILD_MODE=ci    ← running in GitHub Actions (or any CI environment

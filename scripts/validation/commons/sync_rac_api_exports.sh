@@ -18,8 +18,8 @@
 # never appended. To exclude additional symbols, add them to that set.
 #
 # Usage:
-#   scripts/validation/sync_rac_api_exports.sh           # append new symbols
-#   scripts/validation/sync_rac_api_exports.sh --check   # alias for
+#   scripts/validation/commons/sync_rac_api_exports.sh           # append new symbols
+#   scripts/validation/commons/sync_rac_api_exports.sh --check   # alias for
 #                                                       # check_rac_api_exports.sh --strict
 #
 # After running, re-run check_rac_api_exports.sh --strict to confirm
@@ -39,7 +39,7 @@ for arg in "$@"; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 if [[ "${MODE}" == "check" ]]; then
     exec "${SCRIPT_DIR}/check_rac_api_exports.sh" --strict
@@ -179,7 +179,7 @@ for target_path, (label, names) in buckets.items():
         f"# AUTO-SYNC ({ts}): symbols appended by sync_rac_api_exports.sh.",
         "# Net-new RAC_API-decorated decls discovered in the commons headers and",
         "# not already covered by an earlier curated section. Routing rules live",
-        f"# in scripts/validation/sync_rac_api_exports.sh (ROUTING_RULES).",
+        f"# in scripts/validation/commons/sync_rac_api_exports.sh (ROUTING_RULES).",
         f"# Added {len(names)} symbols to {label}, sorted alphabetically.",
         "# ============================================================================",
     ]

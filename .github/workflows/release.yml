@@ -12,7 +12,7 @@ name: Release
 # distribution channel.
 #
 # Pre-flight (engineer runs locally before tagging):
-#   scripts/sync-versions.sh 1.2.3
+#   scripts/release/sync-versions.sh 1.2.3
 #   git add -u && git commit -m "chore: release 1.2.3"
 #   git tag v1.2.3
 #   git push origin main v1.2.3
@@ -58,7 +58,7 @@ jobs:
           PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
-            echo "::error::Run scripts/sync-versions.sh $V before tagging."
+            echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
             exit 1
           fi
 
@@ -82,7 +82,7 @@ jobs:
         # Canonical entry point — same script pr-build.yml uses, so PR-time
         # and tag-time exercise identical build paths. Produces .xcframework
         # bundles under sdk/runanywhere-swift/Binaries/.
-        run: ./scripts/build-core-xcframework.sh
+        run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
       - name: Package and checksum XCFrameworks
         # Zip each .xcframework into dist/packages/ (the layout the rest of
         # this workflow + sync-checksums.sh + Package.swift binary targets
@@ -122,7 +122,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # scripts/build-core-android.sh maps these to the canonical
+        # scripts/build/build-core-android.sh maps these to the canonical
         # android-{arm64,armv7,x86_64} CMake presets. (Legacy 32-bit `x86`
         # was never wired into the new build path and is dropped here.)
         abi: [arm64-v8a, armeabi-v7a, x86_64]
@@ -135,7 +135,7 @@ jobs:
       - name: Build native libs for Android (${{ matrix.abi }})
         # Canonical entry point — same script pr-build.yml uses. The script
         # stages .so files into each SDK's jniLibs/ tree directly.
-        run: ./scripts/build-core-android.sh ${{ matrix.abi }}
+        run: ./scripts/build/build-core-android.sh ${{ matrix.abi }}
       - name: Stage and zip per-ABI outputs
         # Build-core-android.sh writes .so files into each SDK's jniLibs/
         # directly; we collect from the Kotlin jniLibs trees (commons +
@@ -433,7 +433,7 @@ jobs:
           npm run build:ts
       - name: npm pack each Web package
         # @runanywhere/proto-ts is treated as a FIRST-PARTY package that tracks
-        # the SDK version. scripts/sync-versions.sh bumps its package.json on
+        # the SDK version. scripts/release/sync-versions.sh bumps its package.json on
         # every release, and this step republishes the matching tgz alongside
         # the Web SDK packages. If a separately-versioned policy is desired
         # in the future, remove proto-ts from sync-versions.sh AND from this
@@ -903,7 +903,7 @@ jobs:
             ls -la release-flat/ || true
             exit 1
           fi
-          ./scripts/sync-checksums.sh release-flat
+          ./sdk/runanywhere-swift/scripts/sync-checksums.sh release-flat
           if ! git diff --quiet Package.swift; then
             echo "Package.swift checksums updated:"
             git diff Package.swift | head -40

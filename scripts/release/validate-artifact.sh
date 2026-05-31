@@ -15,7 +15,7 @@
 #   .jar         → zip-listable, has META-INF/MANIFEST.MF
 #
 # Usage:
-#   scripts/validate-artifact.sh PATH [PATH ...]
+#   scripts/release/validate-artifact.sh PATH [PATH ...]
 #
 # Exit status: 0 if every path passed, 1 on first failure.
 # =============================================================================

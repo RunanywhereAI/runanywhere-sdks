@@ -1048,7 +1048,7 @@ endif()
 # complete (TODO v0.21). Note: target_link_options only takes effect
 # when the target is linked as a dynamic library — static-archive builds
 # ignore it, which is fine because symbol visibility only matters at final
-# link time. Use scripts/validation/check_rac_api_exports.sh to verify the
+# link time. Use scripts/validation/commons/check_rac_api_exports.sh to verify the
 # list stays in sync; update the count here when it changes materially.
 #
 # This block is additionally gated on

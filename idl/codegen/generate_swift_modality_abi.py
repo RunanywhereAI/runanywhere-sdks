@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover
     sys.stderr.write(
         "error: PyYAML not installed. Run "
         "`python3 -m pip install pyyaml` or use the toolchain installed by "
-        "scripts/setup-toolchain.sh.\n"
+        "scripts/setup/setup-toolchain.sh.\n"
     )
     sys.exit(127)
 

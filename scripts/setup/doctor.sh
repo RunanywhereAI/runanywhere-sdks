@@ -24,7 +24,7 @@ OK="${C_OK}✓${C_RESET}"
 BAD="${C_BAD}✗${C_RESET}"
 NA="${C_NA}—${C_RESET}"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 

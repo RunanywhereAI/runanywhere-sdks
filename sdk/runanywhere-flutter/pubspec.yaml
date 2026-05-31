@@ -26,7 +26,7 @@ melos:
   # Pub does NOT have a Gradle-version-catalog equivalent: there is no native
   # workspace-level dependency override mechanism. The previously documented
   # `melos.dependencies:` block was doc-only — Pub never read it, and
-  # `scripts/validation/check_flutter_centralization.sh` only caught the
+  # `scripts/validation/gates/check_flutter_centralization.sh` only caught the
   # `^x.y.z` literal-drift case (not the `any` resolution-drift case). It has
   # been removed to avoid false confidence.
   #

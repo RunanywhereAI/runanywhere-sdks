@@ -6,7 +6,7 @@
 # version pins declared in dependencies/versions.json (enforced via .syncpackrc.json).
 #
 # Usage:
-#   scripts/validation/check_typescript_centralization.sh
+#   scripts/validation/gates/check_typescript_centralization.sh
 #
 # Environment:
 #   SYNCPACK_VERSION   syncpack version to invoke via npx (default: 13.0.4).
@@ -22,7 +22,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 SYNCPACK_VERSION="${SYNCPACK_VERSION:-13.0.4}"
 SYNCPACKRC="${REPO_ROOT}/.syncpackrc.json"
