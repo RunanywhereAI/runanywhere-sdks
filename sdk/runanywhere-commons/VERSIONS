@@ -68,7 +68,7 @@ FLUTTER_VERSION=3.44.0
 # =============================================================================
 # Cross-language wire-compatibility depends on every generator emitting
 # identical bytes from identical .proto files. These pins are consumed by:
-#   - scripts/setup-toolchain.sh    (installs the pinned versions)
+#   - scripts/setup/setup-toolchain.sh    (installs the pinned versions)
 #   - idl/codegen/generate_*.sh     (verifies the pinned versions at runtime)
 #   - gradle/libs.versions.toml     (Wire runtime, mirrored by hand)
 #   - Mintfile                      (swift-protobuf, mirrored by hand)
@@ -167,6 +167,10 @@ SHERPA_ONNX_VERSION_IOS=1.12.18
 #   ./scripts/android/download-sherpa-onnx.sh
 # The download script auto-validates header vs .so version consistency.
 SHERPA_ONNX_VERSION_ANDROID=1.13.2
+# Android prebuilt source repo. RunAnywhere fork patches the Whisper greedy
+# decoder to populate the per-token ys_log_probs C-API field (hybrid-router
+# confidence); ABI/header-identical to upstream k2-fsa v1.13.2.
+SHERPA_ONNX_REPO_ANDROID=Siddhesh2377/sherpa-onnx-rac
 
 # macOS version
 SHERPA_ONNX_VERSION_MACOS=1.13.2

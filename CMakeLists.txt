@@ -23,7 +23,7 @@
 #
 # Per-language SDKs (Swift / Kotlin / Flutter / RN / Web) consume the artifacts
 # this build produces — they do NOT call this CMake directly. The wrapper
-# scripts under scripts/build-core-{android,xcframework,wasm}.sh wire the
+# scripts under scripts/build/build-core-{android,xcframework,wasm}.sh wire the
 # preset output into the right SDK directory layout.
 # =============================================================================
 

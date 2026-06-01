@@ -6,15 +6,15 @@
 # Each entry must include the leading underscore (Apple linker convention).
 #
 # To audit drift vs. RAC_API-decorated declarations in the commons headers:
-#   scripts/validation/check_rac_api_exports.sh            # advisory report
-#   scripts/validation/check_rac_api_exports.sh --strict   # CI gate (exit 1)
+#   scripts/validation/commons/check_rac_api_exports.sh            # advisory report
+#   scripts/validation/commons/check_rac_api_exports.sh --strict   # CI gate (exit 1)
 #
 # TODO(v0.21): As of 2026-05-05 the include tree exposes 955 RAC_API-decorated
 # decls total; 465 are shipped via this exports list, and 490 remain as
 # internalization candidates not called by any SDK today. Those should either
 # have RAC_API stripped from the header or be relocated to `src/.../internal.h`.
 # Once that cleanup lands, wire `check_rac_api_exports.sh --strict` into
-# `scripts/validation/run_commons_proto_checks.sh` as a CI gate.
+# `scripts/validation/commons/run_commons_proto_checks.sh` as a CI gate.
 #
 # Note: backend-conditional symbols (rac_rag_*, rac_backend_rag_*)
 # are deliberately NOT listed here even though SDKs call them — the shared

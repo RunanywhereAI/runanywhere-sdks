@@ -47,7 +47,7 @@ cd examples/android/RunAnywhereAI
 
 # Build or refresh local SDK JNI artifacts when this checkout has no staged binaries.
 cd ../../..
-./scripts/build-core-android.sh arm64-v8a
+./scripts/build/build-core-android.sh arm64-v8a
 cd examples/android/RunAnywhereAI
 
 ./gradlew :app:assembleDebug
@@ -56,7 +56,7 @@ cd examples/android/RunAnywhereAI
 Notes:
 
 - `settings.gradle.kts` wires the sample to `sdk/runanywhere-kotlin` and its local backend modules.
-- `scripts/build-core-android.sh` stages JNI libraries into the Kotlin SDK core and backend module `jniLibs` directories.
+- `scripts/build/build-core-android.sh` stages JNI libraries into the Kotlin SDK core and backend module `jniLibs` directories.
 - Keep `local.properties` machine-local; do not commit host-specific SDK paths.
 - `scripts/verify.sh` checks SDK/NDK configuration and runs `./gradlew :app:assembleDebug`; set `REFRESH_NATIVE=1` to rebuild the local JNI artifacts first.
 
@@ -69,7 +69,7 @@ This Sample App → runanywhere-sdk.aar (examples/android/RunAnywhereAI/libs/)
                           ↑
      Staged by: ./scripts/stage-sdk-aars.sh
                           ↑
-     Built by: ./scripts/build-core-android.sh arm64-v8a
+     Built by: ./scripts/build/build-core-android.sh arm64-v8a
 ```
 
 The `build-core-android.sh` script:
@@ -83,7 +83,7 @@ The `build-core-android.sh` script:
 - **Kotlin SDK code changes**: Re-run `./scripts/stage-sdk-aars.sh`, then rebuild in Android Studio or run `./gradlew assembleDebug`
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
-  ./scripts/build-core-android.sh arm64-v8a
+  ./scripts/build/build-core-android.sh arm64-v8a
   ./scripts/stage-sdk-aars.sh
   ```
 

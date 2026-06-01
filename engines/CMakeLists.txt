@@ -27,6 +27,10 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llamacpp/CMakeLists.txt")
     add_subdirectory(llamacpp)
 endif()
 
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sarvam/CMakeLists.txt")
+    add_subdirectory(sarvam)
+endif()
+
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sherpa/CMakeLists.txt")
     add_subdirectory(sherpa)
 endif()

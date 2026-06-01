@@ -25,7 +25,7 @@ cd "${APP_ROOT}"
 if [ "${REFRESH_WASM:-0}" = "1" ]; then
     require_command cmake
     log "Refreshing WASM artifact"
-    "${REPO_ROOT}/scripts/build-core-wasm.sh"
+    "${REPO_ROOT}/sdk/runanywhere-web/scripts/build-core-wasm.sh"
 fi
 
 if [ ! -f "${WASM_JS}" ] || [ ! -f "${WASM_BIN}" ]; then

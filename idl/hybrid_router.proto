@@ -1,0 +1,217 @@
+// RunAnywhere IDL — Hybrid router schema.
+//
+// Per-request routing between an on-device (offline) backend and a cloud
+// (online) backend. Wired today for STT: sherpa-onnx offline ↔ Sarvam online.
+// The schema is capability-agnostic; cascade/filter/rank semantics are
+// identical across capabilities.
+//
+// Schema is consumed by Square Wire (Kotlin) and protobuf (C++/Swift) via
+// the codegen scripts in idl/codegen/. The JNI boundary between the Kotlin
+// SDK and rac_commons exchanges these messages as serialized bytes.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "HybridRouterProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Capability under hybrid routing. Only STT is wired today.
+// ---------------------------------------------------------------------------
+enum HybridCapability {
+    HYBRID_CAPABILITY_UNSPECIFIED = 0;
+    HYBRID_CAPABILITY_LLM         = 1;
+    HYBRID_CAPABILITY_VLM         = 2;
+    HYBRID_CAPABILITY_STT         = 3;
+    HYBRID_CAPABILITY_TTS         = 4;
+    HYBRID_CAPABILITY_VAD         = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Backend identity. Matches the engines/ directory entry that registers
+// the service vtable. Cloud backends are explicit kinds rather than a
+// generic "cloud" since each one has a distinct HTTP shape and auth.
+// ---------------------------------------------------------------------------
+enum HybridBackendKind {
+    HYBRID_BACKEND_UNSPECIFIED = 0;
+    HYBRID_BACKEND_LLAMACPP    = 1;
+    HYBRID_BACKEND_OPENROUTER  = 2;
+    HYBRID_BACKEND_SHERPA      = 3;
+    HYBRID_BACKEND_SARVAM      = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Whether a model runs on-device or in the cloud. The router decides which
+// of its two registered candidates to invoke based on policy.
+// ---------------------------------------------------------------------------
+enum HybridModelType {
+    HYBRID_MODEL_TYPE_UNSPECIFIED = 0;
+    HYBRID_MODEL_TYPE_OFFLINE     = 1;
+    HYBRID_MODEL_TYPE_ONLINE      = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Hard filter — drops a candidate from consideration when the predicate
+// fails. Filters compose with AND semantics. The wire kinds match
+// thoughts/file.txt's Routing Conditions list verbatim.
+// ---------------------------------------------------------------------------
+message HybridFilter {
+    // Tag 2 was the `privacy` PII gate; removed entirely. Reserve so the
+    // tag can't be reused with different semantics.
+    reserved 2;
+    reserved "privacy";
+
+    oneof kind {
+        // True iff the host has working network. Disqualifies online
+        // candidates when false; offline candidates are unaffected.
+        bool network = 1;
+
+        // Discrete quality tier required from the candidate. Candidates
+        // declaring a lower tier in their descriptor are filtered out.
+        int32 quality_tier = 3;
+
+        // Disqualifies cloud candidates when the device is below the
+        // given battery percent (0–100).
+        BatteryFilter battery = 4;
+
+        // Caller-supplied predicate, evaluated host-side via the
+        // registered custom-filter callback table.
+        CustomFilter custom = 5;
+    }
+}
+
+message BatteryFilter {
+    int32 min_battery_percent = 1;
+}
+
+message CustomFilter {
+    string name        = 1;
+    string description = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Cascade — triggers fallback from the primary candidate to the next
+// candidate mid-request. Matches the file.txt Confidence policy.
+// ---------------------------------------------------------------------------
+message HybridCascade {
+    oneof kind {
+        // Cascade when the primary's confidence/logprob signal falls below
+        // `threshold`, or when the primary returns an error (treated as
+        // "no confidence").
+        ConfidenceCascade confidence = 1;
+    }
+}
+
+message ConfidenceCascade {
+    float threshold = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Rank — comparator used to sort eligible candidates. Exactly one rank
+// per policy.
+// ---------------------------------------------------------------------------
+enum HybridRank {
+    HYBRID_RANK_UNSPECIFIED        = 0;
+    HYBRID_RANK_PREFER_LOCAL_FIRST  = 1;
+    HYBRID_RANK_PREFER_ONLINE_FIRST = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Full routing policy attached to a model pair. `simple` mode collapses
+// to a single filter; `advanced` mode allows composition.
+// ---------------------------------------------------------------------------
+message HybridRoutingPolicy {
+    repeated HybridFilter hard_filters = 1;
+    HybridCascade         cascade      = 2;
+    HybridRank            rank         = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Descriptor for a single registered model on one side of the pair.
+// ---------------------------------------------------------------------------
+message HybridModelDescriptor {
+    string            model_id   = 1;
+    HybridModelType   model_type = 2;
+    HybridBackendKind backend    = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Metadata returned alongside the capability result describing what the
+// router did. Always populated even on success.
+// ---------------------------------------------------------------------------
+message HybridRoutedMetadata {
+    string chosen_model_id        = 1;
+    bool   was_fallback           = 2;
+    int32  attempt_count          = 3;
+    // Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
+    // the primary served the request or no fallback occurred.
+    int32  primary_error_code     = 4;
+    string primary_error_message  = 5;
+    // Final confidence of the result that was actually returned. NaN when
+    // the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
+    float  confidence             = 6;
+    // Primary's confidence captured BEFORE cascading to the secondary.
+    // Populated only when `was_fallback = true` AND the fallback fired on
+    // confidence (not on an error). NaN otherwise.
+    float  primary_confidence     = 7;
+}
+
+
+// ---------------------------------------------------------------------------
+// Per-request routing context — caller-supplied hints only.
+//
+// Device-state fields (is_online, battery_percent, thermal_throttled) live
+// behind the rac_hybrid_device_state C ABI vtable in commons (task #22).
+// `input_is_sensitive` (tag 2) was the privacy PII hint; removed entirely
+// alongside the HybridFilter.privacy gate.
+//
+// Reserved tags 1–4 prevent re-use of any old field number.
+// ---------------------------------------------------------------------------
+message HybridRoutingContext {
+    reserved 1, 2, 3, 4;
+    reserved "is_online", "input_is_sensitive", "battery_percent", "thermal_throttled";
+}
+
+// ---------------------------------------------------------------------------
+// STT transcription options carried through the router. Sample rate and
+// audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
+// caller-supplied BCP-47 hint (empty = backend auto-detect).
+// ---------------------------------------------------------------------------
+message HybridSttTranscribeOptions {
+    string language     = 1;
+    int32  sample_rate  = 2;
+    // Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
+    int32  audio_format = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Request handed to the JNI transcribe thunk. Audio bytes are passed
+// verbatim to the chosen backend; each engine is responsible for parsing
+// the encoded format (Sarvam reads the multipart file part, sherpa decodes
+// the WAV/PCM bytes).
+// ---------------------------------------------------------------------------
+message HybridSttTranscribeRequest {
+    bytes                       audio_bytes = 1;
+    HybridRoutingContext        context     = 2;
+    HybridSttTranscribeOptions  options     = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Response returned by the JNI transcribe thunk. Carries the transcript,
+// the detected (or hinted) language, the routing decision metadata, the
+// native rc, and a human-readable error message when rc != 0.
+// ---------------------------------------------------------------------------
+message HybridSttTranscribeResponse {
+    int32                rc                = 1;
+    string               text              = 2;
+    string               detected_language = 3;
+    HybridRoutedMetadata routing           = 4;
+    string               error_msg         = 5;
+}

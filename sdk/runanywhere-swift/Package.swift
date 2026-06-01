@@ -61,7 +61,7 @@ let package = Package(
         // silent upstream major bump can't land in `Package.resolved` without
         // a Package.swift edit. Version floors are mirrored in
         // Sources/RunAnywhere/Generated/Versions.swift (RAVersions) — keep
-        // both in sync via scripts/sync-versions.sh.
+        // both in sync via scripts/release/sync-versions.sh.
         // Floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
         .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),

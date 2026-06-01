@@ -143,7 +143,7 @@ fun syncAndroidNdkRuntimeLibs(
 
 android {
     namespace = "com.runanywhere.sdk.kotlin"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24
@@ -164,15 +164,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-        }
-        getByName("test") {
-            java.srcDirs("src/test/kotlin")
-        }
     }
 
     publishing {
@@ -217,7 +208,7 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
 
-    testImplementation(kotlin("test"))
+    testImplementation(kotlin("test-junit"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okio.fakefilesystem)
     testImplementation(libs.junit)
@@ -225,7 +216,7 @@ dependencies {
     testRuntimeOnly(libs.junit.vintage.engine)
 }
 
-val buildCoreAndroidScript = projectDir.resolve("../../scripts/build-core-android.sh").canonicalFile
+val buildCoreAndroidScript = projectDir.resolve("../../scripts/build/build-core-android.sh").canonicalFile
 
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
@@ -280,7 +271,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
                 Local JNI build failed: No .so files found in $jniLibsDir
 
                 Run first-time setup:
-                  ./scripts/build-core-android.sh
+                  ./scripts/build/build-core-android.sh
 
                 Or download from releases:
                   ./gradlew -Prunanywhere.useLocalNatives=false assembleDebug

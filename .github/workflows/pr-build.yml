@@ -8,7 +8,7 @@ name: PR build matrix
 #   cmake --build  --preset <preset>
 #   ctest          --preset <preset>     # debug presets only
 #
-# The wrapper scripts under scripts/build-core-*.sh package the artifacts for
+# The wrapper scripts under scripts/build/build-core-*.sh package the artifacts for
 # each frontend SDK; per-SDK jobs that need those artifacts call the wrapper
 # instead of duplicating cmake calls.
 
@@ -43,16 +43,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '22' }
       - name: TypeScript / Web / RN centralization (syncpack)
-        run: bash scripts/validation/check_typescript_centralization.sh
+        run: bash scripts/validation/gates/check_typescript_centralization.sh
       - name: Flutter dependency centralization
         # Strict by default — drift in ffi / http / protobuf is runtime-critical
         # because these deps lockstep with the C ABI surface. Use STRICT=0 only
         # for short-lived investigations; the workflow should not ship soft.
         env:
           FLUTTER_CENTRALIZATION_STRICT: '1'
-        run: bash scripts/validation/check_flutter_centralization.sh
+        run: bash scripts/validation/gates/check_flutter_centralization.sh
       - name: Gradle / Kotlin centralization
-        run: bash scripts/validation/check_gradle_centralization.sh
+        run: bash scripts/validation/gates/check_gradle_centralization.sh
 
   # =============================================================================
   # Native core builds (one job per CMake preset family)
@@ -192,7 +192,7 @@ jobs:
       - name: Download vendored Sherpa-ONNX (iOS xcframework)
         run: bash sdk/runanywhere-commons/scripts/ios/download-sherpa-onnx.sh
       - name: Build XCFramework
-        run: ./scripts/build-core-xcframework.sh
+        run: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
       - name: swift build
         run: swift build --target RunAnywhere
       # Per-SDK lint lane — fail PRs that introduce SwiftLint
@@ -236,7 +236,7 @@ jobs:
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
       - name: Build Android JNI libs
-        run: ./scripts/build-core-android.sh
+        run: ./scripts/build/build-core-android.sh
       - name: gradle assembleDebug
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew assembleDebug
@@ -354,7 +354,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Deprecated surface check
         continue-on-error: true
-        run: bash scripts/validation/check_deprecated_surfaces.sh
+        run: bash scripts/validation/gates/check_deprecated_surfaces.sh
       - name: RAC_API export drift check (strict)
         continue-on-error: true
-        run: bash scripts/validation/check_rac_api_exports.sh --strict
+        run: bash scripts/validation/commons/check_rac_api_exports.sh --strict

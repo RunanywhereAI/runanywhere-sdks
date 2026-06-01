@@ -26,13 +26,13 @@ cd "${APP_ROOT}"
 if [ "${REFRESH_ANDROID_NATIVE:-0}" = "1" ]; then
     require_command cmake
     log "Refreshing Android native artifacts (${ANDROID_ABI})"
-    "${REPO_ROOT}/scripts/build-core-android.sh" "${ANDROID_ABI}"
+    "${REPO_ROOT}/scripts/build/build-core-android.sh" "${ANDROID_ABI}"
 fi
 
 if [ "${REFRESH_IOS_NATIVE:-0}" = "1" ]; then
     require_command xcodebuild
     log "Refreshing iOS XCFramework artifacts"
-    "${REPO_ROOT}/scripts/build-core-xcframework.sh"
+    "${REPO_ROOT}/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 fi
 
 require_command flutter

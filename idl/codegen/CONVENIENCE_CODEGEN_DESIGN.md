@@ -772,7 +772,7 @@ Swift convenience file today.
 
 ### 5.4 Setup-toolchain note
 
-`scripts/setup-toolchain.sh` already installs Python 3 + the
+`scripts/setup/setup-toolchain.sh` already installs Python 3 + the
 `protobuf` Python package (required by `generate_swift_convenience.py`
 and `generate_swift_modality_abi.py`). No new toolchain dependency is
 introduced by the three new generators — they reuse the same

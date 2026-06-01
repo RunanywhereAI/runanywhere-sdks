@@ -665,10 +665,33 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
     std::lock_guard<std::recursive_mutex> lock(g_adapter_mutex);
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
         // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
-        // since this function IS the platform adapter's log callback)
+        // since this function IS the platform adapter's log callback). Map the
+        // rac level to the matching android priority and pass `tag` through as
+        // the logcat tag so the message survives default logcat filtering.
 #ifdef __ANDROID__
-        __android_log_print(ANDROID_LOG_DEBUG, "RACCommonsJNI", "[%s] %s", tag ? tag : "RAC",
-                            message ? message : "");
+        int prio;
+        switch (level) {
+            case RAC_LOG_TRACE:
+            case RAC_LOG_DEBUG:
+                prio = ANDROID_LOG_DEBUG;
+                break;
+            case RAC_LOG_INFO:
+                prio = ANDROID_LOG_INFO;
+                break;
+            case RAC_LOG_WARNING:
+                prio = ANDROID_LOG_WARN;
+                break;
+            case RAC_LOG_ERROR:
+                prio = ANDROID_LOG_ERROR;
+                break;
+            case RAC_LOG_FATAL:
+                prio = ANDROID_LOG_FATAL;
+                break;
+            default:
+                prio = ANDROID_LOG_INFO;
+                break;
+        }
+        __android_log_print(prio, tag ? tag : "RAC", "%s", message ? message : "");
 #else
         fprintf(stdout, "[DEBUG] [%s] %s\n", tag ? tag : "RAC", message ? message : "");
 #endif

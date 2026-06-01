@@ -25,7 +25,7 @@ set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/include)
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_commons.so")
     message(FATAL_ERROR "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
-                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_commons SHARED IMPORTED)

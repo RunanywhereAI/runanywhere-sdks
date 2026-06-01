@@ -12,7 +12,7 @@ name: Release
 # distribution channel.
 #
 # Pre-flight (engineer runs locally before tagging):
-#   scripts/sync-versions.sh 1.2.3
+#   scripts/release/sync-versions.sh 1.2.3
 #   git add -u && git commit -m "chore: release 1.2.3"
 #   git tag v1.2.3
 #   git push origin main v1.2.3
@@ -58,7 +58,7 @@ jobs:
           PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
-            echo "::error::Run scripts/sync-versions.sh $V before tagging."
+            echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
             exit 1
           fi
 
@@ -78,34 +78,15 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
-      - name: Build XCFrameworks (commons + backends)
-        # Canonical entry point — same script pr-build.yml uses, so PR-time
-        # and tag-time exercise identical build paths. Produces .xcframework
-        # bundles under sdk/runanywhere-swift/Binaries/.
-        run: ./scripts/build-core-xcframework.sh
-      - name: Package and checksum XCFrameworks
-        # Zip each .xcframework into dist/packages/ (the layout the rest of
-        # this workflow + sync-checksums.sh + Package.swift binary targets
-        # already expect) and compute SHA-256 sidecars alongside.
-        run: |
-          set -euo pipefail
-          SRC="${GITHUB_WORKSPACE}/sdk/runanywhere-swift/Binaries"
-          DEST="${GITHUB_WORKSPACE}/sdk/runanywhere-commons/dist/packages"
-          mkdir -p "$DEST"
-          rm -f "$DEST"/*.zip "$DEST"/*.sha256
-          shopt -s nullglob
-          xcframeworks=("$SRC"/*.xcframework)
-          if [ "${#xcframeworks[@]}" -eq 0 ]; then
-            echo "::error::No .xcframework bundles produced under $SRC"
-            exit 1
-          fi
-          for fw in "${xcframeworks[@]}"; do
-            fw_name="$(basename "$fw")"
-            zip_path="$DEST/${fw_name%.xcframework}-ios-v${{ needs.validate.outputs.version }}.zip"
-            echo "▶ Packaging $fw_name → $zip_path"
-            (cd "$SRC" && zip -ry "$zip_path" "$fw_name")
-          done
-          (cd "$DEST" && for f in *.zip; do shasum -a 256 "$f" > "$f.sha256"; done && ls -la)
+      - name: Build + package XCFrameworks (commons + backends)
+        # build-ios.sh delegates the build to build-core-xcframework.sh (the
+        # same script pr-build.yml uses, so PR-time and tag-time take identical
+        # build paths), then stages the versioned RACommons*-ios-v<version>.zip
+        # + .sha256 sidecars into dist/packages/ — the layout sync-checksums.sh
+        # and the Package.swift binary targets expect.
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-commons/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -122,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # scripts/build-core-android.sh maps these to the canonical
+        # scripts/build/build-core-android.sh maps these to the canonical
         # android-{arm64,armv7,x86_64} CMake presets. (Legacy 32-bit `x86`
         # was never wired into the new build path and is dropped here.)
         abi: [arm64-v8a, armeabi-v7a, x86_64]
@@ -132,51 +113,14 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: android
-      - name: Build native libs for Android (${{ matrix.abi }})
-        # Canonical entry point — same script pr-build.yml uses. The script
-        # stages .so files into each SDK's jniLibs/ tree directly.
-        run: ./scripts/build-core-android.sh ${{ matrix.abi }}
-      - name: Stage and zip per-ABI outputs
-        # Build-core-android.sh writes .so files into each SDK's jniLibs/
-        # directly; we collect from the Kotlin jniLibs trees (commons +
-        # llamacpp + onnx backends) into a single per-ABI zip for the
-        # release artifact, matching the layout the Kotlin/RN SDK jobs
-        # expect when they extract the artifact.
-        working-directory: sdk/runanywhere-commons
-        run: |
-          set -euo pipefail
-          ABI="${{ matrix.abi }}"
-          STAGING="dist/android-staging/$ABI"
-          mkdir -p "$STAGING"
-          # Collect every .so the build produced under any Kotlin jniLibs
-          # tree for this ABI — preserves the `jni/`, `llamacpp/`, `onnx/`
-          # split that the Kotlin/RN SDK extract steps unzip back out.
-          REPO_ROOT="$(cd ../.. && pwd)"
-          KOTLIN_BASE="$REPO_ROOT/sdk/runanywhere-kotlin"
-          # Kotlin SDK uses the Android library `src/main/jniLibs` layout (not
-          # the KMP `src/androidMain/jniLibs` layout the SDK was migrated FROM).
-          # build-core-android.sh writes here directly, and build.gradle.kts'
-          # sourceSets resolve from the same paths — see KOTLIN_BASE/build.gradle.kts:234.
-          declare -A SRC_MAP=(
-            ["jni"]="$KOTLIN_BASE/src/main/jniLibs/$ABI"
-            ["llamacpp"]="$KOTLIN_BASE/modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI"
-            ["onnx"]="$KOTLIN_BASE/modules/runanywhere-core-onnx/src/main/jniLibs/$ABI"
-          )
-          for sub in "${!SRC_MAP[@]}"; do
-            src="${SRC_MAP[$sub]}"
-            if [ -d "$src" ]; then
-              mkdir -p "$STAGING/$sub"
-              cp -R "$src/." "$STAGING/$sub/"
-            fi
-          done
-          # Also publish a flat `<abi>/*.so` layout (the historical `unified/`
-          # convenience copy) so consumers that don't care about per-backend
-          # split can grab the lot.
-          mkdir -p "$STAGING/unified"
-          find "$STAGING" -maxdepth 2 -name "*.so" -exec cp {} "$STAGING/unified/" \; 2>/dev/null || true
-          (cd dist/android-staging && zip -r "../RACommons-android-$ABI-v${{ needs.validate.outputs.version }}.zip" "$ABI")
-          shasum -a 256 "dist/RACommons-android-$ABI-v${{ needs.validate.outputs.version }}.zip" \
-            > "dist/RACommons-android-$ABI-v${{ needs.validate.outputs.version }}.zip.sha256"
+      - name: Build + package commons for Android (${{ matrix.abi }})
+        # build-android.sh delegates the build to build-core-android.sh (the
+        # same script pr-build.yml uses), then stages the per-ABI .so set
+        # (commons + llamacpp + onnx, from src/main/jniLibs) into the versioned
+        # RACommons-android-<abi>-v<version>.zip + .sha256 under dist/.
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-commons/scripts/build-android.sh ${{ matrix.abi }}
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -196,40 +140,13 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: linux
-      - name: Build commons + backends for Linux x86_64
-        # Canonical entry point — drive the linux-release CMake preset
-        # directly so PR-time and tag-time exercise identical paths.
-        run: |
-          set -euo pipefail
-          cmake --preset linux-release
-          cmake --build --preset linux-release --parallel
-      - name: Package Linux outputs
-        working-directory: sdk/runanywhere-commons
-        run: |
-          set -euo pipefail
-          DIST="dist/linux"
-          mkdir -p "$DIST/lib" "$DIST/include"
-          # Stage every .so the build produced into dist/linux/lib/ and
-          # mirror the public commons headers so downstream consumers can
-          # compile against the package.
-          find ../../build/linux-release -maxdepth 6 -name "*.so" -print -exec cp {} "$DIST/lib/" \;
-          if [ -d include ]; then
-            cp -R include/. "$DIST/include/"
-          fi
-          # Refuse to package an empty tarball — `find ... -exec cp` exits 0
-          # even with zero matches, and `tar czf .` would produce a valid
-          # archive of just directory entries. Combined with the symmetric
-          # `if-no-files-found: error` upload + `== 'success'` publish gate
-          # (see pass3-syn-007 + pass3-syn-009), a missing input now fails
-          # the job rather than silently shipping an empty tarball.
-          SO_COUNT=$(find "$DIST/lib" -name '*.so' -type f | wc -l | tr -d ' ')
-          if [ "$SO_COUNT" -lt 1 ]; then
-            echo "::error::No .so files found in linux-release build — refusing to package empty tarball"
-            exit 1
-          fi
-          (cd "$DIST" && tar czf "../RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" .)
-          shasum -a 256 "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" \
-            > "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
+      - name: Build + package commons for Linux x86_64
+        # build-linux.sh drives the linux-release CMake preset (same as PR-time),
+        # then stages the .so set + headers and packs the versioned
+        # RACommons-linux-x86_64-v<version>.tar.gz + .sha256 under dist/.
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-commons/scripts/build-linux.sh
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -359,51 +276,18 @@ jobs:
         with:
           pattern: native-android-*
           path: native-android-staging
-      - name: Stage natives into Kotlin SDK
-        run: |
-          # Mirror the path Kotlin's build.gradle.kts reads from (jniLibs.srcDirs
-          # in `src/main/jniLibs`). The KMP-style `src/androidMain/jniLibs` is
-          # no longer used by the Kotlin SDK; build-core-android.sh stages here.
-          mkdir -p sdk/runanywhere-kotlin/src/main/jniLibs
-          for abi_dir in native-android-staging/*; do
-            [ -d "$abi_dir" ] || continue
-            for zip in "$abi_dir"/*.zip; do
-              [ -f "$zip" ] || continue
-              echo "Extracting $zip"
-              unzip -o "$zip" -d sdk/runanywhere-kotlin/src/main/jniLibs/
-            done
-          done
-          ls -la sdk/runanywhere-kotlin/src/main/jniLibs/ || true
-      - name: Build Kotlin AAR + JAR
-        # useLocalNatives=true: use the JNI libs staged above from native_android
-        # artifacts, not the release-asset URLs which don't exist until this
-        # workflow uploads them at the end.
-        #
-        # Skip `build` (which transitively compiles tests) and `test`; call
-        # only the packaging tasks directly. Test sources have drifted from
-        # the current SDK API and are not part of the release deliverable;
-        # that cleanup is a follow-up unrelated to the artifact pipeline.
-        #
-        # SDK_VERSION is consumed by build.gradle.kts (line ~52) to name the
-        # JVM JAR artifact. Without it, it falls back to "0.1.5-SNAPSHOT".
-        working-directory: sdk/runanywhere-kotlin
+          merge-multiple: true
+      - name: Package Kotlin SDK (AAR + JAR + checksums)
+        # Unified packaging contract: stage per-ABI natives → build release
+        # AAR + JVM JAR → checksum. SDK_VERSION names the JVM JAR.
         env:
           SDK_VERSION: ${{ needs.validate.outputs.version }}
-        run: ./gradlew -Prunanywhere.useLocalNatives=true assembleRelease jvmJar --no-daemon
-      - name: Collect Kotlin SDK artifacts
-        run: |
-          mkdir -p sdk-staging/kotlin
-          find sdk/runanywhere-kotlin/build/outputs/aar -name "*.aar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
-          find sdk/runanywhere-kotlin/build/libs -name "*.jar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
-          ls -la sdk-staging/kotlin/ || true
-          for f in sdk-staging/kotlin/*; do
-            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
-          done
+        run: bash sdk/runanywhere-kotlin/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-android-staging"
       - name: Upload Kotlin SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-kotlin
-          path: sdk-staging/kotlin/**
+          path: sdk/runanywhere-kotlin/dist/sdk-kotlin/**
           retention-days: 7
           if-no-files-found: error
 
@@ -421,39 +305,17 @@ jobs:
         with:
           name: native-web
           path: native-web-staging
-      - name: Stage WASM into Web SDK
-        run: |
-          for tar in native-web-staging/*.tar.gz; do
-            [ -f "$tar" ] && tar xzf "$tar" -C sdk/runanywhere-web/packages/
-          done
-      - name: Install + build Web SDK
-        working-directory: sdk/runanywhere-web
-        run: |
-          npm install
-          npm run build:ts
-      - name: npm pack each Web package
-        # @runanywhere/proto-ts is treated as a FIRST-PARTY package that tracks
-        # the SDK version. scripts/sync-versions.sh bumps its package.json on
-        # every release, and this step republishes the matching tgz alongside
-        # the Web SDK packages. If a separately-versioned policy is desired
-        # in the future, remove proto-ts from sync-versions.sh AND from this
-        # `for pkg` loop. See pass3-syn-069 / build-release-pass2-001 §3.
-        working-directory: sdk/runanywhere-web
-        run: |
-          mkdir -p ../../sdk-staging/web
-          WEB_DEST="$(cd ../../sdk-staging/web && pwd)"
-          for pkg in ../shared/proto-ts packages/core packages/llamacpp packages/onnx; do
-            (cd "$pkg" && npm pack --pack-destination "$WEB_DEST")
-          done
-          ls -la ../../sdk-staging/web/ || true
-          for f in ../../sdk-staging/web/*.tgz; do
-            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
-          done
+      - name: Package Web SDK (npm tarballs + checksums)
+        # Unified packaging contract: extract the WASM tarball into the npm
+        # workspaces → npm install + build:ts → npm pack each package → checksum.
+        # The script packs @runanywhere/proto-ts alongside the SDK packages (it
+        # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
+        run: bash sdk/runanywhere-web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
       - name: Upload Web SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-web
-          path: sdk-staging/web/**
+          path: sdk/runanywhere-web/dist/sdk-web/**
           retention-days: 7
           if-no-files-found: error
 
@@ -514,19 +376,11 @@ jobs:
           bash sdk/runanywhere-react-native/scripts/package-sdk.sh \
             --mode ci \
             --natives-from "$GITHUB_WORKSPACE/rn-natives-staging"
-      - name: Collect RN SDK artifacts
-        run: |
-          mkdir -p sdk-staging/react-native
-          if [ -d sdk/runanywhere-react-native/dist/sdk-rn ]; then
-            cp sdk/runanywhere-react-native/dist/sdk-rn/*.tgz sdk-staging/react-native/ 2>/dev/null || true
-            cp sdk/runanywhere-react-native/dist/sdk-rn/*.sha256 sdk-staging/react-native/ 2>/dev/null || true
-          fi
-          ls -la sdk-staging/react-native/ || true
       - name: Upload RN SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-react-native
-          path: sdk-staging/react-native/**
+          path: sdk/runanywhere-react-native/dist/sdk-rn/**
           retention-days: 7
           if-no-files-found: error
 
@@ -903,7 +757,7 @@ jobs:
             ls -la release-flat/ || true
             exit 1
           fi
-          ./scripts/sync-checksums.sh release-flat
+          ./sdk/runanywhere-swift/scripts/sync-checksums.sh release-flat
           if ! git diff --quiet Package.swift; then
             echo "Package.swift checksums updated:"
             git diff Package.swift | head -40

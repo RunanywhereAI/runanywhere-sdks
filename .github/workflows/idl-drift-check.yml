@@ -16,7 +16,7 @@ on:
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'scripts/setup-toolchain.sh'
+      - 'scripts/setup/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
     # Include long-lived integration branches so a
@@ -30,7 +30,7 @@ on:
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/shared/proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'scripts/setup-toolchain.sh'
+      - 'scripts/setup/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
 
 permissions:
@@ -62,7 +62,7 @@ jobs:
             /usr/local/Homebrew
             /opt/homebrew
             ~/Library/Caches/Homebrew
-          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup-toolchain.sh') }}
+          key: ${{ runner.os }}-brew-protoc-${{ hashFiles('scripts/setup/setup-toolchain.sh') }}
 
       # Bootstrap the Mintfile so the Swift dev-tool versions pinned
       # at the repo root (SwiftLint / Periphery / swift-format /
@@ -71,7 +71,7 @@ jobs:
       # repo currently relies on Homebrew's `protoc-gen-grpc-swift-2`
       # binary which is not produced by the Mintfile-pinned grpc-swift 1.x
       # checkout. Mint bootstrap is run with `--overwrite y` so a stale
-      # cache cannot stall the job. Once `scripts/setup-toolchain.sh`
+      # cache cannot stall the job. Once `scripts/setup/setup-toolchain.sh`
       # migrates to mint-only, the brew installs can drop out.
       - name: Cache Mint packages
         uses: actions/cache@v4
@@ -175,7 +175,7 @@ jobs:
             echo "::error::IDL-generated code is out of sync with .proto sources."
             echo ""
             echo "To fix locally:"
-            echo "  ./scripts/setup-toolchain.sh"
+            echo "  ./scripts/setup/setup-toolchain.sh"
             echo "  ./idl/codegen/generate_all.sh"
             echo "  (cd sdk/shared/proto-ts && npm install --package-lock=false && npm run build)"
             echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"

@@ -401,7 +401,7 @@ cd runanywhere-sdks
 
 # Build the native XCFrameworks (generates RACommons + RABackend* xcframeworks
 # into sdk/runanywhere-swift/Binaries/). Required for local Swift development.
-./scripts/build-core-xcframework.sh
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
 # Verify `let useLocalNatives = true` in Package.swift so SPM resolves
 # against the on-disk XCFrameworks instead of the remote release URLs.

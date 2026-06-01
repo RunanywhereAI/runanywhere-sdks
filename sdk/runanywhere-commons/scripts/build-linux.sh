@@ -11,9 +11,9 @@
 #
 #   1. Configuring + building the canonical `linux-release` CMake preset
 #      from the repo root.
-#   2. Copying every produced `.so` and the public `include/` tree into
-#      `sdk/runanywhere-commons/dist/linux/` so the release workflow's
-#      tar/sha256/upload steps continue to find their inputs.
+#   2. Staging every produced `.so` + the public `include/` tree and packing
+#      them into the versioned `dist/RACommons-linux-x86_64-v<version>.tar.gz`
+#      (+ .sha256) that release.yml uploads and `publish` asserts on.
 #
 # Long-term, callers should migrate to invoking
 # `cmake --preset linux-release && cmake --build --preset linux-release`
@@ -54,4 +54,23 @@ if [ -d "${COMMONS_INCLUDE_SRC}" ]; then
     cp -R "${COMMONS_INCLUDE_SRC}/." "${DIST_DIR}/include/"
 fi
 
-echo "✓ build-linux.sh wrapper complete; staged artifacts under ${DIST_DIR}"
+# Refuse to package an empty tarball — `find ... -exec cp` exits 0 even with
+# zero matches, and `tar czf .` would still produce a valid archive of just
+# directory entries. The symmetric upload `if-no-files-found: error` + the
+# `== 'success'` publish gate rely on a present, non-empty archive.
+SO_COUNT=$(find "${DIST_DIR}/lib" -name '*.so' -type f | wc -l | tr -d ' ')
+if [ "${SO_COUNT}" -lt 1 ]; then
+    echo "error: no .so files in linux-release build — refusing to package empty tarball" >&2
+    exit 1
+fi
+
+# Pack the staged tree into the versioned release tarball + .sha256 under dist/.
+# Version: RAC_RELEASE_VERSION (the release tag) or PROJECT_VERSION standalone.
+source "${SCRIPT_DIR}/load-versions.sh" >/dev/null
+VERSION="${RAC_RELEASE_VERSION:-${PROJECT_VERSION}}"
+TARBALL="RACommons-linux-x86_64-v${VERSION}.tar.gz"
+rm -f "${COMMONS_ROOT}/dist/${TARBALL}" "${COMMONS_ROOT}/dist/${TARBALL}.sha256"
+(cd "${DIST_DIR}" && tar czf "../${TARBALL}" .)
+(cd "${COMMONS_ROOT}/dist" && shasum -a 256 "${TARBALL}" > "${TARBALL}.sha256")
+
+echo "✓ build-linux.sh complete; staged → ${COMMONS_ROOT}/dist/${TARBALL}"

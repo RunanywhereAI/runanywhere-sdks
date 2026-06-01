@@ -27,7 +27,7 @@ OUT_DIR="${REPO_ROOT}/sdk/runanywhere-commons/src/generated/proto"
 mkdir -p "${OUT_DIR}"
 
 if ! command -v protoc >/dev/null 2>&1; then
-    echo "error: protoc not found. Run scripts/setup-toolchain.sh." >&2
+    echo "error: protoc not found. Run scripts/setup/setup-toolchain.sh." >&2
     exit 127
 fi
 

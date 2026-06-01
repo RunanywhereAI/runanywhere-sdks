@@ -17,6 +17,7 @@ package com.runanywhere.sdk.native.bridge
 import ai.runanywhere.proto.v1.ErrorCode
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.public.hybrid.DeviceStateProvider
 
 /*
  * Transport DTOs/listeners used by native HTTP bindings live in
@@ -1810,6 +1811,111 @@ object RunAnywhereBridge {
 
     /** Get the model-assignments endpoint path (env-independent). */
     @JvmStatic external fun racEndpointModelAssignments(): String?
+
+    // ========================================================================
+    // HYBRID ROUTER — DEVICE STATE (rac_hybrid_device_state.h)
+    // ========================================================================
+
+    /**
+     * Register a Kotlin [DeviceStateProvider] as the cross-SDK device-state
+     * vtable in commons. The hybrid router calls back into the provider's
+     * three methods on every request to populate the routing context's
+     * `is_online`, `battery_percent`, and `thermal_throttled` fields used by
+     * the NETWORK / Battery filters.
+     *
+     * Passing `null` unsets the current provider and restores commons'
+     * optimistic default vtable.
+     *
+     * @return RAC_SUCCESS (0) on success; negative error code otherwise.
+     */
+    @JvmStatic external fun racHybridSetDeviceState(
+        provider: DeviceStateProvider?,
+    ): Int
+
+    // ========================================================================
+    // STT HYBRID ROUTER (rac_stt_hybrid_router.h)
+    // ========================================================================
+
+    /**
+     * Wrap an in-tree STT backend (e.g. sherpa-onnx) in a
+     * `rac_stt_service_t`. Resolves [modelId] through the C model registry
+     * (`rac_get_model`) to locate the model path + inference framework,
+     * then dispatches to the matching plugin's `create` op.
+     *
+     * The returned handle is owned by the caller and must be released via
+     * [racSttServiceDestroy]. The same handle can be passed to
+     * [racSttHybridRouterSetOfflineService].
+     *
+     * @param modelId Registry id (or model path as fallback).
+     * @return Native handle cast to Long, or 0 on failure.
+     */
+    @JvmStatic external fun racSttServiceCreate(modelId: String): Long
+
+    /**
+     * Destroy a handle previously returned by [racSttServiceCreate].
+     * Safe to call with 0.
+     */
+    @JvmStatic external fun racSttServiceDestroy(serviceHandle: Long)
+
+    /**
+     * Allocate a new STT hybrid router. Returns an opaque handle that
+     * subsequent `racSttHybridRouterSet*` / `racSttHybridRouterTranscribe`
+     * calls operate on.
+     *
+     * @return Native router handle cast to Long, or 0 on failure.
+     */
+    @JvmStatic external fun racSttHybridRouterCreate(): Long
+
+    /**
+     * Destroy a router handle returned by [racSttHybridRouterCreate].
+     * Detaches any attached services first (services are NOT freed — the
+     * caller owns those).
+     */
+    @JvmStatic external fun racSttHybridRouterDestroy(handle: Long)
+
+    /**
+     * Attach the offline-side STT service to a router. Passing
+     * [serviceHandle] = 0 with an empty [descriptorProto] clears the slot.
+     */
+    @JvmStatic external fun racSttHybridRouterSetOfflineService(
+        routerHandle: Long,
+        serviceHandle: Long,
+        descriptorProto: ByteArray,
+    ): Int
+
+    /** Attach the online-side STT service. Symmetric to the offline setter. */
+    @JvmStatic external fun racSttHybridRouterSetOnlineService(
+        routerHandle: Long,
+        serviceHandle: Long,
+        descriptorProto: ByteArray,
+    ): Int
+
+    /**
+     * Install / replace the routing policy on the STT router.
+     *
+     * @param policyProto Serialized `runanywhere.v1.HybridRoutingPolicy`.
+     */
+    @JvmStatic external fun racSttHybridRouterSetPolicy(
+        routerHandle: Long,
+        policyProto: ByteArray,
+    ): Int
+
+    /**
+     * Dispatch one transcribe request through the router. Returns a
+     * serialized `runanywhere.v1.HybridSttTranscribeResponse` byte payload,
+     * or null on hard JNI failure.
+     */
+    @JvmStatic external fun racSttHybridRouterTranscribe(
+        routerHandle: Long,
+        requestProto: ByteArray,
+    ): ByteArray?
+
+    /**
+     * Cancel the in-flight transcribe call on [routerHandle]. Currently a
+     * no-op since rac_stt_service_ops_t has no cancel op; reserved so the
+     * Kotlin facade can call it unconditionally.
+     */
+    @JvmStatic external fun racSttHybridRouterCancel(routerHandle: Long): Int
 
     // ========================================================================
     // CONSTANTS

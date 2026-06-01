@@ -1,19 +1,33 @@
 # Validation Scripts
 
-This folder is the command hub for source and pre-runtime validation.
+This folder is the command hub for source and pre-runtime validation, organized
+into three subfolders by concern:
 
-Use these entry points instead of creating ad hoc `build-cpp*`,
-`build-link*`, or `build-proto*` folders at the repo root.
+- **`gates/`** — CI rule-gates wired into `.github/workflows/pr-build.yml` (TS /
+  Flutter / Gradle centralization + the deprecated-surface regression guard).
+- **`commons/`** — C++ commons checks: RAC_API export drift, PII-logging guard,
+  the commons proto/core CMake test runner, and the export-list sync tool.
+- **`e2e/`** — the seven-lane runtime-validation harness (invoked by the local
+  e2e skills, not CI).
 
-See `docs/BUILD_ORGANIZATION.md` for the build-folder inventory, generated
-artifact policy, and cleanup recommendations.
+`_validation_lib.sh` (shared logging/step helpers) stays at this folder's root
+and is sourced by the `e2e/` and `commons/` run-scripts via `../_validation_lib.sh`.
+Use these entry points instead of ad hoc `build-cpp*` / `build-link*` /
+`build-proto*` folders. See `docs/BUILD_ORGANIZATION.md` for the build-folder
+inventory and cleanup policy.
 
 | Script | Purpose | Default build output |
 | --- | --- | --- |
-| `run_global_source_checks.sh` | Runs repo source checks: short status, whitespace diff check, and IDL drift check. | `build/validation/` |
-| `run_commons_proto_checks.sh` | Configures, builds, and runs the commons proto/core CMake tests. | `build/validation/commons-proto/` |
-| `run_seven_lane_validation.sh` | Creates the seven-lane runtime evidence folder, optional preflight, and optional v2 evidence self-check. | `build/validation/` |
-| `validate_seven_lane_evidence.py` | Validates seven-lane v2 evidence files, required headers, action phases, and lane-relative screenshot/log paths. | N/A |
+| `gates/check_typescript_centralization.sh` | syncpack: TS/RN/Web `package.json` pins vs `dependencies/versions.json`. | N/A |
+| `gates/check_flutter_centralization.sh` | Flutter `pubspec.yaml` pins vs the central registry. | N/A |
+| `gates/check_gradle_centralization.sh` | Fails on hardcoded Maven coords outside `gradle/libs.versions.toml`. | N/A |
+| `gates/check_deprecated_surfaces.sh` | Regression guard against hand-written DTOs / string enums (allowlist beside it). | N/A |
+| `commons/check_rac_api_exports.sh` | RAC_API decls vs `sdk/runanywhere-commons/exports/*.exports` (pairs with `sync_rac_api_exports.sh`). | N/A |
+| `commons/check_no_pii_logging.sh` | Blocks signed-URL / per-user paths in commons INFO logs. | N/A |
+| `commons/run_commons_proto_checks.sh` | Configures, builds, and runs the commons proto/core CMake tests. | `build/validation/commons-proto/` |
+| `e2e/run_global_source_checks.sh` | Repo source checks: short status, whitespace diff, and IDL drift. | `build/validation/` |
+| `e2e/run_seven_lane_validation.sh` | Creates the seven-lane evidence folder, optional preflight, and v2 self-check. | `build/validation/` |
+| `e2e/validate_seven_lane_evidence.py` | Validates seven-lane v2 evidence schema, headers, action phases, and lane-relative paths. | N/A |
 
 Useful environment variables:
 
@@ -43,9 +57,9 @@ staged files and confirmed correct behavior.
 Examples:
 
 ```bash
-scripts/validation/run_global_source_checks.sh
-scripts/validation/run_commons_proto_checks.sh
-scripts/validation/run_seven_lane_validation.sh --with-preflight
-scripts/validation/run_seven_lane_validation.sh --dry-run
-scripts/validation/run_seven_lane_validation.sh --check-only test_workflows/logs/<run-dir>
+scripts/validation/e2e/run_global_source_checks.sh
+scripts/validation/commons/run_commons_proto_checks.sh
+scripts/validation/e2e/run_seven_lane_validation.sh --with-preflight
+scripts/validation/e2e/run_seven_lane_validation.sh --dry-run
+scripts/validation/e2e/run_seven_lane_validation.sh --check-only test_workflows/logs/<run-dir>
 ```

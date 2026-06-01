@@ -166,22 +166,22 @@ cmake --preset wasm && cmake --build build/wasm
 
 ```bash
 # iOS: Build XCFrameworks for all slices → sdk/runanywhere-swift/Binaries/
-./scripts/build-core-xcframework.sh
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 # Also syncs XCFrameworks into React Native and Flutter SDK plugin dirs
 
 # Android: Build .so for all ABIs → copies into all SDK jniLibs/ dirs
-./scripts/build-core-android.sh
+./scripts/build/build-core-android.sh
 
 # WASM: Build racommons-llamacpp.wasm → sdk/runanywhere-web/packages/llamacpp/wasm/
-./scripts/build-core-wasm.sh
+./sdk/runanywhere-web/scripts/build-core-wasm.sh
 
 # Version bump across all manifests
-./scripts/sync-versions.sh <version>
+./scripts/release/sync-versions.sh <version>
 
 # Update Package.swift checksums after building release zips
-./scripts/sync-checksums.sh <zip_dir>
+./sdk/runanywhere-swift/scripts/sync-checksums.sh <zip_dir>
 
-# Full IDL codegen (requires protoc toolchain — see scripts/setup-toolchain.sh)
+# Full IDL codegen (requires protoc toolchain — see scripts/setup/setup-toolchain.sh)
 ./idl/codegen/generate_all.sh
 ```
 
@@ -249,7 +249,7 @@ cd sdk/runanywhere-kotlin/
 ./gradlew publishToMavenLocal
 
 # Native library management (C++ JNI)
-./gradlew setupLocalDevelopment   # First-time: builds C++ JNI libs (runs scripts/build-core-android.sh)
+./gradlew setupLocalDevelopment   # First-time: builds C++ JNI libs (runs scripts/build/build-core-android.sh)
 ./gradlew rebuildCommons          # Rebuild C++ after source changes
 ./gradlew downloadJniLibs         # Download pre-built .so from GitHub Releases
 ```
@@ -305,7 +305,7 @@ WASM outputs: `packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}`, `packages/o
 
 ```bash
 # Install toolchain (protoc, protoc-gen-swift, wire-compiler, ts-proto, etc.)
-./scripts/setup-toolchain.sh
+./scripts/setup/setup-toolchain.sh
 
 # Regenerate all language bindings
 ./idl/codegen/generate_all.sh
@@ -409,7 +409,7 @@ Canonical version: `sdk/runanywhere-commons/VERSION` (single-line file, e.g. `0.
 
 ```bash
 # Bump everywhere: VERSION, Package.swift, gradle.properties, package.json, pubspec.yaml
-./scripts/sync-versions.sh 0.20.0
+./scripts/release/sync-versions.sh 0.20.0
 ```
 
 Release lifecycle: `sync-versions.sh` → PR with `release:minor` label → merge → `auto-tag.yml` pushes `v0.20.0` tag → `release.yml` builds all artifacts and creates draft GitHub Release.

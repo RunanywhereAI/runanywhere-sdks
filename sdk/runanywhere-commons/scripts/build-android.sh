@@ -4,7 +4,7 @@
 # build-android.sh — package-local compatibility wrapper.
 #
 # The original per-package Android build entry
-# point was deleted in favour of repo-root scripts/build-core-android.sh,
+# point was deleted in favour of repo-root scripts/build/build-core-android.sh,
 # but `.github/workflows/release.yml` (native_android matrix job) and the
 # README/CLAUDE.md docs continue to invoke this path. This shim restores
 # the workflow contract by:
@@ -14,13 +14,13 @@
 #      repo-root build-core-android.sh script. The first positional
 #      argument (e.g. `all`) is accepted but ignored — the new script
 #      always builds the canonical commons + plugin set.
-#   2. Staging the resulting `.so` libraries from the per-SDK jniLibs
-#      destinations into `sdk/runanywhere-commons/dist/android/<sub>/<abi>/`
-#      so the release workflow's `dist/android-staging` packaging step
-#      continues to see the expected layout.
+#   2. Staging the resulting `.so` libraries (commons + llamacpp + onnx) for
+#      that ABI into the versioned release archive
+#      `sdk/runanywhere-commons/dist/RACommons-android-<abi>-v<version>.zip`
+#      (+ .sha256) that release.yml uploads and `publish` asserts on.
 #
 # Long-term, callers should migrate to invoking
-# scripts/build-core-android.sh directly.
+# scripts/build/build-core-android.sh directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -51,41 +51,50 @@ if [[ ! "${ABI}" =~ ^(arm64-v8a|armeabi-v7a|x86_64)$ ]]; then
     exit 2
 fi
 
-CORE_SCRIPT="${REPO_ROOT}/scripts/build-core-android.sh"
+CORE_SCRIPT="${REPO_ROOT}/scripts/build/build-core-android.sh"
 if [ ! -x "${CORE_SCRIPT}" ]; then
     echo "error: ${CORE_SCRIPT} not found or not executable" >&2
     exit 1
 fi
 
-echo "▶ Delegating Android build to scripts/build-core-android.sh ${ABI}"
+echo "▶ Delegating Android build to scripts/build/build-core-android.sh ${ABI}"
 "${CORE_SCRIPT}" "${ABI}"
 
-# Stage the produced .so artifacts into the legacy
-# dist/android/<sub>/<abi>/ layout that the release workflow's
-# dist/android-staging packaging step still references.
-KOTLIN_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/src/androidMain/jniLibs/${ABI}"
-KOTLIN_LLAMA_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/${ABI}"
-KOTLIN_ONNX_JNI="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/androidMain/jniLibs/${ABI}"
+# Stage the produced .so libraries (commons + llamacpp + onnx backends) for
+# this ABI into a single per-ABI release zip + .sha256 under dist/ — the layout
+# the Kotlin/RN SDK jobs expect when they extract the artifact. Sources are the
+# Android-library `src/main/jniLibs` trees that build-core-android.sh writes to
+# (NOT the KMP `src/androidMain` layout the SDK was migrated FROM). Version:
+# RAC_RELEASE_VERSION (the release tag) or PROJECT_VERSION for standalone runs.
+source "${SCRIPT_DIR}/load-versions.sh" >/dev/null
+VERSION="${RAC_RELEASE_VERSION:-${PROJECT_VERSION}}"
 
-DIST_BASE="${COMMONS_ROOT}/dist/android"
-mkdir -p \
-    "${DIST_BASE}/jni/${ABI}" \
-    "${DIST_BASE}/unified/${ABI}" \
-    "${DIST_BASE}/llamacpp/${ABI}" \
-    "${DIST_BASE}/onnx/${ABI}"
+KOTLIN_BASE="${REPO_ROOT}/sdk/runanywhere-kotlin"
+DIST="${COMMONS_ROOT}/dist"
+STAGING="${DIST}/android-staging/${ABI}"
+rm -rf "${STAGING}"
+mkdir -p "${STAGING}"
 
-# `jni/` mirrors the canonical commons + JNI bridge artifacts so consumers
-# can pick them up directly. `unified/` ships the same file set as a
-# convenience copy for downstream packagers (parity with the prior layout).
-if [ -d "${KOTLIN_JNI}" ]; then
-    cp -R "${KOTLIN_JNI}/." "${DIST_BASE}/jni/${ABI}/"
-    cp -R "${KOTLIN_JNI}/." "${DIST_BASE}/unified/${ABI}/"
-fi
-if [ -d "${KOTLIN_LLAMA_JNI}" ]; then
-    cp -R "${KOTLIN_LLAMA_JNI}/." "${DIST_BASE}/llamacpp/${ABI}/"
-fi
-if [ -d "${KOTLIN_ONNX_JNI}" ]; then
-    cp -R "${KOTLIN_ONNX_JNI}/." "${DIST_BASE}/onnx/${ABI}/"
-fi
+# Copy a backend's per-ABI .so set into STAGING/<sub>/ if it was produced.
+# A plain function (not a bash-4 associative array) keeps this portable for
+# local macOS runs (bash 3.2) as well as the ubuntu CI runner.
+stage_backend() {
+    local sub="$1" src="$2"
+    if [ -d "${src}" ]; then
+        mkdir -p "${STAGING}/${sub}"
+        cp -R "${src}/." "${STAGING}/${sub}/"
+    fi
+}
+stage_backend jni      "${KOTLIN_BASE}/src/main/jniLibs/${ABI}"
+stage_backend llamacpp "${KOTLIN_BASE}/modules/runanywhere-core-llamacpp/src/main/jniLibs/${ABI}"
+stage_backend onnx     "${KOTLIN_BASE}/modules/runanywhere-core-onnx/src/main/jniLibs/${ABI}"
+# Flat `unified/` convenience copy — every .so for this ABI in one place.
+mkdir -p "${STAGING}/unified"
+find "${STAGING}" -maxdepth 2 -name "*.so" -exec cp {} "${STAGING}/unified/" \; 2>/dev/null || true
 
-echo "✓ build-android.sh wrapper complete; staged ABI '${ABI}' artifacts under ${DIST_BASE}"
+ZIP="RACommons-android-${ABI}-v${VERSION}.zip"
+rm -f "${DIST}/${ZIP}" "${DIST}/${ZIP}.sha256"
+(cd "${DIST}/android-staging" && zip -r "../${ZIP}" "${ABI}")
+(cd "${DIST}" && shasum -a 256 "${ZIP}" > "${ZIP}.sha256")
+
+echo "✓ build-android.sh complete; staged ABI '${ABI}' → ${DIST}/${ZIP}"

@@ -21,8 +21,8 @@
 ## Preflight
 
 ```bash
-scripts/validation/run_global_source_checks.sh
-scripts/validation/run_commons_proto_checks.sh
+scripts/validation/e2e/run_global_source_checks.sh
+scripts/validation/commons/run_commons_proto_checks.sh
 cd examples/android/RunAnywhereAI
 ./gradlew :app:assembleDebug -Prunanywhere.useLocalNatives=false
 ```

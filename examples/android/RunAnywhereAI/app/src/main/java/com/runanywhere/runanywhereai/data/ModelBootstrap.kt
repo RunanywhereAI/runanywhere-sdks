@@ -17,6 +17,7 @@ import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.extensions.pluginLoader
 import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.hybrid.BACKEND
 import timber.log.Timber
 
 /**
@@ -134,6 +135,13 @@ object ModelBootstrap {
         for (m in EMBEDDING_MULTIFILE_MODELS) {
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
+
+        // Sarvam STT — test key, auto-detect language (no languageCode).
+        BACKEND.SARVAM.register(
+            id = "saaras",
+            model = "saaras:v3",
+            apiKey = "sk_4mtoxk81_7Eh1NNJXnJJguRc4M8EY9JSa",
+        )
 
         Timber.i("🌱 Catalog seed complete — registered=$registered, failed=$failed")
     }

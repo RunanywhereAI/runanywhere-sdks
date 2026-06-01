@@ -13,7 +13,7 @@
 ext {
     // Canonical name (matches Swift/Kotlin/RN and the runanywhere core plugin).
     // Defaults to true so monorepo developers building via
-    // `scripts/build-core-android.sh` consume local .so files (or an empty
+    // `scripts/build/build-core-android.sh` consume local .so files (or an empty
     // jniLibs dir if the closed-source Genie backend isn't available locally —
     // the Flutter plugin's GeniePlugin.kt tolerates a missing .so at runtime).
     // Overridable via the root Gradle property `runanywhere.useLocalNatives`.
