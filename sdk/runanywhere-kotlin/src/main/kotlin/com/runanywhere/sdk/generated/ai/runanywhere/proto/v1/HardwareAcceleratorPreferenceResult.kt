@@ -90,11 +90,11 @@ public class HardwareAcceleratorPreferenceResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<HardwareAcceleratorPreferenceResult> =
         object : ProtoAdapter<HardwareAcceleratorPreferenceResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HardwareAcceleratorPreferenceResult::class,
-      "type.googleapis.com/runanywhere.v1.HardwareAcceleratorPreferenceResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HardwareAcceleratorPreferenceResult::class, 
+      "type.googleapis.com/runanywhere.v1.HardwareAcceleratorPreferenceResult", 
+      PROTO_3, 
+      null, 
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: HardwareAcceleratorPreferenceResult): Int {

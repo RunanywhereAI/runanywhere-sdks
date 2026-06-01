@@ -340,11 +340,11 @@ public class LLMStreamEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LLMStreamEvent> = object : ProtoAdapter<LLMStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LLMStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.LLMStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LLMStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.LLMStreamEvent", 
+      PROTO_3, 
+      null, 
       "llm_service.proto"
     ) {
       override fun encodedSize(`value`: LLMStreamEvent): Int {

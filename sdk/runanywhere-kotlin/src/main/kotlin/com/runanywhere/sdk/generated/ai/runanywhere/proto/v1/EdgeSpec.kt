@@ -123,11 +123,11 @@ public class EdgeSpec(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<EdgeSpec> = object : ProtoAdapter<EdgeSpec>(
-      FieldEncoding.LENGTH_DELIMITED,
-      EdgeSpec::class,
-      "type.googleapis.com/runanywhere.v1.EdgeSpec",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      EdgeSpec::class, 
+      "type.googleapis.com/runanywhere.v1.EdgeSpec", 
+      PROTO_3, 
+      null, 
       "pipeline.proto"
     ) {
       override fun encodedSize(`value`: EdgeSpec): Int {

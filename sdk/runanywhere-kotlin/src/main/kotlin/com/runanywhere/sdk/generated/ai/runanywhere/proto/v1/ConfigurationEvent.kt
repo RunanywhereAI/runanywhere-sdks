@@ -226,11 +226,11 @@ public class ConfigurationEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConfigurationEvent> =
         object : ProtoAdapter<ConfigurationEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConfigurationEvent::class,
-      "type.googleapis.com/runanywhere.v1.ConfigurationEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConfigurationEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ConfigurationEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: ConfigurationEvent): Int {

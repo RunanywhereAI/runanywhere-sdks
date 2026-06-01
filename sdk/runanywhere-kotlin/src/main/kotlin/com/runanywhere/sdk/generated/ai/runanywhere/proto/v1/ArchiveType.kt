@@ -37,8 +37,8 @@ public enum class ArchiveType(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ArchiveType> = object : EnumAdapter<ArchiveType>(
-      ArchiveType::class,
-      PROTO_3,
+      ArchiveType::class, 
+      PROTO_3, 
       ArchiveType.ARCHIVE_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ArchiveType? = ArchiveType.fromValue(`value`)

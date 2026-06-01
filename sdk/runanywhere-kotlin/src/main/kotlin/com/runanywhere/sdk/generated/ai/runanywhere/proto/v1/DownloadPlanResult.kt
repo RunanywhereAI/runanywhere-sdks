@@ -216,11 +216,11 @@ public class DownloadPlanResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadPlanResult> =
         object : ProtoAdapter<DownloadPlanResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadPlanResult::class,
-      "type.googleapis.com/runanywhere.v1.DownloadPlanResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadPlanResult::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadPlanResult", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadPlanResult): Int {

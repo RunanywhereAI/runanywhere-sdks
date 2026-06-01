@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 #include "rac/audio/rac_audio_convert.h"
@@ -49,6 +50,77 @@ static std::vector<float> convert_int16_to_float32(const void* int16_data, size_
     return float_samples;
 }
 
+// Parsed view into a WAV/RIFF buffer: a pointer to the PCM `data` chunk plus
+// the format fields needed to feed sherpa correctly.
+struct WavPcm {
+    const uint8_t* pcm = nullptr;
+    size_t         pcm_bytes = 0;
+    uint32_t       sample_rate = 0;
+    uint16_t       channels = 0;
+    uint16_t       bits = 0;
+};
+
+// Minimal WAV reader. Walks RIFF chunks (does not assume a fixed 44-byte
+// header) to locate `fmt ` + `data`. Fills `out` and returns true only for
+// uncompressed PCM (fmt tag 1). All RAC Android targets are little-endian, as
+// is the WAV byte order, so the integer fields are read directly. Returns
+// false on truncation, a missing chunk, or any non-PCM encoding.
+static bool parse_wav_pcm(const uint8_t* data, size_t size, WavPcm& out) {
+    if (size < 44 || std::memcmp(data, "RIFF", 4) != 0 ||
+        std::memcmp(data + 8, "WAVE", 4) != 0) {
+        return false;
+    }
+    uint16_t fmt_tag = 0;
+    bool     have_fmt = false;
+    bool     have_data = false;
+    size_t   off = 12;  // first sub-chunk after "RIFF"<size>"WAVE"
+    while (off + 8 <= size) {
+        uint32_t chunk_size = 0;
+        std::memcpy(&chunk_size, data + off + 4, 4);
+        const size_t body = off + 8;
+        if (std::memcmp(data + off, "fmt ", 4) == 0 && body + 16 <= size) {
+            std::memcpy(&fmt_tag, data + body + 0, 2);
+            std::memcpy(&out.channels, data + body + 2, 2);
+            std::memcpy(&out.sample_rate, data + body + 4, 4);
+            std::memcpy(&out.bits, data + body + 14, 2);
+            have_fmt = true;
+        } else if (std::memcmp(data + off, "data", 4) == 0) {
+            const size_t avail = size - body;
+            out.pcm = data + body;
+            out.pcm_bytes = (chunk_size <= avail) ? chunk_size : avail;
+            have_data = true;
+        }
+        if (have_fmt && have_data) {
+            break;
+        }
+        off = body + chunk_size + (chunk_size & 1u);  // chunks are word-aligned
+    }
+    return have_fmt && have_data && fmt_tag == 1 /* WAVE_FORMAT_PCM */;
+}
+
+// Convert a WAV PCM16 data chunk to mono Float32 in [-1, 1], averaging channels
+// when the source is multi-channel (sherpa's offline recognizer is mono).
+static std::vector<float> wav_pcm16_to_mono_float(const WavPcm& wav) {
+    const int16_t* s = reinterpret_cast<const int16_t*>(wav.pcm);
+    const size_t   total = wav.pcm_bytes / sizeof(int16_t);
+    const uint16_t ch = wav.channels < 1 ? 1 : wav.channels;
+    if (ch == 1) {
+        std::vector<float> out(total);
+        rac::audio::rac_audio_pcm16_to_float32(s, total, out.data());
+        return out;
+    }
+    const size_t       frames = total / ch;
+    std::vector<float> out(frames);
+    for (size_t i = 0; i < frames; ++i) {
+        int32_t acc = 0;
+        for (uint16_t c = 0; c < ch; ++c) {
+            acc += s[i * ch + c];
+        }
+        out[i] = static_cast<float>(acc) / (static_cast<float>(ch) * 32768.0f);
+    }
+    return out;
+}
+
 // Initialize (no-op for Sherpa - model loaded during create)
 static rac_result_t sherpa_stt_vtable_initialize(void* impl, const char* model_path) {
     (void)impl;
@@ -56,7 +128,14 @@ static rac_result_t sherpa_stt_vtable_initialize(void* impl, const char* model_p
     return RAC_SUCCESS;
 }
 
-// Transcribe - converts Int16 PCM to Float32 for Sherpa-ONNX
+// Transcribe - feeds Float32 mono samples to Sherpa-ONNX.
+//
+// Honors options->audio_format (the hybrid router shares one payload across the
+// offline + cloud backends, so this side may receive a WAV container rather than
+// raw PCM): WAV is parsed inline to its PCM data chunk + real sample rate, and
+// raw PCM is consumed directly. Compressed containers (MP3/OPUS/AAC/FLAC) need a
+// codec sherpa doesn't have — those are rejected so the router fails over to the
+// cloud instead of transcribing garbage.
 static rac_result_t sherpa_stt_vtable_transcribe(void* impl, const void* audio_data,
                                                  size_t audio_size,
                                                  const rac_stt_options_t* options,
@@ -64,10 +143,52 @@ static rac_result_t sherpa_stt_vtable_transcribe(void* impl, const void* audio_d
     if (!audio_data || audio_size == 0 || !out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input
+
+    const uint8_t* bytes = static_cast<const uint8_t*>(audio_data);
+    const rac_audio_format_enum_t fmt =
+        options ? options->audio_format : RAC_AUDIO_FORMAT_PCM;
+    const bool looks_wav =
+        fmt == RAC_AUDIO_FORMAT_WAV ||
+        (audio_size >= 12 && std::memcmp(bytes, "RIFF", 4) == 0 &&
+         std::memcmp(bytes + 8, "WAVE", 4) == 0);
+
+    if (looks_wav) {
+        WavPcm wav{};
+        if (!parse_wav_pcm(bytes, audio_size, wav) || wav.bits != 16) {
+            RAC_LOG_ERROR(LOG_CAT,
+                          "sherpa STT: unsupported WAV (parse failed or not 16-bit PCM)");
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        // Tiny-clip guard on the decoded PCM (~0.05s at 16kHz 16-bit). NaN (not
+        // 0.0f) tells the hybrid router "no confidence signal" so it does not
+        // wrongly cascade on a too-short clip.
+        if (wav.pcm_bytes < 1600) {
+            out_result->text = nullptr;
+            out_result->confidence = std::numeric_limits<float>::quiet_NaN();
+            return RAC_SUCCESS;
+        }
+        std::vector<float> float_samples = wav_pcm16_to_mono_float(wav);
+        rac_stt_options_t  opt{};
+        if (options) {
+            opt = *options;
+        }
+        opt.sample_rate = static_cast<int32_t>(wav.sample_rate);
+        opt.audio_format = RAC_AUDIO_FORMAT_PCM;
+        return rac_stt_sherpa_transcribe(impl, float_samples.data(), float_samples.size(), &opt,
+                                         out_result);
+    }
+
+    if (fmt != RAC_AUDIO_FORMAT_PCM) {
+        RAC_LOG_ERROR(LOG_CAT, "sherpa STT cannot decode audio_format=%d (PCM/WAV only)",
+                      static_cast<int>(fmt));
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Raw Int16 PCM. Minimum ~0.05s at 16kHz 16-bit to avoid a Sherpa crash on
+    // empty/tiny input; NaN confidence = "no signal" for the router.
     if (audio_size < 1600) {
         out_result->text = nullptr;
-        out_result->confidence = 0.0f;
+        out_result->confidence = std::numeric_limits<float>::quiet_NaN();
         return RAC_SUCCESS;
     }
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);

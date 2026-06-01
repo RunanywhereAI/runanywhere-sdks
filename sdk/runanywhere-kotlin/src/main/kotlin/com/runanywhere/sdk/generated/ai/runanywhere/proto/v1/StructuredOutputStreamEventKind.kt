@@ -31,8 +31,8 @@ public enum class StructuredOutputStreamEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputStreamEventKind> =
         object : EnumAdapter<StructuredOutputStreamEventKind>(
-      StructuredOutputStreamEventKind::class,
-      PROTO_3,
+      StructuredOutputStreamEventKind::class, 
+      PROTO_3, 
       StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): StructuredOutputStreamEventKind? = StructuredOutputStreamEventKind.fromValue(`value`)

@@ -113,11 +113,11 @@ public class PipelineOptions(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<PipelineOptions> = object : ProtoAdapter<PipelineOptions>(
-      FieldEncoding.LENGTH_DELIMITED,
-      PipelineOptions::class,
-      "type.googleapis.com/runanywhere.v1.PipelineOptions",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      PipelineOptions::class, 
+      "type.googleapis.com/runanywhere.v1.PipelineOptions", 
+      PROTO_3, 
+      null, 
       "pipeline.proto"
     ) {
       override fun encodedSize(`value`: PipelineOptions): Int {

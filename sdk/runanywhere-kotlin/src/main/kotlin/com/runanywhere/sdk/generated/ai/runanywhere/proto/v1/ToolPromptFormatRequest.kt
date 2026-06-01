@@ -131,11 +131,11 @@ public class ToolPromptFormatRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolPromptFormatRequest> =
         object : ProtoAdapter<ToolPromptFormatRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolPromptFormatRequest::class,
-      "type.googleapis.com/runanywhere.v1.ToolPromptFormatRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolPromptFormatRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ToolPromptFormatRequest", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolPromptFormatRequest): Int {

@@ -242,11 +242,11 @@ public class ModelEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelEvent> = object : ProtoAdapter<ModelEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelEvent::class,
-      "type.googleapis.com/runanywhere.v1.ModelEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ModelEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: ModelEvent): Int {

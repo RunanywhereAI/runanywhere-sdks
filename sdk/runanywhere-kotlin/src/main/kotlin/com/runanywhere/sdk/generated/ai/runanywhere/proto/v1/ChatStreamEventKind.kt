@@ -32,8 +32,8 @@ public enum class ChatStreamEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatStreamEventKind> =
         object : EnumAdapter<ChatStreamEventKind>(
-      ChatStreamEventKind::class,
-      PROTO_3,
+      ChatStreamEventKind::class, 
+      PROTO_3, 
       ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ChatStreamEventKind? = ChatStreamEventKind.fromValue(`value`)

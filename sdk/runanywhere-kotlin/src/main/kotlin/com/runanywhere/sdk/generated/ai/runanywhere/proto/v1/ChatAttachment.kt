@@ -172,11 +172,11 @@ public class ChatAttachment(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatAttachment> = object : ProtoAdapter<ChatAttachment>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ChatAttachment::class,
-      "type.googleapis.com/runanywhere.v1.ChatAttachment",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ChatAttachment::class, 
+      "type.googleapis.com/runanywhere.v1.ChatAttachment", 
+      PROTO_3, 
+      null, 
       "chat.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

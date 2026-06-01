@@ -216,11 +216,11 @@ public class StructuredOutputOptions(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputOptions> =
         object : ProtoAdapter<StructuredOutputOptions>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StructuredOutputOptions::class,
-      "type.googleapis.com/runanywhere.v1.StructuredOutputOptions",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StructuredOutputOptions::class, 
+      "type.googleapis.com/runanywhere.v1.StructuredOutputOptions", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: StructuredOutputOptions): Int {

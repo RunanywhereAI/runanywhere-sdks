@@ -148,11 +148,11 @@ public class NamedEntity(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NamedEntity> = object : ProtoAdapter<NamedEntity>(
-      FieldEncoding.LENGTH_DELIMITED,
-      NamedEntity::class,
-      "type.googleapis.com/runanywhere.v1.NamedEntity",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      NamedEntity::class, 
+      "type.googleapis.com/runanywhere.v1.NamedEntity", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: NamedEntity): Int {

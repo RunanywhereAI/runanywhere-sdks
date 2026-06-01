@@ -8,6 +8,8 @@ import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.hybrid.AndroidDeviceStateProvider
+import com.runanywhere.sdk.public.hybrid.RACRouter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -117,9 +119,9 @@ class RunAnywhereApplication : Application() {
         val customBaseURL = SettingsViewModel.getStoredBaseURL(this@RunAnywhereApplication)
         val hasCustomConfig =
             !customApiKey.isNullOrBlank() &&
-                !customBaseURL.isNullOrBlank() &&
-                !looksLikePlaceholder(customApiKey) &&
-                !looksLikePlaceholder(customBaseURL)
+                    !customBaseURL.isNullOrBlank() &&
+                    !looksLikePlaceholder(customApiKey) &&
+                    !looksLikePlaceholder(customBaseURL)
 
         if (hasCustomConfig) {
             Timber.i("🔧 Found custom API configuration")
@@ -207,6 +209,10 @@ class RunAnywhereApplication : Application() {
 
         // Register modules and models
         registerModulesAndModels()
+
+        // Wire the hybrid router's device-state vtable so NETWORK / Battery
+        // filters see live ConnectivityManager / BatteryManager state.
+        RACRouter.setDeviceStateProvider(AndroidDeviceStateProvider(applicationContext))
 
         Timber.i("✅ SDK initialization complete")
 

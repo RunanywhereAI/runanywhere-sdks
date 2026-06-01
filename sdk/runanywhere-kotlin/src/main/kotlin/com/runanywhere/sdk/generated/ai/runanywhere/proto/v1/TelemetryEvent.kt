@@ -128,11 +128,11 @@ public class TelemetryEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TelemetryEvent> = object : ProtoAdapter<TelemetryEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TelemetryEvent::class,
-      "type.googleapis.com/runanywhere.v1.TelemetryEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TelemetryEvent::class, 
+      "type.googleapis.com/runanywhere.v1.TelemetryEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       private val attributesAdapter: ProtoAdapter<Map<String, String>> by

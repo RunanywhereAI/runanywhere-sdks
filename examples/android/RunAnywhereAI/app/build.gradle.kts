@@ -23,7 +23,7 @@ kotlin {
 
 android {
     namespace = "com.runanywhere.runanywhereai"
-    compileSdk = 36
+    compileSdk = 37
 
     ndkVersion = (project.findProperty("racNdkVersion") as? String) ?: "27.0.12077973"
 
@@ -46,24 +46,11 @@ android {
     defaultConfig {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 13
         versionName = "0.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Native build disabled for now to focus on Kotlin implementation
-        // externalNativeBuild {
-        //     cmake {
-        //         cppFlags += listOf("-std=c++17", "-O3")
-        //         arguments += listOf(
-        //             "-DANDROID_STL=c++_shared",
-        //             "-DBUILD_SHARED_LIBS=ON"
-        //         )
-        //     }
-        // }
-
-        // Note: ndk.abiFilters removed — splits.abi handles ABI filtering
     }
 
     buildTypes {

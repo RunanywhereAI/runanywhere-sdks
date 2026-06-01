@@ -200,11 +200,11 @@ public class ChatStreamEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatStreamEvent> = object : ProtoAdapter<ChatStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ChatStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.ChatStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ChatStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ChatStreamEvent", 
+      PROTO_3, 
+      null, 
       "chat.proto"
     ) {
       override fun encodedSize(`value`: ChatStreamEvent): Int {

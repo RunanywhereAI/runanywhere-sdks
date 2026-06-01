@@ -78,11 +78,11 @@ public class MultiFileArtifact(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<MultiFileArtifact> = object : ProtoAdapter<MultiFileArtifact>(
-      FieldEncoding.LENGTH_DELIMITED,
-      MultiFileArtifact::class,
-      "type.googleapis.com/runanywhere.v1.MultiFileArtifact",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      MultiFileArtifact::class, 
+      "type.googleapis.com/runanywhere.v1.MultiFileArtifact", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: MultiFileArtifact): Int {

@@ -139,11 +139,11 @@ public class WakeWordDetectedEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<WakeWordDetectedEvent> =
         object : ProtoAdapter<WakeWordDetectedEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      WakeWordDetectedEvent::class,
-      "type.googleapis.com/runanywhere.v1.WakeWordDetectedEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      WakeWordDetectedEvent::class, 
+      "type.googleapis.com/runanywhere.v1.WakeWordDetectedEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: WakeWordDetectedEvent): Int {

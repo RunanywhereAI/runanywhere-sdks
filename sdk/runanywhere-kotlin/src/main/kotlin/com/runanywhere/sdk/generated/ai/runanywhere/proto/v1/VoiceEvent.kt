@@ -428,11 +428,11 @@ public class VoiceEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceEvent> = object : ProtoAdapter<VoiceEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceEvent::class,
-      "type.googleapis.com/runanywhere.v1.VoiceEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceEvent::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

@@ -34,8 +34,8 @@ public enum class DownloadState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadState> = object : EnumAdapter<DownloadState>(
-      DownloadState::class,
-      PROTO_3,
+      DownloadState::class, 
+      PROTO_3, 
       DownloadState.DOWNLOAD_STATE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DownloadState? = DownloadState.fromValue(`value`)

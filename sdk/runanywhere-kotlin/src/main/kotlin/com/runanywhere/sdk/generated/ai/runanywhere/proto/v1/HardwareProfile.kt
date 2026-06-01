@@ -195,11 +195,11 @@ public class HardwareProfile(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HardwareProfile> = object : ProtoAdapter<HardwareProfile>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HardwareProfile::class,
-      "type.googleapis.com/runanywhere.v1.HardwareProfile",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HardwareProfile::class, 
+      "type.googleapis.com/runanywhere.v1.HardwareProfile", 
+      PROTO_3, 
+      null, 
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: HardwareProfile): Int {

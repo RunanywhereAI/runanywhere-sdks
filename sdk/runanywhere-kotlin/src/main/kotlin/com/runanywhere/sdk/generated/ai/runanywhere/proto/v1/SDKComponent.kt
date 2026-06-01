@@ -49,8 +49,8 @@ public enum class SDKComponent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SDKComponent> = object : EnumAdapter<SDKComponent>(
-      SDKComponent::class,
-      PROTO_3,
+      SDKComponent::class, 
+      PROTO_3, 
       SDKComponent.SDK_COMPONENT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SDKComponent? = SDKComponent.fromValue(`value`)

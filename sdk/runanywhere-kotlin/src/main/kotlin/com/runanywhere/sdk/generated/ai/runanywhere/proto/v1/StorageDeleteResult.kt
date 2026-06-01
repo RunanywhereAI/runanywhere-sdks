@@ -197,11 +197,11 @@ public class StorageDeleteResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageDeleteResult> =
         object : ProtoAdapter<StorageDeleteResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StorageDeleteResult::class,
-      "type.googleapis.com/runanywhere.v1.StorageDeleteResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StorageDeleteResult::class, 
+      "type.googleapis.com/runanywhere.v1.StorageDeleteResult", 
+      PROTO_3, 
+      null, 
       "storage_types.proto"
     ) {
       override fun encodedSize(`value`: StorageDeleteResult): Int {

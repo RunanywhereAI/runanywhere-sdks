@@ -91,11 +91,11 @@ public class DownloadSubscribeRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadSubscribeRequest> =
         object : ProtoAdapter<DownloadSubscribeRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadSubscribeRequest::class,
-      "type.googleapis.com/runanywhere.v1.DownloadSubscribeRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadSubscribeRequest::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadSubscribeRequest", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadSubscribeRequest): Int {

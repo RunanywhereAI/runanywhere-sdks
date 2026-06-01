@@ -443,6 +443,22 @@ else()
     set(_HAD_BUILD_SHARED_LIBS FALSE)
 endif()
 set(BUILD_SHARED_LIBS OFF)
+
+# Android bionic exports futimesat()/lutimes() symbols in libc.so for legacy
+# ABI compatibility but does NOT declare them in any header. libarchive's
+# check_function_exists() links against libc.so, so the check false-passes and
+# defines HAVE_FUTIMESAT / HAVE_LUTIMES — then archive_read_disk_posix.c calls
+# them with no declaration, which NDK r28's clang rejects as a hard error
+# (-Werror=implicit-function-declaration). Pre-seed the result cache vars to 0
+# so libarchive skips the bogus checks and #ifdef's those code paths out. These
+# functions genuinely don't exist on Android, so disabling them is correct.
+if(ANDROID)
+    set(HAVE_FUTIMESAT 0 CACHE INTERNAL "futimesat not declared in Android bionic headers")
+    set(HAVE_LUTIMES 0 CACHE INTERNAL "lutimes not declared in Android bionic headers")
+    set(HAVE_NL_LANGINFO 0 CACHE INTERNAL "nl_langinfo not declared in Android bionic (<API 26)")
+    set(HAVE_LCHMOD 0 CACHE INTERNAL "lchmod not provided by Android bionic")
+endif()
+
 FetchContent_MakeAvailable(libarchive)
 if(_HAD_BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${_SAVED_BUILD_SHARED_LIBS}")
@@ -910,6 +926,10 @@ set(RAC_FEATURES_SOURCES
     # orchestration with typed PipelineNodes + bounded StreamEdge
     # backpressure + hierarchical CancelToken propagation.
     src/features/voice_agent/voice_agent_pipeline.cpp
+    # Hybrid router — per-request offline/online dispatch.
+    src/routing/rac_stt_hybrid_router.cpp
+    src/routing/rac_stt_hybrid_router_proto.cpp
+    src/routing/rac_hybrid_device_state.cpp
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)
@@ -1281,6 +1301,9 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
     # Two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
+    # Hybrid LLM router wire shape: descriptor, policy, filter, cascade,
+    # routing context, generate request/response, routed metadata.
+    ${_RAC_PROTO_GEN_DIR}/hybrid_router.pb.cc
     # rac_options.proto — custom FieldOptions / EnumValueOptions extensions
     # imported by codegen post-processors and several option protos. Required
     # at link time by every .pb.cc that imports rac_options.proto.

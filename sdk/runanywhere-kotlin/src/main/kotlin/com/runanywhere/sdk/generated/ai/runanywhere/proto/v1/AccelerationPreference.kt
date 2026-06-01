@@ -47,8 +47,8 @@ public enum class AccelerationPreference(
     @JvmField
     public val ADAPTER: ProtoAdapter<AccelerationPreference> =
         object : EnumAdapter<AccelerationPreference>(
-      AccelerationPreference::class,
-      PROTO_3,
+      AccelerationPreference::class, 
+      PROTO_3, 
       AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): AccelerationPreference? = AccelerationPreference.fromValue(`value`)

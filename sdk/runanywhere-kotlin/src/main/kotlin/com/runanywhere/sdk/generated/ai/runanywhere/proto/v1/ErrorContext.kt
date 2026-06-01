@@ -163,11 +163,11 @@ public class ErrorContext(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ErrorContext> = object : ProtoAdapter<ErrorContext>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ErrorContext::class,
-      "type.googleapis.com/runanywhere.v1.ErrorContext",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ErrorContext::class, 
+      "type.googleapis.com/runanywhere.v1.ErrorContext", 
+      PROTO_3, 
+      null, 
       "errors.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

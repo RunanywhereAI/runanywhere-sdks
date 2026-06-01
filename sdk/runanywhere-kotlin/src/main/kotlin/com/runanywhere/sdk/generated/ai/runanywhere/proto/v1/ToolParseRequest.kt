@@ -87,11 +87,11 @@ public class ToolParseRequest(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolParseRequest> = object : ProtoAdapter<ToolParseRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolParseRequest::class,
-      "type.googleapis.com/runanywhere.v1.ToolParseRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolParseRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ToolParseRequest", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolParseRequest): Int {

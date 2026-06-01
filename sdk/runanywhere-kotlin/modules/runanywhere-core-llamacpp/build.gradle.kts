@@ -86,7 +86,7 @@ ktlint {
 
 android {
     namespace = "com.runanywhere.sdk.llm.llamacpp"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24

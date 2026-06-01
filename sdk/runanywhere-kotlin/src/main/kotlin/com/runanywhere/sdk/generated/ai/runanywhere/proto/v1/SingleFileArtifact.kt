@@ -115,11 +115,11 @@ public class SingleFileArtifact(
     @JvmField
     public val ADAPTER: ProtoAdapter<SingleFileArtifact> =
         object : ProtoAdapter<SingleFileArtifact>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SingleFileArtifact::class,
-      "type.googleapis.com/runanywhere.v1.SingleFileArtifact",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SingleFileArtifact::class, 
+      "type.googleapis.com/runanywhere.v1.SingleFileArtifact", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: SingleFileArtifact): Int {

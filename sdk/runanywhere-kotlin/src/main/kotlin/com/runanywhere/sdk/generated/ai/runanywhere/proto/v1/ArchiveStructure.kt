@@ -34,8 +34,8 @@ public enum class ArchiveStructure(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ArchiveStructure> = object : EnumAdapter<ArchiveStructure>(
-      ArchiveStructure::class,
-      PROTO_3,
+      ArchiveStructure::class, 
+      PROTO_3, 
       ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ArchiveStructure? = ArchiveStructure.fromValue(`value`)

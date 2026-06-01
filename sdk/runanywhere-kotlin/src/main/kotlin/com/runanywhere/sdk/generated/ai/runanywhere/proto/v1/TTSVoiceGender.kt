@@ -36,8 +36,8 @@ public enum class TTSVoiceGender(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSVoiceGender> = object : EnumAdapter<TTSVoiceGender>(
-      TTSVoiceGender::class,
-      PROTO_3,
+      TTSVoiceGender::class, 
+      PROTO_3, 
       TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): TTSVoiceGender? = TTSVoiceGender.fromValue(`value`)

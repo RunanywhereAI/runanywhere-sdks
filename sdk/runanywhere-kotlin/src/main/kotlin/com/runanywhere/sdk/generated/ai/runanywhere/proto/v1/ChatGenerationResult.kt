@@ -154,11 +154,11 @@ public class ChatGenerationResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatGenerationResult> =
         object : ProtoAdapter<ChatGenerationResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ChatGenerationResult::class,
-      "type.googleapis.com/runanywhere.v1.ChatGenerationResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ChatGenerationResult::class, 
+      "type.googleapis.com/runanywhere.v1.ChatGenerationResult", 
+      PROTO_3, 
+      null, 
       "chat.proto"
     ) {
       override fun encodedSize(`value`: ChatGenerationResult): Int {

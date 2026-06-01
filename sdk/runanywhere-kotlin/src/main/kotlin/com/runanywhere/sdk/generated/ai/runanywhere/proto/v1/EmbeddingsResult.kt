@@ -184,11 +184,11 @@ public class EmbeddingsResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<EmbeddingsResult> = object : ProtoAdapter<EmbeddingsResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      EmbeddingsResult::class,
-      "type.googleapis.com/runanywhere.v1.EmbeddingsResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      EmbeddingsResult::class, 
+      "type.googleapis.com/runanywhere.v1.EmbeddingsResult", 
+      PROTO_3, 
+      null, 
       "embeddings_options.proto"
     ) {
       override fun encodedSize(`value`: EmbeddingsResult): Int {

@@ -134,11 +134,11 @@ public class ChatConversationState(
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatConversationState> =
         object : ProtoAdapter<ChatConversationState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ChatConversationState::class,
-      "type.googleapis.com/runanywhere.v1.ChatConversationState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ChatConversationState::class, 
+      "type.googleapis.com/runanywhere.v1.ChatConversationState", 
+      PROTO_3, 
+      null, 
       "chat.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

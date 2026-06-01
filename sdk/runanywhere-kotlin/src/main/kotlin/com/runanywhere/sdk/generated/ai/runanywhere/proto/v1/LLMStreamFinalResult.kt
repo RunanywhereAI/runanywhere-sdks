@@ -265,11 +265,11 @@ public class LLMStreamFinalResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<LLMStreamFinalResult> =
         object : ProtoAdapter<LLMStreamFinalResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LLMStreamFinalResult::class,
-      "type.googleapis.com/runanywhere.v1.LLMStreamFinalResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LLMStreamFinalResult::class, 
+      "type.googleapis.com/runanywhere.v1.LLMStreamFinalResult", 
+      PROTO_3, 
+      null, 
       "llm_service.proto"
     ) {
       override fun encodedSize(`value`: LLMStreamFinalResult): Int {

@@ -100,11 +100,11 @@ public class VoiceAgentSynthesizeSpeechProtoRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceAgentSynthesizeSpeechProtoRequest> =
         object : ProtoAdapter<VoiceAgentSynthesizeSpeechProtoRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceAgentSynthesizeSpeechProtoRequest::class,
-      "type.googleapis.com/runanywhere.v1.VoiceAgentSynthesizeSpeechProtoRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceAgentSynthesizeSpeechProtoRequest::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceAgentSynthesizeSpeechProtoRequest", 
+      PROTO_3, 
+      null, 
       "voice_agent_service.proto"
     ) {
       override fun encodedSize(`value`: VoiceAgentSynthesizeSpeechProtoRequest): Int {

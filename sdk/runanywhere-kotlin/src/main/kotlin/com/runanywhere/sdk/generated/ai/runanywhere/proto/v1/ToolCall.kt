@@ -172,11 +172,11 @@ public class ToolCall(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCall> = object : ProtoAdapter<ToolCall>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolCall::class,
-      "type.googleapis.com/runanywhere.v1.ToolCall",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolCall::class, 
+      "type.googleapis.com/runanywhere.v1.ToolCall", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolCall): Int {

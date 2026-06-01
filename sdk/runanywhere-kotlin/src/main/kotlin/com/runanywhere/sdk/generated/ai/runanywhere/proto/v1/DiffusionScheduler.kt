@@ -97,8 +97,8 @@ public enum class DiffusionScheduler(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionScheduler> = object : EnumAdapter<DiffusionScheduler>(
-      DiffusionScheduler::class,
-      PROTO_3,
+      DiffusionScheduler::class, 
+      PROTO_3, 
       DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiffusionScheduler? = DiffusionScheduler.fromValue(`value`)

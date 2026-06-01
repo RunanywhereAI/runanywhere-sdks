@@ -86,8 +86,8 @@ public enum class InferenceFramework(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<InferenceFramework> = object : EnumAdapter<InferenceFramework>(
-      InferenceFramework::class,
-      PROTO_3,
+      InferenceFramework::class, 
+      PROTO_3, 
       InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): InferenceFramework? = InferenceFramework.fromValue(`value`)

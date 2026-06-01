@@ -30,8 +30,8 @@ public enum class PerformanceEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<PerformanceEventKind> =
         object : EnumAdapter<PerformanceEventKind>(
-      PerformanceEventKind::class,
-      PROTO_3,
+      PerformanceEventKind::class, 
+      PROTO_3, 
       PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): PerformanceEventKind? = PerformanceEventKind.fromValue(`value`)

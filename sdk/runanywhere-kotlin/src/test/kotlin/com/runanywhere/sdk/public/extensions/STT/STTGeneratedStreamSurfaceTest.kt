@@ -24,4 +24,4 @@ class STTGeneratedStreamSurfaceTest {
 
 @Suppress("unused")
 private fun sttStreamSurface(): Flow<RASTTPartialResult> =
-    RunAnywhere.transcribeStream(audio = emptyFlow())
+    RunAnywhere.transcribeStream(audio = emptyFlow(), options = null)

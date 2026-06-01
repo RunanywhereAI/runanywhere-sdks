@@ -32,8 +32,8 @@ public enum class ToolCallingStreamEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallingStreamEventKind> =
         object : EnumAdapter<ToolCallingStreamEventKind>(
-      ToolCallingStreamEventKind::class,
-      PROTO_3,
+      ToolCallingStreamEventKind::class, 
+      PROTO_3, 
       ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ToolCallingStreamEventKind? = ToolCallingStreamEventKind.fromValue(`value`)

@@ -167,11 +167,11 @@ public class RAGDocument(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGDocument> = object : ProtoAdapter<RAGDocument>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RAGDocument::class,
-      "type.googleapis.com/runanywhere.v1.RAGDocument",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RAGDocument::class, 
+      "type.googleapis.com/runanywhere.v1.RAGDocument", 
+      PROTO_3, 
+      null, 
       "rag.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

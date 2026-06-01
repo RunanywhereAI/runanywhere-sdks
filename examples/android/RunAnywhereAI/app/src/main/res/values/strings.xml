@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">RunAnywhere</string>
+    <string name="title_activity_temp">TempActivity</string>
 </resources>

@@ -165,11 +165,11 @@ public class ModelCompatibilityRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelCompatibilityRequest> =
         object : ProtoAdapter<ModelCompatibilityRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelCompatibilityRequest::class,
-      "type.googleapis.com/runanywhere.v1.ModelCompatibilityRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelCompatibilityRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ModelCompatibilityRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelCompatibilityRequest): Int {

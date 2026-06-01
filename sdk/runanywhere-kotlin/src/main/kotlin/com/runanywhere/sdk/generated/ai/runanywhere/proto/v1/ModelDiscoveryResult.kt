@@ -169,11 +169,11 @@ public class ModelDiscoveryResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelDiscoveryResult> =
         object : ProtoAdapter<ModelDiscoveryResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelDiscoveryResult::class,
-      "type.googleapis.com/runanywhere.v1.ModelDiscoveryResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelDiscoveryResult::class, 
+      "type.googleapis.com/runanywhere.v1.ModelDiscoveryResult", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelDiscoveryResult): Int {

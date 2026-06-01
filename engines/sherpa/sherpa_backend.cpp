@@ -21,13 +21,28 @@
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <functional>  // for std::hash (short espeak symlink name)
+#include <limits>
 #include <vector>
 
 #include "rac/core/rac_logger.h"
+
+// Direct logcat tag for confidence diagnostics. RAC_LOG_* routes through the
+// platform adapter to System.out and is easy to miss / filter; __android_log
+// puts these under a clean "SherpaConf" tag so `adb logcat -s SherpaConf`
+// shows them reliably. Gated to debug builds (NDEBUG is defined in release) so
+// production stays quiet; flip on by building Debug or defining SHERPA_CONF_VERBOSE.
+#if defined(__ANDROID__) && (!defined(NDEBUG) || defined(SHERPA_CONF_VERBOSE))
+#include <android/log.h>
+#define SHERPA_CONF_LOG(...) \
+  __android_log_print(ANDROID_LOG_INFO, "SherpaConf", __VA_ARGS__)
+#else
+#define SHERPA_CONF_LOG(...) ((void)0)
+#endif
 
 namespace runanywhere {
 
@@ -670,19 +685,50 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
             result.detected_language = recognizer_result->lang;
         }
 
+        // Confidence = exp(mean(ys_log_probs)) from sherpa-onnx's per-token
+        // log probabilities (populated by the patched whisper greedy decoder
+        // and by transducer models). NaN when the model emits no per-token
+        // probs, which the hybrid router reads as "no quality signal".
+        SHERPA_CONF_LOG(
+            "fields: count=%d text_len=%zu lang=%s "
+            "ys_log_probs=%s timestamps=%s tokens_arr=%s durations=%s",
+            recognizer_result->count, result.text.size(),
+            recognizer_result->lang ? recognizer_result->lang : "(null)",
+            recognizer_result->ys_log_probs != nullptr ? "present" : "null",
+            recognizer_result->timestamps != nullptr ? "present" : "null",
+            recognizer_result->tokens_arr != nullptr ? "present" : "null",
+            recognizer_result->durations != nullptr ? "present" : "null");
+        SHERPA_CONF_LOG("result.json=%s",
+                        recognizer_result->json ? recognizer_result->json : "(null)");
+
+        if (recognizer_result->ys_log_probs != nullptr && recognizer_result->count > 0) {
+            double sum = 0.0;
+            for (int32_t i = 0; i < recognizer_result->count; ++i) {
+                sum += recognizer_result->ys_log_probs[i];
+            }
+            result.confidence = static_cast<float>(
+                std::exp(sum / static_cast<double>(recognizer_result->count)));
+            SHERPA_CONF_LOG("computed confidence=%.4f from sum=%.4f over %d tokens",
+                            result.confidence, sum, recognizer_result->count);
+        } else {
+            result.confidence = std::numeric_limits<float>::quiet_NaN();
+            SHERPA_CONF_LOG("no per-token log probs -> confidence=NaN (no signal)");
+        }
+
         SherpaOnnxDestroyOfflineRecognizerResult(recognizer_result);
     } else {
         result.text = "";
+        result.confidence = std::numeric_limits<float>::quiet_NaN();
         RAC_LOG_DEBUG("Sherpa.STT", "No transcription result (empty audio or silence)");
     }
 
     SherpaOnnxDestroyOfflineStream(stream);
 
     return result;
-
 #else
     RAC_LOG_ERROR("Sherpa.STT", "Sherpa-ONNX not available");
     result.text = "[Error: Sherpa-ONNX not available]";
+    result.confidence = std::numeric_limits<float>::quiet_NaN();
     return result;
 #endif
 }

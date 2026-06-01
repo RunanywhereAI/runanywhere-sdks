@@ -90,11 +90,11 @@ public class StateChangeEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<StateChangeEvent> = object : ProtoAdapter<StateChangeEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StateChangeEvent::class,
-      "type.googleapis.com/runanywhere.v1.StateChangeEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StateChangeEvent::class, 
+      "type.googleapis.com/runanywhere.v1.StateChangeEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: StateChangeEvent): Int {

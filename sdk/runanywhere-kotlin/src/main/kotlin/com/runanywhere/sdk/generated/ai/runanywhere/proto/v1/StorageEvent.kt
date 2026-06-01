@@ -195,11 +195,11 @@ public class StorageEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageEvent> = object : ProtoAdapter<StorageEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StorageEvent::class,
-      "type.googleapis.com/runanywhere.v1.StorageEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StorageEvent::class, 
+      "type.googleapis.com/runanywhere.v1.StorageEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: StorageEvent): Int {

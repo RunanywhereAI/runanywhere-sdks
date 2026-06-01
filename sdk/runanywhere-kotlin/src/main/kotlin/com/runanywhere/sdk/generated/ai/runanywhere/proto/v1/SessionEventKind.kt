@@ -32,8 +32,8 @@ public enum class SessionEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SessionEventKind> = object : EnumAdapter<SessionEventKind>(
-      SessionEventKind::class,
-      PROTO_3,
+      SessionEventKind::class, 
+      PROTO_3, 
       SessionEventKind.SESSION_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SessionEventKind? = SessionEventKind.fromValue(`value`)
