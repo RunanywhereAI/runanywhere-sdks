@@ -107,11 +107,11 @@ public class VLMLoadResolvedArtifactsResponse(
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMLoadResolvedArtifactsResponse> =
         object : ProtoAdapter<VLMLoadResolvedArtifactsResponse>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VLMLoadResolvedArtifactsResponse::class,
-      "type.googleapis.com/runanywhere.v1.VLMLoadResolvedArtifactsResponse",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VLMLoadResolvedArtifactsResponse::class, 
+      "type.googleapis.com/runanywhere.v1.VLMLoadResolvedArtifactsResponse", 
+      PROTO_3, 
+      null, 
       "vlm_options.proto"
     ) {
       override fun encodedSize(`value`: VLMLoadResolvedArtifactsResponse): Int {

@@ -33,8 +33,8 @@ public enum class HardwareRoutingEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<HardwareRoutingEventKind> =
         object : EnumAdapter<HardwareRoutingEventKind>(
-      HardwareRoutingEventKind::class,
-      PROTO_3,
+      HardwareRoutingEventKind::class, 
+      PROTO_3, 
       HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): HardwareRoutingEventKind? = HardwareRoutingEventKind.fromValue(`value`)

@@ -32,7 +32,7 @@ option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
-option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
+option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
 
 # Ensure EMSCRIPTEN is always defined so
 # generator-expression references like $<BOOL:${EMSCRIPTEN}> below do not trip
@@ -696,7 +696,6 @@ set(RAC_CORE_SOURCES
 # Infrastructure sources - registry, model management, network, telemetry
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
-    src/infrastructure/registry/module_registry.cpp
     # Legacy service_registry.cpp DELETED. Plugin registration
     # now flows exclusively through rac_plugin_registry.cpp below.
     src/plugin/rac_plugin_registry.cpp
@@ -931,10 +930,6 @@ else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
-# WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
-# which declares its own rac_backend_whisperkit_coreml target (via
-# rac_add_engine_plugin). Commons no longer compiles those TUs directly.
-
 # Solutions C ABI — always-built fallback.
 #
 # The full SolutionRunner implementation (rac_solution.cpp + companions)
@@ -1077,10 +1072,10 @@ if(APPLE AND RAC_BUILD_SHARED)
         list(APPEND _rac_exports_merged_inputs
             "${CMAKE_CURRENT_SOURCE_DIR}/exports/RACommons.rag.exports")
     endif()
-    # The onnx_embeddings and whisperkit_coreml sibling
-    # exports siblings were dropped here — those `_rac_backend_*_register`
-    # symbols are defined in the engine targets (engines/onnx,
-    # engines/whisperkit_coreml), not in librac_commons. Listing them in
+    # The onnx_embeddings sibling
+    # exports were dropped here — those `_rac_backend_*_register`
+    # symbols are defined in the engine targets (engines/onnx),
+    # not in librac_commons. Listing them in
     # librac_commons' `-exported_symbols_list` would either be a no-op
     # (symbol absent from the archive) or a hard link error on shared
     # builds. Each engine target publishes its own exports list — see
@@ -1590,7 +1585,7 @@ endif()
 # =============================================================================
 # COMMONS-LOCAL BACKENDS (RAG)
 #
-# Engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
+# Engine plugins (LlamaCPP, ONNX, MetalRT)
 # are wired exclusively from engines/<name>/CMakeLists.txt via the root
 # add_subdirectory(engines) path. Commons no longer instantiates or forwards
 # engine targets — only commons-local OBJECT libraries (RAG) are folded into

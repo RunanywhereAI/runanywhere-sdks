@@ -134,11 +134,11 @@ public class SolutionConfig(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SolutionConfig> = object : ProtoAdapter<SolutionConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SolutionConfig::class,
-      "type.googleapis.com/runanywhere.v1.SolutionConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SolutionConfig::class, 
+      "type.googleapis.com/runanywhere.v1.SolutionConfig", 
+      PROTO_3, 
+      null, 
       "solutions.proto"
     ) {
       override fun encodedSize(`value`: SolutionConfig): Int {

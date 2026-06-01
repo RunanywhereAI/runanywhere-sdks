@@ -53,8 +53,8 @@ public enum class ModelFileRole(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelFileRole> = object : EnumAdapter<ModelFileRole>(
-      ModelFileRole::class,
-      PROTO_3,
+      ModelFileRole::class, 
+      PROTO_3, 
       ModelFileRole.MODEL_FILE_ROLE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelFileRole? = ModelFileRole.fromValue(`value`)

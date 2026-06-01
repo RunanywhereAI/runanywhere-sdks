@@ -2,7 +2,7 @@
 ///
 /// Protocol for SDK modules that provide AI capabilities. Conceptually
 /// mirrors the `RunAnywhereModule` protocol referenced from Swift backend
-/// modules (`LlamaCPP`, `ONNX`, `MetalRT`, `WhisperKitSTT`).
+/// modules (`LlamaCPP`, `ONNX`, `MetalRT`).
 ///
 /// Note: Registration is now handled by the C++ platform backend via FFI.
 /// Modules only need to provide metadata and call the C++ registration function.

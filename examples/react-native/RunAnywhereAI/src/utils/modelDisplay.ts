@@ -26,9 +26,6 @@ export const getFrameworkColor = (
   switch (framework) {
     case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
       return Colors.frameworkLlamaCpp;
-    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT:
-    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-      return Colors.frameworkWhisperKit;
     case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
       return Colors.frameworkPiperTTS;
     case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
@@ -48,7 +45,6 @@ export const getFrameworkColor = (
     case InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
       return Colors.primaryOrange;
     case InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:
-    case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER:
       return Colors.primaryGreen;
     case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
     case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
@@ -65,9 +61,6 @@ export const getFrameworkIcon = (
   switch (framework) {
     case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
       return 'terminal-outline';
-    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT:
-    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-    case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER:
     case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
       return 'mic-outline';
     case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:

@@ -601,7 +601,7 @@ User preferences are stored via `SharedPreferences`:
 - **ARM64 Recommended** — Native libraries optimized for arm64 (x86 emulators may be slow)
 - **Memory Usage** — Large models (7B+) require devices with 6GB+ RAM
 - **First Load** — Initial model loading takes 1-3 seconds (cached afterward)
-- **Live STT** — Requires WhisperKit-compatible models (limited in ONNX)
+- **Live STT** — Best with Sherpa-ONNX streaming models (limited in plain ONNX)
 - **Platform Channels** — Some SDK features use FFI/platform channels
 
 ---

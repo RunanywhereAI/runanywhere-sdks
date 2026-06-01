@@ -61,8 +61,6 @@ rac_add_engine_plugin(diffusion_coreml
                         "-framework CoreML"
                         "-framework Accelerate"
                         rac_runtime_coreml
-    RUNTIMES            CORE_ML ANE
-    FORMATS             COREML
 )
 
 # Self-registration carrier — installs the diffusion-coreml vtable into the

@@ -541,11 +541,11 @@ public class SDKEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SDKEvent> = object : ProtoAdapter<SDKEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SDKEvent::class,
-      "type.googleapis.com/runanywhere.v1.SDKEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SDKEvent::class, 
+      "type.googleapis.com/runanywhere.v1.SDKEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       private val propertiesAdapter: ProtoAdapter<Map<String, String>> by

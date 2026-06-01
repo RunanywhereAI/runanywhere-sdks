@@ -177,11 +177,11 @@ public class ModelFileDescriptor(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelFileDescriptor> =
         object : ProtoAdapter<ModelFileDescriptor>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelFileDescriptor::class,
-      "type.googleapis.com/runanywhere.v1.ModelFileDescriptor",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelFileDescriptor::class, 
+      "type.googleapis.com/runanywhere.v1.ModelFileDescriptor", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelFileDescriptor): Int {

@@ -2,8 +2,8 @@
  * @file rac_primitive.h
  * @brief Canonical enumeration of runtime primitives exposed by engine plugins.
  *
- * Every engine plugin (llama.cpp, ONNX Runtime, whispercpp, WhisperKit CoreML,
- * MetalRT, …) declares which of these primitives it serves via the new unified
+ * Every engine plugin (llama.cpp, ONNX Runtime, sherpa, MetalRT, …)
+ * declares which of these primitives it serves via the new unified
  * `rac_engine_vtable_t`. The pipeline runtime keys off this enum to dispatch
  * operators to engines.
  *
@@ -36,7 +36,12 @@ typedef enum rac_primitive {
     RAC_PRIMITIVE_SYNTHESIZE = 3,    /**< Text-to-Speech. */
     RAC_PRIMITIVE_DETECT_VOICE = 4,  /**< Voice Activity Detection. */
     RAC_PRIMITIVE_EMBED = 5,         /**< Embedding / vectorization. */
-    RAC_PRIMITIVE_RERANK = 6,        /**< Dormant ABI slot; not a routable engine primitive. */
+    RAC_PRIMITIVE_RERANK = 6,        /**< PERMANENTLY DORMANT ABI slot — reserves wire value 6 +
+                                      *   the rerank_ops byte offset; NOT routable (absent from
+                                      *   RAC_PRIMITIVE_TABLE, rac_engine_vtable_slot() returns NULL,
+                                      *   registry rejects manifests declaring it,
+                                      *   rac_primitive_name() returns "reserved_6"); promoting it
+                                      *   requires bumping RAC_PLUGIN_API_VERSION. */
     RAC_PRIMITIVE_VLM = 7,           /**< Vision-Language Models. */
     RAC_PRIMITIVE_DIFFUSION = 8,     /**< Text-to-Image / Image-to-Image diffusion. */
 

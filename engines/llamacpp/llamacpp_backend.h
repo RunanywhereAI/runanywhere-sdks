@@ -38,7 +38,7 @@ struct TextGenerationRequest {
     float top_p = 0.9f;
     int top_k = 40;
     float repetition_penalty = 1.1f;
-    // commons-030-A: additional proto-exposed sampling knobs threaded through
+    // Additional proto-exposed sampling knobs threaded through
     // rac_llm_options_t. 0.0 / 0 / empty = disabled (apply only when set).
     float frequency_penalty = 0.0f;
     float presence_penalty = 0.0f;
@@ -219,6 +219,26 @@ class LlamaCppTextGeneration {
     apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
                         const std::string& system_prompt, bool add_assistant_token);
 
+    // Shared token-decode loop used by both generate_stream() and
+    // generate_from_context(). Runs the sample → EOG-check → UTF-8 assembly →
+    // built-in stop-window detection → KV-decode step loop, emitting completed
+    // UTF-8 chunks through @p sink (return false to cancel; sets
+    // cancel_requested_). Whatever genuinely differs between the two callers is
+    // passed in: the prepared sampler, the prefilled batch, the starting KV
+    // position, the effective token budget, and the sink (streaming callback vs
+    // accumulator). On return, KV/sampler ownership stays with the caller.
+    //
+    // Caller MUST already hold mutex_ and have prefilled the prompt into @p
+    // batch's sequence. @p timing_out (may be NULL) receives t5_last_token_ms /
+    // output_tokens at the same point generate_stream historically recorded
+    // them — immediately after the decode loop exits, before the trailing
+    // UTF-8/stop-window flush.
+    //
+    // @return number of output tokens generated (excludes the prompt).
+    int run_decode_loop(llama_sampler* sampler, llama_batch& batch, int start_n_cur,
+                        int effective_max_tokens, const TextStreamCallback& sink,
+                        rac_benchmark_timing_t* timing_out);
+
     LlamaCppBackend* backend_;
     llama_model* model_ = nullptr;
     llama_context* context_ = nullptr;
@@ -229,7 +249,7 @@ class LlamaCppTextGeneration {
     float cached_top_p_ = -1.0f;
     int cached_top_k_ = -1;
     float cached_repetition_penalty_ = -1.0f;
-    // commons-030-A: cache the extended sampling knobs too so a request that
+    // Cache the extended sampling knobs too so a request that
     // changes only a penalty / min_p / seed / grammar still rebuilds the chain.
     float cached_frequency_penalty_ = -1.0f;
     float cached_presence_penalty_ = -1.0f;

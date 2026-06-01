@@ -113,8 +113,8 @@ const char* framework_to_plugin_name(runanywhere::v1::InferenceFramework framewo
             // ops. We intentionally do NOT pin to "sherpa" here so the router
             // picks the highest-priority registered plugin that actually
             // advertises the voice primitive — letting alternate voice
-            // backends (whispercpp/whisperkit) or test mocks load when sherpa
-            // is not present without hard-failing the load. The router's
+            // backends or test mocks load when sherpa is not present
+            // without hard-failing the load. The router's
             // primitive-support filter (rac_engine_router.cpp) skips engines
             // missing the requested ops, so non-voice plugins ("onnx" in
             // production) are still excluded.
@@ -125,8 +125,6 @@ const char* framework_to_plugin_name(runanywhere::v1::InferenceFramework framewo
             return "onnx";
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
             return "sherpa";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-            return "whisperkit_coreml";
         case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
             return "metalrt";
         case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
@@ -192,8 +190,6 @@ rac_inference_framework_t c_framework_from_proto(runanywhere::v1::InferenceFrame
             return RAC_FRAMEWORK_MLX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
             return RAC_FRAMEWORK_COREML;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-            return RAC_FRAMEWORK_WHISPERKIT_COREML;
         case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
             return RAC_FRAMEWORK_METALRT;
         case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:

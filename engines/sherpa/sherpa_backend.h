@@ -75,6 +75,20 @@ struct DeviceInfo {
 // STT types (STTModelType, AudioSegment, STTRequest, STTResult) are shared
 // across engines — see engines/common/rac_engine_stt_types.h.
 
+// Structured outcome of a SherpaSTT::transcribe() call. Sherpa-local (NOT part
+// of the shared STTResult): it lets the RAC C-ABI layer (rac_stt_sherpa.cpp)
+// switch on a concrete failure cause instead of string-parsing "[Error: ...]"
+// sentinels out of result.text. Each enumerator maps 1:1 to a former sentinel
+// string; on any non-Ok status the result text is left empty.
+enum class SherpaSttStatus {
+    Ok,                     // transcription succeeded (text may still be empty for silence)
+    ModelNotLoaded,         // recognizer missing / model_loaded_ false
+    LanguageNotSupported,   // per-call language rejected (non-Whisper) or rebuild for it failed
+    RecognizerBuildFailed,  // could not (re)build any recognizer; model now unloaded
+    StreamCreationFailed,   // SherpaOnnxCreateOfflineStream returned null
+    BackendUnavailable,     // built without SHERPA_ONNX_AVAILABLE
+};
+
 // =============================================================================
 // TTS TYPES
 // =============================================================================
@@ -196,7 +210,11 @@ class SherpaSTT {
     bool unload_model();
     STTModelType get_model_type() const;
 
-    STTResult transcribe(const STTRequest& request);
+    // Transcribe one audio buffer. When `out_status` is non-null it receives the
+    // structured outcome (SherpaSttStatus) so callers can branch on the failure
+    // cause without parsing result.text. On any non-Ok status result.text is
+    // empty. The default nullptr keeps existing call sites source-compatible.
+    STTResult transcribe(const STTRequest& request, SherpaSttStatus* out_status = nullptr);
     bool supports_streaming() const;
 
     std::string create_stream(const nlohmann::json& config = {});
@@ -216,10 +234,10 @@ class SherpaSTT {
     // `language_`. Mutex MUST be held by the caller. Returns true on success.
     // Existing recognizer (if any) is destroyed first. Used by load_model() to
     // do the initial build and by transcribe() to honor per-call language /
-    // detect-language requests on Whisper recognizers (engine-sherpa-001).
+    // detect-language requests on Whisper recognizers.
     bool build_offline_recognizer_locked();
 
-    // pass2-syn-066: cap on the LRU cache of per-language Whisper recognizers.
+    // Cap on the LRU cache of per-language Whisper recognizers.
     // Each entry holds a fully constructed SherpaOnnxOfflineRecognizer whose
     // ONNX-runtime session is the heavy part of init, so we keep this small to
     // bound resident model memory. With Whisper-small at ~hundreds of MB per
@@ -233,7 +251,7 @@ class SherpaSTT {
     // LRU cache of recognizers keyed by language (empty string == auto-detect).
     // Populated lazily on first transcribe() per language, hit on subsequent
     // calls so alternating-language workloads don't pay the multi-second
-    // SherpaOnnxCreateOfflineRecognizer cost every utterance (pass2-syn-066).
+    // SherpaOnnxCreateOfflineRecognizer cost every utterance.
     // recognizer_lru_ front = most-recently-used. Both structures are guarded
     // by mutex_.
     std::unordered_map<std::string, const SherpaOnnxOfflineRecognizer*> recognizer_cache_;
@@ -286,7 +304,7 @@ class SherpaTTS {
     TTSModelType model_type_ = TTSModelType::PIPER;
     std::atomic<bool> model_loaded_{false};
     std::atomic<bool> cancel_requested_{false};
-    // engines-sherpa-008: cancel epoch counter incremented every time cancel()
+    // Cancel epoch counter incremented every time cancel()
     // is observed. synthesize() snapshots this at entry (before clearing
     // cancel_requested_) and re-reads it post-generate to honor cancels that
     // raced into the lock between two synthesize() calls. Without this, a
@@ -297,6 +315,11 @@ class SherpaTTS {
     std::vector<VoiceInfo> voices_;
     std::string model_dir_;
     std::string espeak_data_dir_;
+    // Synthesis language carried by the TTS load config (config["language"],
+    // default "en"). Sherpa-ONNX's offline-TTS C-API exposes no per-speaker
+    // language, so this engine-configured value is what get_voices() reports for
+    // every speaker instead of a hardcoded literal (mirrors SherpaSTT::language_).
+    std::string language_ = "en";
     int sample_rate_ = 22050;
     mutable std::mutex mutex_;
 };
@@ -324,13 +347,6 @@ class SherpaVAD {
 
     bool configure_vad(const VADConfig& config);
     VADResult process(const std::vector<float>& audio_samples, int sample_rate);
-    std::vector<SpeechSegment> detect_segments(const std::vector<float>& audio_samples,
-                                               int sample_rate);
-
-    std::string create_stream(const VADConfig& config = {});
-    VADResult feed_audio(const std::string& stream_id, const std::vector<float>& samples,
-                         int sample_rate);
-    void destroy_stream(const std::string& stream_id);
 
     void reset();
     VADConfig get_vad_config() const;
@@ -342,7 +358,7 @@ class SherpaVAD {
     // `config_` is populated from JSON) and `configure_vad()` (rebuild path) so
     // that every VADConfig field — threshold, min_silence_duration_ms,
     // min_speech_duration_ms, window_size_ms, sample_rate — actually reaches the
-    // detector instead of getting silently dropped (pass2-syn-064).
+    // detector instead of getting silently dropped.
     // Caller MUST hold mutex_.
     void fill_sherpa_vad_config_locked(SherpaOnnxVadModelConfig& out) const;
 #endif

@@ -53,8 +53,8 @@ public enum class GenerationEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<GenerationEventKind> =
         object : EnumAdapter<GenerationEventKind>(
-      GenerationEventKind::class,
-      PROTO_3,
+      GenerationEventKind::class, 
+      PROTO_3, 
       GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): GenerationEventKind? = GenerationEventKind.fromValue(`value`)

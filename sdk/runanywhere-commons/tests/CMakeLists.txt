@@ -1162,10 +1162,6 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-# Note: whispercpp plugin-entry test is wired in the root
-# CMakeLists.txt for the same reason as sherpa — rac_backend_whispercpp lives
-# under engines/ and is not yet configured at this point.
-
 # Note: metalrt plugin-entry test is wired in the root
 # CMakeLists.txt for the same reason as sherpa — rac_backend_metalrt is built
 # by engines/ (Apple-only OBJECT library folded into rac_commons) and is not

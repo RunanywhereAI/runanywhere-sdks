@@ -57,11 +57,11 @@ public class HardwareAcceleratorsRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<HardwareAcceleratorsRequest> =
         object : ProtoAdapter<HardwareAcceleratorsRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HardwareAcceleratorsRequest::class,
-      "type.googleapis.com/runanywhere.v1.HardwareAcceleratorsRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HardwareAcceleratorsRequest::class, 
+      "type.googleapis.com/runanywhere.v1.HardwareAcceleratorsRequest", 
+      PROTO_3, 
+      null, 
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: HardwareAcceleratorsRequest): Int {

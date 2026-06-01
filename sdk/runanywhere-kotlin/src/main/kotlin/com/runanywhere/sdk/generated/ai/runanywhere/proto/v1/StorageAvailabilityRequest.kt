@@ -140,11 +140,11 @@ public class StorageAvailabilityRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageAvailabilityRequest> =
         object : ProtoAdapter<StorageAvailabilityRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StorageAvailabilityRequest::class,
-      "type.googleapis.com/runanywhere.v1.StorageAvailabilityRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StorageAvailabilityRequest::class, 
+      "type.googleapis.com/runanywhere.v1.StorageAvailabilityRequest", 
+      PROTO_3, 
+      null, 
       "storage_types.proto"
     ) {
       override fun encodedSize(`value`: StorageAvailabilityRequest): Int {

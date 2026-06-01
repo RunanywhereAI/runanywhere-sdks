@@ -47,8 +47,8 @@ public enum class ConfigurationEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConfigurationEventKind> =
         object : EnumAdapter<ConfigurationEventKind>(
-      ConfigurationEventKind::class,
-      PROTO_3,
+      ConfigurationEventKind::class, 
+      PROTO_3, 
       ConfigurationEventKind.CONFIGURATION_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ConfigurationEventKind? = ConfigurationEventKind.fromValue(`value`)

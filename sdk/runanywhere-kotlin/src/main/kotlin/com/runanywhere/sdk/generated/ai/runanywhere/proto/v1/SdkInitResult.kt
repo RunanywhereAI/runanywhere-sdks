@@ -236,11 +236,11 @@ public class SdkInitResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SdkInitResult> = object : ProtoAdapter<SdkInitResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SdkInitResult::class,
-      "type.googleapis.com/runanywhere.v1.SdkInitResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SdkInitResult::class, 
+      "type.googleapis.com/runanywhere.v1.SdkInitResult", 
+      PROTO_3, 
+      null, 
       "sdk_init.proto"
     ) {
       override fun encodedSize(`value`: SdkInitResult): Int {

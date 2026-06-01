@@ -292,8 +292,6 @@ var InferenceFramework;
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_COREML"] = 6] = "INFERENCE_FRAMEWORK_COREML";
     /** INFERENCE_FRAMEWORK_MLX - Apple Silicon */
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_MLX"] = 7] = "INFERENCE_FRAMEWORK_MLX";
-    /** INFERENCE_FRAMEWORK_WHISPERKIT_COREML - Apple */
-    InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_WHISPERKIT_COREML"] = 8] = "INFERENCE_FRAMEWORK_WHISPERKIT_COREML";
     /** INFERENCE_FRAMEWORK_METALRT - Apple */
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_METALRT"] = 9] = "INFERENCE_FRAMEWORK_METALRT";
     /** INFERENCE_FRAMEWORK_GENIE - Qualcomm */
@@ -304,8 +302,6 @@ var InferenceFramework;
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_MLC"] = 14] = "INFERENCE_FRAMEWORK_MLC";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_PICO_LLM"] = 15] = "INFERENCE_FRAMEWORK_PICO_LLM";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_PIPER_TTS"] = 16] = "INFERENCE_FRAMEWORK_PIPER_TTS";
-    InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_WHISPERKIT"] = 17] = "INFERENCE_FRAMEWORK_WHISPERKIT";
-    InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_OPENAI_WHISPER"] = 18] = "INFERENCE_FRAMEWORK_OPENAI_WHISPER";
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS"] = 19] = "INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS";
     /** INFERENCE_FRAMEWORK_BUILT_IN - rule-based, no model */
     InferenceFramework[InferenceFramework["INFERENCE_FRAMEWORK_BUILT_IN"] = 20] = "INFERENCE_FRAMEWORK_BUILT_IN";
@@ -341,9 +337,6 @@ function inferenceFrameworkFromJSON(object) {
         case 7:
         case "INFERENCE_FRAMEWORK_MLX":
             return InferenceFramework.INFERENCE_FRAMEWORK_MLX;
-        case 8:
-        case "INFERENCE_FRAMEWORK_WHISPERKIT_COREML":
-            return InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
         case 9:
         case "INFERENCE_FRAMEWORK_METALRT":
             return InferenceFramework.INFERENCE_FRAMEWORK_METALRT;
@@ -368,12 +361,6 @@ function inferenceFrameworkFromJSON(object) {
         case 16:
         case "INFERENCE_FRAMEWORK_PIPER_TTS":
             return InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS;
-        case 17:
-        case "INFERENCE_FRAMEWORK_WHISPERKIT":
-            return InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT;
-        case 18:
-        case "INFERENCE_FRAMEWORK_OPENAI_WHISPER":
-            return InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER;
         case 19:
         case "INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS":
             return InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS;
@@ -413,8 +400,6 @@ function inferenceFrameworkToJSON(object) {
             return "INFERENCE_FRAMEWORK_COREML";
         case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
             return "INFERENCE_FRAMEWORK_MLX";
-        case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-            return "INFERENCE_FRAMEWORK_WHISPERKIT_COREML";
         case InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
             return "INFERENCE_FRAMEWORK_METALRT";
         case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
@@ -431,10 +416,6 @@ function inferenceFrameworkToJSON(object) {
             return "INFERENCE_FRAMEWORK_PICO_LLM";
         case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
             return "INFERENCE_FRAMEWORK_PIPER_TTS";
-        case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT:
-            return "INFERENCE_FRAMEWORK_WHISPERKIT";
-        case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER:
-            return "INFERENCE_FRAMEWORK_OPENAI_WHISPER";
         case InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
             return "INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS";
         case InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:

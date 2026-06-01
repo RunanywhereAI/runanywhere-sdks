@@ -235,11 +235,11 @@ public class ToolCallingSessionCreateRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallingSessionCreateRequest> =
         object : ProtoAdapter<ToolCallingSessionCreateRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolCallingSessionCreateRequest::class,
-      "type.googleapis.com/runanywhere.v1.ToolCallingSessionCreateRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolCallingSessionCreateRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ToolCallingSessionCreateRequest", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolCallingSessionCreateRequest): Int {

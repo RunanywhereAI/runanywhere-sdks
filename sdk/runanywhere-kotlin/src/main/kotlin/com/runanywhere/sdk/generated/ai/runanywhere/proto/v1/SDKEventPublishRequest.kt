@@ -94,11 +94,11 @@ public class SDKEventPublishRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<SDKEventPublishRequest> =
         object : ProtoAdapter<SDKEventPublishRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SDKEventPublishRequest::class,
-      "type.googleapis.com/runanywhere.v1.SDKEventPublishRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SDKEventPublishRequest::class, 
+      "type.googleapis.com/runanywhere.v1.SDKEventPublishRequest", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: SDKEventPublishRequest): Int {

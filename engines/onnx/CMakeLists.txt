@@ -179,9 +179,6 @@ rac_add_engine_plugin(onnx
                         ${RAC_COMMONS_ROOT_DIR}/src
                         ${ONNX_EXTRA_INCLUDES}
     COMPILE_DEFINITIONS ${ONNX_COMPILE_DEFS}
-    PRIMITIVES          EMBED
-    RUNTIMES            ONNXRT
-    FORMATS             ONNX
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
     PACKAGE_NAME        rac_backend_onnx

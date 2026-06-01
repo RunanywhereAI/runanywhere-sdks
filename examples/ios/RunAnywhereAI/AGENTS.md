@@ -65,8 +65,8 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 | 3 | `MoreHubView` | RAG, STT, TTS, VAD, Storage, Solutions, Voice Keyboard |
 | 4 | `CombinedSettingsView` | Generation params, API keys, tools, storage |
 
-> **Deferred backends.** MetalRT, WhisperKit, and Diffusion (image generation)
-> are excluded from the v1 build (`RunAnywhereAIApp.swift:12,443`). Their
+> **Deferred backends.** MetalRT and Diffusion (image generation)
+> are excluded from the v1 build (`RunAnywhereAIApp.swift:12`). Their
 > products, registration calls, feature folders, and `generateImage` APIs are
 > intentionally absent from the shipped sources.
 

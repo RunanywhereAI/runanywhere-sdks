@@ -174,7 +174,6 @@ object CppBridgeModelPaths {
             CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.INFERENCE_FRAMEWORK_NONE
             CppBridgeModelRegistry.Framework.MLX -> InferenceFramework.INFERENCE_FRAMEWORK_MLX
             CppBridgeModelRegistry.Framework.COREML -> InferenceFramework.INFERENCE_FRAMEWORK_COREML
-            CppBridgeModelRegistry.Framework.WHISPERKIT_COREML -> InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML
             CppBridgeModelRegistry.Framework.METALRT -> InferenceFramework.INFERENCE_FRAMEWORK_METALRT
             CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.INFERENCE_FRAMEWORK_GENIE
             CppBridgeModelRegistry.Framework.SHERPA -> InferenceFramework.INFERENCE_FRAMEWORK_SHERPA

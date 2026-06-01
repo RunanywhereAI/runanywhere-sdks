@@ -44,7 +44,6 @@ option(RAC_WASM_PTHREADS    "Enable pthreads (requires SharedArrayBuffer)" OFF)
 option(RAC_WASM_DEBUG       "Enable debug assertions and verbose logging" OFF)
 option(RAC_WASM_BUILD_CORE  "Build the commons-only Web SDK WASM target" OFF)
 option(RAC_WASM_LLAMACPP    "Build the llama.cpp Web SDK WASM target (LLM + VLM)" OFF)
-option(RAC_WASM_WHISPERCPP  "Build with whisper.cpp STT backend (legacy)" OFF)
 option(RAC_WASM_ONNX        "Build the ONNX + Sherpa Web SDK WASM target" OFF)
 option(RAC_WASM_WEBGPU      "Also emit the WebGPU variant of the llama.cpp target (requires JSPI)" OFF)
 
@@ -82,7 +81,7 @@ set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
 # whenever ANY backend WASM target is requested, so the same RACommons tree
 # can satisfy multiple per-package binaries in one configure step — keeps
 # things simple, dead-strip handles unused engines.
-if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX OR RAC_WASM_BUILD_CORE)
+if(RAC_WASM_LLAMACPP OR RAC_WASM_ONNX OR RAC_WASM_BUILD_CORE)
     set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
 else()
     set(RAC_BUILD_BACKENDS OFF CACHE BOOL "" FORCE)
@@ -90,14 +89,13 @@ endif()
 
 # Individual backend flags
 set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
-set(RAC_BACKEND_WHISPERCPP ${RAC_WASM_WHISPERCPP} CACHE BOOL "" FORCE)
 set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
 
 # =============================================================================
 # BACKEND-SPECIFIC CONFIGURATION
 # =============================================================================
-# IMPORTANT: These must be set BEFORE add_subdirectory() so that llama.cpp,
-# whisper.cpp, and ONNX CMake files see the correct cache variables.
+# IMPORTANT: These must be set BEFORE add_subdirectory() so that llama.cpp
+# and ONNX CMake files see the correct cache variables.
 
 if(RAC_WASM_LLAMACPP)
     message(STATUS "Building with llama.cpp LLM backend for WASM")
@@ -135,22 +133,6 @@ if(RAC_WASM_LLAMACPP)
     # Disable llama.cpp HTML output and single-file embedding
     set(LLAMA_BUILD_HTML OFF CACHE BOOL "" FORCE)
     set(LLAMA_WASM_SINGLE_FILE OFF CACHE BOOL "" FORCE)
-endif()
-
-if(RAC_WASM_WHISPERCPP)
-    message(STATUS "Building with whisper.cpp STT backend for WASM")
-
-    # whisper.cpp shares the same GGML config as llama.cpp
-    set(GGML_METAL OFF CACHE BOOL "" FORCE)
-    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
-    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
-    set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
-    set(GGML_NEON OFF CACHE BOOL "" FORCE)
-    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
-
-    # Disable CoreML for whisper.cpp on WASM
-    set(WHISPER_COREML OFF CACHE BOOL "" FORCE)
 endif()
 
 if(RAC_WASM_ONNX)
@@ -241,9 +223,6 @@ endif()
 
 if(RAC_WASM_LLAMACPP AND NOT TARGET rac_backend_llamacpp)
     message(FATAL_ERROR "RAC_WASM_LLAMACPP=ON requires rac_backend_llamacpp. Configure the root build with llama.cpp enabled.")
-endif()
-if(RAC_WASM_WHISPERCPP AND NOT TARGET rac_backend_whispercpp)
-    message(FATAL_ERROR "RAC_WASM_WHISPERCPP=ON requires rac_backend_whispercpp. Configure the root build with whisper.cpp enabled.")
 endif()
 if(RAC_WASM_ONNX AND NOT TARGET rac_backend_onnx)
     message(FATAL_ERROR
@@ -386,13 +365,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # SDKException route error construction through the shared commons helper
     # rac_result_to_proto_error instead of the local TypeScript category table.
     "_rac_wasm_result_to_proto_error"
-
-    # Module registry
-    "_rac_module_register"
-    "_rac_module_unregister"
-    "_rac_module_list"
-    "_rac_modules_for_capability"
-    "_rac_module_get_info"
 
     # Plugin registry / loader
     "_rac_plugin_api_version"
@@ -1013,16 +985,6 @@ set(RAC_EXPORTED_FUNCTIONS_LLAMACPP
     "_rac_backend_llamacpp_unregister"
 )
 
-set(RAC_EXPORTED_FUNCTIONS_WHISPERCPP
-    "_rac_stt_whispercpp_create"
-    "_rac_stt_whispercpp_transcribe"
-    "_rac_stt_whispercpp_get_language"
-    "_rac_stt_whispercpp_is_ready"
-    "_rac_stt_whispercpp_destroy"
-    "_rac_backend_whispercpp_register"
-    "_rac_backend_whispercpp_unregister"
-)
-
 set(RAC_EXPORTED_FUNCTIONS_ONNX
     # TTS (Piper via ONNX)
     "_rac_tts_onnx_create"
@@ -1408,32 +1370,12 @@ if(RAC_WASM_ONNX)
     list(APPEND _targets_built "racommons_onnx_wasm -> packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}")
 endif()
 
-# --- whisper.cpp (legacy STT) ------------------------------------------------
-# Kept for back-compat with any tooling still wired to --whispercpp. Stages
-# alongside llamacpp output since whisper.cpp shipped through that package
-# historically. New code should prefer the ONNX/Sherpa target.
-if(RAC_WASM_WHISPERCPP)
-    set(_whisper_exports ${RAC_EXPORTED_FUNCTIONS_BASE})
-    list(APPEND _whisper_exports ${RAC_EXPORTED_FUNCTIONS_WHISPERCPP})
-    rac_wasm_add_target(
-        NAME racommons_whispercpp_wasm
-        OUTPUT_NAME racommons-whispercpp
-        OUTPUT_DIR "${_LLAMACPP_OUTPUT_DIR}"
-        EXPORT_NAME createWhisperCppModule
-        LINK_LIBRARIES rac_commons rac_backend_whispercpp
-        EXPORTED_FUNCTIONS ${_whisper_exports}
-        COMPILE_DEFS RAC_WASM_WHISPERCPP=1
-    )
-    list(APPEND _targets_built "racommons_whispercpp_wasm -> packages/llamacpp/wasm/racommons-whispercpp.{js,wasm}")
-endif()
-
 if(NOT _targets_built)
     message(FATAL_ERROR
         "No WASM targets configured. Enable at least one of:\n"
         "  -DRAC_WASM_BUILD_CORE=ON\n"
         "  -DRAC_WASM_LLAMACPP=ON  (optionally with -DRAC_WASM_WEBGPU=ON)\n"
-        "  -DRAC_WASM_ONNX=ON\n"
-        "  -DRAC_WASM_WHISPERCPP=ON"
+        "  -DRAC_WASM_ONNX=ON"
     )
 endif()
 
@@ -1451,7 +1393,6 @@ message(STATUS "Debug:        ${RAC_WASM_DEBUG}")
 message(STATUS "Core target:  ${RAC_WASM_BUILD_CORE}")
 message(STATUS "llama.cpp:    ${RAC_WASM_LLAMACPP}")
 message(STATUS "WebGPU:       ${RAC_WASM_WEBGPU}")
-message(STATUS "whisper.cpp:  ${RAC_WASM_WHISPERCPP}")
 message(STATUS "sherpa-onnx:  ${RAC_WASM_ONNX}")
 message(STATUS "Targets:")
 foreach(_t ${_targets_built})

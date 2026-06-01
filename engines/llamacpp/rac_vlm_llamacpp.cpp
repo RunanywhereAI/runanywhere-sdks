@@ -33,6 +33,8 @@
 #include "mtmd-helper.h"
 #include "mtmd.h"
 
+#include "llamacpp_stop_helpers.h"
+
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/utils/rac_image_utils.h"
@@ -139,7 +141,7 @@ struct LlamaCppVLMBackend {
     VLMModelType model_type = VLMModelType::Unknown;
 
     // Cached sampler parameters to avoid unnecessary rebuilds.
-    // pass3-syn-128: extended to cover the full rac_vlm_options_t sampling
+    // Extended to cover the full rac_vlm_options_t sampling
     // surface (top_k / seed / repetition_penalty / min_p) so any call that
     // touches them invalidates the cached chain and forces a rebuild.
     float cached_temperature = -1.0f;
@@ -149,7 +151,7 @@ struct LlamaCppVLMBackend {
     float cached_repetition_penalty = -1.0f;
     float cached_min_p = -1.0f;
 
-    // pass3-syn-128: caller toggle for image-embedding emission. Stored on the
+    // Caller toggle for image-embedding emission. Stored on the
     // backend so both streaming and non-streaming paths see the same value.
     // No mtmd hook surfaces embeddings today; the flag is recorded for future
     // proto-event emission and so callers see the bool round-trip through the
@@ -530,11 +532,11 @@ const char* get_image_marker() {
  * Only rebuilds the sampler when parameters actually change, avoiding
  * unnecessary heap allocations on every inference call.
  *
- * pass3-syn-128: honors the full sampling surface of rac_vlm_options_t
- * (top_k / seed / repetition_penalty / min_p), mirroring the LLM backend at
- * engines/llamacpp/llamacpp_backend.cpp:905-947. Zero/default values fall
- * back to the historical engine constants so callers that left them at
- * defaults continue to see identical behavior.
+ * Honors the full sampling surface of rac_vlm_options_t
+ * (top_k / seed / repetition_penalty / min_p), mirroring the LLM backend's
+ * build_sampler_chain() in engines/llamacpp/llamacpp_backend.cpp. Zero/default
+ * values fall back to the historical engine constants so callers that left them
+ * at defaults continue to see identical behavior.
  */
 void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* options) {
     // Defaults match the historical hard-coded VLM behavior so callers that
@@ -594,7 +596,7 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
 
     if (temperature > 0.0f) {
         // Token-level repetition penalty + frequency/presence penalties.
-        // Repetition penalty is caller-controlled now (pass3-syn-128); freq/pres
+        // Repetition penalty is caller-controlled now; freq/pres
         // stay at the pre-IDL engine defaults until callers request a knob.
         llama_sampler_chain_add(backend->sampler,
                                 llama_sampler_init_penalties(256, repetition_penalty, 0.1f, 0.1f));
@@ -608,8 +610,8 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
             backend->sampler, llama_sampler_init_dry(vocab, llama_model_n_ctx_train(backend->model),
                                                      0.8f, 1.75f, 2, 256, dry_breakers, 4));
 
-        // top_k only when caller requested it; mirrors LLM backend at
-        // engines/llamacpp/llamacpp_backend.cpp:928-931.
+        // top_k only when caller requested it; mirrors LLM backend's
+        // build_sampler_chain() in engines/llamacpp/llamacpp_backend.cpp.
         if (top_k > 0) {
             llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_k(top_k));
         }
@@ -673,7 +675,7 @@ static VLMModelType resolve_effective_model_type(VLMModelType detected,
 rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_image_t* image,
                                  const char* prompt, const rac_vlm_options_t* options) {
     backend->cancel_requested = false;
-    // pass3-syn-128: surface emit_image_embeddings on the backend so both
+    // Surface emit_image_embeddings on the backend so both
     // process() and process_stream() see the same caller toggle. No mtmd hook
     // exposes raw image embeddings today; recording it here keeps the C ABI
     // round-trip lossless and prepares the contract for future event surfaces.
@@ -732,7 +734,7 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_imag
             // Base64 decode is not wired through mtmd yet. Returning an explicit
             // error is strictly better than silently dropping the image and
             // generating a text-only answer the caller will read as visual
-            // analysis (see hotspot-engine-llamacpp-001).
+            // analysis.
             RAC_LOG_ERROR(LOG_CAT,
                           "Base64 image format not supported by llama.cpp VLM "
                           "backend; decode to RGB pixels or supply a file path");
@@ -867,36 +869,11 @@ std::vector<std::string> collect_stop_sequences(const rac_vlm_options_t* options
     return result;
 }
 
-/**
- * Find the earliest occurrence of any caller-supplied stop sequence in the
- * decode window. Returns std::string::npos when no stop sequence is matched.
- *
- * Matches the LLM backend's loop semantics
- * (engines/llamacpp/llamacpp_backend.cpp:1020).
- */
-size_t find_first_stop_sequence(const std::string& window, const std::vector<std::string>& stops) {
-    size_t earliest = std::string::npos;
-    for (const auto& stop_seq : stops) {
-        const size_t pos = window.find(stop_seq);
-        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
-            earliest = pos;
-        }
-    }
-    return earliest;
-}
-
-/**
- * Compute the longest length across all caller-supplied stop sequences so the
- * scan window can be trimmed to that horizon without losing potential matches.
- */
-size_t max_stop_length(const std::vector<std::string>& stops) {
-    size_t m = 0;
-    for (const auto& s : stops) {
-        if (s.size() > m)
-            m = s.size();
-    }
-    return m;
-}
+// The window-scanning stop helpers (find_first_stop_sequence / max_stop_length)
+// were identical to the LLM backend's; they now live in
+// engines/llamacpp/llamacpp_stop_helpers.h and are shared by both paths.
+using runanywhere::llamacpp_internal::find_first_stop_sequence;
+using runanywhere::llamacpp_internal::max_stop_length;
 
 }  // namespace
 
@@ -968,7 +945,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     // iOS Simulator: Metal GPU allocation via MTLSimDevice crashes
     // in ggml_metal_buffer_set_tensor / _xpc_shmem_create for the mmproj
     // clip tensors. Force CPU execution on simulator (mirrors the LLM
-    // backend's guard in llamacpp_backend.cpp:450). Physical iOS devices
+    // backend's TARGET_OS_SIMULATOR guard in load_model(),
+    // engines/llamacpp/llamacpp_backend.cpp). Physical iOS devices
     // still use Metal.
     if (gpu_layers != 0) {
         RAC_LOG_INFO(LOG_CAT,
@@ -1252,8 +1230,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     int repeat_run = 0;
     constexpr int MAX_CONSECUTIVE_REPEATS = 4;
 
-    // Caller-supplied stop sequences (mirrors LLM backend at
-    // engines/llamacpp/llamacpp_backend.cpp:1020). Empty when no caller stops are
+    // Caller-supplied stop sequences (mirrors LLM backend's run_decode_loop in
+    // engines/llamacpp/llamacpp_backend.cpp). Empty when no caller stops are
     // provided so the scan is short-circuited to a single emptiness check.
     const std::vector<std::string> user_stops = collect_stop_sequences(options);
     const size_t user_stop_max_len = max_stop_length(user_stops);
@@ -1448,8 +1426,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     bool decode_failed = false;
 
     // Caller-supplied stop sequences: track a rolling tail so a stop sequence
-    // can span multiple token pieces (mirrors
-    // engines/llamacpp/llamacpp_backend.cpp:1020). Empty when no stops were
+    // can span multiple token pieces (mirrors run_decode_loop in
+    // engines/llamacpp/llamacpp_backend.cpp). Empty when no stops were
     // supplied so per-token cost is just an emptiness check.
     const std::vector<std::string> user_stops = collect_stop_sequences(options);
     const size_t user_stop_max_len = max_stop_length(user_stops);
@@ -1503,8 +1481,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
                 // hold back the trailing `user_stop_max_len` bytes until we know
                 // they're not part of a stop. When a stop is found, emit only the
                 // bytes BEFORE the match — never leaking the stop prefix to the
-                // callback. Mirrors the LLM backend's stop_window pattern at
-                // engines/llamacpp/llamacpp_backend.cpp:1031-1076.
+                // callback. Mirrors the LLM backend's stop_window pattern in
+                // run_decode_loop (engines/llamacpp/llamacpp_backend.cpp).
                 stop_window.append(buf, len);
 
                 const size_t found_pos = find_first_stop_sequence(stop_window, user_stops);

@@ -3,14 +3,10 @@
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
 
-#include <cstdlib>
-#include <new>
-
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
-#include "rac/runtime/rac_runtime_helpers.h"
 
 namespace {
 
@@ -27,24 +23,18 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_MLPACKAGE,
 };
 
-struct CoreMLSession {
-    MLModel* model = nil;
-};
-
 rac_result_t coreml_init(void) {
     // NSClassFromString(@"MLModel") only proves the framework is linked, which
     // is true on every host where this TU is compiled in -- so the registry
-    // accepts CoreML on iOS Simulator x86_64 / older OSes that cannot actually
-    // run a CoreML graph, and the failure surfaces much later at
-    // coreml_create_session as RAC_ERROR_MODEL_LOAD_FAILED, after the router
-    // has already pinned this runtime (runtimes-006). Mirror Metal's pattern
-    // and probe a real CoreML object: if MLModelConfiguration cannot be
-    // instantiated the runtime cannot run, so self-reject at registry time
-    // and let the router fall back to ONNX/llamacpp paths.
+    // would accept CoreML on iOS Simulator x86_64 / older OSes that cannot
+    // actually run a CoreML graph. Mirror Metal's pattern and probe a real
+    // CoreML object: if MLModelConfiguration cannot be instantiated the runtime
+    // cannot run, so self-reject at registry time and let the router fall back
+    // to ONNX/llamacpp paths.
     //
-    // commons-001: any NSException raised by Foundation/CoreML must be caught
-    // here -- this is the first .mm entry on the C registry path and an
-    // uncaught ObjC exception bridging into extern "C" aborts the process.
+    // Any NSException raised by Foundation/CoreML must be caught here -- this is
+    // the first .mm entry on the C registry path and an uncaught ObjC exception
+    // bridging into extern "C" aborts the process.
     @autoreleasepool {
         @try {
             MLModelConfiguration* cfg = [[[MLModelConfiguration alloc] init] autorelease];
@@ -64,88 +54,6 @@ rac_result_t coreml_init(void) {
 
 void coreml_destroy(void) {}
 
-rac_result_t coreml_create_session(const rac_runtime_session_desc_t* desc,
-                                   rac_runtime_session_t** out) {
-    if (!desc || !out)
-        return RAC_ERROR_NULL_POINTER;
-    *out = nullptr;
-    if (!desc->model_path || desc->model_path[0] == '\0') {
-        return RAC_ERROR_INVALID_PARAMETER;
-    }
-
-    // commons-001: +[MLModel modelWithContentsOfURL:configuration:error:] only
-    // surfaces user-recoverable conditions via NSError; catastrophic parse
-    // failures inside a corrupted .mlpackage's coremldata.bin raise
-    // NSInvalidArgumentException. Crossing extern "C" with an in-flight ObjC
-    // exception is undefined behavior under -fobjc-exceptions and aborts the
-    // host app. Wrap the whole pool in @try and convert any NSException into a
-    // structured RAC_ERROR_MODEL_LOAD_FAILED so the router falls back cleanly.
-    @autoreleasepool {
-        @try {
-            NSString* path = [NSString stringWithUTF8String:desc->model_path];
-            if (!rac_coreml_file_exists(path)) {
-                return RAC_ERROR_MODEL_NOT_FOUND;
-            }
-            NSError* err = nil;
-            MLModelConfiguration* cfg = rac_coreml_default_model_configuration();
-            MLModel* model = [MLModel modelWithContentsOfURL:[NSURL fileURLWithPath:path]
-                                               configuration:cfg
-                                                       error:&err];
-            if (!model) {
-                RAC_LOG_ERROR(kLogCat, "CoreML create_session failed (%s): %s", desc->model_path,
-                              err ? [[err localizedDescription] UTF8String] : "unknown");
-                return RAC_ERROR_MODEL_LOAD_FAILED;
-            }
-            auto* sess = new (std::nothrow) CoreMLSession();
-            if (!sess)
-                return RAC_ERROR_OUT_OF_MEMORY;
-            // `model` was returned autoreleased by +[MLModel modelWithContentsOfURL:].
-            // Without an explicit retain it dies when this @autoreleasepool drains,
-            // leaving CoreMLSession::model dangling for every subsequent prediction
-            // /model_description access (runtimes-001). MRC semantics — paired
-            // -release lives in coreml_destroy_session.
-            sess->model = [model retain];
-            *out = reinterpret_cast<rac_runtime_session_t*>(sess);
-            return RAC_SUCCESS;
-        } @catch (NSException* e) {
-            RAC_LOG_ERROR(kLogCat, "CoreML create_session raised %s on %s: %s",
-                          e.name ? [e.name UTF8String] : "NSException", desc->model_path,
-                          e.reason ? [e.reason UTF8String] : "no reason");
-            return RAC_ERROR_MODEL_LOAD_FAILED;
-        }
-    }
-}
-
-void coreml_destroy_session(rac_runtime_session_t* session) {
-    auto* sess = reinterpret_cast<CoreMLSession*>(session);
-    if (!sess)
-        return;
-    // -[MLModel release] triggers Apple's dealloc, which autoreleases internal
-    // temporaries (compiled-model handles, NSError descriptors, metadata
-    // dictionaries). Callers may invoke us from threads without an outer pool
-    // (worker pthreads, libdispatch concurrent queues, Swift cooperative
-    // Tasks between hops), so wrap the release in our own pool to drain those
-    // temporaries at destroy time -- otherwise repeated load/unload cycles
-    // grow RSS unboundedly (runtimes-001). Matches the @autoreleasepool used
-    // by coreml_create_session above and diffusion_coreml_backend.mm.
-    //
-    // commons-001: a corrupted MLModel dealloc can raise NSException; swallow
-    // it so the C ABI caller (rac_runtime_registry destroy_session dispatch)
-    // never sees an in-flight ObjC exception. Even if release raises, we still
-    // null the slot and free the C++ struct so we don't double-release later.
-    @autoreleasepool {
-        @try {
-            [sess->model release];
-        } @catch (NSException* e) {
-            RAC_LOG_ERROR(kLogCat, "CoreML destroy_session raised %s: %s",
-                          e.name ? [e.name UTF8String] : "NSException",
-                          e.reason ? [e.reason UTF8String] : "no reason");
-        }
-        sess->model = nil;
-    }
-    delete sess;
-}
-
 rac_result_t coreml_device_info(rac_runtime_device_info_t* out) {
     if (!out)
         return RAC_ERROR_NULL_POINTER;
@@ -163,19 +71,15 @@ rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
     out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
-    // Capability shrunk: run_session is NULL; declare zero primitives until tensor execution path
-    // lands.
+    // CoreML is a capability + loader-helper runtime: it advertises device
+    // presence/formats for routing and exposes MLModel loader helpers that
+    // engines (diffusion-coreml) call directly. It is NOT a session-execution
+    // runtime -- the session/run/tensor vtable slots are NULL and
+    // RAC_RUNTIME_CAP_SESSION_EXECUTION is intentionally not set -- so it
+    // declares zero execution primitives.
     out->supported_primitives = nullptr;
     out->supported_primitives_count = 0;
     return RAC_SUCCESS;
-}
-
-void coreml_release_tensor(rac_runtime_tensor_t* tensor) {
-    // No runtime-owned buffer allocator on CoreML: pass nullptr so the helper
-    // matches the historical inline behavior of leaking RUNTIME-owned buffer
-    // slots (none are produced by this adapter today). Keeps CoreML on the
-    // same release path as CPU / ONNXRT (runtimes-003).
-    rac::runtime::rac_runtime_release_tensor(tensor, /*free_buffer=*/nullptr);
 }
 
 const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = {
@@ -187,7 +91,7 @@ const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = {
     /* .map_buffer     = */ nullptr,
     /* .unmap_buffer   = */ nullptr,
     /* .copy_buffer    = */ nullptr,
-    /* .release_tensor = */ coreml_release_tensor,
+    /* .release_tensor = */ nullptr,
     /* .reserved_0     = */ nullptr,
     /* .reserved_1     = */ nullptr,
     /* .reserved_2     = */ nullptr,
@@ -217,9 +121,9 @@ const rac_runtime_vtable_t k_coreml_vtable = {
     },
     /* .init            = */ coreml_init,
     /* .destroy         = */ coreml_destroy,
-    /* .create_session  = */ coreml_create_session,
+    /* .create_session  = */ nullptr,
     /* .run_session     = */ nullptr,
-    /* .destroy_session = */ coreml_destroy_session,
+    /* .destroy_session = */ nullptr,
     /* .alloc_buffer    = */ nullptr,
     /* .free_buffer     = */ nullptr,
     /* .device_info     = */ coreml_device_info,
@@ -238,7 +142,7 @@ MLModelConfiguration* rac_coreml_default_model_configuration(void) {
     // Return an autoreleased instance so MRC callers don't leak it on
     // error paths (clang-analyzer-osx.cocoa.RetainCount).
     //
-    // commons-001: -[MLModelConfiguration init] is documented to raise on
+    // -[MLModelConfiguration init] is documented to raise on
     // OOM / framework misconfiguration; convert to a nil return so the C ABI
     // boundary stays exception-free.
     @try {
@@ -256,7 +160,7 @@ MLModelConfiguration* rac_coreml_default_model_configuration(void) {
 bool rac_coreml_file_exists(NSString* path) {
     if (!path)
         return false;
-    // commons-001: NSFileManager fileExistsAtPath: shouldn't raise on a valid
+    // NSFileManager fileExistsAtPath: shouldn't raise on a valid
     // NSString, but a programmatic NSGenericException from a swizzled file
     // manager (e.g. MDM agents on enterprise iOS) must not bubble up.
     @try {
@@ -271,7 +175,7 @@ bool rac_coreml_file_exists(NSString* path) {
 
 NSString* rac_coreml_find_resource_dir(NSString* base_dir, NSString* required_model_name) {
     NSString* model_name = required_model_name ?: @"Unet";
-    // commons-001: directory enumeration touches the filesystem and can raise
+    // Directory enumeration touches the filesystem and can raise
     // on permission errors / sandbox extensions. Fall back to base_dir on any
     // exception so the caller still gets a usable (if pessimistic) path.
     @try {
@@ -322,7 +226,7 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir, NSString* name, bool requir
         return nil;
     }
 
-    // commons-001: +[MLModel modelWithContentsOfURL:] can raise NSException on
+    // +[MLModel modelWithContentsOfURL:] can raise NSException on
     // malformed mlpackage payloads (corrupted coremldata.bin); the error:
     // out-param only catches user-recoverable failures. Return nil on any
     // catch so callers (diffusion_coreml_backend.mm etc.) treat it as a

@@ -63,9 +63,7 @@ extern "C" {
  *                 `rac_service_{can_handle,create}_fn`, `RAC_DEPRECATED_LEGACY_SVC`).
  *                 Plugins built against v2 will be rejected at register
  *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
- *                 new `create` slot is unreachable otherwise. `rac_capability_t`
- *                 is RETAINED for `rac_module_info_t.capabilities` and
- *                 `rac_modules_for_capability`.
+ *                 new `create` slot is unreachable otherwise.
  */
 #define RAC_PLUGIN_API_VERSION 3u
 

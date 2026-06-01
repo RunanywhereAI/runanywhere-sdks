@@ -30,8 +30,8 @@ public enum class SpeechTurnDetectionEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<SpeechTurnDetectionEventKind> =
         object : EnumAdapter<SpeechTurnDetectionEventKind>(
-      SpeechTurnDetectionEventKind::class,
-      PROTO_3,
+      SpeechTurnDetectionEventKind::class, 
+      PROTO_3, 
       SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SpeechTurnDetectionEventKind? = SpeechTurnDetectionEventKind.fromValue(`value`)

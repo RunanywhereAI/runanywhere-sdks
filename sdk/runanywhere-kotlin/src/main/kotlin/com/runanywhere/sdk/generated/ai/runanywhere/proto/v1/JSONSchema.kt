@@ -287,11 +287,11 @@ public class JSONSchema(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<JSONSchema> = object : ProtoAdapter<JSONSchema>(
-      FieldEncoding.LENGTH_DELIMITED,
-      JSONSchema::class,
-      "type.googleapis.com/runanywhere.v1.JSONSchema",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      JSONSchema::class, 
+      "type.googleapis.com/runanywhere.v1.JSONSchema", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       private val propertiesAdapter: ProtoAdapter<Map<String, JSONSchemaProperty>> by

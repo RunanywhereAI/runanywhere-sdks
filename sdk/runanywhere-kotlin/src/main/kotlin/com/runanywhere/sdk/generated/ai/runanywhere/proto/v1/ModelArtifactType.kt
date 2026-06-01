@@ -45,8 +45,8 @@ public enum class ModelArtifactType(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelArtifactType> = object : EnumAdapter<ModelArtifactType>(
-      ModelArtifactType::class,
-      PROTO_3,
+      ModelArtifactType::class, 
+      PROTO_3, 
       ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelArtifactType? = ModelArtifactType.fromValue(`value`)

@@ -53,10 +53,6 @@ public enum class InferenceFramework(
   /**
    * Apple
    */
-  INFERENCE_FRAMEWORK_WHISPERKIT_COREML(8),
-  /**
-   * Apple
-   */
   INFERENCE_FRAMEWORK_METALRT(9),
   /**
    * Qualcomm
@@ -68,8 +64,6 @@ public enum class InferenceFramework(
   INFERENCE_FRAMEWORK_MLC(14),
   INFERENCE_FRAMEWORK_PICO_LLM(15),
   INFERENCE_FRAMEWORK_PIPER_TTS(16),
-  INFERENCE_FRAMEWORK_WHISPERKIT(17),
-  INFERENCE_FRAMEWORK_OPENAI_WHISPER(18),
   INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS(19),
   /**
    * rule-based, no model
@@ -86,8 +80,8 @@ public enum class InferenceFramework(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<InferenceFramework> = object : EnumAdapter<InferenceFramework>(
-      InferenceFramework::class,
-      PROTO_3,
+      InferenceFramework::class, 
+      PROTO_3, 
       InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): InferenceFramework? = InferenceFramework.fromValue(`value`)
@@ -103,7 +97,6 @@ public enum class InferenceFramework(
       5 -> INFERENCE_FRAMEWORK_FLUID_AUDIO
       6 -> INFERENCE_FRAMEWORK_COREML
       7 -> INFERENCE_FRAMEWORK_MLX
-      8 -> INFERENCE_FRAMEWORK_WHISPERKIT_COREML
       9 -> INFERENCE_FRAMEWORK_METALRT
       10 -> INFERENCE_FRAMEWORK_GENIE
       11 -> INFERENCE_FRAMEWORK_TFLITE
@@ -112,8 +105,6 @@ public enum class InferenceFramework(
       14 -> INFERENCE_FRAMEWORK_MLC
       15 -> INFERENCE_FRAMEWORK_PICO_LLM
       16 -> INFERENCE_FRAMEWORK_PIPER_TTS
-      17 -> INFERENCE_FRAMEWORK_WHISPERKIT
-      18 -> INFERENCE_FRAMEWORK_OPENAI_WHISPER
       19 -> INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS
       20 -> INFERENCE_FRAMEWORK_BUILT_IN
       21 -> INFERENCE_FRAMEWORK_NONE

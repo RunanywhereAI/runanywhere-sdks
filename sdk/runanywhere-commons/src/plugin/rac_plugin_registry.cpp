@@ -4,8 +4,8 @@
  *
  * This is the SOLE plugin registration path. The legacy
  * `service_registry.cpp` / `rac_service_register_provider()` path was
- * removed. All engine backends (llamacpp, onnx, whispercpp,
- * whisperkit_coreml, metalrt, platform) register via
+ * removed. All engine backends (llamacpp, onnx, sherpa, metalrt,
+ * platform) register via
  * `rac_plugin_register(rac_plugin_entry_<name>())`, and commons consumers
  * route through `rac_plugin_route` + `vt->ops->create`.
  */
@@ -80,23 +80,17 @@ State& state() {
     return s;
 }
 
-/** Which primitive slots (in declaration order) the vtable fills. */
+/** Which primitive slots (in declaration order) the vtable fills.
+ *  Generated from RAC_PRIMITIVE_TABLE (rac_engine_vtable.h) — the single
+ *  source of truth for the primitive↔slot mapping. RERANK is absent from the
+ *  table, so it is never reported as served. */
 void each_served_primitive(const rac_engine_vtable_t* v,
                            const std::function<void(rac_primitive_t)>& fn) {
-    if (v->llm_ops)
-        fn(RAC_PRIMITIVE_GENERATE_TEXT);
-    if (v->stt_ops)
-        fn(RAC_PRIMITIVE_TRANSCRIBE);
-    if (v->tts_ops)
-        fn(RAC_PRIMITIVE_SYNTHESIZE);
-    if (v->vad_ops)
-        fn(RAC_PRIMITIVE_DETECT_VOICE);
-    if (v->embedding_ops)
-        fn(RAC_PRIMITIVE_EMBED);
-    if (v->vlm_ops)
-        fn(RAC_PRIMITIVE_VLM);
-    if (v->diffusion_ops)
-        fn(RAC_PRIMITIVE_DIFFUSION);
+#define X(ENUM, FIELD, NAME) \
+    if (v->FIELD)            \
+        fn(ENUM);
+    RAC_PRIMITIVE_TABLE(X)
+#undef X
 }
 
 /** Insert `e` into `bucket` preserving descending priority. */
@@ -235,21 +229,29 @@ rac_result_t rac_engine_manifest_validate_vtable(const rac_engine_manifest_t* ma
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
+    /* A declared manifest primitive is valid iff it is a live routable
+     * primitive (a RAC_PRIMITIVE_TABLE row) whose vtable slot is non-null.
+     * `rac_engine_vtable_slot` returns NULL for everything absent from the
+     * table — RERANK, the reserved slots, UNSPECIFIED, and out-of-range
+     * values — so this single check also rejects them, with no magic range
+     * bound to keep in sync. */
     for (size_t i = 0; i < manifest->primitives_count; ++i) {
         rac_primitive_t primitive = manifest->primitives[i];
-        if (primitive <= RAC_PRIMITIVE_UNSPECIFIED || primitive > RAC_PRIMITIVE_DIFFUSION ||
-            rac_engine_vtable_slot(vtable, primitive) == nullptr) {
+        if (rac_engine_vtable_slot(vtable, primitive) == nullptr) {
             return RAC_ERROR_INVALID_PARAMETER;
         }
     }
 
-    for (int p = RAC_PRIMITIVE_GENERATE_TEXT; p <= RAC_PRIMITIVE_DIFFUSION; ++p) {
-        rac_primitive_t primitive = static_cast<rac_primitive_t>(p);
-        if (rac_engine_vtable_slot(vtable, primitive) != nullptr &&
-            !manifest_declares_primitive(manifest, primitive)) {
-            return RAC_ERROR_INVALID_PARAMETER;
-        }
+    /* Every non-null routable slot the vtable fills must be declared in the
+     * manifest. Iterate the table directly so RERANK / reserved slots are
+     * excluded by construction. */
+#define X(ENUM, FIELD, NAME)                          \
+    if (rac_engine_vtable_slot(vtable, ENUM) != nullptr && \
+        !manifest_declares_primitive(manifest, ENUM)) {    \
+        return RAC_ERROR_INVALID_PARAMETER;           \
     }
+    RAC_PRIMITIVE_TABLE(X)
+#undef X
 
     return RAC_SUCCESS;
 }
@@ -725,22 +727,18 @@ size_t rac_plugin_registry_router_inflight(void) noexcept {
 
 const char* rac_primitive_name(rac_primitive_t p) {
     switch (p) {
-        case RAC_PRIMITIVE_GENERATE_TEXT:
-            return "generate_text";
-        case RAC_PRIMITIVE_TRANSCRIBE:
-            return "transcribe";
-        case RAC_PRIMITIVE_SYNTHESIZE:
-            return "synthesize";
-        case RAC_PRIMITIVE_DETECT_VOICE:
-            return "detect_voice";
-        case RAC_PRIMITIVE_EMBED:
-            return "embed";
+        /* Live routable primitives generated from RAC_PRIMITIVE_TABLE
+         * (rac_engine_vtable.h). */
+#define X(ENUM, FIELD, NAME) \
+    case ENUM:               \
+        return NAME;
+        RAC_PRIMITIVE_TABLE(X)
+#undef X
+        /* Non-table cases kept explicit. RERANK is the dormant slot: it must
+         * report "reserved_6" (NOT "rerank") so it reads as a reserved slot;
+         * a test asserts this. */
         case RAC_PRIMITIVE_RERANK:
             return "reserved_6";
-        case RAC_PRIMITIVE_VLM:
-            return "vlm";
-        case RAC_PRIMITIVE_DIFFUSION:
-            return "diffusion";
         case RAC_PRIMITIVE_UNSPECIFIED:
             return "unspecified";
         default:
@@ -786,23 +784,16 @@ const char* rac_runtime_name(rac_runtime_id_t r) {
 const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_t primitive) {
     if (vt == nullptr)
         return nullptr;
+    /* Cases generated from RAC_PRIMITIVE_TABLE (rac_engine_vtable.h). The
+     * `default` covers everything absent from the table — RERANK (dormant),
+     * the reserved slots, and UNSPECIFIED — all of which are non-routable and
+     * return NULL. */
     switch (primitive) {
-        case RAC_PRIMITIVE_GENERATE_TEXT:
-            return vt->llm_ops;
-        case RAC_PRIMITIVE_TRANSCRIBE:
-            return vt->stt_ops;
-        case RAC_PRIMITIVE_SYNTHESIZE:
-            return vt->tts_ops;
-        case RAC_PRIMITIVE_DETECT_VOICE:
-            return vt->vad_ops;
-        case RAC_PRIMITIVE_EMBED:
-            return vt->embedding_ops;
-        case RAC_PRIMITIVE_RERANK:
-            return nullptr;
-        case RAC_PRIMITIVE_VLM:
-            return vt->vlm_ops;
-        case RAC_PRIMITIVE_DIFFUSION:
-            return vt->diffusion_ops;
+#define X(ENUM, FIELD, NAME) \
+    case ENUM:               \
+        return vt->FIELD;
+        RAC_PRIMITIVE_TABLE(X)
+#undef X
         default:
             return nullptr;
     }

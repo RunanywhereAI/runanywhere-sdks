@@ -35,8 +35,8 @@ public enum class ToolParameterType(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolParameterType> = object : EnumAdapter<ToolParameterType>(
-      ToolParameterType::class,
-      PROTO_3,
+      ToolParameterType::class, 
+      PROTO_3, 
       ToolParameterType.TOOL_PARAMETER_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ToolParameterType? = ToolParameterType.fromValue(`value`)

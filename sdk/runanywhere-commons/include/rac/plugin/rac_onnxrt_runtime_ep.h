@@ -13,10 +13,7 @@
  * by a `rac_onnxrt_ep_type_t` value; at most one EP is "active" at a time.
  * Activation is applied to every subsequent session constructed through the
  * generic ORT tensor runner (`runanywhere::runtime::onnxrt::Session::create`).
- * Existing sessions are unaffected. Provider-owned sessions created via a
- * registered `rac_onnxrt_runtime_provider_t` still dispatch through their
- * provider callbacks and decide themselves whether/how to honor the active
- * EP preference.
+ * Existing sessions are unaffected.
  *
  * Provider availability is gated at build time by `RAC_ONNXRT_EP_*`
  * compile definitions. An EP that is not compiled in will return

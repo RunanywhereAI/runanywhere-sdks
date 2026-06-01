@@ -62,8 +62,8 @@ public enum class NPUChip(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NPUChip> = object : EnumAdapter<NPUChip>(
-      NPUChip::class,
-      PROTO_3,
+      NPUChip::class, 
+      PROTO_3, 
       NPUChip.NPU_CHIP_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): NPUChip? = NPUChip.fromValue(`value`)

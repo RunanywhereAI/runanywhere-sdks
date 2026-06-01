@@ -17,7 +17,7 @@ MLModelConfiguration* rac_coreml_default_model_configuration(void);
  * sending `-release` to the returned object when it is no longer needed,
  * which keeps the pointer alive across enclosing @autoreleasepool drains —
  * the exact scenario that previously left long-lived engine state holding
- * dangling MLModel pointers (runtimes-001).
+ * dangling MLModel pointers.
  *
  * Returns `nil` on missing/failed load; nil returns require no release.
  */

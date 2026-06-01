@@ -314,6 +314,23 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
         return rc;
     }
 
+    /* Soft check on the OPTIONAL session-execution role (see the two-role note
+     * in rac_runtime_vtable.h). Session execution is all-or-nothing: a runtime
+     * that fills `create_session` MUST also fill `run_session` and
+     * `destroy_session`. For MVP this is a warning, not a hard reject — the
+     * runtime still registers — so a runtime mid-migration to capability-only
+     * (NULLing its session slots) doesn't get bounced from the registry. */
+    if (vtable->create_session != nullptr &&
+        (vtable->run_session == nullptr || vtable->destroy_session == nullptr)) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "rac_runtime_register: '%s' has an incomplete session-execution role "
+                        "(create_session present but run_session=%s destroy_session=%s); a runtime "
+                        "providing create_session MUST also provide run_session + destroy_session",
+                        vtable->metadata.name,
+                        vtable->run_session == nullptr ? "NULL" : "set",
+                        vtable->destroy_session == nullptr ? "NULL" : "set");
+    }
+
     /* Call init() OUTSIDE the registry lock so a slow probe never blocks
      * unrelated lookups. If init returns non-zero the runtime is silently
      * rejected (e.g. Metal on Linux, CUDA on a CPU-only host).

@@ -3,30 +3,28 @@
  * @brief Shared provider-registry helper for L1 runtime adapters.
  *
  * RT-CPU-03: promotes the provider-registration pattern, introduced by
- * `rac_cpu_runtime_register_provider` and re-implemented verbatim by
- * `rac_onnxrt_runtime_register_provider` (RT-ONNX-06), into a runtime-agnostic
- * helper that both adapters — and any future L1 adapter — can use without
- * copying mutex / vector / lookup boilerplate.
+ * `rac_cpu_runtime_register_provider`, into a runtime-agnostic helper that the
+ * CPU adapter — and any future L1 adapter — can use without copying mutex /
+ * vector / lookup boilerplate.
  *
  * Design:
- *   CPU and ONNX providers have different C-level struct types
- *   (`rac_cpu_runtime_provider_t` vs `rac_onnxrt_runtime_provider_t`) because
- *   their native session shapes differ. We therefore cannot literally share a
- *   single registry struct, but every current provider type exposes the same
+ *   A provider's C-level struct type (e.g. `rac_cpu_runtime_provider_t`) is
+ *   shaped around its native session, so adapters cannot literally share a
+ *   single registry struct. Every provider type does, however, expose the same
  *   six fields the registry cares about — `name`, `primitive`, `formats`,
  *   `formats_count`, `create_session`, `destroy_session` — so the registry is
  *   implemented as a small header-only template keyed on the provider type:
  *
  *     rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t> cpu_reg;
- *     rac::runtime::ProviderRegistry<rac_onnxrt_runtime_provider_t> onnx_reg;
  *
  *   Each runtime keeps its typed provider surface; only the duplicated
  *   bookkeeping moves into the shared helper. There is no ABI change.
  *
  * Scope:
- *   - CPU + ONNXRT use this helper today.
- *   - CoreML / Metal are explicitly out of scope (DEC-01, Apple-only,
- *     deferred) and would wire in trivially if/when they grow providers.
+ *   - CPU uses this helper today.
+ *   - Any future L1 adapter that grows a typed provider surface (matching the
+ *     six fields above) wires in by instantiating the template on its own
+ *     provider type.
  */
 
 #ifndef RAC_RUNTIME_PROVIDER_REGISTRY_H
@@ -48,9 +46,9 @@ namespace runtime {
 /**
  * @brief Validates a primitive against the declared enum range.
  *
- * Shared by both runtimes' provider-registration paths. Used as a light sanity
- * check at register time; actual dispatch is still gated by the find-by-desc
- * lookup so unsupported primitives fall through to `RAC_ERROR_NOT_IMPLEMENTED`.
+ * Used as a light sanity check at register time; actual dispatch is still gated
+ * by the find-by-desc lookup so unsupported primitives fall through to
+ * `RAC_ERROR_NOT_IMPLEMENTED`.
  */
 inline bool rac_runtime_primitive_in_range(rac_primitive_t primitive) {
     return primitive > RAC_PRIMITIVE_UNSPECIFIED && primitive < RAC_PRIMITIVE_COUNT;
@@ -64,8 +62,8 @@ inline bool rac_runtime_primitive_in_range(rac_primitive_t primitive) {
  * alive for the lifetime of the registration, matching the rest of the plugin
  * metadata ABI.
  *
- * Template requirements on `ProviderT` (both `rac_cpu_runtime_provider_t` and
- * `rac_onnxrt_runtime_provider_t` satisfy these):
+ * Template requirements on `ProviderT` (`rac_cpu_runtime_provider_t`
+ * satisfies these):
  *   - POD copyable
  *   - `const char* name` field
  *   - `rac_primitive_t primitive` field

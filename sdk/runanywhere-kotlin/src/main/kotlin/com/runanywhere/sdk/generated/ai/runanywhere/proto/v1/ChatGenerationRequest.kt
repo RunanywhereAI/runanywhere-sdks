@@ -143,11 +143,11 @@ public class ChatGenerationRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatGenerationRequest> =
         object : ProtoAdapter<ChatGenerationRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ChatGenerationRequest::class,
-      "type.googleapis.com/runanywhere.v1.ChatGenerationRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ChatGenerationRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ChatGenerationRequest", 
+      PROTO_3, 
+      null, 
       "chat.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

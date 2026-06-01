@@ -160,7 +160,7 @@ RAC_PLUGIN_ENTRY_DEF(sherpa) {
 
 }  // extern "C"
 
-// ENG-SHERPA-03: the legacy `__attribute__((constructor))` auto-register
+// The legacy `__attribute__((constructor))` auto-register
 // block previously lived here. It has been removed so all three active
 // backends use the same explicit-register + static-shim pattern:
 //   * dynamic-linkage hosts (Android / Linux / macOS dev) call

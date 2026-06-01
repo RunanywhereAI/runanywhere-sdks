@@ -96,10 +96,10 @@ rac_result_t rac_vad_sherpa_process(rac_handle_t handle, const float* samples, s
     }
 
     std::vector<float> audio(samples, samples + num_samples);
-    // engines-012/013: honor the configured VAD sample rate instead of
+    // Honor the configured VAD sample rate instead of
     // hard-coding 16000. The C ABI/vtable here does not yet carry a
     // per-call sample_rate (unlike rac_stt_sherpa_feed_audio, which got
-    // that surgical fix under engines-sherpa-003), so we route the rate
+    // that surgical fix), so we route the rate
     // from the per-handle VAD config that was set at load/configure time.
     // Non-positive configured rates fall back to 16k to preserve the
     // historic default for callers that have not been updated yet.

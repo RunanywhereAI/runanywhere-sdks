@@ -67,7 +67,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Directory | Contents |
 |-----------|----------|
 | `sdk/runanywhere-commons/` | C/C++ core library — all AI logic, plugin registry, event system |
-| `engines/` | 8 backend plugins: llamacpp, sherpa, onnx, whispercpp, whisperkit_coreml, metalrt, genie, diffusion-coreml |
+| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, metalrt, genie, diffusion-coreml |
 | `runtimes/` | 4 runtime adapters: cpu (always), onnxrt, coreml, metal |
 | `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 
@@ -114,8 +114,8 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                                     │ rac_engine_vtable_t (v3)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
-      llamacpp      sherpa-onnx  metalrt    platform     whispercpp
-     (LLM,VLM)    (STT,TTS,VAD) (Apple)  (Apple FM)      (STT)
+      llamacpp      sherpa-onnx  metalrt    platform        onnx
+     (LLM,VLM)    (STT,TTS,VAD) (Apple)  (Apple FM)   (Embed,WakeWord)
 ```
 
 ### Key Architectural Patterns
@@ -535,8 +535,6 @@ Standard Android library layout. There is no `commonMain`/`jvmAndroidMain`/`andr
 **`gradle.properties`** — `runanywhere.useLocalNatives=true` means local `.so` files. CI overrides with `-Prunanywhere.useLocalNatives=false` to download from GitHub Releases.
 
 **NDK version** — `racNdkVersion=27.3.13750724` (matches `sdk/runanywhere-commons/VERSIONS::NDK_VERSION`, the single source of truth) is the pin for the Kotlin SDK in `sdk/runanywhere-kotlin/gradle.properties`. NDK 27 is the current LTS line (r27d) and provides 16 KB page-alignment required by Android 15+ (NDK 25.x's 4 KB-aligned `libc++_shared.so` / `libomp.so` would trip Android 16's 16 KB page-size enforcement). Flutter/RN Android build files carry their own `?: "..."` fallback literals but the canonical version lives in `VERSIONS`; mirror it whenever bumping.
-
-**Flutter xcframework workaround** — `build-core-xcframework.sh` strips `rac_plugin_entry_whisperkit_coreml.o` from Flutter's copy of the commons archive because Flutter uses `-all_load` which would drag in an unresolvable symbol.
 
 **Web cross-origin isolation** — `SharedArrayBuffer` requires COOP/COEP headers. Safari needs `coi-serviceworker.js` polyfill.
 

@@ -31,8 +31,8 @@
  *   GenieDialogConfig_free(cfg);
  *
  * None of those types are referenced here because the repo does not
- * vendor the Qualcomm headers. Phase 2 introduces a translation unit
- * gated on `RAC_GENIE_SDK_AVAILABLE=1` that owns the real C API handles.
+ * vendor the Qualcomm headers. A translation unit gated on
+ * `RAC_GENIE_SDK_AVAILABLE=1` owns the real C API handles when present.
  */
 
 #include "rac/core/rac_error.h"
@@ -48,16 +48,6 @@ extern "C" {
  * visibility without pulling any Qualcomm headers.
  */
 const char* genie_backend_build_info(void);
-
-/**
- * @brief Shared helper used by every llm_ops stub to produce a
- *        consistent "plugin compiled without the Genie SDK" error.
- *
- * Callers MUST propagate this value; it is the contractually-defined
- * error for a missing engine implementation per
- * `rac/core/rac_error.h::RAC_ERROR_BACKEND_UNAVAILABLE`.
- */
-rac_result_t genie_backend_unavailable(void);
 
 #ifdef __cplusplus
 }

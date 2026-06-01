@@ -50,10 +50,6 @@
 #include "rac/backends/rac_vlm_llamacpp.h"
 #endif
 
-#ifdef RAC_WASM_WHISPERCPP
-#include "rac/backends/rac_stt_whispercpp.h"
-#endif
-
 #ifdef RAC_WASM_ONNX
 #include "rac/backends/rac_tts_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"

@@ -67,7 +67,6 @@ if [ "${VERBOSE:-}" = "1" ]; then
     echo "    SHERPA_ONNX_VERSION_MACOS=${SHERPA_ONNX_VERSION_MACOS}"
     echo "  ML / inference engines:"
     echo "    LLAMACPP_VERSION=${LLAMACPP_VERSION}"
-    echo "    WHISPERCPP_VERSION=${WHISPERCPP_VERSION}"
     echo "  Data / serialization:"
     echo "    NLOHMANN_JSON_VERSION=${NLOHMANN_JSON_VERSION}"
     echo "    PROTOBUF_VERSION=${PROTOBUF_VERSION}"

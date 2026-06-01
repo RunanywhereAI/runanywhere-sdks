@@ -134,11 +134,11 @@ public class SdkInitPhase1Request(
     @JvmField
     public val ADAPTER: ProtoAdapter<SdkInitPhase1Request> =
         object : ProtoAdapter<SdkInitPhase1Request>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SdkInitPhase1Request::class,
-      "type.googleapis.com/runanywhere.v1.SdkInitPhase1Request",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SdkInitPhase1Request::class, 
+      "type.googleapis.com/runanywhere.v1.SdkInitPhase1Request", 
+      PROTO_3, 
+      null, 
       "sdk_init.proto"
     ) {
       override fun encodedSize(`value`: SdkInitPhase1Request): Int {

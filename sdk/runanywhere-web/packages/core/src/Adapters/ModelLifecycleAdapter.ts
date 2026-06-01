@@ -29,7 +29,6 @@ function frameworkToBridgeName(framework: InferenceFramework | string): string |
     case InferenceFramework.INFERENCE_FRAMEWORK_ONNX: return 'onnx';
     case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA: return 'sherpa';
     case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS: return 'sherpa';
-    case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER: return 'sherpa';
     default: return null;
   }
 }

@@ -154,11 +154,11 @@ public class NetworkEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NetworkEvent> = object : ProtoAdapter<NetworkEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      NetworkEvent::class,
-      "type.googleapis.com/runanywhere.v1.NetworkEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      NetworkEvent::class, 
+      "type.googleapis.com/runanywhere.v1.NetworkEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: NetworkEvent): Int {

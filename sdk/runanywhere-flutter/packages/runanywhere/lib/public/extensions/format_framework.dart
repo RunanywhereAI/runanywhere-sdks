@@ -27,8 +27,6 @@ const Map<InferenceFramework, String> _kFrameworkDisplayNames = {
   InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS: 'Foundation Models',
   InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS: 'System TTS',
   InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO: 'FluidAudio',
-  InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML: 'WhisperKit CoreML',
-  InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT: 'WhisperKit',
   InferenceFramework.INFERENCE_FRAMEWORK_METALRT: 'MetalRT',
   InferenceFramework.INFERENCE_FRAMEWORK_GENIE: 'Qualcomm Genie',
   InferenceFramework.INFERENCE_FRAMEWORK_TFLITE: 'TensorFlow Lite',
@@ -37,7 +35,6 @@ const Map<InferenceFramework, String> _kFrameworkDisplayNames = {
   InferenceFramework.INFERENCE_FRAMEWORK_MLC: 'MLC',
   InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM: 'picoLLM',
   InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS: 'Piper TTS',
-  InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER: 'OpenAI Whisper',
   InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
       'Swift Transformers',
   InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN: 'Built-in',

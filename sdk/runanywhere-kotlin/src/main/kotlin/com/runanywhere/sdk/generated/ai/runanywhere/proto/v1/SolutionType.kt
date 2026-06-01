@@ -38,8 +38,8 @@ public enum class SolutionType(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SolutionType> = object : EnumAdapter<SolutionType>(
-      SolutionType::class,
-      PROTO_3,
+      SolutionType::class, 
+      PROTO_3, 
       SolutionType.SOLUTION_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SolutionType? = SolutionType.fromValue(`value`)

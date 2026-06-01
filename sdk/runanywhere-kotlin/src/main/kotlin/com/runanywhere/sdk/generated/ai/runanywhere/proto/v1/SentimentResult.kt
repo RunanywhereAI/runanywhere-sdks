@@ -135,11 +135,11 @@ public class SentimentResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SentimentResult> = object : ProtoAdapter<SentimentResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SentimentResult::class,
-      "type.googleapis.com/runanywhere.v1.SentimentResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SentimentResult::class, 
+      "type.googleapis.com/runanywhere.v1.SentimentResult", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: SentimentResult): Int {

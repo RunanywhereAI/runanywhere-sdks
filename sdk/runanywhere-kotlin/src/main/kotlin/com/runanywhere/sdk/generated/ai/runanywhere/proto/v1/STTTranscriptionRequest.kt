@@ -115,11 +115,11 @@ public class STTTranscriptionRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<STTTranscriptionRequest> =
         object : ProtoAdapter<STTTranscriptionRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      STTTranscriptionRequest::class,
-      "type.googleapis.com/runanywhere.v1.STTTranscriptionRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      STTTranscriptionRequest::class, 
+      "type.googleapis.com/runanywhere.v1.STTTranscriptionRequest", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

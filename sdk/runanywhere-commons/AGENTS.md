@@ -116,8 +116,8 @@ scripts/build-windows.bat
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
-│  llamacpp (LLM+VLM) | onnx (STT+TTS+VAD+Embed+WakeWord)        │
-│  whispercpp (STT) | whisperkit-coreml (STT, Apple)               │
+│  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
+│  onnx (Embed+WakeWord) | diffusion-coreml (Image, Apple)         │
 │  metalrt (LLM+STT+TTS+VLM, Apple) | platform (Apple FM+TTS+Diff)│
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -137,9 +137,9 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
 | `RAC_PRIMITIVE_GENERATE_TEXT` | `llm_ops` | llamacpp, platform, metalrt |
-| `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | onnx, whispercpp, whisperkit-coreml, metalrt |
-| `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | onnx, platform, metalrt |
-| `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | onnx (Silero), energy-based (built-in) |
+| `RAC_PRIMITIVE_TRANSCRIBE` | `stt_ops` | sherpa, metalrt |
+| `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, metalrt |
+| `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
 | `RAC_PRIMITIVE_RERANK` | `rerank_ops` | (reserved) |
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, metalrt |
@@ -160,7 +160,7 @@ All file I/O, secure storage, HTTP, and logging pass through this struct. C++ co
 
 ### Swift Callback Pattern (Apple-only backends)
 
-Foundation Models, System TTS, CoreML Diffusion, and WhisperKit CoreML all use the same pattern:
+Foundation Models, System TTS, and CoreML Diffusion all use the same pattern:
 1. Swift calls `rac_*_set_callbacks(&callback_struct)` to register function pointers
 2. Swift calls `rac_backend_*_register()` which registers the vtable with the plugin registry
 3. At runtime, vtable dispatch calls back into Swift through the stored function pointers
@@ -238,15 +238,11 @@ Add new codes to `rac_error.h`, add case to `rac_error_message()` in `rac_error.
 |---------|-----------|--------|--------|-------------|
 | **llamacpp** | LLM | GGUF | llama.cpp (FetchContent) | `rac_backend_llamacpp_register()` |
 | **llamacpp-vlm** | VLM | GGUF + mmproj | llama.cpp mtmd | `rac_backend_llamacpp_vlm_register()` |
-| **onnx** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_onnx_register()` |
+| **sherpa** | STT, TTS, VAD | ONNX | Sherpa-ONNX C API | `rac_backend_sherpa_register()` |
 | **onnx-embeddings** | Embed | ONNX | Sherpa-ONNX | `rac_backend_onnx_embeddings_register()` |
 | **onnx-wakeword** | WakeWord | ONNX | openWakeWord | `rac_backend_wakeword_onnx_register()` |
-| **whispercpp** | STT | GGML .bin | whisper.cpp (FetchContent) | `rac_backend_whispercpp_register()` |
-| **whisperkit-coreml** | STT (Apple) | .mlmodelc | WhisperKit (Swift) | `rac_backend_whisperkit_coreml_register()` |
 | **metalrt** | LLM, STT, TTS, VLM (Apple) | MetalRT | Metal | `rac_backend_metalrt_register()` |
 | **platform** | LLM, TTS, Diffusion (Apple) | builtin:// | Swift callbacks | `rac_backend_platform_register()` |
-
-**GGML symbol conflict**: LlamaCPP and WhisperCPP both use GGML. If linked together, symbol conflicts occur. Use ONNX Whisper for STT when also using LlamaCPP, or build with symbol prefixing.
 
 ## Version Management
 

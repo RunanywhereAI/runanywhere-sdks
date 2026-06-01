@@ -25,8 +25,6 @@ const FRAMEWORK_DISPLAY_TABLE: Partial<Record<InferenceFramework, string>> = {
     'Foundation Models',
   [InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS]: 'System TTS',
   [InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO]: 'FluidAudio',
-  [InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML]:
-    'WhisperKit CoreML',
   [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
   [InferenceFramework.INFERENCE_FRAMEWORK_GENIE]: 'Qualcomm Genie',
   [InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN]: 'Built-in',

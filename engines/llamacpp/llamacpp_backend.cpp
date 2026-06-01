@@ -133,6 +133,81 @@ struct Utf8State {
 };
 
 // =============================================================================
+// SHARED DECODE HELPERS (file-local)
+// =============================================================================
+
+namespace {
+
+// Built-in stop sequences honoured by the inner generation loop, shared by both
+// generate_stream() and generate_from_context() so the two paths can never
+// drift. Caller-supplied stops (rac_llm_options_t::stop_sequences) are enforced
+// separately at the C-API boundary in rac_llm_llamacpp.cpp.
+const std::vector<std::string> kBuiltinStopSequences = {
+    "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>", "\n\nUser:", "\n\nHuman:",
+};
+
+// Longest built-in stop sequence — the rolling stop_window only needs to retain
+// this many trailing bytes to catch any pending match.
+const size_t kMaxBuiltinStopLen = [] {
+    size_t m = 0;
+    for (const auto& s : kBuiltinStopSequences) {
+        m = std::max(m, s.size());
+    }
+    return m;
+}();
+
+// Construct a fresh per-request sampler chain. Identical ordering and parameters
+// to what generate_stream() and generate_from_context() each built inline
+// before consolidation (grammar → penalties → top_k → top_p → min_p → temp →
+// dist, else greedy). Ownership of the returned sampler transfers to the caller
+// (free via llama_sampler_free / store in sampler_).
+llama_sampler* build_sampler_chain(llama_model* model, const TextGenerationRequest& request) {
+    auto sparams = llama_sampler_chain_default_params();
+    sparams.no_perf = true;
+    llama_sampler* sampler = llama_sampler_chain_init(sparams);
+
+    // A GBNF grammar constrains the logits regardless of greedy-vs-sampled, so
+    // it must be the first sampler in the chain (matches llama.cpp
+    // common/sampling.cpp ordering).
+    if (!request.grammar.empty()) {
+        llama_sampler_chain_add(sampler,
+                                llama_sampler_init_grammar(llama_model_get_vocab(model),
+                                                           request.grammar.c_str(), "root"));
+    }
+
+    if (request.temperature > 0.0f) {
+        // Forward the OpenAI-style frequency/presence penalties
+        // (idl/llm_options.proto:100-101) into the penalty sampler; 0.0 leaves
+        // each disabled exactly as before.
+        llama_sampler_chain_add(
+            sampler, llama_sampler_init_penalties(kRepeatPenaltyWindow, request.repetition_penalty,
+                                                  request.frequency_penalty,
+                                                  request.presence_penalty));
+
+        if (request.top_k > 0) {
+            llama_sampler_chain_add(sampler, llama_sampler_init_top_k(request.top_k));
+        }
+
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(request.top_p, 1));
+        // min_p (idl/llm_options.proto:107). 0.0 = disabled.
+        if (request.min_p > 0.0f) {
+            llama_sampler_chain_add(sampler, llama_sampler_init_min_p(request.min_p, 1));
+        }
+        llama_sampler_chain_add(sampler, llama_sampler_init_temp(request.temperature));
+        // Honor the deterministic seed (0 = backend default).
+        llama_sampler_chain_add(
+            sampler, llama_sampler_init_dist(
+                         request.seed != 0 ? static_cast<uint32_t>(request.seed) : LLAMA_DEFAULT_SEED));
+    } else {
+        llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+    }
+
+    return sampler;
+}
+
+}  // namespace
+
+// =============================================================================
 // LOG CALLBACK
 // =============================================================================
 
@@ -765,6 +840,131 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
     return result;
 }
 
+int LlamaCppTextGeneration::run_decode_loop(llama_sampler* sampler, llama_batch& batch,
+                                            int start_n_cur, int effective_max_tokens,
+                                            const TextStreamCallback& sink,
+                                            rac_benchmark_timing_t* timing_out) {
+    const auto* const vocab = llama_model_get_vocab(model_);
+
+    std::string stop_window;
+    stop_window.reserve(kMaxBuiltinStopLen * 2);
+
+    std::string partial_utf8_buffer;
+    partial_utf8_buffer.reserve(8);
+
+    // Persist UTF-8 scanner across iterations to avoid re-scanning partial bytes
+    Utf8State utf8_scanner;
+
+    int n_cur = start_n_cur;
+    int tokens_generated = 0;
+    bool stop_sequence_hit = false;
+
+    while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
+        const llama_token new_token_id = llama_sampler_sample(sampler, context_, -1);
+
+        llama_sampler_accept(sampler, new_token_id);
+
+        if (llama_vocab_is_eog(vocab, new_token_id)) {
+            RAC_LOG_INFO("LLM.LlamaCpp", "End of generation token received");
+            break;
+        }
+
+        const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);
+
+        // Only scan newly appended bytes — scanner state persists from prior
+        // iterations
+        const size_t scan_start = partial_utf8_buffer.size();
+        partial_utf8_buffer.append(new_token_chars);
+
+        size_t valid_upto = 0;
+        for (size_t i = scan_start; i < partial_utf8_buffer.size(); ++i) {
+            utf8_scanner.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
+            if (utf8_scanner.state == 0) {
+                valid_upto = i + 1;
+            }
+        }
+
+        if (valid_upto > 0) {
+            std::string valid_chunk = partial_utf8_buffer.substr(0, valid_upto);
+            stop_window.append(valid_chunk);
+            partial_utf8_buffer.erase(0, valid_upto);
+
+            size_t found_stop_pos = std::string::npos;
+            for (const auto& stop_seq : kBuiltinStopSequences) {
+                size_t pos = stop_window.find(stop_seq);
+                if (pos != std::string::npos) {
+                    if (found_stop_pos == std::string::npos || pos < found_stop_pos) {
+                        found_stop_pos = pos;
+                    }
+                }
+            }
+
+            if (found_stop_pos != std::string::npos) {
+                RAC_LOG_INFO("LLM.LlamaCpp", "Stop sequence detected");
+                stop_sequence_hit = true;
+                if (found_stop_pos > 0) {
+                    if (!sink(stop_window.substr(0, found_stop_pos))) {
+                        cancel_requested_.store(true);
+                    }
+                }
+                break;
+            }
+
+            if (stop_window.size() > kMaxBuiltinStopLen) {
+                size_t safe_len = stop_window.size() - kMaxBuiltinStopLen;
+                // Don't cut inside a UTF-8 multi-byte sequence; back up until
+                // we're on a leading-byte boundary. Cast to uint8_t so bytes
+                // >= 0x80 aren't treated as negative signed char (UB on platforms
+                // where char is signed).
+                while (safe_len > 0 &&
+                       (static_cast<uint8_t>(stop_window[safe_len]) & 0xC0) == 0x80) {
+                    safe_len--;
+                }
+                if (safe_len > 0) {
+                    if (!sink(stop_window.substr(0, safe_len))) {
+                        RAC_LOG_INFO("LLM.LlamaCpp", "Generation cancelled by callback");
+                        cancel_requested_.store(true);
+                        break;
+                    }
+                    // Erase the flushed portion so stop_window doesn't grow unboundedly.
+                    stop_window.erase(0, safe_len);
+                }
+            }
+        }
+
+        batch.n_tokens = 0;
+        common_batch_add(batch, new_token_id, n_cur, {0}, true);
+
+        n_cur++;
+        tokens_generated++;
+
+        if (llama_decode(context_, batch) != 0) {
+            RAC_LOG_ERROR("LLM.LlamaCpp", "llama_decode failed during generation");
+            decode_failed_ = true;
+            break;
+        }
+    }
+
+    // t5: Record last token time (decode loop exit). Captured here, before the
+    // trailing flush, to match generate_stream's historical timing point.
+    if (timing_out != nullptr) {
+        timing_out->t5_last_token_ms = rac_monotonic_now_ms();
+        timing_out->output_tokens = static_cast<int32_t>(tokens_generated);
+    }
+
+    // Flush any remaining partial UTF-8 bytes (e.g. trailing multi-byte char at
+    // end of generation)
+    if (!cancel_requested_.load() && !stop_sequence_hit && !partial_utf8_buffer.empty()) {
+        stop_window.append(partial_utf8_buffer);
+    }
+
+    if (!cancel_requested_.load() && !stop_sequence_hit && !stop_window.empty()) {
+        sink(stop_window);
+    }
+
+    return tokens_generated;
+}
+
 bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& request,
                                              TextStreamCallback callback, int* out_prompt_tokens,
                                              rac_benchmark_timing_t* timing_out) {
@@ -782,7 +982,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         llama_memory_clear(mem, true);
     }
 
-    // commons-030-A: honor the per-request thread hint (idl/llm_options.proto:119).
+    // Honor the per-request thread hint (idl/llm_options.proto:119).
     // 0 = backend default (the model-load thread count already on the context).
     if (request.n_threads > 0) {
         llama_set_n_threads(context_, request.n_threads, request.n_threads);
@@ -900,46 +1100,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
                 llama_sampler_free(sampler_);
             }
 
-            auto sparams = llama_sampler_chain_default_params();
-            sparams.no_perf = true;
-            sampler_ = llama_sampler_chain_init(sparams);
-
-            // commons-030-A: a GBNF grammar constrains the logits regardless of
-            // greedy-vs-sampled, so it must be the first sampler in the chain
-            // (matches llama.cpp common/sampling.cpp ordering).
-            if (!request.grammar.empty()) {
-                llama_sampler_chain_add(
-                    sampler_, llama_sampler_init_grammar(llama_model_get_vocab(model_),
-                                                         request.grammar.c_str(), "root"));
-            }
-
-            if (request.temperature > 0.0f) {
-                // commons-030-A: forward the OpenAI-style frequency/presence
-                // penalties (idl/llm_options.proto:100-101) into the penalty
-                // sampler; 0.0 leaves each disabled exactly as before.
-                llama_sampler_chain_add(
-                    sampler_, llama_sampler_init_penalties(
-                                  kRepeatPenaltyWindow, request.repetition_penalty,
-                                  request.frequency_penalty, request.presence_penalty));
-
-                if (request.top_k > 0) {
-                    llama_sampler_chain_add(sampler_, llama_sampler_init_top_k(request.top_k));
-                }
-
-                llama_sampler_chain_add(sampler_, llama_sampler_init_top_p(request.top_p, 1));
-                // commons-030-A: min_p (idl/llm_options.proto:107). 0.0 = disabled.
-                if (request.min_p > 0.0f) {
-                    llama_sampler_chain_add(sampler_, llama_sampler_init_min_p(request.min_p, 1));
-                }
-                llama_sampler_chain_add(sampler_, llama_sampler_init_temp(request.temperature));
-                // commons-030-A: honor the deterministic seed (0 = backend default).
-                llama_sampler_chain_add(
-                    sampler_, llama_sampler_init_dist(request.seed != 0
-                                                          ? static_cast<uint32_t>(request.seed)
-                                                          : LLAMA_DEFAULT_SEED));
-            } else {
-                llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
-            }
+            sampler_ = build_sampler_chain(model_, request);
 
             cached_temperature_ = request.temperature;
             cached_top_p_ = request.top_p;
@@ -962,133 +1123,13 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
                  request.temperature, request.top_p, request.top_k, request.max_tokens,
                  effective_max_tokens, request.repetition_penalty, request.system_prompt.length());
 
-    const auto* const vocab = llama_model_get_vocab(model_);
-
-    static const std::vector<std::string> STOP_SEQUENCES = {
-        "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>", "\n\nUser:", "\n\nHuman:",
-    };
-
-    static const size_t MAX_STOP_LEN = [] {
-        size_t m = 0;
-        for (const auto& s : STOP_SEQUENCES)
-            m = std::max(m, s.size());
-        return m;
-    }();
-
-    std::string stop_window;
-    stop_window.reserve(MAX_STOP_LEN * 2);
-
-    std::string partial_utf8_buffer;
-    partial_utf8_buffer.reserve(8);
-
-    // Persist UTF-8 scanner across iterations to avoid re-scanning partial bytes
-    Utf8State utf8_scanner;
-
-    int n_cur = batch.n_tokens;
-    int tokens_generated = 0;
-    bool stop_sequence_hit = false;
-
-    while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
-        const llama_token new_token_id = llama_sampler_sample(sampler_, context_, -1);
-
-        llama_sampler_accept(sampler_, new_token_id);
-
-        if (llama_vocab_is_eog(vocab, new_token_id)) {
-            RAC_LOG_INFO("LLM.LlamaCpp", "End of generation token received");
-            break;
-        }
-
-        const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);
-
-        // Only scan newly appended bytes — scanner state persists from prior
-        // iterations
-        const size_t scan_start = partial_utf8_buffer.size();
-        partial_utf8_buffer.append(new_token_chars);
-
-        size_t valid_upto = 0;
-        for (size_t i = scan_start; i < partial_utf8_buffer.size(); ++i) {
-            utf8_scanner.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
-            if (utf8_scanner.state == 0) {
-                valid_upto = i + 1;
-            }
-        }
-
-        if (valid_upto > 0) {
-            std::string valid_chunk = partial_utf8_buffer.substr(0, valid_upto);
-            stop_window.append(valid_chunk);
-            partial_utf8_buffer.erase(0, valid_upto);
-
-            size_t found_stop_pos = std::string::npos;
-            for (const auto& stop_seq : STOP_SEQUENCES) {
-                size_t pos = stop_window.find(stop_seq);
-                if (pos != std::string::npos) {
-                    if (found_stop_pos == std::string::npos || pos < found_stop_pos) {
-                        found_stop_pos = pos;
-                    }
-                }
-            }
-
-            if (found_stop_pos != std::string::npos) {
-                RAC_LOG_INFO("LLM.LlamaCpp", "Stop sequence detected");
-                stop_sequence_hit = true;
-                if (found_stop_pos > 0) {
-                    if (!callback(stop_window.substr(0, found_stop_pos))) {
-                        cancel_requested_.store(true);
-                    }
-                }
-                break;
-            }
-
-            if (stop_window.size() > MAX_STOP_LEN) {
-                size_t safe_len = stop_window.size() - MAX_STOP_LEN;
-                // Don't cut inside a UTF-8 multi-byte sequence; back up until
-                // we're on a leading-byte boundary. Cast to uint8_t so bytes
-                // >= 0x80 aren't treated as negative signed char (UB on platforms
-                // where char is signed).
-                while (safe_len > 0 &&
-                       (static_cast<uint8_t>(stop_window[safe_len]) & 0xC0) == 0x80) {
-                    safe_len--;
-                }
-                if (safe_len > 0) {
-                    if (!callback(stop_window.substr(0, safe_len))) {
-                        RAC_LOG_INFO("LLM.LlamaCpp", "Generation cancelled by callback");
-                        cancel_requested_.store(true);
-                        break;
-                    }
-                    // Erase the flushed portion so stop_window doesn't grow unboundedly.
-                    stop_window.erase(0, safe_len);
-                }
-            }
-        }
-
-        batch.n_tokens = 0;
-        common_batch_add(batch, new_token_id, n_cur, {0}, true);
-
-        n_cur++;
-        tokens_generated++;
-
-        if (llama_decode(context_, batch) != 0) {
-            RAC_LOG_ERROR("LLM.LlamaCpp", "llama_decode failed during generation");
-            decode_failed_ = true;
-            break;
-        }
-    }
-
-    // t5: Record last token time (decode loop exit)
-    if (timing_out != nullptr) {
-        timing_out->t5_last_token_ms = rac_monotonic_now_ms();
-        timing_out->output_tokens = static_cast<int32_t>(tokens_generated);
-    }
-
-    // Flush any remaining partial UTF-8 bytes (e.g. trailing multi-byte char at
-    // end of generation)
-    if (!cancel_requested_.load() && !stop_sequence_hit && !partial_utf8_buffer.empty()) {
-        stop_window.append(partial_utf8_buffer);
-    }
-
-    if (!cancel_requested_.load() && !stop_sequence_hit && !stop_window.empty()) {
-        callback(stop_window);
-    }
+    // Decode loop: sample → stop-window detection → KV-decode step, emitting
+    // completed UTF-8 chunks straight through the streaming callback. The
+    // starting KV position mirrors the historical generate_stream value
+    // (batch.n_tokens after the prefill loop). Shared with
+    // generate_from_context() via run_decode_loop().
+    const int tokens_generated =
+        run_decode_loop(sampler_, batch, batch.n_tokens, effective_max_tokens, callback, timing_out);
 
     // TODO(streaming-tools): Emit tool_call_delta events during stream.
     // To support generateWithToolsStream for Web and RN, the generate_stream
@@ -1100,7 +1141,7 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     //   1. llamacpp_backend.h: GenerationCallback typedef
     //   2. rac_llm_llamacpp.cpp: wrapper that maps new callback to C ABI
     //   3. rac_llm_stream.cpp: proto-byte event emitter
-    // Deferred to post-round-1 to avoid breaking changes to the stable ABI.
+    // Deferred to avoid breaking changes to the stable ABI.
 
     if (llama_memory_t post_mem = llama_get_memory(context_)) {
         llama_memory_clear(post_mem, true);
@@ -1233,7 +1274,7 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
         return result;
     }
 
-    // commons-030-A: honor the per-request thread hint (idl/llm_options.proto:119).
+    // Honor the per-request thread hint (idl/llm_options.proto:119).
     if (request.n_threads > 0) {
         llama_set_n_threads(context_, request.n_threads, request.n_threads);
     }
@@ -1291,151 +1332,25 @@ LlamaCppTextGeneration::generate_from_context(const TextGenerationRequest& reque
         }
     }
 
-    llama_sampler* sampler = nullptr;
-    {
-        auto sparams = llama_sampler_chain_default_params();
-        sparams.no_perf = true;
-        sampler = llama_sampler_chain_init(sparams);
+    // Same per-request sampler chain as generate_stream(), so the extended
+    // sampling knobs (grammar, OpenAI penalties, min_p, seed) apply on the
+    // context-continuation path too. Built fresh (no member cache) and freed
+    // below.
+    llama_sampler* sampler = build_sampler_chain(model_, request);
 
-        // commons-030-A: mirror the generate_stream sampler chain so the
-        // extended sampling knobs (grammar, OpenAI penalties, min_p, seed)
-        // apply on the context-continuation path too.
-        if (!request.grammar.empty()) {
-            llama_sampler_chain_add(sampler,
-                                    llama_sampler_init_grammar(llama_model_get_vocab(model_),
-                                                               request.grammar.c_str(), "root"));
-        }
-
-        if (request.temperature > 0.0f) {
-            llama_sampler_chain_add(
-                sampler, llama_sampler_init_penalties(64, request.repetition_penalty,
-                                                      request.frequency_penalty,
-                                                      request.presence_penalty));
-            if (request.top_k > 0) {
-                llama_sampler_chain_add(sampler, llama_sampler_init_top_k(request.top_k));
-            }
-            llama_sampler_chain_add(sampler, llama_sampler_init_top_p(request.top_p, 1));
-            if (request.min_p > 0.0f) {
-                llama_sampler_chain_add(sampler, llama_sampler_init_min_p(request.min_p, 1));
-            }
-            llama_sampler_chain_add(sampler, llama_sampler_init_temp(request.temperature));
-            llama_sampler_chain_add(
-                sampler, llama_sampler_init_dist(request.seed != 0
-                                                     ? static_cast<uint32_t>(request.seed)
-                                                     : LLAMA_DEFAULT_SEED));
-        } else {
-            llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
-        }
-    }
-
-    const auto vocab = llama_model_get_vocab(model_);
-
-    static const std::vector<std::string> STOP_SEQUENCES = {
-        "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>", "\n\nUser:", "\n\nHuman:",
-    };
-
-    static const size_t MAX_STOP_LEN = [] {
-        size_t m = 0;
-        for (const auto& s : STOP_SEQUENCES)
-            m = std::max(m, s.size());
-        return m;
-    }();
-
-    std::string stop_window;
-    stop_window.reserve(MAX_STOP_LEN * 2);
-
-    std::string partial_utf8_buffer;
-    partial_utf8_buffer.reserve(8);
-
-    Utf8State scanner_state;
-
+    // Decode loop: accumulate completed UTF-8 chunks into generated_text instead
+    // of streaming them. The starting KV position continues after the
+    // freshly-prefilled prompt. Shared with generate_stream() via
+    // run_decode_loop(); the accumulator sink never cancels, so the shared
+    // loop's callback-cancel branches are inert here. No timing on this path.
     std::string generated_text;
-    int n_cur = static_cast<int>(current_pos) + n_prompt;
-    int tokens_generated = 0;
-    bool stop_sequence_hit = false;
-
-    while (tokens_generated < effective_max_tokens && !cancel_requested_.load()) {
-        const llama_token new_token_id = llama_sampler_sample(sampler, context_, -1);
-        llama_sampler_accept(sampler, new_token_id);
-
-        if (llama_vocab_is_eog(vocab, new_token_id)) {
-            break;
-        }
-
-        const std::string new_token_chars = common_token_to_piece(context_, new_token_id, false);
-        const size_t old_partial_size = partial_utf8_buffer.size();
-        partial_utf8_buffer.append(new_token_chars);
-
-        size_t valid_upto = 0;
-        for (size_t i = old_partial_size; i < partial_utf8_buffer.size(); ++i) {
-            scanner_state.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
-            if (scanner_state.state == 0) {
-                valid_upto = i + 1;
-            }
-        }
-
-        if (valid_upto > 0) {
-            std::string valid_chunk = partial_utf8_buffer.substr(0, valid_upto);
-            stop_window.append(valid_chunk);
-            partial_utf8_buffer.erase(0, valid_upto);
-
-            size_t found_stop_pos = std::string::npos;
-            for (const auto& stop_seq : STOP_SEQUENCES) {
-                const size_t pos = stop_window.find(stop_seq);
-                if (pos != std::string::npos &&
-                    (found_stop_pos == std::string::npos || pos < found_stop_pos)) {
-                    found_stop_pos = pos;
-                }
-            }
-
-            if (found_stop_pos != std::string::npos) {
-                stop_sequence_hit = true;
-                if (found_stop_pos > 0) {
-                    generated_text += stop_window.substr(0, found_stop_pos);
-                }
-                break;
-            }
-
-            if (stop_window.size() > MAX_STOP_LEN) {
-                size_t safe_len = stop_window.size() - MAX_STOP_LEN;
-                // Don't cut inside a UTF-8 multi-byte sequence; back up until
-                // we're on a leading-byte boundary. Cast to uint8_t so bytes
-                // >= 0x80 aren't treated as negative signed char (UB on platforms
-                // where char is signed).
-                while (safe_len > 0 &&
-                       (static_cast<uint8_t>(stop_window[safe_len]) & 0xC0) == 0x80) {
-                    safe_len--;
-                }
-                if (safe_len > 0) {
-                    generated_text += stop_window.substr(0, safe_len);
-                    stop_window.erase(0, safe_len);
-                }
-            }
-        }
-
-        batch.n_tokens = 0;
-        common_batch_add(batch, new_token_id, n_cur, {0}, true);
-        n_cur++;
-        tokens_generated++;
-
-        if (llama_decode(context_, batch) != 0) {
-            RAC_LOG_ERROR("LLM.LlamaCpp",
-                          "generate_from_context: llama_decode failed during generation");
-            decode_failed_ = true;
-            break;
-        }
-    }
-
-    // Flush any remaining partial UTF-8 bytes (e.g. trailing multi-byte char at
-    // end of generation) so trailing codepoints aren't silently dropped. Mirrors
-    // generate_stream() behavior.
-    if (!cancel_requested_.load() && !stop_sequence_hit && !partial_utf8_buffer.empty()) {
-        stop_window.append(partial_utf8_buffer);
-    }
-
-    if (!cancel_requested_.load() && !stop_sequence_hit && !stop_window.empty()) {
-        generated_text += stop_window;
-    }
+    const int tokens_generated = run_decode_loop(
+        sampler, batch, static_cast<int>(current_pos) + n_prompt, effective_max_tokens,
+        [&generated_text](const std::string& chunk) -> bool {
+            generated_text += chunk;
+            return true;
+        },
+        /*timing_out=*/nullptr);
 
     llama_batch_free(batch);
     llama_sampler_free(sampler);

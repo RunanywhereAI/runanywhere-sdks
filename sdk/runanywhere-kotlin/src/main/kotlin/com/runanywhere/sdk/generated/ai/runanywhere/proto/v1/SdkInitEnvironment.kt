@@ -48,8 +48,8 @@ public enum class SdkInitEnvironment(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SdkInitEnvironment> = object : EnumAdapter<SdkInitEnvironment>(
-      SdkInitEnvironment::class,
-      PROTO_3,
+      SdkInitEnvironment::class, 
+      PROTO_3, 
       SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT
     ) {
       override fun fromValue(`value`: Int): SdkInitEnvironment? = SdkInitEnvironment.fromValue(`value`)

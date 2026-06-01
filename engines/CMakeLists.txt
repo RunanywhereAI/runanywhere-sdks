@@ -35,14 +35,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
     add_subdirectory(onnx)
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/whispercpp/CMakeLists.txt")
-    add_subdirectory(whispercpp)
-endif()
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/whisperkit_coreml/CMakeLists.txt")
-    add_subdirectory(whisperkit_coreml)
-endif()
-
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
     add_subdirectory(metalrt)
 endif()

@@ -221,9 +221,8 @@ enum ModelCatalogBootstrap {
         )
         logger.info("ONNX Embedding models registered")
 
-        // MetalRT, WhisperKit, and Diffusion (CoreML) backends are deferred
-        // scope for Swift v1. Their model catalog entries are intentionally
-        // omitted.
+        // MetalRT and Diffusion (CoreML) backends are deferred scope for
+        // Swift v1. Their model catalog entries are intentionally omitted.
 
         logger.info("All modules and models registered")
     }

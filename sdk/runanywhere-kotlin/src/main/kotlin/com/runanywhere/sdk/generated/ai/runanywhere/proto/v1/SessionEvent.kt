@@ -150,11 +150,11 @@ public class SessionEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SessionEvent> = object : ProtoAdapter<SessionEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SessionEvent::class,
-      "type.googleapis.com/runanywhere.v1.SessionEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SessionEvent::class, 
+      "type.googleapis.com/runanywhere.v1.SessionEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: SessionEvent): Int {

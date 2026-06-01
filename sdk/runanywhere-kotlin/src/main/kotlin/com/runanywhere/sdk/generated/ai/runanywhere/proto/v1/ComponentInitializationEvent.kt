@@ -306,11 +306,11 @@ public class ComponentInitializationEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentInitializationEvent> =
         object : ProtoAdapter<ComponentInitializationEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ComponentInitializationEvent::class,
-      "type.googleapis.com/runanywhere.v1.ComponentInitializationEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ComponentInitializationEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ComponentInitializationEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: ComponentInitializationEvent): Int {

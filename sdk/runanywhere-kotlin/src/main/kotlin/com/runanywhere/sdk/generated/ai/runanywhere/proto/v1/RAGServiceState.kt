@@ -146,11 +146,11 @@ public class RAGServiceState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGServiceState> = object : ProtoAdapter<RAGServiceState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RAGServiceState::class,
-      "type.googleapis.com/runanywhere.v1.RAGServiceState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RAGServiceState::class, 
+      "type.googleapis.com/runanywhere.v1.RAGServiceState", 
+      PROTO_3, 
+      null, 
       "rag.proto"
     ) {
       override fun encodedSize(`value`: RAGServiceState): Int {

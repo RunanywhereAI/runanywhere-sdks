@@ -120,31 +120,58 @@ rac_result_t rac_stt_sherpa_transcribe(rac_handle_t handle, const float* audio_s
     if (options && options->language) {
         request.language = options->language;
     }
+    // Thread the option flags that sherpa has a sink for. The two booleans
+    // map onto STTRequest fields the backend already honors.
+    if (options) {
+        request.detect_language = (options->detect_language == RAC_TRUE);
+        request.word_timestamps = (options->enable_timestamps == RAC_TRUE);
+    }
+    // No sherpa sink for the remaining rac_stt_options_t fields, so they are
+    // intentionally NOT threaded into STTRequest (acknowledged, not silently
+    // dropped): enable_punctuation, enable_diarization, max_speakers (sherpa
+    // offline recognizers expose no punctuation/diarization/speaker controls)
+    // and audio_format (this entry point already receives decoded float PCM).
 
-    auto result = h->stt->transcribe(request);
+    // SherpaSTT::transcribe now reports failures via the structured
+    // SherpaSttStatus out-param (text is left empty on error) instead of
+    // embedding "[Error: ...]" sentinels in result.text. Switch on the status to
+    // produce the structured C-ABI error code; the human-readable detail still
+    // reaches operators via rac_error_set_details inside the backend. Returning
+    // a sentinel string under RAC_SUCCESS would lie to the C-API caller — SDK
+    // consumers expect non-success on transcribe failure and out_result->text
+    // == nullptr.
+    runanywhere::SherpaSttStatus status;
+    auto result = h->stt->transcribe(request, &status);
 
-    // engines-sherpa-002: SherpaSTT::transcribe encodes its failure paths as
-    // result.text = "[Error: ...]" sentinels (model-not-loaded, recognizer
-    // build/rebuild failures, language-not-supported, stream creation, etc.).
-    // Returning that string under RAC_SUCCESS would lie to the C-API caller —
-    // SDK consumers expect non-success on transcribe failure and out_result->text
-    // == nullptr. Map the sentinel back to a structured error code here; the
-    // human-readable detail still reaches operators via rac_error_set_details.
-    if (!result.text.empty() && result.text.compare(0, 8, "[Error: ") == 0) {
-        rac_error_set_details(result.text.c_str());
-        out_result->text = nullptr;
-        out_result->detected_language = nullptr;
-        out_result->words = nullptr;
-        out_result->num_words = 0;
-        out_result->confidence = 0.0f;
-        out_result->processing_time_ms = result.inference_time_ms;
-        if (result.text.find("not loaded") != std::string::npos) {
+    switch (status) {
+        case runanywhere::SherpaSttStatus::Ok:
+            break;
+        case runanywhere::SherpaSttStatus::ModelNotLoaded:
+            out_result->text = nullptr;
+            out_result->detected_language = nullptr;
+            out_result->words = nullptr;
+            out_result->num_words = 0;
+            out_result->confidence = 0.0f;
+            out_result->processing_time_ms = result.inference_time_ms;
             return RAC_ERROR_BACKEND_NOT_READY;
-        }
-        if (result.text.find("language not supported") != std::string::npos) {
+        case runanywhere::SherpaSttStatus::LanguageNotSupported:
+            out_result->text = nullptr;
+            out_result->detected_language = nullptr;
+            out_result->words = nullptr;
+            out_result->num_words = 0;
+            out_result->confidence = 0.0f;
+            out_result->processing_time_ms = result.inference_time_ms;
             return RAC_ERROR_NOT_SUPPORTED;
-        }
-        return RAC_ERROR_INFERENCE_FAILED;
+        case runanywhere::SherpaSttStatus::RecognizerBuildFailed:
+        case runanywhere::SherpaSttStatus::StreamCreationFailed:
+        case runanywhere::SherpaSttStatus::BackendUnavailable:
+            out_result->text = nullptr;
+            out_result->detected_language = nullptr;
+            out_result->words = nullptr;
+            out_result->num_words = 0;
+            out_result->confidence = 0.0f;
+            out_result->processing_time_ms = result.inference_time_ms;
+            return RAC_ERROR_INFERENCE_FAILED;
     }
 
     out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
@@ -210,7 +237,7 @@ rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
     auto* h = static_cast<rac_sherpa_stt_handle_impl*>(handle);
     auto* stream_id = static_cast<char*>(stream);
 
-    // engines-sherpa-003: thread the caller's sample rate through to the
+    // Thread the caller's sample rate through to the
     // backend instead of hard-coding 16000. The previous fixed rate forced
     // every non-16k capture (e.g. 48k AVAudioEngine, 44.1k MediaRecorder) to
     // be silently re-interpreted at 16k, producing tempo-distorted feature

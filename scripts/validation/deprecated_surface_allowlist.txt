@@ -93,7 +93,6 @@ sdk/runanywhere-commons/include/rac/features/diffusion/rac_diffusion_service.h
 sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h
 sdk/runanywhere-commons/include/rac/features/embeddings/rac_embeddings_service.h
 sdk/runanywhere-commons/include/rac/infrastructure/network/rac_api_types.h
-sdk/runanywhere-commons/include/rac/backends/rac_stt_whispercpp.h
 sdk/runanywhere-commons/include/rac/backends/rac_vlm_llamacpp.h
 sdk/runanywhere-commons/include/rac/features/tts/rac_tts_component.h
 sdk/runanywhere-commons/include/rac/features/stt/rac_stt_component.h

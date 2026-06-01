@@ -159,12 +159,12 @@ rac_registry_unload_plugin("llamacpp");
 │                         Backend Layer                                    │
 │                                                                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
-│  │   LlamaCPP      │  │      ONNX       │  │   WhisperCPP    │         │
+│  │   LlamaCPP      │  │     Sherpa      │  │      ONNX       │         │
 │  │   Backend       │  │     Backend     │  │    Backend      │         │
 │  │                 │  │                 │  │                 │         │
-│  │  • GGUF models  │  │  • STT (Sherpa) │  │  • STT (GGML)   │         │
-│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • Multi-lang   │         │
-│  │  • Streaming    │  │  • VAD (Silero) │  │  • Fast CPU     │         │
+│  │  • GGUF models  │  │  • STT (Sherpa) │  │  • Embeddings   │         │
+│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • WakeWord     │         │
+│  │  • Streaming    │  │  • VAD (Silero) │  │  • ONNX Runtime │         │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘         │
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────┐│
@@ -239,10 +239,9 @@ runanywhere-commons/
 │   │
 │   └── backends/                   # Backend-specific public headers
 │       ├── rac_llm_llamacpp.h      # LlamaCPP backend API
-│       ├── rac_stt_whispercpp.h    # WhisperCPP backend API
-│       ├── rac_stt_onnx.h          # ONNX STT API
-│       ├── rac_tts_onnx.h          # ONNX TTS API
-│       └── rac_vad_onnx.h          # ONNX VAD API
+│       ├── rac_stt_onnx.h          # Sherpa STT API
+│       ├── rac_tts_onnx.h          # Sherpa TTS API
+│       └── rac_vad_onnx.h          # Sherpa VAD API
 │
 ├── src/                            # Implementation files
 │   ├── core/                       # Core implementations
@@ -263,7 +262,7 @@ runanywhere-commons/
 │   └── jni/                        # JNI bridge for Android
 │
 │   # ML engine plugins live at the monorepo root under ../../engines/
-│   # (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt). Each
+│   # (llamacpp, sherpa, onnx, metalrt, genie, diffusion-coreml). Each
 │   # ships a rac_plugin_entry_<name>.cpp that publishes a
 │   # rac_engine_vtable_t via RAC_STATIC_PLUGIN_REGISTER or a dlopen'd
 │   # entry symbol. See ../../engines/.

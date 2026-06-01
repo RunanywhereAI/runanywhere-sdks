@@ -189,11 +189,11 @@ public class ModelQuery(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelQuery> = object : ProtoAdapter<ModelQuery>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelQuery::class,
-      "type.googleapis.com/runanywhere.v1.ModelQuery",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelQuery::class, 
+      "type.googleapis.com/runanywhere.v1.ModelQuery", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelQuery): Int {

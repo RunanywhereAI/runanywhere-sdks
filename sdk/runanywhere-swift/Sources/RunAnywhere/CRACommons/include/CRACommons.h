@@ -57,7 +57,6 @@
 #include "rac_stt_service.h"
 #include "rac_stt_component.h"
 #include "rac_stt_analytics.h"
-#include "rac_stt_whisperkit_coreml.h"
 
 // TTS (Text-to-Speech)
 #include "rac_tts.h"
@@ -141,12 +140,6 @@
 #include "rac_llm_platform.h"
 #include "rac_tts_platform.h"
 #include "rac_diffusion_platform.h"
-
-// =============================================================================
-// ONNX/WHISPERCPP BACKENDS - STT
-// =============================================================================
-
-#include "rac_stt_whispercpp.h"
 
 // =============================================================================
 // NETWORK - Environment, Auth, API Types, Dev Config

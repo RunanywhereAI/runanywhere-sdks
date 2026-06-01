@@ -91,11 +91,11 @@ public class AgentResponseCompletedEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<AgentResponseCompletedEvent> =
         object : ProtoAdapter<AgentResponseCompletedEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AgentResponseCompletedEvent::class,
-      "type.googleapis.com/runanywhere.v1.AgentResponseCompletedEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AgentResponseCompletedEvent::class, 
+      "type.googleapis.com/runanywhere.v1.AgentResponseCompletedEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: AgentResponseCompletedEvent): Int {

@@ -211,11 +211,11 @@ public class VoiceSessionConfig(
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceSessionConfig> =
         object : ProtoAdapter<VoiceSessionConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceSessionConfig::class,
-      "type.googleapis.com/runanywhere.v1.VoiceSessionConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceSessionConfig::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceSessionConfig", 
+      PROTO_3, 
+      null, 
       "voice_agent_service.proto"
     ) {
       override fun encodedSize(`value`: VoiceSessionConfig): Int {

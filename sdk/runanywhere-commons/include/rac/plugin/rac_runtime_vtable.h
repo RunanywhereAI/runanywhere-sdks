@@ -6,7 +6,7 @@
  *
  * A "runtime" is the compute target an engine executes on: CPU, Apple Metal,
  * Core ML, NVIDIA CUDA, Vulkan, QNN, NNAPI, WebGPU, … Engines (llama.cpp,
- * ONNX Runtime, whispercpp, WhisperKit CoreML, MetalRT, …) are *clients* of
+ * ONNX Runtime, sherpa, MetalRT, …) are *clients* of
  * one or more runtimes. Promoting runtimes to first-class plugins lets
  * multiple engines share a single ORT `Ort::Env`, reuse the same CoreML
  * `MLModel` loader, and allocate GPU buffers through one allocator per
@@ -129,6 +129,15 @@ typedef struct rac_runtime_capabilities {
 #define RAC_RUNTIME_CAP_BUFFER_COPY (1ull << 7)
 #define RAC_RUNTIME_CAP_DEVICE_ALLOC (1ull << 8)
 #define RAC_RUNTIME_CAP_OWNED_OUTPUTS (1ull << 9)
+/** The runtime provides the OPTIONAL session-execution role: it implements
+ *  `create_session` / `run_session` / `destroy_session` (+ buffer ops) and can
+ *  actually run inference, not merely describe hardware. Runtimes that fill
+ *  those vtable slots MUST set this bit in `capabilities()`; capability-only
+ *  runtimes (which leave the session slots NULL) MUST NOT. The engine router
+ *  uses this flag to tell "can this runtime host a session?" apart from "this
+ *  runtime exists and reports device_info/capabilities". See the two-role note
+ *  on `rac_runtime_vtable` below. */
+#define RAC_RUNTIME_CAP_SESSION_EXECUTION (1ull << 10)
 
 /* ===========================================================================
  * Opaque session + buffer handles.
@@ -395,6 +404,23 @@ typedef struct rac_runtime_metadata {
  * Op slots are stable. A NULL pointer means the runtime does not implement
  * that op — callers probe before dispatch and fall back to engine-owned
  * behaviour. `init`/`destroy` MUST be non-NULL.
+ *
+ * A runtime fills two distinct roles:
+ *
+ *   1. Capability role (MANDATORY): identity (`metadata`) + `init` + `destroy`
+ *      + `device_info` + `capabilities`. Every runtime MUST implement these so
+ *      the engine router can do hardware-aware selection. A "capability-only"
+ *      runtime stops here and leaves the session-execution slots NULL.
+ *
+ *   2. Session-execution role (OPTIONAL): `create_session` / `run_session` /
+ *      `destroy_session` plus the buffer ops (`alloc_buffer`, `free_buffer`,
+ *      and the v2 buffer extension). A runtime that actually runs inference
+ *      fills these slots AND advertises `RAC_RUNTIME_CAP_SESSION_EXECUTION` in
+ *      its `capabilities()`. Today only the built-in CPU runtime does this;
+ *      Metal / Core ML / ONNX Runtime are capability-only and leave the
+ *      session slots NULL. Session execution is all-or-nothing: a runtime that
+ *      provides `create_session` MUST also provide `run_session` and
+ *      `destroy_session`.
  */
 typedef struct rac_runtime_vtable {
     rac_runtime_metadata_t metadata;

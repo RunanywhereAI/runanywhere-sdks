@@ -184,11 +184,11 @@ public class CapabilityOperationEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<CapabilityOperationEvent> =
         object : ProtoAdapter<CapabilityOperationEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      CapabilityOperationEvent::class,
-      "type.googleapis.com/runanywhere.v1.CapabilityOperationEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      CapabilityOperationEvent::class, 
+      "type.googleapis.com/runanywhere.v1.CapabilityOperationEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: CapabilityOperationEvent): Int {

@@ -113,11 +113,11 @@ public class ComponentProgressEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentProgressEvent> =
         object : ProtoAdapter<ComponentProgressEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ComponentProgressEvent::class,
-      "type.googleapis.com/runanywhere.v1.ComponentProgressEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ComponentProgressEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ComponentProgressEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: ComponentProgressEvent): Int {

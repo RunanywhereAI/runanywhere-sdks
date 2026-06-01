@@ -30,8 +30,8 @@ public enum class STTStreamEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTStreamEventKind> = object : EnumAdapter<STTStreamEventKind>(
-      STTStreamEventKind::class,
-      PROTO_3,
+      STTStreamEventKind::class, 
+      PROTO_3, 
       STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): STTStreamEventKind? = STTStreamEventKind.fromValue(`value`)

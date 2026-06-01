@@ -2,8 +2,7 @@
  * @file test_plugin_entry_diffusion_coreml.cpp
  * @brief Locks the CoreML diffusion plugin-entry / vtable contract.
  *
- * commons-008 (review RUN=20260527-122639-review): mirrors the parallel
- * test_plugin_entry_{genie,whisperkit_coreml,metalrt}.cpp smoke tests.
+ * Mirrors the parallel test_plugin_entry_{genie,metalrt}.cpp smoke tests.
  * diffusion-coreml is the SOLE RAC_PRIMITIVE_DIFFUSION provider — there is no
  * fallback engine for image generation — and the router fans
  * plugin_find(RAC_PRIMITIVE_DIFFUSION) out exactly to this entry. The existing

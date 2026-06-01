@@ -27,28 +27,6 @@ typedef RacConfigureLoggingNative = Int32 Function(Int32 environment);
 typedef RacConfigureLoggingDart = int Function(int environment);
 
 // =============================================================================
-// Module Registration API (from rac_core.h)
-// =============================================================================
-
-/// rac_result_t rac_module_register(const rac_module_info_t* info)
-typedef RacModuleRegisterNative = Int32 Function(Pointer<Void> info);
-typedef RacModuleRegisterDart = int Function(Pointer<Void> info);
-
-/// rac_result_t rac_module_unregister(const char* module_id)
-typedef RacModuleUnregisterNative = Int32 Function(Pointer<Utf8> moduleId);
-typedef RacModuleUnregisterDart = int Function(Pointer<Utf8> moduleId);
-
-/// rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count)
-typedef RacModuleListNative = Int32 Function(
-  Pointer<Pointer<Void>> outModules,
-  Pointer<IntPtr> outCount,
-);
-typedef RacModuleListDart = int Function(
-  Pointer<Pointer<Void>> outModules,
-  Pointer<IntPtr> outCount,
-);
-
-// =============================================================================
 // Legacy rac_service_{register_provider,create,...} typedefs
 // DELETED. New code uses rac_plugin_{register,route,list} via
 // RacBindings in lib/core/native/rac_native.dart.

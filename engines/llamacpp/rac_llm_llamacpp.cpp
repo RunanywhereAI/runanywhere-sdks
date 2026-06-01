@@ -9,6 +9,7 @@
 #include "rac_llm_llamacpp.h"
 
 #include "llamacpp_backend.h"
+#include "llamacpp_stop_helpers.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -43,13 +44,16 @@ struct rac_llm_llamacpp_handle_impl {
 // CALLER STOP SEQUENCE HELPERS
 // =============================================================================
 //
-// Mirrors the VLM helpers in engines/llamacpp/rac_vlm_llamacpp.cpp:797-841
-// (collect_stop_sequences / find_first_stop_sequence / max_stop_length). The
-// inner llama.cpp text-generation loop only honours a built-in static stop list
-// (engines/llamacpp/llamacpp_backend.cpp:931, :1275), so caller-supplied stops
-// passed via rac_llm_options_t::stop_sequences are enforced here at the C-API
-// boundary.
+// The inner llama.cpp text-generation loop only honours a built-in static stop
+// list (engines/llamacpp/llamacpp_backend.cpp), so caller-supplied stops passed
+// via rac_llm_options_t::stop_sequences are enforced here at the C-API
+// boundary. The window-scanning helpers (find_first_stop_sequence /
+// max_stop_length) are shared with the VLM path via llamacpp_stop_helpers.h;
+// only collection out of the LLM-specific option struct stays local.
 namespace {
+
+using runanywhere::llamacpp_internal::find_first_stop_sequence;
+using runanywhere::llamacpp_internal::max_stop_length;
 
 std::vector<std::string> collect_user_stop_sequences(const rac_llm_options_t* options) {
     std::vector<std::string> result;
@@ -67,29 +71,7 @@ std::vector<std::string> collect_user_stop_sequences(const rac_llm_options_t* op
     return result;
 }
 
-size_t find_first_stop_sequence(const std::string& window,
-                                const std::vector<std::string>& stops) {
-    size_t earliest = std::string::npos;
-    for (const auto& stop_seq : stops) {
-        const size_t pos = window.find(stop_seq);
-        if (pos != std::string::npos && (earliest == std::string::npos || pos < earliest)) {
-            earliest = pos;
-        }
-    }
-    return earliest;
-}
-
-size_t max_stop_length(const std::vector<std::string>& stops) {
-    size_t m = 0;
-    for (const auto& s : stops) {
-        if (s.size() > m) {
-            m = s.size();
-        }
-    }
-    return m;
-}
-
-// commons-030-A: copy the proto-exposed sampling knobs from the C ABI options
+// Copy the proto-exposed sampling knobs from the C ABI options
 // struct onto the internal TextGenerationRequest. max_tokens / temperature /
 // top_p / system_prompt / stop_sequences are handled inline per call site (each
 // also logs them); this centralizes the remaining sampling fields so every
@@ -131,8 +113,8 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
     if (out_handle == nullptr || model_path == nullptr) {
         // Matches the sherpa STT/TTS/VAD wrappers (e.g.
         // engines/sherpa/rac_stt_sherpa.cpp:67) — refuse a NULL path instead of
-        // letting std::string construction at engines/llamacpp/llamacpp_backend.cpp:267
-        // hit undefined behaviour.
+        // letting std::string construction in
+        // LlamaCppTextGeneration::load_model hit undefined behaviour.
         return RAC_ERROR_NULL_POINTER;
     }
 
@@ -204,7 +186,7 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
 }
 
 rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle) {
-    // ENG-LLAMA-05: teardown is owned by rac_llm_llamacpp_destroy; cleanup()
+    // Teardown is owned by rac_llm_llamacpp_destroy; cleanup()
     // is a no-op so the commons vtable cleanup slot doesn't report a spurious
     // NOT_SUPPORTED for every LLM teardown.
     (void)handle;
@@ -399,10 +381,10 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     //
     // Caller-supplied stop sequences are not honoured by the inner backend
     // loop, so we wrap the per-token callback with the same rolling stop_window
-    // pattern used by the VLM streaming path
-    // (engines/llamacpp/rac_vlm_llamacpp.cpp:1390-1444): emit only bytes that
-    // cannot still form part of a pending stop match, halt as soon as a stop is
-    // matched, and never leak the stop prefix through.
+    // pattern used by the VLM streaming path in
+    // engines/llamacpp/rac_vlm_llamacpp.cpp: emit only bytes that cannot still
+    // form part of a pending stop match, halt as soon as a stop is matched, and
+    // never leak the stop prefix through.
     const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
     const size_t user_stop_max_len = max_stop_length(user_stops);
     std::string stop_window;
@@ -412,7 +394,7 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     bool stop_hit = false;
 
     // Mirrors the terminal_emitted guard in
-    // engines/llamacpp/rac_vlm_llamacpp.cpp:1445-1583: the documented streaming
+    // engines/llamacpp/rac_vlm_llamacpp.cpp: the documented streaming
     // contract is that callers ALWAYS receive exactly one callback with
     // is_final=RAC_TRUE before this function returns. Without this guard,
     // exception paths and the prompt-too-long / decode-failure backend paths
@@ -478,9 +460,9 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
         return RAC_SUCCESS;
     }
 
-    // generate_stream returned false on a non-stop-hit path (prompt-too-long at
-    // engines/llamacpp/llamacpp_backend.cpp:824-834, prefill decode failure at
-    // :861-871, or mid-generation decode failure at :1034-1038). Emit the
+    // generate_stream returned false on a non-stop-hit path (prompt-too-long,
+    // prefill decode failure, or mid-generation decode failure in
+    // LlamaCppTextGeneration::generate_stream / run_decode_loop). Emit the
     // terminal marker so direct C-API consumers can close their iterators
     // before we surface the inference error.
     if (!terminal_emitted) {
@@ -606,7 +588,7 @@ rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* pr
 
 void rac_llm_llamacpp_cancel(rac_handle_t handle) {
     // Cancel is intentionally lock-free: LlamaCppTextGeneration::cancel() only
-    // stores an atomic flag (engines/llamacpp/llamacpp_backend.cpp:1079).
+    // stores an atomic flag (cancel_requested_).
     //
     // PRECONDITION: callers MUST guarantee `handle` is not concurrently being
     // destroyed via rac_llm_llamacpp_destroy(). Commons-routed callers are
@@ -807,9 +789,8 @@ rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const c
         }
 
         // Same caller-stop truncation as rac_llm_llamacpp_generate above —
-        // the inner generate_from_context loop in
-        // engines/llamacpp/llamacpp_backend.cpp:1275 only honours its built-in
-        // static stop list.
+        // the inner LlamaCppTextGeneration::generate_from_context loop only
+        // honours its built-in static stop list.
         const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
         if (!user_stops.empty() && !result.text.empty()) {
             const size_t cut = find_first_stop_sequence(result.text, user_stops);

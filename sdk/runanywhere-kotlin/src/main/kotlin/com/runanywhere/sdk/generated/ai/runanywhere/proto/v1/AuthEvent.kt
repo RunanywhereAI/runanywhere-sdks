@@ -122,11 +122,11 @@ public class AuthEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AuthEvent> = object : ProtoAdapter<AuthEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AuthEvent::class,
-      "type.googleapis.com/runanywhere.v1.AuthEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AuthEvent::class, 
+      "type.googleapis.com/runanywhere.v1.AuthEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: AuthEvent): Int {

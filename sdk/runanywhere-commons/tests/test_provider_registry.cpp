@@ -14,7 +14,7 @@
  *   6. unregister_provider removes entry; find_by_desc then fails.
  *   7. Concurrent register + find_by_desc from 8 threads × 1000 iters (mutex).
  *   8. rac_runtime_primitive_in_range boundary checks.
- *   9. ONNX provider type exercises the same template path.
+ *   9. A second, independent registry instance round-trips on its own.
  */
 
 #include <atomic>
@@ -26,7 +26,6 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/plugin/rac_cpu_runtime_provider.h"
-#include "rac/plugin/rac_onnxrt_runtime_provider.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 #include "rac/runtime/rac_runtime_provider_registry.h"
@@ -60,19 +59,6 @@ void noop_destroy(rac_runtime_session_t*) {}
 /* Build a minimal valid CPU provider. */
 rac_cpu_runtime_provider_t make_cpu(const char* name, rac_primitive_t primitive) {
     rac_cpu_runtime_provider_t p{};
-    p.name = name;
-    p.primitive = primitive;
-    p.formats = nullptr;
-    p.formats_count = 0;
-    p.create_session = noop_create;
-    p.run_session = noop_run;
-    p.destroy_session = noop_destroy;
-    return p;
-}
-
-/* Build a minimal valid ONNX provider. */
-rac_onnxrt_runtime_provider_t make_onnx(const char* name, rac_primitive_t primitive) {
-    rac_onnxrt_runtime_provider_t p{};
     p.name = name;
     p.primitive = primitive;
     p.formats = nullptr;
@@ -258,18 +244,19 @@ int main() {
               "(8) COUNT is out of range");
     }
 
-    /* --- (9) ONNX provider type exercises the same template path ----------- */
+    /* --- (9) a second, independent registry instance round-trips on its own  */
     {
-        rac::runtime::ProviderRegistry<rac_onnxrt_runtime_provider_t> reg;
-        auto p = make_onnx("onnx-embed", RAC_PRIMITIVE_EMBED);
+        rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t> reg;
+        auto p = make_cpu("embed-engine", RAC_PRIMITIVE_EMBED);
 
-        CHECK(reg.register_provider(&p) == RAC_SUCCESS, "(9) ONNX provider registers ok");
+        CHECK(reg.register_provider(&p) == RAC_SUCCESS, "(9) second registry registers ok");
 
         rac_runtime_session_desc_t desc{};
         desc.primitive = RAC_PRIMITIVE_EMBED;
-        rac_onnxrt_runtime_provider_t out{};
-        CHECK(reg.find_by_desc(&desc, &out), "(9) ONNX find_by_desc succeeds");
-        CHECK(std::strcmp(out.name, "onnx-embed") == 0, "(9) ONNX found provider correct name");
+        rac_cpu_runtime_provider_t out{};
+        CHECK(reg.find_by_desc(&desc, &out), "(9) second registry find_by_desc succeeds");
+        CHECK(std::strcmp(out.name, "embed-engine") == 0,
+              "(9) second registry found provider correct name");
     }
 
     std::fprintf(stdout, "\n%d checks, %d failed\n", g_test_count, g_fail_count);

@@ -29,8 +29,8 @@ public enum class TelemetryEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TelemetryEventKind> = object : EnumAdapter<TelemetryEventKind>(
-      TelemetryEventKind::class,
-      PROTO_3,
+      TelemetryEventKind::class, 
+      PROTO_3, 
       TelemetryEventKind.TELEMETRY_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): TelemetryEventKind? = TelemetryEventKind.fromValue(`value`)

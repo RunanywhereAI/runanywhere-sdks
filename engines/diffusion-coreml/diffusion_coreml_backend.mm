@@ -1373,8 +1373,7 @@ rac_result_t rac_diffusion_coreml_cleanup(rac_diffusion_coreml_impl_t* impl) {
     std::lock_guard<std::mutex> lock(impl->mtx);
     // Pair the retain that rac_coreml_load_model_in_dir performed during
     // initialize. Without these -release calls the MLModel instances would
-    // leak; without the retain in the helper they would dangle. See
-    // runtimes-001.
+    // leak; without the retain in the helper they would dangle.
     [impl->text_encoder release];
     [impl->unet release];
     [impl->vae_decoder release];

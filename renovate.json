@@ -35,18 +35,6 @@
     },
     {
       "customType": "regex",
-      "description": "WHISPERCPP_VERSION → ggerganov/whisper.cpp (GitHub tag).",
-      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
-      "matchStrings": [
-        "^WHISPERCPP_VERSION=(?<currentValue>\\S+)"
-      ],
-      "matchStringsStrategy": "any",
-      "depNameTemplate": "ggerganov/whisper.cpp",
-      "datasourceTemplate": "github-tags",
-      "versioningTemplate": "loose"
-    },
-    {
-      "customType": "regex",
       "description": "USEARCH_VERSION → unum-cloud/usearch (GitHub tag).",
       "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
       "matchStrings": [

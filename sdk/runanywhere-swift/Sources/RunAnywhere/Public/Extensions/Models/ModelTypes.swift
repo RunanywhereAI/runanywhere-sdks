@@ -232,25 +232,22 @@ public extension RAInferenceFramework {
     static var knownCases: [RAInferenceFramework] {
         [
             .onnx, .sherpa, .llamaCpp, .foundationModels, .systemTts, .fluidAudio,
-            .coreml, .mlx, .whisperkitCoreml, .metalrt, .genie,
+            .coreml, .mlx, .metalrt, .genie,
             .tflite, .executorch, .mediapipe, .mlc, .picoLlm,
-            .piperTts, .whisperkit, .openaiWhisper, .swiftTransformers,
+            .piperTts, .swiftTransformers,
             .builtIn, .none, .unknown
         ]
     }
 
     // MARK: - Pre-IDL case-name aliases
     //
-    // The hand-written `InferenceFramework` enum used `.systemTTS` and
-    // `.whisperKitCoreML` (UK-TLA camel-case). Proto conversion normalizes to
-    // `.systemTts` and `.whisperkitCoreml`. Aliases below keep every existing
-    // call site compiling with zero edits.
+    // The hand-written `InferenceFramework` enum used `.systemTTS` (UK-TLA
+    // camel-case). Proto conversion normalizes to `.systemTts`. Aliases below
+    // keep every existing call site compiling with zero edits.
 
     static var systemTTS: RAInferenceFramework { .systemTts }
-    static var whisperKitCoreML: RAInferenceFramework { .whisperkitCoreml }
     static var picoLLM: RAInferenceFramework { .picoLlm }
     static var piperTTS: RAInferenceFramework { .piperTts }
-    static var openAIWhisper: RAInferenceFramework { .openaiWhisper }
     static var execuTorch: RAInferenceFramework { .executorch }
     static var mediaPipe: RAInferenceFramework { .mediapipe }
 }

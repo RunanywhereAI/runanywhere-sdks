@@ -106,11 +106,11 @@ public class VLMChatTemplate(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMChatTemplate> = object : ProtoAdapter<VLMChatTemplate>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VLMChatTemplate::class,
-      "type.googleapis.com/runanywhere.v1.VLMChatTemplate",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VLMChatTemplate::class, 
+      "type.googleapis.com/runanywhere.v1.VLMChatTemplate", 
+      PROTO_3, 
+      null, 
       "vlm_options.proto"
     ) {
       override fun encodedSize(`value`: VLMChatTemplate): Int {

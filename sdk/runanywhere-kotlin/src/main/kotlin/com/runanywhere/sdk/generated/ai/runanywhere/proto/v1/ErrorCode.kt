@@ -581,8 +581,8 @@ public enum class ErrorCode(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ErrorCode> = object : EnumAdapter<ErrorCode>(
-      ErrorCode::class,
-      PROTO_3,
+      ErrorCode::class, 
+      PROTO_3, 
       ErrorCode.ERROR_CODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ErrorCode? = ErrorCode.fromValue(`value`)

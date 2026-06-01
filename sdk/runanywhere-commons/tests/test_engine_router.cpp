@@ -4,7 +4,7 @@
  *
  * Success criteria:
  *   1. PrefersHardwareAcceleratedOnAppleSilicon — Metal plugin beats CPU plugin by ≥30.
- *   2. ANEHintSelectsWhisperKit — preferred_runtime = ANE returns whisperkit_coreml over onnx.
+ *   2. ANEHintSelectsCoreMLEngine — preferred_runtime = ANE returns the ANE/CoreML engine over onnx.
  *   3. PinnedEngineHardWins — pinned_engine returns it even against higher-scoring rivals.
  *   4. NoFallbackReturnsNotFound — no_fallback=1 + missing pinned name → RAC_ERROR_NOT_FOUND.
  *   5. Determinism — same RouteRequest 1000× → same winner.
@@ -146,7 +146,7 @@ int main() {
         rac_runtime_unregister(RAC_RUNTIME_METAL);
     }
 
-    /* --- (2) ANEHintSelectsWhisperKit ------------------------------------ */
+    /* --- (2) ANEHintSelectsCoreMLEngine ---------------------------------- */
     {
         rac::router::HardwareProfile prof{};
         prof.has_ane = true;
@@ -160,18 +160,18 @@ int main() {
         auto rt_onnxrt = make_runtime_vt(RAC_RUNTIME_ONNXRT, "onnxrt-test");
         rac_runtime_register(&rt_ane);
         rac_runtime_register(&rt_onnxrt);
-        auto v_wkit = make_vt("whisperkit_coreml", 110, ane_rts, 2, nullptr, 0);
+        auto v_ane = make_vt("coreml_ane_engine", 110, ane_rts, 2, nullptr, 0);
         auto v_onnx = make_vt("onnx", 80, onnx_rts, 1, nullptr, 0);
-        rac_plugin_register(&v_wkit);
+        rac_plugin_register(&v_ane);
         rac_plugin_register(&v_onnx);
 
         rac::router::RouteRequest req;
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.preferred_runtime = RAC_RUNTIME_ANE;
         auto result = router.route(req);
-        CHECK(result.vtable == &v_wkit, "(2) ANE hint picks WhisperKit over ONNX");
+        CHECK(result.vtable == &v_ane, "(2) ANE hint picks the ANE/CoreML engine over ONNX");
 
-        rac_plugin_unregister("whisperkit_coreml");
+        rac_plugin_unregister("coreml_ane_engine");
         rac_plugin_unregister("onnx");
         rac_runtime_unregister(RAC_RUNTIME_ANE);
         rac_runtime_unregister(RAC_RUNTIME_ONNXRT);
@@ -360,11 +360,11 @@ int main() {
         diffusion.diffusion_ops =
             reinterpret_cast<const struct rac_diffusion_service_ops*>(&k_sentinel);
         diffusion.llm_ops = nullptr;
-        auto whisperkit = make_vt("whisperkit_coreml", 110, coreml_rts, 2, nullptr, 0);
-        whisperkit.stt_ops = reinterpret_cast<const struct rac_stt_service_ops*>(&k_sentinel);
-        whisperkit.llm_ops = nullptr;
+        auto coreml_stt = make_vt("coreml_stt_engine", 110, coreml_rts, 2, nullptr, 0);
+        coreml_stt.stt_ops = reinterpret_cast<const struct rac_stt_service_ops*>(&k_sentinel);
+        coreml_stt.llm_ops = nullptr;
         rac_plugin_register(&diffusion);
-        rac_plugin_register(&whisperkit);
+        rac_plugin_register(&coreml_stt);
 
         rac::router::RouteRequest diffusion_req;
         diffusion_req.primitive = RAC_PRIMITIVE_DIFFUSION;
@@ -376,10 +376,10 @@ int main() {
         stt_req.primitive = RAC_PRIMITIVE_TRANSCRIBE;
         auto stt_result = router.route(stt_req);
         CHECK(stt_result.vtable == nullptr,
-              "(10) WhisperKit rejects when CoreML runtime is not registered");
+              "(10) CoreML STT engine rejects when CoreML runtime is not registered");
 
         rac_plugin_unregister("diffusion_coreml");
-        rac_plugin_unregister("whisperkit_coreml");
+        rac_plugin_unregister("coreml_stt_engine");
     }
 
     /* --- (bonus) C ABI wrapper smoke test -------------------------------- */

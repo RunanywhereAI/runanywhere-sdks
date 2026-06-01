@@ -222,8 +222,6 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
         return 'Core ML';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
         return 'MLX';
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-        return 'WhisperKit Core ML';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
         return 'MetalRT';
       case pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:

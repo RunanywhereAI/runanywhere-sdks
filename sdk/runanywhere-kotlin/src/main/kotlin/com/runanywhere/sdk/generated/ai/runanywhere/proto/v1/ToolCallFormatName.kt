@@ -49,8 +49,8 @@ public enum class ToolCallFormatName(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallFormatName> = object : EnumAdapter<ToolCallFormatName>(
-      ToolCallFormatName::class,
-      PROTO_3,
+      ToolCallFormatName::class, 
+      PROTO_3, 
       ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ToolCallFormatName? = ToolCallFormatName.fromValue(`value`)

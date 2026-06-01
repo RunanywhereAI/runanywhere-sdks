@@ -31,7 +31,7 @@ constexpr int32_t kProtoIfwSystemTts = 4;
 constexpr int32_t kProtoIfwFluidAudio = 5;
 constexpr int32_t kProtoIfwCoreml = 6;
 constexpr int32_t kProtoIfwMlx = 7;
-constexpr int32_t kProtoIfwWhisperkitCoreml = 8;
+// Proto value 8 (WHISPERKIT_COREML) retired — gap preserved.
 constexpr int32_t kProtoIfwMetalrt = 9;
 constexpr int32_t kProtoIfwGenie = 10;
 constexpr int32_t kProtoIfwTflite = 11;
@@ -40,8 +40,7 @@ constexpr int32_t kProtoIfwMediapipe = 13;
 constexpr int32_t kProtoIfwMlc = 14;
 constexpr int32_t kProtoIfwPicoLlm = 15;
 constexpr int32_t kProtoIfwPiperTts = 16;
-constexpr int32_t kProtoIfwWhisperkit = 17;
-constexpr int32_t kProtoIfwOpenaiWhisper = 18;
+// Proto values 17 (WHISPERKIT) and 18 (OPENAI_WHISPER) retired — gaps preserved.
 constexpr int32_t kProtoIfwSwiftTransformers = 19;
 constexpr int32_t kProtoIfwBuiltIn = 20;
 constexpr int32_t kProtoIfwNone = 21;
@@ -123,9 +122,6 @@ rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
         case kProtoIfwMlx:
             *out = RAC_FRAMEWORK_MLX;
             return RAC_SUCCESS;
-        case kProtoIfwWhisperkitCoreml:
-            *out = RAC_FRAMEWORK_WHISPERKIT_COREML;
-            return RAC_SUCCESS;
         case kProtoIfwMetalrt:
             *out = RAC_FRAMEWORK_METALRT;
             return RAC_SUCCESS;
@@ -146,17 +142,15 @@ rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
             return RAC_SUCCESS;
         // Proto values defined in idl/model_types.proto but without a
         // corresponding rac_inference_framework_t case: TFLITE, EXECUTORCH,
-        // MEDIAPIPE, MLC, PICO_LLM, PIPER_TTS, WHISPERKIT, OPENAI_WHISPER,
-        // SWIFT_TRANSFORMERS. Fold these into UNKNOWN so commons can still
-        // round-trip a generated proto envelope without losing the message.
+        // MEDIAPIPE, MLC, PICO_LLM, PIPER_TTS, SWIFT_TRANSFORMERS. Fold these
+        // into UNKNOWN so commons can still round-trip a generated proto
+        // envelope without losing the message.
         case kProtoIfwTflite:
         case kProtoIfwExecutorch:
         case kProtoIfwMediapipe:
         case kProtoIfwMlc:
         case kProtoIfwPicoLlm:
         case kProtoIfwPiperTts:
-        case kProtoIfwWhisperkit:
-        case kProtoIfwOpenaiWhisper:
         case kProtoIfwSwiftTransformers:
             *out = RAC_FRAMEWORK_UNKNOWN;
             return RAC_SUCCESS;
@@ -197,9 +191,6 @@ rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value, i
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_COREML:
             *out = kProtoIfwCoreml;
-            return RAC_SUCCESS;
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            *out = kProtoIfwWhisperkitCoreml;
             return RAC_SUCCESS;
         case RAC_FRAMEWORK_METALRT:
             *out = kProtoIfwMetalrt;

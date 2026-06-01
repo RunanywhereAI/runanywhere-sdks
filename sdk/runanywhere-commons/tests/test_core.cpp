@@ -232,53 +232,6 @@ static TestResult test_logger_no_crash() {
 }
 
 // =============================================================================
-// Test: module register / list / unregister
-// =============================================================================
-
-static TestResult test_module_register() {
-    rac_config_t config = make_test_config();
-    rac_result_t rc = rac_init(&config);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_init should succeed");
-
-    // Prepare module info
-    rac_capability_t caps[] = {RAC_CAPABILITY_STT};
-    rac_module_info_t mod = {};
-    mod.id = "test-module";
-    mod.name = "Test";
-    mod.version = "1.0";
-    mod.description = "A test module";
-    mod.capabilities = caps;
-    mod.num_capabilities = 1;
-
-    rc = rac_module_register(&mod);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_module_register should succeed");
-
-    // List modules
-    const rac_module_info_t* modules = nullptr;
-    size_t count = 0;
-    rc = rac_module_list(&modules, &count);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_module_list should succeed");
-    ASSERT_TRUE(count > 0, "module count should be > 0 after register");
-
-    // Verify our module is in the list
-    bool found = false;
-    for (size_t i = 0; i < count; ++i) {
-        if (modules[i].id && std::strcmp(modules[i].id, "test-module") == 0) {
-            found = true;
-            break;
-        }
-    }
-    ASSERT_TRUE(found, "registered module 'test-module' should appear in module list");
-
-    // Unregister
-    rc = rac_module_unregister("test-module");
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_module_unregister should succeed");
-
-    rac_shutdown();
-    return TEST_PASS();
-}
-
-// =============================================================================
 // Test: rac_alloc / rac_free / rac_strdup
 // =============================================================================
 
@@ -371,7 +324,6 @@ int main(int argc, char** argv) {
         suite.add("error_details", test_error_details);
         suite.add("logger_levels", test_logger_levels);
         suite.add("logger_no_crash", test_logger_no_crash);
-        suite.add("module_register", test_module_register);
         suite.add("alloc_free", test_alloc_free);
         suite.add("audio_float32_to_wav", test_audio_float32_to_wav);
         suite.add("audio_int16_to_wav", test_audio_int16_to_wav);

@@ -41,8 +41,8 @@ public enum class ComponentInitializationEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentInitializationEventKind> =
         object : EnumAdapter<ComponentInitializationEventKind>(
-      ComponentInitializationEventKind::class,
-      PROTO_3,
+      ComponentInitializationEventKind::class, 
+      PROTO_3, 
       ComponentInitializationEventKind.COMPONENT_INIT_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ComponentInitializationEventKind? = ComponentInitializationEventKind.fromValue(`value`)

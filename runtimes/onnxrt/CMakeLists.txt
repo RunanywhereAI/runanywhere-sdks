@@ -48,7 +48,7 @@ if(ANDROID OR RAC_PLATFORM_ANDROID)
     target_compile_definitions(rac_runtime_onnxrt PUBLIC ORT_API_VERSION=17)
 endif()
 
-# RT-ONNX-04: Execution-provider compile-time switches. Enable an EP only when
+# Execution-provider compile-time switches. Enable an EP only when
 # the vendored ORT build actually ships its append function + provider-factory
 # header; otherwise the EP stays a stub that returns CAPABILITY_UNSUPPORTED to
 # callers. Keeping this granular lets us ship the CoreML EP on Apple today and

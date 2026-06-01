@@ -42,8 +42,8 @@ public enum class StorageEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageEventKind> = object : EnumAdapter<StorageEventKind>(
-      StorageEventKind::class,
-      PROTO_3,
+      StorageEventKind::class, 
+      PROTO_3, 
       StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): StorageEventKind? = StorageEventKind.fromValue(`value`)

@@ -307,11 +307,11 @@ public class STTOptions(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTOptions> = object : ProtoAdapter<STTOptions>(
-      FieldEncoding.LENGTH_DELIMITED,
-      STTOptions::class,
-      "type.googleapis.com/runanywhere.v1.STTOptions",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      STTOptions::class, 
+      "type.googleapis.com/runanywhere.v1.STTOptions", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: STTOptions): Int {

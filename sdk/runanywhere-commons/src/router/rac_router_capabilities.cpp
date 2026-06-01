@@ -60,9 +60,6 @@ runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable
     if (name.find("llama") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
     }
-    if (name.find("whisperkit") != std::string::npos && name.find("coreml") != std::string::npos) {
-        return runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
-    }
     if (name.find("coreml") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     }
@@ -77,10 +74,6 @@ runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable
     }
     if (name.find("piper") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_PIPER_TTS;
-    }
-    if (name.find("whisper") != std::string::npos) {
-        /* whispercpp — not a first-class framework enum yet; fall through. */
-        return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
     }
     return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
 }

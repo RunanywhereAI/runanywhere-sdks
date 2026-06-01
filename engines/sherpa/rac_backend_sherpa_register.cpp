@@ -17,7 +17,6 @@
 #include <vector>
 
 #include "rac/audio/rac_audio_convert.h"
-#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -373,19 +372,6 @@ rac_result_t rac_backend_sherpa_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    rac_module_info_t module_info = {};
-    module_info.id = "sherpa";
-    module_info.name = "Sherpa-ONNX";
-    module_info.version = "1.0.0";
-    module_info.description = "Sherpa-ONNX backend (STT / TTS / VAD)";
-    module_info.capabilities = nullptr;
-    module_info.num_capabilities = 0;
-
-    rac_result_t result = rac_module_register(&module_info);
-    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-        return result;
-    }
-
     const rac_engine_vtable_t* vt = rac_plugin_entry_sherpa();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
@@ -407,7 +393,6 @@ rac_result_t rac_backend_sherpa_unregister(void) {
     }
 
     rac_plugin_unregister("sherpa");
-    rac_module_unregister("sherpa");
 
     g_sherpa_registered = false;
     return RAC_SUCCESS;

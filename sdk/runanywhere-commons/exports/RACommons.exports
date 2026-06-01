@@ -26,10 +26,9 @@
 # `-exported_symbols_list` linker would reject an entry naming it —
 # hence the split.
 #
-# The previous onnx_embeddings and
-# whisperkit_coreml sibling exports were dropped because those
+# The previous onnx_embeddings sibling exports were dropped because those
 # `_rac_backend_*_register` symbols live in the engine targets
-# (engines/onnx, engines/whisperkit_coreml), not in librac_commons.
+# (engines/onnx), not in librac_commons.
 # Each engine target publishes its own exports list.
 #
 # The previously-stale rac_vad_{start,stop,reset} RAC_API
@@ -481,12 +480,12 @@ _rac_device_get_or_create_persistent_id
 _rac_device_identity_reset_cache_for_testing
 
 # Backend registration entry points — every backend (platform FM, RAG,
-# WhisperKit CoreML, etc.) publishes a rac_backend_*_register()/_unregister()
+# etc.) publishes a rac_backend_*_register()/_unregister()
 # pair that the platform SDK calls at module load.
 _rac_backend_platform_register
 _rac_backend_platform_unregister
 
-# Apple platform (Foundation Models / System TTS / WhisperKit CoreML) callback
+# Apple platform (Foundation Models / System TTS) callback
 # contracts. Swift registers C callbacks via rac_platform_*_set_callbacks.
 _rac_platform_llm_set_callbacks
 _rac_platform_tts_set_callbacks
@@ -798,12 +797,6 @@ _rac_download_task_ids_free
 # Archive extraction helpers (ONNX .tar.bz2, diffusion bundles, etc.).
 _rac_extract_archive
 _rac_extract_archive_native
-
-# Module registry — capability probing called from CppBridge+Services.swift.
-_rac_module_get_info
-_rac_module_list
-_rac_module_register
-_rac_module_unregister
 
 # Lower-level event bus (analytics/track). Public event stream remains rac_sdk_event_*.
 _rac_event_subscribe
@@ -1152,15 +1145,11 @@ _rac_model_strategy_is_valid
 _rac_model_strategy_post_process
 _rac_model_strategy_prepare_download
 _rac_model_strategy_unregister
-_rac_modules_for_capability
 _rac_monotonic_now_ms
 _rac_onnxrt_runtime_enable_execution_provider
 _rac_onnxrt_runtime_ep_device_class
 _rac_onnxrt_runtime_ep_is_available
 _rac_onnxrt_runtime_get_active_ep
-_rac_onnxrt_runtime_get_provider_session
-_rac_onnxrt_runtime_register_provider
-_rac_onnxrt_runtime_unregister_provider
 _rac_openai_chat_response_free
 _rac_openai_models_response_free
 _rac_path_is_non_empty_directory

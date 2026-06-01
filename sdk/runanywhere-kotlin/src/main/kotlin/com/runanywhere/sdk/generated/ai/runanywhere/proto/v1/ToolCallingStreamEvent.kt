@@ -180,11 +180,11 @@ public class ToolCallingStreamEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallingStreamEvent> =
         object : ProtoAdapter<ToolCallingStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolCallingStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.ToolCallingStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolCallingStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ToolCallingStreamEvent", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolCallingStreamEvent): Int {

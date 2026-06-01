@@ -5,230 +5,59 @@
  * Shell plugin: the entry point remains inspectable,
  * but registration is rejected and no LLM/routing metadata is advertised
  * until real Genie LLM ops are wired. SDK discovery alone is not enough:
- * the current public implementation still returns
- * RAC_ERROR_BACKEND_UNAVAILABLE from every LLM op.
+ * genie is OFF by default and never routable in-tree
+ * (`RAC_GENIE_LLM_OPS_AVAILABLE=0`), so every routable seam stays absent.
  *
  * The ABI surface intentionally stays identical in both modes so that
  * downstream SDKs (runanywhere_genie Flutter plugin, Kotlin Genie
  * module) can load the shell without platform-specific branches while the
  * router only sees Genie when the Qualcomm SDK-backed ops are real.
  *
- * Declarative manifest publishes package ownership, Qualcomm-only
- * (private) availability and the served primitive set alongside the routing
- * metadata. The manifest mirrors the conditional ops slots so registry
- * validation accepts both routable and shell builds.
+ * The not-routable manifest + all-NULL vtable + entry are emitted by the
+ * shared `RAC_ENGINE_UNAVAILABLE_PLUGIN` shell (engines/common/), which genie
+ * is the first consumer of; only `genie_capability_check()` (its SDK/Android
+ * 3-way gate) is engine-specific. When real Genie LLM ops are wired
+ * (`RAC_GENIE_LLM_OPS_AVAILABLE=1`), replace the shared shell with a
+ * hand-written routable manifest/vtable exposing `RAC_PRIMITIVE_GENERATE_TEXT`.
  */
 
 #include "genie_backend.h"
+#include "common/rac_engine_unavailable.h"
 
-#include "rac/features/llm/rac_llm_service.h"
-#include "rac/plugin/rac_engine_manifest.h"
-#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
-
-#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE && defined(__ANDROID__) && \
-    defined(RAC_GENIE_LLM_OPS_AVAILABLE) && RAC_GENIE_LLM_OPS_AVAILABLE
-#define RAC_GENIE_ROUTABLE 1
-#else
-#define RAC_GENIE_ROUTABLE 0
-#endif
 
 namespace {
 
-// -----------------------------------------------------------------------------
-// Unavailable stubs
-// -----------------------------------------------------------------------------
-// Every llm_ops entry dispatches into these when the Genie SDK isn't
-// linked. Explicitly named rather than a generic lambda so stack traces
-// during debugging point at the primitive the caller tried to invoke.
-
-rac_result_t genie_llm_create(const char* /*model_id*/, const char* /*config_json*/,
-                              void** out_impl) {
-    if (out_impl)
-        *out_impl = nullptr;
-    return genie_backend_unavailable();
-}
-
-rac_result_t genie_llm_initialize(void* /*impl*/, const char* /*model_path*/) {
-    return genie_backend_unavailable();
-}
-
-rac_result_t genie_llm_generate(void* /*impl*/, const char* /*prompt*/,
-                                const rac_llm_options_t* /*opts*/, rac_llm_result_t* /*out*/) {
-    return genie_backend_unavailable();
-}
-
-rac_result_t genie_llm_generate_stream(void* /*impl*/, const char* /*prompt*/,
-                                       const rac_llm_options_t* /*opts*/,
-                                       rac_llm_stream_callback_fn /*cb*/, void* /*user_data*/) {
-    return genie_backend_unavailable();
-}
-
-rac_result_t genie_llm_get_info(void* /*impl*/, rac_llm_info_t* /*out*/) {
-    return genie_backend_unavailable();
-}
-
-rac_result_t genie_llm_cancel(void* /*impl*/) {
-    return genie_backend_unavailable();
-}
-
-rac_result_t genie_llm_cleanup(void* /*impl*/) {
-    return RAC_SUCCESS;
-}
-
-void genie_llm_destroy(void* /*impl*/) {
-    /* No-op: create always returned RAC_ERROR_BACKEND_UNAVAILABLE so impl
-     * is NULL. Safe to call. */
-}
-
 // capability_check runs during rac_plugin_register. Reject the shell so the
 // router never sees Genie as an eligible LLM backend in public/default builds.
-// Non-Android hosts are rejected because the runtime targets Snapdragon
-// Android.
+// Non-Android hosts are rejected (CAPABILITY_UNSUPPORTED) because the runtime
+// targets Snapdragon Android; Android hosts without SDK-backed ops are rejected
+// (BACKEND_UNAVAILABLE). The 3-way decision is delegated to the shared helper.
+//
+// SDK-discovery seam: RAC_GENIE_SDK_AVAILABLE only governs whether the shell
+// compiles against Qualcomm headers — it never makes Genie routable on its own.
+// `backend_present` additionally requires RAC_GENIE_LLM_OPS_AVAILABLE (real
+// SDK-backed ops), which is a local build fact pinned to 0 in CMakeLists.txt.
 rac_result_t genie_capability_check(void) {
-#if !defined(RAC_GENIE_SDK_AVAILABLE) || !RAC_GENIE_SDK_AVAILABLE
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
-#elif !defined(__ANDROID__)
-    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
-#elif !defined(RAC_GENIE_LLM_OPS_AVAILABLE) || !RAC_GENIE_LLM_OPS_AVAILABLE
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
+    return rac_engine_unavailable_capability(
+#if defined(__ANDROID__)
+        1, /* platform_supported: runtime targets Snapdragon Android */
 #else
-    return RAC_SUCCESS;
+        0,
 #endif
+#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE && \
+    defined(RAC_GENIE_LLM_OPS_AVAILABLE) && RAC_GENIE_LLM_OPS_AVAILABLE
+        1 /* backend_present: SDK-backed LLM ops are wired */
+#else
+        0
+#endif
+    );
 }
 
 }  // namespace
 
-extern "C" const rac_llm_service_ops_t g_genie_llm_ops = {
-    .initialize = genie_llm_initialize,
-    .generate = genie_llm_generate,
-    .generate_stream = genie_llm_generate_stream,
-    .generate_stream_with_timing = nullptr,
-    .get_info = genie_llm_get_info,
-    .cancel = genie_llm_cancel,
-    .cleanup = genie_llm_cleanup,
-    .destroy = genie_llm_destroy,
-    .load_lora = nullptr,
-    .remove_lora = nullptr,
-    .clear_lora = nullptr,
-    .get_lora_info = nullptr,
-    .inject_system_prompt = nullptr,
-    .append_context = nullptr,
-    .generate_from_context = nullptr,
-    .clear_context = nullptr,
-    .create = genie_llm_create,
-};
-
 extern "C" {
 
-#if RAC_GENIE_ROUTABLE
-static const rac_runtime_id_t k_genie_runtimes[] = {
-    RAC_RUNTIME_QNN,
-    RAC_RUNTIME_CPU,
-};
-
-static const uint32_t k_genie_formats[] = {
-    RAC_MODEL_FORMAT_ID_ONNX, /* Genie ingests QNN-compiled ONNX bundles */
-};
-
-static const rac_primitive_t k_genie_primitives[] = {
-    RAC_PRIMITIVE_GENERATE_TEXT,
-};
-#endif
-
-static const rac_engine_manifest_t k_genie_manifest = {
-    .name = "genie",
-    .display_name =
-#if RAC_GENIE_ROUTABLE
-        "Qualcomm Genie (NPU)",
-#else
-        "Qualcomm Genie (NPU) [ops unavailable]",
-#endif
-    .version = nullptr,
-    .package_owner = "runanywhere",
-    .package_name = "runanywhere_genie",
-    .availability = RAC_ENGINE_AVAILABILITY_PRIVATE, /* Qualcomm-only. */
-    /* High priority only when the SDK-backed Android engine is eligible. */
-    .priority =
-#if RAC_GENIE_ROUTABLE
-        200,
-#else
-        0,
-#endif
-    .capability_flags = 0,
-    .primitives =
-#if RAC_GENIE_ROUTABLE
-        k_genie_primitives,
-#else
-        nullptr,
-#endif
-    .primitives_count =
-#if RAC_GENIE_ROUTABLE
-        sizeof(k_genie_primitives) / sizeof(k_genie_primitives[0]),
-#else
-        0,
-#endif
-    .runtimes =
-#if RAC_GENIE_ROUTABLE
-        k_genie_runtimes,
-#else
-        nullptr,
-#endif
-    .runtimes_count =
-#if RAC_GENIE_ROUTABLE
-        sizeof(k_genie_runtimes) / sizeof(k_genie_runtimes[0]),
-#else
-        0,
-#endif
-    .formats =
-#if RAC_GENIE_ROUTABLE
-        k_genie_formats,
-#else
-        nullptr,
-#endif
-    .formats_count =
-#if RAC_GENIE_ROUTABLE
-        sizeof(k_genie_formats) / sizeof(k_genie_formats[0]),
-#else
-        0,
-#endif
-    .reserved_0 = 0,
-    .reserved_1 = 0,
-};
-
-static const rac_engine_vtable_t g_genie_engine_vtable = {
-    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_genie_manifest),
-    /* capability_check */ genie_capability_check,
-    /* on_unload        */ nullptr,
-
-/* llm_ops          */
-#if RAC_GENIE_ROUTABLE
-    &g_genie_llm_ops,
-#else
-    nullptr,
-#endif
-    /* stt_ops          */ nullptr,
-    /* tts_ops          */ nullptr,
-    /* vad_ops          */ nullptr,
-    /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
-    /* vlm_ops          */ nullptr,
-    /* diffusion_ops    */ nullptr,
-
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-};
-
-RAC_PLUGIN_ENTRY_DEF(genie) {
-    return rac_engine_entry_with_manifest(&k_genie_manifest, &g_genie_engine_vtable);
-}
+RAC_ENGINE_UNAVAILABLE_PLUGIN(genie, "Qualcomm Genie (NPU)", genie_capability_check)
 
 }  // extern "C"

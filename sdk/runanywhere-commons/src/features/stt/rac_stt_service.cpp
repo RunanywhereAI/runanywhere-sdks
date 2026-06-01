@@ -38,8 +38,6 @@ static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
             return "onnx";
         case RAC_FRAMEWORK_SHERPA:
             return "sherpa";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "whisperkit_coreml";
         case RAC_FRAMEWORK_METALRT:
             return "metalrt";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:

@@ -138,11 +138,11 @@ public class WordTimestamp(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<WordTimestamp> = object : ProtoAdapter<WordTimestamp>(
-      FieldEncoding.LENGTH_DELIMITED,
-      WordTimestamp::class,
-      "type.googleapis.com/runanywhere.v1.WordTimestamp",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      WordTimestamp::class, 
+      "type.googleapis.com/runanywhere.v1.WordTimestamp", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: WordTimestamp): Int {

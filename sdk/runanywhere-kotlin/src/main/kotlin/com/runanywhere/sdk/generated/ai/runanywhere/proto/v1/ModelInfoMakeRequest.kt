@@ -151,11 +151,11 @@ public class ModelInfoMakeRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelInfoMakeRequest> =
         object : ProtoAdapter<ModelInfoMakeRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelInfoMakeRequest::class,
-      "type.googleapis.com/runanywhere.v1.ModelInfoMakeRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelInfoMakeRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ModelInfoMakeRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelInfoMakeRequest): Int {

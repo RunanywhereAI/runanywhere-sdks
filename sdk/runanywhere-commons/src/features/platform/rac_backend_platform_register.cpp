@@ -554,7 +554,6 @@ namespace {
 struct PlatformRegistryState {
     std::mutex mutex;
     bool registered = false;
-    char module_id[16] = "platform";
 };
 
 PlatformRegistryState& get_state() {
@@ -734,23 +733,6 @@ rac_result_t rac_backend_platform_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    rac_module_info_t module_info = {};
-    module_info.id = state.module_id;
-    module_info.name = "Platform Services";
-    module_info.version = "1.0.0";
-    module_info.description =
-        "Apple platform services (Foundation Models, System TTS, CoreML Diffusion)";
-
-    rac_capability_t capabilities[] = {RAC_CAPABILITY_TEXT_GENERATION, RAC_CAPABILITY_TTS,
-                                       RAC_CAPABILITY_DIFFUSION};
-    module_info.capabilities = capabilities;
-    module_info.num_capabilities = 3;
-
-    rac_result_t result = rac_module_register(&module_info);
-    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-        return result;
-    }
-
     // v3 Phase B7: plugin registration for the 3 platform primitives
     // (LLM, TTS, Diffusion) via rac_plugin_entry_platform() — see
     // sdk/runanywhere-commons/src/features/platform/rac_plugin_entry_platform.cpp.
@@ -772,8 +754,6 @@ rac_result_t rac_backend_platform_unregister(void) {
     if (!state.registered) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
-
-    rac_module_unregister(state.module_id);
 
     state.registered = false;
     RAC_LOG_INFO(LOG_CAT, "Platform backend unregistered");

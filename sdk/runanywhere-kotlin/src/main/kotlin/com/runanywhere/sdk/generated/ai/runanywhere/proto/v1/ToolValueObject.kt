@@ -79,11 +79,11 @@ public class ToolValueObject(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolValueObject> = object : ProtoAdapter<ToolValueObject>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolValueObject::class,
-      "type.googleapis.com/runanywhere.v1.ToolValueObject",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolValueObject::class, 
+      "type.googleapis.com/runanywhere.v1.ToolValueObject", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       private val fieldsAdapter: ProtoAdapter<Map<String, ToolValue>> by

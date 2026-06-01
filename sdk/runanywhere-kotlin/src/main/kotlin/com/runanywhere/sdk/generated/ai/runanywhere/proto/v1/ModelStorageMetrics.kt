@@ -120,11 +120,11 @@ public class ModelStorageMetrics(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelStorageMetrics> =
         object : ProtoAdapter<ModelStorageMetrics>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelStorageMetrics::class,
-      "type.googleapis.com/runanywhere.v1.ModelStorageMetrics",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelStorageMetrics::class, 
+      "type.googleapis.com/runanywhere.v1.ModelStorageMetrics", 
+      PROTO_3, 
+      null, 
       "storage_types.proto"
     ) {
       override fun encodedSize(`value`: ModelStorageMetrics): Int {

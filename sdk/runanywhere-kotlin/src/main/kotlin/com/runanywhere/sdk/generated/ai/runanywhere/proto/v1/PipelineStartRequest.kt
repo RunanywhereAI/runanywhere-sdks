@@ -82,11 +82,11 @@ public class PipelineStartRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<PipelineStartRequest> =
         object : ProtoAdapter<PipelineStartRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      PipelineStartRequest::class,
-      "type.googleapis.com/runanywhere.v1.PipelineStartRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      PipelineStartRequest::class, 
+      "type.googleapis.com/runanywhere.v1.PipelineStartRequest", 
+      PROTO_3, 
+      null, 
       "pipeline.proto"
     ) {
       override fun encodedSize(`value`: PipelineStartRequest): Int {

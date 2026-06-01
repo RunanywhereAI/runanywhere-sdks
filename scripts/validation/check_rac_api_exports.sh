@@ -57,8 +57,7 @@ fi
 # RAC_API decls don't show up as missing.
 SIBLING_EXPORTS=()
 for sibling in "${EXPORTS_DIR}/RACommons.rag.exports" \
-               "${EXPORTS_DIR}/RACommons.onnx_embeddings.exports" \
-               "${EXPORTS_DIR}/RACommons.whisperkit_coreml.exports"; do
+               "${EXPORTS_DIR}/RACommons.onnx_embeddings.exports"; do
     if [[ -f "${sibling}" ]]; then
         SIBLING_EXPORTS+=("${sibling}")
     fi
@@ -76,8 +75,8 @@ strict = sys.argv[3] == '1'
 sibling_paths = sys.argv[4:]
 
 # Collect exported symbols from the main file plus all sibling
-# backend-conditional exports files (RAG, ONNX embeddings, WhisperKit
-# CoreML). The Apple linker concatenates these at link time based on
+# backend-conditional exports files (RAG, ONNX embeddings). The Apple
+# linker concatenates these at link time based on
 # RAC_BACKEND_* flags; for drift accounting we treat all of them as
 # part of the canonical exported surface.
 exported = set()

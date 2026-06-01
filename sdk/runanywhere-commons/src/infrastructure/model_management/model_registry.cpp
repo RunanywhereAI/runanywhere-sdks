@@ -255,8 +255,6 @@ static InferenceFramework inference_framework_to_proto(rac_inference_framework_t
             return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
         case RAC_FRAMEWORK_COREML:
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
         case RAC_FRAMEWORK_METALRT:
             return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
         case RAC_FRAMEWORK_GENIE:
@@ -289,8 +287,6 @@ static rac_inference_framework_t inference_framework_from_proto(InferenceFramewo
             return RAC_FRAMEWORK_MLX;
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
             return RAC_FRAMEWORK_COREML;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-            return RAC_FRAMEWORK_WHISPERKIT_COREML;
         case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
             return RAC_FRAMEWORK_METALRT;
         case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
@@ -2972,9 +2968,9 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
         RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
         RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
         RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
-        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-        RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
+        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_METALRT,
+        RAC_FRAMEWORK_GENIE,       RAC_FRAMEWORK_SHERPA,
+        RAC_FRAMEWORK_UNKNOWN};
 
     int32_t linked = 0;
     std::vector<rac_directory_entry_t> framework_entries;
@@ -3352,9 +3348,9 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
         RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
         RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
         RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
-        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-        RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
+        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_METALRT,
+        RAC_FRAMEWORK_GENIE,       RAC_FRAMEWORK_SHERPA,
+        RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
     // Lock-copy-dispatch: snapshot the registered ids (and which ones already

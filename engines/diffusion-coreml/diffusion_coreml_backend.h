@@ -35,7 +35,7 @@ typedef struct rac_diffusion_coreml_impl rac_diffusion_coreml_impl_t;
  * `rac_diffusion_coreml_initialize` to point it at a model directory.
  *
  * @param model_id    Optional model identifier (logged, not required).
- * @param config_json Optional backend-specific JSON (ignored in T5.3).
+ * @param config_json Optional backend-specific JSON (currently ignored).
  * @param out_impl    Receives the impl pointer.
  * @return RAC_SUCCESS on success.
  */
