@@ -14,7 +14,7 @@
  *   - metalrt — multi-primitive engine whose closed-source binary
  *     (`RAC_METALRT_ENGINE_AVAILABLE`) is usually absent, so its STUB ARM
  *     publishes nothing.
- *   - diffusion-coreml — Apple-only; its non-routable arm publishes nothing.
+ *   - coreml — Apple-only; its non-routable arm publishes nothing.
  *
  * Each of those hand-rolls the identical four-part shell:
  *   1. an empty / not-routable `rac_engine_manifest_t` (zero primitives /
@@ -134,10 +134,10 @@ extern "C" {
  *
  * Engines pass their own `#if`-derived booleans (1/0):
  *   - @p platform_supported — is this OS/arch a target for the engine at all?
- *     (e.g. `__ANDROID__` for genie, `__APPLE__` for metalrt / diffusion-coreml).
+ *     (e.g. `__ANDROID__` for genie, `__APPLE__` for metalrt / coreml).
  *   - @p backend_present    — is the real engine implementation linked / wired
  *     on this build? (SDK-backed ops for genie, the closed-source binary for
- *     metalrt, the generate path for diffusion-coreml).
+ *     metalrt, the generate path for coreml).
  *
  * Returns, in priority order:
  *   - `RAC_ERROR_CAPABILITY_UNSUPPORTED` when the platform itself is wrong —
@@ -150,7 +150,7 @@ extern "C" {
  *
  * The platform check is evaluated first so a stub build on the wrong OS reports
  * UNSUPPORTED rather than UNAVAILABLE, matching the hand-written gates in
- * genie / metalrt / diffusion-coreml.
+ * genie / metalrt / coreml.
  */
 static inline rac_result_t rac_engine_unavailable_capability(int platform_supported,
                                                              int backend_present) {

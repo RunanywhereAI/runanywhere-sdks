@@ -48,7 +48,7 @@ namespace {
 constexpr const char* kTag = "ToolCallingRunLoop";
 constexpr uint32_t kDefaultMaxIterations = 5;
 
-// pass2-syn-007: per-loop cancellation state. Allocated on the heap, owned by
+// per-loop cancellation state. Allocated on the heap, owned by
 // a per-process registry keyed by an opaque handle published to the host via
 // rac_tool_calling_run_loop_with_handle_proto. The cancel function is
 // thread-safe relative to the run loop (uses a separate active_ref_mu).
@@ -114,7 +114,7 @@ struct LoopContext {
     bool keep_tools_available = false;
     bool validate_calls = true;
 
-    // pass2-syn-006: request-level tool_choice / forced_tool_name overrides.
+    // request-level tool_choice / forced_tool_name overrides.
     // When present, build_options_snapshot copies them onto the synthesized
     // ToolCallingOptions before every format/validate proto helper call.
     bool has_tool_choice = false;
@@ -141,7 +141,7 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
         options.set_system_prompt(ctx.system_prompt);
     }
     // Honor ToolCallingSessionCreateRequest.tool_choice / forced_tool_name
-    // (pass2-syn-006). The request-level fields take precedence over any
+    // The request-level fields take precedence over any
     // tool_options the caller might have pre-populated, so the high-level
     // run-loop / session APIs surface the OpenAI-style tool_choice knob
     // that the format/validate primitives already read.
@@ -292,7 +292,7 @@ bool run_generate_once(const LoopContext& ctx, LoopCancelState* cancel_state,
         return false;
     }
 
-    // pass2-syn-007: publish the in-flight ref so a cancel from another
+    // publish the in-flight ref so a cancel from another
     // thread can interrupt. Latch a pre-arrived cancel onto the ref now.
     if (cancel_state) {
         std::lock_guard<std::mutex> guard(cancel_state->active_ref_mu);
@@ -346,7 +346,7 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
 
 }  // namespace
 
-// pass3-syn-028: internal helper that owns the full run-loop body. Both the
+// internal helper that owns the full run-loop body. Both the
 // pointer-shape (rac_tool_calling_run_loop_with_handle_proto) and the
 // callback-shape (rac_tool_calling_run_loop_with_handle_and_cb_proto) entry
 // points funnel through this helper. The handle is allocated FIRST — before
@@ -387,7 +387,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     }
     rac_proto_buffer_init(out_result);
 
-    // pass3-syn-028: mint the cancel state and handle FIRST — before any
+    // mint the cancel state and handle FIRST — before any
     // proto parsing or LLM work — so the host can race the handle into its
     // own thread-safe sink synchronously from on_handle_published. RAII
     // guard unregisters on every return path.
@@ -439,7 +439,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     // that delegate validation/authorization to their executor opt out by
     // explicitly setting validate_calls=false.
     ctx.validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
-    // pass2-syn-006: pick up the request-level OpenAI-style tool_choice and
+    // pick up the request-level OpenAI-style tool_choice and
     // forced_tool_name knobs (idl/tool_calling.proto fields 7/8) — these are
     // copied onto every ToolCallingOptions snapshot the loop synthesizes for
     // format/validate proto calls.
@@ -471,7 +471,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
         std::string response;
         rac_result_t rc = RAC_SUCCESS;
         if (!run_generate_once(ctx, cancel_state.get(), current_prompt, &response, &rc)) {
-            // pass3-syn-021 parity: distinguish cancel from other generate
+            // distinguish cancel from other generate
             // failures, mirroring run_generate_loop in tool_calling_session.cpp.
             // A cancel that latched before/during generate surfaces as
             // RAC_ERROR_CANCELLED with "LLM generation cancelled" so hosts can
@@ -622,7 +622,7 @@ extern "C" rac_result_t rac_tool_calling_run_loop_with_handle_proto(
                          /*on_handle_user_data=*/nullptr, out_run_loop_handle, out_result);
 }
 
-// pass3-syn-028: callback-shape entry — fires on_handle_published(handle, ud)
+// callback-shape entry — fires on_handle_published(handle, ud)
 // SYNCHRONOUSLY the moment a cancellable handle is minted, BEFORE the first
 // generate iteration runs. This lets Swift/Kotlin/Flutter/RN/Web SDKs route
 // the handle into a thread-safe sink (HandleBox, CompletableDeferred,

@@ -27,7 +27,7 @@
 
 namespace {
 
-// pass2-syn-001-followup-vlm: lift the voice_agent in_flight quiesce pattern
+// Lift the voice_agent in_flight quiesce pattern
 // to the VLM proto-byte dispatcher. Even though VLM does NOT publish a
 // registry-style set/unset stream-callback ABI (each rac_vlm_*_stream_proto
 // entry point owns a per-call StreamCtx / GeneratedStreamCtx and invokes
@@ -44,7 +44,7 @@ namespace {
 // just before returning. rac_vlm_component_destroy spin-waits for the counter
 // to drain to zero, exactly mirroring voice_agent.cpp:594.
 //
-// pass3-syn-089: complete the voice_agent pattern by adding an
+// Complete the voice_agent pattern by adding an
 // is_shutting_down barrier (voice_agent.cpp:569 / 1212-1221). Without it, a
 // new caller could acquire the in_flight counter mid-quiesce and extend the
 // spin-wait indefinitely (and worse, dispatch on a legacy struct-API service
@@ -440,9 +440,9 @@ extern "C" {
 // Public quiesce helper. Callers (rac_vlm_component_destroy, lifecycle
 // teardown paths in SDK bridges) spin-wait here before freeing any
 // user_data that may have been passed into a rac_vlm_*_stream_proto call.
-// Mirrors the contract documented in pass2-syn-001 for the LLM dispatcher.
+// Mirrors the in-flight quiesce contract used by the LLM dispatcher.
 //
-// pass3-syn-089: set the is_shutting_down barrier FIRST so any caller that
+// Set the is_shutting_down barrier FIRST so any caller that
 // tries to enter the dispatcher after quiesce begins is rejected by
 // VlmInFlightGuard, then spin-wait until currently-in-flight calls drain.
 // This mirrors voice_agent.cpp:569-592 and rac_diffusion_proto_quiesce.

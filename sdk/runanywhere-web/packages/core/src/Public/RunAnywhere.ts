@@ -72,6 +72,7 @@ import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid';
 import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
 import {
   createStorageNamespace,
@@ -1069,6 +1070,10 @@ export const RunAnywhere = {
 
   /** Vision-language model inference — `RunAnywhere.visionLanguage.processImage(...)`. */
   visionLanguage: VisionLanguageCapability,
+
+  /** Hybrid STT router — `RunAnywhere.hybrid.createSttRouter()` etc. Per-request
+   * offline(sherpa)↔online(cloud) dispatch; commons owns all routing. */
+  hybrid: HybridCapability,
 
   /** Runtime plugin loader — unavailable on plain WASM unless host exports the ABI. */
   pluginLoader: PluginLoaderCapability,

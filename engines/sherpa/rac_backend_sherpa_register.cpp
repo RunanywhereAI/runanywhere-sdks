@@ -2,8 +2,8 @@
  * @file rac_backend_sherpa_register.cpp
  * @brief RunAnywhere Core - Sherpa Backend RAC Registration
  *
- * Registers the Sherpa backend with the module and service registries.
- * Provides vtable implementations for STT, TTS, and VAD services.
+ * Registers the Sherpa backend's unified plugin vtable with the plugin
+ * registry. Provides vtable implementations for STT, TTS, and VAD services.
  */
 
 #include "rac_stt_sherpa.h"
@@ -472,8 +472,8 @@ extern "C" const rac_vad_service_ops_t g_sherpa_vad_ops = {
 //
 // Standardized registration. Mirrors the llamacpp + onnx
 // pattern — one explicit `rac_backend_<name>_register()` entry point that
-// registers both the module record and the unified plugin vtable with the
-// registry. Replaces the deleted ELF `__attribute__((constructor))` auto-
+// registers the unified plugin vtable with the plugin registry via
+// rac_plugin_register(). Replaces the deleted ELF `__attribute__((constructor))` auto-
 // register block that previously lived at the bottom of
 // rac_plugin_entry_sherpa.cpp. iOS / WASM hosts still exercise the static
 // path via RAC_STATIC_PLUGIN_REGISTER(sherpa) (see

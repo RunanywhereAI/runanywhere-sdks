@@ -104,7 +104,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  * from rac_backend_llamacpp). Without an explicit annotation at declaration
  * time, loadability depended on transitive default visibility of the host
  * plugin target — a brittle invariant that a future visibility tightening
- * would silently break (pass2-syn-062).
+ * would silently break.
  *
  * Example:
  * @code

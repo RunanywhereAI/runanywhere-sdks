@@ -52,7 +52,7 @@ typedef void (*rac_diffusion_stream_proto_callback_fn)(const uint8_t* event_byte
  * One registration per handle. Calling again replaces the previous slot.
  * Pass NULL to clear.
  *
- * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ * @warning user_data ownership and lifetime (cross-SDK
  *          contract — see rac_llm_stream.h for the canonical recipe). The C
  *          runtime may invoke `callback(bytes, size, user_data)` on a
  *          background thread AFTER

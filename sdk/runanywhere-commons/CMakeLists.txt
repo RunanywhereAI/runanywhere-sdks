@@ -926,9 +926,10 @@ set(RAC_FEATURES_SOURCES
     # backpressure + hierarchical CancelToken propagation.
     src/features/voice_agent/voice_agent_pipeline.cpp
     # Hybrid router — per-request offline/online dispatch.
-    src/routing/rac_stt_hybrid_router.cpp
-    src/routing/rac_stt_hybrid_router_proto.cpp
-    src/routing/rac_hybrid_device_state.cpp
+    src/router/hybrid/rac_stt_hybrid_router.cpp
+    src/router/hybrid/rac_stt_hybrid_router_proto.cpp
+    src/router/hybrid/rac_hybrid_device_state.cpp
+    src/router/hybrid/rac_hybrid_custom_filter.cpp
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)

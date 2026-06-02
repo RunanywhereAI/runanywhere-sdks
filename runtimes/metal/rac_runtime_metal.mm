@@ -1,3 +1,16 @@
+/*
+ * RESERVED / EXPERIMENTAL — capability-only Metal runtime.
+ *
+ * This runtime is a pure presence gate: it fills only the MANDATORY capability
+ * role (init/destroy + device_info + capabilities) and leaves every
+ * session-execution slot NULL (no RAC_RUNTIME_CAP_SESSION_EXECUTION). The NULL
+ * session slots are BY DESIGN, not unfinished work — the real Metal compute
+ * path lives inside llama.cpp/ggml, never here. Its only consumer is the
+ * `metalrt` engine (Apple-only, RAC_BACKEND_METALRT defaults OFF — dormant),
+ * which calls `rac_metal_runtime_require_available()` to assert the device is
+ * registered before routing. Reserved for future first-class Metal runtimes.
+ * See runtimes/AGENTS.md ("Reserved / experimental: metal").
+ */
 #include "rac_runtime_metal.h"
 
 #import <Foundation/Foundation.h>

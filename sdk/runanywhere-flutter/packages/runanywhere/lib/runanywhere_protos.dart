@@ -22,6 +22,8 @@ export 'generated/errors.pb.dart';
 export 'generated/errors.pbenum.dart';
 export 'generated/hardware_profile.pb.dart';
 export 'generated/hardware_profile.pbenum.dart';
+export 'generated/hybrid_router.pb.dart';
+export 'generated/hybrid_router.pbenum.dart';
 export 'generated/lifecycle_service.pb.dart';
 export 'generated/lifecycle_service.pbenum.dart';
 export 'generated/llm_options.pb.dart';

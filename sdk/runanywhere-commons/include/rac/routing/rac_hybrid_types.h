@@ -40,15 +40,15 @@ typedef enum rac_hybrid_capability {
 
 /**
  * @brief Backend identity. Matches an engines/ subdir registering a service
- *        vtable. Cloud backends are explicit kinds (each has a distinct
- *        HTTP shape + auth).
+ *        vtable. RAC_HYBRID_BACKEND_CLOUD is the generic cloud backend
+ *        ("cloud", serving STT today); the concrete HTTP provider is chosen via config.
  */
 typedef enum rac_hybrid_backend_kind {
     RAC_HYBRID_BACKEND_UNSPECIFIED = 0,
     RAC_HYBRID_BACKEND_LLAMACPP    = 1,
     RAC_HYBRID_BACKEND_OPENROUTER  = 2,
     RAC_HYBRID_BACKEND_SHERPA      = 3,
-    RAC_HYBRID_BACKEND_SARVAM      = 4
+    RAC_HYBRID_BACKEND_CLOUD       = 4  /* generic cloud STT backend (provider chosen via config) */
 } rac_hybrid_backend_kind_t;
 
 /**
@@ -168,10 +168,17 @@ typedef struct rac_hybrid_model_descriptor {
  * @brief Per-request routing context populated by the SDK from host state.
  *        Not part of the user-facing Kotlin API — the JNI layer fills this
  *        with detected device state before calling the router.
+ *
+ * `candidate_model_id` is NOT host-supplied: the router rewrites it to the
+ * model id of the candidate currently under evaluation before invoking a
+ * custom-filter predicate (see rac_hybrid_custom_filter.h), so a host
+ * predicate keyed by name can still branch per candidate. It is empty ("")
+ * outside that per-candidate evaluation.
  */
 typedef struct rac_hybrid_routing_context {
     bool    is_online;
     int32_t battery_percent;
+    char    candidate_model_id[128];
 } rac_hybrid_routing_context_t;
 
 /**

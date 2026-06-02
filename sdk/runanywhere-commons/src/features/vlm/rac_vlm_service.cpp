@@ -268,7 +268,7 @@ void rac_vlm_destroy(rac_handle_t handle) {
     if (!handle)
         return;
 
-    // pass2-syn-001-followup-vlm: quiesce any in-flight rac_vlm_*_proto
+    // quiesce any in-flight rac_vlm_*_proto
     // entry points before tearing down the backend impl. Defensive
     // mirror of voice_agent.cpp:594.
     rac_vlm_proto_quiesce();

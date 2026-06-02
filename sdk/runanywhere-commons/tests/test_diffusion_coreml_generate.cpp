@@ -1,4 +1,4 @@
-#include "diffusion_coreml_backend.h"
+#include "rac_diffusion_coreml.h"
 
 #include <cstdio>
 #include <cstdlib>

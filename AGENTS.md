@@ -67,7 +67,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Directory | Contents |
 |-----------|----------|
 | `sdk/runanywhere-commons/` | C/C++ core library — all AI logic, plugin registry, event system |
-| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, metalrt, genie, diffusion-coreml |
+| `engines/` | 6 backend plugins: llamacpp, sherpa, onnx, metalrt, genie, coreml |
 | `runtimes/` | 4 runtime adapters: cpu (always), onnxrt, coreml, metal |
 | `idl/` | 23 Protobuf schemas + per-language codegen scripts |
 

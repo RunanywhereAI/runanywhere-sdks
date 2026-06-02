@@ -2,6 +2,10 @@
  * @file rac_plugin_entry_metalrt.cpp
  * @brief Unified-ABI entry point for MetalRT backend (Apple only).
  *
+ * RESERVED / EXPERIMENTAL — reserved-for-future engine wrapping a private,
+ * closed-source MetalRT lib; OFF by default and a not-routable stub when the
+ * binary is absent. See engines/AGENTS.md ("Stubs & reserved engines").
+ *
  * MetalRT is a multi-primitive engine: it serves LLM + STT + TTS + VLM all
  * from custom Metal shaders. `capability_check()` gates on both __APPLE__
  * and the private engine binary so stub builds do not advertise primitives.

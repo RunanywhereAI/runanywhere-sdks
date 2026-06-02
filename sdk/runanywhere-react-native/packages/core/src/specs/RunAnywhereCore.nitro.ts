@@ -502,6 +502,189 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<void>;
 
   // ============================================================================
+  // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)
+  //
+  // THIN proto-byte / handle surface over the commons STT hybrid router
+  // (rac_stt_hybrid_router_proto.h + rac_hybrid_device_state.h +
+  // rac_hybrid_custom_filter.h). Mirrors the Kotlin RunAnywhereBridge JNI
+  // quartet and the Swift CRACommons calls: commons owns the entire routing
+  // decision (filter -> rank -> invoke -> fallback); these methods only create
+  // the router + the two registry-routed STT services, marshal the policy
+  // bytes, install the device-state + custom-filter callbacks, and drive
+  // transcribe.
+  //
+  // Handles (router + per-side service) are opaque commons pointers surfaced to
+  // JS as doubles (same packing the Solutions / VoiceAgent handles use).
+  // ============================================================================
+
+  /**
+   * Allocate a native STT hybrid router (`rac_stt_hybrid_router_create`).
+   * @returns router handle as a double (0 on failure).
+   */
+  hybridSttRouterCreate(): Promise<number>;
+
+  /**
+   * Destroy a router handle (`rac_stt_hybrid_router_destroy`). The wrapped
+   * services are NOT destroyed — release those via
+   * `hybridSttRouterDestroyService` first. Idempotent / 0-safe.
+   */
+  hybridSttRouterDestroy(routerHandle: number): Promise<void>;
+
+  /**
+   * Create one registry-routed `rac_stt_service_t` for the offline or online
+   * side. Replicates the commons JNI `create_stt_service_via_registry` recipe:
+   * `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint)` -> `stt_ops->create` ->
+   * heap-wrap. The cloud provider (default "sarvam") rides in `configJson`.
+   *
+   * @param engineHint    "sherpa" | "cloud" — pinned as preferred engine.
+   * @param modelIdOrPath On-device model path for sherpa, "" for cloud.
+   * @param configJson    Cloud `{provider,api_key,model,…}` JSON, "" for sherpa.
+   * @returns service handle as a double (0 on failure).
+   */
+  hybridSttRouterCreateService(
+    engineHint: string,
+    modelIdOrPath: string,
+    configJson: string
+  ): Promise<number>;
+
+  /**
+   * Release a service handle from `hybridSttRouterCreateService` through
+   * `rac_stt_destroy`. Idempotent / 0-safe.
+   */
+  hybridSttRouterDestroyService(serviceHandle: number): Promise<void>;
+
+  /**
+   * Attach (or clear when serviceHandle == 0) the offline-side service +
+   * its serialized runanywhere.v1.HybridModelDescriptor bytes
+   * (`rac_stt_hybrid_router_set_offline_service_proto`).
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridSttRouterSetOfflineService(
+    routerHandle: number,
+    serviceHandle: number,
+    descriptorBytes: ArrayBuffer
+  ): Promise<number>;
+
+  /**
+   * Symmetric to `hybridSttRouterSetOfflineService` for the online side
+   * (`rac_stt_hybrid_router_set_online_service_proto`).
+   */
+  hybridSttRouterSetOnlineService(
+    routerHandle: number,
+    serviceHandle: number,
+    descriptorBytes: ArrayBuffer
+  ): Promise<number>;
+
+  /**
+   * Install / replace the routing policy from serialized
+   * runanywhere.v1.HybridRoutingPolicy bytes
+   * (`rac_stt_hybrid_router_set_policy_proto`).
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridSttRouterSetPolicy(
+    routerHandle: number,
+    policyBytes: ArrayBuffer
+  ): Promise<number>;
+
+  /**
+   * Dispatch one transcribe request through the router
+   * (`rac_stt_hybrid_router_transcribe_proto`). Input is serialized
+   * runanywhere.v1.HybridSttTranscribeRequest; output is serialized
+   * runanywhere.v1.HybridSttTranscribeResponse (empty buffer on native rc!=0).
+   * Commons reads the device-state snapshot + custom-filter predicates while
+   * routing.
+   */
+  hybridSttRouterTranscribe(
+    routerHandle: number,
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Best-effort cancel of an in-flight transcribe
+   * (`rac_stt_hybrid_router_cancel`). No STT engine exposes a cancel op today,
+   * so commons treats this as a no-op until one does.
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridSttRouterCancel(routerHandle: number): Promise<number>;
+
+  /**
+   * Register (or replace) a named custom-filter predicate with the cross-SDK
+   * commons callback table (`rac_hybrid_register_custom_filter`). Commons
+   * resolves it by name and invokes it once per candidate during the router's
+   * filter phase — the predicate logic stays host-side, the decision stays in
+   * commons. The native side blocks the (background) routing thread on the JS
+   * promise, mirroring the synchronous JS-executor pattern used by
+   * `toolRunLoopProto`.
+   *
+   * @param name      Wire identity (`CustomFilter.name`); non-empty, unique.
+   * @param predicate `(candidateModelId) => Promise<boolean>` — true keeps the
+   *                  candidate eligible.
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridRegisterCustomFilter(
+    name: string,
+    predicate: (candidateModelId: string) => Promise<boolean>
+  ): Promise<number>;
+
+  /**
+   * Remove a named custom-filter predicate
+   * (`rac_hybrid_unregister_custom_filter`). No-op when not registered.
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridUnregisterCustomFilter(name: string): Promise<number>;
+
+  /**
+   * Push a host device-state snapshot into the commons device-state vtable
+   * (`rac_hybrid_set_device_state`) so the router's NETWORK / Battery hard
+   * filters see live values on the next transcribe.
+   *
+   * RN cannot call JS synchronously from the commons routing thread (unlike the
+   * Kotlin/Swift bindings, which install live `@convention(c)` / JNI callbacks),
+   * so the binding pushes a snapshot of cached values instead; the installed
+   * native vtable returns those cached values to commons. Call before
+   * transcribe and whenever connectivity / battery changes.
+   *
+   * @returns true on RAC_SUCCESS.
+   */
+  hybridSetDeviceState(
+    isOnline: boolean,
+    batteryPercent: number,
+    thermalThrottled: boolean
+  ): Promise<boolean>;
+
+  /**
+   * Detach the host device-state vtable and restore the commons optimistic
+   * default (always-online, 100% battery, not-throttled) via
+   * `rac_hybrid_set_device_state(NULL)`.
+   * @returns true on RAC_SUCCESS.
+   */
+  hybridClearDeviceState(): Promise<boolean>;
+
+  /**
+   * Register the generic "cloud" engine plugin with the commons registry
+   * (`rac_backend_cloud_register`) so the hybrid router can route the
+   * online side (hint "cloud"). Mirrors `ONNX.register()` /
+   * `LlamaCPP.register()` and the Kotlin `CloudBridge.nativeRegister`.
+   * Tolerant of already-registered. The concrete HTTP provider is data carried
+   * per-service in the create config, not a distinct plugin.
+   * @returns true on RAC_SUCCESS (or already-registered).
+   */
+  cloudRegister(): Promise<boolean>;
+
+  /**
+   * Unregister the "cloud" engine plugin
+   * (`rac_backend_cloud_unregister`).
+   * @returns true on RAC_SUCCESS.
+   */
+  cloudUnregister(): Promise<boolean>;
+
+  /**
+   * Whether the "cloud" plugin is currently registered for TRANSCRIBE
+   * (`rac_backend_cloud_is_registered`).
+   */
+  cloudIsRegistered(): Promise<boolean>;
+
+  // ============================================================================
   // TTS Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+TTS.swift - calls lifecycle proto APIs.
   // Requires a backend (e.g., @runanywhere/onnx) to be registered.

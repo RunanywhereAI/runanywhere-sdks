@@ -576,6 +576,36 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_stt_component_get_metrics"
     "_rac_stt_component_destroy"
 
+    # STT hybrid router (commons-local — folds into rac_commons). The router C++
+    # lives in src/router/hybrid/rac_stt_hybrid_router*.cpp and is anti-dead-stripped
+    # by the routing #includes in wasm/src/wasm_exports.cpp. The Web binding's
+    # REQUIRED_HYBRID_ROUTER_EXPORTS (HybridWasmModule.ts) hard-depends on the
+    # lifecycle + 5 proto-byte calls + buffer-free + the two service-creation
+    # helpers; the device-state / custom-filter table symbols are optional
+    # (the binding degrades gracefully when absent). The cloud engine's
+    # register/unregister are appended on the ONNX-sherpa target that owns the
+    # offline STT side (see RAC_EXPORTED_FUNCTIONS_CLOUD below).
+    "_rac_stt_hybrid_router_create"
+    "_rac_stt_hybrid_router_destroy"
+    "_rac_stt_hybrid_router_cancel"
+    "_rac_stt_hybrid_router_set_offline_service_proto"
+    "_rac_stt_hybrid_router_set_online_service_proto"
+    "_rac_stt_hybrid_router_set_policy_proto"
+    "_rac_stt_hybrid_router_transcribe_proto"
+    "_rac_stt_hybrid_router_proto_buffer_free"
+    "_rac_stt_hybrid_router_create_service"
+    "_rac_stt_hybrid_router_destroy_service"
+    # Hybrid host-state vtables (rac_hybrid_device_state.h /
+    # rac_hybrid_custom_filter.h). The struct-based setters are exported here;
+    # the flattened `*_from_js` convenience wrappers the TS layer prefers are a
+    # separate future build delta (the binding falls back to the optimistic
+    # default / ignores custom filters when they are absent).
+    "_rac_hybrid_set_device_state"
+    "_rac_hybrid_get_device_state_snapshot"
+    "_rac_hybrid_register_custom_filter"
+    "_rac_hybrid_unregister_custom_filter"
+    "_rac_hybrid_invoke_custom_filter"
+
     # TTS service
     "_rac_tts_create"
     "_rac_tts_initialize"
@@ -1010,6 +1040,21 @@ set(RAC_EXPORTED_FUNCTIONS_SHERPA
     "_rac_backend_sherpa_unregister"
 )
 
+# cloud engine registration — the ONLINE side of the hybrid STT router.
+# The cloud engine is lightweight (HTTP STT, no local runtime); under Emscripten
+# RAC_STATIC_PLUGINS is forced ON, so its sources (incl. the register/unregister
+# entry points) FOLD INTO rac_commons rather than a standalone
+# rac_backend_cloud archive. We therefore only need to EXPORT the two entry
+# symbols in the emitted JS glue; they resolve from rac_commons. Appended to the
+# ONNX-sherpa target, which owns the offline sherpa STT side — so a single
+# bundle can serve both router sides. (If a future non-static-plugin WASM build
+# produces a standalone rac_backend_cloud target, the link guard below picks
+# it up.)
+set(RAC_EXPORTED_FUNCTIONS_CLOUD
+    "_rac_backend_cloud_register"
+    "_rac_backend_cloud_unregister"
+)
+
 # RAG generated-proto pipeline. The RAG OBJECT library folds into
 # librac_commons whenever RAC_BACKEND_RAG=ON (default ON, gated to ONNX
 # availability on Emscripten — see sdk/runanywhere-commons/CMakeLists.txt).
@@ -1349,6 +1394,17 @@ if(RAC_WASM_ONNX)
     if(TARGET rac_backend_sherpa)
         list(APPEND _onnx_libs rac_backend_sherpa)
         list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_SHERPA})
+    endif()
+
+    # cloud — the online side of the hybrid STT router. Always export its
+    # register/unregister symbols on this target (the offline-STT owner) so a
+    # single bundle can drive both router sides. Under Emscripten the cloud
+    # sources fold into rac_commons (RAC_STATIC_PLUGINS forced ON), so no extra
+    # link is required; the link below is a defensive guard for any future build
+    # that produces a standalone rac_backend_cloud target.
+    list(APPEND _onnx_exports ${RAC_EXPORTED_FUNCTIONS_CLOUD})
+    if(TARGET rac_backend_cloud)
+        list(APPEND _onnx_libs rac_backend_cloud)
     endif()
 
     # RAG proto-byte exports: the ONNX target also ships RAG so the same

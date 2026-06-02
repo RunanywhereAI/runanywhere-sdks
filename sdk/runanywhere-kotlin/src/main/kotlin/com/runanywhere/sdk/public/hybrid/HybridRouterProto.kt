@@ -6,9 +6,11 @@
  * routing-policy encoders are capability-agnostic and reused by the STT
  * router (see HybridSttRouterProto for the STT request/response shapes).
  *
- * Both functions are pure — no state, no I/O. Custom filter callbacks are
- * extracted into PackedPolicy.customFilters for host-side evaluation since
- * function pointers can't cross JNI.
+ * Both functions are pure — no state, no I/O. Custom filter definitions are
+ * extracted into PackedPolicy.customFilters so the router can register each
+ * one's predicate by name with the commons callback table (the policy proto
+ * carries only the filter's name/description; commons invokes the predicate
+ * during filtering).
  */
 
 package com.runanywhere.sdk.public.hybrid
@@ -28,7 +30,8 @@ import ai.runanywhere.proto.v1.HybridRoutingPolicy
 /**
  * Output of [HybridRouterProto.policy]. Carries the serialised policy
  * bytes for the native side plus any [RACRouter.RoutingPolicy.CustomDefine]
- * filters extracted for host-side evaluation (callbacks can't cross JNI).
+ * filters extracted so the router can register each predicate by name with
+ * the commons custom-filter callback table.
  */
 internal data class PackedPolicy(
     val bytes: ByteArray,
@@ -56,21 +59,27 @@ internal data class PackedPolicy(
 internal object HybridRouterProto {
 
     /**
-     * Serialise a [RACModel] + backend wire kind as a HybridModelDescriptor.
+     * Serialise a [RACModel] + backend [kind] as a HybridModelDescriptor.
      * Native side decodes via runanywhere::v1::HybridModelDescriptor::ParseFromArray.
+     *
+     * [provider] populates the descriptor's `provider` field for a
+     * `HYBRID_BACKEND_CLOUD` backend (e.g. "sarvam"); pass empty for non-cloud
+     * backends, where the field is ignored.
      */
-    fun descriptor(model: RACModel, backendKind: Int): ByteArray {
+    fun descriptor(model: RACModel, kind: HybridBackendKind, provider: String = ""): ByteArray {
         val msg = HybridModelDescriptor(
             model_id = model.id,
             model_type = model.modelType.toProto(),
-            backend = backendKindFromInt(backendKind),
+            backend = kind,
+            provider = provider,
         )
         return HybridModelDescriptor.ADAPTER.encode(msg)
     }
 
     /**
      * Marshal a [RACRouter.SimpleRouterPolicy] or [RACRouter.AdvanceRouterPolicy]
-     * into HybridRoutingPolicy bytes plus the host-side CustomDefine list.
+     * into HybridRoutingPolicy bytes plus the list of CustomDefine filters the
+     * router must register with the commons callback table.
      */
     fun policy(policy: RACRouter.RouterPolicyBase): PackedPolicy {
         val filters = mutableListOf<HybridFilter>()
@@ -139,11 +148,5 @@ internal object HybridRouterProto {
     private fun RACRouter.Rank.toProto(): HybridRank = when (this) {
         RACRouter.Rank.PreferLocalFirst -> HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST
         RACRouter.Rank.PreferOnlineFirst -> HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST
-    }
-
-    private fun backendKindFromInt(kind: Int): HybridBackendKind = when (kind) {
-        3 -> HybridBackendKind.HYBRID_BACKEND_SHERPA
-        4 -> HybridBackendKind.HYBRID_BACKEND_SARVAM
-        else -> HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
     }
 }

@@ -80,6 +80,17 @@
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 
+// Routing — STT hybrid router (offline/online dispatch) + its proto-byte ABI,
+// the cross-SDK host device-state vtable, and the named custom-filter table.
+// Included so the linker keeps these commons-local exports in the WASM module
+// instead of dead-stripping them (mirrors the per-feature includes above). The
+// matching _rac_stt_hybrid_router_* / _rac_hybrid_* symbols are listed in
+// RAC_EXPORTED_FUNCTIONS_BASE in wasm/CMakeLists.txt.
+#include "rac/routing/rac_hybrid_custom_filter.h"
+#include "rac/routing/rac_hybrid_device_state.h"
+#include "rac/routing/rac_stt_hybrid_router.h"
+#include "rac/routing/rac_stt_hybrid_router_proto.h"
+
 /**
  * WASM module initialization.
  * Called when the WASM module is instantiated.

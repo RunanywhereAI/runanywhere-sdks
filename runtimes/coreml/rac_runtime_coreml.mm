@@ -73,7 +73,7 @@ rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
     // CoreML is a capability + loader-helper runtime: it advertises device
     // presence/formats for routing and exposes MLModel loader helpers that
-    // engines (diffusion-coreml) call directly. It is NOT a session-execution
+    // engines (the coreml engine) call directly. It is NOT a session-execution
     // runtime -- the session/run/tensor vtable slots are NULL and
     // RAC_RUNTIME_CAP_SESSION_EXECUTION is intentionally not set -- so it
     // declares zero execution primitives.
@@ -229,7 +229,7 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir, NSString* name, bool requir
     // +[MLModel modelWithContentsOfURL:] can raise NSException on
     // malformed mlpackage payloads (corrupted coremldata.bin); the error:
     // out-param only catches user-recoverable failures. Return nil on any
-    // catch so callers (diffusion_coreml_backend.mm etc.) treat it as a
+    // catch so callers (rac_diffusion_coreml.mm etc.) treat it as a
     // missing optional model rather than crash the host process.
     @try {
         NSError* err = nil;
@@ -242,7 +242,7 @@ MLModel* rac_coreml_load_model_in_dir(NSString* dir, NSString* name, bool requir
         }
         // +modelWithContentsOfURL: returns an autoreleased instance — promote it
         // to a retained reference so callers that store the pointer into
-        // long-lived engine state (e.g. diffusion_coreml_backend.mm) don't end
+        // long-lived engine state (e.g. rac_diffusion_coreml.mm) don't end
         // up with a dangling reference after the enclosing @autoreleasepool
         // drains. NS_RETURNS_RETAINED documents the matching -release contract.
         return [model retain];

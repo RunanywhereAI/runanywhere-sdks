@@ -18,7 +18,7 @@ import kotlin.Suppress
 
 /**
  * ---------------------------------------------------------------------------
- * Capability under hybrid routing. POC only implements LLM.
+ * Capability under hybrid routing. Only STT is wired today.
  * ---------------------------------------------------------------------------
  */
 public enum class HybridCapability(

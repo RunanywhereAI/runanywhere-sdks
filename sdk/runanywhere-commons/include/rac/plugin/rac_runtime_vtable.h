@@ -509,7 +509,7 @@ typedef const rac_runtime_vtable_t* (*rac_runtime_entry_fn)(void);
  * Without an explicit annotation at declaration time, loadability depends
  * on transitive default visibility of the host runtime target — a brittle
  * invariant that a future visibility tightening would silently break
- * (mirrors pass2-syn-062 for engine plugins).
+ * (mirrors the engine-plugin entry declaration).
  */
 #define RAC_RUNTIME_ENTRY_DECL(name) \
     RAC_API const rac_runtime_vtable_t* rac_runtime_entry_##name(void)

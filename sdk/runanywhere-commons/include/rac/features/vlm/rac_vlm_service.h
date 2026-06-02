@@ -223,7 +223,7 @@ RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_i
  * bytes. The optional out_result receives the aggregate runanywhere.v1.VLMResult
  * when generation completes.
  *
- * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ * @warning user_data ownership and lifetime (cross-SDK
  *          contract — see rac_llm_stream.h for the canonical recipe). The C
  *          runtime may invoke `callback(bytes, size, user_data)` on a
  *          background thread AFTER this entry point has returned, because
@@ -301,7 +301,7 @@ RAC_API rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes,
  * runanywhere.v1.VLMStreamEvent bytes including token deltas and exactly one
  * terminal event.
  *
- * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ * @warning user_data ownership and lifetime (cross-SDK
  *          contract — see rac_llm_stream.h for the canonical recipe). The C
  *          runtime may invoke `callback(bytes, size, user_data)` on a
  *          background thread AFTER this entry point has returned, because

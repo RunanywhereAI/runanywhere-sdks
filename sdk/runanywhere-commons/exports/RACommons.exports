@@ -389,6 +389,45 @@ _rac_plugin_route
 _rac_router_frameworks_for_capability_proto
 _rac_router_frameworks_for_capability_proto_free
 
+# STT hybrid router — handle-based offline/online STT dispatch + its proto-byte
+# ABI. Called by the Swift + Flutter-iOS hybrid-router FFI; without these the
+# curated Apple -exported_symbols_list strips them from librac_commons.dylib and
+# the bindings fail to link at runtime. Both the struct setters and the
+# proto-byte wrappers are exported (bindings cross the proto-byte boundary, but
+# the struct ABI stays callable for in-process hosts).
+_rac_stt_hybrid_router_create
+_rac_stt_hybrid_router_destroy
+_rac_stt_hybrid_router_cancel
+_rac_stt_hybrid_router_set_offline_service
+_rac_stt_hybrid_router_set_online_service
+_rac_stt_hybrid_router_set_policy
+_rac_stt_hybrid_router_transcribe
+_rac_stt_hybrid_router_set_offline_service_proto
+_rac_stt_hybrid_router_set_online_service_proto
+_rac_stt_hybrid_router_set_policy_proto
+_rac_stt_hybrid_router_transcribe_proto
+_rac_stt_hybrid_router_proto_buffer_free
+# Registry-backed STT service factory shared by both router sides — lets the
+# Swift/Flutter/Web/RN bindings construct a rac_stt_service_t* without
+# dereferencing a routed vtable across the ABI boundary.
+_rac_stt_hybrid_router_create_service
+_rac_stt_hybrid_router_destroy_service
+
+# Hybrid router host-state vtables (cross-SDK). Bindings install a device-state
+# vtable + named custom-filter predicates at SDK init / policy-install time.
+_rac_hybrid_set_device_state
+_rac_hybrid_get_device_state_snapshot
+_rac_hybrid_register_custom_filter
+_rac_hybrid_unregister_custom_filter
+_rac_hybrid_invoke_custom_filter
+
+# cloud engine registration. The cloud backend folds into rac_commons on
+# iOS (RAC_STATIC_PLUGINS=ON), so its register/unregister entry points ship from
+# librac_commons here — CloudSTT.register() / the Flutter-iOS bridge call them at
+# module load to make the "cloud" plugin routable.
+_rac_backend_cloud_register
+_rac_backend_cloud_unregister
+
 # HTTP transport contract — platform SDK registers a URLSession/OkHttp vtable
 # here and the C ABI download executor dispatches through it.
 _rac_http_client_create

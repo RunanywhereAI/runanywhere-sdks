@@ -176,4 +176,27 @@
 #include "rac_runtime_registry.h"  // explicit-module mode requirement
 #include "rac_runtime_vtable.h"
 
+// =============================================================================
+// HYBRID ROUTER (cross-SDK STT offline ↔ online dispatch)
+//
+// Capability-agnostic filter/cascade/rank types + the STT hybrid router and
+// its proto-byte ABI, plus the host device-state vtable and the named
+// custom-filter callback table. All routing/cascade LOGIC lives in commons
+// (src/routing/*.cpp, part of rac_commons core → RACommons.xcframework); the
+// Swift binding (Sources/RunAnywhere/Hybrid/) only marshals the policy proto,
+// installs callbacks, and calls the router.
+// =============================================================================
+
+#include "rac_hybrid_types.h"
+#include "rac_hybrid_device_state.h"
+#include "rac_hybrid_custom_filter.h"
+#include "rac_stt_hybrid_router.h"
+#include "rac_stt_hybrid_router_proto.h"
+
+// cloud engine registration (online side of the STT hybrid pair). Declares
+// only rac_backend_cloud_register/_unregister so Cloud.register() can
+// fold the plugin in, mirroring ONNX.register() for sherpa. The concrete HTTP
+// provider (e.g. "sarvam") is chosen via the create config, not a distinct plugin.
+#include "rac_plugin_entry_cloud.h"
+
 #endif /* CRACOMMONS_H */

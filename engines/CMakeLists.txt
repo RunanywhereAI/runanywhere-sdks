@@ -27,8 +27,8 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llamacpp/CMakeLists.txt")
     add_subdirectory(llamacpp)
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sarvam/CMakeLists.txt")
-    add_subdirectory(sarvam)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cloud/CMakeLists.txt")
+    add_subdirectory(cloud)
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sherpa/CMakeLists.txt")
@@ -50,8 +50,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/genie/CMakeLists.txt")
     add_subdirectory(genie)
 endif()
 
-# Apple CoreML diffusion engine (Stable Diffusion via MLModel).
-# Apple-only — self-gates to return() on non-Apple platforms.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/diffusion-coreml/CMakeLists.txt")
-    add_subdirectory(diffusion-coreml)
+# coreml engine — Apple-only engine that runs ON Apple CoreML (serves the
+# DIFFUSION modality today via MLModel). Named by the FRAMEWORK, not the
+# modality, mirroring the `cloud` engine. Self-gates to return() on non-Apple
+# platforms. Coexists with the runtime `coreml` (runtimes/coreml) — separate
+# registry/dir/symbols.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/coreml/CMakeLists.txt")
+    add_subdirectory(coreml)
 endif()

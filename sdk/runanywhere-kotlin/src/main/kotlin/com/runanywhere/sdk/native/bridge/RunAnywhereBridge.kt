@@ -17,6 +17,7 @@ package com.runanywhere.sdk.native.bridge
 import ai.runanywhere.proto.v1.ErrorCode
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.public.hybrid.CustomFilterPredicate
 import com.runanywhere.sdk.public.hybrid.DeviceStateProvider
 
 /*
@@ -1833,6 +1834,34 @@ object RunAnywhereBridge {
     ): Int
 
     // ========================================================================
+    // HYBRID ROUTER — CUSTOM FILTER CALLBACKS (rac_hybrid_custom_filter.h)
+    // ========================================================================
+    //
+    // Registers a Kotlin CustomFilterPredicate (in com.runanywhere.sdk.public
+    // .hybrid) by NAME into the cross-SDK rac_hybrid_custom_filter table. The hybrid
+    // router resolves a `HybridFilter.custom` by its `CustomFilter.name` and
+    // invokes the registered predicate DURING candidate filtering in commons —
+    // so the eligibility decision lives in commons, not the Kotlin layer. The
+    // JNI looks the predicate up by the exact signature
+    // `evaluate(Ljava/lang/String;)Z`.
+
+    /**
+     * Register (or replace) the custom-filter predicate published under
+     * [name]. Commons invokes [predicate].evaluate(modelId) while filtering
+     * candidates. Returns rac_result_t (0 = success).
+     */
+    @JvmStatic external fun racHybridRegisterCustomFilter(
+        name: String,
+        predicate: CustomFilterPredicate,
+    ): Int
+
+    /**
+     * Remove the custom-filter predicate previously registered under [name].
+     * Idempotent for unknown names. Returns rac_result_t.
+     */
+    @JvmStatic external fun racHybridUnregisterCustomFilter(name: String): Int
+
+    // ========================================================================
     // STT HYBRID ROUTER (rac_stt_hybrid_router.h)
     // ========================================================================
 
@@ -1856,6 +1885,38 @@ object RunAnywhereBridge {
      * Safe to call with 0.
      */
     @JvmStatic external fun racSttServiceDestroy(serviceHandle: Long)
+
+    /**
+     * Registry-routed STT service factory used by BOTH router sides.
+     * Resolves the engine via `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE,
+     * hint=[engineHint])` → `stt_ops->create`, so service creation always
+     * goes through the unified plugin registry — no bespoke per-engine
+     * factory. The offline (sherpa) side passes the resolved on-device path
+     * as [modelIdOrPath] with a null [configJson]; the online (cloud) side
+     * passes `engineHint="cloud"` + the `{provider,api_key,model,…}` JSON
+     * as [configJson] (and a null/empty [modelIdOrPath]).
+     *
+     * @param engineHint    Preferred engine name ("sherpa" | "cloud" | …).
+     *                      Empty lets the registry pick by primitive/format.
+     * @param modelIdOrPath Forwarded verbatim as the create op's `model_id`
+     *                      (on-device path for sherpa, empty for cloud).
+     * @param configJson    Forwarded verbatim as the create op's
+     *                      `config_json` (the cloud JSON with `provider`,
+     *                      or empty).
+     * @return Native `rac_stt_service_t*` cast to Long, or 0 on failure.
+     */
+    @JvmStatic external fun racSttHybridRouterCreateService(
+        engineHint: String,
+        modelIdOrPath: String,
+        configJson: String,
+    ): Long
+
+    /**
+     * Destroy a handle returned by [racSttHybridRouterCreateService]. Routes
+     * through `rac_stt_destroy` (engine `stt_ops->destroy` + wrapper free).
+     * Safe to call with 0.
+     */
+    @JvmStatic external fun racSttHybridRouterDestroyService(serviceHandle: Long)
 
     /**
      * Allocate a new STT hybrid router. Returns an opaque handle that

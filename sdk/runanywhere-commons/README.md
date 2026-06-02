@@ -22,7 +22,7 @@
 
 ## Overview
 
-RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swift, Kotlin, Flutter) and ML inference backends (LlamaCPP, ONNX/Sherpa-ONNX, WhisperCPP). It provides:
+RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swift, Kotlin, Flutter) and ML inference backends (LlamaCPP, Sherpa-ONNX, ONNX, cloud). It provides:
 
 - **Unified C API** - All public functions use the `rac_` prefix and follow a consistent vtable-based abstraction pattern
 - **Backend Abstraction** - Multiple ML backends can be registered and selected at runtime based on model requirements
@@ -87,9 +87,9 @@ RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swi
 ┌────────────────────────────▼────────────────────────────────┐
 │                   Engine Plugins (engines/)                  │
 │   ┌─────────────┐  ┌─────────────────┐  ┌───────────────┐   │
-│   │  llamacpp/  │  │      onnx/      │  │  whispercpp/  │   │
-│   │  LLM (GGUF) │  │ STT/TTS/VAD     │  │  STT (GGML)   │   │
-│   │  Metal GPU  │  │ (Sherpa-ONNX)   │  │  Whisper.cpp  │   │
+│   │  llamacpp/  │  │  sherpa/ onnx/  │  │  cloud/       │   │
+│   │  LLM (GGUF) │  │ STT/TTS/VAD,    │  │  STT (HTTP,   │   │
+│   │  Metal GPU  │  │ embeddings      │  │  cloud)       │   │
 │   └─────────────┘  └─────────────────┘  └───────────────┘   │
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐   │
@@ -107,7 +107,7 @@ RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swi
 | Capability | Description | Backends |
 |------------|-------------|----------|
 | **TEXT_GENERATION** | LLM text generation with streaming | LlamaCPP, Platform (Apple FM) |
-| **STT** | Speech-to-text transcription | ONNX (Sherpa), WhisperCPP |
+| **STT** | Speech-to-text transcription | Sherpa (offline ONNX), Cloud STT (online HTTP) |
 | **TTS** | Text-to-speech synthesis | ONNX (Sherpa), Platform (System TTS) |
 | **VAD** | Voice activity detection | ONNX (Silero), Built-in (Energy-based) |
 | **VOICE_AGENT** | Full voice pipeline orchestration | Composite (STT+LLM+TTS+VAD) |
@@ -154,11 +154,14 @@ rac_stt_onnx_transcribe(stt, audio_samples, num_samples, NULL, &result);
 printf("Transcription: %s\n", result.text);
 ```
 
-### WhisperCPP Backend
-- **Capability**: STT (speech-to-text)
-- **Model Format**: GGML (quantized Whisper models)
-- **Features**: Fast CPU inference, multiple languages
-- **Header**: `include/rac/backends/rac_stt_whispercpp.h`
+### Cloud STT Backend
+- **Capability**: STT (speech-to-text), online
+- **Transport**: Generic HTTP; provider selected at create() via `config_json["provider"]` (e.g. Sarvam)
+- **Features**: Server-side transcription with a single shared engine + per-provider adapters
+- **Header**: `engines/cloud/include/rac/backends/rac_stt_cloud.h`
+
+> Offline STT is served by the Sherpa engine; the hybrid confidence router
+> picks Sherpa (offline) vs Cloud STT (online) per request.
 
 ### Platform Backend (Apple-only)
 - **Capabilities**: LLM (Apple Foundation Models), TTS (System TTS)
@@ -239,7 +242,8 @@ rac_shutdown();
 | `RAC_BUILD_BACKENDS` | OFF | Build ML backends |
 | `RAC_BACKEND_LLAMACPP` | ON | Build LlamaCPP backend (when BACKENDS=ON) |
 | `RAC_BACKEND_ONNX` | ON | Build ONNX backend (when BACKENDS=ON) |
-| `RAC_BACKEND_WHISPERCPP` | OFF | Build WhisperCPP backend (when BACKENDS=ON) |
+| `RAC_BACKEND_SHERPA` | ON | Build Sherpa-ONNX backend — offline STT/TTS/VAD (when BACKENDS=ON) |
+| `RAC_BACKEND_CLOUD` | ON | Build cloud HTTP backend — online STT (when BACKENDS=ON) |
 
 ### Platform-Specific Builds
 
@@ -293,25 +297,32 @@ void rac_shutdown(void);
 rac_bool_t rac_is_initialized(void);
 rac_version_t rac_get_version(void);
 
-// Module Registration
-rac_result_t rac_module_register(const rac_module_info_t* info);
-rac_result_t rac_module_unregister(const char* module_id);
-rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count);
-
-// Engine Plugin Registry (rac/plugin/rac_plugin_loader.h, rac_plugin_entry.h)
+// Engine Plugin Registry (rac/plugin/rac_plugin_entry.h, rac_plugin_loader.h)
 //
-// Plugins publish a single rac_engine_vtable_t whose metadata.abi_version
-// must equal RAC_PLUGIN_API_VERSION (3u). Static builds use
+// Engines are the single registration unit. Each fills a rac_engine_vtable_t
+// (one op-struct per served primitive) plus a rac_engine_manifest_t, and
+// registers it via rac_plugin_register; metadata.abi_version must equal
+// RAC_PLUGIN_API_VERSION (3u). Static builds wire this through
 // RAC_STATIC_PLUGIN_REGISTER(<name>) at file scope in the engine's
 // rac_plugin_entry_<name>.cpp; shared builds expose the same entry symbol
 // for dlopen via rac_registry_load_plugin.
+rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable);
 rac_result_t rac_registry_load_plugin(const char* path);
 rac_result_t rac_registry_unload_plugin(const char* name);
 uint32_t     rac_plugin_api_version(void);
+
+// Dispatch: the engine router picks a capable, highest-scoring plugin for a
+// (primitive, model-format) request (rac/router/rac_route.h). Frontends reach
+// it through the C ABI wrapper rac_plugin_route; the public primitive APIs
+// (rac_llm_create, rac_stt_create, ...) resolve through it internally.
+rac_result_t rac_plugin_route(rac_primitive_t primitive, uint32_t format,
+                              const rac_routing_hints_t* hints,
+                              const rac_engine_vtable_t** out_vtable);
 ```
 
 > Historical: v2 used a separate capability-oriented service registry
-> (`rac_service_register_provider` / `rac_service_create`). That surface was
+> (`rac_service_register_provider` / `rac_service_create`) and a module
+> registry (`rac_module_register` / `rac_module_list`). Both surfaces were
 > removed in the v3 ABI cut-over and replaced by the unified engine-plugin
 > vtable above. See `include/rac/plugin/rac_engine_vtable.h` for the 8 active
 > + 10 reserved primitive slots.

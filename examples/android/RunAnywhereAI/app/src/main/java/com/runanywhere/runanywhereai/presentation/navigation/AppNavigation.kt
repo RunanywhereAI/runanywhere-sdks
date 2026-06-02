@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
@@ -36,8 +37,10 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDeta
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
 import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.components.LocalTopBarState
 import com.runanywhere.runanywhereai.presentation.components.TopBarState
+import com.runanywhere.runanywhereai.presentation.hybrid.HybridRouterScreen
 import com.runanywhere.runanywhereai.presentation.lora.LoraManagerScreen
 import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
@@ -187,6 +190,9 @@ fun AppNavigation() {
                         onNavigateToSolutions = {
                             navController.navigate(NavigationRoute.SOLUTIONS)
                         },
+                        onNavigateToHybridStt = {
+                            navController.navigate(NavigationRoute.HYBRID_STT)
+                        },
                     )
                 }
 
@@ -241,6 +247,19 @@ fun AppNavigation() {
                     SolutionsScreen()
                 }
 
+                composable(NavigationRoute.HYBRID_STT) {
+                    // HybridRouterScreen drives the shared top bar via the same
+                    // TopBarState the other "More" sub-screens use. The NavHost
+                    // already applies the Scaffold padding (see Modifier above),
+                    // so the screen gets an empty PaddingValues like its siblings.
+                    ConfigureTopBar(
+                        title = "Hybrid STT Router",
+                        showBack = true,
+                        onBack = { navController.popBackStack() },
+                    )
+                    HybridRouterScreen(paddingValues = PaddingValues())
+                }
+
                 composable(NavigationRoute.SETTINGS) {
                     SettingsScreen()
                 }
@@ -268,6 +287,7 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab =
                 NavigationRoute.BENCHMARKS,
                 NavigationRoute.LORA_MANAGER,
                 NavigationRoute.SOLUTIONS,
+                NavigationRoute.HYBRID_STT,
             ) ||
             route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
         route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
@@ -297,5 +317,6 @@ object NavigationRoute {
     const val BENCHMARK_DETAIL = "benchmark_detail"
     const val LORA_MANAGER = "lora_manager"
     const val SOLUTIONS = "solutions"
+    const val HYBRID_STT = "hybrid_stt"
     const val SETTINGS = "settings"
 }

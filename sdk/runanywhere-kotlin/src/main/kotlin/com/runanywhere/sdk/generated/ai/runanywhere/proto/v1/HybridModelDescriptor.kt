@@ -58,6 +58,18 @@ public class HybridModelDescriptor(
     schemaIndex = 2,
   )
   public val backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED,
+  /**
+   * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
+   * "sarvam"). The cloud_stt engine reads it from config_json\["provider"\];
+   * empty defaults to "sarvam". Ignored for non-cloud backends.
+   */
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val provider: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridModelDescriptor, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -73,6 +85,7 @@ public class HybridModelDescriptor(
     if (model_id != other.model_id) return false
     if (model_type != other.model_type) return false
     if (backend != other.backend) return false
+    if (provider != other.provider) return false
     return true
   }
 
@@ -83,6 +96,7 @@ public class HybridModelDescriptor(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + model_type.hashCode()
       result = result * 37 + backend.hashCode()
+      result = result * 37 + provider.hashCode()
       super.hashCode = result
     }
     return result
@@ -93,6 +107,7 @@ public class HybridModelDescriptor(
     result += """model_id=${sanitize(model_id)}"""
     result += """model_type=$model_type"""
     result += """backend=$backend"""
+    result += """provider=${sanitize(provider)}"""
     return result.joinToString(prefix = "HybridModelDescriptor{", separator = ", ", postfix = "}")
   }
 
@@ -100,8 +115,9 @@ public class HybridModelDescriptor(
     model_id: String = this.model_id,
     model_type: HybridModelType = this.model_type,
     backend: HybridBackendKind = this.backend,
+    provider: String = this.provider,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridModelDescriptor = HybridModelDescriptor(model_id, model_type, backend, unknownFields)
+  ): HybridModelDescriptor = HybridModelDescriptor(model_id, model_type, backend, provider, unknownFields)
 
   public companion object {
     @JvmField
@@ -125,6 +141,9 @@ public class HybridModelDescriptor(
         if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
           size += HybridBackendKind.ADAPTER.encodedSizeWithTag(3, value.backend)
         }
+        if (value.provider != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.provider)
+        }
         return size
       }
 
@@ -138,11 +157,17 @@ public class HybridModelDescriptor(
         if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
           HybridBackendKind.ADAPTER.encodeWithTag(writer, 3, value.backend)
         }
+        if (value.provider != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.provider)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridModelDescriptor) {
         writer.writeBytes(value.unknownFields)
+        if (value.provider != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 4, value.provider)
+        }
         if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
           HybridBackendKind.ADAPTER.encodeWithTag(writer, 3, value.backend)
         }
@@ -158,6 +183,7 @@ public class HybridModelDescriptor(
         var model_id: String = ""
         var model_type: HybridModelType = HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED
         var backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
+        var provider: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -171,6 +197,7 @@ public class HybridModelDescriptor(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            4 -> provider = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -178,6 +205,7 @@ public class HybridModelDescriptor(
           model_id = model_id,
           model_type = model_type,
           backend = backend,
+          provider = provider,
           unknownFields = unknownFields
         )
       }

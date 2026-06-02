@@ -131,17 +131,33 @@
  *  - nativeGetVersion returns env->NewStringUTF(VERSION_EXPR).
  *
  * NOT wrapped in `extern "C"`: place inside the bridge's `extern "C" { ... }`.
+ *
+ * ── JNI_OnLoad ownership ──────────────────────────────────────────────────────
+ * This full macro EMITS `JNI_OnLoad`, which is correct for an engine bridge that
+ * links as its OWN standalone `.so` (onnx → rac_backend_onnx_jni, llamacpp →
+ * rac_backend_llamacpp_jni): each such library needs exactly one JNI_OnLoad and
+ * has no other provider. If instead the engine JNI TU is FOLDED INTO a host lib
+ * that ALREADY defines `JNI_OnLoad` — e.g. cloud_stt's rac_stt_cloud_jni.cpp is
+ * compiled straight into `runanywhere_commons_jni` (librunanywhere_jni.so), and
+ * commons already owns JNI_OnLoad (runanywhere_commons_jni.cpp) to cache the
+ * JavaVM — emitting a second JNI_OnLoad is a hard duplicate-symbol link error.
+ * Such TUs MUST use RAC_DEFINE_ENGINE_JNI_BRIDGE_NO_ONLOAD below: it emits the
+ * identical register quartet (Kotlin still binds those symbols) but omits the
+ * JNI_OnLoad, deferring JavaVM ownership to the host. Registration is unaffected
+ * — the Kotlin `*Bridge.nativeRegister()` path drives REGISTER_FN() and never
+ * depends on this TU's JNI_OnLoad.
  */
-#define RAC_DEFINE_ENGINE_JNI_BRIDGE(JCLASS_TOKENS, REGISTER_FN, UNREGISTER_FN, ENGINE_LABEL,       \
-                                     REGISTER_OK_SUFFIX, AFTER_REGISTER_STMT, ISREG_PRIMITIVE,      \
-                                     ISREG_PLUGIN_NAME, VERSION_EXPR)                               \
-                                                                                                   \
-    JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {                                         \
-        (void)vm;                                                                                  \
-        (void)reserved;                                                                            \
-        LOGi("JNI_OnLoad: " ENGINE_LABEL " JNI bridge loaded");                                     \
-        return JNI_VERSION_1_6;                                                                     \
-    }                                                                                              \
+
+// Internal: the engine JNI register quartet (nativeRegister / nativeUnregister /
+// nativeIsRegistered / nativeGetVersion) WITHOUT JNI_OnLoad. Shared verbatim by
+// both the full RAC_DEFINE_ENGINE_JNI_BRIDGE (which prepends JNI_OnLoad) and the
+// RAC_DEFINE_ENGINE_JNI_BRIDGE_NO_ONLOAD variant (which does not), so the quartet
+// body is written exactly once. Not intended to be invoked directly — use one of
+// the two public macros so JNI_OnLoad ownership is an explicit choice. Parameters
+// are identical to the public macros' (minus none): see their docs above.
+#define RAC_DEFINE_ENGINE_JNI_REGISTER_QUARTET(                                                     \
+    JCLASS_TOKENS, REGISTER_FN, UNREGISTER_FN, ENGINE_LABEL, REGISTER_OK_SUFFIX,                    \
+    AFTER_REGISTER_STMT, ISREG_PRIMITIVE, ISREG_PLUGIN_NAME, VERSION_EXPR)                          \
                                                                                                    \
     JNIEXPORT jint JNICALL RAC_JNI_FN(JCLASS_TOKENS, nativeRegister)(JNIEnv* env, jclass clazz) {   \
         (void)env;                                                                                 \
@@ -195,5 +211,59 @@
         (void)clazz;                                                                               \
         return env->NewStringUTF(VERSION_EXPR);                                                     \
     }
+
+/**
+ * Emit the standard engine JNI bridge: `JNI_OnLoad` + the register quartet.
+ *
+ * The DEFAULT/full variant. Use this for an engine bridge that links as its own
+ * standalone JNI `.so` (onnx, llamacpp), where this TU is the sole owner of
+ * JNI_OnLoad. Parameters and per-symbol behavior are documented on the block
+ * immediately above. The JNI_OnLoad it emits just logs and returns
+ * JNI_VERSION_1_6 (these standalone engine libs cache no JavaVM of their own).
+ *
+ * NOT wrapped in `extern "C"`: place inside the bridge's `extern "C" { ... }`.
+ */
+#define RAC_DEFINE_ENGINE_JNI_BRIDGE(JCLASS_TOKENS, REGISTER_FN, UNREGISTER_FN, ENGINE_LABEL,       \
+                                     REGISTER_OK_SUFFIX, AFTER_REGISTER_STMT, ISREG_PRIMITIVE,      \
+                                     ISREG_PLUGIN_NAME, VERSION_EXPR)                               \
+                                                                                                   \
+    JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {                                         \
+        (void)vm;                                                                                  \
+        (void)reserved;                                                                            \
+        LOGi("JNI_OnLoad: " ENGINE_LABEL " JNI bridge loaded");                                     \
+        return JNI_VERSION_1_6;                                                                     \
+    }                                                                                              \
+                                                                                                   \
+    RAC_DEFINE_ENGINE_JNI_REGISTER_QUARTET(JCLASS_TOKENS, REGISTER_FN, UNREGISTER_FN, ENGINE_LABEL, \
+                                           REGISTER_OK_SUFFIX, AFTER_REGISTER_STMT, ISREG_PRIMITIVE, \
+                                           ISREG_PLUGIN_NAME, VERSION_EXPR)
+
+/**
+ * Emit the standard engine JNI bridge WITHOUT `JNI_OnLoad` — register quartet only.
+ *
+ * Use this when the engine JNI TU is folded into a HOST library that already
+ * defines `JNI_OnLoad`, so a second definition would be a duplicate-symbol link
+ * error. The in-tree case is cloud_stt: rac_stt_cloud_jni.cpp is compiled into
+ * `runanywhere_commons_jni` (librunanywhere_jni.so), and commons already owns
+ * JNI_OnLoad to cache the JavaVM. The four
+ * `Java_<...>Bridge_native{Register,Unregister,IsRegistered,GetVersion}` symbols
+ * are emitted byte-for-byte identically to the full macro (Kotlin still binds
+ * them); only JNI_OnLoad is omitted. Registration is unaffected: it flows through
+ * nativeRegister → REGISTER_FN(), independent of any JNI_OnLoad in this TU.
+ *
+ * Standalone per-engine `.so`s must use the full RAC_DEFINE_ENGINE_JNI_BRIDGE so
+ * their library still provides exactly one JNI_OnLoad.
+ *
+ * Same parameters / per-symbol behavior as RAC_DEFINE_ENGINE_JNI_BRIDGE (minus
+ * the JNI_OnLoad). NOT wrapped in `extern "C"`: place inside the bridge's
+ * `extern "C" { ... }`.
+ */
+#define RAC_DEFINE_ENGINE_JNI_BRIDGE_NO_ONLOAD(                                                     \
+    JCLASS_TOKENS, REGISTER_FN, UNREGISTER_FN, ENGINE_LABEL, REGISTER_OK_SUFFIX,                    \
+    AFTER_REGISTER_STMT, ISREG_PRIMITIVE, ISREG_PLUGIN_NAME, VERSION_EXPR)                          \
+                                                                                                   \
+    RAC_DEFINE_ENGINE_JNI_REGISTER_QUARTET(JCLASS_TOKENS, REGISTER_FN, UNREGISTER_FN, ENGINE_LABEL, \
+                                           REGISTER_OK_SUFFIX, AFTER_REGISTER_STMT, ISREG_PRIMITIVE, \
+                                           ISREG_PLUGIN_NAME, VERSION_EXPR)
 
 #endif  // RUNANYWHERE_ENGINES_COMMON_JNI_BRIDGE_H

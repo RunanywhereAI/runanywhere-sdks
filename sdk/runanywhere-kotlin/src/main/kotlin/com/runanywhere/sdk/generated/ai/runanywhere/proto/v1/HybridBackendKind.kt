@@ -19,8 +19,9 @@ import kotlin.Suppress
 /**
  * ---------------------------------------------------------------------------
  * Backend identity. Matches the engines/ directory entry that registers
- * the service vtable. Cloud backends are explicit kinds rather than a
- * generic "cloud" since each one has a distinct HTTP shape and auth.
+ * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
+ * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
+ * the descriptor's `provider` field, not from a distinct enum kind.
  * ---------------------------------------------------------------------------
  */
 public enum class HybridBackendKind(
@@ -30,7 +31,11 @@ public enum class HybridBackendKind(
   HYBRID_BACKEND_LLAMACPP(1),
   HYBRID_BACKEND_OPENROUTER(2),
   HYBRID_BACKEND_SHERPA(3),
-  HYBRID_BACKEND_SARVAM(4),
+  /**
+   * Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
+   * the generic "cloud_stt" backend; the provider is carried out-of-band.
+   */
+  HYBRID_BACKEND_CLOUD(4),
   ;
 
   public companion object {
@@ -49,7 +54,7 @@ public enum class HybridBackendKind(
       1 -> HYBRID_BACKEND_LLAMACPP
       2 -> HYBRID_BACKEND_OPENROUTER
       3 -> HYBRID_BACKEND_SHERPA
-      4 -> HYBRID_BACKEND_SARVAM
+      4 -> HYBRID_BACKEND_CLOUD
       else -> null
     }
   }

@@ -231,7 +231,7 @@ enum HybridBackendKind : int {
   HYBRID_BACKEND_LLAMACPP = 1,
   HYBRID_BACKEND_OPENROUTER = 2,
   HYBRID_BACKEND_SHERPA = 3,
-  HYBRID_BACKEND_SARVAM = 4,
+  HYBRID_BACKEND_CLOUD = 4,
   HybridBackendKind_INT_MIN_SENTINEL_DO_NOT_USE_ =
       ::std::numeric_limits<::int32_t>::min(),
   HybridBackendKind_INT_MAX_SENTINEL_DO_NOT_USE_ =
@@ -1159,6 +1159,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
   // accessors -------------------------------------------------------
   enum : int {
     kModelIdFieldNumber = 1,
+    kProviderFieldNumber = 4,
     kModelTypeFieldNumber = 2,
     kBackendFieldNumber = 3,
   };
@@ -1175,6 +1176,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
   const ::std::string& _internal_model_id() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // string provider = 4;
+  void clear_provider() ;
+  [[nodiscard]] const ::std::string& provider() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_provider(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_provider();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_provider();
+  void set_allocated_provider(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_provider() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_provider(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_provider();
 
   public:
   // .runanywhere.v1.HybridModelType model_type = 2;
@@ -1201,8 +1217,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          0, 53,
+      ::google::protobuf::internal::TcParseTable<2, 4,
+                          0, 61,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1231,6 +1247,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::google::protobuf::internal::ArenaStringPtr provider_;
     int model_type_;
     int backend_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -3913,7 +3930,7 @@ inline void HybridModelDescriptor::set_allocated_model_id(::std::string* PROTOBU
 inline void HybridModelDescriptor::clear_model_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.model_type_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::model_type() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.model_type)
@@ -3921,7 +3938,7 @@ inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::model_type() co
 }
 inline void HybridModelDescriptor::set_model_type(::runanywhere::v1::HybridModelType value) {
   _internal_set_model_type(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.model_type)
 }
 inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::_internal_model_type() const {
@@ -3937,7 +3954,7 @@ inline void HybridModelDescriptor::_internal_set_model_type(::runanywhere::v1::H
 inline void HybridModelDescriptor::clear_backend() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.backend_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::runanywhere::v1::HybridBackendKind HybridModelDescriptor::backend() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.backend)
@@ -3945,7 +3962,7 @@ inline ::runanywhere::v1::HybridBackendKind HybridModelDescriptor::backend() con
 }
 inline void HybridModelDescriptor::set_backend(::runanywhere::v1::HybridBackendKind value) {
   _internal_set_backend(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.backend)
 }
 inline ::runanywhere::v1::HybridBackendKind HybridModelDescriptor::_internal_backend() const {
@@ -3955,6 +3972,70 @@ inline ::runanywhere::v1::HybridBackendKind HybridModelDescriptor::_internal_bac
 inline void HybridModelDescriptor::_internal_set_backend(::runanywhere::v1::HybridBackendKind value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.backend_ = value;
+}
+
+// string provider = 4;
+inline void HybridModelDescriptor::clear_provider() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.provider_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::std::string& HybridModelDescriptor::provider() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.provider)
+  return _internal_provider();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void HybridModelDescriptor::set_provider(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.provider_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.provider)
+}
+inline ::std::string* PROTOBUF_NONNULL HybridModelDescriptor::mutable_provider()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_provider();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HybridModelDescriptor.provider)
+  return _s;
+}
+inline const ::std::string& HybridModelDescriptor::_internal_provider() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.provider_.Get();
+}
+inline void HybridModelDescriptor::_internal_set_provider(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.provider_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL HybridModelDescriptor::_internal_mutable_provider() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.provider_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE HybridModelDescriptor::release_provider() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.HybridModelDescriptor.provider)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.provider_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.provider_.Set("", GetArena());
+  }
+  return released;
+}
+inline void HybridModelDescriptor::set_allocated_provider(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.provider_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.provider_.IsDefault()) {
+    _impl_.provider_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridModelDescriptor.provider)
 }
 
 // -------------------------------------------------------------------

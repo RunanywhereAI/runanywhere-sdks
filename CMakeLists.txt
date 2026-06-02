@@ -45,7 +45,7 @@ project(runanywhere
 )
 
 # Enable Objective-C++ at the root project level so
-# engines/diffusion-coreml/*.mm (and any future Apple-framework
+# engines/coreml/*.mm (and any future Apple-framework
 # bridge TU) compile correctly. `enable_language` inside a subdirectory
 # doesn't populate the CMAKE_OBJCXX_* toolchain variables the build
 # generator needs — it must be called before the subdirectories run.
@@ -202,7 +202,7 @@ endif()
 
 # engines/ — top-level engine plugin directory. Migrated backends
 # (llamacpp, onnx, metalrt) and net-new
-# entries (sherpa, genie, diffusion-coreml) live here. Sherpa owns speech
+# entries (sherpa, genie, coreml) live here. Sherpa owns speech
 # primitives and legacy ONNX-named speech compatibility; ONNX owns embeddings
 # and ONNXRT-backed generic services.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
@@ -341,19 +341,19 @@ if(RAC_BUILD_TESTS)
         add_test(NAME plugin_entry_metalrt_tests COMMAND test_plugin_entry_metalrt)
     endif()
 
-    if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
-       AND TARGET rac_backend_diffusion_coreml
+    if(APPLE AND RAC_BACKEND_COREML
+       AND TARGET rac_backend_coreml
        AND NOT TARGET test_diffusion_coreml_generate)
         add_executable(test_diffusion_coreml_generate
             sdk/runanywhere-commons/tests/test_diffusion_coreml_generate.cpp)
         target_include_directories(test_diffusion_coreml_generate PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/engines/diffusion-coreml
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/coreml
         )
         target_link_libraries(test_diffusion_coreml_generate PRIVATE
             rac_commons
-            rac_backend_diffusion_coreml
+            rac_backend_coreml
         )
         if(TARGET archive_static)
             target_link_libraries(test_diffusion_coreml_generate PRIVATE archive_static)
@@ -368,39 +368,38 @@ if(RAC_BUILD_TESTS)
         add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
     endif()
 
-    # commons-008: diffusion-coreml plugin-entry smoke test. Same wiring
-    # rationale as the metalrt block above —
-    # rac_backend_diffusion_coreml is built by engines/ which is configured
-    # after sdk/runanywhere-commons/. diffusion-coreml is the sole
+    # coreml engine plugin-entry smoke test. Same wiring rationale as the
+    # metalrt block above — rac_backend_coreml is built by engines/ which is
+    # configured after sdk/runanywhere-commons/. The coreml engine is the sole
     # RAC_PRIMITIVE_DIFFUSION provider, so this locks the manifest's COREML
     # runtime/format + diffusion_ops slot that the EngineRouter routes against;
     # test_diffusion_coreml_generate.cpp only exercises the backend directly and
     # bypasses the plugin-entry/vtable path. Apple-only because the backend is.
-    if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
-       AND TARGET rac_backend_diffusion_coreml
-       AND NOT TARGET test_plugin_entry_diffusion_coreml)
-        add_executable(test_plugin_entry_diffusion_coreml
-            sdk/runanywhere-commons/tests/test_plugin_entry_diffusion_coreml.cpp)
-        target_include_directories(test_plugin_entry_diffusion_coreml PRIVATE
+    if(APPLE AND RAC_BACKEND_COREML
+       AND TARGET rac_backend_coreml
+       AND NOT TARGET test_plugin_entry_coreml)
+        add_executable(test_plugin_entry_coreml
+            sdk/runanywhere-commons/tests/test_plugin_entry_coreml.cpp)
+        target_include_directories(test_plugin_entry_coreml PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
             ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
         )
-        target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE
+        target_link_libraries(test_plugin_entry_coreml PRIVATE
             rac_commons
-            rac_backend_diffusion_coreml
+            rac_backend_coreml
         )
         if(TARGET archive_static)
-            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE archive_static)
+            target_link_libraries(test_plugin_entry_coreml PRIVATE archive_static)
         endif()
         if(TARGET zlibstatic)
-            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE zlibstatic)
+            target_link_libraries(test_plugin_entry_coreml PRIVATE zlibstatic)
         endif()
         if(TARGET bz2_bundled)
-            target_link_libraries(test_plugin_entry_diffusion_coreml PRIVATE bz2_bundled)
+            target_link_libraries(test_plugin_entry_coreml PRIVATE bz2_bundled)
         endif()
-        target_compile_features(test_plugin_entry_diffusion_coreml PRIVATE cxx_std_17)
-        add_test(NAME plugin_entry_diffusion_coreml_tests
-                 COMMAND test_plugin_entry_diffusion_coreml)
+        target_compile_features(test_plugin_entry_coreml PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_coreml_tests
+                 COMMAND test_plugin_entry_coreml)
     endif()
 
     # Cross-SDK parity test harness.

@@ -107,7 +107,7 @@ int main() {
 
     // Routable branch: LLM/STT/TTS/VLM ops are populated; VAD / embedding /
     // rerank / diffusion ops must remain NULL — those primitives live in
-    // sibling engines (sherpa VAD, onnx embeddings, diffusion-coreml) and the
+    // sibling engines (sherpa VAD, onnx embeddings, coreml diffusion) and the
     // router relies on the disjoint-slot invariant to score routing candidates.
     if (vt->llm_ops == nullptr || vt->stt_ops == nullptr || vt->tts_ops == nullptr ||
         vt->vlm_ops == nullptr) {

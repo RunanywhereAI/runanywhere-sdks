@@ -1,5 +1,11 @@
 # MetalRT Backend — Apple-only (iOS/macOS)
 #
+# RESERVED / EXPERIMENTAL: metalrt is a reserved-for-future engine, not a live
+# boundary member. It wraps a private, CLOSED-SOURCE MetalRT lib, is OFF by
+# default (RAC_BACKEND_METALRT=OFF), and compiles to a not-routable stub when the
+# engine binary is absent (RAC_METALRT_ENGINE_AVAILABLE=0). Documented in
+# engines/AGENTS.md ("Stubs & reserved engines"); see there before wiring it.
+#
 # The MetalRT engine (libmetalrt_engine.a + metalrt_c_api.h) is a private,
 # closed-source dependency. This CMakeLists supports two modes:
 #
@@ -133,7 +139,7 @@ target_link_libraries(rac_backend_metalrt PRIVATE
 # `rac_backend_metalrt_register()` has zero call sites in the monorepo
 # and routes pinned to RAC_FRAMEWORK_METALRT for any of LLM / STT / TTS
 # / VLM cannot resolve. Mirrors the carrier pattern used by llamacpp /
-# diffusion-coreml.
+# the coreml engine.
 #
 # Static path only: when RAC_STATIC_PLUGINS=ON (iOS / WASM hosts), the
 # ctor lands inside rac_commons so it runs before main(). The MetalRT

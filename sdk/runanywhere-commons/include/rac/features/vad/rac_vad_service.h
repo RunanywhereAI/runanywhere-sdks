@@ -141,7 +141,7 @@ RAC_API rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
                                                 rac_vad_audio_callback_fn callback,
                                                 void* user_data);
 
-// pass2-syn-002: rac_vad_{start,stop,reset} were declared RAC_API but never
+// rac_vad_{start,stop,reset} were declared RAC_API but never
 // implemented in commons. The lifecycle/component proto ABI
 // (rac_vad_{start,stop,reset}_lifecycle_proto, rac_vad_component_{start,stop,reset})
 // is the canonical surface; the bare service-level start/stop/reset variants

@@ -1,6 +1,6 @@
 # RunAnywhere Engines - Clang Format Configuration
 # Mirrors sdk/runanywhere-commons/.clang-format to keep engine plugin
-# sources (llamacpp, sherpa, onnx, metalrt, genie, diffusion-coreml, common)
+# sources (llamacpp, sherpa, onnx, metalrt, genie, coreml, common)
 # on the same style as the C ABI/headers
 # they implement. Editing this file? Keep it in lockstep with
 # sdk/runanywhere-commons/.clang-format and runtimes/.clang-format.

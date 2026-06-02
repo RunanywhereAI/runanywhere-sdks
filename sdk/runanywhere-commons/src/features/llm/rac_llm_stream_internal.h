@@ -68,7 +68,7 @@ struct LLMStreamEventParams {
     // (proto_service path). When null, proto3 omits field 10.
 #ifdef RAC_HAVE_PROTOBUF
     const runanywhere::v1::LLMStreamFinalResult* final_result = nullptr;
-    // pass2-syn-010: optional tool_call payload (proto field 18). Populated
+    // optional tool_call payload (proto field 18). Populated
     // by the tool-calling boundary-detection path in llm_component.cpp /
     // rac_llm_proto_service.cpp so streaming consumers can observe the tool
     // call inline with the token stream. NULL = omit (proto3 default).
@@ -77,7 +77,7 @@ struct LLMStreamEventParams {
     const void* final_result = nullptr;  // unused without protobuf
     const void* tool_call = nullptr;     // unused without protobuf (WASM)
 #endif
-    // pass2-syn-010: pre-serialized ToolCall bytes for the hand-encoded
+    // pre-serialized ToolCall bytes for the hand-encoded
     // (WASM) path. The protobuf path prefers the typed `tool_call` pointer
     // above; this fallback exists so a caller that has access to a
     // serialized ToolCall (e.g. via a side channel that already encoded it)

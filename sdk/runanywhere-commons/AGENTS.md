@@ -117,7 +117,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed+WakeWord) | diffusion-coreml (Image, Apple)         │
+│  onnx (Embed+WakeWord) | coreml (Image/Diffusion, Apple)         │
 │  metalrt (LLM+STT+TTS+VLM, Apple) | platform (Apple FM+TTS+Diff)│
 └─────────────────────────────────────────────────────────────────┘
 ```

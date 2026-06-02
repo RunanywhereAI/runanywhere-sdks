@@ -629,7 +629,7 @@ RAC_API rac_result_t rac_tool_calling_session_step_with_result_proto(
 RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_handle);
 
 /**
- * @brief Cancel an in-flight tool-calling session (pass2-syn-007).
+ * @brief Cancel an in-flight tool-calling session.
  *
  * Sets the cancel flag on the session's in-flight LifecycleLlmRef so the
  * underlying backend `ops->generate` returns at the next cancel boundary.
@@ -736,7 +736,7 @@ RAC_API rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_b
 /**
  * @brief Same as rac_tool_calling_run_loop_proto but additionally publishes
  *        an opaque handle the host can pass to rac_tool_calling_run_loop_cancel_proto
- *        to interrupt the in-flight loop from another thread (pass2-syn-007).
+ *        to interrupt the in-flight loop from another thread.
  *
  * The handle is owned by commons; it is automatically reclaimed when this
  * function returns, so the host MUST NOT use it past the return. A typical
@@ -746,7 +746,7 @@ RAC_API rac_result_t rac_tool_calling_run_loop_proto(const uint8_t* in_request_b
  * `AbortController.abort()` so the structured-concurrency context can fan
  * its cancel into the native loop.
  *
- * @warning Handle-publication races (pass3-syn-028 / cross-SDK contract):
+ * @warning Handle-publication races (cross-SDK contract):
  *          @p out_run_loop_handle is written SYNCHRONOUSLY inside this call
  *          before the iteration loop begins, but the call itself is
  *          synchronous from the caller's perspective. SDKs that need to
@@ -776,7 +776,7 @@ RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_proto(
 
 /**
  * @brief Callback fired synchronously from inside the run-loop the moment a
- *        cancellable handle is minted (pass3-syn-028 / cross-SDK contract).
+ *        cancellable handle is minted (cross-SDK contract).
  *
  * @param run_loop_handle Just-minted handle. Identical to the value that
  *                        rac_tool_calling_run_loop_with_handle_proto would
@@ -801,7 +801,7 @@ typedef void (*rac_tool_calling_run_loop_on_handle_published_cb_t)(uint64_t run_
 
 /**
  * @brief Variant of rac_tool_calling_run_loop_with_handle_proto that adds a
- *        synchronous handle-publication callback (pass3-syn-028).
+ *        synchronous handle-publication callback.
  *
  * Fires @p on_handle_published(handle, on_handle_user_data) SYNCHRONOUSLY
  * the moment the cancellable run-loop handle is minted, BEFORE the first
@@ -831,7 +831,7 @@ RAC_API rac_result_t rac_tool_calling_run_loop_with_handle_and_cb_proto(
     void* on_handle_user_data, uint64_t* out_run_loop_handle, rac_proto_buffer_t* out_result);
 
 /**
- * @brief Cancel an in-flight tool-calling run loop (pass2-syn-007).
+ * @brief Cancel an in-flight tool-calling run loop.
  *
  * Looks up the run-loop handle published by
  * rac_tool_calling_run_loop_with_handle_proto and asks the in-flight

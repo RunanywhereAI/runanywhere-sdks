@@ -222,7 +222,7 @@ rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
         return result;
     }
 
-    // pass3-syn-100: HuggingFace tokenizer endpoints may include redirect-
+    // HuggingFace tokenizer endpoints may include redirect-
     // chain query parameters; downgrade from INFO to DEBUG so the URL does
     // not reach the platform logger in production builds. The filename is
     // safe to keep at the call site below (filename-only log).

@@ -12,7 +12,8 @@
  *   router.stt.addPair(model1, model2, routerPolicy)
  *   router.stt.transcribe(audio)
  *
- * Only the STT capability is wired today (offline sherpa ↔ cloud Sarvam).
+ * Only the STT capability is wired today (offline sherpa ↔ cloud, e.g.
+ * the Sarvam provider).
  * `router.tts` / `router.vlm` accessors exist for the API shape but raise
  * NotImplementedError.
  */
@@ -29,7 +30,7 @@ import java.io.Closeable
  *
  *     val router = RACRouter.stt.init(
  *         backendOffline = BACKEND.SHERPA.STT,
- *         backendOnline  = BACKEND.SARVAM.STT,
+ *         backendOnline  = BACKEND.CLOUD.STT,
  *     )
  *     router.stt.addPair(
  *         model1 = RACModel(id = "sherpa-onnx-whisper-tiny.en", modelType = ROUTER.OFFLINE),
@@ -152,14 +153,19 @@ class RACRouter internal constructor() : Closeable {
         }
 
         /**
-         * Filter: caller-supplied predicate evaluated host-side, once per
-         * candidate, per request. Return `true` to keep the candidate
-         * eligible, `false` to drop it.
+         * Filter: caller-supplied predicate. The router registers it by
+         * [name] in the cross-SDK commons callback table; commons invokes it
+         * once per candidate, per request, during its filtering phase. Return
+         * `true` to keep the candidate eligible, `false` to drop it.
          *
          * The callback is invoked synchronously on the request thread —
          * keep it fast and side-effect-free.
          *
-         * @property name        Short label for logs.
+         * [name] doubles as the wire identity (`CustomFilter.name`) that links
+         * the policy proto entry to the registered predicate, so it must be
+         * non-blank and unique within a policy.
+         *
+         * @property name        Wire identity + log label; non-blank, unique.
          * @property description Human-readable purpose for the filter.
          * @property check       Lambda `(modelId) -> Boolean` deciding
          *                       eligibility for the given candidate.
@@ -288,7 +294,15 @@ class RACRouter internal constructor() : Closeable {
         private var onlineModel: RACModel? = null
         private var offlineServiceHandle: Long = 0L
         private var onlineServiceHandle: Long = 0L
-        private var pendingCustomFilters: List<RoutingPolicy.CustomDefine> = emptyList()
+
+        /**
+         * Names of the custom filters this router currently has registered in
+         * the commons callback table (one per [RoutingPolicy.CustomDefine] in
+         * the active policy). Tracked so [addPair] can replace and [close] can
+         * unregister them. Commons — not Kotlin — invokes the predicates while
+         * filtering candidates.
+         */
+        private var registeredCustomFilterNames: List<String> = emptyList()
 
         init {
             RunAnywhereBridge.ensureNativeLibraryLoaded()
@@ -325,8 +339,8 @@ class RACRouter internal constructor() : Closeable {
             val offBackend = offlineBackend ?: error("init() not called")
             val onBackend = onlineBackend ?: error("init() not called")
 
-            HybridRouterBridgeAdapter.destroyService(offBackend, offlineServiceHandle)
-            HybridRouterBridgeAdapter.destroyService(onBackend, onlineServiceHandle)
+            HybridRouterBridgeAdapter.destroyService(offlineServiceHandle)
+            HybridRouterBridgeAdapter.destroyService(onlineServiceHandle)
 
             offlineServiceHandle = HybridRouterBridgeAdapter.createService(offBackend, offModel)
             onlineServiceHandle = HybridRouterBridgeAdapter.createService(onBackend, onModel)
@@ -336,7 +350,11 @@ class RACRouter internal constructor() : Closeable {
             val rc1 = RunAnywhereBridge.racSttHybridRouterSetOfflineService(
                 routerHandle = nativeHandle,
                 serviceHandle = offlineServiceHandle,
-                descriptorProto = HybridRouterProto.descriptor(offModel, offBackend.kind),
+                descriptorProto = HybridRouterProto.descriptor(
+                    offModel,
+                    offBackend.kindEnum,
+                    offBackend.provider,
+                ),
             )
             check(rc1 == RunAnywhereBridge.RAC_SUCCESS) {
                 "racSttHybridRouterSetOfflineService rc=$rc1"
@@ -344,14 +362,35 @@ class RACRouter internal constructor() : Closeable {
             val rc2 = RunAnywhereBridge.racSttHybridRouterSetOnlineService(
                 routerHandle = nativeHandle,
                 serviceHandle = onlineServiceHandle,
-                descriptorProto = HybridRouterProto.descriptor(onModel, onBackend.kind),
+                descriptorProto = HybridRouterProto.descriptor(
+                    onModel,
+                    onBackend.kindEnum,
+                    onBackend.provider,
+                ),
             )
             check(rc2 == RunAnywhereBridge.RAC_SUCCESS) {
                 "racSttHybridRouterSetOnlineService rc=$rc2"
             }
 
             val packed = HybridRouterProto.policy(routerPolicy)
-            pendingCustomFilters = packed.customFilters
+
+            // Register each custom filter's predicate by NAME with the
+            // cross-SDK commons callback table. Commons evaluates them during
+            // candidate filtering — the Kotlin layer does NOT pre-filter or
+            // toggle router slots. Replace any filters from a previous addPair
+            // first so re-binding a new policy doesn't leak stale callbacks.
+            unregisterCustomFilters()
+            for (custom in packed.customFilters) {
+                val rc = RunAnywhereBridge.racHybridRegisterCustomFilter(
+                    name = custom.name,
+                    predicate = CustomFilterPredicate { modelId -> custom.check(modelId) },
+                )
+                check(rc == RunAnywhereBridge.RAC_SUCCESS) {
+                    "racHybridRegisterCustomFilter('${custom.name}') rc=$rc"
+                }
+            }
+            registeredCustomFilterNames = packed.customFilters.map { it.name }
+
             val rc3 = RunAnywhereBridge.racSttHybridRouterSetPolicy(nativeHandle, packed.bytes)
             check(rc3 == RunAnywhereBridge.RAC_SUCCESS) {
                 "racSttHybridRouterSetPolicy rc=$rc3"
@@ -359,11 +398,23 @@ class RACRouter internal constructor() : Closeable {
         }
 
         /**
+         * Unregister every custom-filter predicate this router installed in the
+         * commons callback table. Idempotent.
+         */
+        private fun unregisterCustomFilters() {
+            for (name in registeredCustomFilterNames) {
+                RunAnywhereBridge.racHybridUnregisterCustomFilter(name)
+            }
+            registeredCustomFilterNames = emptyList()
+        }
+
+        /**
          * Run one transcribe request through the router.
          *
          * @param audioBytes  File-encoded audio (wav/mp3/flac/...) OR raw
          *                    PCM bytes. Each engine decodes per its own
-         *                    expectations: Sarvam sends the bytes as a
+         *                    expectations: the cloud provider (e.g. Sarvam)
+         *                    sends the bytes as a
          *                    multipart file part; sherpa parses WAV
          *                    inline.
          * @param language    Optional BCP-47 hint. Empty = auto-detect.
@@ -379,48 +430,22 @@ class RACRouter internal constructor() : Closeable {
             audioFormat: Int = 0,
         ): TranscribeResult {
             check(nativeHandle != 0L) { "Call init() then addPair() first" }
-            val offModel = offlineModel ?: error("addPair() not called")
-            val onModel = onlineModel ?: error("addPair() not called")
-            val offBackend = offlineBackend ?: error("init() not called")
-            val onBackend = onlineBackend ?: error("init() not called")
+            check(offlineModel != null && onlineModel != null) { "addPair() not called" }
 
-            val offlineEligible = pendingCustomFilters.all { it.check(offModel.id) }
-            val onlineEligible = pendingCustomFilters.all { it.check(onModel.id) }
-
-            if (!offlineEligible) {
-                RunAnywhereBridge.racSttHybridRouterSetOfflineService(nativeHandle, 0L, ByteArray(0))
-            }
-            if (!onlineEligible) {
-                RunAnywhereBridge.racSttHybridRouterSetOnlineService(nativeHandle, 0L, ByteArray(0))
-            }
-
-            try {
-                val responseBytes = RunAnywhereBridge.racSttHybridRouterTranscribe(
-                    routerHandle = nativeHandle,
-                    requestProto = HybridSttRouterProto.request(
-                        audioBytes = audioBytes,
-                        language = language,
-                        sampleRate = sampleRate,
-                        audioFormat = audioFormat,
-                    ),
-                ) ?: error("racSttHybridRouterTranscribe returned null envelope")
-                return HybridSttRouterProto.parseResponse(responseBytes)
-            } finally {
-                if (!offlineEligible) {
-                    RunAnywhereBridge.racSttHybridRouterSetOfflineService(
-                        routerHandle = nativeHandle,
-                        serviceHandle = offlineServiceHandle,
-                        descriptorProto = HybridRouterProto.descriptor(offModel, offBackend.kind),
-                    )
-                }
-                if (!onlineEligible) {
-                    RunAnywhereBridge.racSttHybridRouterSetOnlineService(
-                        routerHandle = nativeHandle,
-                        serviceHandle = onlineServiceHandle,
-                        descriptorProto = HybridRouterProto.descriptor(onModel, onBackend.kind),
-                    )
-                }
-            }
+            // Pure pass-through: commons owns the entire routing decision —
+            // hard-filter eligibility (including custom-filter callbacks),
+            // ranking, and cascade. Kotlin marshals the request and decodes the
+            // response; it does NOT pre-filter candidates or toggle slots.
+            val responseBytes = RunAnywhereBridge.racSttHybridRouterTranscribe(
+                routerHandle = nativeHandle,
+                requestProto = HybridSttRouterProto.request(
+                    audioBytes = audioBytes,
+                    language = language,
+                    sampleRate = sampleRate,
+                    audioFormat = audioFormat,
+                ),
+            ) ?: error("racSttHybridRouterTranscribe returned null envelope")
+            return HybridSttRouterProto.parseResponse(responseBytes)
         }
 
         /**
@@ -428,21 +453,21 @@ class RACRouter internal constructor() : Closeable {
          * Safe to call multiple times. Called from [RACRouter.close].
          */
         override fun close() {
+            unregisterCustomFilters()
             if (nativeHandle != 0L) {
                 RunAnywhereBridge.racSttHybridRouterSetOfflineService(nativeHandle, 0L, ByteArray(0))
                 RunAnywhereBridge.racSttHybridRouterSetOnlineService(nativeHandle, 0L, ByteArray(0))
                 RunAnywhereBridge.racSttHybridRouterDestroy(nativeHandle)
                 nativeHandle = 0L
             }
-            HybridRouterBridgeAdapter.destroyService(offlineBackend, offlineServiceHandle)
+            HybridRouterBridgeAdapter.destroyService(offlineServiceHandle)
             offlineServiceHandle = 0L
-            HybridRouterBridgeAdapter.destroyService(onlineBackend, onlineServiceHandle)
+            HybridRouterBridgeAdapter.destroyService(onlineServiceHandle)
             onlineServiceHandle = 0L
             offlineBackend = null
             onlineBackend = null
             offlineModel = null
             onlineModel = null
-            pendingCustomFilters = emptyList()
         }
     }
 
@@ -518,7 +543,7 @@ class RACRouter internal constructor() : Closeable {
          * Allocate a new router and configure both STT backends.
          *
          * @param backendOffline The on-device backend (e.g. [BACKEND.SHERPA.STT]).
-         * @param backendOnline  The cloud backend (e.g. [BACKEND.SARVAM.STT]).
+         * @param backendOnline  The cloud backend (e.g. [BACKEND.CLOUD.STT]).
          * @return Ready-to-`addPair` router. Caller owns and must [close].
          */
         fun init(backendOffline: BackendId, backendOnline: BackendId): RACRouter {
