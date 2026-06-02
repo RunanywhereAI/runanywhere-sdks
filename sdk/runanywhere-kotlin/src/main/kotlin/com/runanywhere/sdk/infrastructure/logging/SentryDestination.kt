@@ -43,9 +43,7 @@ class SentryDestination : LogDestination {
      */
     private val minSentryLevel: LogLevel = LogLevel.WARNING
 
-    // =============================================================================
-    // LOG DESTINATION OPERATIONS
-    // =============================================================================
+    // Log destination operations
 
     /**
      * Write a log entry to Sentry.
@@ -77,9 +75,7 @@ class SentryDestination : LogDestination {
         SentryManager.flush()
     }
 
-    // =============================================================================
-    // PRIVATE HELPERS
-    // =============================================================================
+    // Private helpers
 
     /**
      * Add a breadcrumb for context trail.

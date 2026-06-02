@@ -52,9 +52,7 @@ object CppBridgeFileManager {
      */
     fun clearTemp(): Boolean = RunAnywhereBridge.nativeFileManagerClearTemp() == 0
 
-    // ========================================================================
-    // SWIFT-PARITY WRAPPERS (mirror CppBridge+FileManager.swift)
-    // ========================================================================
+    // Swift-parity wrappers (mirror CppBridge+FileManager.swift)
     //
     // Thin JNI passthroughs to the `rac_file_manager_*` C ABI. Paths use Kotlin
     // `String` (vs Swift's `URL`). The framework-aware variants of delete /

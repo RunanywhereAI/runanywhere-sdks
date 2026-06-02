@@ -64,9 +64,7 @@ class SDKException(
         "SDKException[$category] ${code.name}: ${error.message}"
 
     companion object {
-        // ====================================================================
-        // GENERIC FACTORY (Swift parity: SDKException.make(...))
-        // ====================================================================
+        // Generic factory (Swift parity: SDKException.make(...))
 
         /**
          * Generic factory; auto-logs unexpected errors unless [shouldLog] is
@@ -108,9 +106,7 @@ class SDKException(
             return ex
         }
 
-        // ====================================================================
-        // INITIALIZATION FACTORIES
-        // ====================================================================
+        // Initialization factories
 
         fun notInitialized(component: String, cause: Throwable? = null) =
             of(
@@ -193,9 +189,7 @@ class SDKException(
             return ex
         }
 
-        // ====================================================================
-        // MODEL FACTORIES
-        // ====================================================================
+        // Model factories
 
         fun modelNotFound(modelId: String, cause: Throwable? = null) =
             of(
@@ -221,9 +215,7 @@ class SDKException(
                 cause = cause,
             )
 
-        // ====================================================================
-        // NETWORK FACTORIES
-        // ====================================================================
+        // Network factories
 
         fun networkError(message: String, cause: Throwable? = null) =
             of(
@@ -242,9 +234,7 @@ class SDKException(
                 cause = cause,
             )
 
-        // ====================================================================
-        // COMPONENT FACTORIES
-        // ====================================================================
+        // Component factories
 
         fun invalidState(message: String, cause: Throwable? = null) =
             of(
@@ -292,14 +282,10 @@ class SDKException(
                 cause = cause,
             )
 
-        // ====================================================================
-        // MODALITY FACTORIES (STT/TTS/LLM/VAD/VLM/VoiceAgent)
-        //
+        // Modality factories (STT/TTS/LLM/VAD/VLM/VoiceAgent).
         // Per errors.proto:516-518, `c_abi_code` MUST equal `-int32(code)` for
-        // codes ≤ 899. The chosen ProtoErrorCode determines the cAbiCode via
-        // the of() helper's automatic round-trip computation — no hand-written
-        // cAbiCode literals.
-        // ====================================================================
+        // codes ≤ 899; the chosen ProtoErrorCode drives cAbiCode via of()'s
+        // round-trip computation — no hand-written cAbiCode literals.
 
         fun tts(message: String, cause: Throwable? = null) =
             of(
@@ -325,9 +311,7 @@ class SDKException(
                 cause = cause,
             )
 
-        // ====================================================================
-        // CATEGORY FACTORIES (storage/platform/model/operation)
-        // ====================================================================
+        // Category factories (storage/platform/model/operation)
 
         fun storage(message: String, cause: Throwable? = null) =
             of(
@@ -361,9 +345,7 @@ class SDKException(
                 cause = cause,
             )
 
-        // ====================================================================
-        // ERROR CONVERSION (Swift parity: SDKException.from / fromONNXCode)
-        // ====================================================================
+        // Error conversion (Swift parity: SDKException.from / fromONNXCode)
 
         /**
          * Convert any [Throwable] into an SDKException. If [error] is already
@@ -507,9 +489,7 @@ class SDKException(
     }
 }
 
-// ============================================================================
-// ProtoErrorCode CLASSIFICATION HELPER (Swift parity: RAErrorCode.isExpected)
-// ============================================================================
+// ProtoErrorCode classification helper (Swift parity: RAErrorCode.isExpected)
 
 /**
  * Whether this proto error code represents an expected/routine outcome that
@@ -527,9 +507,7 @@ val ProtoErrorCode.isExpected: Boolean
             else -> false
         }
 
-// ============================================================================
-// SDKException CONVENIENCE EXTENSIONS (Swift parity)
-// ============================================================================
+// SDKException convenience extensions (Swift parity)
 
 /**
  * One-line failure-reason summary suitable for log metadata. Mirrors the

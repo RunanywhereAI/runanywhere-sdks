@@ -29,7 +29,7 @@ private val logger = SDKLogger(TAG)
  * @param baseURL Backend API base URL (required for production/staging)
  */
 internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
-    logger.info("Initializing CppBridge for environment: $environment")
+    logger.debug("Initializing CppBridge for environment: $environment")
 
     // Normalize UNSPECIFIED -> DEVELOPMENT so the downstream C-ABI call gets a valid value.
     val resolvedEnvironment =
@@ -42,7 +42,7 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
     // Configure telemetry base URL if provided
     if (!baseURL.isNullOrEmpty()) {
         CppBridgeTelemetry.setBaseUrl(baseURL)
-        logger.info("Telemetry base URL configured: $baseURL")
+        logger.debug("Telemetry base URL configured: $baseURL")
     }
 
     CppBridge.initialize(resolvedEnvironment, apiKey, baseURL)
@@ -54,7 +54,7 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
     // (the actual no-ops on UnsatisfiedLinkError).
     EventBus.start()
 
-    logger.info("CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
+    logger.debug("CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
 }
 
 /**
@@ -68,10 +68,10 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
  * the next [RunAnywhere.ensureServicesReady] call retries HTTP setup.
  */
 internal suspend fun initializePlatformBridgeServices(): Boolean {
-    logger.info("Initializing CppBridge services...")
+    logger.debug("Initializing CppBridge services...")
     CppBridge.initializeServices()
     val httpConfigured = HTTPClientAdapter.isConfigured
-    logger.info(
+    logger.debug(
         "CppBridge services initialization complete (httpConfigured=$httpConfigured)",
     )
     return httpConfigured
@@ -81,18 +81,16 @@ internal suspend fun initializePlatformBridgeServices(): Boolean {
  * Shutdown CppBridge and release resources.
  */
 internal fun shutdownPlatformBridge() {
-    logger.info("Shutting down CppBridge...")
+    logger.debug("Shutting down CppBridge...")
     // Tear down the native SDKEvent subscription before C++ commons is
     // shutdown so the unsubscribe call still has a working ABI surface.
     EventBus.stop()
     CppBridge.shutdown()
-    logger.info("CppBridge shutdown complete")
+    logger.debug("CppBridge shutdown complete")
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Auth + device-state actuals — route directly through `rac_auth_*` and
 // CppBridgeDevice thunks. No Kotlin-side cache.
-// ═══════════════════════════════════════════════════════════════════════════
 
 internal fun platformGetUserId(): String? = RunAnywhereBridge.racAuthGetUserId()
 

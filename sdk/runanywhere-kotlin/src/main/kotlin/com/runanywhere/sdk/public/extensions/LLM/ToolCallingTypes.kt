@@ -27,9 +27,7 @@ import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.ToolValueJSON
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
-// =============================================================================
 // PROTO TYPEALIASES (RA-prefixed, mirroring Swift)
-// =============================================================================
 
 typealias ToolValue = ai.runanywhere.proto.v1.ToolValue
 typealias ToolValueArray = ai.runanywhere.proto.v1.ToolValueArray
@@ -53,9 +51,7 @@ typealias RAToolValueObject = ai.runanywhere.proto.v1.ToolValueObject
 typealias RAToolCallingOptions = ai.runanywhere.proto.v1.ToolCallingOptions
 typealias RAToolCallingResult = ai.runanywhere.proto.v1.ToolCallingResult
 
-// =============================================================================
 // TOOL EXECUTOR (matches Swift's typed-map signature)
-// =============================================================================
 
 /**
  * Function type for host tool executors.
@@ -74,9 +70,7 @@ internal data class RegisteredTool(
     val executor: ToolExecutor,
 )
 
-// =============================================================================
 // RAToolCallingOptions.defaults() — Swift parity
-// =============================================================================
 
 internal const val DEFAULT_TOOL_CALL_MAX_ITERATIONS = 5
 
@@ -95,9 +89,7 @@ fun ai.runanywhere.proto.v1.ToolCallingOptions.Companion.defaults(): RAToolCalli
         format_hint = "default",
     )
 
-// =============================================================================
 // LLMGenerationOptions -> ToolCallingOptions normalization
-// =============================================================================
 
 internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions {
     val generationOptions = this
@@ -177,9 +169,7 @@ private fun ToolCallFormatName?.toToolFormatHint(): String =
         else -> ""
     }
 
-// =============================================================================
 // RAToolValue ergonomic helpers (mirror Swift `RAToolValue` extension)
-// =============================================================================
 
 // MARK: Constructors -----------------------------------------------------------
 

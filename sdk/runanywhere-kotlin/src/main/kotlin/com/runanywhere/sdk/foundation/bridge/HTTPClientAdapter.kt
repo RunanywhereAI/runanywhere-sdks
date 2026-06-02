@@ -96,9 +96,7 @@ public object HTTPClientAdapter {
 
     @Volatile private var apiKey: String? = null
 
-    // ────────────────────────────────────────────────────────────────────
     // Configuration
-    // ────────────────────────────────────────────────────────────────────
 
     /**
      * Configure the adapter with a base URL and API key. Validates inputs
@@ -135,9 +133,7 @@ public object HTTPClientAdapter {
             return isUsableHTTPURL(url) && isUsableCredential(apiKey)
         }
 
-    // ────────────────────────────────────────────────────────────────────
     // Public request surface
-    // ────────────────────────────────────────────────────────────────────
 
     /** Send a raw POST payload. Mirrors Swift `postRaw(_:_:requiresAuth:)`. */
     public suspend fun postRaw(
@@ -188,9 +184,7 @@ public object HTTPClientAdapter {
         return interpretResult(result, method = "GET", url = url)
     }
 
-    // ────────────────────────────────────────────────────────────────────
     // Internal execution
-    // ────────────────────────────────────────────────────────────────────
 
     private suspend fun execute(
         method: String,
@@ -309,9 +303,7 @@ public object HTTPClientAdapter {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────
     // Header / URL construction
-    // ────────────────────────────────────────────────────────────────────
 
     /**
      * Build the per-request header map. Prefers commons' canonical header
@@ -392,9 +384,7 @@ public object HTTPClientAdapter {
         }
     }
 
-    // ────────────────────────────────────────────────────────────────────
     // Local validators (mirror CppBridge.DevConfig in Swift)
-    // ────────────────────────────────────────────────────────────────────
 
     private fun isUsableHTTPURL(url: String?): Boolean {
         if (url.isNullOrBlank()) return false
@@ -523,9 +513,7 @@ internal suspend fun platformResolveAuthToken(): String? =
         CppBridgeAuth.getValidToken()
     }
 
-// ────────────────────────────────────────────────────────────────────────
 // Private helpers
-// ────────────────────────────────────────────────────────────────────────
 
 private fun nativeHttpResponseToResult(resp: NativeHttpResponse?): HttpExecutionResult {
     return if (resp == null) {

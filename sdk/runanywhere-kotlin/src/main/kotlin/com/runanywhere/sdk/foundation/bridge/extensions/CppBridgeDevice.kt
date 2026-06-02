@@ -120,9 +120,7 @@ object CppBridgeDevice {
         fun getEfficiencyCores(): Int = getCoreCount() - getPerformanceCores()
     }
 
-    // ========================================================================
-    // PUBLIC API
-    // ========================================================================
+    // Public API
 
     /**
      * Register the JNI callback bag with the C++ device manager.
@@ -228,9 +226,7 @@ object CppBridgeDevice {
         return result == 0
     }
 
-    // ========================================================================
-    // JNI CALLBACKS (invoked by commons through `rac_device_callbacks_t`)
-    // ========================================================================
+    // JNI callbacks (invoked by commons through `rac_device_callbacks_t`)
 
     @JvmStatic
     fun getDeviceIdCallback(): String {
@@ -399,9 +395,7 @@ object CppBridgeDevice {
         }
     }
 
-    // ========================================================================
-    // PRIVATE HELPERS
-    // ========================================================================
+    // Private helpers
 
     /**
      * Initialise or load the persistent device id.

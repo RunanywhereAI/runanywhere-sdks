@@ -83,30 +83,26 @@ internal object ToolCallingOrchestrator {
     private const val TAG = "ToolCalling"
     private val logger = SDKLogger(TAG)
 
-    // ========================================================================
-    // TOOL REGISTRATION
-    // ========================================================================
+    // Tool registration
 
     suspend fun registerTool(definition: ToolDefinition, executor: ToolExecutor) {
         ToolRegistry.register(definition, executor)
-        logger.info("Registered tool: ${definition.name}")
+        logger.debug("Registered tool: ${definition.name}")
     }
 
     suspend fun unregisterTool(toolName: String) {
         ToolRegistry.unregister(toolName)
-        logger.info("Unregistered tool: $toolName")
+        logger.debug("Unregistered tool: $toolName")
     }
 
     suspend fun getRegisteredTools(): List<ToolDefinition> = ToolRegistry.getAll()
 
     suspend fun clearTools() {
         ToolRegistry.clear()
-        logger.info("Cleared all registered tools")
+        logger.debug("Cleared all registered tools")
     }
 
-    // ========================================================================
-    // TOOL EXECUTION
-    // ========================================================================
+    // Tool execution
 
     /**
      * Execute a tool call through its registered executor. Used by the
@@ -188,9 +184,7 @@ internal object ToolCallingOrchestrator {
             completed_at_ms = completedAtMs,
         )
 
-    // ========================================================================
-    // GENERATE WITH TOOLS
-    // ========================================================================
+    // Generate with tools
 
     /**
      * Generates a response with tool calling support. The entire generate →

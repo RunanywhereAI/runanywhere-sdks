@@ -157,9 +157,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
         fanOut?.forceTearDown()
     }
 
-    // -----------------------------------------------------------------
     // Per-handle fan-out
-    // -----------------------------------------------------------------
 
     /**
      * Owns the single C-side registration for a specific (streamKey,
@@ -416,9 +414,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
         }
     }
 
-    // -----------------------------------------------------------------
     // Global per-handle fan-out registry
-    // -----------------------------------------------------------------
 
     companion object {
         /**

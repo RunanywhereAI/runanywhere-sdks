@@ -6,18 +6,14 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-// =============================================================================
 // LOG LEVEL (consolidated — see com.runanywhere.sdk.public.extensions.LogLevel)
-// =============================================================================
 //
 // The canonical LogLevel is the public API enum defined in
 // RunAnywhereLogging.kt. Values: DEBUG(0), INFO(1), WARNING(2), ERROR(3),
 // FAULT(4). Ordered by severity, larger value = more severe (matches Swift).
 // Filtering semantics: log iff `level.value >= minLogLevel.value`.
 
-// =============================================================================
-// LOG ENTRY
-// =============================================================================
+// Log entry
 
 /**
  * Represents a single log message with metadata.
@@ -37,9 +33,7 @@ data class LogEntry(
     val framework: String? = null,
 )
 
-// =============================================================================
-// LOG DESTINATION PROTOCOL
-// =============================================================================
+// Log destination protocol
 
 /**
  * Protocol for log output destinations (Console, remote services, etc.).
@@ -59,9 +53,7 @@ interface LogDestination {
     fun flush()
 }
 
-// =============================================================================
-// LOGGING CONFIGURATION
-// =============================================================================
+// Logging configuration
 
 /**
  * Configuration for the logging system.
@@ -131,9 +123,7 @@ data class LoggingConfiguration(
     }
 }
 
-// =============================================================================
-// LOGGING (CENTRAL SERVICE)
-// =============================================================================
+// Logging (central service)
 
 /**
  * Central logging service that routes logs to multiple destinations.
@@ -165,9 +155,7 @@ object Logging {
     val destinations: List<LogDestination>
         get() = _destinations.toList()
 
-    // =============================================================================
-    // CONFIGURATION
-    // =============================================================================
+    // Configuration
 
     /**
      * Configure the logging system.
@@ -262,9 +250,7 @@ object Logging {
         commonsLogBridge = bridge
     }
 
-    // =============================================================================
-    // CORE LOGGING
-    // =============================================================================
+    // Core logging
 
     /**
      * Log a message with optional metadata.
@@ -323,9 +309,7 @@ object Logging {
         }
     }
 
-    // =============================================================================
-    // DESTINATION MANAGEMENT
-    // =============================================================================
+    // Destination management
 
     /**
      * Add a log destination.
@@ -373,9 +357,7 @@ object Logging {
         }
     }
 
-    // =============================================================================
-    // PRIVATE HELPERS
-    // =============================================================================
+    // Private helpers
 
     private fun printToConsole(entry: LogEntry) {
         val levelIndicator =
@@ -425,9 +407,7 @@ object Logging {
         println(output)
     }
 
-    // =============================================================================
-    // METADATA SANITIZATION
-    // =============================================================================
+    // Metadata sanitization
 
     // Fallback sensitive-substring list used when the canonical C++ policy
     // (`rac_log_metadata_should_redact`) is not yet reachable — e.g. before
@@ -472,9 +452,7 @@ object Logging {
     }
 }
 
-// =============================================================================
-// SDK LOGGER (CONVENIENCE WRAPPER)
-// =============================================================================
+// SDK logger (convenience wrapper)
 
 /**
  * Simple logger for SDK components with category-based filtering.
@@ -483,9 +461,7 @@ object Logging {
 class SDKLogger(
     val category: String = "SDK",
 ) {
-    // =============================================================================
-    // LOGGING METHODS
-    // =============================================================================
+    // Logging methods
 
     /**
      * Log a trace-level message (routed to DEBUG in the canonical enum —
@@ -611,9 +587,7 @@ class SDKLogger(
         )
     }
 
-    // =============================================================================
-    // ERROR LOGGING WITH CONTEXT
-    // =============================================================================
+    // Error logging with context
 
     /**
      * Log an error with source location context.
@@ -697,9 +671,7 @@ class SDKLogger(
         )
     }
 
-    // =============================================================================
-    // COMPANION OBJECT - CONVENIENCE LOGGERS
-    // =============================================================================
+    // Companion object — convenience loggers
 
     companion object {
         /**
@@ -709,9 +681,7 @@ class SDKLogger(
             Logging.setMinLogLevel(level)
         }
 
-        // =============================================================================
         // CONVENIENCE LOGGERS (matching Swift SDK and runanywhere-commons)
-        // =============================================================================
 
         /** Shared logger for general SDK usage */
         val shared = SDKLogger("RunAnywhere")

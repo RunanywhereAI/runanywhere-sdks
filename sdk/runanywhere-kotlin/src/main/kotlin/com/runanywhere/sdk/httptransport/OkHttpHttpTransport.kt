@@ -164,9 +164,7 @@ object OkHttpHttpTransport {
      */
     private val registrationState: AtomicReference<Boolean> = AtomicReference(false)
 
-    // ---------------------------------------------------------------------
     // Public entry points (mirrors Swift URLSessionHttpTransport)
-    // ---------------------------------------------------------------------
 
     /**
      * Install the OkHttp adapter as the active HTTP transport.
@@ -296,10 +294,8 @@ object OkHttpHttpTransport {
     @JvmStatic
     fun getHttpClient(): OkHttpClient? = clientRef.get()
 
-    // ---------------------------------------------------------------------
     // C-callback entry points (invoked by JNI; mirror Swift's
     // `cRequestSend` / `cRequestStream` / `cRequestResume` trampolines)
-    // ---------------------------------------------------------------------
 
     /**
      * `request_send` vtable slot — blocking single-shot request. Invoked
@@ -419,9 +415,7 @@ object OkHttpHttpTransport {
         )
     }
 
-    // ---------------------------------------------------------------------
     // Native bridge
-    // ---------------------------------------------------------------------
 
     /**
      * Native bridge: hands a chunk to the C `rac_http_body_chunk_fn` pointed
@@ -438,9 +432,7 @@ object OkHttpHttpTransport {
         contentLength: Long,
     ): Boolean
 
-    // ---------------------------------------------------------------------
     // Streaming core (shared between request_stream + request_resume)
-    // ---------------------------------------------------------------------
 
     private fun streamInternal(
         method: String,
@@ -590,9 +582,7 @@ object OkHttpHttpTransport {
         return cancelled
     }
 
-    // ---------------------------------------------------------------------
     // Helpers
-    // ---------------------------------------------------------------------
 
     private fun buildRequest(
         method: String,
@@ -702,9 +692,7 @@ object OkHttpHttpTransport {
         return pairs.toTypedArray()
     }
 
-    // ---------------------------------------------------------------------
     // Response DTOs
-    // ---------------------------------------------------------------------
 
     /**
      * Response DTO for the blocking path. Layout matches the JNI

@@ -80,7 +80,7 @@ class AudioCaptureManager {
         get() = currentAudioLevel
 
     init {
-        logger.info("AudioCaptureManager initialized")
+        logger.debug("AudioCaptureManager initialized")
     }
 
     suspend fun requestPermission(): Boolean {
@@ -295,7 +295,7 @@ class AudioCaptureManager {
         withContext(Dispatchers.IO) {
             requestAudioFocus(ctx)
         }
-        logger.info("Audio session activated (audio focus requested)")
+        logger.debug("Audio session activated (audio focus requested)")
     }
 
     suspend fun deactivateAudioSession() {
@@ -303,12 +303,10 @@ class AudioCaptureManager {
         withContext(Dispatchers.IO) {
             abandonAudioFocus(ctx)
         }
-        logger.info("Audio session deactivated")
+        logger.debug("Audio session deactivated")
     }
 
-    // ============================================================================
     // Private helpers
-    // ============================================================================
 
     /**
      * Compute a normalized audio level (0.0–1.0) for the given PCM 16-bit

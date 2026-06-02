@@ -104,9 +104,7 @@ internal object HybridRouterProto {
         )
     }
 
-    // ----------------------------------------------------------------------
     // Internal mappers
-    // ----------------------------------------------------------------------
 
     private fun filterToProto(
         filter: RACRouter.Filter,

@@ -23,13 +23,9 @@ import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHardware
 import com.runanywhere.sdk.public.RunAnywhere
 
-// ---------------------------------------------------------------------------
 // Hardware — namespaced capability class
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // RunAnywhere.hardware accessor
-// ---------------------------------------------------------------------------
 
 class Hardware {
     fun getProfile(): HardwareProfileResult = CppBridgeHardware.getProfile()

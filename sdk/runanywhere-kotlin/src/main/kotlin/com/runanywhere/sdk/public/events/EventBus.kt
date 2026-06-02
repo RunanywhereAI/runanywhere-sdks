@@ -204,6 +204,4 @@ object EventBus {
         get() = events(EVENT_CATEGORY_RAG)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Platform-specific native bridge hooks (expect/actual pattern)
-// ═══════════════════════════════════════════════════════════════════════════

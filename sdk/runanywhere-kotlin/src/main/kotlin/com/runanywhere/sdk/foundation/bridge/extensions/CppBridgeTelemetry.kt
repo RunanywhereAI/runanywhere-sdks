@@ -73,10 +73,8 @@ object CppBridgeTelemetry {
     /** Background scope for the C++→Kotlin HTTP callback. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // ─────────────────────────────────────────────────────────────────
     // Lifecycle (parity with Swift `CppBridge.Events.register/unregister`
     // and `CppBridge.Telemetry.initialize/shutdown`)
-    // ─────────────────────────────────────────────────────────────────
 
     /** Register the telemetry bridge. Idempotent. */
     fun register() {
@@ -198,11 +196,9 @@ object CppBridgeTelemetry {
     /** Native telemetry manager handle (0 if not initialized). */
     fun getTelemetryHandle(): Long = telemetryManagerHandle
 
-    // ─────────────────────────────────────────────────────────────────
     // Configuration (called by CppBridge.kt + PlatformBridge.kt during
     // Phase 1 init). Mirrors Swift, where the same values feed
     // `CppBridge.HTTP.configure(baseURL:apiKey:)`.
-    // ─────────────────────────────────────────────────────────────────
 
     fun setBaseUrl(url: String) {
         _baseUrl = url
@@ -242,9 +238,7 @@ object CppBridgeTelemetry {
                 CppBridgeDevConfig.isUsableCredential(_apiKey)
         }
 
-    // ─────────────────────────────────────────────────────────────────
     // HTTP callback path
-    // ─────────────────────────────────────────────────────────────────
 
     /**
      * Forward a telemetry HTTP request from C++ through the canonical
@@ -274,14 +268,12 @@ object CppBridgeTelemetry {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────
     // SDK lifecycle event emission helpers (parity with Swift's
     // `CppBridge.Events.emitSDKInit*` / `emitSDKModelsLoaded`).
     //
     // Each builds an [InitializationEvent] + wraps it in an [SDKEvent]
     // and publishes it through the canonical SDKEvent proto stream via
     // [CppBridgeSDKEventStream.publish] — C++ owns fan-out + routing.
-    // ─────────────────────────────────────────────────────────────────
 
     /** Emit "SDK init started" through the canonical SDKEvent proto stream. */
     fun emitSDKInitStarted() {

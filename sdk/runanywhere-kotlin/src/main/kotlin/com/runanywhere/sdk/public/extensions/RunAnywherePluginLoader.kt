@@ -18,9 +18,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// ---------------------------------------------------------------------------
 // PluginInfo — lightweight descriptor for a loaded plugin.
-// ---------------------------------------------------------------------------
 
 /**
  * Descriptor for a plugin loaded at runtime.
@@ -33,13 +31,9 @@ data class PluginInfo(
     val path: String? = null,
 )
 
-// ---------------------------------------------------------------------------
 // PluginLoader — namespaced capability class
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
 // RunAnywhere.pluginLoader accessor
-// ---------------------------------------------------------------------------
 
 class PluginLoader {
     val apiVersion: UInt

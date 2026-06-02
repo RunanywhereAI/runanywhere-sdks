@@ -32,14 +32,12 @@ typealias ComponentStates = RAVoiceAgentComponentStates
 
 // MARK: - Voice Agent Configuration
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Round 1 KOTLIN (Task 7 / G-E4): canonical streaming voice-agent entry-point.
 //
 // Iron Rule 5: example apps MUST NOT call CppBridgeVoiceAgent directly.
 // `streamVoiceAgent()` is the public surface that replaces the pattern:
 //     val handle = CppBridgeVoiceAgent.getHandle()
 //     VoiceAgentStreamAdapter(handle).stream()
-// ─────────────────────────────────────────────────────────────────────────────
 
 private val voiceAgentLogger = SDKLogger.voiceAgent
 
@@ -217,11 +215,9 @@ suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
     return CppBridgeVoiceAgent.processVoiceTurnProto(audioData)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Round 1 KOTLIN (Task 7 / G-E4): public streamVoiceAgent() entry-point.
 // Replaces the pattern: CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
 // that leaked CppBridge internals into example apps.
-// ─────────────────────────────────────────────────────────────────────────────
 
 fun RunAnywhere.streamVoiceAgent(): kotlinx.coroutines.flow.Flow<ai.runanywhere.proto.v1.VoiceEvent> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")

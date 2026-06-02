@@ -36,9 +36,7 @@ import com.runanywhere.sdk.public.hybrid.DeviceStateProvider
 object RunAnywhereBridge {
     private const val TAG = "RunAnywhereBridge"
 
-    // ========================================================================
-    // NATIVE LIBRARY LOADING
-    // ========================================================================
+    // Native library loading
 
     @Volatile
     private var nativeLibraryLoaded = false
@@ -56,7 +54,7 @@ object RunAnywhereBridge {
         synchronized(loadLock) {
             if (nativeLibraryLoaded) return true
 
-            logger.info("Loading native library 'runanywhere_jni'...")
+            logger.debug("Loading native library 'runanywhere_jni'...")
 
             try {
                 System.loadLibrary("runanywhere_jni")
@@ -65,13 +63,13 @@ object RunAnywhereBridge {
                 // C ABI so Kotlin SDKLogger and the C++ logger share one
                 // sensitive-substring list (mirrors Swift's SDKLogger).
                 Logging.shouldRedactPolicy = { key -> racLogMetadataShouldRedact(key) }
-                logger.info("✅ Native library loaded successfully")
+                logger.debug("Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
-                logger.error("❌ Failed to load native library: ${e.message}", throwable = e)
+                logger.error("Failed to load native library: ${e.message}", throwable = e)
                 return false
             } catch (e: Exception) {
-                logger.error("❌ Unexpected error: ${e.message}", throwable = e)
+                logger.error("Unexpected error: ${e.message}", throwable = e)
                 return false
             }
         }
@@ -79,9 +77,7 @@ object RunAnywhereBridge {
 
     fun isNativeLibraryLoaded(): Boolean = nativeLibraryLoaded
 
-    // ========================================================================
     // CORE INITIALIZATION (rac_core.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racInit(): Int
@@ -92,9 +88,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racIsInitialized(): Boolean
 
-    // ========================================================================
     // PLATFORM ADAPTER (rac_platform_adapter.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racSetPlatformAdapter(adapter: Any): Int
@@ -102,9 +96,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racGetPlatformAdapter(): Any?
 
-    // ========================================================================
     // LOGGING (rac_logger.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racConfigureLogging(level: Int, logFilePath: String?): Int
@@ -138,10 +130,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racResultToProtoError(code: Int): ByteArray?
 
-    // ========================================================================
     // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
     // Path shape: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/
-    // ========================================================================
 
     /**
      * Set the base directory used by C++ path utilities.
@@ -161,9 +151,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racModelPathsGetModelFolder(modelId: String, framework: Int): String?
 
-    // ========================================================================
     // LLM COMPONENT (rac_llm_component.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racLlmComponentCreate(): Long
@@ -180,9 +168,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentCancel(handle: Long): Int
 
-    // ========================================================================
     // LLM GENERATED-PROTO ABI (rac_llm_service.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racLlmGenerateProto(requestProto: ByteArray): ByteArray?
@@ -196,9 +182,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmCancelProto(): ByteArray?
 
-    // ========================================================================
     // STT COMPONENT (rac_stt_component.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racSttComponentCreate(): Long
@@ -209,14 +193,12 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttComponentCancel(handle: Long): Int
 
-    // ========================================================================
     // STT LIFECYCLE-PROTO ABI (rac_stt_transcribe_*_lifecycle_proto)
     // Swift-aligned: mirrors iOS's `rac_stt_transcribe_lifecycle_proto`.
     // Takes a serialized STTTranscriptionRequest (with audio + options
     // bundled) and resolves the lifecycle-loaded STT model internally.
     // The legacy `racSttComponentTranscribe[Stream]Proto` were deleted in
     // favour of these lifecycle variants — no component-handle threading.
-    // ========================================================================
 
     @JvmStatic
     external fun racSttTranscribeLifecycleProto(requestProto: ByteArray): ByteArray?
@@ -227,9 +209,7 @@ object RunAnywhereBridge {
         listener: NativeProtoProgressListener?,
     ): Int
 
-    // ========================================================================
     // TTS COMPONENT (rac_tts_component.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racTtsComponentCreate(): Long
@@ -240,7 +220,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTtsComponentCancel(handle: Long): Int
 
-    // ========================================================================
     // TTS LIFECYCLE-PROTO ABI (rac_tts_{synthesize,synthesize_stream,
     // list_voices}_lifecycle_proto).
     // Swift-aligned: mirrors iOS's lifecycle-proto path. Takes a serialized
@@ -248,7 +227,6 @@ object RunAnywhereBridge {
     // lifecycle-loaded TTS voice internally. The legacy
     // `racTtsComponent{Synthesize,SynthesizeStream,ListVoices}Proto` JNI
     // exports were deleted — Kotlin SDK is lifecycle-only.
-    // ========================================================================
 
     @JvmStatic
     external fun racTtsSynthesizeLifecycleProto(requestProto: ByteArray): ByteArray?
@@ -273,9 +251,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTtsStopLifecycleProto(): ByteArray?
 
-    // ========================================================================
     // VAD COMPONENT (rac_vad_component.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racVadComponentCreate(): Long
@@ -289,9 +265,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVadComponentCancel(handle: Long): Int
 
-    // ========================================================================
     // VAD GENERATED-PROTO ABI (rac_vad_component.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racVadComponentConfigureProto(handle: Long, configProto: ByteArray): Int
@@ -313,12 +287,10 @@ object RunAnywhereBridge {
         listener: NativeProtoProgressListener?,
     ): Int
 
-    // ========================================================================
     // VAD STREAM PROTO ABI (rac_vad_stream.h)
     // Lifecycle-owned proto-byte VADStreamEvent session API. Register the
     // per-handle listener, start a session to obtain a 64-bit session id, feed
     // PCM int16 mono audio frames, and stop/cancel to tear down.
-    // ========================================================================
 
     @JvmStatic
     external fun racVadSetStreamProtoCallback(
@@ -338,9 +310,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVadStreamCancelProto(sessionId: Long): Int
 
-    // ========================================================================
     // VLM GENERATED-PROTO SERVICE ABI (rac_vlm_service.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racVlmComponentLoadResolvedArtifactsProto(requestProto: ByteArray): ByteArray?
@@ -380,9 +350,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVlmDestroy(handle: Long)
 
-    // ========================================================================
-    // BACKEND REGISTRATION
-    // ========================================================================
+    // Backend registration
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
     //
     //   LlamaCPP: com.runanywhere.sdk.llm.llamacpp.LlamaCPPBridge.nativeRegister()
@@ -393,7 +361,6 @@ object RunAnywhereBridge {
     //
     // This mirrors the Swift SDK architecture where each backend has its own
     // XCFramework (RABackendLlamaCPP, RABackendONNX) with separate registration.
-    // ========================================================================
 
     // Download + non-proto model-registry thunks removed. All of
     // `racDownloadStart` /
@@ -403,9 +370,7 @@ object RunAnywhereBridge {
     // (`racDownloadStartProto`, `racModelRegistry*Proto`) are the canonical
     // surface.
 
-    // ========================================================================
     // MODEL REGISTRY - Direct C++ registry access (mirrors Swift CppBridge+ModelRegistry)
-    // ========================================================================
 
     /**
      * Register model metadata from serialized runanywhere.v1.ModelInfo bytes.
@@ -507,9 +472,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racArtifactInferFromUrlProto(requestBytes: ByteArray): ByteArray?
 
-    // ========================================================================
     // MODEL LIFECYCLE PROTO ABI (rac_model_lifecycle.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racModelLifecycleLoadProto(requestProto: ByteArray): ByteArray?
@@ -523,9 +486,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racComponentLifecycleSnapshotProto(component: Int): ByteArray?
 
-    // ========================================================================
     // AUDIO UTILS (rac_audio_utils.h)
-    // ========================================================================
 
     /**
      * Convert Float32 PCM audio data to WAV format.
@@ -542,10 +503,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racAudioFloat32ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
 
-    // ========================================================================
     // DEVICE MANAGER (rac_device_manager.h)
     // Mirrors Swift SDK's CppBridge+Device.swift
-    // ========================================================================
 
     /**
      * Set device manager callbacks.
@@ -568,10 +527,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDeviceManagerRegisterIfNeeded(environment: Int, buildToken: String?): Int
 
-    // ========================================================================
     // TELEMETRY MANAGER (rac_telemetry_manager.h)
     // Mirrors Swift SDK's CppBridge+Telemetry.swift
-    // ========================================================================
 
     /**
      * Create telemetry manager.
@@ -615,9 +572,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTelemetryManagerFlush(handle: Long): Int
 
-    // ========================================================================
     // ANALYTICS EVENTS (rac_analytics_events.h)
-    // ========================================================================
 
     /**
      * Register analytics events callback with telemetry manager.
@@ -817,10 +772,8 @@ object RunAnywhereBridge {
         energyLevel: Float,
     ): Int
 
-    // ========================================================================
     // DEVELOPMENT CONFIG (rac_dev_config.h)
     // Mirrors Swift SDK's CppBridge+Environment.swift DevConfig
-    // ========================================================================
 
     /**
      * Check if development config is available (has Supabase credentials configured).
@@ -857,9 +810,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDevConfigGetSentryDsn(): String?
 
-    // ========================================================================
-    // SDK CONFIGURATION INITIALIZATION
-    // ========================================================================
+    // SDK configuration initialization
 
     /**
      * Initialize SDK configuration with version and platform info.
@@ -884,17 +835,13 @@ object RunAnywhereBridge {
         baseUrl: String?,
     ): Int
 
-    // ========================================================================
     // TOOL CALLING API (rac_tool_calling.h)
     // Mirrors Swift SDK's CppBridge+ToolCalling.swift
-    // ========================================================================
 
     @JvmStatic
     external fun racToolCallFormatPromptProto(requestProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // FILE MANAGER (rac_file_manager.h)
-    // ========================================================================
 
     /**
      * Register file manager callbacks object.
@@ -917,9 +864,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun nativeFileManagerClearTemp(): Int
 
-    // ========================================================================
     // STORAGE PROTO ABI (rac_storage_analyzer.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racStorageInfoProto(requestProto: ByteArray): ByteArray?
@@ -933,9 +878,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racStorageDeleteProto(requestProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // SDK EVENT STREAM PROTO ABI (rac_sdk_event_stream.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racSdkEventSubscribe(listener: NativeProtoProgressListener): Long
@@ -958,9 +901,7 @@ object RunAnywhereBridge {
         recoverable: Boolean,
     ): Int
 
-    // ========================================================================
     // DOWNLOAD PROTO ABI (rac_download_orchestrator.h)
-    // ========================================================================
 
     @JvmStatic
     external fun racDownloadSetProgressProtoCallback(listener: NativeProtoProgressListener?): Int
@@ -980,9 +921,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDownloadProgressPollProto(requestProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // VOICE AGENT (rac_voice_agent.h)
-    // ========================================================================
     //
     // 4 thunks exposing the voice-agent handle lifecycle to
     // Kotlin. Mirrors Swift's CppBridge.VoiceAgent.shared.getHandle()
@@ -1014,9 +953,7 @@ object RunAnywhereBridge {
     /** Process one voice turn and return serialized VoiceAgentResult bytes. */
     @JvmStatic external fun racVoiceAgentProcessVoiceTurnProto(handle: Long, audioData: ByteArray): ByteArray?
 
-    // ========================================================================
     // TOOL-CALLING SESSION (rac_tool_calling.h)
-    // ========================================================================
     //
     // Native-owned state machine for generate → parse → execute → loop. The
     // session emits ToolCallingSessionEvent bytes on each step. Kotlin only
@@ -1059,9 +996,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racToolCallingSessionCancelProto(sessionHandle: Long): Int
 
-    // ========================================================================
     // TOOL-CALLING RUN LOOP (rac_tool_calling.h)
-    // ========================================================================
     //
     // Single-call native orchestration. Mirrors Swift's
     // RunAnywhere+ToolCalling.swift which drives
@@ -1093,9 +1028,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racToolCallingRunLoopCancelProto(runLoopHandle: Long): Int
 
-    // ========================================================================
     // TOOL VALUE JSON BRIDGE (rac_tool_calling.h)
-    // ========================================================================
     //
     // Moves the recursive ToolValue <-> JSON walk into commons. Mirrors
     // Swift's ToolCallingTypes.swift which loads the same two symbols.
@@ -1118,9 +1051,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racToolValueFromJsonProto(toolValueJsonProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // SOLUTIONS (rac/solutions/rac_solution.h)
-    // ========================================================================
     //
     // Proto-byte / YAML driven L5 solution runtime. Each call returns a
     // Long handle that wraps a `rac_solution_handle_t` from the C side;
@@ -1155,9 +1086,7 @@ object RunAnywhereBridge {
     /** Cancel, join, and destroy the solution. Always safe; null handle is a no-op. */
     @JvmStatic external fun racSolutionDestroy(handle: Long)
 
-    // ========================================================================
     // EMBEDDINGS GENERATED-PROTO ABI (rac_embeddings_service.h)
-    // ========================================================================
 
     @JvmStatic external fun racEmbeddingsCreate(modelId: String): Long
 
@@ -1165,9 +1094,7 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racEmbeddingsEmbedBatchLifecycleProto(requestProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // RAG PIPELINE GENERATED-PROTO ABI (rac_rag_pipeline.h)
-    // ========================================================================
 
     /** Create a RAG session. Returns 0 on failure. */
     @JvmStatic external fun racRagSessionCreateProto(configProto: ByteArray): Long
@@ -1190,9 +1117,7 @@ object RunAnywhereBridge {
     /** Get serialized RAGStatistics proto bytes. Null on error. */
     @JvmStatic external fun racRagStatsProto(handle: Long): ByteArray?
 
-    // ========================================================================
     // LORA GENERATED-PROTO ABI (rac_lora_service.h)
-    // ========================================================================
 
     @JvmStatic external fun racLoraApplyProto(requestProto: ByteArray): ByteArray?
 
@@ -1215,9 +1140,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
-    // ========================================================================
     //
     // External thunks for the plugin loader.
 
@@ -1236,9 +1159,7 @@ object RunAnywhereBridge {
     /** Snapshot of currently registered plugin names. */
     @JvmStatic external fun racRegistryGetRegisteredNames(): Array<String>?
 
-    // ========================================================================
     // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
-    // ========================================================================
     //
     // Legacy direct HTTP runner retained for modality-specific adapters that
     // still need migration. Registry/model downloads use the generated
@@ -1265,9 +1186,7 @@ object RunAnywhereBridge {
         outHttpStatus: IntArray?,
     ): Int
 
-    // ========================================================================
     // PLATFORM HTTP TRANSPORT (rac_http_transport.h)
-    // ========================================================================
     //
     // Registers / unregisters the OkHttp-backed `rac_http_transport_ops`
     // adapter. When registered, every `rac_http_request_*` call from
@@ -1284,9 +1203,7 @@ object RunAnywhereBridge {
     /** Unregister the OkHttp transport and fall back to libcurl. Returns rac_result_t. */
     @JvmStatic external fun racHttpTransportUnregisterOkHttp(): Int
 
-    // ========================================================================
     // NATIVE HTTP REQUEST (rac_http_client.h)
-    // ========================================================================
     //
     // Single blocking entrypoint that wraps
     // rac_http_client_create + rac_http_request_send + rac_http_response_free
@@ -1316,9 +1233,7 @@ object RunAnywhereBridge {
         followRedirects: Boolean,
     ): NativeHttpResponse?
 
-    // ========================================================================
     // CANONICAL DEFAULT HEADERS (Swift parity)
-    // ========================================================================
     //
     // Thunk wrapping commons' shared HTTP policy helper. Used by
     // `HTTPClientAdapter` to converge on the same canonical SDK header
@@ -1350,9 +1265,7 @@ object RunAnywhereBridge {
      */
     @JvmStatic external fun racHttpDefaultHeaders(): Array<String>?
 
-    // ========================================================================
     // AUTH MANAGER (rac_auth_manager.h)
-    // ========================================================================
     //
     // 16 thunks delegating to the
     // matching rac_auth_* C ABI in runanywhere_commons_jni.cpp. The
@@ -1407,9 +1320,7 @@ object RunAnywhereBridge {
      *  CppBridgeAuth wrapper unpacks it into a Pair<String?, Boolean>?. */
     @JvmStatic external fun racAuthGetValidToken(): Array<String?>?
 
-    // ========================================================================
     // STRUCTURED OUTPUT (rac/features/llm/rac_structured_output.h)
-    // ========================================================================
 
     @JvmStatic external fun racStructuredOutputParseProto(requestProto: ByteArray): ByteArray?
 
@@ -1438,9 +1349,7 @@ object RunAnywhereBridge {
         listener: NativeProtoProgressListener?,
     ): Int
 
-    // ========================================================================
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
-    // ========================================================================
     //
     // JNI thunk for rac_hardware_profile_get. Returns a serialized
     // HardwareProfileResult proto, or null if the C++ implementation is not
@@ -1450,9 +1359,7 @@ object RunAnywhereBridge {
      *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
     @JvmStatic external fun racHardwareProfileGet(): ByteArray?
 
-    // ========================================================================
     // ENGINE ROUTER — CAPABILITY QUERIES
-    // ========================================================================
     //
     // `rac_router_frameworks_for_capability_proto` consumes a serialized
     // `runanywhere.v1.FrameworksForCapabilityRequest` and returns a serialized
@@ -1460,9 +1367,7 @@ object RunAnywhereBridge {
     // SDKComponent → ModelCategory → framework mapping that used to live in
     // Kotlin.
 
-    // ========================================================================
     // HARDWARE ACCELERATORS (Swift-alignment)
-    // ========================================================================
     //
     // Surface the lightweight accelerator list and preference setter that
     // Swift's CppBridge+Hardware uses (rac_hardware_get_accelerators /
@@ -1478,9 +1383,7 @@ object RunAnywhereBridge {
      *  @return rac_result_t (0 = success). */
     @JvmStatic external fun racHardwareSetAcceleratorPreference(bytes: ByteArray): Int
 
-    // ========================================================================
     // VAD COMPONENT METADATA (Swift-alignment)
-    // ========================================================================
 
     /** Check if the VAD component is initialized. */
     @JvmStatic external fun racVadComponentIsInitialized(handle: Long): Boolean
@@ -1491,14 +1394,12 @@ object RunAnywhereBridge {
     /** Cleanup the VAD component (release all resources). Returns rac_result_t. */
     @JvmStatic external fun racVadComponentCleanup(handle: Long): Int
 
-    // ========================================================================
     // VAD LIFECYCLE PROTO ABI (rac_vad_service.h — Swift-alignment)
     //
     // Handle-less lifecycle-owned VAD operations. Each routes through the
     // commons VAD lifecycle to the currently-loaded VAD service. Mirrors
     // Swift `VADGeneratedProtoABI.configureLifecycle/startLifecycle/...`.
     //
-    // ========================================================================
 
     /**
      * Configure the lifecycle-loaded VAD with a VADConfiguration proto.
@@ -1530,9 +1431,7 @@ object RunAnywhereBridge {
      */
     @JvmStatic external fun racVadProcessLifecycleProto(requestProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // VLM COMPONENT METADATA (Swift-alignment)
-    // ========================================================================
 
     /** Check if the VLM component supports streaming. */
     @JvmStatic external fun racVlmComponentSupportsStreaming(handle: Long): Boolean
@@ -1540,9 +1439,7 @@ object RunAnywhereBridge {
     /** Get current VLM lifecycle state. Returns rac_lifecycle_state_t enum value. */
     @JvmStatic external fun racVlmComponentGetState(handle: Long): Int
 
-    // ========================================================================
     // STT COMPONENT METADATA (Swift-alignment)
-    // ========================================================================
 
     /** Check if the STT component supports streaming. */
     @JvmStatic external fun racSttComponentSupportsStreaming(handle: Long): Boolean
@@ -1552,9 +1449,7 @@ object RunAnywhereBridge {
      *  Returns rac_result_t. */
     @JvmStatic external fun racSttComponentConfigure(handle: Long, framework: Int): Int
 
-    // ========================================================================
     // VOICE AGENT — COMPOSITE LIFECYCLE (Swift-alignment)
-    // ========================================================================
 
     /** Create a voice-agent handle that wraps four already-created STT/LLM/TTS/VAD
      *  component handles. Mirrors Swift's voice-agent composite constructor.
@@ -1565,9 +1460,7 @@ object RunAnywhereBridge {
      *  Returns rac_result_t. */
     @JvmStatic external fun racVoiceAgentCleanup(handle: Long): Int
 
-    // ========================================================================
     // PROTO BRIDGES — Lifecycle/Registry/Structured Output
-    // ========================================================================
 
     /** Clear queued SDKEvents without removing subscriptions. Test helper.
      *  Returns 0 on success. */
@@ -1590,9 +1483,7 @@ object RunAnywhereBridge {
      *  Handle is reserved for forward compatibility — current C ABI is handle-less. */
     @JvmStatic external fun racStructuredOutputGenerateProto(handle: Long, req: ByteArray): ByteArray?
 
-    // ========================================================================
     // SDK STATE ACCESSORS (Swift-alignment)
-    // ========================================================================
     //
     // Mirrors Swift's CppBridge+State.swift. Reads the global SDK state
     // populated by racSdkInit. Returns null/0 if SDK is not initialized.
@@ -1618,9 +1509,7 @@ object RunAnywhereBridge {
     /** Resolve or create the persistent device ID. Returns null on failure. */
     @JvmStatic external fun racDeviceGetOrCreatePersistentId(): String?
 
-    // ========================================================================
     // MODEL PATHS — FULL SURFACE (Swift-alignment)
-    // ========================================================================
     //
     // Mirrors Swift's CppBridge+ModelPaths. racModelPathsSetBaseDir +
     // racModelPathsGetModelFolder already exist above — the rest of the
@@ -1661,9 +1550,7 @@ object RunAnywhereBridge {
      */
     @JvmStatic external fun racInferModelFileRole(filename: String, modalityProto: Int): Int
 
-    // ========================================================================
     // INFERENCE FRAMEWORK display / analytics / raw tables
-    // ========================================================================
     //
     // Replaces the hand-written rawValue/displayName/analyticsKey switch
     // tables in ModelTypes.kt with the canonical commons tables Swift
@@ -1680,9 +1567,7 @@ object RunAnywhereBridge {
     /** Canonical raw value string (e.g. "LlamaCpp", "ONNX"). Null on failure. */
     @JvmStatic external fun racFrameworkRawValue(frameworkProto: Int): String?
 
-    // ========================================================================
     // ARCHIVE TYPE helpers
-    // ========================================================================
 
     /**
      * Detect the archive type from a URL/file-path. Returns the proto
@@ -1706,9 +1591,7 @@ object RunAnywhereBridge {
      */
     @JvmStatic external fun racArtifactExpectedFilesProto(modelInfoProto: ByteArray): ByteArray?
 
-    // ========================================================================
     // TWO-PHASE SDK INIT (rac_sdk_init.h)
-    // ========================================================================
     //
     // Mirrors Swift's CppBridge.SdkInit. phase1/phase2 take a serialized
     // request and return a serialized SdkInitResult; retryHttp takes no input.
@@ -1737,9 +1620,7 @@ object RunAnywhereBridge {
      */
     @JvmStatic external fun racSdkRetryHttpProto(): ByteArray?
 
-    // ========================================================================
     // FILE MANAGER — FULL PROTO/STRUCTURED SURFACE
-    // ========================================================================
     //
     // The racFileManager* bindings below provide the Swift-aligned naming for
     // file-manager operations, including the model-folder-has-contents and
@@ -1774,9 +1655,7 @@ object RunAnywhereBridge {
     /** Check if `required` bytes are available. Returns true if so. */
     @JvmStatic external fun racFileManagerCheckStorage(required: Long): Boolean
 
-    // ========================================================================
     // ENVIRONMENT VALIDATION + ENDPOINTS (Swift-alignment)
-    // ========================================================================
 
     /** Check if an environment int requires API authentication. */
     @JvmStatic external fun racEnvRequiresAuth(env: Int): Boolean
@@ -1812,9 +1691,7 @@ object RunAnywhereBridge {
     /** Get the model-assignments endpoint path (env-independent). */
     @JvmStatic external fun racEndpointModelAssignments(): String?
 
-    // ========================================================================
     // HYBRID ROUTER — DEVICE STATE (rac_hybrid_device_state.h)
-    // ========================================================================
 
     /**
      * Register a Kotlin [DeviceStateProvider] as the cross-SDK device-state
@@ -1832,9 +1709,7 @@ object RunAnywhereBridge {
         provider: DeviceStateProvider?,
     ): Int
 
-    // ========================================================================
     // STT HYBRID ROUTER (rac_stt_hybrid_router.h)
-    // ========================================================================
 
     /**
      * Wrap an in-tree STT backend (e.g. sherpa-onnx) in a
@@ -1917,9 +1792,7 @@ object RunAnywhereBridge {
      */
     @JvmStatic external fun racSttHybridRouterCancel(routerHandle: Long): Int
 
-    // ========================================================================
-    // CONSTANTS
-    // ========================================================================
+    // Constants
 
     // Result codes.
     //

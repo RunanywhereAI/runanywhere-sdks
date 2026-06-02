@@ -114,9 +114,7 @@ internal object ModelTypesCppBridge {
         }
     }
 
-    // ========================================================================
-    // PROTO ABI
-    // ========================================================================
+    // Proto ABI
 
     private fun formatFromUrlProto(url: String): ModelFormatFromUrlResult? {
         val request = ModelFormatFromUrlRequest(url = url)
@@ -160,9 +158,7 @@ internal object ModelTypesCppBridge {
             null
         }
 
-    // ========================================================================
-    // LOGGING
-    // ========================================================================
+    // Logging
 
     private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
 

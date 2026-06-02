@@ -56,12 +56,10 @@ import com.runanywhere.sdk.public.configuration.cEnvironment
 object CppBridgeState {
     private val logger = SDKLogger("CppBridgeState")
 
-    // ════════════════════════════════════════════════════════════════════
     // Runtime gate flags (Kotlin-only — Swift inlines these into
     // CppBridgeSharedState; here they live alongside the persisted
     // accessors so the future refactor can retire the duplicates in
     // CppBridge.kt without breaking callers).
-    // ════════════════════════════════════════════════════════════════════
 
     /**
      * Whether Phase 1 (synchronous core init) has completed. Mirrors
@@ -93,9 +91,7 @@ object CppBridgeState {
     @Volatile
     var nativeLibraryLoaded: Boolean = false
 
-    // ════════════════════════════════════════════════════════════════════
     // Initialization / Shutdown (Swift parity)
-    // ════════════════════════════════════════════════════════════════════
 
     /**
      * Initialize the C++ state manager.
@@ -154,9 +150,7 @@ object CppBridgeState {
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
     // Persisted state accessors (rac_sdk_state — non-auth)
-    // ════════════════════════════════════════════════════════════════════
 
     /**
      * Current SDK environment as stored in the C++ state singleton.
@@ -203,13 +197,9 @@ object CppBridgeState {
     val isDeviceRegistered: Boolean
         get() = RunAnywhereBridge.racStateIsDeviceRegistered()
 
-    // ════════════════════════════════════════════════════════════════════
     // Auth state (delegated to rac_auth_manager)
-    // ════════════════════════════════════════════════════════════════════
 
-    // ════════════════════════════════════════════════════════════════════
     // Runtime-gate helpers
-    // ════════════════════════════════════════════════════════════════════
 
     /**
      * Reset every runtime gate flag back to its pre-init state. Used by

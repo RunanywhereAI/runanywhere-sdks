@@ -181,9 +181,7 @@ object CppBridgeModelPaths {
             else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
         }
 
-    // ========================================================================
-    // SWIFT-PARITY WRAPPERS (mirror CppBridge+ModelPaths.swift)
-    // ========================================================================
+    // Swift-parity wrappers (mirror CppBridge+ModelPaths.swift)
     //
     // Thin JNI passthroughs to the `rac_model_paths_*` C ABI. Paths are
     // returned as `String` (Kotlin/JVM idiom) instead of Swift's `URL`.

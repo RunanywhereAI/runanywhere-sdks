@@ -8,6 +8,10 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
+import com.runanywhere.sdk.foundation.bridge.CppBridge.initialize
+import com.runanywhere.sdk.foundation.bridge.CppBridge.initializeServices
+import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdown
+import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdownSuspending
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
@@ -158,8 +162,6 @@ object CppBridge {
             // on ~5% of devices. Safe to no-op if the native lib is missing.
             registerOkHttpTransport()
 
-            // Configure logging with Sentry integration
-            // Setup Sentry hooks so Logging can trigger Sentry setup/teardown
             setupSentryHooks(environment)
 
             // Initialize Sentry if enabled for this environment (staging/production)
@@ -196,16 +198,12 @@ object CppBridge {
                 }
             }
 
-            // Register device callbacks (sets up JNI callbacks for C++ to call)
             CppBridgeDevice.register()
 
-            // Initialize SDK config with version, platform, and auth info
-            // This is REQUIRED for device registration to use the correct sdk_version
+            // REQUIRED before device registration so it uses the correct sdk_version.
             // Mirrors Swift SDK's rac_sdk_init() call in CppBridge+State.swift
             initializeSdkConfig(environment, apiKey, baseURL)
 
-            // Initialize telemetry manager with device info
-            // This creates the C++ telemetry manager and sets up HTTP callback
             initializeTelemetryManager(environment)
 
             // Register analytics events callback AFTER telemetry manager is initialized
@@ -241,7 +239,7 @@ object CppBridge {
             // Emit SDK init completed event with duration
             val initDurationMs = System.currentTimeMillis() - initStartTime
             CppBridgeSDKEvents.emitSDKInitCompleted(initDurationMs.toDouble())
-            logger.info("✅ Phase 1 complete in ${initDurationMs}ms ($environment)")
+            logger.debug("Phase 1 complete in ${initDurationMs}ms ($environment)")
         }
     }
 
@@ -254,29 +252,24 @@ object CppBridge {
      */
     private fun initializeTelemetryManager(environment: SDKEnvironment) {
         try {
-            // Get device ID (persistent UUID) - this may initialize it if not already done
+            // getDeviceIdCallback() may lazily initialize the persistent UUID
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
 
             if (deviceId.isEmpty()) {
-                // Device ID unavailable - likely secure storage issue
-                // Skip telemetry to avoid creating orphaned records with temporary IDs
+                // Skip telemetry rather than create orphaned records with a temporary ID
                 logger.error(
-                    "Device ID unavailable - telemetry will be disabled for this session. " +
-                        "This usually indicates secure storage is not properly initialized. " +
-                        "Ensure AndroidPlatformContext.initialize() is called before SDK initialization.",
+                    "Device ID unavailable - telemetry will be disabled for this session. " + "This usually indicates secure storage is not properly initialized. " + "Ensure AndroidPlatformContext.initialize() is called before SDK initialization.",
                 )
                 return
             }
 
-            // Get device info from provider or defaults
             val provider = CppBridgeDevice.deviceInfoProvider
             val deviceModel = provider?.getDeviceModel() ?: getDefaultDeviceModel()
             val osVersion = provider?.getOSVersion() ?: getDefaultOsVersion()
-            val sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.VERSION
+            val sdkVersion = SDKConstants.VERSION
 
-            logger.info("Initializing telemetry manager: device=$deviceId, model=$deviceModel, os=$osVersion")
+            logger.debug("Initializing telemetry manager: device=$deviceId, model=$deviceModel, os=$osVersion")
 
-            // Initialize telemetry manager with C++ via JNI
             CppBridgeTelemetry.initialize(
                 environment = environment,
                 deviceId = deviceId,
@@ -285,7 +278,7 @@ object CppBridge {
                 sdkVersion = sdkVersion,
             )
 
-            logger.info("✅ Telemetry manager initialized")
+            logger.debug("Telemetry manager initialized")
         } catch (e: Exception) {
             logger.error("Failed to initialize telemetry manager: ${e.message}")
         }
@@ -310,23 +303,22 @@ object CppBridge {
      */
     private fun initializeSdkConfig(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
         val deviceId = CppBridgeDevice.getDeviceIdCallback()
-        logger.info("Initializing SDK config (phase 1): env=$environment")
+        logger.debug("Initializing SDK config (phase 1): env=$environment")
         if (!apiKey.isNullOrEmpty()) {
-            logger.info("API key provided: ${apiKey.take(10)}...")
+            logger.debug("API key provided: ${apiKey.take(10)}...")
         }
         if (!baseURL.isNullOrEmpty()) {
-            logger.info("Base URL: $baseURL")
+            logger.debug("Base URL: $baseURL")
         }
 
-        val result =
-            CppBridgeSdkInit.phase1(
-                environment = environment,
-                apiKey = apiKey.orEmpty(),
-                baseURL = baseURL.orEmpty(),
-                deviceId = deviceId,
-            )
-        logger.info(
-            "✅ SDK config initialized (phase 1): linkedModels=${result.linked_models_count}",
+        val result = CppBridgeSdkInit.phase1(
+            environment = environment,
+            apiKey = apiKey.orEmpty(),
+            baseURL = baseURL.orEmpty(),
+            deviceId = deviceId,
+        )
+        logger.debug(
+            "SDK config initialized (phase 1): linkedModels=${result.linked_models_count}",
         )
     }
 
@@ -375,7 +367,7 @@ object CppBridge {
         try {
             val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
             if (rc == 0) {
-                logger.info("✅ OkHttp HTTP transport registered (system trust store + proxy)")
+                logger.info("OkHttp HTTP transport registered (system trust store + proxy)")
             } else {
                 logger.warn("OkHttp HTTP transport registration returned rc=$rc; falling back to libcurl")
             }
@@ -408,17 +400,16 @@ object CppBridge {
      * respective backend modules to enable AI inference.
      */
     private fun tryLoadNativeLibrary() {
-        logger.info("Starting native library loading sequence...")
+        logger.debug("Starting native library loading sequence")
 
         CppBridgeState.nativeLibraryLoaded = RunAnywhereBridge.ensureNativeLibraryLoaded()
 
         if (CppBridgeState.nativeLibraryLoaded) {
-            logger.info("✅ Native commons library loaded successfully")
-            logger.info("AI inference features are AVAILABLE")
+            logger.info("Native commons library loaded; AI inference features available")
         } else {
-            logger.warn("❌ Native commons library not available.")
-            logger.warn("AI inference features are DISABLED.")
-            logger.warn("Ensure librunanywhere_jni.so is in your APK's lib/ folder.")
+            logger.warn(
+                "Native commons library not available; AI inference features disabled. " + "Ensure librunanywhere_jni.so is in your APK's lib/ folder.",
+            )
         }
     }
 
@@ -463,8 +454,7 @@ object CppBridge {
                     apiKey = CppBridgeTelemetry.getApiKey()
                 }
                 if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
-                    com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
-                        .configure(baseUrl, apiKey)
+                    HTTPClientAdapter.configure(baseUrl, apiKey)
                 }
             }
 
@@ -477,16 +467,16 @@ object CppBridge {
 
                 if (!apiKey.isNullOrEmpty() && !baseUrl.isNullOrEmpty()) {
                     try {
-                        logger.info("Authenticating with backend...")
+                        logger.debug("Authenticating with backend")
                         val deviceId = CppBridgeDevice.getDeviceId() ?: CppBridgeDevice.getDeviceIdCallback()
                         CppBridgeAuth.authenticate(
                             apiKey = apiKey,
                             baseUrl = baseUrl,
                             deviceId = deviceId,
                             platform = SDKConstants.SDK_PLATFORM,
-                            sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION,
+                            sdkVersion = SDKConstants.SDK_VERSION,
                         )
-                        logger.info("Authentication successful")
+                        logger.debug("Authentication successful")
                     } catch (e: Exception) {
                         logger.error("Authentication failed: ${e.message}")
                         // Non-fatal: continue with services initialization
@@ -515,7 +505,7 @@ object CppBridge {
                         CppBridgeState.servicesInitialized = true
                         CppBridgeState.servicesInitializing = false
                     }
-                    logger.info("✅ Phase 2 services initialization complete")
+                    logger.debug("Phase 2 services initialization complete")
                     return
                 }
 
@@ -523,33 +513,30 @@ object CppBridge {
 
                 // Get build token for development mode (mirrors Swift SDK)
                 // Swift: let buildTokenString = environment == .development ? CppBridge.DevConfig.buildToken : nil
-                val buildToken =
-                    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                        try {
-                            val token = RunAnywhereBridge.racDevConfigGetBuildToken()
-                            if (!token.isNullOrEmpty()) {
-                                logger.debug("Using build token from dev config for device registration")
-                                token
-                            } else {
-                                logger.debug("No build token available in dev config")
-                                null
-                            }
-                        } catch (e: Exception) {
-                            logger.warn("Failed to get build token: ${e.message}")
+                val buildToken = if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+                    try {
+                        val token = RunAnywhereBridge.racDevConfigGetBuildToken()
+                        if (!token.isNullOrEmpty()) {
+                            logger.debug("Using build token from dev config for device registration")
+                            token
+                        } else {
+                            logger.debug("No build token available in dev config")
                             null
                         }
-                    } else {
-                        null // Build token only used in development mode
+                    } catch (e: Exception) {
+                        logger.warn("Failed to get build token: ${e.message}")
+                        null
                     }
+                } else {
+                    null // Build token only used in development mode
+                }
 
-                val success =
-                    CppBridgeDevice.triggerRegistration(
-                        environment = _environment,
-                        buildToken = buildToken,
-                    )
+                val success = CppBridgeDevice.triggerRegistration(
+                    environment = _environment,
+                    buildToken = buildToken,
+                )
                 if (success) {
-                    logger.info("✅ Device registration triggered")
-                    // Emit device registered event
+                    logger.debug("Device registration triggered")
                     CppBridgeSDKEvents.emitDeviceRegistered(deviceId)
                 } else {
                     logger.warn("Device registration not triggered (may already be registered)")
@@ -576,7 +563,7 @@ object CppBridge {
                 CppBridgeState.servicesInitialized = true
                 CppBridgeState.servicesInitializing = false
             }
-            logger.info("✅ Phase 2 services initialization complete")
+            logger.debug("Phase 2 services initialization complete")
         } catch (e: Exception) {
             synchronized(lock) {
                 CppBridgeState.servicesInitializing = false
@@ -615,13 +602,12 @@ object CppBridge {
     suspend fun shutdownSuspending() {
         // Snapshot initialization state under the lock without holding it
         // across the suspend destroy calls below.
-        val wasInitialized =
-            synchronized(lock) {
-                if (!CppBridgeState.isInitialized) {
-                    return
-                }
-                true
+        val wasInitialized = synchronized(lock) {
+            if (!CppBridgeState.isInitialized) {
+                return
             }
+            true
+        }
         if (!wasInitialized) return
 
         // Destroy AI components sequentially before tearing down Telemetry/Events.
@@ -703,10 +689,6 @@ object CppBridge {
         return RunAnywhereBridge.racIsInitialized()
     }
 
-    // =============================================================================
-    // SENTRY LOGGING INTEGRATION
-    // =============================================================================
-
     /**
      * Setup Sentry hooks so Logging can trigger Sentry setup/teardown dynamically.
      *
@@ -731,13 +713,11 @@ object CppBridge {
      */
     private fun setupSentryLogging(environment: SDKEnvironment) {
         try {
-            // Initialize Sentry manager
             SentryManager.initialize(environment = environment)
 
             if (SentryManager.isInitialized) {
-                // Add Sentry destination to logging system
                 Logging.addDestinationSync(SentryDestination())
-                logger.info("✅ Sentry logging initialized")
+                logger.info("Sentry logging initialized")
             }
         } catch (e: Exception) {
             logger.error("Failed to setup Sentry logging: ${e.message}")
@@ -749,16 +729,13 @@ object CppBridge {
      */
     private fun teardownSentryLogging() {
         try {
-            // Remove Sentry destination from logging system
-            val sentryDestination =
-                Logging.destinations.find {
-                    it.identifier == SentryDestination.DESTINATION_ID
-                }
+            val sentryDestination = Logging.destinations.find {
+                it.identifier == SentryDestination.DESTINATION_ID
+            }
             if (sentryDestination != null) {
                 Logging.removeDestinationSync(sentryDestination)
             }
 
-            // Close Sentry manager
             SentryManager.close()
             logger.info("Sentry logging disabled")
         } catch (e: Exception) {

@@ -62,9 +62,7 @@ class RACRouter internal constructor() : Closeable {
         stt.close()
     }
 
-    // ----------------------------------------------------------------------
     // Filter / Cascade / Rank interfaces and the RoutingPolicy accessor.
-    // ----------------------------------------------------------------------
 
     /**
      * Hard eligibility predicate. Each filter drops candidates that don't
@@ -267,9 +265,7 @@ class RACRouter internal constructor() : Closeable {
         }
     }
 
-    // ----------------------------------------------------------------------
     // STT capability slot.
-    // ----------------------------------------------------------------------
 
     /**
      * STT-capability slot — owns one native router handle plus one
@@ -468,9 +464,7 @@ class RACRouter internal constructor() : Closeable {
             throw NotImplementedError("router.$name.generate is not wired yet")
     }
 
-    // ----------------------------------------------------------------------
     // Static entry point: RACRouter.stt.init(backendOffline, backendOnline)
-    // ----------------------------------------------------------------------
 
     companion object {
         /** Static factory for STT-capability routers. See [SttFactory.init]. */

@@ -24,6 +24,7 @@ package com.runanywhere.sdk.public
 
 import android.content.Context
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
@@ -39,35 +40,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SDK INITIALIZATION FLOW (Two-Phase Pattern)
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// PHASE 1: Core Init (Synchronous, ~1-5ms, No Network)
-// ─────────────────────────────────────────────────────
-//   RunAnywhere.initialize(environment)
-//     ├─ Build + validate SDKInitParams
-//     ├─ CppBridge.initialize()  (via initializePlatformBridge expect)
-//     │    ├─ PlatformAdapter.register()  ← File ops, logging, keychain
-//     │    ├─ Events.register()           ← Analytics callback
-//     │    ├─ Telemetry.initialize()      ← HTTP callback
-//     │    ├─ Device.register()           ← Device registration
-//     │    └─ CppBridgeSdkInit.phase1 (rac_sdk_init_phase1_proto)
-//     │         ← validation + config/state init
-//     ├─ Emit SDKInitStarted / SDKInitCompleted events (via CppBridge)
-//     └─ Mark: isInitialized = true; spawn Phase 2 in background
-//
-// PHASE 2: Services Init (Async, ~100-500ms, Network May Be Required)
-// ────────────────────────────────────────────────────────────────────
-//   RunAnywhere.completeServicesInitialization()
-//     ├─ CppBridge.initializeServices()  (via initializePlatformBridgeServices expect)
-//     │    ├─ Step 1: HTTP transport + auth round-trip (OkHttp/CppBridgeAuth)
-//     │    ├─ Step 2: telemetry flush (CppBridgeTelemetry)
-//     │    ├─ Step 3: device registration (CppBridgeDevice.triggerRegistration)
-//     └─ Mark: areServicesReady = true; capture hasCompletedHTTPSetup flag
-//
-// ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * The RunAnywhere SDK - Single entry point for on-device AI
@@ -90,9 +62,7 @@ import kotlinx.coroutines.sync.withLock
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).
  */
 object RunAnywhere {
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Private State
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Private state
 
     private val logger = SDKLogger("RunAnywhere")
 
@@ -123,6 +93,18 @@ object RunAnywhere {
     @Volatile
     private var _hasCompletedHTTPSetup: Boolean = false
 
+    /**
+     * Whether HTTP/auth setup is applicable for the active configuration. False
+     * when there is no usable external config (local-only / development without
+     * a backend), where [_hasCompletedHTTPSetup] can never become true because
+     * there is nothing to connect to. Used by [ensureServicesReady] to skip the
+     * retry path in that case, so the Phase 2 service bootstrap is not re-run on
+     * every API call. Distinct from a transient offline failure (config present,
+     * network down), where retrying is still worthwhile.
+     */
+    @Volatile
+    private var _httpSetupApplicable: Boolean = true
+
     private val lock = Any()
     private val servicesMutex = Mutex()
 
@@ -134,9 +116,7 @@ object RunAnywhere {
      */
     private val initScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Public Properties
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Public properties
 
     /**
      * Check if SDK is initialized (Phase 1 complete)
@@ -168,9 +148,7 @@ object RunAnywhere {
     val environment: SDKEnvironment?
         get() = _currentEnvironment
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Event Access
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Event access
 
     /**
      * Event bus for SDK event subscriptions.
@@ -185,9 +163,7 @@ object RunAnywhere {
     val events: EventBus
         get() = EventBus
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Authentication Info (Production/Staging only)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Authentication info (production/staging only)
 
     /**
      * Get the current user ID from authentication state.
@@ -228,9 +204,7 @@ object RunAnywhere {
     val deviceId: String
         get() = platformDeviceId()
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Phase 1: Core Initialization (Synchronous)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Phase 1: core initialization (synchronous)
 
     /**
      * Initialize the RunAnywhere SDK (Phase 1)
@@ -382,7 +356,7 @@ object RunAnywhere {
                     initScope.launch {
                         try {
                             completeServicesInitialization()
-                            logger.info("Phase 2 complete (background)")
+                            logger.debug("Phase 2 complete (background)")
                         } catch (error: Throwable) {
                             logger.warn("Phase 2 failed (non-critical): ${error.message}")
                         }
@@ -399,9 +373,7 @@ object RunAnywhere {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Phase 2: Services Initialization (Async)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // Phase 2: services initialization (async)
 
     /**
      * Complete services initialization (Phase 2). Safe to call multiple times;
@@ -444,7 +416,7 @@ object RunAnywhere {
                 _initParams
                     ?: throw SDKException.notInitialized("SDK init params missing — call RunAnywhere.initialize() first")
 
-            logger.info("Initializing services for ${params.environment.wireString} mode...")
+            logger.debug("Initializing services for ${params.environment.wireString} mode")
 
             try {
                 // Delegate to the platform bridge — runs the Kotlin-side
@@ -459,6 +431,14 @@ object RunAnywhere {
                 // remote catalog/device paths). Mirrors Swift
                 // `RunAnywhere.swift:261-265` which derives
                 // `hasCompletedHTTPSetup` from `CppBridge.HTTP.shared.isConfigured`.
+                //
+                // Record whether HTTP/auth is even applicable: when there is no
+                // usable external config (local-only / dev without a backend),
+                // `_hasCompletedHTTPSetup` can never flip, so [ensureServicesReady]
+                // must not keep retrying — that would re-run this whole bootstrap
+                // on every API call. A transient offline failure (config present,
+                // network down) stays applicable and is still retried.
+                _httpSetupApplicable = CppBridgeTelemetry.hasUsableNetworkConfig(params.environment)
                 _hasCompletedHTTPSetup = httpConfigured
                 _areServicesReady = true
 
@@ -481,9 +461,13 @@ object RunAnywhere {
      * Ensure services are ready before API calls (internal guard).
      *
      * Mirrors Swift `RunAnywhere.ensureServicesReady()`:
-     *  - Fast path: services ready + HTTP configured → return (O(1)).
-     *  - Recovery path: services ready but HTTP failed (offline init) →
-     *    retry HTTP setup via [retryHTTPSetup] without re-running Phase 2.
+     *  - Fast path: services ready, and HTTP either done or not applicable →
+     *    return (O(1)).
+     *  - Recovery path: services ready, HTTP applicable but not yet completed
+     *    (offline init with a backend configured) → retry HTTP/auth via
+     *    [retryHTTPSetup]. This re-runs the Phase 2 service bootstrap, so it is
+     *    gated on [_httpSetupApplicable] to avoid re-running on every call in
+     *    local-only mode where HTTP can never complete.
      *  - Cold start path: services not ready → kick off
      *    [completeServicesInitialization].
      *
@@ -494,13 +478,15 @@ object RunAnywhere {
      * @throws IllegalStateException if Phase 1 ([initialize]) has not run.
      */
     internal suspend fun ensureServicesReady() {
-        // Fast path — both services and HTTP done.
-        if (_areServicesReady && _hasCompletedHTTPSetup) {
-            return
-        }
-        // Recovery path — services done, HTTP failed (offline init).
-        if (_areServicesReady && !_hasCompletedHTTPSetup) {
-            retryHTTPSetup()
+        if (_areServicesReady) {
+            // Retry HTTP/auth only when it is applicable (a backend is
+            // configured) but has not completed yet — e.g. an offline init that
+            // can succeed once connectivity returns. When HTTP is not applicable
+            // (local-only / no external config), skip: retrying would re-run the
+            // whole Phase 2 bootstrap on every API call and never converge.
+            if (!_hasCompletedHTTPSetup && _httpSetupApplicable) {
+                retryHTTPSetup()
+            }
             return
         }
         // Cold start path — Phase 1 must already be complete.
@@ -555,9 +541,7 @@ object RunAnywhere {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - SDK Reset
-    // ═══════════════════════════════════════════════════════════════════════════
+    // SDK reset
 
     /**
      * Reset SDK state
@@ -573,6 +557,7 @@ object RunAnywhere {
             _isInitialized = false
             _areServicesReady = false
             _hasCompletedHTTPSetup = false
+            _httpSetupApplicable = true
             _currentEnvironment = null
             _initParams = null
         }
@@ -581,10 +566,5 @@ object RunAnywhere {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
 // Platform-specific bridge functions (expect/actual pattern)
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Platform-specific auth/device state accessors (expect/actual pattern)
-// ═══════════════════════════════════════════════════════════════════════════

@@ -68,9 +68,7 @@ object CppBridgeModelRegistry {
         const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 
-    // ========================================================================
-    // PUBLIC API - Mirrors Swift CppBridge.ModelRegistry
-    // ========================================================================
+    // Public API — mirrors Swift CppBridge.ModelRegistry
 
     /**
      * Save model to C++ registry.
@@ -82,8 +80,6 @@ object CppBridgeModelRegistry {
      * @throws RuntimeException if save fails
      */
     fun save(model: ProtoModelInfo) {
-        log(LogLevel.DEBUG, "Saving model to C++ registry: ${model.id} (framework=${model.framework})")
-
         val result =
             registerProto(model)
                 ?: throw RuntimeException("Native model registry proto ABI unavailable")
@@ -93,7 +89,7 @@ object CppBridgeModelRegistry {
             throw RuntimeException("Failed to save model to C++ registry: $result")
         }
 
-        log(LogLevel.INFO, "Model saved to C++ registry: ${model.id}")
+        log(LogLevel.DEBUG, "Model saved to C++ registry: ${model.id}")
     }
 
     /**
@@ -331,9 +327,7 @@ object CppBridgeModelRegistry {
         update(updated)
     }
 
-    // ========================================================================
-    // PROTO ABI
-    // ========================================================================
+    // Proto ABI
 
     private fun registerProto(model: ProtoModelInfo): Int? =
         callProtoInt("registerProto") {
@@ -452,9 +446,7 @@ object CppBridgeModelRegistry {
             query = ProtoModelQuery(downloaded_only = true),
         )
 
-    // ========================================================================
-    // LOGGING
-    // ========================================================================
+    // Logging
 
     private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
 

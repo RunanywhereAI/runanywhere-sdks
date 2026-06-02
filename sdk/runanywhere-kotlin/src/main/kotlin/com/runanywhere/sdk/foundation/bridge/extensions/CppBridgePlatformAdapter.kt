@@ -165,9 +165,7 @@ object CppBridgePlatformAdapter {
      */
     fun isRegistered(): Boolean = isRegistered
 
-    // ========================================================================
-    // LOGGING CALLBACKS
-    // ========================================================================
+    // Logging callbacks
 
     /**
      * Log callback for C++ core.
@@ -258,9 +256,7 @@ object CppBridgePlatformAdapter {
         return Pair(cleanMessage, metadata.ifEmpty { null })
     }
 
-    // ========================================================================
-    // FILE OPERATION CALLBACKS
-    // ========================================================================
+    // File operation callbacks
 
     /**
      * Check if a file exists at the given path.
@@ -348,9 +344,7 @@ object CppBridgePlatformAdapter {
         }
     }
 
-    // ========================================================================
-    // DIRECTORY ENUMERATION CALLBACKS (kotlin-005-C)
-    // ========================================================================
+    // Directory enumeration callbacks (kotlin-005-C)
     //
     // Populate the `file_list_directory` and `is_non_empty_directory` slots
     // in `rac_platform_adapter_t` so model-registry refresh (`rescan_local`)
@@ -450,9 +444,7 @@ object CppBridgePlatformAdapter {
         }
     }
 
-    // ========================================================================
-    // SECURE STORAGE CALLBACKS
-    // ========================================================================
+    // Secure storage callbacks
 
     /**
      * Get a value from secure storage.
@@ -529,9 +521,7 @@ object CppBridgePlatformAdapter {
         }
     }
 
-    // ========================================================================
-    // CLOCK CALLBACKS
-    // ========================================================================
+    // Clock callbacks
 
     /**
      * Get the current time in milliseconds since Unix epoch.
@@ -545,16 +535,12 @@ object CppBridgePlatformAdapter {
         return System.currentTimeMillis()
     }
 
-    // ========================================================================
     // Platform HTTP byte execution is registered through CppBridgeHTTP.
     // Download workflow planning/progress/state now flows through generated
     // Download* proto calls; direct HTTP callbacks here remain intentionally
     // absent from the platform adapter surface.
-    // ========================================================================
 
-    // ========================================================================
-    // INSTANCE METHODS REQUIRED BY JNI PLATFORM ADAPTER
-    // ========================================================================
+    // Instance methods required by the JNI platform adapter
 
     fun log(level: Int, tag: String, message: String) {
         logCallback(level, tag, message)
@@ -586,13 +572,9 @@ object CppBridgePlatformAdapter {
 
     fun nowMs(): Long = nowMsCallback()
 
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
+    // JNI native declarations
 
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
+    // Lifecycle management
 
     /**
      * Unregister the platform adapter.

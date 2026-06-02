@@ -29,7 +29,6 @@ import com.runanywhere.sdk.foundation.errors.SDKException
  */
 typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment
 
-// ════════════════════════════════════════════════════════════════════════════
 // Extensions (preserved from the hand-written enum)
 //
 // `wireString` and the reverse `fromWireString` factory are emitted by the
@@ -37,7 +36,6 @@ typealias SDKEnvironment = ai.runanywhere.proto.v1.SDKEnvironment
 // hand-written drift was retired in T6.4. Import them from
 // `com.runanywhere.sdk.generated.convenience` (extension property +
 // `Companion.fromWireString` factory).
-// ════════════════════════════════════════════════════════════════════════════
 
 /**
  * Legacy C-ABI integer (0 = development, 1 = staging, 2 = production).
@@ -63,11 +61,9 @@ val SDKEnvironment.description: String
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "Unspecified Environment"
         }
 
-// ════════════════════════════════════════════════════════════════════════════
 // SDKInitParams — mirrors Swift's `SDKInitParams` struct (3 constructors +
 // validate). Kotlin uses `String` for `baseURL` (no commonMain URL type;
 // matches the existing `RunAnywhere.initialize(baseURL: String?)` shape).
-// ════════════════════════════════════════════════════════════════════════════
 
 /**
  * SDK initialization parameters.

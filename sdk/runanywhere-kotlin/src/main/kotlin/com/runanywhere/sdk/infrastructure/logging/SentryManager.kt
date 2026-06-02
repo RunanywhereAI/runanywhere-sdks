@@ -31,9 +31,7 @@ object SentryManager {
     val isInitialized: Boolean
         get() = _isInitialized
 
-    // =============================================================================
-    // INITIALIZATION
-    // =============================================================================
+    // Initialization
 
     /**
      * Initialize Sentry with the configured DSN.
@@ -85,7 +83,7 @@ object SentryManager {
             }
 
             _isInitialized = true
-            SDKLogger(TAG).info("Sentry initialized successfully")
+            SDKLogger(TAG).debug("Sentry initialized successfully")
         } catch (e: Exception) {
             SDKLogger(TAG).error("Failed to initialize Sentry: ${e.message}")
         }

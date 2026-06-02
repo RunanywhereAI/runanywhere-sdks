@@ -92,9 +92,7 @@ object CppBridgeHardware {
         }
     }
 
-    // ========================================================================
-    // PLATFORM FALLBACKS (CPU / RAM / NPU / GPU)
-    // ========================================================================
+    // Platform fallbacks (CPU / RAM / NPU / GPU)
     //
     // These helpers run on Android via reflection so the SDK keeps building
     // on plain JVM. They are only consulted when the optional
