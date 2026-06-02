@@ -27,12 +27,6 @@ typedef RacConfigureLoggingNative = Int32 Function(Int32 environment);
 typedef RacConfigureLoggingDart = int Function(int environment);
 
 // =============================================================================
-// Legacy rac_service_{register_provider,create,...} typedefs
-// DELETED. New code uses rac_plugin_{register,route,list} via
-// RacBindings in lib/core/native/rac_native.dart.
-// =============================================================================
-
-// =============================================================================
 // LLM API Function Signatures (from rac_llm_llamacpp.h)
 // =============================================================================
 
@@ -151,5 +145,3 @@ typedef RacLlmComponentCleanupDart = int Function(RacHandle handle);
 /// void rac_llm_component_destroy(rac_handle_t handle)
 typedef RacLlmComponentDestroyNative = Void Function(RacHandle handle);
 typedef RacLlmComponentDestroyDart = void Function(RacHandle handle);
-
-// Legacy aliases for backward compatibility (unused - remove after migration)

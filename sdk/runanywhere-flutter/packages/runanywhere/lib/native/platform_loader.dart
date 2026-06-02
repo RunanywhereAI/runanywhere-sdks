@@ -303,9 +303,6 @@ class PlatformLoader {
   /// Check if the commons library is loaded.
   static bool get isCommonsLoaded => _commonsLibrary != null;
 
-  /// Legacy: Check if any native library is loaded.
-  static bool get isLoaded => _commonsLibrary != null;
-
   /// Get the last load error, if any.
   static String? get loadError => _loadError;
 
@@ -340,6 +337,4 @@ class PlatformLoader {
     }
   }
 
-  /// Convenience alias for load().
-  static DynamicLibrary loadNativeLibrary() => load();
 }

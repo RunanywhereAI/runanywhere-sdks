@@ -92,41 +92,6 @@ const getContextTitle = (context: ModelSelectionContext): string => {
 };
 
 /**
- * Get relevant categories for context (kept for reference)
- */
-const _getRelevantCategories = (
-  context: ModelSelectionContext
-): Set<ModelCategory> => {
-  switch (context) {
-    case ModelSelectionContext.LLM:
-      return new Set([
-        ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-      ]);
-    case ModelSelectionContext.STT:
-      return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION]);
-    case ModelSelectionContext.TTS:
-      return new Set([ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS]);
-    case ModelSelectionContext.Voice:
-      return new Set([
-        ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-      ]);
-    case ModelSelectionContext.VLM:
-      return new Set([
-        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-        ModelCategory.MODEL_CATEGORY_VISION,
-      ]);
-    case ModelSelectionContext.RagEmbedding:
-      return new Set([ModelCategory.MODEL_CATEGORY_EMBEDDING]);
-    case ModelSelectionContext.RagLLM:
-      return new Set([ModelCategory.MODEL_CATEGORY_LANGUAGE]);
-  }
-};
-
-/**
  * Get category for SDK filtering (uses SDK's `ModelCategory` proto enum).
  * Returns the proto-canonical numeric `ModelCategory` value or `null` to mean
  * "show all".

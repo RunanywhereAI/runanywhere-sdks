@@ -329,34 +329,6 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
  */
 RAC_API rac_result_t rac_log_metadata_should_redact(const char* key, rac_bool_t* out);
 
-// =============================================================================
-// LEGACY COMPATIBILITY (maps to new logging system)
-// =============================================================================
-
-/**
- * Legacy log_info macro - maps to RAC_LOG_INFO.
- * @deprecated Use RAC_LOG_INFO instead.
- */
-#define log_info(category, ...) RAC_LOG_INFO(category, __VA_ARGS__)
-
-/**
- * Legacy log_debug macro - maps to RAC_LOG_DEBUG.
- * @deprecated Use RAC_LOG_DEBUG instead.
- */
-#define log_debug(category, ...) RAC_LOG_DEBUG(category, __VA_ARGS__)
-
-/**
- * Legacy log_warning macro - maps to RAC_LOG_WARNING.
- * @deprecated Use RAC_LOG_WARNING instead.
- */
-#define log_warning(category, ...) RAC_LOG_WARNING(category, __VA_ARGS__)
-
-/**
- * Legacy log_error macro - maps to RAC_LOG_ERROR.
- * @deprecated Use RAC_LOG_ERROR instead.
- */
-#define log_error(category, ...) RAC_LOG_ERROR(category, __VA_ARGS__)
-
 #ifdef __cplusplus
 }
 #endif

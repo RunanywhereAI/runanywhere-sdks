@@ -424,15 +424,6 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
          */
         const val INVALID_CALLBACK_ID: Long = 0L
 
-        /**
-         * Historical name retained for reference: per-collector channel
-         * capacity used to be 64 with DROP_OLDEST. Since the policy
-         * switched to `Channel.UNLIMITED` for Swift `AsyncStream` parity,
-         * the constant is no longer wired in but is kept exposed for
-         * legacy tests that pinned the older bounded-buffer behavior.
-         */
-        internal const val COLLECTOR_BUFFER_CAPACITY: Int = 64
-
         // Backed by a `MutableMap` + monitor rather than
         // `ConcurrentHashMap` so the generic stays in `commonMain`
         // (KMP commonMain has no java.util.concurrent). Critical

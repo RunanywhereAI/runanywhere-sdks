@@ -23,10 +23,6 @@ const int _exceptionalReturnInt32 = -183; // RAC_ERROR_FILE_NOT_FOUND
 /// Exceptional return value for bool operations
 const int _exceptionalReturnFalse = 0;
 
-/// Exceptional return value for int64 operations
-// ignore: unused_element
-const int _exceptionalReturnInt64 = 0;
-
 typedef _SysctlByNameNative =
     Int32 Function(
       Pointer<Utf8>,
@@ -725,12 +721,6 @@ Future<void> _deleteSecureStorage(String key) async {
   } catch (_) {
     // Ignore errors
   }
-}
-
-/// Clock callback - returns current time in milliseconds
-// ignore: unused_element
-int _platformNowMsCallback(Pointer<Void> userData) {
-  return DateTime.now().millisecondsSinceEpoch;
 }
 
 Map<String, int>? _readProcMemInfo() {

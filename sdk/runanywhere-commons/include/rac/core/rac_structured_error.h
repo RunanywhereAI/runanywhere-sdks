@@ -377,12 +377,6 @@ RAC_API char* rac_error_to_debug_string(const rac_error_t* error);
     rac_error_create_at(code, category, message, __FILE__, __LINE__, __func__)
 
 /**
- * @brief Creates an error with formatted message and source location.
- */
-#define RAC_ERRORF(code, category, ...) \
-    rac_error_create_at_f(code, category, __FILE__, __LINE__, __func__, __VA_ARGS__)
-
-/**
  * @brief Category-specific error macros.
  */
 #define RAC_ERROR_STT(code, msg) RAC_ERROR(code, RAC_CATEGORY_STT, msg)

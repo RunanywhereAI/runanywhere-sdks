@@ -118,9 +118,6 @@ const listModels = async (): Promise<SDKModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 const loadModelWithRequest = RunAnywhere.loadModel;
 
-// STT Model IDs (kept for reference, uses SDK model registry)
-const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
-
 export const STTScreen: React.FC = () => {
   // State
   const [mode, setMode] = useState<STTMode>(STTMode.Batch);

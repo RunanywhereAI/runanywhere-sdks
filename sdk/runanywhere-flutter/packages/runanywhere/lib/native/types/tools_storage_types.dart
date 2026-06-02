@@ -4,8 +4,6 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-import 'package:runanywhere/native/types/memory_platform_types.dart';
-
 // =============================================================================
 // Tool Calling FFI Types (from rac_tool_calling.h)
 // =============================================================================
@@ -172,15 +170,3 @@ final class RacStorageAvailabilityStruct extends Struct {
   external int hasWarning;
   external Pointer<Utf8> recommendation;
 }
-
-// =============================================================================
-// Backward Compatibility Aliases
-// =============================================================================
-
-/// Backward compatibility: old ra_* types map to new rac_* types
-// =============================================================================
-// Convenient Type Alias
-// =============================================================================
-
-/// Type alias for platform adapter struct
-typedef RacPlatformAdapter = RacPlatformAdapterStruct;

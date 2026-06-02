@@ -164,14 +164,6 @@ object AppColors {
         )
 
     /**
-     * Assistant message bubble gradient (gray) - non-composable version for legacy use
-     */
-    fun assistantBubbleGradient() =
-        Brush.linearGradient(
-            colors = listOf(messageBubbleAssistantGradientStart, messageBubbleAssistantGradientEnd),
-        )
-
-    /**
      * Theme-aware assistant message bubble gradient
      * Uses dark gray in dark mode, light gray in light mode
      */

@@ -416,7 +416,6 @@ sealed class AudioCaptureError(
  */
 internal object AudioCaptureConstants {
     const val TARGET_SAMPLE_RATE: Int = 16000
-    const val CHANNEL_COUNT: Int = 1
     const val BYTES_PER_SAMPLE: Int = 2
     const val CHUNK_DURATION_MS: Int = 100
 }

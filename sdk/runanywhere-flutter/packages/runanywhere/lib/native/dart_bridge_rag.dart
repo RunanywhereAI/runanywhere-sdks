@@ -2,7 +2,6 @@
 //
 // Generated-proto RAG session bridge.
 
-import 'dart:convert';
 import 'dart:ffi' as ffi;
 
 import 'package:ffi/ffi.dart';
@@ -109,42 +108,6 @@ class DartBridgeRAG {
       decode: RAGStatistics.fromBuffer,
       symbol: 'rac_rag_ingest_proto',
     );
-  }
-
-  Future<RAGStatistics> addDocumentAsync(
-    String text, {
-    String? metadataJson,
-  }) async {
-    // The `metadata_json` proto field was deleted. Best-effort parse of
-    // the legacy JSON into the typed `metadata` map before ingestion.
-    return ingestDocument(
-        RAGDocument(text: text, metadata: _parseMetadata(metadataJson).entries));
-  }
-
-  Future<RAGStatistics> addDocumentsBatchAsync(
-    List<Map<String, String>> documents,
-  ) async {
-    RAGStatistics stats = RAGStatistics();
-    for (final doc in documents) {
-      stats = ingestDocument(RAGDocument(
-        text: doc['text'] ?? '',
-        metadata: _parseMetadata(doc['metadataJson']).entries,
-      ));
-    }
-    return stats;
-  }
-
-  Map<String, String> _parseMetadata(String? json) {
-    if (json == null || json.isEmpty) return const <String, String>{};
-    try {
-      final decoded = jsonDecode(json);
-      if (decoded is! Map) return const <String, String>{};
-      return decoded.map(
-        (key, value) => MapEntry(key.toString(), value.toString()),
-      );
-    } catch (_) {
-      return const <String, String>{};
-    }
   }
 
   RAGStatistics clearDocuments() {
