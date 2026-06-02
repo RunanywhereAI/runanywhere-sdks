@@ -376,6 +376,33 @@ else()
     list(APPEND SHERPA_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=0)
 endif()
 
+# Per-token confidence (ys_log_probs) is only present in the confidence-patched
+# sherpa-onnx fork the Android prebuilt is built from (SHERPA_ONNX_REPO_ANDROID).
+# The stock upstream prebuilt the iOS/macOS pod-archive ships (and any platform
+# pinned to an unpatched release — see SHERPA_ONNX_VERSION_IOS in VERSIONS) has
+# no such field on SherpaOnnxOfflineRecognizerResult. Probe the actual header so
+# sherpa_backend.cpp computes the confidence cascade signal where the field
+# exists and degrades to NaN ("no quality signal", which the hybrid router
+# already treats as accept-primary) where it does not — keeping one source tree
+# buildable against both forks.
+set(SHERPA_HAS_YS_LOG_PROBS 0)
+if(SHERPA_ONNX_AVAILABLE AND DEFINED SHERPA_HEADER_PATH)
+    include(CheckStructHasMember)
+    set(CMAKE_REQUIRED_INCLUDES "${SHERPA_HEADER_PATH}")
+    check_struct_has_member(
+        "struct SherpaOnnxOfflineRecognizerResult"
+        ys_log_probs
+        "sherpa-onnx/c-api/c-api.h"
+        SHERPA_RESULT_HAS_YS_LOG_PROBS
+        LANGUAGE CXX
+    )
+    unset(CMAKE_REQUIRED_INCLUDES)
+    if(SHERPA_RESULT_HAS_YS_LOG_PROBS)
+        set(SHERPA_HAS_YS_LOG_PROBS 1)
+    endif()
+endif()
+list(APPEND SHERPA_COMPILE_DEFS SHERPA_HAS_YS_LOG_PROBS=${SHERPA_HAS_YS_LOG_PROBS})
+
 rac_add_engine_plugin(sherpa
     TARGET_NAME         rac_backend_sherpa
     CXX_STANDARD        20

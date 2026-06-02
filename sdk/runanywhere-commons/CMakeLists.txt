@@ -255,6 +255,18 @@ if(NOT ZLIB_FOUND)
     set(SKIP_INSTALL_LIBRARIES ON CACHE BOOL "" FORCE)
     set(SKIP_INSTALL_HEADERS ON CACHE BOOL "" FORCE)
     set(SKIP_INSTALL_FILES ON CACHE BOOL "" FORCE)
+    # Newer madler/zlib layouts gate their SHARED `add_library(zlib SHARED ...)`
+    # behind a dedicated ZLIB_BUILD_SHARED option (default ON) that does NOT key
+    # off BUILD_SHARED_LIBS. On dynamic-linking-less targets (Emscripten, and
+    # the iOS static slices) that SHARED add_library hard-errors with
+    # "ADD_LIBRARY called with SHARED option but the target platform does not
+    # support dynamic linking." We only ever consume the STATIC `zlibstatic`
+    # target, so force the shared (and examples-as-tests) build OFF and keep the
+    # static build ON. The BUILD_SHARED_LIBS save/restore below stays for older
+    # zlib tags that still honor it.
+    set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
+    set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
     # Save and restore BUILD_SHARED_LIBS
     set(_SAVED_BSL_ZLIB ${BUILD_SHARED_LIBS})
     set(BUILD_SHARED_LIBS OFF)

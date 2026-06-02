@@ -4,7 +4,7 @@
  * Source: idl/rag.proto
  * Template: idl/codegen/templates/ts_async_iterable.njk
  *
- * GAP 09 Phase 14. Provides an AsyncIterable<RAGStreamEvent> client
+ * Provides an AsyncIterable<RAGStreamEvent> client
  * over an in-process server-streaming callback. The transport ("how a token
  * arrives in the JS heap") is platform-specific:
  *   - React Native: a Nitro HybridObject method whose callback fires once

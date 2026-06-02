@@ -665,6 +665,11 @@ class DartBridgeHybridStt {
   /// Swift `CloudSTT.register` → `rac_backend_cloud_register`.
   int? registerCloud() {
     try {
+      // On Android the register symbol is DEFINED in the standalone
+      // librac_backend_cloud.so and only IMPORTED by the commons JNI lib, so it
+      // must be dlopen'd before the lookup can resolve through `_lib`. No-op on
+      // iOS/macOS (statically linked into the process). Tolerant of absence.
+      PlatformLoader.ensureCloudBackendLoaded();
       final fn = _lib.lookupFunction<_CloudRegisterNative,
           _CloudRegisterDart>('rac_backend_cloud_register');
       final rc = fn();
@@ -685,6 +690,7 @@ class DartBridgeHybridStt {
   /// symbol is unavailable.
   int? unregisterCloud() {
     try {
+      PlatformLoader.ensureCloudBackendLoaded();
       final fn = _lib.lookupFunction<_CloudRegisterNative,
           _CloudRegisterDart>('rac_backend_cloud_unregister');
       return fn();

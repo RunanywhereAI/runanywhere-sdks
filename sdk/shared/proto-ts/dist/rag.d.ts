@@ -16,7 +16,7 @@ export declare function rAGStreamEventKindToJSON(object: RAGStreamEventKind): st
  * ---------------------------------------------------------------------------
  * RAGConfiguration — low-level pipeline config.
  *
- * As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+ * This message carries *model ids*, not filesystem paths.
  * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
  * for resolving those ids to on-disk paths through the canonical model
  * registry. SDK callers MUST register the embedding / LLM / reranker models

@@ -109,7 +109,7 @@ function componentLifecycleStateToJSON(object) {
  * Canonical event category carried by every SDKEvent envelope. Lives here
  * (instead of sdk_events.proto) so voice_events.proto and voice_agent_service
  * .proto can reference it without importing sdk_events.proto (which itself
- * imports voice_events.proto — IDL-07 cycle resolution).
+ * imports voice_events.proto — cycle resolution).
  */
 var EventCategory;
 (function (EventCategory) {
@@ -151,7 +151,7 @@ var EventCategory;
     EventCategory[EventCategory["EVENT_CATEGORY_NETWORK"] = 34] = "EVENT_CATEGORY_NETWORK";
     EventCategory[EventCategory["EVENT_CATEGORY_ERROR"] = 35] = "EVENT_CATEGORY_ERROR";
     /**
-     * EVENT_CATEGORY_AUDIO - IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+     * EVENT_CATEGORY_AUDIO - Absorbed from former VoiceEventCategory (voice_events.proto).
      * AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
      * previously only on the voice-pipeline side.
      */

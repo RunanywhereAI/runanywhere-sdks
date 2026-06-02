@@ -697,6 +697,15 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
         // log probabilities (populated by the patched whisper greedy decoder
         // and by transducer models). NaN when the model emits no per-token
         // probs, which the hybrid router reads as "no quality signal".
+        //
+        // ys_log_probs only exists on SherpaOnnxOfflineRecognizerResult in the
+        // confidence-patched fork (Android prebuilt). On the stock upstream
+        // prebuilt (iOS/macOS pod-archive) the field is absent, so the whole
+        // confidence path is compiled out and we report NaN — the same "no
+        // signal" outcome the patched path produces when probs are missing.
+        // SHERPA_HAS_YS_LOG_PROBS is set by engines/sherpa/CMakeLists.txt via a
+        // check_struct_has_member probe of the actual sherpa header.
+#if defined(SHERPA_HAS_YS_LOG_PROBS) && SHERPA_HAS_YS_LOG_PROBS
         SHERPA_CONF_LOG(
             "fields: count=%d text_len=%zu lang=%s "
             "ys_log_probs=%s timestamps=%s tokens_arr=%s durations=%s",
@@ -722,6 +731,11 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
             result.confidence = std::numeric_limits<float>::quiet_NaN();
             SHERPA_CONF_LOG("no per-token log probs -> confidence=NaN (no signal)");
         }
+#else
+        result.confidence = std::numeric_limits<float>::quiet_NaN();
+        SHERPA_CONF_LOG(
+            "sherpa build has no ys_log_probs field -> confidence=NaN (no signal)");
+#endif
 
         SherpaOnnxDestroyOfflineRecognizerResult(recognizer_result);
     } else {

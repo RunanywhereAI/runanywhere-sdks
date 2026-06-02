@@ -17,7 +17,7 @@ exports.protobufPackage = "runanywhere.v1";
  * Hardware acceleration preference for inference. Canonical single enum —
  * previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
  * file and `AccelerationPreference` in model_types.proto. Consolidated here
- * (Wave H-2 / IDL-01) because it is a pure hardware concept and
+ * because it is a pure hardware concept and
  * hardware_profile.proto has no imports (model_types.proto already imports
  * this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
  *   Web    enums.ts:165   (Auto / WebGPU / CPU)

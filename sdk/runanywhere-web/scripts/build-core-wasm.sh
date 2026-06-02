@@ -59,6 +59,24 @@ fi
 rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm"
 
 echo "▶ Configure wasm build"
+# NOTE: these flags mirror the canonical multi-target builder
+# sdk/runanywhere-web/wasm/scripts/build.sh so this thin wrapper produces an
+# equivalent llama.cpp artifact:
+#   * RAC_ENABLE_PROTOBUF=ON — the Web SDK is driven ENTIRELY through the
+#     proto-byte C ABI (every *_proto export, incl. the hybrid STT router's
+#     rac_stt_hybrid_router_*_proto). On Emscripten RAC_ENABLE_PROTOBUF DEFAULTS
+#     TO OFF (see sdk/runanywhere-commons/CMakeLists.txt), which turns every
+#     proto ABI symbol into a FEATURE_NOT_AVAILABLE stub AND fails to compile
+#     src/router/hybrid/rac_stt_hybrid_router_proto.cpp (it unconditionally
+#     #includes hybrid_router.pb.h). Forcing it ON makes commons vendor+build
+#     libprotobuf for WASM (RAC_VENDOR_PROTOBUF=ON default) and define
+#     RAC_HAVE_PROTOBUF=1 so the real proto implementations link.
+#   * RAC_ENABLE_SOLUTIONS=OFF — the L5 Solutions runtime is not part of this
+#     bundle; keep it explicitly off (it also requires protobuf+absl).
+#   * ZLIB_BUILD_SHARED=OFF / ZLIB_VERSION — zlib 1.3.2 added ZLIB_BUILD_SHARED
+#     (default ON, ignores BUILD_SHARED_LIBS); Emscripten's wasm-ld rejects the
+#     SHARED add_library, so force it off and pin the numeric version libarchive's
+#     nested find_package(ZLIB 1.2.1) accepts.
 cmake \
     -S "${REPO_ROOT}" \
     -B "${BUILD_DIR}" \
@@ -66,16 +84,26 @@ cmake \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_FILE}" \
     -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
+    -DRAC_ENABLE_PROTOBUF=ON \
+    -DRAC_ENABLE_SOLUTIONS=OFF \
     -DRAC_STATIC_PLUGINS=ON \
     -DRAC_BUILD_BACKENDS=ON \
     -DRAC_BUILD_PLATFORM=OFF \
     -DRAC_BUILD_SHARED=OFF \
+    -DZLIB_BUILD_SHARED=OFF \
+    -DZLIB_VERSION="1.3.2" \
+    -DZLIB_VERSION_STRING="1.3.2" \
     -DRAC_WASM_LLAMACPP=ON
 
 echo "▶ Build wasm target"
 # Use CMake's generator-agnostic --parallel (Ninja rejects a bare `-j`,
 # while Make accepts it). Lets CMake pick a sensible default job count.
-cmake --build "${BUILD_DIR}" --target runanywhere_wasm --parallel
+# The concrete executable target for the llama.cpp Web package is
+# racommons_llamacpp_wasm (see sdk/runanywhere-web/wasm/CMakeLists.txt
+# rac_wasm_add_target NAME); it emits racommons-llamacpp.{js,wasm}. There is no
+# umbrella `runanywhere_wasm` target — each npm package has its own per-backend
+# executable target.
+cmake --build "${BUILD_DIR}" --target racommons_llamacpp_wasm --parallel
 
 mkdir -p "${DEST}"
 

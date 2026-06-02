@@ -15,39 +15,45 @@
 
 namespace margelo::nitro::runanywhere {
 
-  std::shared_ptr<JHybridRunAnywhereDeviceInfoSpec> JHybridRunAnywhereDeviceInfoSpec::JavaPart::getJHybridRunAnywhereDeviceInfoSpec() {
-    auto hybridObject = JHybridObject::JavaPart::getJHybridObject();
-    auto castHybridObject = std::dynamic_pointer_cast<JHybridRunAnywhereDeviceInfoSpec>(hybridObject);
-    if (castHybridObject == nullptr) [[unlikely]] {
-      throw std::runtime_error("Failed to downcast JHybridObject to JHybridRunAnywhereDeviceInfoSpec!");
-    }
-    return castHybridObject;
-  }
-
-  jni::local_ref<JHybridRunAnywhereDeviceInfoSpec::CxxPart::jhybriddata> JHybridRunAnywhereDeviceInfoSpec::CxxPart::initHybrid(jni::alias_ref<jhybridobject> jThis) {
+  jni::local_ref<JHybridRunAnywhereDeviceInfoSpec::jhybriddata> JHybridRunAnywhereDeviceInfoSpec::initHybrid(jni::alias_ref<jhybridobject> jThis) {
     return makeCxxInstance(jThis);
   }
 
-  std::shared_ptr<JHybridObject> JHybridRunAnywhereDeviceInfoSpec::CxxPart::createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) {
-    auto castJavaPart = jni::dynamic_ref_cast<JHybridRunAnywhereDeviceInfoSpec::JavaPart>(javaPart);
-    if (castJavaPart == nullptr) [[unlikely]] {
-      throw std::runtime_error("Failed to cast JHybridObject::JavaPart to JHybridRunAnywhereDeviceInfoSpec::JavaPart!");
-    }
-    return std::make_shared<JHybridRunAnywhereDeviceInfoSpec>(castJavaPart);
-  }
-
-  void JHybridRunAnywhereDeviceInfoSpec::CxxPart::registerNatives() {
+  void JHybridRunAnywhereDeviceInfoSpec::registerNatives() {
     registerHybrid({
-      makeNativeMethod("initHybrid", JHybridRunAnywhereDeviceInfoSpec::CxxPart::initHybrid),
+      makeNativeMethod("initHybrid", JHybridRunAnywhereDeviceInfoSpec::initHybrid),
     });
   }
 
-  // Properties
+  size_t JHybridRunAnywhereDeviceInfoSpec::getExternalMemorySize() noexcept {
+    static const auto method = javaClassStatic()->getMethod<jlong()>("getMemorySize");
+    return method(_javaPart);
+  }
 
+  bool JHybridRunAnywhereDeviceInfoSpec::equals(const std::shared_ptr<HybridObject>& other) {
+    if (auto otherCast = std::dynamic_pointer_cast<JHybridRunAnywhereDeviceInfoSpec>(other)) {
+      return _javaPart == otherCast->_javaPart;
+    }
+    return false;
+  }
+
+  void JHybridRunAnywhereDeviceInfoSpec::dispose() noexcept {
+    static const auto method = javaClassStatic()->getMethod<void()>("dispose");
+    method(_javaPart);
+  }
+
+  std::string JHybridRunAnywhereDeviceInfoSpec::toString() {
+    static const auto method = javaClassStatic()->getMethod<jni::JString()>("toString");
+    auto javaString = method(_javaPart);
+    return javaString->toStdString();
+  }
+
+  // Properties
+  
 
   // Methods
   std::shared_ptr<Promise<std::string>> JHybridRunAnywhereDeviceInfoSpec::getDeviceModel() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getDeviceModel");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getDeviceModel");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<std::string>::create();
@@ -63,7 +69,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<std::string>> JHybridRunAnywhereDeviceInfoSpec::getOSVersion() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getOSVersion");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getOSVersion");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<std::string>::create();
@@ -79,7 +85,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<std::string>> JHybridRunAnywhereDeviceInfoSpec::getPlatform() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getPlatform");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getPlatform");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<std::string>::create();
@@ -95,7 +101,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<double>> JHybridRunAnywhereDeviceInfoSpec::getTotalRAM() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getTotalRAM");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getTotalRAM");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<double>::create();
@@ -111,7 +117,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<double>> JHybridRunAnywhereDeviceInfoSpec::getAvailableRAM() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getAvailableRAM");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getAvailableRAM");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<double>::create();
@@ -127,7 +133,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<double>> JHybridRunAnywhereDeviceInfoSpec::getCPUCores() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getCPUCores");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getCPUCores");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<double>::create();
@@ -143,7 +149,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<bool>> JHybridRunAnywhereDeviceInfoSpec::hasGPU() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("hasGPU");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("hasGPU");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<bool>::create();
@@ -159,7 +165,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<bool>> JHybridRunAnywhereDeviceInfoSpec::hasNPU() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("hasNPU");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("hasNPU");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<bool>::create();
@@ -175,7 +181,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<std::string>> JHybridRunAnywhereDeviceInfoSpec::getChipName() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getChipName");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getChipName");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<std::string>::create();
@@ -191,7 +197,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<double>> JHybridRunAnywhereDeviceInfoSpec::getThermalState() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getThermalState");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getThermalState");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<double>::create();
@@ -207,7 +213,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<double>> JHybridRunAnywhereDeviceInfoSpec::getBatteryLevel() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getBatteryLevel");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("getBatteryLevel");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<double>::create();
@@ -223,7 +229,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<bool>> JHybridRunAnywhereDeviceInfoSpec::isCharging() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("isCharging");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("isCharging");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<bool>::create();
@@ -239,7 +245,7 @@ namespace margelo::nitro::runanywhere {
     }();
   }
   std::shared_ptr<Promise<bool>> JHybridRunAnywhereDeviceInfoSpec::isLowPowerMode() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("isLowPowerMode");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("isLowPowerMode");
     auto __result = method(_javaPart);
     return [&]() {
       auto __promise = Promise<bool>::create();

@@ -84,7 +84,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
     }
   }
 
-
+  
 
   /**
    * Get the memory size of the Swift class (plus size of any other allocations)
@@ -121,7 +121,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
   }
 
   // Properties
-
+  
 
   // Methods
   @inline(__always)
@@ -142,7 +142,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_std__string___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getOSVersion() -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
@@ -161,7 +161,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_std__string___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getPlatform() -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
@@ -180,7 +180,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_std__string___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getTotalRAM() -> bridge.Result_std__shared_ptr_Promise_double___ {
     do {
@@ -199,7 +199,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getAvailableRAM() -> bridge.Result_std__shared_ptr_Promise_double___ {
     do {
@@ -218,7 +218,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getCPUCores() -> bridge.Result_std__shared_ptr_Promise_double___ {
     do {
@@ -237,7 +237,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func hasGPU() -> bridge.Result_std__shared_ptr_Promise_bool___ {
     do {
@@ -256,7 +256,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_bool___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func hasNPU() -> bridge.Result_std__shared_ptr_Promise_bool___ {
     do {
@@ -275,7 +275,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_bool___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getChipName() -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
@@ -294,7 +294,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_std__string___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getThermalState() -> bridge.Result_std__shared_ptr_Promise_double___ {
     do {
@@ -313,7 +313,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func getBatteryLevel() -> bridge.Result_std__shared_ptr_Promise_double___ {
     do {
@@ -332,7 +332,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func isCharging() -> bridge.Result_std__shared_ptr_Promise_bool___ {
     do {
@@ -351,7 +351,7 @@ open class HybridRunAnywhereDeviceInfoSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_bool___(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func isLowPowerMode() -> bridge.Result_std__shared_ptr_Promise_bool___ {
     do {

@@ -233,6 +233,13 @@ for ABI in "${ABIS[@]}"; do
     # -------------------------------------------------------------------------
     LIB_COMMONS="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_commons.so"             -print -quit || true)"
     LIB_COMMONS_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_jni.so"     -print -quit || true)"
+    # Cloud STT engine plugin. librunanywhere_jni.so declares
+    # `NEEDED librac_backend_cloud.so` (it imports rac_backend_cloud_register +
+    # rac_stt_cloud_* for the hybrid STT router), so this lib MUST travel with
+    # the JNI bridge into every core package or the dynamic linker fails to load
+    # runanywhere_jni at runtime. It is bundled in core (not a separate package)
+    # because the cloud provider is data-driven config, not a distinct plugin.
+    LIB_CLOUD="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_cloud.so"         -print -quit || true)"
     LIB_LLAMA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_llamacpp.so"      -print -quit || true)"
     LIB_LLAMA_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_llamacpp_jni.so" -print -quit || true)"
     LIB_ONNX="$(find "${BUILD_DIR}"  -maxdepth 6 -name "librac_backend_onnx.so"          -print -quit || true)"
@@ -244,6 +251,8 @@ for ABI in "${ABIS[@]}"; do
     # commons core + JNI go to Kotlin, RN core and Flutter core.
     copy_if_exists "${LIB_COMMONS}"     "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
     copy_if_exists "${LIB_COMMONS_JNI}" "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
+    # Cloud STT engine — co-located with librunanywhere_jni.so (its NEEDED dep).
+    copy_if_exists "${LIB_CLOUD}"       "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
     copy_if_exists "${LIB_RAG_JNI}"     "${KOTLIN_DEST}"
 
     # Engine plugin entry-point libs (runanywhere_<engine>.so) — routed to

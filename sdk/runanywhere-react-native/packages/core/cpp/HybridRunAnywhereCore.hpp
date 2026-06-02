@@ -203,30 +203,15 @@ public:
     double component) override;
 
   // ============================================================================
-  // HTTP Client - libcurl-backed rac_http_client_* runner. `configureHttp`
-  // still stashes baseURL + apiKey in HTTPBridge so native consumers
-  // (DeviceBridge, telemetry) continue to resolve their base URL.
+  // HTTP Client - libcurl-backed rac_http_client_* runner.
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> configureHttp(
-    const std::string& baseUrl,
-    const std::string& apiKey) override;
   std::shared_ptr<Promise<std::string>> httpRequest(
     const std::string& method,
     const std::string& url,
     const std::string& headersJson,
     const std::string& bodyJson,
     double timeoutMs) override;
-
-  // ============================================================================
-  // Utility Functions
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> extractArchive(
-    const std::string& archivePath,
-    const std::string& destPath) override;
-  std::shared_ptr<Promise<std::string>> getDeviceCapabilities() override;
-  std::shared_ptr<Promise<double>> getMemoryUsage() override;
 
   // ============================================================================
   // LLM Capability (Backend-Agnostic)
@@ -352,25 +337,9 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmCancelProto() override;
 
   // ============================================================================
-  // Secure Storage
-  // Matches Swift: KeychainManager.swift
-  // Uses platform adapter callbacks for Keychain/Keystore
+  // Device Identity
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> secureStorageSet(
-    const std::string& key,
-    const std::string& value) override;
-  std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(
-    const std::string& key) override;
-  std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
-  std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;
-
-  // Aliases for semantic clarity (forward to Set/Get implementations)
-  std::shared_ptr<Promise<void>> secureStorageStore(
-    const std::string& key,
-    const std::string& value) override;
-  std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageRetrieve(
-    const std::string& key) override;
   std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
 
   // ============================================================================

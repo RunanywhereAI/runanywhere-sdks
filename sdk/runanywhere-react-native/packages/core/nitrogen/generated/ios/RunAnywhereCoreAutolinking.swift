@@ -19,7 +19,7 @@ public final class RunAnywhereCoreAutolinking {
       return __cxxWrapped.getCxxPart()
     }()
   }
-
+  
   public static func isRunAnywhereDeviceInfoRecyclable() -> Bool {
     return HybridRunAnywhereDeviceInfo.self is any RecyclableView.Type
   }

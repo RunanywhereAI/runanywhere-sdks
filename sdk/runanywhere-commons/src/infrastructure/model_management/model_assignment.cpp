@@ -497,6 +497,18 @@ static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& 
     return RAC_SUCCESS;
 }
 
+// Pure C-enum predicate: a model format "needs inference" when it is the
+// unspecified/unknown sentinel. Defined OUTSIDE the RAC_HAVE_PROTOBUF guard
+// because it has no protobuf dependency and is also called from the public
+// (always-compiled) refresh path below (see rac_model_registry_refresh's
+// existing-vs-incoming format-preservation merge). Keeping it inside the
+// protobuf guard made the no-protobuf build (e.g. WASM without a system
+// libprotobuf) fail with "use of undeclared identifier
+// 'c_format_needs_inference'".
+static bool c_format_needs_inference(rac_model_format_t format) {
+    return format == RAC_MODEL_FORMAT_UNSPECIFIED || format == RAC_MODEL_FORMAT_UNKNOWN;
+}
+
 #ifdef RAC_HAVE_PROTOBUF
 
 using runanywhere::v1::InferenceFramework;
@@ -599,9 +611,9 @@ static bool proto_format_needs_inference(ModelFormat format) {
            format == runanywhere::v1::MODEL_FORMAT_UNKNOWN;
 }
 
-static bool c_format_needs_inference(rac_model_format_t format) {
-    return format == RAC_MODEL_FORMAT_UNSPECIFIED || format == RAC_MODEL_FORMAT_UNKNOWN;
-}
+// NOTE: c_format_needs_inference (the pure C-enum variant) is intentionally
+// defined ABOVE the #ifdef RAC_HAVE_PROTOBUF block — it is also used by the
+// always-compiled public refresh path and must exist in no-protobuf builds.
 
 static bool proto_framework_needs_inference(InferenceFramework framework) {
     return framework == runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED ||

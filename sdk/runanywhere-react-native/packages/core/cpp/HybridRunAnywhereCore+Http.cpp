@@ -14,15 +14,6 @@ using namespace ::runanywhere::bridges;
 // HTTP Client — libcurl-backed rac_http_client_*
 // ============================================================================
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::configureHttp(
-    const std::string& baseUrl,
-    const std::string& apiKey) {
-    return Promise<bool>::async([baseUrl, apiKey]() -> bool {
-        HTTPBridge::shared().configure(baseUrl, apiKey);
-        return HTTPBridge::shared().isConfigured();
-    });
-}
-
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpRequest(
     const std::string& method,
     const std::string& url,

@@ -19,8 +19,6 @@
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
-// #include <NitroModules/Null.hpp> // Removed - file does not ship in react-native-nitro-modules 0.33.9 (nitrogen 0.34.1 codegen emits it; runtime pin pair documented in dependencies/versions.json)
-#include <variant>
 #include <optional>
 
 namespace margelo::nitro::runanywhere {
@@ -50,7 +48,7 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-
+      
 
     public:
       // Methods
@@ -105,13 +103,9 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> modelLifecycleUnloadProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> currentModelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> componentLifecycleSnapshotProto(double component) = 0;
-      virtual std::shared_ptr<Promise<bool>> configureHttp(const std::string& baseUrl, const std::string& apiKey) = 0;
       virtual std::shared_ptr<Promise<std::string>> httpRequest(const std::string& method, const std::string& url, const std::string& headersJson, const std::string& bodyJson, double timeoutMs) = 0;
       virtual std::shared_ptr<Promise<std::string>> authAuthenticate(const std::string& apiKey, const std::string& baseURL, const std::string& deviceId, const std::string& platform, const std::string& sdkVersion) = 0;
       virtual std::shared_ptr<Promise<std::string>> authRefreshToken(const std::string& baseURL) = 0;
-      virtual std::shared_ptr<Promise<bool>> extractArchive(const std::string& archivePath, const std::string& destPath) = 0;
-      virtual std::shared_ptr<Promise<std::string>> getDeviceCapabilities() = 0;
-      virtual std::shared_ptr<Promise<double>> getMemoryUsage() = 0;
       virtual std::shared_ptr<Promise<bool>> isTextModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTextModel() = 0;
       virtual std::shared_ptr<Promise<double>> getLLMHandle() = 0;
@@ -123,6 +117,22 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> sttTranscribeStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridSttRouterCreate() = 0;
+      virtual std::shared_ptr<Promise<void>> hybridSttRouterDestroy(double routerHandle) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridSttRouterCreateService(const std::string& engineHint, const std::string& modelIdOrPath, const std::string& configJson) = 0;
+      virtual std::shared_ptr<Promise<void>> hybridSttRouterDestroyService(double serviceHandle) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridSttRouterSetOfflineService(double routerHandle, double serviceHandle, const std::shared_ptr<ArrayBuffer>& descriptorBytes) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridSttRouterSetOnlineService(double routerHandle, double serviceHandle, const std::shared_ptr<ArrayBuffer>& descriptorBytes) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridSttRouterSetPolicy(double routerHandle, const std::shared_ptr<ArrayBuffer>& policyBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hybridSttRouterTranscribe(double routerHandle, const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridSttRouterCancel(double routerHandle) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridRegisterCustomFilter(const std::string& name, const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<bool>>>>(const std::string& /* candidateModelId */)>& predicate) = 0;
+      virtual std::shared_ptr<Promise<double>> hybridUnregisterCustomFilter(const std::string& name) = 0;
+      virtual std::shared_ptr<Promise<bool>> hybridSetDeviceState(bool isOnline, double batteryPercent, bool thermalThrottled) = 0;
+      virtual std::shared_ptr<Promise<bool>> hybridClearDeviceState() = 0;
+      virtual std::shared_ptr<Promise<bool>> cloudRegister() = 0;
+      virtual std::shared_ptr<Promise<bool>> cloudUnregister() = 0;
+      virtual std::shared_ptr<Promise<bool>> cloudIsRegistered() = 0;
       virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTTSModel() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsListVoicesProto() = 0;
@@ -139,12 +149,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> vlmProcessStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmCancelProto() = 0;
-      virtual std::shared_ptr<Promise<bool>> secureStorageSet(const std::string& key, const std::string& value) = 0;
-      virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(const std::string& key) = 0;
-      virtual std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) = 0;
-      virtual std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) = 0;
-      virtual std::shared_ptr<Promise<void>> secureStorageStore(const std::string& key, const std::string& value) = 0;
-      virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageRetrieve(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() = 0;
       virtual std::shared_ptr<Promise<void>> flushTelemetry() = 0;
       virtual std::shared_ptr<Promise<bool>> isTelemetryInitialized() = 0;

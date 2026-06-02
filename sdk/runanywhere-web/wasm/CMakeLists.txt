@@ -1354,6 +1354,23 @@ if(RAC_WASM_LLAMACPP)
         list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_RAG})
     endif()
 
+    # cloud — the ONLINE side of the hybrid STT router. The llamacpp Web target
+    # is the default Web WASM bundle (LLM + VLM + the hybrid STT router that
+    # lives in rac_commons), and the hybrid router's online leg routes through
+    # the "cloud" engine over the existing JS fetch transport. The cloud sources
+    # fold into rac_commons under RAC_STATIC_PLUGINS=ON (forced for WASM — see
+    # engines/cloud/CMakeLists.txt), so rac_backend_cloud_register resolves from
+    # the already-linked librac_commons.a; we only need to EXPORT the two entry
+    # symbols in the emitted JS glue so dead-strip keeps them and CloudSTT.ts can
+    # call _rac_backend_cloud_register. (Mirrors the same append on the ONNX
+    # target below; the standalone-target link guard is defensive for a future
+    # non-static-plugin WASM build.)
+    list(APPEND _llamacpp_exports ${RAC_EXPORTED_FUNCTIONS_CLOUD})
+    set(_llamacpp_libs rac_commons rac_backend_llamacpp)
+    if(TARGET rac_backend_cloud)
+        list(APPEND _llamacpp_libs rac_backend_cloud)
+    endif()
+
     if(NOT RAC_WASM_WEBGPU)
         # CPU variant — keep EXPORT_NAME=createLlamaCppModule for backward
         # compatibility with the existing TS bridge.
@@ -1362,7 +1379,7 @@ if(RAC_WASM_LLAMACPP)
             OUTPUT_NAME racommons-llamacpp
             OUTPUT_DIR "${_LLAMACPP_OUTPUT_DIR}"
             EXPORT_NAME createLlamaCppModule
-            LINK_LIBRARIES rac_commons rac_backend_llamacpp
+            LINK_LIBRARIES ${_llamacpp_libs}
             EXPORTED_FUNCTIONS ${_llamacpp_exports}
             COMPILE_DEFS RAC_WASM_LLAMACPP=1
         )
@@ -1376,7 +1393,7 @@ if(RAC_WASM_LLAMACPP)
             OUTPUT_NAME racommons-llamacpp-webgpu
             OUTPUT_DIR "${_LLAMACPP_OUTPUT_DIR}"
             EXPORT_NAME createLlamaCppWebGPUModule
-            LINK_LIBRARIES rac_commons rac_backend_llamacpp
+            LINK_LIBRARIES ${_llamacpp_libs}
             EXPORTED_FUNCTIONS ${_llamacpp_exports}
             COMPILE_DEFS RAC_WASM_LLAMACPP=1 RAC_WASM_WEBGPU=1 GGML_USE_WEBGPU=1
             ENABLE_WEBGPU ON

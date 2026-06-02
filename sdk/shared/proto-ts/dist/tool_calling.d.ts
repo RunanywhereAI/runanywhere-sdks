@@ -159,7 +159,7 @@ export interface ToolCall {
     /**
      * JSON-encoded arguments. Empty object "{}" if no args.
      *
-     * AUDIT (IDL-13): the C++ tokenizer / tool-prompt formatter
+     * The C++ tokenizer / tool-prompt formatter
      * (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
      * `arguments_json` directly when building LLM prompts. It is the
      * canonical wire shape for the prompt-formatting path.
@@ -187,7 +187,7 @@ export interface ToolResult {
     /**
      * JSON-encoded tool execution result.
      *
-     * AUDIT (IDL-13): the C++ tool-prompt formatter
+     * The C++ tool-prompt formatter
      * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
      * reads `result_json` directly when building follow-up LLM prompts after
      * tool execution. It is the canonical wire shape.

@@ -25,77 +25,80 @@ import com.margelo.nitro.core.HybridObject
   "LocalVariableName", "PropertyName", "PrivatePropertyName", "FunctionName"
 )
 abstract class HybridRunAnywhereDeviceInfoSpec: HybridObject() {
-  // Properties
-
-
-  // Methods
   @DoNotStrip
-  @Keep
-  abstract fun getDeviceModel(): Promise<String>
+  private var mHybridData: HybridData = initHybrid()
 
-  @DoNotStrip
-  @Keep
-  abstract fun getOSVersion(): Promise<String>
+  init {
+    super.updateNative(mHybridData)
+  }
 
-  @DoNotStrip
-  @Keep
-  abstract fun getPlatform(): Promise<String>
-
-  @DoNotStrip
-  @Keep
-  abstract fun getTotalRAM(): Promise<Double>
-
-  @DoNotStrip
-  @Keep
-  abstract fun getAvailableRAM(): Promise<Double>
-
-  @DoNotStrip
-  @Keep
-  abstract fun getCPUCores(): Promise<Double>
-
-  @DoNotStrip
-  @Keep
-  abstract fun hasGPU(): Promise<Boolean>
-
-  @DoNotStrip
-  @Keep
-  abstract fun hasNPU(): Promise<Boolean>
-
-  @DoNotStrip
-  @Keep
-  abstract fun getChipName(): Promise<String>
-
-  @DoNotStrip
-  @Keep
-  abstract fun getThermalState(): Promise<Double>
-
-  @DoNotStrip
-  @Keep
-  abstract fun getBatteryLevel(): Promise<Double>
-
-  @DoNotStrip
-  @Keep
-  abstract fun isCharging(): Promise<Boolean>
-
-  @DoNotStrip
-  @Keep
-  abstract fun isLowPowerMode(): Promise<Boolean>
+  override fun updateNative(hybridData: HybridData) {
+    mHybridData = hybridData
+    super.updateNative(hybridData)
+  }
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {
     return "[HybridObject RunAnywhereDeviceInfo]"
   }
 
-  // C++ backing class
+  // Properties
+  
+
+  // Methods
   @DoNotStrip
   @Keep
-  protected open class CxxPart(javaPart: HybridRunAnywhereDeviceInfoSpec): HybridObject.CxxPart(javaPart) {
-    // C++ JHybridRunAnywhereDeviceInfoSpec::CxxPart::initHybrid(...)
-    external override fun initHybrid(): HybridData
-  }
-  override fun createCxxPart(): CxxPart {
-    return CxxPart(this)
-  }
+  abstract fun getDeviceModel(): Promise<String>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getOSVersion(): Promise<String>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getPlatform(): Promise<String>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getTotalRAM(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getAvailableRAM(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getCPUCores(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun hasGPU(): Promise<Boolean>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun hasNPU(): Promise<Boolean>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getChipName(): Promise<String>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getThermalState(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getBatteryLevel(): Promise<Double>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun isCharging(): Promise<Boolean>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun isLowPowerMode(): Promise<Boolean>
+
+  private external fun initHybrid(): HybridData
 
   companion object {
     protected const val TAG = "HybridRunAnywhereDeviceInfoSpec"

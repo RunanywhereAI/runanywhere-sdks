@@ -331,7 +331,7 @@ export declare enum ErrorCode {
     ERROR_CODE_UNKNOWN = 804,
     /** ERROR_CODE_INTERNAL - RAC_ERROR_INTERNAL */
     ERROR_CODE_INTERNAL = 805,
-    /** ERROR_CODE_ABI_VERSION_MISMATCH - -- Plugin (GAP 02 / GAP 03; -810..-829) ------------------------------- */
+    /** ERROR_CODE_ABI_VERSION_MISMATCH - -- Plugin (-810..-829) ------------------------------------------------ */
     ERROR_CODE_ABI_VERSION_MISMATCH = 810,
     /** ERROR_CODE_CAPABILITY_UNSUPPORTED - RAC_ERROR_CAPABILITY_UNSUPPORTED */
     ERROR_CODE_CAPABILITY_UNSUPPORTED = 811,

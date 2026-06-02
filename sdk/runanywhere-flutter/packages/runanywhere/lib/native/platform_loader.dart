@@ -81,6 +81,40 @@ class PlatformLoader {
     return _loadLibrary(libraryName);
   }
 
+  // Cached handle for the cloud-STT backend provider lib (Android only).
+  static DynamicLibrary? _cloudBackendLibrary;
+
+  /// Ensure the cloud-STT backend provider library is loaded so its symbols
+  /// (`rac_backend_cloud_register` / `rac_backend_cloud_unregister`) are
+  /// resolvable.
+  ///
+  /// On Android these symbols are DEFINED in the standalone
+  /// `librac_backend_cloud.so` (mirroring the standalone onnx/llamacpp backend
+  /// libs) and only IMPORTED (undefined) by `librunanywhere_jni.so`. The
+  /// commons handle therefore cannot resolve them until the provider lib is
+  /// `dlopen`ed into the process, which also satisfies the undefined import in
+  /// the commons JNI lib. This opens it once (idempotent) and tolerates its
+  /// absence (returns `false`) for builds that ship without the cloud backend.
+  ///
+  /// On iOS/macOS the cloud TU is statically linked into the process image
+  /// (resolved via `DynamicLibrary.process()` in [loadCommons]); there is no
+  /// separate provider lib, so this is a no-op that reports success.
+  static bool ensureCloudBackendLoaded() {
+    if (!Platform.isAndroid && !Platform.isLinux) {
+      // Statically linked into the process on iOS/macOS/Windows builds.
+      return true;
+    }
+    if (_cloudBackendLibrary != null) {
+      return true;
+    }
+    try {
+      _cloudBackendLibrary = DynamicLibrary.open('librac_backend_cloud.so');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static DynamicLibrary _loadLibrary(String libraryName) {
     if (Platform.isAndroid) {
       return _loadAndroid(libraryName);
