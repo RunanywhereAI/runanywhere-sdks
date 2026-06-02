@@ -66,9 +66,7 @@ extern "C" {
  *                 `rac_service_{can_handle,create}_fn`, `RAC_DEPRECATED_LEGACY_SVC`).
  *                 Plugins built against v2 will be rejected at register
  *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
- *                 new `create` slot is unreachable otherwise. `rac_capability_t`
- *                 is RETAINED for `rac_module_info_t.capabilities` and
- *                 `rac_modules_for_capability`.
+ *                 new `create` slot is unreachable otherwise.
  *                 NOTE: `rac_service_register_provider` /
  *                 `rac_service_unregister_provider` remain as no-op
  *                 deprecation shims (log a WARN, return RAC_SUCCESS) in
@@ -106,7 +104,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  * from rac_backend_llamacpp). Without an explicit annotation at declaration
  * time, loadability depended on transitive default visibility of the host
  * plugin target — a brittle invariant that a future visibility tightening
- * would silently break (pass2-syn-062).
+ * would silently break.
  *
  * Example:
  * @code
@@ -206,10 +204,56 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
     extern "C" RAC_STATIC_REGISTRAR_USED_ATTR const char* const rac_plugin_static_marker_##name = \
         #name
 
+/**
+ * @brief Variant of RAC_STATIC_PLUGIN_REGISTER that routes through a backend's
+ *        explicit `rac_backend_<name>_register()` entry point.
+ *
+ * Some backends need more than the bare
+ * `rac_plugin_register(rac_plugin_entry_<name>())` that RAC_STATIC_PLUGIN_REGISTER
+ * performs — e.g. llamacpp also hooks up its CPU-runtime provider, and metalrt
+ * emits a stub-mode diagnostic when the closed-source engine binary is absent.
+ * Those backends expose a hand-written `rac_backend_<name>_register()` that does
+ * the unified plugin registration *plus* the engine-specific bring-up, and is
+ * idempotent on repeat calls (so the dynamic-link path — where the SDK bridge
+ * calls it directly — and this static-init path agree).
+ *
+ * This macro emits the SAME static-init scaffold and the SAME externally-visible
+ * marker symbol (`rac_plugin_static_marker_<name>`) as RAC_STATIC_PLUGIN_REGISTER,
+ * so the `-force_load` / `--whole-archive` / MSVC `/INCLUDE:` keep-alive in
+ * `cmake/plugins.cmake` is unchanged. The only difference is that the Registrar
+ * ctor calls `::rac_backend_##name##_register()` instead of
+ * `rac_plugin_register(rac_plugin_entry_##name())`. See RAC_STATIC_PLUGIN_REGISTER
+ * above for the full rationale on `used`, init ordering, and noexcept.
+ *
+ * Usage (one line in a dedicated C++ shim TU named explicitly in CMake so it is
+ * retained by `-force_load`):
+ * @code
+ *   RAC_STATIC_REGISTER_BACKEND(llamacpp);
+ * @endcode
+ */
+#define RAC_STATIC_REGISTER_BACKEND(name)                                                         \
+    extern "C" rac_result_t rac_backend_##name##_register(void);                                  \
+    namespace rac_plugin_autoreg_##name {                                                         \
+        struct Registrar {                                                                        \
+            Registrar() noexcept {                                                                \
+                (void)::rac_backend_##name##_register();                                          \
+            }                                                                                     \
+        };                                                                                        \
+        /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
+         * still has to ask the linker not to drop the .o file (see header                        \
+         * docs above for the per-platform link flag). */                                         \
+        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;                              \
+    }                                                                                             \
+    /* Force at least one externally-visible symbol per plugin so the linker                      \
+     * can be asked to keep the TU by name without `-force_load`. */                              \
+    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR const char* const rac_plugin_static_marker_##name = \
+        #name
+
 #else
 #define RAC_STATIC_PLUGIN_REGISTER(name)
 /* Static registration requires C++ linkage — put a one-line C++ shim TU \
  * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
+#define RAC_STATIC_REGISTER_BACKEND(name)
 #endif
 
 /* ===========================================================================

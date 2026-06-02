@@ -36,7 +36,7 @@ Two `Package.swift` files exist:
 - **Root** (`runanywhere-sdks/Package.swift`): For external SPM consumers — downloads XCFrameworks from GitHub releases.
 - **Local** (`sdk/runanywhere-swift/Package.swift`): For SDK development — references `Binaries/` directory (git-ignored).
 
-Products: `RunAnywhere` (all backends), `RunAnywhereCore` (core only), `RunAnywhereLlamaCPP`, `RunAnywhereONNX`, `RunAnywhereMetalRT`, `RunAnywhereWhisperKit`.
+Products: `RunAnywhere` (all backends), `RunAnywhereCore` (core only), `RunAnywhereLlamaCPP`, `RunAnywhereONNX`.
 
 Platforms: iOS 17+, macOS 14+. Swift tools version 5.9.
 
@@ -88,7 +88,6 @@ All cross-boundary communication uses **vtable-based function pointer structs**:
 - `rac_http_transport_ops_t` — HTTP transport (URLSession)
 - `rac_secure_storage_t` — auth token persistence
 - `rac_platform_llm/tts/diffusion_callbacks_t` — Apple platform services
-- `rac_whisperkit_coreml_stt_callbacks_t` — WhisperKit STT
 - `rac_discovery_callbacks_t` — filesystem callbacks for model discovery
 
 Async Swift bridged to synchronous C ABI via `DispatchSemaphore` or `DispatchGroup.wait()`.
@@ -206,7 +205,6 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | DeviceKit | Device model identification |
 | sentry-cocoa | Error reporting (optional) |
 | ml-stable-diffusion | CoreML image generation |
-| WhisperKit | CoreML speech recognition |
 | swift-protobuf | Proto-generated type support |
 
 ## Unsupported Features

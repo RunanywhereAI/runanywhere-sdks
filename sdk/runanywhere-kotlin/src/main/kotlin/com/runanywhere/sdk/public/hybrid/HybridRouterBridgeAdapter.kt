@@ -5,17 +5,29 @@
  * Builds a native rac_stt_service_t handle (a Long) for a given
  * BackendId + RACModel, and tears it down again on close().
  *
- * Resolution rules:
- *   - SHERPA.STT — rac_stt_create via the C model registry. The caller must
- *     have registered + downloaded the sherpa model before reaching here.
- *   - SARVAM.STT — BACKEND.SARVAM.register(...) lookup supplies the model
- *     string + API key; SarvamBridge.racSttSarvamCreateFromJson builds it.
+ * BOTH sides are created through the SAME unified registry-routed factory
+ * (`racSttHybridRouterCreateService`), which resolves the engine via
+ * `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint=<engine>)` →
+ * `stt_ops->create`. There is no bespoke per-engine factory on the router
+ * path:
+ *   - SHERPA — engine hint "sherpa", on-device model path resolved through
+ *     the C model registry ([RunAnywhereBridge.racSttServiceCreate], which
+ *     itself routes through the registry). The caller must have registered +
+ *     downloaded the sherpa model before reaching here.
+ *   - CLOUD — engine hint "cloud"; [BACKEND.CLOUD.register] supplies the
+ *     model string + API key + provider, marshalled into the cloud config JSON
+ *     (including `provider`) and forwarded verbatim to the routed engine's
+ *     create op. The provider (e.g. "sarvam") is data in the config, not a
+ *     distinct engine.
+ *
+ * Backend / capability dispatch keys off the structured [HybridBackendKind]
+ * proto enum (via [BackendId.kind]) — never a raw string.
  */
 
 package com.runanywhere.sdk.public.hybrid
 
+import ai.runanywhere.proto.v1.HybridBackendKind
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.native.bridge.SarvamBridge
 import org.json.JSONObject
 
 /**
@@ -31,17 +43,19 @@ internal object HybridRouterBridgeAdapter {
      * slot via `racSttHybridRouterSet*Service`.
      *
      * @throws IllegalStateException if the native call fails (e.g. model id
-     *         not in the registry, Sarvam entry not registered).
+     *         not in the registry, cloud entry not registered).
      */
     fun createService(backend: BackendId, model: RACModel): Long {
-        val key = backend.family to backend.capability
-        val handle = when (key) {
-            "SHERPA" to "STT" -> {
+        val handle = when (backend.kindEnum) {
+            HybridBackendKind.HYBRID_BACKEND_SHERPA -> {
                 requireSherpaRegistered()
+                // The model-registry path-resolution lives in
+                // racSttServiceCreate; it routes the create through the same
+                // plugin registry (hint "sherpa") as the online side.
                 RunAnywhereBridge.racSttServiceCreate(model.id)
             }
-            "SARVAM" to "STT" -> createSarvamService(model.id)
-            else -> error("Unknown backend: ${backend.family}.${backend.capability}")
+            HybridBackendKind.HYBRID_BACKEND_CLOUD -> createCloudService(model.id, backend.provider)
+            else -> error("Unsupported hybrid backend: ${backend.family}.${backend.capability}")
         }
         check(handle != 0L) {
             "Failed to create native service for ${backend.family}.${backend.capability} model=${model.id}"
@@ -71,36 +85,49 @@ internal object HybridRouterBridgeAdapter {
 
     /**
      * Release the native handle [handle] returned by [createService].
-     * No-op when [handle] is 0. Routes destruction to the right native
-     * destroy fn based on [backend].
+     * No-op when [handle] is 0. Both sides route destruction through the
+     * unified registry destroy thunk (`rac_stt_destroy`), so no per-backend
+     * dispatch is needed.
      */
-    fun destroyService(backend: BackendId?, handle: Long) {
+    fun destroyService(handle: Long) {
         if (handle == 0L) {
             return
         }
-        val key = backend?.let { it.family to it.capability }
-        when (key) {
-            "SARVAM" to "STT" -> SarvamBridge.racSttSarvamDestroy(handle)
-            else -> RunAnywhereBridge.racSttServiceDestroy(handle)
-        }
+        RunAnywhereBridge.racSttHybridRouterDestroyService(handle)
     }
 
     /**
-     * Look up [id] in [BACKEND.SARVAM]'s registry, build the config JSON the
-     * Sarvam factory expects, and call into JNI.
+     * Look up [id] in [BACKEND.CLOUD]'s registry, build the config JSON the
+     * cloud engine expects, and create the service through the
+     * registry-routed factory with engine hint "cloud".
+     *
+     * The concrete provider is carried in `config_json["provider"]` — taken
+     * from the registered entry, falling back to the backend's [backendProvider]
+     * (default "sarvam"). Commons injects a default too, but we pass it
+     * explicitly so the routed engine never has to guess.
      */
-    private fun createSarvamService(id: String): Long {
-        val entry = BACKEND.SARVAM.lookup(id)
+    private fun createCloudService(id: String, backendProvider: String): Long {
+        val entry = BACKEND.CLOUD.lookup(id)
             ?: error(
-                "Sarvam model id '$id' not registered. " +
-                    "Call BACKEND.SARVAM.register(id, model, apiKey) at app startup.",
+                "Cloud model id '$id' not registered. " +
+                    "Call BACKEND.CLOUD.register(id, model, apiKey) at app startup.",
             )
+        val provider = entry.provider.ifBlank { backendProvider }.ifBlank { BACKEND.DEFAULT_PROVIDER }
         val configJson = JSONObject()
+            .put("provider", provider)
             .put("api_key", entry.apiKey)
             .put("model", entry.model)
         entry.languageCode?.let { configJson.put("language_code", it) }
         entry.baseUrl?.let { configJson.put("base_url", it) }
         entry.timeoutMs?.let { configJson.put("timeout_ms", it) }
-        return SarvamBridge.racSttSarvamCreateFromJson(configJson.toString())
+        return RunAnywhereBridge.racSttHybridRouterCreateService(
+            engineHint = CLOUD_ENGINE_HINT,
+            // Cloud engine takes everything via config_json; no model path.
+            modelIdOrPath = "",
+            configJson = configJson.toString(),
+        )
     }
+
+    /** Engine hint pinned as `preferred_engine_name` for the cloud route. */
+    private const val CLOUD_ENGINE_HINT = "cloud"
 }

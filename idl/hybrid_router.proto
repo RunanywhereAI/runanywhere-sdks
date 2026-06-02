@@ -1,9 +1,9 @@
 // RunAnywhere IDL — Hybrid router schema.
 //
 // Per-request routing between an on-device (offline) backend and a cloud
-// (online) backend. Wired today for STT: sherpa-onnx offline ↔ Sarvam online.
-// The schema is capability-agnostic; cascade/filter/rank semantics are
-// identical across capabilities.
+// (online) backend. Wired today for STT: sherpa-onnx offline ↔ cloud STT
+// (provider=sarvam) online. The schema is capability-agnostic; cascade/filter/
+// rank semantics are identical across capabilities.
 //
 // Schema is consumed by Square Wire (Kotlin) and protobuf (C++/Swift) via
 // the codegen scripts in idl/codegen/. The JNI boundary between the Kotlin
@@ -36,15 +36,18 @@ enum HybridCapability {
 
 // ---------------------------------------------------------------------------
 // Backend identity. Matches the engines/ directory entry that registers
-// the service vtable. Cloud backends are explicit kinds rather than a
-// generic "cloud" since each one has a distinct HTTP shape and auth.
+// the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
+// ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
+// the descriptor's `provider` field, not from a distinct enum kind.
 // ---------------------------------------------------------------------------
 enum HybridBackendKind {
     HYBRID_BACKEND_UNSPECIFIED = 0;
     HYBRID_BACKEND_LLAMACPP    = 1;
     HYBRID_BACKEND_OPENROUTER  = 2;
     HYBRID_BACKEND_SHERPA      = 3;
-    HYBRID_BACKEND_SARVAM      = 4;
+    // Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
+    // the generic "cloud_stt" backend; the provider is carried out-of-band.
+    HYBRID_BACKEND_CLOUD       = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +143,10 @@ message HybridModelDescriptor {
     string            model_id   = 1;
     HybridModelType   model_type = 2;
     HybridBackendKind backend    = 3;
+    // Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
+    // "sarvam"). The cloud_stt engine reads it from config_json["provider"];
+    // empty defaults to "sarvam". Ignored for non-cloud backends.
+    string            provider   = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,8 +201,8 @@ message HybridSttTranscribeOptions {
 // ---------------------------------------------------------------------------
 // Request handed to the JNI transcribe thunk. Audio bytes are passed
 // verbatim to the chosen backend; each engine is responsible for parsing
-// the encoded format (Sarvam reads the multipart file part, sherpa decodes
-// the WAV/PCM bytes).
+// the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
+// file part; sherpa decodes the WAV/PCM bytes).
 // ---------------------------------------------------------------------------
 message HybridSttTranscribeRequest {
     bytes                       audio_bytes = 1;

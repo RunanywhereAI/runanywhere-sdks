@@ -182,7 +182,6 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return copy_supported_formats(fluid_audio_formats, 1, out_formats, out_count);
         case RAC_FRAMEWORK_COREML:
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return copy_supported_formats(coreml_formats, 3, out_formats, out_count);
         case RAC_FRAMEWORK_METALRT:
             return copy_supported_formats(metalrt_formats, 1, out_formats, out_count);
@@ -207,7 +206,6 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
         case RAC_FRAMEWORK_GENIE:
             return (format == RAC_MODEL_FORMAT_QNN_CONTEXT) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_COREML:
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return (format == RAC_MODEL_FORMAT_COREML || format == RAC_MODEL_FORMAT_MLMODEL ||
                     format == RAC_MODEL_FORMAT_MLPACKAGE)
                        ? RAC_TRUE
@@ -227,9 +225,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:             // Sherpa-ONNX speech models extract to directories
                                                // (encoder/decoder/tokens.txt)
-        case RAC_FRAMEWORK_COREML:             // CoreML compiled models (.mlmodelc) are directories
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:  // WhisperKit models are directories of .mlmodelc
-                                               // files
+        case RAC_FRAMEWORK_COREML:   // CoreML compiled models (.mlmodelc) are directories
         case RAC_FRAMEWORK_METALRT:  // MetalRT models are directories (config.json + .safetensors)
         case RAC_FRAMEWORK_GENIE:    // Genie models are directories (config.json + bin files)
             return RAC_TRUE;
@@ -256,7 +252,6 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_SHERPA:
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -292,8 +287,6 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "System TTS";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "WhisperKit CoreML";
         case RAC_FRAMEWORK_GENIE:
             return "Qualcomm Genie";
         case RAC_FRAMEWORK_BUILTIN:
@@ -324,8 +317,6 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "system_tts";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "fluid_audio";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "whisperkit_coreml";
         case RAC_FRAMEWORK_GENIE:
             return "genie";
         case RAC_FRAMEWORK_BUILTIN:
@@ -408,8 +399,6 @@ const char* inference_framework_wire_string_value(rac_inference_framework_t f) {
             return "INFERENCE_FRAMEWORK_COREML";
         case RAC_FRAMEWORK_MLX:
             return "INFERENCE_FRAMEWORK_MLX";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "INFERENCE_FRAMEWORK_WHISPERKIT_COREML";
         case RAC_FRAMEWORK_METALRT:
             return "INFERENCE_FRAMEWORK_METALRT";
         case RAC_FRAMEWORK_GENIE:
@@ -446,8 +435,6 @@ const char* inference_framework_display_name_value(rac_inference_framework_t f) 
             return "Core ML";
         case RAC_FRAMEWORK_MLX:
             return "MLX";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "WhisperKit CoreML";
         case RAC_FRAMEWORK_METALRT:
             return "MetalRT";
         case RAC_FRAMEWORK_GENIE:
@@ -482,8 +469,6 @@ const char* inference_framework_analytics_key_value(rac_inference_framework_t f)
             return "coreml";
         case RAC_FRAMEWORK_MLX:
             return "mlx";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "whisperkit_coreml";
         case RAC_FRAMEWORK_METALRT:
             return "metalrt";
         case RAC_FRAMEWORK_GENIE:
@@ -528,7 +513,6 @@ constexpr rac_inference_framework_t kKnownFrameworks[] = {
     RAC_FRAMEWORK_FLUID_AUDIO,
     RAC_FRAMEWORK_COREML,
     RAC_FRAMEWORK_MLX,
-    RAC_FRAMEWORK_WHISPERKIT_COREML,
     RAC_FRAMEWORK_METALRT,
     RAC_FRAMEWORK_GENIE,
     RAC_FRAMEWORK_SHERPA,
@@ -839,7 +823,6 @@ rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
             match = matches_any({"onnx", "ort"});
             break;
         case RAC_FRAMEWORK_COREML:
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
             match = matches_any({"mlmodelc", "mlpackage", "mlmodel"});
             break;
         case RAC_FRAMEWORK_METALRT:

@@ -387,13 +387,11 @@ rac_add_engine_plugin(sherpa
                         ${RAC_COMMONS_ROOT_DIR}/src
                         ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/*.h
     COMPILE_DEFINITIONS ${SHERPA_COMPILE_DEFS}
-    RUNTIMES            CPU
-    FORMATS             ONNX
 )
 
 # Platform tweaks — hidden visibility handled by rac_add_engine_plugin when
 # truly SHARED. Add log linkage + page alignment for Android per project
-# convention (mirrors engines/whispercpp).
+# convention (matches the other in-tree engines).
 if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_sherpa PRIVATE log)
     target_compile_options(rac_backend_sherpa PRIVATE -O3 -ffunction-sections -fdata-sections)

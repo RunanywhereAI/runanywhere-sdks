@@ -3,14 +3,12 @@
  * @brief Qualcomm Genie engine shell implementation.
  *
  * This shell compiles on every host regardless of SDK
- * availability. When `RAC_GENIE_SDK_AVAILABLE=0`, registration is rejected
- * before the router can select Genie; any direct stub invocation still returns
- * `RAC_ERROR_BACKEND_UNAVAILABLE`.
+ * availability. Registration is rejected before the router can select Genie
+ * (see `genie_capability_check()` in rac_plugin_entry_genie.cpp). This TU now
+ * only carries the `genie_backend_build_info()` marker used by tests.
  */
 
 #include "genie_backend.h"
-
-#include "rac/core/rac_logger.h"
 
 #if RAC_GENIE_SDK_AVAILABLE
 // Real Qualcomm Genie integration. The headers listed below
@@ -28,14 +26,6 @@ const char* genie_backend_build_info(void) {
 #else
     return "genie:sdk-unavailable";
 #endif
-}
-
-rac_result_t genie_backend_unavailable(void) {
-    RAC_LOG_WARNING("Genie",
-                    "Genie backend unavailable. It requires an Android build "
-                    "with -DRAC_BACKEND_GENIE=ON, "
-                    "-DRAC_GENIE_SDK_ROOT=<qnn-sdk-path>, and SDK-backed LLM ops.");
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 
 }  // extern "C"

@@ -635,9 +635,6 @@ static ModelCategory infer_proto_category_from_framework(InferenceFramework fram
         case runanywhere::v1::INFERENCE_FRAMEWORK_PIPER_TTS:
             return runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS;
         case runanywhere::v1::INFERENCE_FRAMEWORK_FLUID_AUDIO:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_OPENAI_WHISPER:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
             return runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION;
         case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
@@ -680,8 +677,6 @@ static InferenceFramework proto_framework_from_struct(rac_inference_framework_t 
             return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
         case RAC_FRAMEWORK_COREML:
             return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
         case RAC_FRAMEWORK_METALRT:
             return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
         case RAC_FRAMEWORK_GENIE:
@@ -1344,8 +1339,7 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
                 return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
             case 8:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-            case 9:
-                return runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
+            // Value 9 (WHISPERKIT_COREML) retired — falls through to UNKNOWN.
             case 10:
                 return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
             case 11:

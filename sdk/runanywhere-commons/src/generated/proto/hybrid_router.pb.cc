@@ -547,11 +547,11 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
     {
       PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      4, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967280,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
+      4,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -561,18 +561,21 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
       ::_pbi::TcParser::GetTable<::runanywhere::v1::HybridModelDescriptor>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // string provider = 4;
+      {::_pbi::TcParser::FastUS1,
+       {34, 1, 0,
+        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.provider_)}},
       // string model_id = 1;
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_id_)}},
       // .runanywhere.v1.HybridModelType model_type = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.model_type_), 1>(),
-       {16, 1, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.model_type_), 2>(),
+       {16, 2, 0,
         PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_)}},
       // .runanywhere.v1.HybridBackendKind backend = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.backend_), 2>(),
-       {24, 2, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.backend_), 3>(),
+       {24, 3, 0,
         PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_)}},
     }}, {{
       65535, 65535
@@ -580,15 +583,18 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
       // string model_id = 1;
       {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // .runanywhere.v1.HybridModelType model_type = 2;
-      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // .runanywhere.v1.HybridBackendKind backend = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string provider = 4;
+      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.provider_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\44\10\0\0\0\0\0\0"
+      "\44\10\0\0\10\0\0\0"
       "runanywhere.v1.HybridModelDescriptor"
       "model_id"
+      "provider"
     }},
   };
 }
@@ -599,6 +605,9 @@ inline constexpr HybridModelDescriptor::Impl_::Impl_(
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
         model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        provider_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         model_type_{static_cast< ::runanywhere::v1::HybridModelType >(0)},
@@ -2012,13 +2021,15 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_._has_bits_),
-        6, // hasbit index offset
+        7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_type_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.backend_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.provider_),
         0,
-        1,
         2,
+        3,
+        1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutedMetadata, _impl_._has_bits_),
         10, // hasbit index offset
@@ -2079,11 +2090,11 @@ static const ::_pbi::MigrationSchema
         {23, sizeof(::runanywhere::v1::ConfidenceCascade)},
         {28, sizeof(::runanywhere::v1::HybridRoutingPolicy)},
         {37, sizeof(::runanywhere::v1::HybridModelDescriptor)},
-        {46, sizeof(::runanywhere::v1::HybridRoutedMetadata)},
-        {63, sizeof(::runanywhere::v1::HybridRoutingContext)},
-        {64, sizeof(::runanywhere::v1::HybridSttTranscribeOptions)},
-        {73, sizeof(::runanywhere::v1::HybridSttTranscribeRequest)},
-        {82, sizeof(::runanywhere::v1::HybridSttTranscribeResponse)},
+        {48, sizeof(::runanywhere::v1::HybridRoutedMetadata)},
+        {65, sizeof(::runanywhere::v1::HybridRoutingContext)},
+        {66, sizeof(::runanywhere::v1::HybridSttTranscribeOptions)},
+        {75, sizeof(::runanywhere::v1::HybridSttTranscribeRequest)},
+        {84, sizeof(::runanywhere::v1::HybridSttTranscribeResponse)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2117,53 +2128,54 @@ const char descriptor_table_protodef_hybrid_5frouter_2eproto[] ABSL_ATTRIBUTE_SE
     "\003(\0132\034.runanywhere.v1.HybridFilter\022.\n\007cas"
     "cade\030\002 \001(\0132\035.runanywhere.v1.HybridCascad"
     "e\022(\n\004rank\030\003 \001(\0162\032.runanywhere.v1.HybridR"
-    "ank\"\222\001\n\025HybridModelDescriptor\022\020\n\010model_i"
+    "ank\"\244\001\n\025HybridModelDescriptor\022\020\n\010model_i"
     "d\030\001 \001(\t\0223\n\nmodel_type\030\002 \001(\0162\037.runanywher"
     "e.v1.HybridModelType\0222\n\007backend\030\003 \001(\0162!."
-    "runanywhere.v1.HybridBackendKind\"\307\001\n\024Hyb"
-    "ridRoutedMetadata\022\027\n\017chosen_model_id\030\001 \001"
-    "(\t\022\024\n\014was_fallback\030\002 \001(\010\022\025\n\rattempt_coun"
-    "t\030\003 \001(\005\022\032\n\022primary_error_code\030\004 \001(\005\022\035\n\025p"
-    "rimary_error_message\030\005 \001(\t\022\022\n\nconfidence"
-    "\030\006 \001(\002\022\032\n\022primary_confidence\030\007 \001(\002\"q\n\024Hy"
-    "bridRoutingContextJ\004\010\001\020\002J\004\010\002\020\003J\004\010\003\020\004J\004\010\004"
-    "\020\005R\tis_onlineR\022input_is_sensitiveR\017batte"
-    "ry_percentR\021thermal_throttled\"Y\n\032HybridS"
-    "ttTranscribeOptions\022\020\n\010language\030\001 \001(\t\022\023\n"
-    "\013sample_rate\030\002 \001(\005\022\024\n\014audio_format\030\003 \001(\005"
-    "\"\245\001\n\032HybridSttTranscribeRequest\022\023\n\013audio"
-    "_bytes\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$.runanywh"
-    "ere.v1.HybridRoutingContext\022;\n\007options\030\003"
-    " \001(\0132*.runanywhere.v1.HybridSttTranscrib"
-    "eOptions\"\234\001\n\033HybridSttTranscribeResponse"
-    "\022\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021detected_l"
-    "anguage\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132$.runanyw"
-    "here.v1.HybridRoutedMetadata\022\021\n\terror_ms"
-    "g\030\005 \001(\t*\274\001\n\020HybridCapability\022!\n\035HYBRID_C"
-    "APABILITY_UNSPECIFIED\020\000\022\031\n\025HYBRID_CAPABI"
-    "LITY_LLM\020\001\022\031\n\025HYBRID_CAPABILITY_VLM\020\002\022\031\n"
-    "\025HYBRID_CAPABILITY_STT\020\003\022\031\n\025HYBRID_CAPAB"
-    "ILITY_TTS\020\004\022\031\n\025HYBRID_CAPABILITY_VAD\020\005*\245"
-    "\001\n\021HybridBackendKind\022\036\n\032HYBRID_BACKEND_U"
-    "NSPECIFIED\020\000\022\033\n\027HYBRID_BACKEND_LLAMACPP\020"
-    "\001\022\035\n\031HYBRID_BACKEND_OPENROUTER\020\002\022\031\n\025HYBR"
-    "ID_BACKEND_SHERPA\020\003\022\031\n\025HYBRID_BACKEND_SA"
-    "RVAM\020\004*q\n\017HybridModelType\022!\n\035HYBRID_MODE"
-    "L_TYPE_UNSPECIFIED\020\000\022\035\n\031HYBRID_MODEL_TYP"
-    "E_OFFLINE\020\001\022\034\n\030HYBRID_MODEL_TYPE_ONLINE\020"
-    "\002*r\n\nHybridRank\022\033\n\027HYBRID_RANK_UNSPECIFI"
-    "ED\020\000\022\"\n\036HYBRID_RANK_PREFER_LOCAL_FIRST\020\001"
-    "\022#\n\037HYBRID_RANK_PREFER_ONLINE_FIRST\020\002B\214\001"
-    "\n\027ai.runanywhere.proto.v1B\021HybridRouterP"
-    "rotoP\001Z<github.com/runanywhere/runanywhe"
-    "re-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002"
-    "\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "runanywhere.v1.HybridBackendKind\022\020\n\010prov"
+    "ider\030\004 \001(\t\"\307\001\n\024HybridRoutedMetadata\022\027\n\017c"
+    "hosen_model_id\030\001 \001(\t\022\024\n\014was_fallback\030\002 \001"
+    "(\010\022\025\n\rattempt_count\030\003 \001(\005\022\032\n\022primary_err"
+    "or_code\030\004 \001(\005\022\035\n\025primary_error_message\030\005"
+    " \001(\t\022\022\n\nconfidence\030\006 \001(\002\022\032\n\022primary_conf"
+    "idence\030\007 \001(\002\"q\n\024HybridRoutingContextJ\004\010\001"
+    "\020\002J\004\010\002\020\003J\004\010\003\020\004J\004\010\004\020\005R\tis_onlineR\022input_i"
+    "s_sensitiveR\017battery_percentR\021thermal_th"
+    "rottled\"Y\n\032HybridSttTranscribeOptions\022\020\n"
+    "\010language\030\001 \001(\t\022\023\n\013sample_rate\030\002 \001(\005\022\024\n\014"
+    "audio_format\030\003 \001(\005\"\245\001\n\032HybridSttTranscri"
+    "beRequest\022\023\n\013audio_bytes\030\001 \001(\014\0225\n\007contex"
+    "t\030\002 \001(\0132$.runanywhere.v1.HybridRoutingCo"
+    "ntext\022;\n\007options\030\003 \001(\0132*.runanywhere.v1."
+    "HybridSttTranscribeOptions\"\234\001\n\033HybridStt"
+    "TranscribeResponse\022\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002"
+    " \001(\t\022\031\n\021detected_language\030\003 \001(\t\0225\n\007routi"
+    "ng\030\004 \001(\0132$.runanywhere.v1.HybridRoutedMe"
+    "tadata\022\021\n\terror_msg\030\005 \001(\t*\274\001\n\020HybridCapa"
+    "bility\022!\n\035HYBRID_CAPABILITY_UNSPECIFIED\020"
+    "\000\022\031\n\025HYBRID_CAPABILITY_LLM\020\001\022\031\n\025HYBRID_C"
+    "APABILITY_VLM\020\002\022\031\n\025HYBRID_CAPABILITY_STT"
+    "\020\003\022\031\n\025HYBRID_CAPABILITY_TTS\020\004\022\031\n\025HYBRID_"
+    "CAPABILITY_VAD\020\005*\244\001\n\021HybridBackendKind\022\036"
+    "\n\032HYBRID_BACKEND_UNSPECIFIED\020\000\022\033\n\027HYBRID"
+    "_BACKEND_LLAMACPP\020\001\022\035\n\031HYBRID_BACKEND_OP"
+    "ENROUTER\020\002\022\031\n\025HYBRID_BACKEND_SHERPA\020\003\022\030\n"
+    "\024HYBRID_BACKEND_CLOUD\020\004*q\n\017HybridModelTy"
+    "pe\022!\n\035HYBRID_MODEL_TYPE_UNSPECIFIED\020\000\022\035\n"
+    "\031HYBRID_MODEL_TYPE_OFFLINE\020\001\022\034\n\030HYBRID_M"
+    "ODEL_TYPE_ONLINE\020\002*r\n\nHybridRank\022\033\n\027HYBR"
+    "ID_RANK_UNSPECIFIED\020\000\022\"\n\036HYBRID_RANK_PRE"
+    "FER_LOCAL_FIRST\020\001\022#\n\037HYBRID_RANK_PREFER_"
+    "ONLINE_FIRST\020\002B\214\001\n\027ai.runanywhere.proto."
+    "v1B\021HybridRouterProtoP\001Z<github.com/runa"
+    "nywhere/runanywhere-sdks/idl/v1;runanywh"
+    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
+    "roto3"
 };
 static ::absl::once_flag descriptor_table_hybrid_5frouter_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5frouter_2eproto = {
     false,
     false,
-    2228,
+    2245,
     descriptor_table_protodef_hybrid_5frouter_2eproto,
     "hybrid_router.proto",
     &descriptor_table_hybrid_5frouter_2eproto_once,
@@ -3758,7 +3770,8 @@ PROTOBUF_NDEBUG_INLINE HybridModelDescriptor::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::HybridModelDescriptor& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        model_id_(arena, from.model_id_) {}
+        model_id_(arena, from.model_id_),
+        provider_(arena, from.provider_) {}
 
 HybridModelDescriptor::HybridModelDescriptor(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -3788,7 +3801,8 @@ PROTOBUF_NDEBUG_INLINE HybridModelDescriptor::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        model_id_(arena) {}
+        model_id_(arena),
+        provider_(arena) {}
 
 inline void HybridModelDescriptor::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -3811,6 +3825,7 @@ inline void HybridModelDescriptor::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
+  this_._impl_.provider_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -3848,10 +3863,15 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.model_id_.ClearNonDefaultToEmpty();
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.provider_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
     ::memset(&_impl_.model_type_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.backend_) -
         reinterpret_cast<char*>(&_impl_.model_type_)) + sizeof(_impl_.backend_));
@@ -3890,7 +3910,7 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
   }
 
   // .runanywhere.v1.HybridModelType model_type = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_model_type() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -3899,11 +3919,21 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
   }
 
   // .runanywhere.v1.HybridBackendKind backend = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_backend() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
           3, this_._internal_backend(), target);
+    }
+  }
+
+  // string provider = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_provider().empty()) {
+      const ::std::string& _s = this_._internal_provider();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.HybridModelDescriptor.provider");
+      target = stream->WriteStringMaybeAliased(4, _s, target);
     }
   }
 
@@ -3932,7 +3962,7 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     // string model_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_model_id().empty()) {
@@ -3940,15 +3970,22 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // .runanywhere.v1.HybridModelType model_type = 2;
+    // string provider = 4;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_provider().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_provider());
+      }
+    }
+    // .runanywhere.v1.HybridModelType model_type = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_model_type() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_model_type());
       }
     }
     // .runanywhere.v1.HybridBackendKind backend = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_backend() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_backend());
@@ -3972,7 +4009,7 @@ void HybridModelDescriptor::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
@@ -3983,11 +4020,20 @@ void HybridModelDescriptor::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_provider().empty()) {
+        _this->_internal_set_provider(from._internal_provider());
+      } else {
+        if (_this->_impl_.provider_.IsDefault()) {
+          _this->_internal_set_provider("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_model_type() != 0) {
         _this->_impl_.model_type_ = from._impl_.model_type_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_backend() != 0) {
         _this->_impl_.backend_ = from._impl_.backend_;
       }
@@ -4013,6 +4059,7 @@ void HybridModelDescriptor::InternalSwap(HybridModelDescriptor* PROTOBUF_RESTRIC
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.provider_, &other->_impl_.provider_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_)
       + sizeof(HybridModelDescriptor::_impl_.backend_)

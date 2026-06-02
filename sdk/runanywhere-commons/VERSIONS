@@ -188,12 +188,6 @@ SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 LLAMACPP_VERSION=b9222
 
 # =============================================================================
-# whisper.cpp (STT — opt-in fallback for Whisper-family models)
-# =============================================================================
-# Pinned tag for engines/whispercpp/CMakeLists.txt FetchContent.
-WHISPERCPP_VERSION=v1.8.4
-
-# =============================================================================
 # nlohmann/json
 # =============================================================================
 NLOHMANN_JSON_VERSION=3.12.0

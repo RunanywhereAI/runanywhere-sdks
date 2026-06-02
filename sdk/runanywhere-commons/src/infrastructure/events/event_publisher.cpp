@@ -222,9 +222,6 @@ runanywhere::v1::InferenceFramework framework_for_engine(const rac_engine_vtable
     if (name.find("llama") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
     }
-    if (name.find("whisperkit") != std::string::npos && name.find("coreml") != std::string::npos) {
-        return runanywhere::v1::INFERENCE_FRAMEWORK_WHISPERKIT_COREML;
-    }
     if (name.find("coreml") != std::string::npos)
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     if (name.find("metal") != std::string::npos)

@@ -49,14 +49,14 @@ set(GENIE_LINK_LIBS "")
 set(GENIE_COMPILE_DEFS RAC_GENIE_BUILDING)
 set(GENIE_INCLUDE_DIRS
     ${RAC_COMMONS_ROOT_DIR}/include
-    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends)
-set(GENIE_PLUGIN_RUNTIMES "")
-set(GENIE_PLUGIN_FORMATS "")
+    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/..)  # engines/ — for engines/common/rac_engine_unavailable.h
 
 # Optional SDK discovery: when the user provides RAC_GENIE_SDK_ROOT and it
 # contains the expected headers, define RAC_GENIE_SDK_AVAILABLE so the shell can
 # compile against Qualcomm's distribution. SDK discovery does not make Genie
-# routable; only real SDK-backed LLM ops may advertise runtime/format metadata.
+# routable; only real SDK-backed LLM ops route at run time (the C manifest in
+# rac_plugin_entry_genie.cpp is what the router reads).
 if(DEFINED RAC_GENIE_SDK_ROOT AND EXISTS "${RAC_GENIE_SDK_ROOT}/include/GenieCommon.h")
     message(STATUS "  Genie SDK discovered at: ${RAC_GENIE_SDK_ROOT}")
     set(RAC_GENIE_SDK_AVAILABLE 1)
@@ -88,11 +88,6 @@ endif()
 set(RAC_GENIE_LLM_OPS_AVAILABLE 0)
 list(APPEND GENIE_COMPILE_DEFS RAC_GENIE_LLM_OPS_AVAILABLE=0)
 
-if(RAC_GENIE_SDK_AVAILABLE AND RAC_GENIE_LLM_OPS_AVAILABLE)
-    set(GENIE_PLUGIN_RUNTIMES QNN CPU)
-    set(GENIE_PLUGIN_FORMATS ONNX)
-endif()
-
 rac_add_engine_plugin(genie
     TARGET_NAME         rac_backend_genie
     CXX_STANDARD        17
@@ -101,8 +96,6 @@ rac_add_engine_plugin(genie
     LINK_LIBRARIES      ${GENIE_LINK_LIBS}
     INCLUDE_DIRECTORIES ${GENIE_INCLUDE_DIRS}
     COMPILE_DEFINITIONS ${GENIE_COMPILE_DEFS}
-    RUNTIMES            ${GENIE_PLUGIN_RUNTIMES}
-    FORMATS             ${GENIE_PLUGIN_FORMATS}
 )
 
 if(RAC_STATIC_PLUGINS)

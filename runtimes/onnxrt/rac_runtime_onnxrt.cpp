@@ -7,8 +7,6 @@
 #endif
 
 #include <algorithm>
-#include <atomic>
-#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <new>
@@ -19,17 +17,14 @@
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_onnxrt_runtime_ep.h"
-#include "rac/plugin/rac_onnxrt_runtime_provider.h"
 #include "rac/plugin/rac_runtime_registry.h"
-#include "rac/runtime/rac_runtime_helpers.h"
-#include "rac/runtime/rac_runtime_provider_registry.h"
 
 namespace runanywhere {
 namespace runtime {
 namespace onnxrt {
 namespace {
 
-/* RT-ONNX-07: `SharedOrt` no longer carries a mutex. Initialization of the
+/* `SharedOrt` carries no mutex. Initialization of the
  * singleton is already thread-safe via C++11 magic statics (`shared_ort()`
  * below), and `OrtApi::CreateSession` is documented to be callable concurrently
  * from multiple threads against the same `OrtEnv` (each call gets its own
@@ -73,7 +68,7 @@ SharedOrt& shared_ort() {
 }
 
 /* --------------------------------------------------------------------------
- * RT-ONNX-04: Execution-provider (EP) state.
+ * Execution-provider (EP) state.
  *
  * A single "active EP" is tracked process-wide. The initial skeleton only
  * wires CoreML end-to-end (the vendored ORT build ships `coreml_provider_
@@ -291,7 +286,7 @@ size_t element_count(const std::vector<int64_t>& shape) {
     return count;
 }
 
-/* RT-ONNX-04: the device-class manifest is widened at compile time to reflect
+/* The device-class manifest is widened at compile time to reflect
  * which Execution Providers are linked into this build. CPU is always present;
  * CoreML / CUDA / DirectML / NNAPI / QNN / WebGPU add NPU, GPU, or WEB_GPU
  * capability. The router uses this array to decide whether onnxrt can be
@@ -299,7 +294,7 @@ size_t element_count(const std::vector<int64_t>& shape) {
  * everything the adapter can route to at runtime. Activation at runtime is
  * what actually selects one.
  *
- * pass3-syn-136: each device class is gated by a *union* of the EPs that map
+ * Each device class is gated by a *union* of the EPs that map
  * to it so the entry appears at most once. Earlier per-EP gates could emit
  * duplicate entries (e.g. GPU twice when CoreML + CUDA are both compiled in,
  * NPU twice on CoreML + NNAPI). De-duplicating here keeps the router's
@@ -326,15 +321,11 @@ const uint32_t k_supported_formats[] = {
     RAC_MODEL_FORMAT_ID_ONNX,
     RAC_MODEL_FORMAT_ID_ORT,
 };
-/* RT-ONNX-05: the onnxrt adapter ships with a generic ORT tensor runner —
- * `onnxrt_run_session` dispatches `OrtSession::Run` without primitive-aware
- * pre/post processing. The always-on wired consumer is the onnx embedding
- * provider (engines/onnx, manifest at rac_plugin_entry_onnx.cpp). Engines
- * that want primitive-aware handling (feature extraction, token decoding,
- * etc.) can register providers via `rac_onnxrt_runtime_register_provider`
- * (RT-ONNX-06) — `onnxrt_capabilities` then rebuilds the primitive list
- * dynamically from the static seed below plus the live provider set,
- * mirroring `cpu_capabilities`. */
+/* ONNXRT is capability-only: it advertises the primitives it can describe for
+ * the router, but hosts no session through the C vtable. The onnx engine
+ * reaches ONNX Runtime exclusively through the C++ `Session` class below (see
+ * engines/onnx/onnx_embedding_provider.cpp). EMBED is the primitive the live
+ * `Session` path serves. */
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_EMBED,
 };
@@ -389,7 +380,7 @@ OrtSessionOptions* prepare_session_options(const SharedOrt& ort, const SessionOp
         }
     }
 
-    /* RT-ONNX-04: append the currently-active execution provider, if any.
+    /* Append the currently-active execution provider, if any.
      * `apply_active_ep` is advisory -- CoreML is the only real wiring today;
      * CUDA / DirectML / NNAPI / QNN / WebGPU accept activation but degrade
      * gracefully to CPU-only execution until their linker paths land. */
@@ -412,7 +403,7 @@ std::unique_ptr<Session> Session::create(const std::string& model_path,
     if (!session_options)
         return nullptr;
 
-    /* RT-ONNX-07: `CreateSession` is called without any global lock. ORT's
+    /* `CreateSession` is called without any global lock. ORT's
      * contract is that `CreateSession` may run concurrently from multiple
      * threads against a single `OrtEnv` as long as each call supplies a
      * distinct `OrtSessionOptions` + `OrtSession**`, which is the case here
@@ -554,7 +545,7 @@ rac_result_t Session::run(const TensorInput* inputs, size_t input_count,
         return RAC_ERROR_INFERENCE_FAILED;
     }
 
-    /* runtimes-001: every partial-failure path through the per-output marshal
+    /* Every partial-failure path through the per-output marshal
      * loop previously released only the OrtValue at the current index, leaking
      * the remaining N-i-1 ORT-owned outputs (each holds a heap tensor buffer
      * sized to the model's output). Drive all releases through one helper that
@@ -575,7 +566,7 @@ rac_result_t Session::run(const TensorInput* inputs, size_t input_count,
         OrtValue* value = output_values[i];
         TensorOutput out;
 
-        /* RT-ONNX-02: consult the actual ORT tensor dtype and element count
+        /* Consult the actual ORT tensor dtype and element count
          * rather than force-casting to `float*`. We read shape, dtype, and
          * element count via GetTensorTypeAndShapeInfo (the ORT-recommended
          * single-call path) so the copy is `element_size × count` bytes of the
@@ -676,43 +667,7 @@ using runanywhere::runtime::onnxrt::k_supported_devices;
 using runanywhere::runtime::onnxrt::k_supported_formats;
 using runanywhere::runtime::onnxrt::k_supported_primitives;
 
-/* RT-ONNX-06: session handle now supports two shapes. Sessions created by the
- * built-in generic tensor runner own a `runanywhere::runtime::onnxrt::Session`
- * directly. Sessions created via a registered provider carry a provider-owned
- * session handle plus a copy of the provider vtable so dispatch / destroy can
- * round-trip without re-consulting the provider registry. Exactly one of the
- * two shapes is populated per session. */
-struct rac_runtime_session {
-    std::unique_ptr<runanywhere::runtime::onnxrt::Session> session;
-
-    /* Provider path — NULL when this session was created by the generic path. */
-    rac_onnxrt_runtime_provider_t provider{};
-    rac_runtime_session_t* provider_session = nullptr;
-    bool is_provider_session = false;
-};
-
-struct rac_runtime_buffer {
-    void* data = nullptr;
-    size_t bytes = 0;
-};
-
 namespace {
-
-/* --------------------------------------------------------------------------
- * Provider registry (RT-ONNX-06). Mirrors the CPU provider surface so engines
- * can plug in per-primitive handlers (embedding, STT, TTS, VAD) rather than
- * rediscovering the onnxrt singleton. Keyed by provider `name`; lookup matches
- * on `(primitive, model_format)`.
- *
- * RT-CPU-03: mutex / vector / register / lookup bookkeeping lives in the
- * shared `rac::runtime::ProviderRegistry<>` template. This TU only owns the
- * typed registry singleton.
- * -------------------------------------------------------------------------- */
-
-rac::runtime::ProviderRegistry<rac_onnxrt_runtime_provider_t>& onnxrt_provider_registry() {
-    static rac::runtime::ProviderRegistry<rac_onnxrt_runtime_provider_t> registry;
-    return registry;
-}
 
 rac_result_t onnxrt_init(void) {
     const OrtApiBase* base = OrtGetApiBase();
@@ -722,554 +677,7 @@ rac_result_t onnxrt_init(void) {
 
 void onnxrt_destroy(void) {}
 
-/* commons-094: the vtable ops below are reached from `extern "C"` dispatch (the
- * proto/runtime registry and the JNI thunks). They build `std::vector` /
- * `std::string` and call into `Session::run` / `Session::create`, any of which
- * can throw `std::bad_alloc` on the inference hot path. Letting a C++ exception
- * cross the C ABI is undefined behavior (it aborts the whole process). Run each
- * op through this guard so allocation failure becomes RAC_ERROR_OUT_OF_MEMORY
- * and any other exception becomes RAC_ERROR_INTERNAL. */
-template <typename Fn>
-rac_result_t onnxrt_guard(Fn&& fn) {
-    try {
-        return fn();
-    } catch (const std::bad_alloc&) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    } catch (...) {
-        return RAC_ERROR_INTERNAL;
-    }
-}
-
-rac_result_t onnxrt_create_session_impl(const rac_runtime_session_desc_t* desc,
-                                        rac_runtime_session_t** out) {
-    if (!desc || !out)
-        return RAC_ERROR_NULL_POINTER;
-    /* runtimes-004: rac_runtime_session_desc_t allows either a model_path on
-     * disk OR an in-memory model_blob (vtable header line 308-312). Reject only
-     * the truly-empty case where neither input is provided. The path vs. blob
-     * branch is selected below; provider sessions take desc as-is and may use
-     * either field. */
-    const bool has_path = desc->model_path && desc->model_path[0] != '\0';
-    const bool has_blob = desc->model_blob != nullptr && desc->model_blob_bytes > 0;
-    if (!has_path && !has_blob)
-        return RAC_ERROR_INVALID_PARAMETER;
-    *out = nullptr;
-
-    /* RT-ONNX-06: if a provider is registered for this primitive + format,
-     * delegate session construction to it. Providers own their native session
-     * state (e.g. tokenizer + ORT session pair for embeddings) and return a
-     * handle we wrap in a provider-flavored `rac_runtime_session`. Generic
-     * "bare tensor runner" callers fall through to the default path below. */
-    rac_onnxrt_runtime_provider_t provider{};
-    if (onnxrt_provider_registry().find_by_desc(desc, &provider) &&
-        provider.create_session != nullptr) {
-        rac_runtime_session_t* provider_session = nullptr;
-        rac_result_t rc = provider.create_session(desc, &provider_session);
-        if (rc != RAC_SUCCESS)
-            return rc;
-        if (provider_session == nullptr)
-            return RAC_ERROR_INVALID_HANDLE;
-
-        auto* handle = new (std::nothrow) rac_runtime_session();
-        if (!handle) {
-            if (provider.destroy_session != nullptr) {
-                provider.destroy_session(provider_session);
-            }
-            return RAC_ERROR_OUT_OF_MEMORY;
-        }
-        handle->provider = provider;
-        handle->provider_session = provider_session;
-        handle->is_provider_session = true;
-        *out = handle;
-        return RAC_SUCCESS;
-    }
-
-    std::string error;
-    runanywhere::runtime::onnxrt::SessionOptions options{};
-    std::unique_ptr<runanywhere::runtime::onnxrt::Session> session;
-    if (has_path) {
-        session = runanywhere::runtime::onnxrt::Session::create(desc->model_path, options, &error);
-    } else {
-        /* runtimes-004: in-memory blob path. ORT's CreateSessionFromArray
-         * (via Session::create_from_blob) is the canonical no-disk-read route. */
-        session = runanywhere::runtime::onnxrt::Session::create_from_blob(
-            desc->model_blob, desc->model_blob_bytes, options, &error);
-    }
-    if (!session) {
-        RAC_LOG_ERROR("Runtime.ONNXRT", "create_session failed: %s", error.c_str());
-        return RAC_ERROR_MODEL_LOAD_FAILED;
-    }
-    auto* handle = new (std::nothrow) rac_runtime_session();
-    if (!handle)
-        return RAC_ERROR_OUT_OF_MEMORY;
-    handle->session = std::move(session);
-    *out = handle;
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_create_session(const rac_runtime_session_desc_t* desc,
-                                   rac_runtime_session_t** out) {
-    return onnxrt_guard([&] { return onnxrt_create_session_impl(desc, out); });
-}
-
-rac_result_t onnxrt_run_session_impl(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
-                                     size_t input_count, rac_runtime_io_t* outputs,
-                                     size_t output_count) {
-    if (!session || !inputs || !outputs)
-        return RAC_ERROR_NULL_POINTER;
-
-    /* RT-ONNX-06: route through the registered provider when this session was
-     * created by one. Generic-path sessions fall through to the inline tensor
-     * runner below. */
-    if (session->is_provider_session) {
-        if (session->provider.run_session == nullptr)
-            return RAC_ERROR_NOT_IMPLEMENTED;
-        return session->provider.run_session(session->provider_session, inputs, input_count,
-                                             outputs, output_count);
-    }
-
-    std::vector<runanywhere::runtime::onnxrt::TensorInput> runtime_inputs;
-    std::vector<const char*> output_names;
-    runtime_inputs.reserve(input_count);
-    output_names.reserve(output_count);
-    for (size_t i = 0; i < input_count; ++i) {
-        runtime_inputs.push_back({
-            inputs[i].name,
-            inputs[i].data,
-            inputs[i].data_bytes,
-            inputs[i].shape,
-            inputs[i].rank,
-            static_cast<runanywhere::runtime::onnxrt::ElementType>(inputs[i].dtype),
-        });
-    }
-    for (size_t i = 0; i < output_count; ++i) {
-        if (!outputs[i].name)
-            return RAC_ERROR_NULL_POINTER;
-        output_names.push_back(outputs[i].name);
-    }
-
-    std::vector<runanywhere::runtime::onnxrt::TensorOutput> runtime_outputs;
-    std::string error;
-    rac_result_t rc =
-        session->session->run(runtime_inputs.data(), runtime_inputs.size(), output_names.data(),
-                              output_names.size(), runtime_outputs, &error);
-    if (rc != RAC_SUCCESS) {
-        RAC_LOG_ERROR("Runtime.ONNXRT", "run_session failed: %s", error.c_str());
-        return rc;
-    }
-    /* First pass: detect any capacity shortfall and publish the required byte
-     * count on every affected output so the caller can reallocate and retry.
-     * We report truncation without copying any partial data, so the caller can
-     * cleanly distinguish "legitimate zero-byte output" from "buffer too small,
-     * output dropped" (RT-ONNX-03). RT-ONNX-02: `bytes` is now the real
-     * element-size × count payload from the tensor's actual dtype, not a
-     * `sizeof(float)` multiple. */
-    bool truncated = false;
-    for (size_t i = 0; i < output_count && i < runtime_outputs.size(); ++i) {
-        const size_t required = runtime_outputs[i].bytes.size();
-        if (outputs[i].data != nullptr && outputs[i].data_bytes < required) {
-            outputs[i].data_bytes = required;
-            truncated = true;
-        }
-    }
-    if (truncated) {
-        return RAC_ERROR_OUTPUT_TRUNCATED;
-    }
-    /* Second pass: all outputs fit — commit the copies and record actual sizes
-     * plus the observed dtype so the caller can interpret the bytes correctly. */
-    for (size_t i = 0; i < output_count && i < runtime_outputs.size(); ++i) {
-        const size_t bytes = runtime_outputs[i].bytes.size();
-        if (outputs[i].data != nullptr) {
-            if (bytes > 0) {
-                std::memcpy(outputs[i].data, runtime_outputs[i].bytes.data(), bytes);
-            }
-            outputs[i].data_bytes = bytes;
-        }
-        outputs[i].dtype = static_cast<uint32_t>(runtime_outputs[i].dtype);
-    }
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_run_session(rac_runtime_session_t* session, const rac_runtime_io_t* inputs,
-                                size_t input_count, rac_runtime_io_t* outputs,
-                                size_t output_count) {
-    return onnxrt_guard([&] {
-        return onnxrt_run_session_impl(session, inputs, input_count, outputs, output_count);
-    });
-}
-
-void onnxrt_destroy_session(rac_runtime_session_t* session) {
-    if (!session)
-        return;
-    /* RT-ONNX-06: forward destroy to the provider for provider-owned sessions.
-     * Generic-path sessions carry a `Session` unique_ptr that cleans up via
-     * the defaulted struct destructor. */
-    if (session->is_provider_session) {
-        if (session->provider.destroy_session != nullptr && session->provider_session != nullptr) {
-            session->provider.destroy_session(session->provider_session);
-        }
-    }
-    delete session;
-}
-
-void onnxrt_free_buffer(rac_runtime_buffer_t* buffer) {
-    if (!buffer)
-        return;
-    std::free(buffer->data);
-    delete buffer;
-}
-
-/* RT-ONNX-01: V2-native `run_session_v2` path. Shares the same `Session::run`
- * tensor execution as V1 but honors V2 buffer-ownership + capacity semantics
- * on the output side:
- *   - Inputs borrow from the caller. If a `buffer` handle is supplied the
- *     runtime reads through it; otherwise `data` + `data_bytes` are used
- *     directly. Dtype mapping reuses `to_ort_type` via `ElementType`.
- *   - Outputs: if the caller pre-allocated `data` with a non-zero
- *     `data_capacity_bytes`, the output is copied in-place and ownership is
- *     left at `NONE`. If the capacity is smaller than the actual tensor bytes,
- *     every affected output's `data_bytes` is set to the required size and
- *     `RAC_ERROR_OUTPUT_TRUNCATED` is returned (no partial copies). If the
- *     caller did not supply a buffer (`data == NULL` and `data_capacity_bytes
- *     == 0`), the runtime allocates a new data block via `malloc` and marks
- *     `data_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME` so the caller can free
- *     it through `release_tensor`. Shape is handled the same way, using
- *     `shape_capacity` for caller-supplied storage. Dtype + rank are written
- *     back unconditionally. */
-rac_result_t onnxrt_run_session_v2_impl(rac_runtime_session_t* session,
-                                        const rac_runtime_tensor_t* inputs, size_t n_in,
-                                        rac_runtime_tensor_t* outputs, size_t n_out) {
-    if (!session)
-        return RAC_ERROR_INVALID_HANDLE;
-    if (n_in > 0 && !inputs)
-        return RAC_ERROR_NULL_POINTER;
-    if (n_out > 0 && !outputs)
-        return RAC_ERROR_NULL_POINTER;
-
-    /* RT-ONNX-06: provider-owned sessions forward V2 directly when the
-     * provider implements `run_session_v2`; otherwise fall back to a V1 shim
-     * that flattens V2 tensors into `rac_runtime_io_t`, runs the provider's
-     * legacy `run_session`, then copies dtype / shape / byte count back.
-     *
-     * pass3-syn-137: previously this path returned NOT_IMPLEMENTED, which made
-     * the onnxrt runtime asymmetric to the CPU runtime (`cpu_run_session_v2`
-     * already shims V2 → V1 for providers that only implement legacy
-     * `run_session`). V2 is the canonical surface and a V1-only provider
-     * should remain reachable through it. Ownership and capacity fields cannot
-     * round-trip through this path; V2-only features (runtime-owned outputs,
-     * caller-supplied capacity reporting) remain unreachable here — providers
-     * that need them must implement `run_session_v2`. */
-    if (session->is_provider_session) {
-        if (session->provider.run_session_v2 != nullptr) {
-            return session->provider.run_session_v2(session->provider_session, inputs, n_in,
-                                                    outputs, n_out);
-        }
-        if (session->provider.run_session == nullptr) {
-            return RAC_ERROR_NOT_IMPLEMENTED;
-        }
-
-        std::vector<rac_runtime_io_t> legacy_inputs(n_in);
-        std::vector<rac_runtime_io_t> legacy_outputs(n_out);
-
-        for (size_t i = 0; i < n_in; ++i) {
-            const void* data = inputs[i].data;
-            size_t data_bytes = inputs[i].data_bytes;
-            if (inputs[i].buffer != nullptr) {
-                data = inputs[i].buffer->data;
-                data_bytes = inputs[i].buffer->bytes;
-            }
-            legacy_inputs[i].name = inputs[i].name;
-            legacy_inputs[i].data = const_cast<void*>(data);
-            legacy_inputs[i].data_bytes = data_bytes;
-            legacy_inputs[i].dtype = static_cast<uint32_t>(inputs[i].dtype);
-            legacy_inputs[i].shape = inputs[i].shape;
-            legacy_inputs[i].rank = inputs[i].rank;
-        }
-
-        for (size_t i = 0; i < n_out; ++i) {
-            void* data = outputs[i].data;
-            size_t data_bytes = outputs[i].data_capacity_bytes != 0 ? outputs[i].data_capacity_bytes
-                                                                    : outputs[i].data_bytes;
-            if (outputs[i].buffer != nullptr) {
-                data = outputs[i].buffer->data;
-                data_bytes = outputs[i].buffer->bytes;
-            }
-            legacy_outputs[i].name = outputs[i].name;
-            legacy_outputs[i].data = data;
-            legacy_outputs[i].data_bytes = data_bytes;
-            legacy_outputs[i].dtype = static_cast<uint32_t>(outputs[i].dtype);
-            legacy_outputs[i].shape = outputs[i].shape;
-            legacy_outputs[i].rank = outputs[i].rank;
-        }
-
-        rac_result_t rc = session->provider.run_session(
-            session->provider_session, legacy_inputs.data(), legacy_inputs.size(),
-            legacy_outputs.data(), legacy_outputs.size());
-        if (rc != RAC_SUCCESS)
-            return rc;
-
-        for (size_t i = 0; i < n_out; ++i) {
-            outputs[i].data_bytes = legacy_outputs[i].data_bytes;
-            outputs[i].dtype = static_cast<rac_runtime_dtype_t>(legacy_outputs[i].dtype);
-            outputs[i].rank = legacy_outputs[i].rank;
-        }
-        return RAC_SUCCESS;
-    }
-
-    using runanywhere::runtime::onnxrt::ElementType;
-    using runanywhere::runtime::onnxrt::TensorInput;
-    using runanywhere::runtime::onnxrt::TensorOutput;
-
-    /* Marshal V2 inputs into the internal `TensorInput` used by `Session::run`.
-     * If a caller supplies a runtime buffer, resolve its host pointer + byte
-     * count; otherwise use the raw `data`/`data_bytes` fields. */
-    std::vector<TensorInput> runtime_inputs;
-    std::vector<const char*> output_names;
-    runtime_inputs.reserve(n_in);
-    output_names.reserve(n_out);
-
-    for (size_t i = 0; i < n_in; ++i) {
-        const void* data = inputs[i].data;
-        size_t data_bytes = inputs[i].data_bytes;
-        if (inputs[i].buffer != nullptr) {
-            data = inputs[i].buffer->data;
-            data_bytes = inputs[i].buffer->bytes;
-        }
-        if (!inputs[i].name || !data || !inputs[i].shape || inputs[i].rank == 0) {
-            return RAC_ERROR_NULL_POINTER;
-        }
-        runtime_inputs.push_back({
-            inputs[i].name,
-            data,
-            data_bytes,
-            inputs[i].shape,
-            inputs[i].rank,
-            static_cast<ElementType>(inputs[i].dtype),
-        });
-    }
-
-    for (size_t i = 0; i < n_out; ++i) {
-        if (!outputs[i].name)
-            return RAC_ERROR_NULL_POINTER;
-        output_names.push_back(outputs[i].name);
-    }
-
-    std::vector<TensorOutput> runtime_outputs;
-    std::string error;
-    rac_result_t rc =
-        session->session->run(runtime_inputs.data(), runtime_inputs.size(), output_names.data(),
-                              output_names.size(), runtime_outputs, &error);
-    if (rc != RAC_SUCCESS) {
-        RAC_LOG_ERROR("Runtime.ONNXRT", "run_session_v2 failed: %s", error.c_str());
-        return rc;
-    }
-
-    /* First pass: detect capacity shortfalls without copying so the caller can
-     * cleanly reallocate and retry. Mirrors the V1 semantics in
-     * `onnxrt_run_session` — we publish the required byte count on each
-     * truncated output and also flag shape-capacity shortfalls. */
-    bool truncated = false;
-    for (size_t i = 0; i < n_out && i < runtime_outputs.size(); ++i) {
-        const size_t required_bytes = runtime_outputs[i].bytes.size();
-        const size_t required_rank = runtime_outputs[i].shape.size();
-        /* Data capacity check — only applies when the caller supplied storage. */
-        if (outputs[i].data != nullptr && outputs[i].data_capacity_bytes > 0 &&
-            outputs[i].data_capacity_bytes < required_bytes) {
-            outputs[i].data_bytes = required_bytes;
-            truncated = true;
-        }
-        /* Shape capacity check — only applies when the caller supplied storage. */
-        if (outputs[i].shape != nullptr && outputs[i].shape_capacity > 0 &&
-            outputs[i].shape_capacity < required_rank) {
-            outputs[i].rank = required_rank;
-            truncated = true;
-        }
-    }
-    if (truncated) {
-        return RAC_ERROR_OUTPUT_TRUNCATED;
-    }
-
-    /* Second pass: commit outputs. If the caller supplied backing storage,
-     * copy in place and keep `*_ownership == NONE`. Otherwise allocate
-     * runtime-owned storage and mark ownership as RUNTIME so the caller can
-     * release through `onnxrt_release_tensor`.
-     *
-     * On any malloc failure mid-loop we must walk back over outputs[0..i] and
-     * free every RAC_RUNTIME_OWNERSHIP_RUNTIME data/shape block we already
-     * committed. Otherwise the caller — who receives a non-success return —
-     * has no documented obligation (and no clean way) to iterate the partial
-     * output array and reclaim the leaked storage. */
-    auto release_committed = [&](size_t last_committed) {
-        for (size_t k = 0; k <= last_committed && k < n_out; ++k) {
-            if (outputs[k].data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-                outputs[k].data != nullptr) {
-                std::free(outputs[k].data);
-                outputs[k].data = nullptr;
-                outputs[k].data_bytes = 0;
-                outputs[k].data_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
-            }
-            if (outputs[k].shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
-                outputs[k].shape != nullptr) {
-                std::free(outputs[k].shape);
-                outputs[k].shape = nullptr;
-                outputs[k].rank = 0;
-                outputs[k].shape_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
-            }
-        }
-    };
-
-    for (size_t i = 0; i < n_out && i < runtime_outputs.size(); ++i) {
-        const auto& src = runtime_outputs[i];
-        const size_t bytes = src.bytes.size();
-        const size_t rank = src.shape.size();
-
-        /* Data. */
-        if (outputs[i].data != nullptr && outputs[i].data_capacity_bytes > 0) {
-            /* Caller-supplied storage; copy in place. */
-            if (bytes > 0) {
-                std::memcpy(outputs[i].data, src.bytes.data(), bytes);
-            }
-            outputs[i].data_bytes = bytes;
-            /* Leave data_ownership untouched — caller owns their own buffer. */
-        } else if (bytes > 0) {
-            /* No caller storage → allocate runtime-owned data. */
-            void* owned = std::malloc(bytes);
-            if (!owned) {
-                /* Roll back any RUNTIME-owned data/shape we committed on
-                 * outputs[0..i-1] before bailing out. The current output i has not
-                 * been stamped yet so it carries no ownership flag of its own. */
-                if (i > 0) {
-                    release_committed(i - 1);
-                }
-                return RAC_ERROR_OUT_OF_MEMORY;
-            }
-            std::memcpy(owned, src.bytes.data(), bytes);
-            outputs[i].data = owned;
-            outputs[i].data_bytes = bytes;
-            outputs[i].data_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
-        } else {
-            outputs[i].data = nullptr;
-            outputs[i].data_bytes = 0;
-        }
-
-        /* Shape. */
-        if (outputs[i].shape != nullptr && outputs[i].shape_capacity > 0) {
-            if (rank > 0) {
-                std::memcpy(outputs[i].shape, src.shape.data(), rank * sizeof(int64_t));
-            }
-            outputs[i].rank = rank;
-        } else if (rank > 0) {
-            auto* owned_shape = static_cast<int64_t*>(std::malloc(rank * sizeof(int64_t)));
-            if (!owned_shape) {
-                /* Roll back data allocation on this output if we just made one,
-                 * plus every RUNTIME-owned entry on outputs[0..i-1], so the caller
-                 * doesn't leak on the error path. */
-                release_committed(i);
-                return RAC_ERROR_OUT_OF_MEMORY;
-            }
-            std::memcpy(owned_shape, src.shape.data(), rank * sizeof(int64_t));
-            outputs[i].shape = owned_shape;
-            outputs[i].rank = rank;
-            outputs[i].shape_ownership = RAC_RUNTIME_OWNERSHIP_RUNTIME;
-        } else {
-            outputs[i].rank = 0;
-        }
-
-        /* Dtype + memory space are always reported from the runtime. */
-        outputs[i].dtype = static_cast<rac_runtime_dtype_t>(src.dtype);
-        outputs[i].memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
-    }
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_run_session_v2(rac_runtime_session_t* session,
-                                   const rac_runtime_tensor_t* inputs, size_t n_in,
-                                   rac_runtime_tensor_t* outputs, size_t n_out) {
-    return onnxrt_guard(
-        [&] { return onnxrt_run_session_v2_impl(session, inputs, n_in, outputs, n_out); });
-}
-
-rac_result_t onnxrt_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
-                                    rac_runtime_buffer_t** out) {
-    if (!desc || !out)
-        return RAC_ERROR_NULL_POINTER;
-    *out = nullptr;
-    if (desc->device_class != RAC_DEVICE_CLASS_UNSPECIFIED &&
-        desc->device_class != RAC_DEVICE_CLASS_CPU) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-    if (desc->memory_space != RAC_RUNTIME_MEMORY_SPACE_UNSPECIFIED &&
-        desc->memory_space != RAC_RUNTIME_MEMORY_SPACE_HOST) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-    if (desc->alignment > static_cast<uint32_t>(alignof(std::max_align_t))) {
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-    auto* buffer = new (std::nothrow) rac_runtime_buffer();
-    if (!buffer)
-        return RAC_ERROR_OUT_OF_MEMORY;
-    buffer->data = std::malloc(desc->bytes);
-    if (!buffer->data) {
-        delete buffer;
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    buffer->bytes = desc->bytes;
-    *out = buffer;
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_buffer_info(rac_runtime_buffer_t* buffer, rac_runtime_buffer_info_t* out) {
-    if (!buffer || !out)
-        return RAC_ERROR_NULL_POINTER;
-    *out = rac_runtime_buffer_info_t{};
-    out->bytes = buffer->bytes;
-    out->memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
-    out->device_class = RAC_DEVICE_CLASS_CPU;
-    out->alignment = static_cast<uint32_t>(alignof(std::max_align_t));
-    out->device_id = "onnxrt-cpu";
-    out->native_handle = buffer->data;
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_map_buffer(rac_runtime_buffer_t* buffer, size_t offset, size_t bytes,
-                               uint32_t map_flags, rac_runtime_buffer_mapping_t* out) {
-    if (!buffer || !out)
-        return RAC_ERROR_NULL_POINTER;
-    if (offset > buffer->bytes)
-        return RAC_ERROR_INVALID_PARAMETER;
-    const size_t available = buffer->bytes - offset;
-    const size_t mapped_bytes = bytes == 0 ? available : bytes;
-    if (mapped_bytes > available)
-        return RAC_ERROR_INVALID_PARAMETER;
-    *out = rac_runtime_buffer_mapping_t{};
-    out->data = static_cast<unsigned char*>(buffer->data) + offset;
-    out->bytes = mapped_bytes;
-    out->memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
-    out->map_flags = map_flags;
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_unmap_buffer(rac_runtime_buffer_t* buffer,
-                                 rac_runtime_buffer_mapping_t* mapping) {
-    if (!buffer || !mapping)
-        return RAC_ERROR_NULL_POINTER;
-    *mapping = rac_runtime_buffer_mapping_t{};
-    return RAC_SUCCESS;
-}
-
-rac_result_t onnxrt_copy_buffer(rac_runtime_buffer_t* dst, size_t dst_offset,
-                                const rac_runtime_buffer_t* src, size_t src_offset, size_t bytes) {
-    if (!dst || !src)
-        return RAC_ERROR_NULL_POINTER;
-    return rac::runtime::rac_runtime_copy_buffer(dst->data, dst->bytes, dst_offset, src->data,
-                                                 src->bytes, src_offset, bytes);
-}
-
-void onnxrt_release_tensor(rac_runtime_tensor_t* tensor) {
-    rac::runtime::rac_runtime_release_tensor(tensor, onnxrt_free_buffer);
-}
-
-/* RT-ONNX-04: stable per-EP `device_id` strings backed by static storage so
+/* Stable per-EP `device_id` strings backed by static storage so
  * callers can safely hold the pointer across calls. We return pointers to
  * these rather than building a heap string per `onnxrt_device_info` call. */
 constexpr const char* k_onnxrt_device_id_cpu = "onnxrt-cpu";
@@ -1304,7 +712,7 @@ rac_result_t onnxrt_device_info(rac_runtime_device_info_t* out) {
     if (!out)
         return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_device_info_t{};
-    /* RT-ONNX-04: the active EP determines both the class and the id so the
+    /* The active EP determines both the class and the id so the
      * router can pick onnxrt for NPU/GPU-class primitives when an appropriate
      * EP has been activated. Falls back to CPU when no EP is active. */
     rac_onnxrt_ep_type_t active =
@@ -1315,73 +723,28 @@ rac_result_t onnxrt_device_info(rac_runtime_device_info_t* out) {
     return RAC_SUCCESS;
 }
 
-/* Snapshot storage for the dynamic primitive list published by
- * `onnxrt_capabilities`. Thread-local so concurrent callers from different
- * threads each get a stable snapshot whose lifetime extends until the next
- * `onnxrt_capabilities` call on the same thread. Fixed-size array sized to
- * the full primitive enum — no allocation on the capability hot path. */
-thread_local rac_primitive_t tl_onnxrt_primitive_snapshot[RAC_PRIMITIVE_COUNT];
-thread_local size_t tl_onnxrt_primitive_snapshot_count = 0;
-
 rac_result_t onnxrt_capabilities(rac_runtime_capabilities_t* out) {
     if (!out)
         return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
-    out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES |
-                            RAC_RUNTIME_CAP_BUFFER_MAPPING | RAC_RUNTIME_CAP_BUFFER_COPY |
-                            RAC_RUNTIME_CAP_DEVICE_ALLOC | RAC_RUNTIME_CAP_OWNED_OUTPUTS;
+    /* ONNXRT is capability-only over the C vtable: it describes the model
+     * formats/dtypes ONNX Runtime supports but hosts no session here (no
+     * buffer/output ownership through the runtime), so it does NOT set the
+     * buffer/owned-output flags or `RAC_RUNTIME_CAP_SESSION_EXECUTION`. FP16 and
+     * dynamic shapes reflect what the underlying ORT engine genuinely handles. */
+    out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
-
-    /* RT-ONNX-06: rebuild the primitive list from the static "generic tensor
-     * runner" surface (`k_supported_primitives`, currently just EMBED) plus
-     * whichever primitives have at least one registered provider. Order is
-     * stable (primitive enum value ascending) so callers that cache the list
-     * see consistent results across calls. Mirrors `cpu_capabilities`. */
-    bool seen[RAC_PRIMITIVE_COUNT] = {false};
-    for (rac_primitive_t p : k_supported_primitives) {
-        if (rac::runtime::rac_runtime_primitive_in_range(p)) {
-            seen[static_cast<size_t>(p)] = true;
-        }
-    }
-    onnxrt_provider_registry().for_each([&](const rac_onnxrt_runtime_provider_t& provider) {
-        if (rac::runtime::rac_runtime_primitive_in_range(provider.primitive)) {
-            seen[static_cast<size_t>(provider.primitive)] = true;
-        }
-    });
-
-    size_t count = 0;
-    for (size_t i = 1; i < RAC_PRIMITIVE_COUNT; ++i) {
-        if (seen[i]) {
-            tl_onnxrt_primitive_snapshot[count++] = static_cast<rac_primitive_t>(i);
-        }
-    }
-    tl_onnxrt_primitive_snapshot_count = count;
-    out->supported_primitives = count > 0 ? tl_onnxrt_primitive_snapshot : nullptr;
-    out->supported_primitives_count = count;
+    out->supported_primitives = k_supported_primitives;
+    out->supported_primitives_count =
+        sizeof(k_supported_primitives) / sizeof(k_supported_primitives[0]);
     return RAC_SUCCESS;
 }
 
-const rac_runtime_vtable_v2_t k_onnxrt_vtable_v2 = {
-    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
-    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
-    /* .run_session_v2 = */ onnxrt_run_session_v2,
-    /* .alloc_buffer   = */ onnxrt_alloc_buffer_v2,
-    /* .buffer_info    = */ onnxrt_buffer_info,
-    /* .map_buffer     = */ onnxrt_map_buffer,
-    /* .unmap_buffer   = */ onnxrt_unmap_buffer,
-    /* .copy_buffer    = */ onnxrt_copy_buffer,
-    /* .release_tensor = */ onnxrt_release_tensor,
-    /* .reserved_0     = */ nullptr,
-    /* .reserved_1     = */ nullptr,
-    /* .reserved_2     = */ nullptr,
-    /* .reserved_3     = */ nullptr,
-    /* .reserved_4     = */ nullptr,
-    /* .reserved_5     = */ nullptr,
-    /* .reserved_6     = */ nullptr,
-    /* .reserved_7     = */ nullptr,
-};
-
+/* ONNXRT exposes no ABI-v2 session/buffer ops: the v2 run + buffer block is
+ * part of the session-execution role, which ONNXRT does not provide over the C
+ * vtable (the onnx engine drives ONNX Runtime through the C++ `Session` class).
+ * `reserved_slot_0` is therefore left NULL — there is no v2 extension table. */
 const rac_runtime_vtable_t k_onnxrt_vtable = {
     /* .metadata = */ {
         /* .abi_version             = */ RAC_RUNTIME_ABI_VERSION,
@@ -1401,14 +764,17 @@ const rac_runtime_vtable_t k_onnxrt_vtable = {
     },
     /* .init            = */ onnxrt_init,
     /* .destroy         = */ onnxrt_destroy,
-    /* .create_session  = */ onnxrt_create_session,
-    /* .run_session     = */ onnxrt_run_session,
-    /* .destroy_session = */ onnxrt_destroy_session,
+    /* ONNXRT is capability-only: the session-execution slots are NULL. The onnx
+     * engine reaches ONNX Runtime through the C++ `Session` class, never the C
+     * vtable's session/buffer ops. */
+    /* .create_session  = */ nullptr,
+    /* .run_session     = */ nullptr,
+    /* .destroy_session = */ nullptr,
     /* .alloc_buffer    = */ nullptr,
     /* .free_buffer     = */ nullptr,
     /* .device_info     = */ onnxrt_device_info,
     /* .capabilities    = */ onnxrt_capabilities,
-    /* .reserved_slot_0 = */ &k_onnxrt_vtable_v2,
+    /* .reserved_slot_0 = */ nullptr,
     /* .reserved_slot_1 = */ nullptr,
     /* .reserved_slot_2 = */ nullptr,
     /* .reserved_slot_3 = */ nullptr,
@@ -1430,7 +796,7 @@ const rac_runtime_vtable_t* runtime_vtable() {
 }  // namespace runtime
 }  // namespace runanywhere
 
-/* runtimes-002: linker-keep-alive anchor, symmetric to
+/* Linker-keep-alive anchor, symmetric to
  * `rac_coreml_runtime_require_available` / `rac_metal_runtime_require_available`.
  * Engines that route to onnxrt call this from their plugin entry so a real
  * symbol reference forces the linker to retain THIS translation unit — which
@@ -1448,21 +814,7 @@ extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_onnxrt(void) {
     return &k_onnxrt_vtable;
 }
 
-/* RT-ONNX-06: provider registration surface, symmetric to CPU's
- * `rac_cpu_runtime_register_provider`. Providers are stored by value and
- * looked up by name for replacement / unregistration. Dispatch happens
- * transparently inside `onnxrt_create_session` so existing consumers of the
- * generic tensor runner keep working unchanged. */
-extern "C" RAC_API rac_result_t
-rac_onnxrt_runtime_register_provider(const rac_onnxrt_runtime_provider_t* provider) {
-    return onnxrt_provider_registry().register_provider(provider);
-}
-
-extern "C" RAC_API void rac_onnxrt_runtime_unregister_provider(const char* name) {
-    onnxrt_provider_registry().unregister_provider(name);
-}
-
-/* RT-ONNX-04: Execution-provider configuration surface. Real linkage is only
+/* Execution-provider configuration surface. Real linkage is only
  * wired for CoreML today; other EPs accept activation but run on CPU until
  * their follow-up rows bring the ORT append paths online. */
 extern "C" RAC_API rac_result_t
@@ -1506,32 +858,6 @@ rac_onnxrt_runtime_ep_device_class(rac_onnxrt_ep_type_t type) {
         default:
             return RAC_DEVICE_CLASS_CPU;
     }
-}
-
-extern "C" RAC_API rac_result_t rac_onnxrt_runtime_get_provider_session(
-    rac_runtime_session_t* session, const char** out_provider_name,
-    rac_runtime_session_t** out_provider_session) {
-    if (out_provider_session == nullptr)
-        return RAC_ERROR_NULL_POINTER;
-    *out_provider_session = nullptr;
-    if (out_provider_name)
-        *out_provider_name = nullptr;
-
-    if (session == nullptr)
-        return RAC_ERROR_INVALID_HANDLE;
-
-    if (session->is_provider_session) {
-        if (out_provider_name)
-            *out_provider_name = session->provider.name;
-        *out_provider_session = session->provider_session;
-        return RAC_SUCCESS;
-    }
-
-    /* Generic-path session — no provider is involved. Return the same session
-     * handle as the "provider session" so callers can treat the path
-     * uniformly, with NULL provider_name as the signal. */
-    *out_provider_session = session;
-    return RAC_SUCCESS;
 }
 
 RAC_STATIC_RUNTIME_REGISTER(onnxrt);

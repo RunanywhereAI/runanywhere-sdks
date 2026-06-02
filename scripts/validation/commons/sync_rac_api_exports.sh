@@ -61,11 +61,10 @@ fi
 
 # pass2-syn-002: collect sibling backend-conditional exports too so
 # symbols listed there are not re-appended into the main file.
-# pass3-syn-080: RACommons.rag.exports is the only remaining sibling
-# (RACommons.onnx_embeddings.exports and RACommons.whisperkit_coreml.exports
-# were deleted by pass3-syn-002 when their decls were folded into the main
-# exports list). The list still iterates so this stays forward-compatible
-# if a new sibling file is added.
+# RACommons.rag.exports is the only remaining sibling
+# (RACommons.onnx_embeddings.exports was deleted when its decls were folded
+# into the main exports list). The list still iterates so this stays
+# forward-compatible if a new sibling file is added.
 SIBLING_EXPORTS=()
 for sibling in "${RAG_EXPORTS_FILE}"; do
     if [[ -f "${sibling}" ]]; then

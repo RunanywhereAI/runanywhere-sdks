@@ -5142,7 +5142,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionDe
     return static_cast<jint>(rc);
 }
 
-// pass2-syn-007: JNI passthrough for the new cancel ABI. Does NOT touch the
+// JNI passthrough for the new cancel ABI. Does NOT touch the
 // listener registry — cancel is independent of destroy and the caller is
 // expected to invoke both (cancel from any thread to interrupt; destroy from
 // the orchestration coroutine once the in-flight call has resolved).
@@ -5283,7 +5283,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopWi
     RAC_JNI_CATCH_PTR()
 }
 
-// pass2-syn-007: cancel the in-flight run loop from any thread. Idempotent —
+// cancel the in-flight run loop from any thread. Idempotent —
 // a stale/zero handle is a no-op returning RAC_SUCCESS.
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingRunLoopCancelProto(

@@ -14,7 +14,6 @@
 #include <new>
 #include <nlohmann/json.hpp>
 
-#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -377,15 +376,6 @@ struct LlamaCPPRegistryState {
     std::mutex mutex;
     bool registered = false;
     char provider_name[32] = "LlamaCPPService";
-    char module_id[16] = "llamacpp";
-};
-
-// Unified module info: llama.cpp publishes ONE module with both
-// text-generation and vision-language capabilities. The two capabilities
-// share the same engine implementation and the same plugin vtable.
-static const rac_capability_t k_llamacpp_capabilities[] = {
-    RAC_CAPABILITY_TEXT_GENERATION,
-    RAC_CAPABILITY_VISION_LANGUAGE,
 };
 
 LlamaCPPRegistryState& get_state() {
@@ -424,28 +414,6 @@ rac_result_t rac_backend_llamacpp_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Module registration stays (independent of the deleted service registry;
-    // rac_module_info_t + rac_capability_t are retained in v3 for the module
-    // registry which app-level capability discovery still uses).
-    // The unified llamacpp module announces BOTH text-generation and
-    // vision-language capabilities; the engine handles both modalities through
-    // its single plugin vtable.
-    rac_module_info_t module_info = {};
-    module_info.id = state.module_id;
-    module_info.name = "LlamaCPP";
-    module_info.version = "1.0.0";
-    module_info.description =
-        "llama.cpp backend (text generation + vision-language) for GGUF models";
-
-    module_info.capabilities = k_llamacpp_capabilities;
-    module_info.num_capabilities =
-        sizeof(k_llamacpp_capabilities) / sizeof(k_llamacpp_capabilities[0]);
-
-    rac_result_t result = rac_module_register(&module_info);
-    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-        return result;
-    }
-
     // Android-fix: on dynamic-plugin hosts the static-register shim's ctor only
     // fires if the carrier `librunanywhere_llamacpp.so` is dlopened — which
     // Kotlin/JNI does not do (it loads `librac_backend_llamacpp_jni.so`, which
@@ -453,10 +421,10 @@ rac_result_t rac_backend_llamacpp_register(void) {
     // rac_plugin_route(framework=llamacpp) can find the unified vtable (with
     // both llm_ops and vlm_ops slots filled). Mirrors the pattern in
     // rac_backend_onnx_register.cpp.
-    // The unified llamacpp plugin already serves both LLM and VLM primitives;
-    // any pre-unification "llamacpp_vlm" pin is normalized to "llamacpp" by
-    // the commons router (rac_route.cpp normalize_legacy_engine_pin), so the
-    // legacy alias plugin entry no longer exists and is not registered here.
+    // The unified llamacpp plugin already serves both LLM and VLM primitives
+    // and registers only under "llamacpp"; there is no alias normalization, so
+    // the legacy "llamacpp_vlm" plugin entry no longer exists and is not
+    // registered here.
     const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
@@ -480,11 +448,8 @@ rac_result_t rac_backend_llamacpp_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    // v3: plugin unregistration is the registry's responsibility
-    // (rac_plugin_unregister("llamacpp") called by the host). Module
-    // registration is the only leftover to tear down here.
-    rac_module_unregister(state.module_id);
-
+    // Plugin unregistration is the registry's responsibility
+    // (rac_plugin_unregister("llamacpp") called by the host).
     state.registered = false;
     RAC_LOG_INFO(LOG_CAT, "Backend unregistered");
     return RAC_SUCCESS;

@@ -32,8 +32,8 @@ import okio.ByteString
  * ---------------------------------------------------------------------------
  * Request handed to the JNI transcribe thunk. Audio bytes are passed
  * verbatim to the chosen backend; each engine is responsible for parsing
- * the encoded format (Sarvam reads the multipart file part, sherpa decodes
- * the WAV/PCM bytes).
+ * the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
+ * file part; sherpa decodes the WAV/PCM bytes).
  * ---------------------------------------------------------------------------
  */
 public class HybridSttTranscribeRequest(

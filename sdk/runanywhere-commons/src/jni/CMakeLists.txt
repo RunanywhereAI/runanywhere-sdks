@@ -73,10 +73,11 @@ set(JNI_SOURCES
     # proxy support for free. Fixes rc=77 SSL errors permanently.
     okhttp_transport_adapter.cpp
     rac_hybrid_device_state_jni.cpp
+    rac_hybrid_custom_filter_jni.cpp
     rac_stt_hybrid_router_jni.cpp
 )
 
-# Cloud-engine JNI thunks (e.g. Sarvam STT) are attached by each engine's own
+# Cloud-engine JNI thunks (e.g. cloud) are attached by each engine's own
 # CMakeLists.txt via target_sources(runanywhere_commons_jni ...) — those
 # subdirs are processed AFTER this one, so a conditional here would see the
 # per-engine RAC_BACKEND_* option undefined and silently drop the symbols.

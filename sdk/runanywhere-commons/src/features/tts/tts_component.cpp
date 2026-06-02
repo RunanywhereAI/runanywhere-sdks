@@ -373,7 +373,7 @@ extern "C" void rac_tts_component_destroy(rac_handle_t handle) {
     // here prevents stale wire-seq / stale user_data when the handle heap
     // address is reused by a fresh component.
     rac_tts_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-tts: spin-wait for any in-flight
+    // spin-wait for any in-flight
     // dispatch_tts_stream_event() invocation on another thread before freeing
     // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
     rac_tts_proto_quiesce();
@@ -400,7 +400,7 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
     // destroy → original destroy-time fix never fires for handle reuse, so
     // the wire-seq counter in g_slots() would retain its prior value.
     rac_tts_unset_stream_proto_callback(handle);
-    // pass2-syn-001-followup-tts: drain any in-flight dispatcher bound to the
+    // drain any in-flight dispatcher bound to the
     // previous voice before swapping in the new one so user_data captured by
     // the previous registration can be safely freed.
     rac_tts_proto_quiesce();

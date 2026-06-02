@@ -2,8 +2,7 @@
  * @file platform_llm_callbacks_internal.h
  * @brief Internal helper around the Swift platform-LLM callback table.
  *
- * Mirrors engines/whisperkit_coreml/whisperkit_callbacks_internal.h:
- * provides a value-snapshot of the registered callbacks taken under the
+ * Provides a value-snapshot of the registered callbacks taken under the
  * registration lock so consumers do not dereference the global struct
  * after another thread may have written it (commons-032 — torn-read
  * TOCTOU between rac_platform_llm_set_callbacks and the public pointer

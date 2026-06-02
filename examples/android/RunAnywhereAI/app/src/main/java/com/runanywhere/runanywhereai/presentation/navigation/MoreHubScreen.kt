@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Description
@@ -49,6 +50,7 @@ fun MoreHubScreen(
     onNavigateToBenchmarks: () -> Unit,
     onNavigateToLoraManager: () -> Unit = {},
     onNavigateToSolutions: () -> Unit = {},
+    onNavigateToHybridStt: () -> Unit = {},
 ) {
     ConfigureTopBar(title = "More")
 
@@ -93,6 +95,16 @@ fun MoreHubScreen(
             title = "Speech to Text",
             subtitle = "Transcribe audio to text using on-device models",
             onClick = onNavigateToSTT,
+        )
+
+        Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+
+        MoreFeatureCard(
+            icon = Icons.AutoMirrored.Filled.AltRoute,
+            iconColor = AppColors.primaryAccent,
+            title = "Hybrid STT Router",
+            subtitle = "Route transcription between on-device and cloud by confidence",
+            onClick = onNavigateToHybridStt,
         )
 
         Spacer(modifier = Modifier.height(Dimensions.xxLarge))

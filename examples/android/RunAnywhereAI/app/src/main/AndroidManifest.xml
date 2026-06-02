@@ -36,11 +36,6 @@
         android:theme="@style/Theme.RunAnywhereAI"
         android:usesCleartextTraffic="false"
         tools:targetApi="35">
-        <activity
-            android:name=".TempActivity"
-            android:exported="true"
-            android:theme="@style/Theme.RunAnywhereAI">
-        </activity>
         <!--
          Qualcomm FastRPC transport library for QNN HTP (NPU) inference.
              Required on API 31+ to make vendor public libraries accessible.

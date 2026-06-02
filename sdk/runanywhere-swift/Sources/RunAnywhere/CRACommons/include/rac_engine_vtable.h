@@ -4,7 +4,7 @@
  *
  * A single vtable type replaces the per-domain `rac_llm_service_ops_t`,
  * `rac_stt_service_ops_t`, `rac_tts_service_ops_t`, … structs. Every engine
- * backend (llama.cpp, ONNX, whispercpp, WhisperKit CoreML, MetalRT, …)
+ * backend (llama.cpp, ONNX, sherpa, MetalRT, …)
  * populates one of these. Primitives the engine does NOT serve leave the
  * corresponding op-struct pointer NULL; the registry treats NULL as "engine
  * does not support this primitive" and returns `RAC_ERROR_CAPABILITY_UNSUPPORTED`.
@@ -65,7 +65,7 @@ typedef struct rac_engine_metadata {
     /** Must equal RAC_PLUGIN_API_VERSION. Mismatch = plugin rejected. */
     uint32_t abi_version;
 
-    /** Stable short name (e.g. "llamacpp", "onnx", "whispercpp"). Used as
+    /** Stable short name (e.g. "llamacpp", "onnx", "sherpa"). Used as
      * dedup key; registering a second plugin with the same name replaces the
      * first if-and-only-if the second's priority is >=.
      * MUST NOT be NULL. */

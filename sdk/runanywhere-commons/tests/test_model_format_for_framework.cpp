@@ -74,11 +74,10 @@ int test_positive_matches() {
     EXPECT_TRUE(query(RAC_FRAMEWORK_SHERPA, "onnx"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_SHERPA, ".ort"));
 
-    // CoreML / WhisperKit-CoreML: .mlmodelc, .mlpackage, .mlmodel
+    // CoreML: .mlmodelc, .mlpackage, .mlmodel
     EXPECT_TRUE(query(RAC_FRAMEWORK_COREML, "mlmodelc"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_COREML, ".mlpackage"));
     EXPECT_TRUE(query(RAC_FRAMEWORK_COREML, "mlmodel"));
-    EXPECT_TRUE(query(RAC_FRAMEWORK_WHISPERKIT_COREML, "mlmodelc"));
 
     // MetalRT: .safetensors, .json
     EXPECT_TRUE(query(RAC_FRAMEWORK_METALRT, "safetensors"));

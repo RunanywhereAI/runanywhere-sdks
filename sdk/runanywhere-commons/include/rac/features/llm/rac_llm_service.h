@@ -302,7 +302,7 @@ RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
  * structured_output, enable_real_time_tracking, and repeat_last_n cannot be
  * carried over the streaming path either until idl-002 lands.
  *
- * @warning user_data ownership and lifetime (pass3-syn-026 / cross-SDK
+ * @warning user_data ownership and lifetime (cross-SDK
  *          contract). The C runtime may invoke
  *          `callback(bytes, size, user_data)` on a background thread AFTER
  *          this function has returned to its caller, because the

@@ -54,7 +54,9 @@ namespace {
 // Kept locally so the test file does not depend on the generated *.pb.h.
 // ---------------------------------------------------------------------------
 
-// InferenceFramework — full proto range 0..23.
+// InferenceFramework — proto range 0..23 minus the retired values 8
+// (WHISPERKIT_COREML), 17 (WHISPERKIT), and 18 (OPENAI_WHISPER), which are no
+// longer defined in the proto and therefore map to RAC_ERROR_INVALID_ARGUMENT.
 constexpr int32_t kProtoIfwAll[] = {
     0,   // UNSPECIFIED        → RAC_FRAMEWORK_UNKNOWN
     1,   // ONNX               → RAC_FRAMEWORK_ONNX
@@ -64,7 +66,6 @@ constexpr int32_t kProtoIfwAll[] = {
     5,   // FLUID_AUDIO        → RAC_FRAMEWORK_FLUID_AUDIO
     6,   // COREML             → RAC_FRAMEWORK_COREML
     7,   // MLX                → RAC_FRAMEWORK_MLX
-    8,   // WHISPERKIT_COREML  → RAC_FRAMEWORK_WHISPERKIT_COREML
     9,   // METALRT            → RAC_FRAMEWORK_METALRT
     10,  // GENIE              → RAC_FRAMEWORK_GENIE
     11,  // TFLITE             → RAC_FRAMEWORK_UNKNOWN (no C case)
@@ -73,8 +74,6 @@ constexpr int32_t kProtoIfwAll[] = {
     14,  // MLC                → RAC_FRAMEWORK_UNKNOWN
     15,  // PICO_LLM           → RAC_FRAMEWORK_UNKNOWN
     16,  // PIPER_TTS          → RAC_FRAMEWORK_UNKNOWN
-    17,  // WHISPERKIT         → RAC_FRAMEWORK_UNKNOWN
-    18,  // OPENAI_WHISPER     → RAC_FRAMEWORK_UNKNOWN
     19,  // SWIFT_TRANSFORMERS → RAC_FRAMEWORK_UNKNOWN
     20,  // BUILT_IN           → RAC_FRAMEWORK_BUILTIN
     21,  // NONE               → RAC_FRAMEWORK_NONE
@@ -93,7 +92,6 @@ constexpr rac_inference_framework_t kCAllFrameworks[] = {
     RAC_FRAMEWORK_NONE,
     RAC_FRAMEWORK_MLX,
     RAC_FRAMEWORK_COREML,
-    RAC_FRAMEWORK_WHISPERKIT_COREML,
     RAC_FRAMEWORK_METALRT,
     RAC_FRAMEWORK_GENIE,
     RAC_FRAMEWORK_SHERPA,
@@ -157,11 +155,11 @@ constexpr rac_archive_structure_t kCAllArchiveStructures[] = {
 // ---------------------------------------------------------------------------
 // InferenceFramework: round-trip every proto value through C and back.
 //
-// For values 11..19 (TFLITE/EXECUTORCH/MEDIAPIPE/MLC/PICO_LLM/PIPER_TTS/
-// WHISPERKIT/OPENAI_WHISPER/SWIFT_TRANSFORMERS) there is no corresponding
-// C enum case, so the from-proto path folds those into RAC_FRAMEWORK_UNKNOWN.
-// The forward direction therefore lands on the proto UNKNOWN (=22). We assert
-// that explicitly rather than expecting strict identity.
+// For values 11..16 and 19 (TFLITE/EXECUTORCH/MEDIAPIPE/MLC/PICO_LLM/
+// PIPER_TTS/SWIFT_TRANSFORMERS) there is no corresponding C enum case, so the
+// from-proto path folds those into RAC_FRAMEWORK_UNKNOWN. The forward direction
+// therefore lands on the proto UNKNOWN (=22). We assert that explicitly rather
+// than expecting strict identity.
 // ---------------------------------------------------------------------------
 int test_inference_framework_proto_round_trip() {
     for (int32_t proto : kProtoIfwAll) {

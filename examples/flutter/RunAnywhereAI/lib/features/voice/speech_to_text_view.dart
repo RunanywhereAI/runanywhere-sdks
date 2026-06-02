@@ -143,9 +143,9 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       setState(() {
         _selectedFramework = model.preferredFramework;
         _selectedModelName = model.name;
-        // B-FL-11-001: Sherpa-ONNX supports
-        // streaming transcription via its zipformer/RNN-T runtime. Allow
-        // Live mode for both WhisperKit and ONNX-backed STT models.
+        // Sherpa-ONNX supports streaming transcription via its
+        // zipformer/RNN-T runtime. Allow Live mode for Sherpa- and
+        // ONNX-backed STT models.
         _supportsLiveMode = model.preferredFramework ==
                 LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN ||
             model.preferredFramework == LLMFramework.INFERENCE_FRAMEWORK_ONNX;

@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "rac/backends/rac_embeddings_onnx.h"
-#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
@@ -123,7 +122,7 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
 
         // Reject the provider's empty-vector failure sentinel before the result
         // is published, so a per-text inference failure does not become a
-        // successful zero-dimensional embedding (see engine-onnx-003).
+        // successful zero-dimensional embedding.
         for (size_t i = 0; i < num_texts; ++i) {
             if (batch_results[i].empty()) {
                 RAC_LOG_ERROR(LOG_CAT, "Batch embedding[%zu] returned an empty vector", i);
@@ -190,7 +189,7 @@ static void onnx_embed_vtable_destroy(void* impl) {
     }
 }
 
-// v3 Phase B7: ONNX embeddings `create` adapter. Allocates an
+// ONNX embeddings `create` adapter. Allocates an
 // onnx_embeddings_handle wrapping ONNXEmbeddingProvider. Called by
 // commons rac_embeddings_create() via rac_plugin_route → g_onnx_engine_vtable
 // (embedding_ops slot).
@@ -244,7 +243,6 @@ struct OnnxEmbeddingsRegistryState {
     std::mutex mutex;
     bool registered = false;
     char provider_name[32] = "ONNXEmbeddings";
-    char module_id[24] = "onnx_embeddings";
 };
 
 OnnxEmbeddingsRegistryState& get_onnx_embed_state() {
@@ -252,7 +250,7 @@ OnnxEmbeddingsRegistryState& get_onnx_embed_state() {
     return state;
 }
 
-// v3 Phase B7: legacy rac_service_request_t factories removed.
+// Legacy rac_service_request_t factories removed.
 // Model-format gating (.onnx / directory containing model.onnx /
 // RAC_FRAMEWORK_ONNX) lives in g_onnx_engine_vtable.metadata.formats
 // in engines/onnx/rac_plugin_entry_onnx.cpp. Backend impl allocation
@@ -274,21 +272,7 @@ rac_result_t rac_backend_onnx_embeddings_register(void) {
     if (state.registered)
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
 
-    rac_module_info_t module_info = {};
-    module_info.id = state.module_id;
-    module_info.name = "ONNX Embeddings";
-    module_info.version = "1.0.0";
-    module_info.description = "Sentence-transformer embedding provider via ONNX Runtime";
-
-    rac_capability_t capabilities[] = {RAC_CAPABILITY_EMBEDDINGS};
-    module_info.capabilities = capabilities;
-    module_info.num_capabilities = 1;
-
-    rac_result_t result = rac_module_register(&module_info);
-    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED)
-        return result;
-
-    // v3 Phase B7: embeddings plugin registration flows through the
+    // Embeddings plugin registration flows through the
     // unified g_onnx_engine_vtable (embedding_ops slot) in
     // rac_plugin_entry_onnx.cpp.
     state.registered = true;
@@ -304,8 +288,6 @@ rac_result_t rac_backend_onnx_embeddings_unregister(void) {
 
     if (!state.registered)
         return RAC_ERROR_MODULE_NOT_FOUND;
-
-    rac_module_unregister(state.module_id);
 
     state.registered = false;
     RAC_LOG_INFO(LOG_CAT, "ONNX embeddings backend unregistered");

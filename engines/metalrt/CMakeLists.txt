@@ -1,5 +1,11 @@
 # MetalRT Backend — Apple-only (iOS/macOS)
 #
+# RESERVED / EXPERIMENTAL: metalrt is a reserved-for-future engine, not a live
+# boundary member. It wraps a private, CLOSED-SOURCE MetalRT lib, is OFF by
+# default (RAC_BACKEND_METALRT=OFF), and compiles to a not-routable stub when the
+# engine binary is absent (RAC_METALRT_ENGINE_AVAILABLE=0). Documented in
+# engines/AGENTS.md ("Stubs & reserved engines"); see there before wiring it.
+#
 # The MetalRT engine (libmetalrt_engine.a + metalrt_c_api.h) is a private,
 # closed-source dependency. This CMakeLists supports two modes:
 #
@@ -63,15 +69,16 @@ set_target_properties(rac_backend_metalrt PROPERTIES
 target_include_directories(rac_backend_metalrt PRIVATE
     ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..  # engines/ — for engines/common/rac_engine_unavailable.h
 )
 
 target_compile_definitions(rac_backend_metalrt PRIVATE RAC_METALRT_BUILDING)
 
 # Tooling metadata for `cmake -t graphviz/json` parity with
-# rac_add_engine_plugin()-managed engines.
+# rac_add_engine_plugin()-managed engines. Runtimes/formats are NOT declared
+# here — the C manifest (k_metalrt_runtimes/formats[] in
+# rac_plugin_entry_metalrt.cpp) is the single source the router reads.
 set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_ENGINES metalrt)
-set_property(GLOBAL APPEND PROPERTY RAC_ENGINE_metalrt_RUNTIMES METAL ANE)
-set_property(GLOBAL APPEND PROPERTY RAC_ENGINE_metalrt_FORMATS GGUF COREML METAL)
 
 if(RAC_METALRT_ENGINE_AVAILABLE)
     # ------------------------------------------------------------------
@@ -132,7 +139,7 @@ target_link_libraries(rac_backend_metalrt PRIVATE
 # `rac_backend_metalrt_register()` has zero call sites in the monorepo
 # and routes pinned to RAC_FRAMEWORK_METALRT for any of LLM / STT / TTS
 # / VLM cannot resolve. Mirrors the carrier pattern used by llamacpp /
-# diffusion-coreml (see pass2-syn-016 for context).
+# the coreml engine.
 #
 # Static path only: when RAC_STATIC_PLUGINS=ON (iOS / WASM hosts), the
 # ctor lands inside rac_commons so it runs before main(). The MetalRT

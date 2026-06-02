@@ -23,7 +23,7 @@ include(LoadVersions)
 # fallback (DRY; single source of truth).
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
-# ENG-LLAMA-01: propagate llama.cpp upstream tag through to the JNI bridge so
+# Propagate llama.cpp upstream tag through to the JNI bridge so
 # nativeGetVersion() doesn't drift from the actual linked llama.cpp build.
 add_compile_definitions(RAC_LLAMACPP_VERSION="${LLAMACPP_VERSION}")
 
@@ -158,6 +158,7 @@ set(LLAMACPP_BACKEND_SOURCES
 
 set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
+    llamacpp_stop_helpers.h
 )
 
 # VLM multimodal support is always compiled in — llama.cpp is one engine
@@ -244,9 +245,6 @@ rac_add_engine_plugin(llamacpp
                         ${llamacpp_SOURCE_DIR}/ggml/include
                         ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
-    PRIMITIVES          GENERATE_TEXT VLM
-    RUNTIMES            CPU METAL CUDA
-    FORMATS             GGUF GGML BIN
     AVAILABILITY        PUBLIC
     PACKAGE_OWNER       runanywhere
     PACKAGE_NAME        runanywhere_llamacpp

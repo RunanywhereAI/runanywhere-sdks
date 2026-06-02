@@ -36,7 +36,7 @@
 
 namespace {
 
-// pass2-syn-001-followup-llm: lift the voice_agent in_flight quiesce pattern
+// Lift the voice_agent in_flight quiesce pattern
 // to the LLM proto-byte dispatcher. The dispatch_llm_stream_event() function
 // copies the (callback, user_data) pair out of g_slots() under g_mu(), then
 // drops the lock before invoking slot.fn(). A concurrent
@@ -154,7 +154,7 @@ int derive_event_kind(int kind, bool is_final, const char* error_message) {
     if (kind == kTokenKindThought) {
         return kThinking;
     }
-    // pass3-syn-039: surface tool-call events on the canonical LLMStreamEvent
+    // surface tool-call events on the canonical LLMStreamEvent
     // path. The proto-service producer emits an event with
     // kind=TOKEN_KIND_TOOL_CALL + tool_call payload when the tool-calling
     // parser detects a call mid-stream; LLM_STREAM_EVENT_KIND_TOOL_CALL is the
@@ -253,7 +253,7 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     if (p.final_result != nullptr) {
         *proto_event.mutable_result() = *p.final_result;
     }
-    // pass2-syn-010: emit proto field 18 (LLMStreamEvent.tool_call) when the
+    // emit proto field 18 (LLMStreamEvent.tool_call) when the
     // caller has detected a tool-call boundary mid-stream. NULL leaves the
     // field unset (proto3 default) so legacy text-only streams are byte-for-
     // byte identical to before.
@@ -408,7 +408,7 @@ inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const c
     out.insert(out.end(), str, str + len);
 }
 
-// pass2-syn-010: length-delimited bytes (wire type 2) for a pre-serialized
+// length-delimited bytes (wire type 2) for a pre-serialized
 // nested message. Used for emitting LLMStreamEvent.tool_call (proto field
 // 18) on the hand-encoded WASM path — the caller passes already-encoded
 // ToolCall bytes (e.g. through a side channel that does have access to
@@ -464,7 +464,7 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     wire_int32_field(out, /*field=*/15, p.prompt_tokens_processed);
     wire_int32_field(out, /*field=*/16, p.completion_tokens_generated);
     wire_int64_field(out, /*field=*/17, p.elapsed_ms);
-    // pass2-syn-010: tool_call (field 18) — length-delimited nested message.
+    // tool_call (field 18) — length-delimited nested message.
     // The libprotobuf path uses `p.tool_call`; the hand-encoded path here
     // accepts pre-serialized bytes via `p.tool_call_bytes` so a caller that
     // already has encoded ToolCall bytes can still emit the field. NULL or
@@ -497,7 +497,7 @@ namespace rac::llm {
  * different threads do not contend on heap allocation.
  */
 void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& p) {
-    // pass2-syn-001-followup-llm: hold an InFlightGuard across the callback
+    // hold an InFlightGuard across the callback
     // fire so rac_llm_proto_quiesce() can be sure no slot.fn invocation is
     // still running before destroy/teardown frees user_data. The guard is
     // taken *inside* the registry lock, only once a live slot is found: an

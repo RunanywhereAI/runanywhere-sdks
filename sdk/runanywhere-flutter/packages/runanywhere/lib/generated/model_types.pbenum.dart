@@ -172,9 +172,6 @@ class InferenceFramework extends $pb.ProtobufEnum {
           6, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_COREML');
   static const InferenceFramework INFERENCE_FRAMEWORK_MLX =
       InferenceFramework._(7, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_MLX');
-  static const InferenceFramework INFERENCE_FRAMEWORK_WHISPERKIT_COREML =
-      InferenceFramework._(
-          8, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_WHISPERKIT_COREML');
   static const InferenceFramework INFERENCE_FRAMEWORK_METALRT =
       InferenceFramework._(
           9, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_METALRT');
@@ -198,12 +195,6 @@ class InferenceFramework extends $pb.ProtobufEnum {
   static const InferenceFramework INFERENCE_FRAMEWORK_PIPER_TTS =
       InferenceFramework._(
           16, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_PIPER_TTS');
-  static const InferenceFramework INFERENCE_FRAMEWORK_WHISPERKIT =
-      InferenceFramework._(
-          17, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_WHISPERKIT');
-  static const InferenceFramework INFERENCE_FRAMEWORK_OPENAI_WHISPER =
-      InferenceFramework._(
-          18, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_OPENAI_WHISPER');
   static const InferenceFramework INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS =
       InferenceFramework._(
           19, _omitEnumNames ? '' : 'INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS');
@@ -229,7 +220,6 @@ class InferenceFramework extends $pb.ProtobufEnum {
     INFERENCE_FRAMEWORK_FLUID_AUDIO,
     INFERENCE_FRAMEWORK_COREML,
     INFERENCE_FRAMEWORK_MLX,
-    INFERENCE_FRAMEWORK_WHISPERKIT_COREML,
     INFERENCE_FRAMEWORK_METALRT,
     INFERENCE_FRAMEWORK_GENIE,
     INFERENCE_FRAMEWORK_TFLITE,
@@ -238,8 +228,6 @@ class InferenceFramework extends $pb.ProtobufEnum {
     INFERENCE_FRAMEWORK_MLC,
     INFERENCE_FRAMEWORK_PICO_LLM,
     INFERENCE_FRAMEWORK_PIPER_TTS,
-    INFERENCE_FRAMEWORK_WHISPERKIT,
-    INFERENCE_FRAMEWORK_OPENAI_WHISPER,
     INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS,
     INFERENCE_FRAMEWORK_BUILT_IN,
     INFERENCE_FRAMEWORK_NONE,

@@ -13,6 +13,37 @@
 
 export { RunAnywhere } from './Public/RunAnywhere';
 
+// Hybrid STT router (offline sherpa <-> cloud). THIN binding over the
+// commons hybrid router — commons owns all routing. Mirrors Swift `Hybrid/*`
+// and Kotlin `public/hybrid/*` (RACRouter / CloudSTT / RoutingPolicy).
+export {
+  HybridSttRouter,
+  CloudSTT,
+  HybridDeviceState,
+  HybridBackendKind,
+  HybridModelType,
+  HybridRank,
+  DEFAULT_CLOUD_PROVIDER,
+  HYBRID_STT_CONFIDENCE_THRESHOLD,
+  Filters,
+  Cascades,
+  offlineSherpa,
+  onlineCloud,
+} from './Public/Extensions/Hybrid';
+export type {
+  HybridModel,
+  HybridTranscribeOptions,
+  HybridTranscribeResult,
+  HybridRoutedMetadata,
+  HybridFilter,
+  HybridCascade,
+  HybridRoutingPolicy,
+  CustomFilterCheck,
+  CloudModelEntry,
+  CloudRegisterOptions,
+  HybridDeviceStateProvider,
+} from './Public/Extensions/Hybrid';
+
 export { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 export type { SDKInitOptions } from './types/models';
 

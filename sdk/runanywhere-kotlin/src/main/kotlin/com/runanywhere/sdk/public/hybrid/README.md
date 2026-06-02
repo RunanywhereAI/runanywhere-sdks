@@ -5,8 +5,9 @@ and a **cloud** (online) backend. The router applies eligibility filters, ranks
 the surviving candidates, invokes the primary, and falls back to the secondary
 on failure or low transcript confidence.
 
-Today only the **STT** capability is wired: offline **sherpa-onnx** ↔ cloud
-**Sarvam**. `router.tts` / `router.vlm` exist for API shape but throw
+Today only the **STT** capability is wired: offline **sherpa-onnx** ↔ the
+generic **cloud** engine (whose HTTP provider — e.g. **Sarvam** — is chosen
+per registered model). `router.tts` / `router.vlm` exist for API shape but throw
 `NotImplementedError`.
 
 ---
@@ -31,16 +32,24 @@ Before `RACRouter.stt.init(...)`, three things must be in place:
    `sherpa-onnx-whisper-tiny.en`). The router resolves the on-disk path via
    `rac_get_model`.
 
-3. **Cloud credentials registered** (if using the online side):
+3. **Cloud credentials registered** (if using the online side). This also
+   registers the native `"cloud"` engine plugin with the registry (mirrors
+   `ONNX.register()` for sherpa), so the router can route the online side to it.
+   The `provider` (default `"sarvam"`) is carried in the registered entry and
+   forwarded to the engine via `config_json["provider"]`:
 
    ```kotlin
-   BACKEND.SARVAM.register(
+   BACKEND.CLOUD.register(
        id = "saaras",
        model = "saaras:v3",
        apiKey = "sk_...",
-       languageCode = null,   // null = let Sarvam auto-detect
+       provider = "sarvam",   // default; selects the cloud HTTP provider
+       languageCode = null,   // null = let the provider auto-detect
    )
    ```
+
+   `BACKEND.SARVAM.register(...)` remains as a thin alias that pins
+   `provider = "sarvam"`.
 
 Optionally, register a device-state provider so the `NETWORK` / `Battery`
 filters see live values:
@@ -58,7 +67,7 @@ Without a provider the router assumes online + 100% battery.
 ```kotlin
 val router = RACRouter.stt.init(
     backendOffline = BACKEND.SHERPA.STT,
-    backendOnline  = BACKEND.SARVAM.STT,
+    backendOnline  = BACKEND.CLOUD.STT,
 )
 
 router.stt.addPair(
@@ -87,10 +96,11 @@ the `ONLINE` model to the online slot.
 | Accessor | Kind | Notes |
 |---|---|---|
 | `BACKEND.SHERPA.STT` | offline | Resolved through the model registry by id. Requires the sherpa plugin loaded. |
-| `BACKEND.SARVAM.STT` | online | Resolved through `BACKEND.SARVAM.register(...)` (in-memory credential table). |
+| `BACKEND.CLOUD.STT` | online | Resolved through `BACKEND.CLOUD.register(...)` (in-memory credential table); each entry carries its `provider`. |
 
-`BACKEND.SARVAM` also exposes `lookup(id)`, `isRegistered(id)`, `unregister(id)`,
-`clear()`.
+`BACKEND.CLOUD` also exposes `lookup(id)`, `isRegistered(id)`, `unregister(id)`,
+`clear()`. `BACKEND.SARVAM` is a backwards-compatible alias that delegates to
+`BACKEND.CLOUD` with `provider = "sarvam"`.
 
 ---
 
@@ -126,7 +136,7 @@ val policy = RACRouter.AdvanceRouterPolicy {
 | `NETWORK()` | Drops the **online** candidate when the device is offline. |
 | `Battery(minPercent)` | Drops the **online** candidate below the battery threshold. |
 | `Quality(tier)` | Reserved — no-op in the current wire schema. |
-| `CustomDefine(name, description, check)` | Host-side predicate `(modelId) -> Boolean`, evaluated on the request thread. Return `false` to drop that candidate. |
+| `CustomDefine(name, description, check)` | Predicate `(modelId) -> Boolean` registered by `name` with the commons callback table; **commons** invokes it once per candidate during filtering. Return `false` to drop that candidate. |
 
 ### Rank (orders the survivors)
 
@@ -179,8 +189,8 @@ The native router evaluates two independent fallbacks per request:
   the policy, the primary result always stands (subject to failure fallback).
 
 Confidence flows **only from the offline sherpa engine** (`exp(mean(ys_log_probs))`,
-which requires the confidence-patched sherpa build). The cloud (Sarvam) returns
-`NaN`, so the online side never triggers a cascade.
+which requires the confidence-patched sherpa build). The cloud engine (e.g.
+the Sarvam provider) returns `NaN`, so the online side never triggers a cascade.
 
 ---
 

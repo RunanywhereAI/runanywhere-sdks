@@ -581,7 +581,7 @@ Public symbols:
 | `RAArchiveType.fileExtension` | 298 | `rac_archive_type_extension` |
 | `RAArchiveType.from(url:)` | 307 | `rac_archive_type_from_path` |
 
-`Codable` conformances on every enum round-trip through `wireString` / `from(wireString:)`. Pre-IDL case aliases (`systemTTS`, `whisperKitCoreML`, `picoLLM`, etc.) at lines 242–248 forward to the renamed proto cases.
+`Codable` conformances on every enum round-trip through `wireString` / `from(wireString:)`. Pre-IDL case aliases (`systemTTS`, `picoLLM`, `piperTTS`, etc.) forward to the renamed proto cases.
 
 ##### §5.4.3.2 ModelTypes+Artifacts.swift
 
@@ -2423,8 +2423,6 @@ The file at `sdk/runanywhere-swift/Package.swift` is the **local development man
 - `RunAnywhereCore` — only the `RunAnywhere` target (core, no backends)
 - `RunAnywhereLlamaCPP` — `LlamaCPPRuntime` only
 - `RunAnywhereONNX` — `ONNXRuntime` only
-
-Note: `RunAnywhereMetalRT` and `RunAnywhereWhisperKit` are present in the root-level external `Package.swift` but absent from the local manifest. The `RABackendMetalRT.xcframework` is present in `Binaries/` but has no corresponding product.
 
 **External dependencies** (`Package.swift:48-57`):
 - `swift-crypto` ≥ 3.0.0

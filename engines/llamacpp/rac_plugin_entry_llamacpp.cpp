@@ -167,10 +167,8 @@ RAC_PLUGIN_ENTRY_DEF(llamacpp) {
 }
 
 /* The legacy "llamacpp_vlm" plugin alias was removed: the unified
- * "llamacpp" plugin already serves both LLM and VLM primitives, and the
- * commons router normalizes any pre-unification "llamacpp_vlm" pin to
- * "llamacpp" before scoring (see sdk/runanywhere-commons/src/router/
- * rac_route.cpp normalize_legacy_engine_pin). Registering the alias as a
- * second plugin only added registry noise. */
+ * "llamacpp" plugin already serves both LLM and VLM primitives, so it now
+ * registers only under "llamacpp" and there is no alias to normalize.
+ * Registering a second plugin only added registry noise. */
 
 }  // extern "C"

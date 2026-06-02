@@ -1162,25 +1162,21 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-# Note: whispercpp plugin-entry test is wired in the root
-# CMakeLists.txt for the same reason as sherpa — rac_backend_whispercpp lives
-# under engines/ and is not yet configured at this point.
-
 # Note: metalrt plugin-entry test is wired in the root
 # CMakeLists.txt for the same reason as sherpa — rac_backend_metalrt is built
 # by engines/ (Apple-only OBJECT library folded into rac_commons) and is not
 # yet configured at this point.
 
-if(APPLE AND RAC_BACKEND_DIFFUSION_COREML AND TARGET rac_backend_diffusion_coreml)
+if(APPLE AND RAC_BACKEND_COREML AND TARGET rac_backend_coreml)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
     target_include_directories(test_diffusion_coreml_generate PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/diffusion-coreml
+        ${CMAKE_SOURCE_DIR}/engines/coreml
     )
     target_link_libraries(test_diffusion_coreml_generate PRIVATE
         rac_commons
-        rac_backend_diffusion_coreml
+        rac_backend_coreml
     )
     rac_link_archive_deps(test_diffusion_coreml_generate)
     target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)

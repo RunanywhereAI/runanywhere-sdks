@@ -2,8 +2,8 @@
  * @file rac_primitive.h
  * @brief Canonical enumeration of runtime primitives exposed by engine plugins.
  *
- * Every engine plugin (llama.cpp, ONNX Runtime, whispercpp, WhisperKit CoreML,
- * MetalRT, …) declares which of these primitives it serves via the new unified
+ * Every engine plugin (llama.cpp, ONNX Runtime, sherpa, MetalRT, …)
+ * declares which of these primitives it serves via the new unified
  * `rac_engine_vtable_t`. The pipeline runtime keys off this enum to dispatch
  * operators to engines.
  *

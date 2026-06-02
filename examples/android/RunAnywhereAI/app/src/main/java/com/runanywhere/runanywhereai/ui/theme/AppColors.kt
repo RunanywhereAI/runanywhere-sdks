@@ -232,7 +232,6 @@ object AppColors {
     fun frameworkBadgeColor(framework: String): Color =
         when (framework.uppercase()) {
             "LLAMA_CPP", "LLAMACPP" -> primaryAccent.copy(alpha = 0.2f) // Brand primary
-            "WHISPERKIT", "WHISPER" -> badgeGreen
             "MLKIT", "ML_KIT" -> badgePurple
             "COREML", "CORE_ML" -> badgeOrange
             else -> primaryAccent.copy(alpha = 0.2f)
@@ -244,7 +243,6 @@ object AppColors {
     fun frameworkTextColor(framework: String): Color =
         when (framework.uppercase()) {
             "LLAMA_CPP", "LLAMACPP" -> primaryAccent // Brand primary
-            "WHISPERKIT", "WHISPER" -> primaryGreen
             "MLKIT", "ML_KIT" -> primaryPurple
             "COREML", "CORE_ML" -> primaryOrange
             else -> primaryAccent

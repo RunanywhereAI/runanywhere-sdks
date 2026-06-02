@@ -159,12 +159,12 @@ rac_registry_unload_plugin("llamacpp");
 │                         Backend Layer                                    │
 │                                                                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
-│  │   LlamaCPP      │  │      ONNX       │  │   WhisperCPP    │         │
+│  │   LlamaCPP      │  │     Sherpa      │  │      ONNX       │         │
 │  │   Backend       │  │     Backend     │  │    Backend      │         │
 │  │                 │  │                 │  │                 │         │
-│  │  • GGUF models  │  │  • STT (Sherpa) │  │  • STT (GGML)   │         │
-│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • Multi-lang   │         │
-│  │  • Streaming    │  │  • VAD (Silero) │  │  • Fast CPU     │         │
+│  │  • GGUF models  │  │  • STT (Sherpa) │  │  • Embeddings   │         │
+│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • WakeWord     │         │
+│  │  • Streaming    │  │  • VAD (Silero) │  │  • ONNX Runtime │         │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘         │
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────┐│
@@ -239,10 +239,9 @@ runanywhere-commons/
 │   │
 │   └── backends/                   # Backend-specific public headers
 │       ├── rac_llm_llamacpp.h      # LlamaCPP backend API
-│       ├── rac_stt_whispercpp.h    # WhisperCPP backend API
-│       ├── rac_stt_onnx.h          # ONNX STT API
-│       ├── rac_tts_onnx.h          # ONNX TTS API
-│       └── rac_vad_onnx.h          # ONNX VAD API
+│       ├── rac_stt_onnx.h          # Sherpa STT API
+│       ├── rac_tts_onnx.h          # Sherpa TTS API
+│       └── rac_vad_onnx.h          # Sherpa VAD API
 │
 ├── src/                            # Implementation files
 │   ├── core/                       # Core implementations
@@ -263,7 +262,7 @@ runanywhere-commons/
 │   └── jni/                        # JNI bridge for Android
 │
 │   # ML engine plugins live at the monorepo root under ../../engines/
-│   # (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt). Each
+│   # (llamacpp, sherpa, onnx, metalrt, genie, coreml). Each
 │   # ships a rac_plugin_entry_<name>.cpp that publishes a
 │   # rac_engine_vtable_t via RAC_STATIC_PLUGIN_REGISTER or a dlopen'd
 │   # entry symbol. See ../../engines/.
@@ -307,31 +306,17 @@ rac_result_t result = rac_init(&config);
 **Initialization Flow:**
 1. Validate platform adapter (required callbacks)
 2. Initialize logging system
-3. Initialize module registry
-4. Initialize service registry
-5. Initialize model registry
-6. Set initialized flag
+3. Initialize model registry
+4. Set initialized flag
 
-### Module Registry
+(Engine plugins self-register into the plugin registry at image load /
+`rac_registry_load_plugin` time, not during `rac_init`.)
 
-Backends register as modules declaring their capabilities:
-
-```c
-rac_module_info_t info = {
-    .id = "llamacpp",
-    .name = "LlamaCPP",
-    .version = "1.0.0",
-    .description = "LLM backend using llama.cpp",
-    .capabilities = (rac_capability_t[]){RAC_CAPABILITY_TEXT_GENERATION},
-    .num_capabilities = 1
-};
-rac_module_register(&info);
-```
-
-**Module Registry Responsibilities:**
-- Track registered modules
-- Query modules by capability
-- Support runtime module discovery
+> Historical: v2 had a separate module registry (`rac_module_register` /
+> `rac_module_list`) where backends declared coarse capabilities. It was
+> removed in v3; engine plugins (below) are now the only registration unit,
+> and capabilities are derived from the populated `rac_engine_vtable_t`
+> primitive op-structs.
 
 ### Plugin Registry + Engine Router
 
@@ -373,6 +358,12 @@ rac_llm_create("my-model-id", &llm);   // router picks a capable plugin
    caller-supplied `rac_routing_hints`; the highest-scoring plugin whose
    primitive op-struct for the requested capability is non-NULL handles
    the call.
+
+**Runtimes** (`include/rac/plugin/rac_runtime_vtable.h`) describe the
+compute target an engine runs on. Only the built-in CPU runtime fills the
+optional session-execution slots; Metal, Core ML, and ONNX Runtime are
+capability-only — they advertise device capabilities for routing and leave
+session execution to the engine.
 
 ### Logging System
 
@@ -701,7 +692,7 @@ Audio Input
         ▼
 ┌───────────────┐
 │      STT      │ ──► Transcribe audio to text
-│  (ONNX/Whisper)│
+│ (Sherpa/Cloud)│
 └───────┬───────┘
         │ Transcription
         ▼

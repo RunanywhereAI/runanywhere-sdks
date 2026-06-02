@@ -14,7 +14,6 @@ set -euo pipefail
 #   --llamacpp    packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}    (LLM + VLM)
 #   --webgpu      packages/llamacpp/wasm/racommons-llamacpp-webgpu.{js,wasm} (variant of llamacpp)
 #   --onnx        packages/onnx/wasm/racommons-onnx-sherpa.{js,wasm}     (STT/TTS/VAD)
-#   --whispercpp  packages/llamacpp/wasm/racommons-whispercpp.{js,wasm}  (legacy)
 #
 # Common options:
 #   --debug      Debug build with assertions and safe heap
@@ -42,7 +41,6 @@ PTHREADS="ON"
 DEBUG="OFF"
 BUILD_CORE="OFF"
 LLAMACPP="OFF"
-WHISPERCPP="OFF"
 ONNX="OFF"
 WEBGPU="OFF"
 RAG="OFF"
@@ -71,10 +69,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --llamacpp)
             LLAMACPP="ON"
-            shift
-            ;;
-        --whispercpp)
-            WHISPERCPP="ON"
             shift
             ;;
         --onnx)
@@ -125,7 +119,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --llamacpp       Build packages/llamacpp/wasm/racommons-llamacpp (LLM + VLM)"
             echo "  --webgpu         Build packages/llamacpp/wasm/racommons-llamacpp-webgpu (variant of llamacpp)"
             echo "  --onnx           Build packages/onnx/wasm/racommons-onnx-sherpa (STT/TTS/VAD)"
-            echo "  --whispercpp     Build legacy whisper.cpp STT target"
             echo "  --all-backends   Build core + llamacpp (CPU) + onnx"
             echo ""
             echo "Options:"
@@ -146,7 +139,7 @@ done
 
 # Default to building llamacpp CPU if no target was requested (back-compat with
 # `npm run build:wasm` invocations that pass no flags).
-if [ "$BUILD_CORE" = "OFF" ] && [ "$LLAMACPP" = "OFF" ] && [ "$WHISPERCPP" = "OFF" ] && [ "$ONNX" = "OFF" ] && [ "$WEBGPU" = "OFF" ]; then
+if [ "$BUILD_CORE" = "OFF" ] && [ "$LLAMACPP" = "OFF" ] && [ "$ONNX" = "OFF" ] && [ "$WEBGPU" = "OFF" ]; then
     LLAMACPP="ON"
 fi
 
@@ -197,8 +190,7 @@ fi
 #   $5 -- "ON"/"OFF" for RAC_WASM_BUILD_CORE
 #   $6 -- "ON"/"OFF" for RAC_WASM_LLAMACPP
 #   $7 -- "ON"/"OFF" for RAC_WASM_ONNX
-#   $8 -- "ON"/"OFF" for RAC_WASM_WHISPERCPP
-#   $9 -- "ON"/"OFF" for RAC_WASM_WEBGPU
+#   $8 -- "ON"/"OFF" for RAC_WASM_WEBGPU
 build_target() {
     local label="$1"
     local target_name="$2"
@@ -207,8 +199,7 @@ build_target() {
     local wasm_core="$5"
     local wasm_llamacpp="$6"
     local wasm_onnx="$7"
-    local wasm_whispercpp="$8"
-    local wasm_webgpu="$9"
+    local wasm_webgpu="$8"
 
     local build_dir="${WASM_DIR}/build-${label}"
 
@@ -233,7 +224,6 @@ build_target() {
     echo "  RAC_WASM_BUILD_CORE  = ${wasm_core}"
     echo "  RAC_WASM_LLAMACPP    = ${wasm_llamacpp}"
     echo "  RAC_WASM_ONNX        = ${wasm_onnx}"
-    echo "  RAC_WASM_WHISPERCPP  = ${wasm_whispercpp}"
     echo "  RAC_WASM_WEBGPU      = ${wasm_webgpu}"
     echo "======================================"
 
@@ -298,7 +288,6 @@ build_target() {
         -DRAC_WASM_DEBUG="${DEBUG}" \
         -DRAC_WASM_BUILD_CORE="${wasm_core}" \
         -DRAC_WASM_LLAMACPP="${wasm_llamacpp}" \
-        -DRAC_WASM_WHISPERCPP="${wasm_whispercpp}" \
         -DRAC_WASM_ONNX="${wasm_onnx}" \
         -DRAC_RUNTIME_ONNXRT="${wasm_onnx}" \
         -DRAC_WASM_WEBGPU="${wasm_webgpu}" \
@@ -417,7 +406,6 @@ echo " Targets:"
 [ "$LLAMACPP" = "ON" ]     && [ "$WEBGPU" = "OFF" ] && echo "  - llamacpp (CPU)"
 [ "$WEBGPU" = "ON" ]       && echo "  - llamacpp-webgpu"
 [ "$ONNX" = "ON" ]         && echo "  - onnx-sherpa"
-[ "$WHISPERCPP" = "ON" ]   && echo "  - whispercpp (legacy)"
 echo "======================================"
 
 # Dispatch each requested target individually. Each gets its own configure
@@ -430,7 +418,7 @@ if [ "$BUILD_CORE" = "ON" ]; then
         "racommons_core_wasm" \
         "racommons" \
         "${WASM_DIR}/../packages/core/wasm" \
-        "ON" "OFF" "OFF" "OFF" "OFF"
+        "ON" "OFF" "OFF" "OFF"
 fi
 
 if [ "$LLAMACPP" = "ON" ] && [ "$WEBGPU" = "OFF" ]; then
@@ -439,7 +427,7 @@ if [ "$LLAMACPP" = "ON" ] && [ "$WEBGPU" = "OFF" ]; then
         "racommons_llamacpp_wasm" \
         "racommons-llamacpp" \
         "${WASM_DIR}/../packages/llamacpp/wasm" \
-        "OFF" "ON" "OFF" "OFF" "OFF"
+        "OFF" "ON" "OFF" "OFF"
 fi
 
 if [ "$WEBGPU" = "ON" ]; then
@@ -448,7 +436,7 @@ if [ "$WEBGPU" = "ON" ]; then
         "racommons_llamacpp_webgpu_wasm" \
         "racommons-llamacpp-webgpu" \
         "${WASM_DIR}/../packages/llamacpp/wasm" \
-        "OFF" "ON" "OFF" "OFF" "ON"
+        "OFF" "ON" "OFF" "ON"
 fi
 
 if [ "$ONNX" = "ON" ]; then
@@ -457,16 +445,7 @@ if [ "$ONNX" = "ON" ]; then
         "racommons_onnx_wasm" \
         "racommons-onnx-sherpa" \
         "${WASM_DIR}/../packages/onnx/wasm" \
-        "OFF" "OFF" "ON" "OFF" "OFF"
-fi
-
-if [ "$WHISPERCPP" = "ON" ]; then
-    build_target \
-        "whispercpp" \
-        "racommons_whispercpp_wasm" \
-        "racommons-whispercpp" \
-        "${WASM_DIR}/../packages/llamacpp/wasm" \
-        "OFF" "OFF" "OFF" "ON" "OFF"
+        "OFF" "OFF" "ON" "OFF"
 fi
 
 echo ""

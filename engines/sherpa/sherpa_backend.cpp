@@ -127,7 +127,7 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         sherpa_recognizer_ = nullptr;
     }
 
-    // engines-sherpa-001: the per-language LRU cache populated by transcribe()
+    // The per-language LRU cache populated by transcribe()
     // belongs to the *previous* model. Without this teardown a swap from model A
     // to model B would leave A's recognizers parked in recognizer_cache_, and a
     // subsequent transcribe() with the cached language would silently reuse the
@@ -177,8 +177,8 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
         // we prefer the int8 variant because it is what Sherpa-ONNX
         // recommends for on-device inference (smaller, faster, identical
         // accuracy on Whisper-tiny) and matches what the Voice Assistant
-        // path (AK-15) successfully loads. Without this preference, the
-        // standalone STT path (AK-11/AK-12) sometimes ended up with the
+        // path successfully loads. Without this preference, the
+        // standalone STT path sometimes ended up with the
         // fp32 encoder paired against an int8 decoder (or vice versa) and
         // SherpaOnnxCreateOfflineRecognizer rejected the mismatched pair
         // → -111 RAC_ERROR_MODEL_LOAD_FAILED within ~5 ms.
@@ -360,7 +360,7 @@ bool SherpaSTT::build_offline_recognizer_locked() {
     // Tear down any prior recognizer so we can rebuild with the current
     // `language_` setting. Used both by load_model() and by transcribe() when
     // the per-call language differs from what the recognizer was last built
-    // with (engine-sherpa-001).
+    // with.
     if (sherpa_recognizer_) {
         SherpaOnnxDestroyOfflineRecognizer(sherpa_recognizer_);
         sherpa_recognizer_ = nullptr;
@@ -509,7 +509,7 @@ bool SherpaSTT::unload_model() {
         sherpa_recognizer_ = nullptr;
     }
 
-    // pass2-syn-066: also destroy any cached per-language recognizers parked
+    // Also destroy any cached per-language recognizers parked
     // by transcribe() when callers alternated languages.
     for (auto& entry : recognizer_cache_) {
         if (entry.second) {
@@ -528,8 +528,16 @@ STTModelType SherpaSTT::get_model_type() const {
     return model_type_;
 }
 
-STTResult SherpaSTT::transcribe(const STTRequest& request) {
+STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_status) {
     STTResult result;
+    // Default to success; each failure path below overwrites this before
+    // returning. set_status() is a no-op when the caller passed nullptr.
+    auto set_status = [out_status](SherpaSttStatus s) {
+        if (out_status) {
+            *out_status = s;
+        }
+    };
+    set_status(SherpaSttStatus::Ok);
 
 #if SHERPA_ONNX_AVAILABLE
     // Lock for the lifetime of this call so we can safely (a) honor a per-call
@@ -539,11 +547,11 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
 
     if (!sherpa_recognizer_ || !model_loaded_) {
         RAC_LOG_ERROR("Sherpa.STT", "STT not ready for transcription");
-        result.text = "[Error: STT model not loaded]";
+        set_status(SherpaSttStatus::ModelNotLoaded);
         return result;
     }
 
-    // engine-sherpa-001: the recognizer is built once with `language_` (default
+    // The recognizer is built once with `language_` (default
     // "en"). Per-call STTRequest.language / detect_language was previously
     // ignored, so multilingual Whisper users got English-forced output. Honor
     // the request by rebuilding the Whisper recognizer with the new whisper.
@@ -564,11 +572,11 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
                             "Per-call language='%s' (detect=%d) not supported for "
                             "non-Whisper recognizer; rejecting request",
                             request.language.c_str(), request.detect_language ? 1 : 0);
-            result.text = "[Error: language not supported by recognizer]";
+            set_status(SherpaSttStatus::LanguageNotSupported);
             return result;
         }
 
-        // pass2-syn-066: cache recognizers by language with a small LRU so a
+        // Cache recognizers by language with a small LRU so a
         // caller alternating between languages does not pay the multi-second
         // SherpaOnnxCreateOfflineRecognizer cost on every utterance.
         //
@@ -612,7 +620,7 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
                     recognizer_cache_.erase(prev_hit);
                     recognizer_lru_.remove(previous_language);
                     language_ = previous_language;
-                    result.text = "[Error: language not supported by recognizer]";
+                    set_status(SherpaSttStatus::LanguageNotSupported);
                     return result;
                 }
                 // Previous recognizer not in cache (initial build never ran or
@@ -620,10 +628,10 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
                 language_ = previous_language;
                 if (!build_offline_recognizer_locked()) {
                     model_loaded_ = false;
-                    result.text = "[Error: recognizer rebuild failed]";
+                    set_status(SherpaSttStatus::RecognizerBuildFailed);
                     return result;
                 }
-                result.text = "[Error: language not supported by recognizer]";
+                set_status(SherpaSttStatus::LanguageNotSupported);
                 return result;
             }
         }
@@ -631,7 +639,7 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
         // Enforce LRU cap. recognizer_lru_ tracks recently-parked entries; evict
         // tail entries until the cache is within the cap. Note: the currently
         // active recognizer is NOT in the cache, so the cap bounds *idle*
-        // recognizers. pass3-syn-132: peak transient resident count is
+        // recognizers. Peak transient resident count is
         // kRecognizerCacheCap + 2 — at this point we have (a) the freshly-built
         // active recognizer in `sherpa_recognizer_`, (b) up to kRecognizerCacheCap
         // legitimate idle entries in the cache, and (c) one stale entry that was
@@ -664,7 +672,7 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
     const SherpaOnnxOfflineStream* stream = SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
     if (!stream) {
         RAC_LOG_ERROR("Sherpa.STT", "Failed to create offline stream");
-        result.text = "[Error: Failed to create stream]";
+        set_status(SherpaSttStatus::StreamCreationFailed);
         return result;
     }
 
@@ -727,7 +735,13 @@ STTResult SherpaSTT::transcribe(const STTRequest& request) {
     return result;
 #else
     RAC_LOG_ERROR("Sherpa.STT", "Sherpa-ONNX not available");
-    result.text = "[Error: Sherpa-ONNX not available]";
+    // Refactor contract: report failure via the structured status out-param
+    // (the rac_stt_sherpa.cpp caller switches on BackendUnavailable and returns
+    // RAC_ERROR_INFERENCE_FAILED with text=nullptr) rather than the old
+    // "[Error: ...]" sentinel string. Also flag confidence as NaN to match the
+    // hybrid router's "no quality signal" convention used on the other empty
+    // /unavailable paths above, in case result is inspected directly.
+    set_status(SherpaSttStatus::BackendUnavailable);
     result.confidence = std::numeric_limits<float>::quiet_NaN();
     return result;
 #endif
@@ -1238,6 +1252,16 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
     model_type_ = model_type;
     model_dir_ = model_path;
 
+    // Synthesis language for this model. Sherpa-ONNX's offline-TTS C-API has no
+    // per-speaker language field, so we record the engine-configured language
+    // (config["language"], default "en") and report it from get_voices() instead
+    // of hardcoding a literal. Mirrors how SherpaSTT::load_model reads its
+    // language_ from the same config key.
+    language_ = "en";
+    if (config.contains("language")) {
+        language_ = config["language"].get<std::string>();
+    }
+
     RAC_LOG_INFO("Sherpa.TTS", "[BUILD_V5] Loading model from: %s", model_path.c_str());
 
     std::string model_onnx_path;
@@ -1476,7 +1500,10 @@ bool SherpaTTS::load_model(const std::string& model_path, TTSModelType model_typ
         VoiceInfo voice;
         voice.id = std::to_string(i);
         voice.name = "Speaker " + std::to_string(i);
-        voice.language = "en";
+        // Per-speaker language is not exposed by the sherpa-onnx TTS C-API; use
+        // the engine-configured synthesis language (see language_ above) so
+        // get_languages() reflects the loaded model rather than a fixed "en".
+        voice.language = language_;
         voice.sample_rate = sample_rate_;
         voices_.push_back(voice);
     }
@@ -1500,8 +1527,8 @@ bool SherpaTTS::unload_model() {
 #if SHERPA_ONNX_AVAILABLE
     model_loaded_ = false;
 
-    // pass3-syn-130: previously a warning logged when active_synthesis_count_ > 0
-    // here, but pass2-syn-065 made synthesize() hold mutex_ for its entire
+    // Previously a warning logged when active_synthesis_count_ > 0
+    // here, but serializing synthesize() under mutex_ for its entire
     // duration and unload_model() takes the same mutex on entry — so no
     // synthesize() can be in flight when we reach this point. The counter and
     // its SynthesisGuard RAII helper inside synthesize() are now dead and the
@@ -1528,7 +1555,7 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
     TTSResult result;
 
 #if SHERPA_ONNX_AVAILABLE
-    // pass2-syn-065: serialize synthesize() under mutex_ across the entire
+    // Serialize synthesize() under mutex_ across the entire
     // call. Previously the lock was scoped only around the sherpa_tts_ read,
     // so overlapping synthesize() invocations could clobber each other's
     // cancel signals — call #2's `cancel_requested_.store(false, ...)` at
@@ -1541,16 +1568,16 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
     // longer parallelism-safe — concurrent callers queue.
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // pass3-syn-130: the former SynthesisGuard RAII helper (and the matching
+    // The former SynthesisGuard RAII helper (and the matching
     // active_synthesis_count_ atomic + warning in unload_model()) used to track
-    // concurrent synthesize() callers. After pass2-syn-065 made synthesize()
-    // hold mutex_ across its full duration, at most one synthesize() can be
+    // concurrent synthesize() callers. Now that synthesize()
+    // holds mutex_ across its full duration, at most one synthesize() can be
     // running at a time and unload_model() must wait for it to release the
     // mutex before tearing the model down — so the counter could only ever be
     // 0 when observed under the same mutex. Both the guard and the warning are
     // dead and have been removed.
 
-    // engines-sherpa-008: snapshot the cancel epoch BEFORE clearing
+    // Snapshot the cancel epoch BEFORE clearing
     // cancel_requested_ so a stop issued between the previous synthesize()'s
     // post-generate drop and this call's lock acquisition is still observed.
     // cancel() (lock-free) bumps cancel_epoch_ on every invocation; if the
@@ -1559,7 +1586,7 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
     // in between by an unrelated reset.
     const uint64_t entry_epoch = cancel_epoch_.load(std::memory_order_acquire);
 
-    // hotspot-engine-sherpa-004: clear any stale cancel signal from a prior
+    // Clear any stale cancel signal from a prior
     // synthesis so cancel() observed during THIS call's blocking
     // SherpaOnnxOfflineTtsGenerate is what we react to. The Sherpa-ONNX C TTS
     // API has no cancellation hook, so the flag is consulted post-generate to
@@ -1608,7 +1635,7 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
         return result;
     }
 
-    // hotspot-engine-sherpa-004 + engines-sherpa-008: drop the post-stop
+    // Drop the post-stop
     // result if cancel() fired while SherpaOnnxOfflineTtsGenerate was running
     // OR before we acquired the mutex (epoch bumped past entry_epoch). We
     // can't preempt the blocking Piper generator, but we MUST NOT surface its
@@ -1652,7 +1679,7 @@ bool SherpaTTS::supports_streaming() const {
 }
 
 void SherpaTTS::cancel() {
-    // engines-sherpa-008: bump epoch BEFORE setting the flag so that
+    // Bump epoch BEFORE setting the flag so that
     // synthesize()'s post-generate check, which reads epoch with acquire
     // ordering after a release on cancel_requested_, always observes the
     // epoch increment when it sees the flag. The flag preserves the original
@@ -1680,7 +1707,7 @@ SherpaVAD::~SherpaVAD() {
 // VADConfig.padding_ms default mirrors the struct definition in
 // sherpa_backend.h (currently 30). Used to detect non-default values that the
 // caller may have set expecting them to take effect — they won't, since the
-// Sherpa SilerVad ABI has no equivalent slot (pass3-syn-131).
+// Sherpa SilerVad ABI has no equivalent slot.
 static constexpr int kSherpaVadDefaultPaddingMs = 30;
 
 namespace {
@@ -1698,10 +1725,9 @@ void SherpaVAD::fill_sherpa_vad_config_locked(SherpaOnnxVadModelConfig& out) con
     // Translate VADConfig (ms-based, schema-aligned with Swift/Kotlin/Dart) into
     // the Sherpa-ONNX SilerVadModelConfig (seconds / samples). Single source of
     // truth used by both load_model() and configure_vad() so non-threshold
-    // fields are no longer silently dropped on the rebuild path
-    // (pass2-syn-064).
+    // fields are no longer silently dropped on the rebuild path.
     //
-    // pass3-syn-131: VADConfig.padding_ms (used by other backends to extend
+    // VADConfig.padding_ms (used by other backends to extend
     // detected speech segments) has no equivalent slot in
     // SherpaOnnxSileroVadModelConfig — Sherpa's SilerVad C ABI exposes only
     // threshold / min_silence_duration / min_speech_duration / window_size /
@@ -1855,7 +1881,7 @@ bool SherpaVAD::configure_vad(const VADConfig& config) {
     config_ = config;
 
 #if SHERPA_ONNX_AVAILABLE
-    // pass3-syn-131: Sherpa SilerVad has no padding equivalent. Warn (once per
+    // Sherpa SilerVad has no padding equivalent. Warn (once per
     // change) when the caller passes a non-default padding_ms so the silent drop
     // is observable in logs. Intentionally NOT failing the call: this matches
     // the other VAD backends' best-effort posture and keeps configure_vad a
@@ -1873,13 +1899,13 @@ bool SherpaVAD::configure_vad(const VADConfig& config) {
     // Sherpa-ONNX's SilerVAD captures every parameter at detector construction
     // and exposes no setters, so a configure_vad() that only mutates `config_`
     // round-trips through the service layer as a successful no-op while the
-    // model-based VAD decision still uses the original parameters (see
-    // engine-sherpa-002). Rebuild the live detector whenever any field that
+    // model-based VAD decision still uses the original parameters. Rebuild the
+    // live detector whenever any field that
     // affects detection actually changes so the new values affect subsequent
-    // process() calls. pass2-syn-064: previously only `threshold` was
+    // process() calls. Previously only `threshold` was
     // considered, and the rebuild path hardcoded every other field — now the
     // full VADConfig snapshot is threaded through fill_sherpa_vad_config_locked.
-    // padding_ms is omitted by design (pass3-syn-131); see helper comment.
+    // padding_ms is omitted by design; see helper comment.
     const bool detector_changed =
         old_config.threshold != config_.threshold ||
         old_config.min_speech_duration_ms != config_.min_speech_duration_ms ||
@@ -1983,22 +2009,6 @@ VADResult SherpaVAD::process(const std::vector<float>& audio_samples, int sample
 
     return result;
 }
-
-std::vector<SpeechSegment> SherpaVAD::detect_segments(const std::vector<float>& audio_samples,
-                                                      int sample_rate) {
-    return {};
-}
-
-std::string SherpaVAD::create_stream(const VADConfig& config) {
-    return "";
-}
-
-VADResult SherpaVAD::feed_audio(const std::string& stream_id, const std::vector<float>& samples,
-                                int sample_rate) {
-    return {};
-}
-
-void SherpaVAD::destroy_stream(const std::string& stream_id) {}
 
 void SherpaVAD::reset() {
     std::lock_guard<std::mutex> lock(mutex_);

@@ -17,7 +17,7 @@ package com.runanywhere.sdk.public.hybrid
  *     (`rac_get_model`) so the underlying engine (e.g. sherpa) can load
  *     the corresponding model files.
  *   - For [ModelType.ONLINE]: looked up in the cloud backend registry
- *     (e.g. `BACKEND.SARVAM`) to fetch the model string + credentials.
+ *     (`BACKEND.CLOUD`) to fetch the model string + credentials + provider.
  *
  * Construct via the [offline] / [online] convenience properties on
  * `ROUTER` to keep [modelType] correct by construction.

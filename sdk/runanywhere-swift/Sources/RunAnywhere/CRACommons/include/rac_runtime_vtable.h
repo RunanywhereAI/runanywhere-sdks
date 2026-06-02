@@ -6,7 +6,7 @@
  *
  * A "runtime" is the compute target an engine executes on: CPU, Apple Metal,
  * Core ML, NVIDIA CUDA, Vulkan, QNN, NNAPI, WebGPU, … Engines (llama.cpp,
- * ONNX Runtime, whispercpp, WhisperKit CoreML, MetalRT, …) are *clients* of
+ * ONNX Runtime, sherpa, MetalRT, …) are *clients* of
  * one or more runtimes. Promoting runtimes to first-class plugins lets
  * multiple engines share a single ORT `Ort::Env`, reuse the same CoreML
  * `MLModel` loader, and allocate GPU buffers through one allocator per

@@ -1,25 +1,33 @@
 /**
  * @file rac_stt_hybrid_router_jni.cpp
- * @brief JNI thunks for the STT hybrid router + the offline STT service
- *        factory.
+ * @brief JNI thunks for the STT hybrid router + a unified registry-backed STT
+ *        service factory used by BOTH router sides.
  *
- * Stays byte-only at the .so boundary. All proto parsing / building
- * lives inside rac_commons (rac_stt_hybrid_router_proto.cpp); these
- * thunks just marshal jbyteArray → (const uint8_t*, size_t) and back.
+ * Stays byte-only at the proto .so boundary. All proto parsing / building
+ * lives inside rac_commons (rac_stt_hybrid_router_proto.cpp); the transcribe /
+ * set-policy / set-service thunks just marshal jbyteArray → (const uint8_t*,
+ * size_t) and back.
  *
  * Service handles (offline / online) cross the JNI as raw `jlong`
- * (reinterpret_cast'd `rac_stt_service_t*`). Kotlin obtains them from
- * either racSttServiceCreate (for in-tree STT backends like sherpa-onnx)
- * or from the engine-specific factory (e.g. SarvamBridge.racSttSarvamCreate).
+ * (reinterpret_cast'd `rac_stt_service_t*`). BOTH sides are created through the
+ * SAME registry path — rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, …,
+ * hint=<"sherpa"|"cloud">) → vt->stt_ops->create — via
+ * create_stt_service_via_registry(): the offline side enters it from
+ * racSttServiceCreate (model-registry path resolution for in-tree backends
+ * like sherpa-onnx), the online side from racSttHybridRouterCreateService
+ * (explicit engine hint + config JSON; the cloud provider, default
+ * "sarvam", travels in that config JSON). The router path no longer depends on
+ * any bespoke per-engine factory; racSttHybridRouterDestroyService releases
+ * either handle through rac_stt_destroy.
  */
 
 #include <jni.h>
 #include <sys/stat.h>
 
-#include <cstdlib>
-#include <cstring>
 #include <string>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 // Errors always log. The verbose INFO trace is gated to debug builds (NDEBUG is
 // defined in release) so production stays quiet.
@@ -41,10 +49,6 @@
 #include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
 #include "rac/routing/rac_stt_hybrid_router.h"
 #include "rac/routing/rac_stt_hybrid_router_proto.h"
 
@@ -97,12 +101,78 @@ const char* framework_to_plugin_hint(rac_inference_framework_t fw) {
     switch (fw) {
         case RAC_FRAMEWORK_SHERPA:            return "sherpa";
         case RAC_FRAMEWORK_ONNX:              return "onnx";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML: return "whisperkit_coreml";
+        // RAC_FRAMEWORK_WHISPERKIT_COREML (retired enum value 9) intentionally
+        // dropped: the whisperkit_coreml engine was removed, so no plugin hint
+        // can resolve to it. Unmapped frameworks fall through to the default
+        // (nullptr), letting rac_plugin_route pick by primitive/format.
         case RAC_FRAMEWORK_FOUNDATION_MODELS: return "platform";
         case RAC_FRAMEWORK_SYSTEM_TTS:        return "platform";
         case RAC_FRAMEWORK_COREML:            return "platform";
         default:                              return nullptr;
     }
+}
+
+// Engine hint for the generic cloud backend (engines/cloud), a modality-agnostic
+// engine that today serves STT. The concrete HTTP provider is chosen per-service
+// from config_json["provider"] (default "sarvam"), NOT from the hint.
+constexpr char kCloudSttEngineHint[] = "cloud";
+constexpr char kDefaultCloudProvider[] = "sarvam";
+
+// Ensures config_json carries a "provider" so the cloud engine selects a
+// concrete adapter. When the hint targets cloud and the incoming JSON has
+// no "provider" key, inject the default ("sarvam"). Returns the (possibly
+// rewritten) config string; passes non-cloud hints and already-tagged configs
+// through unchanged. Malformed JSON is left untouched — the engine surfaces the
+// parse error itself.
+std::string ensure_cloud_provider(const std::string& engine_hint,
+                                  const std::string& config_json) {
+    if (engine_hint != kCloudSttEngineHint) {
+        return config_json;
+    }
+    nlohmann::json j = config_json.empty()
+                           ? nlohmann::json::object()
+                           : nlohmann::json::parse(config_json, nullptr, /*allow_exceptions=*/false);
+    if (!j.is_object()) {
+        return config_json;  // not an object → leave verbatim for the engine.
+    }
+    if (!j.contains("provider")) {
+        j["provider"] = kDefaultCloudProvider;
+    }
+    return j.dump();
+}
+
+// Unified "create an STT service by engine hint + config" path. BOTH the
+// offline (sherpa) and online (cloud, provider=sarvam) sides of the hybrid
+// router go through this single function so service creation always resolves the
+// engine through the plugin registry (rac_plugin_route → vt->stt_ops->create) —
+// there is no bespoke per-engine factory on the router path.
+//
+//   - engine_hint    : "sherpa" | "cloud" | … pinned as preferred_engine_name.
+//                      Empty/NULL lets the registry pick by primitive/format.
+//   - model_or_config: passed verbatim as the create op's `model_id` argument
+//                      (an on-device path for sherpa, or NULL for cloud
+//                      engines that take everything via config_json).
+//   - config_json    : passed verbatim as the create op's `config_json`
+//                      argument (the cloud {provider,api_key,model,…} JSON, or
+//                      NULL). The online entry point threads the provider in.
+//
+// Thin JNI adapter over the public commons factory
+// rac_stt_hybrid_router_create_service (DRY: one implementation; the route /
+// heap-wrap / ownership live in commons). Returns a heap rac_stt_service_t* (as
+// jlong) the router owns by handle, or 0.
+jlong create_stt_service_via_registry(const std::string& engine_hint,
+                                      const char*        model_or_config,
+                                      const char*        config_json) {
+    rac_stt_service_t* service = rac_stt_hybrid_router_create_service(
+        engine_hint.empty() ? nullptr : engine_hint.c_str(), model_or_config, config_json);
+    if (service == nullptr) {
+        STTJNI_LOG_E("create_stt_service_via_registry: create failed hint='%s'",
+                     engine_hint.c_str());
+        return 0;
+    }
+    STTJNI_LOG("create_stt_service_via_registry: OK service=%p hint='%s'",
+               (void*)service, engine_hint.c_str());
+    return reinterpret_cast<jlong>(service);
 }
 
 }  // namespace
@@ -149,42 +219,57 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceCreate(
         STTJNI_LOG("racSttServiceCreate: using flat path '%s'", resolved_path.c_str());
     }
 
-    // Route to the matching STT plugin and call its create op directly with
-    // our resolved path. Bypasses rac_stt_create()'s path-override logic.
-    rac_routing_hints_t hints {};
-    hints.preferred_engine_name = framework_to_plugin_hint(framework);
-
-    const rac_engine_vtable_t* vt = nullptr;
-    rac_result_t route_rc = rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, /*format=*/0, &hints, &vt);
-    if (route_rc != RAC_SUCCESS || vt == nullptr || vt->stt_ops == nullptr ||
-        vt->stt_ops->create == nullptr) {
-        STTJNI_LOG_E("racSttServiceCreate: rac_plugin_route failed rc=%d vt=%p", route_rc, (const void*)vt);
-        return 0;
+    // Route to the matching STT plugin and call its create op with our
+    // resolved path through the shared registry helper. Bypasses
+    // rac_stt_create()'s path-override logic; the create itself goes through
+    // rac_plugin_route exactly like every other commons consumer.
+    const char* hint = framework_to_plugin_hint(framework);
+    const jlong svc = create_stt_service_via_registry(
+        hint != nullptr ? std::string(hint) : std::string(),
+        resolved_path.c_str(), /*config_json=*/nullptr);
+    if (svc == 0) {
+        STTJNI_LOG_E("racSttServiceCreate: create_stt_service_via_registry failed path='%s'",
+                     resolved_path.c_str());
     }
+    return svc;
+}
 
-    void* impl = nullptr;
-    rac_result_t create_rc =
-        vt->stt_ops->create(resolved_path.c_str(), /*config_json=*/nullptr, &impl);
-    if (create_rc != RAC_SUCCESS || impl == nullptr) {
-        STTJNI_LOG_E("racSttServiceCreate: stt_ops->create FAILED rc=%d path='%s'",
-                     create_rc, resolved_path.c_str());
-        return 0;
+// Unified registry-based STT service factory used by the hybrid router for the
+// ONLINE side (and any caller wanting an explicit engine hint + config). The
+// online cloud service (provider=sarvam by default) is now resolved through
+// the plugin registry exactly like the offline/sherpa service — `engineHint`
+// (e.g. "cloud") is pinned as preferred_engine_name, `modelIdOrPath` and
+// `configJson` are forwarded to the routed engine's stt_ops->create. For the
+// cloud hint the provider is threaded into config_json (defaulting to
+// "sarvam") so the engine selects the right adapter. This replaces the bespoke
+// SarvamBridge.racSttSarvamCreate* factory on the router path; the returned
+// jlong is the same opaque rac_stt_service_t* the router setters accept.
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterCreateService(
+    JNIEnv* env, jclass /*clazz*/, jstring engine_hint, jstring model_id_or_path,
+    jstring config_json) {
+    const std::string hint = jstring_to_std(env, engine_hint);
+    const std::string model = jstring_to_std(env, model_id_or_path);
+    const std::string config = ensure_cloud_provider(hint, jstring_to_std(env, config_json));
+    STTJNI_LOG("racSttHybridRouterCreateService: hint='%s' model_len=%zu config_len=%zu",
+               hint.c_str(), model.size(), config.size());
+    return create_stt_service_via_registry(
+        hint,
+        model.empty() ? nullptr : model.c_str(),
+        config.empty() ? nullptr : config.c_str());
+}
+
+// Destroy a service created by racSttHybridRouterCreateService (or by
+// racSttServiceCreate). Both wrap the routed engine's vtable in a
+// rac_stt_service_t and route destroy through rac_stt_destroy, which calls the
+// engine's stt_ops->destroy and frees the wrapper — no bespoke per-engine
+// destroy thunk is involved on the router path.
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterDestroyService(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong service_handle) {
+    if (service_handle != 0) {
+        rac_stt_destroy(reinterpret_cast<rac_handle_t>(service_handle));
     }
-
-    auto* service = static_cast<rac_stt_service_t*>(std::malloc(sizeof(rac_stt_service_t)));
-    if (service == nullptr) {
-        if (vt->stt_ops->destroy != nullptr) {
-            vt->stt_ops->destroy(impl);
-        }
-        return 0;
-    }
-    service->ops = vt->stt_ops;
-    service->impl = impl;
-    service->model_id = strdup(id.c_str());  // rac_stt_destroy free()s this
-
-    STTJNI_LOG("racSttServiceCreate: OK service=%p path='%s'",
-               (void*)service, resolved_path.c_str());
-    return reinterpret_cast<jlong>(service);
 }
 
 JNIEXPORT void JNICALL

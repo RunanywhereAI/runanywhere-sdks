@@ -76,7 +76,6 @@ constexpr rac_inference_framework_t kAllFrameworks[] = {
     RAC_FRAMEWORK_NONE,
     RAC_FRAMEWORK_MLX,
     RAC_FRAMEWORK_COREML,
-    RAC_FRAMEWORK_WHISPERKIT_COREML,
     RAC_FRAMEWORK_METALRT,
     RAC_FRAMEWORK_GENIE,
     RAC_FRAMEWORK_SHERPA,
@@ -156,9 +155,8 @@ int test_inference_framework_canonical_names() {
     EXPECT_RC(rac_inference_framework_display_name(RAC_FRAMEWORK_LLAMACPP, &s), RAC_SUCCESS);
     EXPECT_TRUE(std::strcmp(s, "llama.cpp") == 0);
 
-    EXPECT_RC(rac_inference_framework_display_name(RAC_FRAMEWORK_WHISPERKIT_COREML, &s),
-              RAC_SUCCESS);
-    EXPECT_TRUE(std::strcmp(s, "WhisperKit CoreML") == 0);
+    EXPECT_RC(rac_inference_framework_display_name(RAC_FRAMEWORK_COREML, &s), RAC_SUCCESS);
+    EXPECT_TRUE(std::strcmp(s, "Core ML") == 0);
 
     EXPECT_RC(rac_inference_framework_analytics_key(RAC_FRAMEWORK_LLAMACPP, &s), RAC_SUCCESS);
     EXPECT_TRUE(std::strcmp(s, "llama_cpp") == 0);
@@ -201,8 +199,8 @@ int test_inference_framework_from_string_alias_inputs() {
     EXPECT_TRUE(parsed == RAC_FRAMEWORK_LLAMACPP);
 
     // Display name with different casing
-    EXPECT_RC(rac_inference_framework_from_string("WHISPERKIT COREML", &parsed), RAC_SUCCESS);
-    EXPECT_TRUE(parsed == RAC_FRAMEWORK_WHISPERKIT_COREML);
+    EXPECT_RC(rac_inference_framework_from_string("CORE ML", &parsed), RAC_SUCCESS);
+    EXPECT_TRUE(parsed == RAC_FRAMEWORK_COREML);
 
     // Wire string with mixed casing (Swift's caseInsensitive init guarantees this).
     EXPECT_RC(rac_inference_framework_from_string("inference_framework_onnx", &parsed),

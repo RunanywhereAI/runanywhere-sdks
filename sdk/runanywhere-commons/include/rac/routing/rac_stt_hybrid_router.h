@@ -9,8 +9,8 @@
  * rac_hybrid_routed_metadata_t describing the decision.
  *
  * The router does NOT own the underlying services — callers create them
- * via the backend-specific factory (rac_stt_create() for sherpa,
- * rac_stt_sarvam_create() for the cloud) and pass them in. Caller must
+ * through the plugin registry (engine_hint="sherpa" for the on-device side,
+ * "cloud" with provider=sarvam for the cloud side) and pass them in. Caller must
  * call set_*_service(handle, NULL) BEFORE destroying either underlying
  * service to avoid use-after-free on the next route.
  *
@@ -109,6 +109,50 @@ RAC_API rac_result_t rac_stt_hybrid_router_transcribe(
  * @return RAC_SUCCESS.
  */
 RAC_API rac_result_t rac_stt_hybrid_router_cancel(rac_handle_t handle);
+
+/**
+ * @brief Create an STT service through the plugin registry, by engine hint.
+ *
+ * The single registry-backed factory for BOTH router sides: the offline
+ * (on-device) service and the online (cloud) service are created the same way
+ * — route RAC_PRIMITIVE_TRANSCRIBE with @p engine_hint pinned as
+ * preferred_engine_name (and fallback disabled), then call the routed engine's
+ * stt_ops->create. The returned vtable + impl are heap-wrapped into a
+ * rac_stt_service_t the caller owns and passes to
+ * rac_stt_hybrid_router_set_offline_service / _set_online_service.
+ *
+ * This is exposed so non-JNI bindings (Web/WASM, RN, Flutter) can construct a
+ * rac_stt_service_t* without dereferencing a function pointer inside a routed
+ * vtable across the proto-byte ABI boundary — the dereference and heap-wrap
+ * happen here, inside commons, where the symbols are local. The Android JNI
+ * service-create thunks delegate to this same function (one implementation).
+ *
+ * @param engine_hint       "sherpa" | "cloud" | … pinned as the preferred
+ *                          engine. NULL/empty lets the registry pick by
+ *                          primitive/format.
+ * @param model_id_or_path  Passed verbatim as the create op's `model_id`
+ *                          argument (an on-device path for sherpa, or NULL for
+ *                          cloud engines that take everything via config_json).
+ * @param config_json       Passed verbatim as the create op's `config_json`
+ *                          argument (the cloud {provider,api_key,model,…} JSON,
+ *                          or NULL). The caller is responsible for threading the
+ *                          provider in (e.g. {"provider":"sarvam"}).
+ * @return A heap-allocated rac_stt_service_t* the caller owns (release with
+ *         rac_stt_hybrid_router_destroy_service), or NULL on routing/create
+ *         failure or OOM.
+ */
+RAC_API rac_stt_service_t* rac_stt_hybrid_router_create_service(
+    const char* engine_hint,
+    const char* model_id_or_path,
+    const char* config_json);
+
+/**
+ * @brief Destroy a service returned by rac_stt_hybrid_router_create_service.
+ *
+ * Routes through rac_stt_destroy: calls the engine's stt_ops->destroy, frees
+ * the wrapper's strdup'd model_id, and frees the wrapper struct. NULL-safe.
+ */
+RAC_API void rac_stt_hybrid_router_destroy_service(rac_stt_service_t* service);
 
 #ifdef __cplusplus
 }

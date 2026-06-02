@@ -15,9 +15,8 @@ namespace onnxrt {
 
 /** ONNX tensor element types we can marshal in and out of ORT.
  *  Values map 1:1 to `rac_runtime_dtype_t` so the public
- * `rac_runtime_io_t::dtype` wire is lossless. RT-ONNX-02: extended from
- * {Float32, Int64} to the full set of ORT primitive dtypes the adapter can
- * actually round-trip. */
+ * `rac_runtime_io_t::dtype` wire is lossless. Covers the full set of ORT
+ * primitive dtypes the adapter can actually round-trip. */
 enum class ElementType : uint32_t {
     Undefined = RAC_RUNTIME_DTYPE_UNDEFINED,
     Float32 = RAC_RUNTIME_DTYPE_F32,
@@ -48,11 +47,11 @@ struct TensorInput {
     ElementType type = ElementType::Float32;
 };
 
-/** Raw-bytes tensor output. RT-ONNX-02: previously a `std::vector<float>`
- *  which force-cast every output to float32 regardless of the tensor's real
- *  dtype, silently corrupting i64/f16/u8/bf16/f64 outputs. `bytes` now holds
- *  the raw element-size × count payload and `dtype` records the ORT tensor's
- *  actual element type so callers can interpret it correctly. */
+/** Raw-bytes tensor output. Holds the raw element-size × count payload in
+ *  `bytes` with `dtype` recording the ORT tensor's actual element type so
+ *  callers can interpret it correctly — as opposed to a `std::vector<float>`
+ *  that would force-cast every output to float32 regardless of the tensor's
+ *  real dtype, silently corrupting i64/f16/u8/bf16/f64 outputs. */
 struct TensorOutput {
     std::vector<uint8_t> bytes;
     std::vector<int64_t> shape;
@@ -75,7 +74,7 @@ class Session {
     static std::unique_ptr<Session> create(const std::string& model_path,
                                            const SessionOptions& options, std::string* out_error);
 
-    /** runtimes-004: in-memory model bytes path. The vtable contract for
+    /** In-memory model bytes path. The vtable contract for
      *  `rac_runtime_session_desc_t` (rac_runtime_vtable.h:303-315) declares
      *  model_blob/model_blob_bytes as a peer to model_path -- both must be
      *  honored. ORT routes blobs through CreateSessionFromArray. */

@@ -73,7 +73,7 @@ typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes, siz
  *                                         frontend should fall back to
  *                                         the struct callback path.
  *
- * @warning user_data ownership and lifetime (pass3-syn-027 / cross-SDK
+ * @warning user_data ownership and lifetime (cross-SDK
  *          contract). The C runtime may invoke
  *          `callback(bytes, size, user_data)` on a background thread AFTER
  *          rac_llm_unset_stream_proto_callback(handle) has returned, because

@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
-// Deferred backends (MetalRT, WhisperKit, Diffusion) are excluded from the
+// Deferred backends (MetalRT, Diffusion) are excluded from the
 // Swift v1 build. See `thoughts/shared/plans/curious-greeting-panda.md`.
 #if canImport(UIKit)
 import UIKit

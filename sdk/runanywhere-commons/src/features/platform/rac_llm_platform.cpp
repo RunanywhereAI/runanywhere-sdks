@@ -39,8 +39,7 @@ namespace runanywhere::commons::platform_llm {
 
 // commons-032: take a value snapshot under the registration lock so callers
 // don't dereference the global struct after another thread may have written
-// it (mirrors engines/whisperkit_coreml::snapshot_callbacks). Returns true
-// iff a valid snapshot was produced.
+// it. Returns true iff a valid snapshot was produced.
 bool snapshot_callbacks(rac_platform_llm_callbacks_t* out) {
     if (!out) {
         return false;

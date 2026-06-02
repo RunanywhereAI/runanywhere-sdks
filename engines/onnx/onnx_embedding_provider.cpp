@@ -35,7 +35,7 @@ namespace runanywhere {
 namespace rag {
 
 // =============================================================================
-// SIMPLE TOKENIZER (Word-level for MVP)
+// SIMPLE TOKENIZER (Word-level)
 // =============================================================================
 
 class SimpleTokenizer {
@@ -582,7 +582,7 @@ class ONNXEmbeddingProvider::Impl {
                 return {};
             }
 
-            /* RT-ONNX-02: output.bytes holds raw element-size × count bytes;
+            /* output.bytes holds raw element-size × count bytes;
              * embedding models publish `last_hidden_state` as float32, so we
              * reinterpret the byte buffer as floats. Reject any non-float32
              * dtype up front instead of copying garbage. */
@@ -726,7 +726,7 @@ class ONNXEmbeddingProvider::Impl {
                 return {};
             }
 
-            /* RT-ONNX-02: reinterpret raw tensor bytes as float32 for
+            /* Reinterpret raw tensor bytes as float32 for
              * last_hidden_state; bail if the model produced a different dtype. */
             if (output.dtype != runanywhere::runtime::onnxrt::ElementType::Float32) {
                 LOGE("Batch embedding output dtype %u is not float32",
@@ -751,7 +751,7 @@ class ONNXEmbeddingProvider::Impl {
             // Mean-pooling each sentence reads `stride` float32s from the model
             // output; refuse to proceed if the byte budget is short of the count
             // we'd dereference across all sentences (mirrors the single-embed
-            // guard added for engines-other-003).
+            // guard above).
             const size_t required_floats = count * stride;
             if (output.bytes.size() < required_floats * sizeof(float)) {
                 LOGE("Batch embedding output buffer underflow: %zu bytes < required %zu",

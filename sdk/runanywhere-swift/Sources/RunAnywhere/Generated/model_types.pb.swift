@@ -248,9 +248,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
   case mlx // = 7
 
   /// Apple
-  case whisperkitCoreml // = 8
-
-  /// Apple
   case metalrt // = 9
 
   /// Qualcomm
@@ -261,8 +258,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
   case mlc // = 14
   case picoLlm // = 15
   case piperTts // = 16
-  case whisperkit // = 17
-  case openaiWhisper // = 18
   case swiftTransformers // = 19
 
   /// rule-based, no model
@@ -288,7 +283,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case 5: self = .fluidAudio
     case 6: self = .coreml
     case 7: self = .mlx
-    case 8: self = .whisperkitCoreml
     case 9: self = .metalrt
     case 10: self = .genie
     case 11: self = .tflite
@@ -297,8 +291,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case 14: self = .mlc
     case 15: self = .picoLlm
     case 16: self = .piperTts
-    case 17: self = .whisperkit
-    case 18: self = .openaiWhisper
     case 19: self = .swiftTransformers
     case 20: self = .builtIn
     case 21: self = .none
@@ -318,7 +310,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case .fluidAudio: return 5
     case .coreml: return 6
     case .mlx: return 7
-    case .whisperkitCoreml: return 8
     case .metalrt: return 9
     case .genie: return 10
     case .tflite: return 11
@@ -327,8 +318,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     case .mlc: return 14
     case .picoLlm: return 15
     case .piperTts: return 16
-    case .whisperkit: return 17
-    case .openaiWhisper: return 18
     case .swiftTransformers: return 19
     case .builtIn: return 20
     case .none: return 21
@@ -348,7 +337,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     .fluidAudio,
     .coreml,
     .mlx,
-    .whisperkitCoreml,
     .metalrt,
     .genie,
     .tflite,
@@ -357,8 +345,6 @@ public nonisolated enum RAInferenceFramework: SwiftProtobuf.Enum, Swift.CaseIter
     .mlc,
     .picoLlm,
     .piperTts,
-    .whisperkit,
-    .openaiWhisper,
     .swiftTransformers,
     .builtIn,
     .none,
@@ -2731,7 +2717,7 @@ nonisolated extension RAModelFormat: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAInferenceFramework: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{1}INFERENCE_FRAMEWORK_WHISPERKIT_COREML\0\u{1}INFERENCE_FRAMEWORK_METALRT\0\u{1}INFERENCE_FRAMEWORK_GENIE\0\u{1}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{1}INFERENCE_FRAMEWORK_WHISPERKIT\0\u{1}INFERENCE_FRAMEWORK_OPENAI_WHISPER\0\u{1}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INFERENCE_FRAMEWORK_UNSPECIFIED\0\u{1}INFERENCE_FRAMEWORK_ONNX\0\u{1}INFERENCE_FRAMEWORK_LLAMA_CPP\0\u{1}INFERENCE_FRAMEWORK_FOUNDATION_MODELS\0\u{1}INFERENCE_FRAMEWORK_SYSTEM_TTS\0\u{1}INFERENCE_FRAMEWORK_FLUID_AUDIO\0\u{1}INFERENCE_FRAMEWORK_COREML\0\u{1}INFERENCE_FRAMEWORK_MLX\0\u{2}\u{2}INFERENCE_FRAMEWORK_METALRT\0\u{1}INFERENCE_FRAMEWORK_GENIE\0\u{1}INFERENCE_FRAMEWORK_TFLITE\0\u{1}INFERENCE_FRAMEWORK_EXECUTORCH\0\u{1}INFERENCE_FRAMEWORK_MEDIAPIPE\0\u{1}INFERENCE_FRAMEWORK_MLC\0\u{1}INFERENCE_FRAMEWORK_PICO_LLM\0\u{1}INFERENCE_FRAMEWORK_PIPER_TTS\0\u{2}\u{3}INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS\0\u{1}INFERENCE_FRAMEWORK_BUILT_IN\0\u{1}INFERENCE_FRAMEWORK_NONE\0\u{1}INFERENCE_FRAMEWORK_UNKNOWN\0\u{1}INFERENCE_FRAMEWORK_SHERPA\0")
 }
 
 nonisolated extension RAModelCategory: SwiftProtobuf._ProtoNameProviding {

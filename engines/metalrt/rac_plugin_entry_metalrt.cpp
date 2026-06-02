@@ -2,6 +2,10 @@
  * @file rac_plugin_entry_metalrt.cpp
  * @brief Unified-ABI entry point for MetalRT backend (Apple only).
  *
+ * RESERVED / EXPERIMENTAL — reserved-for-future engine wrapping a private,
+ * closed-source MetalRT lib; OFF by default and a not-routable stub when the
+ * binary is absent. See engines/AGENTS.md ("Stubs & reserved engines").
+ *
  * MetalRT is a multi-primitive engine: it serves LLM + STT + TTS + VLM all
  * from custom Metal shaders. `capability_check()` gates on both __APPLE__
  * and the private engine binary so stub builds do not advertise primitives.
@@ -11,6 +15,8 @@
  * metadata. The manifest mirrors the conditional ops slots so registry
  * validation accepts both routable and stub builds.
  */
+
+#include "common/rac_engine_unavailable.h"
 
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -34,14 +40,23 @@ extern const rac_stt_service_ops_t g_metalrt_stt_ops;
 extern const rac_tts_service_ops_t g_metalrt_tts_ops;
 extern const rac_vlm_service_ops_t g_metalrt_vlm_ops;
 
+// 3-way gate delegated to the shared helper (engines/common/): non-Apple →
+// CAPABILITY_UNSUPPORTED, Apple-without-engine-binary → BACKEND_UNAVAILABLE,
+// routable (Apple + engine linked) → SUCCESS. Same outcome the hand-written
+// #if/#elif/#else produced; the macros below pin platform/backend to 1/0.
 static rac_result_t metalrt_capability_check(void) {
-#if !defined(__APPLE__)
-    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
-#elif defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
-    return RAC_SUCCESS;
+    return rac_engine_unavailable_capability(
+#if defined(__APPLE__)
+        1, /* platform_supported: MetalRT is Apple-only */
 #else
-    return RAC_ERROR_BACKEND_UNAVAILABLE;
+        0,
 #endif
+#if defined(RAC_METALRT_ENGINE_AVAILABLE) && RAC_METALRT_ENGINE_AVAILABLE
+        1 /* backend_present: closed-source engine binary linked */
+#else
+        0
+#endif
+    );
 }
 
 #if RAC_METALRT_ROUTABLE
@@ -63,6 +78,12 @@ static const rac_primitive_t k_metalrt_primitives[] = {
 };
 #endif
 
+#if RAC_METALRT_ROUTABLE
+// ── Real arm (engine binary linked) ─────────────────────────────────────────
+// Full multi-primitive manifest + 4-ops vtable. Kept hand-written: this is the
+// re-drop seam for the closed-source MetalRT engine. The inner
+// `#if RAC_METALRT_ROUTABLE` guards below are always-true inside this block —
+// they are retained verbatim so the routable arm stays byte-for-byte identical.
 static const rac_engine_manifest_t k_metalrt_manifest = {
     .name = "metalrt",
     .display_name =
@@ -171,5 +192,13 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
 RAC_PLUGIN_ENTRY_DEF(metalrt) {
     return rac_engine_entry_with_manifest(&k_metalrt_manifest, &g_metalrt_engine_vtable);
 }
+#else
+// ── Stub arm (engine binary absent) ─────────────────────────────────────────
+// Not routable: emit the shared empty-manifest + all-NULL vtable + entry shell
+// (engines/common/rac_engine_unavailable.h, USAGE B). capability_check still
+// returns the same 3-way result as the real arm's gate, so registration is
+// rejected and routing never selects this stub.
+RAC_ENGINE_UNAVAILABLE_PLUGIN(metalrt, "MetalRT", metalrt_capability_check)
+#endif
 
 }  // extern "C"

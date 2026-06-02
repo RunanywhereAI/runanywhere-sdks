@@ -33,7 +33,7 @@ extern "C" {
  */
 typedef struct rac_routing_hints {
     /**
-     * Hard pin to a specific plugin by `metadata.name` (e.g. "whisperkit_coreml").
+     * Hard pin to a specific plugin by `metadata.name` (e.g. "sherpa").
      * When set, the router only considers this plugin. NULL = no pin.
      */
     const char* preferred_engine_name;

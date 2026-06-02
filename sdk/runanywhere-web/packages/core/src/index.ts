@@ -38,6 +38,44 @@ export type {
 export type {
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
+// Hybrid STT router (cross-SDK parity with Kotlin RACRouter / Swift
+// HybridSTTRouter). Per-request offline(sherpa)↔online(cloud) dispatch;
+// commons owns all routing. Public API surfaces via `RunAnywhere.hybrid.*`.
+export { HybridSttRouter } from './Public/Extensions/Hybrid/HybridSttRouter';
+export { CloudSTT, cloud } from './Public/Extensions/Hybrid/CloudSTT';
+export type {
+  CloudModelEntry,
+  CloudSTTConfig,
+} from './Public/Extensions/Hybrid/CloudSTT';
+export {
+  HybridBackendKind,
+  HybridModelType,
+  HybridRank,
+  DEFAULT_CLOUD_PROVIDER,
+  HYBRID_STT_CONFIDENCE_THRESHOLD,
+  networkFilter,
+  batteryFilter,
+  customFilter,
+  confidenceCascade,
+  offlineSherpa,
+  onlineCloud,
+} from './Public/Extensions/Hybrid/HybridTypes';
+export type {
+  HybridFilterSpec,
+  HybridCascadeSpec,
+  HybridRoutingPolicySpec,
+  HybridModelSpec,
+  HybridTranscribeOptions,
+  HybridTranscribeResult,
+  HybridRoutedMetadata,
+} from './Public/Extensions/Hybrid/HybridTypes';
+export {
+  setHybridDeviceStateProvider,
+  registerHybridCustomFilter,
+  unregisterHybridCustomFilter,
+  browserDeviceStateProvider,
+} from './Public/Extensions/Hybrid/HybridDeviceState';
+export type { HybridDeviceStateProvider } from './Public/Extensions/Hybrid/HybridDeviceState';
 export type {
   PluginInfo,
   PluginLoaderCapability,

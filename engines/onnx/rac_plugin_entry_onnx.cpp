@@ -55,7 +55,7 @@ static const rac_primitive_t k_onnx_primitives[] = {
 };
 #endif
 
-// P0 regression fix (post FIX-AK17 autoregister): the onnx engine plugin
+// Autoregister regression fix: the onnx engine plugin
 // only owns the embeddings primitive on this build (stt/tts/vad ops are
 // nullptr and shipped by engines/sherpa). Keep priority below sherpa's 90.
 static const rac_engine_manifest_t k_onnx_manifest = {

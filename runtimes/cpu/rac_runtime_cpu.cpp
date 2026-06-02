@@ -2,8 +2,6 @@
  * @file rac_runtime_cpu.cpp
  * @brief Built-in CPU runtime plugin.
  *
- * Task T4.1.
- *
  * The CPU runtime is always available on every supported host. It guarantees
  * the runtime registry is non-empty and exposes a canonical `RAC_RUNTIME_CPU`
  * descriptor (device info + capabilities). Session execution is delegated to
@@ -21,7 +19,7 @@
  *                  them via NEON / AVX / VNNI.
  *   sessions — delegated to registered rac_cpu_runtime_provider_t entries.
  *
- * NOTE (RT-CPU-01): supported primitives are no longer a static, GENERATE_TEXT-
+ * NOTE: supported primitives are no longer a static, GENERATE_TEXT-
  * only list. `capabilities()` rebuilds a snapshot of primitives from the live
  * provider registry on every call, and `primitive_is_supported` /
  * `rac_cpu_runtime_register_provider` validate against the full primitive-enum
@@ -65,8 +63,7 @@ const rac_device_class_t k_supported_devices[] = {RAC_DEVICE_CLASS_CPU};
  * have at least one `rac_cpu_runtime_provider_t` registered at the time
  * `capabilities()` is invoked. This keeps the manifest honest as engines plug
  * in additional providers (STT, TTS, VAD, EMBED, RERANK, VLM, DIFFUSION)
- * without requiring a rebuild of the CPU runtime. See RT-CPU-01 in
- * gaps/inconsistencies/ runtimes.md (pre-fix audit). */
+ * without requiring a rebuild of the CPU runtime. */
 
 struct CpuRuntimeSession {
     uint64_t magic = kCpuSessionMagic;
@@ -91,7 +88,7 @@ struct FreeDeleter {
     }
 };
 
-/* RT-CPU-03: provider bookkeeping (mutex + vector + register/unregister/find)
+/* Provider bookkeeping (mutex + vector + register/unregister/find)
  * lives in `rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t>`. This
  * TU only has to supply the registry singleton. */
 rac::runtime::ProviderRegistry<rac_cpu_runtime_provider_t>& provider_registry() {
@@ -187,11 +184,17 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
     *out = rac_runtime_capabilities_t{};
 
     /* Static, always-on capabilities. The runtime itself (not the providers)
-     * implements buffer mapping/copy/alloc, so those flags are unconditional. */
+     * implements buffer mapping/copy/alloc, so those flags are unconditional.
+     * RAC_RUNTIME_CAP_SESSION_EXECUTION is likewise unconditional: the CPU
+     * runtime always fills the create/run/destroy_session slots and serves the
+     * OPTIONAL session-execution role by delegating to its provider registry —
+     * it is the one runtime that hosts sessions rather than only describing
+     * hardware. (Whether any provider is currently registered governs the
+     * supported-primitive list below, not this role bit.) */
     uint64_t flags = RAC_RUNTIME_CAP_QUANTIZED_INT8 | RAC_RUNTIME_CAP_QUANTIZED_INT4 |
                      RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_DYNAMIC_SHAPES |
                      RAC_RUNTIME_CAP_BUFFER_MAPPING | RAC_RUNTIME_CAP_BUFFER_COPY |
-                     RAC_RUNTIME_CAP_DEVICE_ALLOC;
+                     RAC_RUNTIME_CAP_DEVICE_ALLOC | RAC_RUNTIME_CAP_SESSION_EXECUTION;
     out->supported_formats = nullptr; /* format-agnostic */
     out->supported_formats_count = 0;
 
@@ -203,7 +206,7 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
      * the optional V2-native `run_session_v2` callback.
      * `RAC_RUNTIME_CAP_OWNED_OUTPUTS` is only advertised when at least one
      * provider can return runtime-owned outputs — the V1-shim fallback flattens
-     * tensors and cannot transport ownership back to the caller. See RT-CPU-02.
+     * tensors and cannot transport ownership back to the caller.
      */
     bool seen[RAC_PRIMITIVE_COUNT] = {false};
     bool any_v2 = false;
@@ -299,7 +302,7 @@ rac_result_t cpu_run_session_v2(rac_runtime_session_t* session, const rac_runtim
     /* V2-native fast path: provider handles tensors directly, preserving
      * buffers, ownership flags, capacity fields, memory-space, and dtype.
      * This is the only path through which `RAC_RUNTIME_CAP_OWNED_OUTPUTS` is
-     * reachable — see RT-CPU-02. */
+     * reachable. */
     if (cpu_session->provider.run_session_v2 != nullptr) {
         /* Validate any caller-supplied CPU buffers up front so the provider
          * only ever sees handles it can safely dereference. Tensors that

@@ -23,7 +23,6 @@
 #include <string>
 #include <sys/stat.h>
 
-#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -159,7 +158,7 @@ static rac_result_t llm_vtable_clear_context(void* impl) {
     return rac_llm_metalrt_clear_context(impl);
 }
 
-// v3 Phase B6: MetalRT LLM `create` adapter. Resolves nested tar.gz
+// MetalRT LLM `create` adapter. Resolves nested tar.gz
 // extraction directories before calling rac_llm_metalrt_create.
 static rac_result_t metalrt_llm_create_impl(const char* model_id, const char* /*config_json*/,
                                             void** out_impl) {
@@ -182,12 +181,11 @@ static rac_result_t metalrt_llm_create_impl(const char* model_id, const char* /*
 
 }  // namespace
 
-// MF-02: keep external C linkage so rac_plugin_entry_metalrt.cpp's
+// Keep external C linkage so rac_plugin_entry_metalrt.cpp's
 // `extern const rac_llm_service_ops_t g_metalrt_llm_ops` declaration is
 // satisfied by a matching external-linkage definition. Defining this struct
 // inside the anonymous namespace gave it internal linkage, contradicting the
-// `extern` declaration in the plugin-entry TU. Match the pattern used by
-// whisperkit_coreml (see rac_backend_whisperkit_coreml_register.cpp:194-200).
+// `extern` declaration in the plugin-entry TU.
 extern "C" const rac_llm_service_ops_t g_metalrt_llm_ops = {
     .initialize = llm_vtable_initialize,
     .generate = llm_vtable_generate,
@@ -241,7 +239,7 @@ static void stt_vtable_destroy(void* impl) {
     rac_stt_metalrt_destroy(impl);
 }
 
-// v3 Phase B6: MetalRT STT `create` adapter.
+// MetalRT STT `create` adapter.
 static rac_result_t metalrt_stt_create_impl(const char* model_id, const char* /*config_json*/,
                                             void** out_impl) {
     if (!model_id || !out_impl)
@@ -263,7 +261,7 @@ static rac_result_t metalrt_stt_create_impl(const char* model_id, const char* /*
 
 }  // namespace
 
-// MF-02: see g_metalrt_llm_ops above — external C linkage required.
+// See g_metalrt_llm_ops above — external C linkage required.
 extern "C" const rac_stt_service_ops_t g_metalrt_stt_ops = {
     .initialize = stt_vtable_initialize,
     .transcribe = stt_vtable_transcribe,
@@ -312,7 +310,7 @@ static void tts_vtable_destroy(void* impl) {
     rac_tts_metalrt_destroy(impl);
 }
 
-// v3 Phase B6: MetalRT TTS `create` adapter.
+// MetalRT TTS `create` adapter.
 static rac_result_t metalrt_tts_create_impl(const char* model_id, const char* /*config_json*/,
                                             void** out_impl) {
     if (!model_id || !out_impl)
@@ -334,7 +332,7 @@ static rac_result_t metalrt_tts_create_impl(const char* model_id, const char* /*
 
 }  // namespace
 
-// MF-02: see g_metalrt_llm_ops above — external C linkage required.
+// See g_metalrt_llm_ops above — external C linkage required.
 extern "C" const rac_tts_service_ops_t g_metalrt_tts_ops = {
     .initialize = tts_vtable_initialize,
     .synthesize = tts_vtable_synthesize,
@@ -398,7 +396,7 @@ static void vlm_vtable_destroy(void* impl) {
     rac_vlm_metalrt_destroy(impl);
 }
 
-// v3 Phase B6: MetalRT VLM `create` adapter. config_json MAY carry a
+// MetalRT VLM `create` adapter. config_json MAY carry a
 // "mmproj_path" field but the MetalRT VLM backend (rac_vlm_metalrt_create)
 // takes a single path and loads mmproj from within the model folder;
 // we intentionally ignore config_json here.
@@ -423,7 +421,7 @@ static rac_result_t metalrt_vlm_create_impl(const char* model_id, const char* /*
 
 }  // namespace
 
-// MF-02: see g_metalrt_llm_ops above — external C linkage required.
+// See g_metalrt_llm_ops above — external C linkage required.
 extern "C" const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
     .initialize = vlm_vtable_initialize,
     .process = vlm_vtable_process,
@@ -444,7 +442,6 @@ namespace {
 struct MetalRTRegistryState {
     std::mutex mutex;
     bool registered = false;
-    char module_id[16] = "metalrt";
 };
 
 MetalRTRegistryState& get_state() {
@@ -491,32 +488,10 @@ rac_result_t rac_backend_metalrt_register(void) {
     return RAC_SUCCESS;
 #endif
 
-    rac_module_info_t module_info = {};
-    module_info.id = state.module_id;
-    module_info.name = "MetalRT";
-    module_info.version = "1.0.0";
-    module_info.description =
-        "High-performance inference using custom Metal GPU kernels (Apple only)";
-
-    rac_capability_t capabilities[] = {
-        RAC_CAPABILITY_TEXT_GENERATION,
-        RAC_CAPABILITY_STT,
-        RAC_CAPABILITY_TTS,
-        RAC_CAPABILITY_VISION_LANGUAGE,
-    };
-    module_info.capabilities = capabilities;
-    module_info.num_capabilities = 4;
-
-    rac_result_t result = rac_module_register(&module_info);
-    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-        return result;
-    }
-
-    // Service routing dispatches from the unified plugin registry (not the
-    // legacy module registry), so the vtable must be installed there too —
-    // otherwise rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT|TRANSCRIBE|
-    // SYNTHESIZE|VLM, framework=metalrt) returns BACKEND_NOT_FOUND even
-    // though module_info is registered. Mirrors the Sherpa/WhisperCPP pattern.
+    // Service routing dispatches from the unified plugin registry, so the
+    // vtable must be installed there — otherwise
+    // rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT|TRANSCRIBE|SYNTHESIZE|VLM,
+    // framework=metalrt) returns BACKEND_NOT_FOUND. Mirrors the Sherpa pattern.
     const rac_engine_vtable_t* vt = rac_plugin_entry_metalrt();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);
@@ -540,11 +515,9 @@ rac_result_t rac_backend_metalrt_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    // Tear down the plugin route before the module entry so any in-flight
-    // routing lookup sees a consistent state. RAC_ERROR_NOT_FOUND is
-    // acceptable here (stub registrations never call rac_plugin_register).
+    // Tear down the plugin route. RAC_ERROR_NOT_FOUND is acceptable here
+    // (stub registrations never call rac_plugin_register).
     rac_plugin_unregister("metalrt");
-    rac_module_unregister(state.module_id);
 
     state.registered = false;
     RAC_LOG_INFO(LOG_CAT, "Backend unregistered");

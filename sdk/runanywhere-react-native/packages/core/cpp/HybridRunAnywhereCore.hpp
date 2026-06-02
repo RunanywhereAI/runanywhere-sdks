@@ -258,6 +258,57 @@ public:
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
 
   // ============================================================================
+  // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)
+  // THIN proto-byte / handle surface over rac_stt_hybrid_router_proto.h +
+  // rac_hybrid_device_state.h + rac_hybrid_custom_filter.h. Implemented in
+  // HybridRunAnywhereCore+Hybrid.cpp.
+  // ============================================================================
+
+  /// JS custom-filter predicate: (candidateModelId) -> Promise<bool>.
+  /// Nitro wraps a JS callback that returns a Promise in a double Promise (the
+  /// outer marshals the invocation, the inner is the JS-returned promise) — same
+  /// shape as ToolRunLoopExecuteCallback.
+  using HybridCustomFilterCallback = std::function<
+    std::shared_ptr<Promise<std::shared_ptr<Promise<bool>>>>(const std::string&)>;
+
+  std::shared_ptr<Promise<double>> hybridSttRouterCreate() override;
+  std::shared_ptr<Promise<void>> hybridSttRouterDestroy(double routerHandle) override;
+  std::shared_ptr<Promise<double>> hybridSttRouterCreateService(
+    const std::string& engineHint,
+    const std::string& modelIdOrPath,
+    const std::string& configJson) override;
+  std::shared_ptr<Promise<void>> hybridSttRouterDestroyService(
+    double serviceHandle) override;
+  std::shared_ptr<Promise<double>> hybridSttRouterSetOfflineService(
+    double routerHandle,
+    double serviceHandle,
+    const std::shared_ptr<ArrayBuffer>& descriptorBytes) override;
+  std::shared_ptr<Promise<double>> hybridSttRouterSetOnlineService(
+    double routerHandle,
+    double serviceHandle,
+    const std::shared_ptr<ArrayBuffer>& descriptorBytes) override;
+  std::shared_ptr<Promise<double>> hybridSttRouterSetPolicy(
+    double routerHandle,
+    const std::shared_ptr<ArrayBuffer>& policyBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hybridSttRouterTranscribe(
+    double routerHandle,
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<double>> hybridSttRouterCancel(double routerHandle) override;
+  std::shared_ptr<Promise<double>> hybridRegisterCustomFilter(
+    const std::string& name,
+    const HybridCustomFilterCallback& predicate) override;
+  std::shared_ptr<Promise<double>> hybridUnregisterCustomFilter(
+    const std::string& name) override;
+  std::shared_ptr<Promise<bool>> hybridSetDeviceState(
+    bool isOnline,
+    double batteryPercent,
+    bool thermalThrottled) override;
+  std::shared_ptr<Promise<bool>> hybridClearDeviceState() override;
+  std::shared_ptr<Promise<bool>> cloudRegister() override;
+  std::shared_ptr<Promise<bool>> cloudUnregister() override;
+  std::shared_ptr<Promise<bool>> cloudIsRegistered() override;
+
+  // ============================================================================
   // TTS Capability (Backend-Agnostic)
   // Delegates to lifecycle proto APIs via commons.
   // ============================================================================

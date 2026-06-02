@@ -561,7 +561,6 @@ enum InferenceFramework : int {
   INFERENCE_FRAMEWORK_FLUID_AUDIO = 5,
   INFERENCE_FRAMEWORK_COREML = 6,
   INFERENCE_FRAMEWORK_MLX = 7,
-  INFERENCE_FRAMEWORK_WHISPERKIT_COREML = 8,
   INFERENCE_FRAMEWORK_METALRT = 9,
   INFERENCE_FRAMEWORK_GENIE = 10,
   INFERENCE_FRAMEWORK_TFLITE = 11,
@@ -570,8 +569,6 @@ enum InferenceFramework : int {
   INFERENCE_FRAMEWORK_MLC = 14,
   INFERENCE_FRAMEWORK_PICO_LLM = 15,
   INFERENCE_FRAMEWORK_PIPER_TTS = 16,
-  INFERENCE_FRAMEWORK_WHISPERKIT = 17,
-  INFERENCE_FRAMEWORK_OPENAI_WHISPER = 18,
   INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS = 19,
   INFERENCE_FRAMEWORK_BUILT_IN = 20,
   INFERENCE_FRAMEWORK_NONE = 21,
@@ -589,7 +586,7 @@ inline constexpr InferenceFramework InferenceFramework_MIN =
 inline constexpr InferenceFramework InferenceFramework_MAX =
     static_cast<InferenceFramework>(23);
 [[nodiscard]] inline bool InferenceFramework_IsValid(int value) {
-  return 0 <= value && value <= 23;
+  return 0 <= value && value <= 23 && ((16383743u >> value) & 1) != 0;
 }
 inline constexpr int InferenceFramework_ARRAYSIZE = 23 + 1;
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL

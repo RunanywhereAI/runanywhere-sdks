@@ -69,6 +69,7 @@ import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hardware.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_lora.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
@@ -699,6 +700,13 @@ abstract final class RunAnywhere {
   /// Hardware profile (chip, NPU presence, acceleration mode).
   /// Canonical §14 namespace.
   static RunAnywhereHardware get hardware => RunAnywhereHardware.shared;
+
+  /// Hybrid STT router — per-request dispatch between an on-device (offline,
+  /// sherpa) and a cloud (online, cloud) speech service. Vends the router
+  /// factory, the cloud-backend registry, the device-state installer, and
+  /// cloud plugin registration. Mirrors Kotlin `RACRouter` /
+  /// Swift `HybridSTTRouter`. STT-only today.
+  static RunAnywhereHybrid get hybrid => RunAnywhereHybrid.shared;
 
   // -- Flat aliases for cross-SDK portability (canonical §0 — RN/Web/Swift use
   //    flat method names; Flutter additionally exposes them so portable

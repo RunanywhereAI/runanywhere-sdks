@@ -2,7 +2,7 @@
  * @file rac_runtime_entry_cpu.h
  * @brief Public entry-point declaration for the built-in CPU runtime plugin.
  *
- * Task T4.1 — the CPU runtime is always-available. Consumers who want to
+ * The CPU runtime is always-available. Consumers who want to
  * force a static link (so the registrar TU survives iOS's dead-symbol
  * stripper) should reference `rac_runtime_static_marker_cpu` or call
  * `rac_runtime_entry_cpu()` directly from host init.

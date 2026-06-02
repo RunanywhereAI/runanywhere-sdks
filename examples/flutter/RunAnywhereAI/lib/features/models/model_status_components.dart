@@ -283,7 +283,7 @@ class ModelRequiredOverlay extends StatelessWidget {
       case ModelSelectionContext.llm:
         return 'Select a language model to start chatting. Choose from LLaMA.cpp, Foundation Models, or other frameworks.';
       case ModelSelectionContext.stt:
-        return 'Select a speech recognition model to transcribe audio. Choose from WhisperKit or ONNX Runtime.';
+        return 'Select a speech recognition model to transcribe audio. Choose from Sherpa-ONNX or ONNX Runtime.';
       case ModelSelectionContext.tts:
         // System TTS is Apple-only — the commons `platform` engine plugin
         // is gated behind `if(APPLE AND RAC_BUILD_PLATFORM)`. Tailor the

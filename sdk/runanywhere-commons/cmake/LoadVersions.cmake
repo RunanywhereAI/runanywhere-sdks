@@ -55,7 +55,7 @@ foreach(_LINE IN LISTS _VERSIONS_LINES)
         # otherwise restore the raw `v1.3.2` and undo the v-strip
         # fix on a per-subdirectory basis. Strip the 'v' once at the source for
         # ZLIB_VERSION specifically. Other VERSION keys (USEARCH/GOOGLETEST/
-        # CPPHTTPLIB/WHISPERCPP) intentionally keep the 'v' because they feed
+        # CPPHTTPLIB) intentionally keep the 'v' because they feed
         # GIT_TAG arguments where the tag literally starts with 'v'.
         set(_RAC_BARE_VALUE "${_VALUE}")
         if("${_KEY}" STREQUAL "ZLIB_VERSION" AND _RAC_BARE_VALUE MATCHES "^v[0-9]")
@@ -85,7 +85,6 @@ message(STATUS "    SHERPA_ONNX_VERSION_LINUX: ${RAC_SHERPA_ONNX_VERSION_LINUX}"
 message(STATUS "    SHERPA_ONNX_VERSION_WINDOWS: ${RAC_SHERPA_ONNX_VERSION_WINDOWS}")
 message(STATUS "  ML / inference engines:")
 message(STATUS "    LLAMACPP_VERSION:    ${RAC_LLAMACPP_VERSION}")
-message(STATUS "    WHISPERCPP_VERSION:  ${RAC_WHISPERCPP_VERSION}")
 message(STATUS "  Data / serialization:")
 message(STATUS "    NLOHMANN_JSON_VERSION: ${RAC_NLOHMANN_JSON_VERSION}")
 message(STATUS "    PROTOBUF_VERSION:      ${RAC_PROTOBUF_VERSION}")

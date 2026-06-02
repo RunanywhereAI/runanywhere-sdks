@@ -61,7 +61,6 @@ object CppBridgeModelRegistry {
         const val NONE = 6 // RAC_FRAMEWORK_NONE
         const val MLX = 7 // RAC_FRAMEWORK_MLX
         const val COREML = 8 // RAC_FRAMEWORK_COREML
-        const val WHISPERKIT_COREML = 9 // RAC_FRAMEWORK_WHISPERKIT_COREML
         const val METALRT = 10 // RAC_FRAMEWORK_METALRT
         const val GENIE = 11 // RAC_FRAMEWORK_GENIE
         const val SHERPA = 12 // RAC_FRAMEWORK_SHERPA (Sherpa-ONNX speech engine)
