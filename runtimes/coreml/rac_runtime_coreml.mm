@@ -82,25 +82,8 @@ rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
     return RAC_SUCCESS;
 }
 
-const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = {
-    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
-    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
-    /* .run_session_v2 = */ nullptr,
-    /* .alloc_buffer   = */ nullptr,
-    /* .buffer_info    = */ nullptr,
-    /* .map_buffer     = */ nullptr,
-    /* .unmap_buffer   = */ nullptr,
-    /* .copy_buffer    = */ nullptr,
-    /* .release_tensor = */ nullptr,
-    /* .reserved_0     = */ nullptr,
-    /* .reserved_1     = */ nullptr,
-    /* .reserved_2     = */ nullptr,
-    /* .reserved_3     = */ nullptr,
-    /* .reserved_4     = */ nullptr,
-    /* .reserved_5     = */ nullptr,
-    /* .reserved_6     = */ nullptr,
-    /* .reserved_7     = */ nullptr,
-};
+// Capability-only: no session, no device buffers — all v2 op slots NULL.
+const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = RAC_RUNTIME_VTABLE_V2_CAPABILITY_ONLY;
 
 const rac_runtime_vtable_t k_coreml_vtable = {
     /* .metadata = */ {

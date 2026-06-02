@@ -138,24 +138,38 @@ bool ep_is_compiled_in(rac_onnxrt_ep_type_t type) {
     }
 }
 
-const char* ep_short_name(rac_onnxrt_ep_type_t type) {
-    switch (type) {
-        case RAC_ONNXRT_EP_CPU:
-            return "cpu";
-        case RAC_ONNXRT_EP_COREML:
-            return "coreml";
-        case RAC_ONNXRT_EP_CUDA:
-            return "cuda";
-        case RAC_ONNXRT_EP_DIRECTML:
-            return "directml";
-        case RAC_ONNXRT_EP_NNAPI:
-            return "nnapi";
-        case RAC_ONNXRT_EP_QNN:
-            return "qnn";
-        case RAC_ONNXRT_EP_WEBGPU:
-            return "webgpu";
+/* Per-EP metadata: short name, stable device_id, and device class. One row per
+ * EP so the name / device_id / class lookups can never drift apart. The string
+ * literals have static storage duration, so callers may hold the returned
+ * `short_name` / `device_id` pointers across calls (e.g. onnxrt_device_info). */
+struct EpInfo {
+    rac_onnxrt_ep_type_t type;
+    const char* short_name;
+    const char* device_id;
+    rac_device_class_t device_class;
+};
+
+constexpr EpInfo k_ep_info[] = {
+    {RAC_ONNXRT_EP_CPU, "cpu", "onnxrt-cpu", RAC_DEVICE_CLASS_CPU},
+    {RAC_ONNXRT_EP_COREML, "coreml", "onnxrt-coreml", RAC_DEVICE_CLASS_NPU /* ANE */},
+    {RAC_ONNXRT_EP_CUDA, "cuda", "onnxrt-cuda", RAC_DEVICE_CLASS_GPU},
+    {RAC_ONNXRT_EP_DIRECTML, "directml", "onnxrt-directml", RAC_DEVICE_CLASS_GPU},
+    {RAC_ONNXRT_EP_NNAPI, "nnapi", "onnxrt-nnapi", RAC_DEVICE_CLASS_NPU},
+    {RAC_ONNXRT_EP_QNN, "qnn", "onnxrt-qnn", RAC_DEVICE_CLASS_NPU},
+    {RAC_ONNXRT_EP_WEBGPU, "webgpu", "onnxrt-webgpu", RAC_DEVICE_CLASS_WEB_GPU},
+};
+
+// Look up an EP's row; unknown/out-of-range values fall back to CPU (row 0).
+const EpInfo& ep_info(rac_onnxrt_ep_type_t type) {
+    for (const auto& e : k_ep_info) {
+        if (e.type == type)
+            return e;
     }
-    return "cpu";
+    return k_ep_info[0];
+}
+
+const char* ep_short_name(rac_onnxrt_ep_type_t type) {
+    return ep_info(type).short_name;
 }
 
 /* Apply the active EP to the supplied session options. Returns RAC_SUCCESS
@@ -677,35 +691,11 @@ rac_result_t onnxrt_init(void) {
 
 void onnxrt_destroy(void) {}
 
-/* Stable per-EP `device_id` strings backed by static storage so
- * callers can safely hold the pointer across calls. We return pointers to
- * these rather than building a heap string per `onnxrt_device_info` call. */
-constexpr const char* k_onnxrt_device_id_cpu = "onnxrt-cpu";
-constexpr const char* k_onnxrt_device_id_coreml = "onnxrt-coreml";
-constexpr const char* k_onnxrt_device_id_cuda = "onnxrt-cuda";
-constexpr const char* k_onnxrt_device_id_directml = "onnxrt-directml";
-constexpr const char* k_onnxrt_device_id_nnapi = "onnxrt-nnapi";
-constexpr const char* k_onnxrt_device_id_qnn = "onnxrt-qnn";
-constexpr const char* k_onnxrt_device_id_webgpu = "onnxrt-webgpu";
-
+/* Stable per-EP `device_id` strings live in the `EpInfo` table (defined in the
+ * onnxrt namespace above); the returned pointers are static-storage literals so
+ * callers can hold them across calls rather than rebuilding a heap string. */
 const char* active_ep_device_id(rac_onnxrt_ep_type_t type) {
-    switch (type) {
-        case RAC_ONNXRT_EP_COREML:
-            return k_onnxrt_device_id_coreml;
-        case RAC_ONNXRT_EP_CUDA:
-            return k_onnxrt_device_id_cuda;
-        case RAC_ONNXRT_EP_DIRECTML:
-            return k_onnxrt_device_id_directml;
-        case RAC_ONNXRT_EP_NNAPI:
-            return k_onnxrt_device_id_nnapi;
-        case RAC_ONNXRT_EP_QNN:
-            return k_onnxrt_device_id_qnn;
-        case RAC_ONNXRT_EP_WEBGPU:
-            return k_onnxrt_device_id_webgpu;
-        case RAC_ONNXRT_EP_CPU:
-        default:
-            return k_onnxrt_device_id_cpu;
-    }
+    return runanywhere::runtime::onnxrt::ep_info(type).device_id;
 }
 
 rac_result_t onnxrt_device_info(rac_runtime_device_info_t* out) {
@@ -841,23 +831,7 @@ extern "C" RAC_API int rac_onnxrt_runtime_ep_is_available(rac_onnxrt_ep_type_t t
 
 extern "C" RAC_API rac_device_class_t
 rac_onnxrt_runtime_ep_device_class(rac_onnxrt_ep_type_t type) {
-    switch (type) {
-        case RAC_ONNXRT_EP_COREML:
-            return RAC_DEVICE_CLASS_NPU; /* ANE. */
-        case RAC_ONNXRT_EP_CUDA:
-            return RAC_DEVICE_CLASS_GPU;
-        case RAC_ONNXRT_EP_DIRECTML:
-            return RAC_DEVICE_CLASS_GPU;
-        case RAC_ONNXRT_EP_NNAPI:
-            return RAC_DEVICE_CLASS_NPU;
-        case RAC_ONNXRT_EP_QNN:
-            return RAC_DEVICE_CLASS_NPU;
-        case RAC_ONNXRT_EP_WEBGPU:
-            return RAC_DEVICE_CLASS_WEB_GPU;
-        case RAC_ONNXRT_EP_CPU:
-        default:
-            return RAC_DEVICE_CLASS_CPU;
-    }
+    return runanywhere::runtime::onnxrt::ep_info(type).device_class;
 }
 
 RAC_STATIC_RUNTIME_REGISTER(onnxrt);

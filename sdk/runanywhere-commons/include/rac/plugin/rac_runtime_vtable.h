@@ -319,6 +319,40 @@ typedef struct rac_runtime_vtable_v2 {
 
 #define RAC_RUNTIME_VTABLE_V2_MIN_SIZE ((uint32_t)offsetof(rac_runtime_vtable_v2_t, reserved_0))
 
+/**
+ * @brief Initializer for the v2 extension table of a capability-only runtime.
+ *
+ * Capability-only runtimes (Core ML, Metal) host no session and allocate no
+ * device buffers, so every v2 op slot is NULL — only the ABI header is
+ * populated. They still ship a v2 table on `reserved_slot_0` so the registry's
+ * v2 probe succeeds; a runtime that offers no session role at all may instead
+ * leave `reserved_slot_0` NULL (as onnxrt does). Use this to avoid hand-copying
+ * the all-NULL body:
+ *
+ *     const rac_runtime_vtable_v2_t k_coreml_vtable_v2 =
+ *         RAC_RUNTIME_VTABLE_V2_CAPABILITY_ONLY;
+ */
+#define RAC_RUNTIME_VTABLE_V2_CAPABILITY_ONLY                    \
+    {                                                            \
+        /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,      \
+        /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t), \
+        /* .run_session_v2 = */ NULL,                            \
+        /* .alloc_buffer   = */ NULL,                            \
+        /* .buffer_info    = */ NULL,                            \
+        /* .map_buffer     = */ NULL,                            \
+        /* .unmap_buffer   = */ NULL,                            \
+        /* .copy_buffer    = */ NULL,                            \
+        /* .release_tensor = */ NULL,                            \
+        /* .reserved_0     = */ NULL,                            \
+        /* .reserved_1     = */ NULL,                            \
+        /* .reserved_2     = */ NULL,                            \
+        /* .reserved_3     = */ NULL,                            \
+        /* .reserved_4     = */ NULL,                            \
+        /* .reserved_5     = */ NULL,                            \
+        /* .reserved_6     = */ NULL,                            \
+        /* .reserved_7     = */ NULL,                            \
+    }
+
 /** Parameters for `create_session`. Stable by-value POD. */
 typedef struct rac_runtime_session_desc {
     /** Which service primitive the session serves (llm, stt, …). */
