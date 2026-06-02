@@ -734,7 +734,10 @@ rac_result_t onnxrt_capabilities(rac_runtime_capabilities_t* out) {
 /* ONNXRT exposes no ABI-v2 session/buffer ops: the v2 run + buffer block is
  * part of the session-execution role, which ONNXRT does not provide over the C
  * vtable (the onnx engine drives ONNX Runtime through the C++ `Session` class).
- * `reserved_slot_0` is therefore left NULL — there is no v2 extension table. */
+ * It still publishes a capability-only v2 extension — the registry requires a
+ * non-NULL `reserved_slot_0` (see validate_v2_extension); all v2 op slots NULL. */
+const rac_runtime_vtable_v2_t k_onnxrt_vtable_v2 = RAC_RUNTIME_VTABLE_V2_CAPABILITY_ONLY;
+
 const rac_runtime_vtable_t k_onnxrt_vtable = {
     /* .metadata = */ {
         /* .abi_version             = */ RAC_RUNTIME_ABI_VERSION,
@@ -764,7 +767,7 @@ const rac_runtime_vtable_t k_onnxrt_vtable = {
     /* .free_buffer     = */ nullptr,
     /* .device_info     = */ onnxrt_device_info,
     /* .capabilities    = */ onnxrt_capabilities,
-    /* .reserved_slot_0 = */ nullptr,
+    /* .reserved_slot_0 = */ &k_onnxrt_vtable_v2,
     /* .reserved_slot_1 = */ nullptr,
     /* .reserved_slot_2 = */ nullptr,
     /* .reserved_slot_3 = */ nullptr,

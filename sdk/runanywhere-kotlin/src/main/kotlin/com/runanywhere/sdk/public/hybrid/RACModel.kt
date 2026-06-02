@@ -19,8 +19,8 @@ package com.runanywhere.sdk.public.hybrid
  *   - For [ModelType.ONLINE]: looked up in the cloud backend registry
  *     (`BACKEND.CLOUD`) to fetch the model string + credentials + provider.
  *
- * Construct via the [offline] / [online] convenience properties on
- * `ROUTER` to keep [modelType] correct by construction.
+ * Construct via the [ROUTER.OFFLINE] / [ROUTER.ONLINE] convenience
+ * properties to keep [modelType] correct by construction.
  *
  * @property id        Registry identifier shared with the SDK.
  * @property modelType Whether this side of the pair runs on-device or in the cloud.
@@ -35,18 +35,18 @@ class RACModel(
  * Wire values match `HybridModelType` in idl/hybrid_router.proto.
  */
 enum class ModelType(val value: Int) {
-    /** On-device backend (e.g. llama.cpp). */
+    /** On-device backend (e.g. sherpa). */
     OFFLINE(1),
 
-    /** Cloud backend (e.g. OpenRouter). */
+    /** Cloud backend (e.g. the Sarvam provider). */
     ONLINE(2),
 }
 
 /**
- * Convenience accessor mirroring the file.txt sketch:
+ * Convenience accessor for the two model types:
  *
- *     RACModel(id = "llama-1.2b", modelType = ROUTER.OFFLINE)
- *     RACModel(id = "claude-haiku", modelType = ROUTER.ONLINE)
+ *     RACModel(id = "sherpa-onnx-whisper-tiny.en", modelType = ROUTER.OFFLINE)
+ *     RACModel(id = "saaras", modelType = ROUTER.ONLINE)
  */
 object ROUTER {
     /** Shortcut for [ModelType.OFFLINE]. */

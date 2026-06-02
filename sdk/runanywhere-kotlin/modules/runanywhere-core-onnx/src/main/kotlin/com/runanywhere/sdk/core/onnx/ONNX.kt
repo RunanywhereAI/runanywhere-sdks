@@ -4,10 +4,10 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
- * ONNX Runtime module for STT, TTS, and VAD services.
+ * ONNX Runtime module for embedding services.
  *
- * Provides speech-to-text, text-to-speech, and voice activity detection
- * capabilities using ONNX Runtime with models like Whisper, Piper, and Silero.
+ * Provides text-embedding capabilities using ONNX Runtime with models like
+ * all-MiniLM. Speech primitives (STT/TTS/VAD) are served by the sherpa module.
  *
  * This is a thin wrapper that calls C++ backend registration.
  * All business logic is handled by the C++ commons layer.
@@ -27,11 +27,8 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
  * service creation and lifecycle internally:
  *
  * ```kotlin
- * // STT via public API
- * val text = RunAnywhere.transcribe(audioData)
- *
- * // TTS via public API
- * RunAnywhere.speak("Hello")
+ * // Embeddings via public API
+ * val embedding = RunAnywhere.embed(text, modelId = "all-minilm-l6-v2")
  * ```
  *
  * Matches iOS ONNX.swift exactly.
@@ -60,8 +57,8 @@ object ONNX {
     /**
      * Register ONNX backend with the C++ service registry.
      *
-     * Calls `rac_backend_onnx_register()` to register all ONNX service providers
-     * (STT, TTS, VAD) with the C++ commons layer. Suspend so that callers can
+     * Calls `rac_backend_onnx_register()` to register the ONNX embedding
+     * provider with the C++ commons layer. Suspend so that callers can
      * await module bootstrap from a coroutine scope.
      */
     suspend fun register() {
@@ -97,7 +94,7 @@ object ONNX {
         }
 
         isRegistered = true
-        logger.info("ONNX backend registered successfully (STT + TTS + VAD)")
+        logger.info("ONNX backend registered successfully (embeddings)")
     }
 
     // `canHandleSTT` / `canHandleTTS` / `canHandleVAD` deleted per
