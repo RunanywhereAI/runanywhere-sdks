@@ -28,9 +28,13 @@ import kotlinx.serialization.json.contentOrNull
 // MARK: - RAGConfiguration
 
 /**
- * Build a [RAGConfiguration] populated with the canonical defaults used by
- * the Swift SDK: 384-dim embeddings, top-K of 5, similarity threshold 0.7,
- * 512-token chunks with 64 tokens of overlap.
+ * Build a [RAGConfiguration] populated with the canonical RAG defaults:
+ * 384-dim embeddings, top-K of 5, similarity threshold 0.3, 512-token chunks
+ * with 64 tokens of overlap.
+ *
+ * The threshold is 0.3 — not 0.7 — because all-MiniLM-class embeddings produce
+ * cosine similarities that rarely exceed ~0.5 even for relevant chunks, so a
+ * 0.7 floor filters out every match and retrieval returns nothing.
  */
 fun RAGConfiguration.Companion.defaults(
     embeddingModelId: String = "",
@@ -41,7 +45,7 @@ fun RAGConfiguration.Companion.defaults(
         llm_model_id = llmModelId,
         embedding_dimension = 384,
         top_k = 5,
-        similarity_threshold = 0.7f,
+        similarity_threshold = 0.3f,
         chunk_size = 512,
         chunk_overlap = 64,
     )
@@ -63,7 +67,7 @@ fun RARAGConfiguration.validate() {
     if (effectiveTopK <= 0) {
         throw SDKException.invalidArgument("topK must be > 0 (got $effectiveTopK)")
     }
-    val effectiveThreshold = similarity_threshold ?: 0.7f
+    val effectiveThreshold = similarity_threshold ?: 0.3f
     if (effectiveThreshold < 0f || effectiveThreshold > 1.0f) {
         throw SDKException.invalidArgument(
             "Similarity threshold must be in 0..1.0 (got $effectiveThreshold)",
