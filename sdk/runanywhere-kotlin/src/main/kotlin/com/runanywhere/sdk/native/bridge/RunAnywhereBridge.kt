@@ -19,6 +19,7 @@ import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.hybrid.CustomFilterPredicate
 import com.runanywhere.sdk.public.hybrid.DeviceStateProvider
+import com.runanywhere.sdk.public.hybrid.NativeCloudSttProvider
 
 /*
  * Transport DTOs/listeners used by native HTTP bindings live in
@@ -1735,6 +1736,29 @@ object RunAnywhereBridge {
      * Idempotent for unknown names. Returns rac_result_t.
      */
     @JvmStatic external fun racHybridUnregisterCustomFilter(name: String): Int
+
+    // CLOUD STT PROVIDERS (rac_cloud_stt_provider.h)
+    //
+    // Developer-defined cloud STT backends. The cloud engine resolves a
+    // provider with no static adapter through this named host-callback table,
+    // invoking [provider].invoke(configJson, audio, audioFormat) to perform the
+    // whole request host-side. JNI looks the object up by the exact signature
+    // `invoke(Ljava/lang/String;[BI)Ljava/lang/String;`.
+
+    /**
+     * Register (or replace) the cloud STT provider published under [name].
+     * Returns rac_result_t (0 = success).
+     */
+    @JvmStatic external fun racCloudRegisterSttProvider(
+        name: String,
+        provider: NativeCloudSttProvider,
+    ): Int
+
+    /**
+     * Remove the cloud STT provider previously registered under [name].
+     * Idempotent for unknown names. Returns rac_result_t.
+     */
+    @JvmStatic external fun racCloudUnregisterSttProvider(name: String): Int
 
     // STT HYBRID ROUTER (rac_stt_hybrid_router.h)
 

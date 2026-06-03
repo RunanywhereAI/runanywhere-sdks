@@ -942,6 +942,8 @@ set(RAC_FEATURES_SOURCES
     src/router/hybrid/rac_stt_hybrid_router_proto.cpp
     src/router/hybrid/rac_hybrid_device_state.cpp
     src/router/hybrid/rac_hybrid_custom_filter.cpp
+    # Developer-defined cloud STT providers — named host-callback table.
+    src/cloud/rac_cloud_stt_provider.cpp
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)

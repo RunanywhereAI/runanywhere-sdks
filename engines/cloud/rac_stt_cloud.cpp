@@ -46,6 +46,7 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/cloud/rac_cloud_stt_provider.h"
 
 #include "cloud_stt_provider.h"
 
@@ -202,17 +203,30 @@ rac_result_t parse_config(const std::string& config_json, CloudSttImpl& out) {
         out.model         = json.value("model", std::string{});
         out.language_code = json.value("language_code", std::string{kDefaultLanguage});
         out.timeout_ms    = json.value("timeout_ms", kDefaultTimeoutMs);
+        out.provider_name = provider_name;
+        out.config_json   = config_json;
 
         const CloudSttProvider* provider = find_cloud_stt_provider(provider_name);
-        if (provider == nullptr) {
+        if (provider != nullptr) {
+            out.use_host_callback = false;
+            out.provider = provider;
+            // Provider defaults first, then optional per-request overrides.
+            out.base_url = json.value("base_url", std::string{provider->default_base_url});
+            out.path     = json.value("path", std::string{provider->default_path});
+        } else if (rac_cloud_has_stt_provider(provider_name.c_str()) == RAC_TRUE) {
+            // Developer-registered host-callback provider: the host owns the wire
+            // format end to end, so there's no static adapter and no engine-side
+            // base_url/path defaults — the host reads whatever it needs from the
+            // forwarded config_json.
+            out.use_host_callback = true;
+            out.provider = nullptr;
+            out.base_url = json.value("base_url", std::string{});
+            out.path     = json.value("path", std::string{});
+        } else {
             CLOUD_STT_LOG_E("parse_config: unknown provider '%s'", provider_name.c_str());
             RAC_LOG_ERROR("cloud_stt", "unknown provider '%s'", provider_name.c_str());
             return RAC_ERROR_INVALID_CONFIGURATION;
         }
-        out.provider = provider;
-        // Provider defaults first, then optional per-request overrides.
-        out.base_url = json.value("base_url", std::string{provider->default_base_url});
-        out.path     = json.value("path", std::string{provider->default_path});
     } catch (const std::exception&) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
@@ -220,6 +234,74 @@ rac_result_t parse_config(const std::string& config_json, CloudSttImpl& out) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
     return RAC_SUCCESS;
+}
+
+// ---- host-callback (developer-defined) provider path ------------------------
+
+// Decode the host callback's result JSON into out_result. Shape:
+//   {"text": "...", "language_code": "...", "confidence": <number|omitted>,
+//    "error_code": 0, "error_message": "..."}
+// A non-zero error_code is surfaced as an HTTP error; confidence defaults to the
+// cloud "no-signal" NaN when the host omits it.
+rac_result_t parse_host_result_json(const char*       result_json,
+                                    rac_stt_result_t* out_result,
+                                    int64_t           elapsed_ms) {
+    if (result_json == nullptr || out_result == nullptr) {
+        return RAC_ERROR_INVALID_RESPONSE;
+    }
+    try {
+        const auto json = nlohmann::json::parse(result_json);
+        const int error_code = json.value("error_code", 0);
+        if (error_code != 0) {
+            const auto msg = json.value("error_message", std::string{});
+            CLOUD_STT_LOG_E("host provider error %d: %s", error_code, msg.c_str());
+            RAC_LOG_ERROR("cloud_stt", "host provider error %d: %s", error_code, msg.c_str());
+            return RAC_ERROR_HTTP_ERROR;
+        }
+        out_result->text = cloud_stt_dup_cstr(json.value("text", std::string{}));
+        if (out_result->text == nullptr) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        const auto language = json.value("language_code", std::string{});
+        if (!language.empty()) {
+            out_result->detected_language = cloud_stt_dup_cstr(language);
+        }
+        out_result->confidence =
+            (json.contains("confidence") && json["confidence"].is_number())
+                ? json["confidence"].get<float>()
+                : cloud_stt_no_confidence();
+        out_result->processing_time_ms = elapsed_ms;
+        return RAC_SUCCESS;
+    } catch (const std::exception&) {
+        return RAC_ERROR_INVALID_RESPONSE;
+    }
+}
+
+// Delegate the whole transcribe to the host-registered provider callback. The
+// host builds the request, performs the HTTP, and parses the response; we just
+// hand over the audio + forwarded config and decode the result JSON it returns.
+rac_result_t transcribe_via_host(CloudSttImpl&            impl,
+                                 const void*              audio,
+                                 size_t                   audio_size,
+                                 const rac_stt_options_t* options,
+                                 rac_stt_result_t*        out_result) {
+    const int32_t fmt = (options != nullptr) ? static_cast<int32_t>(options->audio_format)
+                                             : static_cast<int32_t>(RAC_AUDIO_FORMAT_WAV);
+    char* result_json = nullptr;
+    const auto start = std::chrono::steady_clock::now();
+    rac_result_t rc = rac_cloud_invoke_stt_provider(
+        impl.provider_name.c_str(), impl.config_json.c_str(),
+        static_cast<const uint8_t*>(audio), audio_size, fmt, &result_json);
+    const auto elapsed_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count();
+    if (rc != RAC_SUCCESS) {
+        rac_cloud_stt_result_free(result_json);
+        return rc;
+    }
+    rc = parse_host_result_json(result_json, out_result, static_cast<int64_t>(elapsed_ms));
+    rac_cloud_stt_result_free(result_json);
+    return rc;
 }
 
 // =============================================================================
@@ -253,7 +335,10 @@ rac_result_t ops_create(const char* model_id, const char* config_json, void** ou
     if (model_id != nullptr && model_id[0] != '\0') {
         impl->model = model_id;
     }
-    if (impl->provider == nullptr || impl->api_key.empty() || impl->model.empty()) {
+    // A usable service needs either a static provider adapter or a host-callback
+    // provider; api_key + model stay required for both.
+    if ((impl->provider == nullptr && !impl->use_host_callback) ||
+        impl->api_key.empty() || impl->model.empty()) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
     *out_impl = impl.release();
@@ -273,12 +358,18 @@ rac_result_t ops_transcribe(void* impl_v, const void* audio_data, size_t audio_s
                         impl_v, audio_data, audio_size, (void*)out_result);
         return RAC_ERROR_INVALID_PARAMETER;
     }
+    impl->cancelled.store(false);
+    std::memset(out_result, 0, sizeof(*out_result));
+
+    // Developer-defined provider: the host performs the whole request.
+    if (impl->use_host_callback) {
+        return transcribe_via_host(*impl, audio_data, audio_size, options, out_result);
+    }
+
     if (impl->provider == nullptr || impl->provider->build_request == nullptr ||
         impl->provider->parse_response == nullptr) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
-    impl->cancelled.store(false);
-    std::memset(out_result, 0, sizeof(*out_result));
 
     const std::string language_code =
         (options != nullptr && options->language != nullptr && options->language[0] != '\0')

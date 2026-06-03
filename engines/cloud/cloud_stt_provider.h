@@ -73,6 +73,14 @@ struct CloudSttImpl {
     std::string base_url;  // resolved: provider default unless config overrides
     std::string path;      // resolved: provider default unless config overrides
 
+    // Host-callback (developer-defined) provider path. When true, transcribe is
+    // delegated to the host via rac_cloud_invoke_stt_provider(provider_name, …)
+    // — the host owns build + HTTP + parse — and `provider` stays null. Set when
+    // config_json["provider"] has no static adapter but a registered callback.
+    bool        use_host_callback = false;
+    std::string provider_name;  // config_json["provider"]; selects the host callback
+    std::string config_json;    // raw config forwarded verbatim to the host callback
+
     int32_t           timeout_ms = kDefaultTimeoutMs;
     std::atomic<bool> cancelled{false};
     std::mutex        http_mutex;

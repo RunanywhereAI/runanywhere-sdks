@@ -74,6 +74,7 @@ set(JNI_SOURCES
     okhttp_transport_adapter.cpp
     rac_hybrid_device_state_jni.cpp
     rac_hybrid_custom_filter_jni.cpp
+    rac_cloud_stt_provider_jni.cpp
     rac_stt_hybrid_router_jni.cpp
 )
 

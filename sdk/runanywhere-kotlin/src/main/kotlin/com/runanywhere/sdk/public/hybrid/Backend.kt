@@ -174,6 +174,58 @@ object BACKEND {
         fun clear() {
             registry.clear()
         }
+
+        // Developer-defined providers, kept by name so re-registration and
+        // [unregisterProvider] are well-defined. The native side holds the
+        // authoritative GlobalRef; this map mirrors it for lifecycle clarity.
+        private val providerHandlers = ConcurrentHashMap<String, NativeCloudSttProvider>()
+
+        /**
+         * Register (or replace) a developer-defined cloud STT [provider]. The
+         * [handler] performs the whole request host-side (build + HTTP + parse),
+         * so any vendor works without a native adapter. Tie a model to it by
+         * calling [register] with the same `provider` string:
+         *
+         *     BACKEND.CLOUD.registerProvider("deepgram") { req ->
+         *         // build + POST with OkHttp, parse the JSON …
+         *         CloudSttResult(text = transcript, confidence = score)
+         *     }
+         *     BACKEND.CLOUD.register(
+         *         id = "dg-nova2", model = "nova-2", apiKey = "…",
+         *         provider = "deepgram", baseUrl = "https://api.deepgram.com",
+         *     )
+         *
+         * The handler is invoked on the router's request thread and may block on
+         * network. Built-in providers (e.g. "sarvam") cannot be shadowed — a
+         * static adapter always wins over a host callback of the same name.
+         *
+         * @throws IllegalArgumentException if [provider] is blank.
+         * @throws IllegalStateException if native registration fails.
+         */
+        @JvmStatic
+        fun registerProvider(provider: String, handler: CloudSttProvider) {
+            require(provider.isNotBlank()) { "Cloud provider name must be non-blank" }
+            ensurePluginRegistered()
+            val native = NativeCloudSttProvider(handler)
+            val rc = RunAnywhereBridge.racCloudRegisterSttProvider(provider, native)
+            check(rc == RunAnywhereBridge.RAC_SUCCESS) {
+                "Failed to register cloud provider '$provider' (rc=$rc)"
+            }
+            providerHandlers[provider] = native
+        }
+
+        /**
+         * Remove a developer-defined provider previously registered via
+         * [registerProvider]. Idempotent for unknown names.
+         */
+        @JvmStatic
+        fun unregisterProvider(provider: String) {
+            if (provider.isBlank()) {
+                return
+            }
+            RunAnywhereBridge.racCloudUnregisterSttProvider(provider)
+            providerHandlers.remove(provider)
+        }
     }
 
     /**
