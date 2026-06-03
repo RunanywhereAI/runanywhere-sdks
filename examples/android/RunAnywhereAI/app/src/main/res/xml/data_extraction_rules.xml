@@ -1,25 +1,19 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-   API 31+ backup/restore rules (data extraction rules).
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample data extraction rules file; uncomment and customize as necessary.
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
+   for details.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!--
-          Exclude EncryptedSharedPreferences from cloud backup. The ciphertext is
-          encrypted under a non-exportable Android Keystore master key; restoring it
-          to a new device (which has a different key) causes GeneralSecurityException
-          on every read and silently corrupts all persisted SDK state (device_id,
-          auth tokens, etc.).
+        <!-- TODO: Use <include> and <exclude> to control what is backed up.
+        <include .../>
+        <exclude .../>
         -->
-        <exclude
-            domain="sharedpref"
-            path="runanywhere_secure_storage_encrypted.xml" />
     </cloud-backup>
+    <!--
     <device-transfer>
-        <!-- Same exclusion applies to device-to-device transfers. -->
-        <exclude
-            domain="sharedpref"
-            path="runanywhere_secure_storage_encrypted.xml" />
+        <include .../>
+        <exclude .../>
     </device-transfer>
+    -->
 </data-extraction-rules>

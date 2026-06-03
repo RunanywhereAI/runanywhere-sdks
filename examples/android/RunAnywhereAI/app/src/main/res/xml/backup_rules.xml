@@ -1,17 +1,13 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-   Auto-backup rules for API < 31 (fullBackupContent).
+<?xml version="1.0" encoding="utf-8"?><!--
+   Sample backup rules file; uncomment and customize as necessary.
    See https://developer.android.com/guide/topics/data/autobackup
-   Note: devices running API 31+ use data_extraction_rules.xml instead.
+   for details.
+   Note: This file is ignored for devices older than API 31
+   See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
     <!--
-      Exclude EncryptedSharedPreferences from backup. The ciphertext is
-      encrypted under a non-exportable Android Keystore master key; restoring
-      it to a new device causes GeneralSecurityException and silently corrupts
-      all persisted SDK state (device_id, auth tokens, etc.).
-    -->
-    <exclude
-        domain="sharedpref"
-        path="runanywhere_secure_storage_encrypted.xml" />
+   <include domain="sharedpref" path="."/>
+   <exclude domain="sharedpref" path="device.xml"/>
+-->
 </full-backup-content>

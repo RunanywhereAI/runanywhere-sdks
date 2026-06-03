@@ -2,266 +2,56 @@ package com.runanywhere.runanywhereai
 
 import ai.runanywhere.proto.v1.SDKEnvironment
 import android.app.Application
-import android.os.Handler
-import android.os.Looper
 import com.runanywhere.runanywhereai.data.ModelBootstrap
-import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
-import com.runanywhere.sdk.generated.convenience.wireString
+import com.runanywhere.runanywhereai.data.benchmark.BenchmarkStore
+import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
+import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
+import com.runanywhere.runanywhereai.data.settings.SettingsRepository
+import com.runanywhere.runanywhereai.state.GlobalState
+import com.runanywhere.runanywhereai.tools.BuiltInTools
+import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP
+import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.public.hybrid.RACRouter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import timber.log.Timber
-
-/**
- * Represents the SDK initialization state.
- */
-sealed class SDKInitializationState {
-    /** SDK is currently initializing */
-    data object Loading : SDKInitializationState()
-
-    /** SDK initialized successfully */
-    data object Ready : SDKInitializationState()
-
-    /** SDK initialization failed */
-    data class Error(
-        val error: Throwable,
-    ) : SDKInitializationState()
-}
 
 class RunAnywhereApplication : Application() {
-    companion object {
-        private var instance: RunAnywhereApplication? = null
 
-        /** Get the application instance */
-        fun getInstance(): RunAnywhereApplication = instance ?: throw IllegalStateException("Application not initialized")
-    }
-
-    /**
-     * Application-scoped CoroutineScope for SDK initialization and background work.
-     * Uses SupervisorJob to prevent failures in one coroutine from affecting others.
-     * This replaces GlobalScope to ensure proper lifecycle management.
-     */
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-
-    @Volatile
-    private var isSDKInitialized = false
-
-    @Volatile
-    private var initializationError: Throwable? = null
-
-    /** Observable SDK initialization state for Compose UI */
-    private val _initializationState = MutableStateFlow<SDKInitializationState>(SDKInitializationState.Loading)
-    val initializationState: StateFlow<SDKInitializationState> = _initializationState.asStateFlow()
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
 
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
+        GlobalState.warmUp()
+        ConversationRepository.initialize(applicationContext)
+        SettingsRepository.initialize(applicationContext)
+        CloudProviderRepository.initialize(applicationContext)
+        BenchmarkStore.initialize(applicationContext)
+        appScope.launch(Dispatchers.IO) {
+            ConversationRepository.refresh()
+            setupSDK()
         }
-
-        Timber.i("App launched, initializing SDK...")
-
-        // Post initialization to main thread's message queue to ensure system is ready
-        // This prevents crashes on devices where device-encrypted storage hasn't mounted yet
-        Handler(Looper.getMainLooper()).postDelayed({
-            // Initialize SDK asynchronously using application-scoped coroutine
-            applicationScope.launch(Dispatchers.IO) {
-                try {
-                    // Additional small delay to ensure storage is mounted
-                    delay(200)
-                    initializeSDK()
-                } catch (e: Exception) {
-                    Timber.e(e, "❌ Fatal error during SDK initialization: ${e.message}")
-                    // Don't crash the app - let it continue without SDK
-                }
-            }
-        }, 100) // 100ms delay to let system mount storage
     }
 
-    override fun onTerminate() {
-        // Cancel all coroutines when app terminates
-        applicationScope.cancel()
-        super.onTerminate()
-    }
-
-    private suspend fun initializeSDK() {
-        initializationError = null
-        Timber.i("🎯 Starting SDK initialization...")
-
-        // S5: libcurl + bundled mbedTLS + CA bundle deleted. The OkHttp
-        // platform transport (registered by RunAnywhereBridge during
-        // RunAnywhere.initialize) uses Android's system trust store, so
-        // no per-app CA bundle install is needed anymore.
-        Timber.w("=======================================================")
-        Timber.w("🔍 BUILD INFO - CHECK THIS FOR ANALYTICS DEBUGGING:")
-        Timber.w("   BuildConfig.DEBUG = ${BuildConfig.DEBUG}")
-        Timber.w("   BuildConfig.DEBUG_MODE = ${BuildConfig.DEBUG_MODE}")
-        Timber.w("   BuildConfig.BUILD_TYPE = ${BuildConfig.BUILD_TYPE}")
-        Timber.w("   Package name = ${applicationContext.packageName}")
-        Timber.w("=======================================================")
-
+    private suspend fun setupSDK() {
+        RACLog.i("RAC SDK Setup initialization... Recording Time")
         val startTime = System.currentTimeMillis()
 
-        // Check for custom API configuration (stored via Settings screen)
-        val customApiKey = SettingsViewModel.getStoredApiKey(this@RunAnywhereApplication)
-        val customBaseURL = SettingsViewModel.getStoredBaseURL(this@RunAnywhereApplication)
-        val hasCustomConfig =
-            !customApiKey.isNullOrBlank() &&
-                    !customBaseURL.isNullOrBlank() &&
-                    !looksLikePlaceholder(customApiKey) &&
-                    !looksLikePlaceholder(customBaseURL)
-
-        if (hasCustomConfig) {
-            Timber.i("🔧 Found custom API configuration")
-            Timber.i("   Base URL: $customBaseURL")
-        }
-
-        // Determine environment based on DEBUG_MODE (NOT BuildConfig.DEBUG!)
-        // BuildConfig.DEBUG is tied to isDebuggable flag, which we set to true for release builds
-        // to allow logging. BuildConfig.DEBUG_MODE correctly reflects debug vs release build type.
-        val defaultEnvironment =
-            if (BuildConfig.DEBUG_MODE) {
-                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-            } else {
-                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-            }
-
-        // If custom config is set, use production environment to enable the custom backend
-        val environment = if (hasCustomConfig) SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION else defaultEnvironment
-
-        // Try to initialize SDK - log failures but continue regardless. The
-        // `RunAnywhere.initialize(Context, ...)` overload absorbs the
-        // previously-explicit `AndroidPlatformContext.initialize(...)` call so
-        // the example does not import SDK-internal foundation packages.
-        val appContext = this@RunAnywhereApplication
-        try {
-            if (hasCustomConfig) {
-                // Custom configuration mode - use stored API key and base URL
-                RunAnywhere.initialize(
-                    context = appContext,
-                    apiKey = customApiKey!!,
-                    baseURL = customBaseURL!!,
-                    environment = environment,
-                )
-                Timber.i("✅ SDK initialized with CUSTOM configuration (${environment.wireString})")
-            } else if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                // DEVELOPMENT mode: Don't pass baseURL - SDK uses Supabase URL from C++ dev config
-                RunAnywhere.initialize(
-                    context = appContext,
-                    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-                )
-                Timber.i("✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
-            } else {
-                // PRODUCTION mode without custom config: hard-fail so a release build that
-                // wasn't wired up with real credentials cannot silently boot into dev mode.
-                // Mirror iOS: #if DEBUG → initialize(); #else → fatalError(...).
-                if (BuildConfig.DEBUG_MODE) {
-                    RunAnywhere.initialize(
-                        context = appContext,
-                        environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-                    )
-                    Timber.i("SDK initialized in DEVELOPMENT mode (no custom config)")
-                } else {
-                    throw IllegalStateException(
-                        "Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL " +
-                            "via gradle.properties or the Settings screen — configure before shipping.",
-                    )
-                }
-            }
-
-            // Phase 2 (services / device registration) is now triggered lazily
-            // on the first feature entry via `RunAnywhere.ensureServicesReady()`.
-            // Mirrors Swift `_servicesInitTask` fan-in — explicit Phase 2 kick
-            // here is no longer required.
-            Timber.i("✅ SDK Phase 1 ready (Phase 2 will run lazily on first feature call)")
-        } catch (e: Exception) {
-            // Log the failure but continue
-            Timber.w("⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")
-            initializationError = e
-
-            // Fall back to development mode
-            try {
-                // Don't pass baseURL - SDK uses Supabase URL from C++ dev config
-                RunAnywhere.initialize(
-                    context = appContext,
-                    environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-                )
-                Timber.i("✅ SDK initialized in OFFLINE mode (local models only)")
-
-                // Still try Phase 2 in offline mode
-                RunAnywhere.completeServicesInitialization()
-            } catch (fallbackError: Exception) {
-                Timber.e("❌ Fallback initialization also failed: ${fallbackError.message}")
-            }
-        }
-
-        // Register modules and models
-        registerModulesAndModels()
-
-        // Wire the hybrid router's device-state vtable so NETWORK / Battery
-        // filters see live ConnectivityManager / BatteryManager state.
+        //Starting Setup Work
+        AndroidPlatformContext.initialize(this@RunAnywhereApplication)
+        RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
+        CppBridgeHTTP.register()
         RACRouter.setDeviceStateProvider(AndroidDeviceStateProvider(applicationContext))
-
-        Timber.i("✅ SDK initialization complete")
-
-        val initTime = System.currentTimeMillis() - startTime
-        Timber.i("✅ SDK setup completed in ${initTime}ms")
-        Timber.i("🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
-
-        isSDKInitialized = RunAnywhere.isInitialized
-
-        // Update observable state for Compose UI
-        val error = initializationError
-        if (isSDKInitialized) {
-            _initializationState.value = SDKInitializationState.Ready
-            Timber.i("🎉 App is ready to use!")
-        } else if (error != null) {
-            _initializationState.value = SDKInitializationState.Error(error)
-        } else {
-            // SDK reported not initialized but no error - treat as ready for offline mode
-            _initializationState.value = SDKInitializationState.Ready
-            Timber.i("🎉 App is ready to use (offline mode)!")
-        }
-    }
-
-    /**
-     * Get SDK initialization status
-     */
-    fun isSDKReady(): Boolean = isSDKInitialized
-
-    /**
-     * Get initialization error if any
-     */
-    fun getInitializationError(): Throwable? = initializationError
-
-    private fun looksLikePlaceholder(value: String?): Boolean {
-        if (value.isNullOrBlank()) return true
-        return Regex("YOUR_|<your|REPLACE_ME|PLACEHOLDER", RegexOption.IGNORE_CASE).containsMatchIn(value)
-    }
-
-    /**
-     * Retry SDK initialization
-     */
-    suspend fun retryInitialization() {
-        _initializationState.value = SDKInitializationState.Loading
-        withContext(Dispatchers.IO) {
-            initializeSDK()
-        }
-    }
-
-    private suspend fun registerModulesAndModels() {
         ModelBootstrap.setupModels()
+        CloudProviderRepository.registerAll()
+        BuiltInTools.register(applicationContext)
+        GlobalState.markReady()
+        val initTime = System.currentTimeMillis() - startTime
+        RACLog.i("SDK setup completed in ${initTime}ms")
     }
 }
