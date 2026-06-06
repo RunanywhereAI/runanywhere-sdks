@@ -14,16 +14,13 @@ import type {
   ModelFileDescriptor,
   ModelInfo,
   MultiFileArtifact,
-  RegisterModelFromUrlRequest,
 } from '@runanywhere/proto-ts/model_types';
 import {
   ModelArtifactType,
   ModelCategory,
   ModelFileRole,
   ModelFormat,
-  ModelInfo as ModelInfoCodec,
   ModelSource,
-  RegisterModelFromUrlRequest as RegisterModelFromUrlRequestCodec,
 } from '@runanywhere/proto-ts/model_types';
 import type {
   StorageAvailabilityRequest,
@@ -37,25 +34,7 @@ import type {
 } from '@runanywhere/proto-ts/storage_types';
 import { SDKException } from '../../Foundation/SDKException';
 import { StorageAdapter } from '../../Adapters/StorageAdapter';
-import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
-import { SDKLogger } from '../../Foundation/SDKLogger';
-import { tryRunanywhereModule } from '../../runtime/EmscriptenModule';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
-
-const _storageLogger = new SDKLogger('RunAnywhere+Storage');
-
-/**
- * Minimal typed overlay for the `_rac_register_model_from_url_proto` WASM
- * export. Declared locally so the fix does not require touching
- * EmscriptenModule.ts interface before the WASM is rebuilt with this export.
- */
-interface RegisterModelFromUrlModule {
-  _rac_register_model_from_url_proto?: (
-    requestBytes: number,
-    requestSize: number,
-    outBuffer: number,
-  ) => number;
-}
 
 function requireNativeStorage(operation: string): StorageAdapter {
   const adapter = StorageAdapter.tryDefault();
@@ -236,34 +215,9 @@ function totalFileSize(files: readonly RegisterModelFile[]): number {
 }
 
 /**
- * Call `rac_register_model_from_url_proto` in the commons WASM module to build
- * and persist the canonical `ModelInfo` — matching Swift's `registerModelFromUrl`
- * which delegates to this same ABI. Returns null when the WASM export is not yet
- * available (WASM rebuild pending), allowing the caller to fall back.
- */
-function registerModelInfoViaWasm(
-  request: RegisterModelFromUrlRequest,
-): ModelInfo | null {
-  type RegisterModule = ReturnType<typeof tryRunanywhereModule> & RegisterModelFromUrlModule;
-  const mod = tryRunanywhereModule() as RegisterModule | null;
-  if (!mod) return null;
-  if (typeof mod._rac_register_model_from_url_proto !== 'function') return null;
-
-  const bridge = new ProtoWasmBridge(mod, _storageLogger);
-  const requestBytes = RegisterModelFromUrlRequestCodec.encode(request).finish();
-  return bridge.withHeapBytes(requestBytes, (ptr, size) => (
-    bridge.callResultProto(
-      ModelInfoCodec,
-      (outBuffer) => mod._rac_register_model_from_url_proto!(ptr, size, outBuffer),
-      'rac_register_model_from_url_proto',
-    )
-  ));
-}
-
-/**
- * Fallback id derivation used only when the WASM export is unavailable.
- * Matches the subset of `rac_model_generate_id` that strips known model
- * extensions (.gguf, .onnx, .ort, .bin) in addition to .gz/.bz2.
+ * Derive a model id from a download URL when the caller does not supply an
+ * explicit id. Strips known model extensions (.gguf, .onnx, .ort, .bin) in
+ * addition to archive suffixes (.gz/.bz2/.tar/.zip).
  */
 function deriveIdFromUrlFallback(url: string): string {
   const trailing = url.split('?')[0].split('/').pop() ?? '';
@@ -299,13 +253,12 @@ function toMultiFileArtifact(
 }
 
 /**
- * Build a hand-rolled `ModelInfo` for a single-file remote model. Used as
- * a fallback when the `_rac_register_model_from_url_proto` WASM export is
- * not yet available (WASM rebuild pending). The id produced here does strip
- * the most common model extensions to reduce cross-SDK divergence, but full
- * parity requires the WASM export.
+ * Build the canonical `ModelInfo` for a single-file remote model from the
+ * caller's args, setting every capability field. The plain register path
+ * (`ModelRegistry.registerModel` → `_rac_model_registry_register_proto`)
+ * persists all of these fields, so one complete build + one save is enough.
  */
-function buildSingleFileModelInfoFallback(
+function buildSingleFileModelInfo(
   url: string,
   name: string,
   framework: InferenceFramework,
@@ -372,20 +325,11 @@ function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
  * Register a single-file remote model by URL. Mirrors Swift's
  * `RunAnywhere.registerModel(id:name:url:framework:...)`.
  *
- * Delegates the build-and-save flow to `rac_register_model_from_url_proto`
- * in the commons WASM (matching Swift which delegates to the same C ABI).
- * The WASM call handles id generation (extension stripping), format detection,
- * and framework→category mapping — ensuring cross-SDK catalog parity.
- *
- * After the WASM call, any options fields not yet modelled by
- * `RegisterModelFromUrlRequest` (id override, memoryRequirement,
- * supportsThinking, supportsLora, artifactType, contextLength, description,
- * downloadSizeBytes) are applied as a needsResave overlay and the updated
- * entry is persisted via `ModelRegistry.updateModel`, mirroring Swift's
- * needsResave pattern.
- *
- * When the WASM export is not yet available (WASM rebuild pending), falls
- * back to the previous hand-rolled path to keep existing apps working.
+ * Builds a complete `ModelInfo` from the caller's args — setting every
+ * capability field (id, memoryRequirement, supportsThinking, supportsLora,
+ * artifactType, contextLength, description, downloadSizeBytes) — and persists
+ * it with a single `ModelRegistry.registerModel(...)` call. The plain register
+ * path already saves all of those fields, so no second save is needed.
  */
 export function registerModelFromUrl(
   url: string,
@@ -393,67 +337,7 @@ export function registerModelFromUrl(
   framework: InferenceFramework,
   options: RegisterModelOptions = {},
 ): ModelInfo {
-  const request: RegisterModelFromUrlRequest = {
-    url,
-    name,
-    framework,
-    category: options.modality,
-    source: options.source,
-  };
-
-  const wasmModel = registerModelInfoViaWasm(request);
-
-  if (wasmModel) {
-    const now = Date.now();
-    let model = wasmModel;
-    let needsResave = false;
-
-    if (options.id !== undefined && options.id !== model.id) {
-      model = { ...model, id: options.id };
-      needsResave = true;
-    }
-    if (options.memoryRequirement !== undefined) {
-      model = { ...model, downloadSizeBytes: options.memoryRequirement, memoryRequiredBytes: options.memoryRequirement };
-      needsResave = true;
-    }
-    if (options.downloadSizeBytes !== undefined && options.memoryRequirement === undefined) {
-      model = { ...model, downloadSizeBytes: options.downloadSizeBytes };
-      needsResave = true;
-    }
-    if (options.supportsThinking) {
-      model = { ...model, supportsThinking: true };
-      needsResave = true;
-    }
-    if (options.supportsLora) {
-      model = { ...model, supportsLora: true };
-      needsResave = true;
-    }
-    if (options.artifactType !== undefined) {
-      model = { ...model, artifactType: options.artifactType };
-      needsResave = true;
-    }
-    if (options.contextLength !== undefined) {
-      model = { ...model, contextLength: options.contextLength };
-      needsResave = true;
-    }
-    if (options.description !== undefined && options.description !== '') {
-      model = { ...model, description: options.description };
-      needsResave = true;
-    }
-    if (needsResave) {
-      model = { ...model, updatedAtUnixMs: now };
-      if (!ModelRegistry.updateModel(model)) {
-        throw SDKException.backendNotAvailable(
-          'registerModel',
-          `Model registry update rejected '${model.id}'. Ensure a backend module is registered before calling RunAnywhere.registerModel().`,
-        );
-      }
-    }
-    schedulePostRegisterHydrate();
-    return model;
-  }
-
-  const model = buildSingleFileModelInfoFallback(url, name, framework, options);
+  const model = buildSingleFileModelInfo(url, name, framework, options);
   if (!ModelRegistry.registerModel(model)) {
     throw SDKException.backendNotAvailable(
       'registerModel',

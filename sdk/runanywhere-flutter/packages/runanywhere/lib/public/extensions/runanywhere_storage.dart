@@ -28,11 +28,12 @@ class RunAnywhereStorage {
   // ===========================================================================
 
   /// Register a remote model with the in-memory model registry from a
-  /// download URL. Delegates the full build-and-save flow to the canonical
-  /// `rac_register_model_from_url_proto` C ABI; only the parameters the proto
-  /// request does not yet model (id override, memory hint, thinking flag,
-  /// LoRA flag, explicit artifact type) are patched onto the saved
-  /// [ModelInfo] and re-persisted through the registry's proto save path.
+  /// download URL. Builds a complete [ModelInfo] in-place — every capability
+  /// field (id, framework, category, memory/download size, thinking, LoRA,
+  /// artifact type) carried on the caller's arguments — and persists it
+  /// through the registry's proto save path in a single save. The save path
+  /// (`rac_model_registry_register_proto`) round-trips every field, so no
+  /// from-url build-then-patch-then-resave dance is required.
   ///
   /// Mirrors Swift `RunAnywhere.registerModel(id:name:url:framework:modality:
   /// artifactType:memoryRequirement:supportsThinking:supportsLora:)`.
@@ -51,53 +52,39 @@ class RunAnywhereStorage {
       throw SDKException.notInitialized();
     }
 
-    final request = RegisterModelFromUrlRequest(
-      url: url,
+    final nowMs = Int64(DateTime.now().millisecondsSinceEpoch);
+    final model = ModelInfo(
+      id: id ?? _deriveModelId(name),
       name: name,
-      framework: framework,
       category: modality,
+      format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
+      framework: framework,
+      downloadUrl: url,
+      singleFile: SingleFileArtifact(),
+      artifactType:
+          artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+      downloadSizeBytes: Int64(memoryRequirement ?? 0),
+      memoryRequiredBytes: Int64(memoryRequirement ?? 0),
+      contextLength: _defaultContextLength(modality),
+      supportsThinking: supportsThinking,
+      supportsLora: supportsLora,
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      createdAtUnixMs: nowMs,
+      updatedAtUnixMs: nowMs,
     );
 
-    final saved =
-        await DartBridgeModelRegistry.instance.registerModelFromUrl(request);
-    if (saved == null) {
-      throw SDKException.processingFailed(
-        'rac_register_model_from_url_proto unavailable',
-      );
-    }
-
-    var model = saved;
-    var needsResave = false;
-    if (id != null && id != model.id) {
-      model = model.deepCopy()..id = id;
-      needsResave = true;
-    }
-    if (memoryRequirement != null) {
-      model = model.deepCopy()
-        ..downloadSizeBytes = Int64(memoryRequirement)
-        ..memoryRequiredBytes = Int64(memoryRequirement);
-      needsResave = true;
-    }
-    if (supportsThinking && !model.supportsThinking) {
-      model = model.deepCopy()..supportsThinking = true;
-      needsResave = true;
-    }
-    if (supportsLora && !model.supportsLora) {
-      model = model.deepCopy()..supportsLora = true;
-      needsResave = true;
-    }
-    if (artifactType != null && artifactType != model.artifactType) {
-      model = model.deepCopy()..artifactType = artifactType;
-      needsResave = true;
-    }
-
-    if (needsResave) {
-      model = model.deepCopy()
-        ..updatedAtUnixMs = Int64(DateTime.now().millisecondsSinceEpoch);
-      await DartBridgeModelRegistry.instance.saveProtoModel(model);
-    }
-
+    await DartBridgeModelRegistry.instance.saveProtoModel(model);
     return model;
+  }
+
+  /// Derive a stable, slug-style model id from a display [name] when the
+  /// caller does not supply one explicitly.
+  static String _deriveModelId(String name) {
+    final slug = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return slug.isEmpty ? 'model' : slug;
   }
 
   /// Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip)

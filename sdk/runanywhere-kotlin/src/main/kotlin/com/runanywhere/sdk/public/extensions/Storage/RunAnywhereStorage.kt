@@ -26,7 +26,6 @@ import ai.runanywhere.proto.v1.ModelImportResult
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
-import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
@@ -77,93 +76,13 @@ suspend fun RunAnywhere.registerModel(
 ): RAModelInfo {
     requireStorageInitialized(this)
 
-    // Delegate the full build-and-save flow to commons via the canonical
-    // `rac_register_model_from_url_proto` ABI — mirrors Swift's
-    // `RunAnywhere+Storage.swift:19-72`. The native helper translates a
-    // RegisterModelFromUrlRequest → ModelInfoMakeRequest (framework-aware
-    // defaulting + artifact inference + id/name derivation) and persists
-    // through the registry's proto save path. If the JNI thunk has not yet
-    // been wired in commons we fall back to the legacy local build path so
-    // current behaviour is preserved.
-    val request =
-        RegisterModelFromUrlRequest(
-            url = url,
-            name = name,
-            framework = framework,
-            category = modality,
-            source = ModelSource.MODEL_SOURCE_REMOTE,
-        )
-
+    // Build a complete ModelInfo locally with every caller-supplied capability
+    // field already set, then persist it through the registry's proto save
+    // path ONCE. The plain save (rac_model_registry_register_proto) persists
+    // every capability field (id, memory_required_bytes, supports_thinking +
+    // thinking_pattern, supports_lora, artifact_type, download_size_bytes,
+    // …), so no from-url-then-patch-then-resave round trip is needed.
     var model =
-        CppBridgeModelRegistry.registerModelFromUrl(request)
-            ?: buildModelFromUrlLocally(
-                id = id,
-                name = name,
-                url = url,
-                framework = framework,
-                modality = modality,
-                memoryRequirement = memoryRequirement,
-                supportsThinking = supportsThinking,
-            )
-
-    // Patch fields the proto request does not yet model (id override, memory
-    // hint, thinking flag, LoRA flag, explicit artifact type) and re-persist
-    // through the registry's proto save path. Mirrors Swift's needsResave
-    // pattern.
-    var needsResave = false
-    if (id != null && id != model.id) {
-        model = model.copy(id = id)
-        needsResave = true
-    }
-    if (memoryRequirement != null) {
-        model =
-            model.copy(
-                download_size_bytes = memoryRequirement,
-                memory_required_bytes = memoryRequirement,
-            )
-        needsResave = true
-    }
-    if (supportsThinking && model.thinking_pattern == null) {
-        model =
-            model.copy(
-                supports_thinking = true,
-                thinking_pattern = ThinkingTagPattern(),
-            )
-        needsResave = true
-    }
-    if (supportsLora) {
-        model = model.copy(supports_lora = true)
-        needsResave = true
-    }
-    if (artifactType != null && artifactType != model.artifact_type) {
-        model = model.copy(artifact_type = artifactType)
-        needsResave = true
-    }
-
-    if (needsResave) {
-        model = model.copy(updated_at_unix_ms = getCurrentTimeMillis())
-        CppBridgeModelRegistry.save(model)
-    }
-
-    return model
-}
-
-/**
- * JVM-only fallback that mirrors the legacy local build-and-save path used
- * before commons exposed `rac_register_model_from_url_proto`. Kept so
- * registerModel(URL) still works when the JNI thunk is not yet bound (e.g.
- * older `librunanywhere_jni.so` builds).
- */
-private fun buildModelFromUrlLocally(
-    id: String?,
-    name: String,
-    url: String,
-    framework: InferenceFramework,
-    modality: ModelCategory,
-    memoryRequirement: Long?,
-    supportsThinking: Boolean,
-): RAModelInfo {
-    val model =
         ModelInfo.create(
             id = id ?: deriveModelIdFromUrl(url, name),
             name = name,
@@ -173,8 +92,20 @@ private fun buildModelFromUrlLocally(
             downloadURL = url,
             downloadSizeBytes = memoryRequirement,
             supportsThinking = supportsThinking,
+            thinkingPattern = if (supportsThinking) ThinkingTagPattern() else null,
             source = ModelSource.MODEL_SOURCE_REMOTE,
         )
+
+    if (memoryRequirement != null) {
+        model = model.copy(memory_required_bytes = memoryRequirement)
+    }
+    if (supportsLora) {
+        model = model.copy(supports_lora = true)
+    }
+    if (artifactType != null && artifactType != model.artifact_type) {
+        model = model.copy(artifact_type = artifactType)
+    }
+
     CppBridgeModelRegistry.save(model)
     return model
 }

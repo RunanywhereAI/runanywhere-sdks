@@ -10,11 +10,12 @@ import Foundation
 
 public extension RunAnywhere {
     /// Register a remote model with the in-memory model registry from a
-    /// download URL. Delegates the full build-and-save flow to the canonical
-    /// `rac_register_model_from_url_proto` C ABI; only the parameters
-    /// the proto request does not yet model (id override, memory hint, thinking
-    /// flag, LoRA flag, explicit artifact type) are patched onto the saved
-    /// `RAModelInfo` and re-persisted through the registry's proto save path.
+    /// download URL. Builds a complete `RAModelInfo` via the canonical
+    /// `RAModelInfo.make(...)` factory (which derives id/format/artifact via
+    /// `rac_model_info_make_proto`), layers on the caller-supplied capability
+    /// fields, and persists through the registry's proto save path in a single
+    /// `save(...)` — `rac_model_registry_register_proto` already persists every
+    /// capability field, so no from-url call + re-save dance is required.
     @discardableResult
     static func registerModel(
         id: String? = nil,
@@ -31,43 +32,32 @@ public extension RunAnywhere {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
-        var request = RARegisterModelFromUrlRequest()
-        request.url = url
-        request.name = name
-        request.framework = framework
-        request.category = modality
-
-        var model = try registerModelFromUrl(request)
-
-        var needsResave = false
-        if let id, id != model.id {
-            model.id = id
-            needsResave = true
-        }
+        let downloadURL = URL(string: url)
+        var model = RAModelInfo.make(
+            id: id ?? generatedModelID(from: url, name: name),
+            name: name,
+            category: modality,
+            format: .unspecified,
+            framework: framework,
+            downloadURL: downloadURL,
+            downloadSizeBytes: memoryRequirement,
+            contextLength: modality.requiresContextLength ? 2048 : nil,
+            supportsThinking: supportsThinking
+        )
         if let memoryRequirement {
-            model.downloadSizeBytes = memoryRequirement
             model.memoryRequiredBytes = memoryRequirement
-            needsResave = true
-        }
-        if supportsThinking {
-            model.supportsThinking = true
-            model.thinkingPattern = .defaultPattern
-            needsResave = true
         }
         if supportsLora {
             model.supportsLora = true
-            needsResave = true
         }
+        // Apply the explicit artifact-type override last: `make(...)` derives
+        // the artifact (and its artifact_type) from the URL, so the caller's
+        // override has to win after that derivation runs.
         if let artifactType {
             model.artifactType = artifactType
-            needsResave = true
         }
 
-        if needsResave {
-            model.updatedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-            try await CppBridge.ModelRegistry.shared.save(model)
-        }
-
+        try await CppBridge.ModelRegistry.shared.save(model)
         return model
     }
 
@@ -75,9 +65,9 @@ public extension RunAnywhere {
     /// where the caller needs to specify the on-disk layout (`directoryBased`,
     /// `nestedDirectory`, etc.) the URL-form `registerModel` cannot infer.
     ///
-    /// Composes the canonical URL-form `registerModel(...)` (which delegates
-    /// to `rac_register_model_from_url_proto`) and then patches the resolved
-    /// `RAArchiveArtifact.structure` before re-saving through the registry.
+    /// Builds the archive artifact (type + caller-specified structure) inline,
+    /// layers on the caller-supplied capability fields, and persists through the
+    /// registry's proto save path in a single `save(...)`.
     @discardableResult
     static func registerModel(
         archive url: String,
@@ -91,37 +81,42 @@ public extension RunAnywhere {
         supportsThinking: Bool = false,
         supportsLora: Bool = false
     ) async throws -> RAModelInfo {
-        let resolvedArtifactType: RAModelArtifactType? = archiveType.map { type in
-            switch type {
-            case .zip:      return .zipArchive
-            case .tarGz:    return .tarGzArchive
-            case .tarBz2:   return .tarBz2Archive
-            case .tarXz:    return .tarXzArchive
-            default:        return .archive
-            }
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
-        var model = try await registerModel(
-            id: id,
-            name: name,
-            url: url,
-            framework: framework,
-            modality: modality,
-            artifactType: resolvedArtifactType,
-            memoryRequirement: memoryRequirement,
-            supportsThinking: supportsThinking,
-            supportsLora: supportsLora
-        )
+        let downloadURL = URL(string: url)
 
-        // Preserve structure on the archive artifact. `inferredArtifact` only
-        // captures the archive type, not the nested/directory layout, so we
-        // patch it here and re-persist through the registry's proto save path.
-        guard var archiveArtifact = model.archiveArtifact else {
-            return model
+        // Resolve the archive type (caller override → inference from the URL),
+        // then build the archive artifact carrying the caller-specified layout
+        // structure that the URL alone cannot infer.
+        var archiveArtifact = RAArchiveArtifact()
+        if let archiveType {
+            archiveArtifact.type = archiveType
+        } else if let downloadURL, let inferred = ArchiveType.from(url: downloadURL) {
+            archiveArtifact.type = inferred
         }
         archiveArtifact.structure = structure
-        model.setArtifact(.archive(archiveArtifact))
-        model.updatedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+
+        var model = RAModelInfo.make(
+            id: id ?? generatedModelID(from: url, name: name),
+            name: name,
+            category: modality,
+            format: .unspecified,
+            framework: framework,
+            downloadURL: downloadURL,
+            artifact: .archive(archiveArtifact),
+            downloadSizeBytes: memoryRequirement,
+            contextLength: modality.requiresContextLength ? 2048 : nil,
+            supportsThinking: supportsThinking
+        )
+        if let memoryRequirement {
+            model.memoryRequiredBytes = memoryRequirement
+        }
+        if supportsLora {
+            model.supportsLora = true
+        }
+
         try await CppBridge.ModelRegistry.shared.save(model)
         return model
     }
@@ -355,30 +350,20 @@ private extension RunAnywhere {
         return await CppBridge.Download.shared.plan(request)
     }
 
-    /// Single-call URL → saved ModelInfo via `rac_register_model_from_url_proto`.
-    static func registerModelFromUrl(_ request: RARegisterModelFromUrlRequest) throws -> RAModelInfo {
-        var outBuffer = rac_proto_buffer_t()
-        defer { rac_proto_buffer_free(&outBuffer) }
-
-        let data = try request.serializedData()
-        let status = data.withUnsafeBytes { rawBuffer -> rac_result_t in
-            let bytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress
-            return rac_register_model_from_url_proto(bytes, rawBuffer.count, &outBuffer)
+    /// Derive a stable model id from a download URL via commons
+    /// `rac_model_id_from_url` (the same extension-stripping logic the legacy
+    /// from-url register path used). Falls back to the human-readable name when
+    /// the URL yields nothing usable.
+    static func generatedModelID(from url: String, name: String) -> String {
+        var buffer = [CChar](repeating: 0, count: 256)
+        let status = url.withCString { urlPtr in
+            rac_model_id_from_url(urlPtr, &buffer, buffer.count)
         }
-
-        guard status == RAC_SUCCESS, outBuffer.status == RAC_SUCCESS else {
-            let message = outBuffer.error_message.map { String(cString: $0) }
-                ?? "rac_register_model_from_url_proto rc=\(status)"
-            throw SDKException(code: .processingFailed, message: message, category: .internal)
+        if status == RAC_SUCCESS {
+            let derived = String(cString: buffer)
+            if !derived.isEmpty { return derived }
         }
-        guard let bytes = outBuffer.data, outBuffer.size > 0 else {
-            throw SDKException(
-                code: .processingFailed,
-                message: "rac_register_model_from_url_proto returned empty payload",
-                category: .internal
-            )
-        }
-        return try RAModelInfo(serializedBytes: Data(bytes: bytes, count: outBuffer.size))
+        return name
     }
 
     /// Tear down the commons download worker for `taskID` / `modelID` so a

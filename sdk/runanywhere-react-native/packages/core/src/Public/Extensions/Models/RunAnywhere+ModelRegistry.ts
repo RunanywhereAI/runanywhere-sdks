@@ -35,7 +35,6 @@ import {
   ModelListResult,
   ModelQuery,
   ModelSource,
-  RegisterModelFromUrlRequest,
   InferenceFramework,
 } from '@runanywhere/proto-ts/model_types';
 import { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
@@ -109,17 +108,12 @@ export interface RegisterMultiFileModelInput {
 /**
  * Register a model in the native registry from a single download URL.
  *
- * Delegates the full build-and-save flow to the canonical
- * `rac_register_model_from_url_proto` C ABI (mirroring Swift
- * `RunAnywhere+Storage.swift:19-72` and Kotlin `RunAnywhereStorage.kt:67-149`):
- * commons owns framework-aware defaulting, artifact-type-from-extension
- * inference, and stable id-from-URL derivation, so RN no longer drifts from
- * Swift/Kotlin/Flutter. Only the parameters the proto request does not model
- * (id override, memory hint, thinking flag, LoRA flag, explicit artifact
- * type) are patched onto the saved `ModelInfo` and re-persisted, matching
- * Swift's `needsResave` pattern. When the native ABI is unavailable on the
- * staged artifact we fall back to Kotlin's local build-and-save path
- * (`buildModelFromUrlLocally`).
+ * Builds a complete `ModelInfo` from the caller's input — including every
+ * capability field (id, framework, category, memory/download sizing, thinking
+ * and LoRA flags, artifact type) — and persists it through the registry's
+ * proto save path (`rac_model_registry_register_proto`) in a single call. That
+ * plain register path already persists every capability field, so the prior
+ * from-url-then-patch-then-resave dance is unnecessary.
  *
  * Returns the resolved `ModelInfo` proto so callers can pipe it straight into
  * `downloadModel(...)`.
@@ -137,93 +131,6 @@ export async function registerModel(
   const supportsThinking = input.supportsThinking ?? false;
   const supportsLora = input.supportsLora ?? false;
 
-  const request = RegisterModelFromUrlRequest.fromPartial({
-    url: input.url,
-    name: input.name,
-    framework: input.framework,
-    category: modality,
-    source: ModelSource.MODEL_SOURCE_REMOTE,
-  });
-  const savedBuffer = await native.registerModelFromUrlProto(
-    encodeProtoMessage(request, RegisterModelFromUrlRequest),
-  );
-  const savedBytes = arrayBufferToBytes(savedBuffer);
-  let model =
-    savedBytes.byteLength > 0
-      ? ModelInfoCodec.decode(savedBytes)
-      : await buildModelFromUrlLocally(native, {
-          input,
-          modality,
-          memoryHint,
-          supportsThinking,
-        });
-
-  // Patch fields the proto request does not yet model and re-persist through
-  // the registry's proto save path (mirrors Swift / Kotlin needsResave).
-  let needsResave = false;
-  if (input.id && input.id !== model.id) {
-    model = { ...model, id: input.id };
-    needsResave = true;
-  }
-  if (memoryHint !== undefined) {
-    model = {
-      ...model,
-      downloadSizeBytes: memoryHint,
-      memoryRequiredBytes: memoryHint,
-    };
-    needsResave = true;
-  }
-  if (supportsThinking && !model.thinkingPattern) {
-    model = {
-      ...model,
-      supportsThinking: true,
-      thinkingPattern: ThinkingTagPattern.fromPartial({}),
-    };
-    needsResave = true;
-  }
-  if (supportsLora) {
-    model = { ...model, supportsLora: true };
-    needsResave = true;
-  }
-  if (input.artifactType !== undefined && input.artifactType !== model.artifactType) {
-    model = { ...model, artifactType: input.artifactType };
-    needsResave = true;
-  }
-
-  if (needsResave) {
-    model = { ...model, updatedAtUnixMs: Date.now() };
-    const accepted = await native.registerModelProto(
-      encodeProtoMessage(model, ModelInfoCodec),
-    );
-    if (!accepted) {
-      throw SDKException.of(
-        ErrorCode.ERROR_CODE_INVALID_STATE,
-        `Model registry rejected '${model.id}'. Ensure the SDK is initialized before calling registerModel().`,
-        { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
-      );
-    }
-  }
-
-  return model;
-}
-
-/**
- * Local URL → saved `ModelInfo` fallback used only when commons'
- * `rac_register_model_from_url_proto` is unavailable on the staged native
- * artifact. Mirrors Kotlin's `buildModelFromUrlLocally`
- * (`RunAnywhereStorage.kt:157-180`): build a minimal `ModelInfo` and persist
- * it through the registry's proto save path.
- */
-async function buildModelFromUrlLocally(
-  native: ReturnType<typeof requireNativeModule>,
-  params: {
-    input: RegisterModelInput;
-    modality: ModelCategory;
-    memoryHint: number | undefined;
-    supportsThinking: boolean;
-  },
-): Promise<ModelInfo> {
-  const { input, modality, memoryHint, supportsThinking } = params;
   const model = ModelInfoCodec.fromPartial({
     id: input.id ?? deriveModelIdFromUrl(input.url, input.name),
     name: input.name,
@@ -232,10 +139,16 @@ async function buildModelFromUrlLocally(
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     downloadUrl: input.url,
-    ...(memoryHint !== undefined ? { downloadSizeBytes: memoryHint } : {}),
-    supportsThinking,
     source: ModelSource.MODEL_SOURCE_REMOTE,
+    supportsThinking,
+    supportsLora,
+    ...(memoryHint !== undefined
+      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
+      : {}),
+    ...(supportsThinking ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) } : {}),
+    ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
   });
+
   const accepted = await native.registerModelProto(
     encodeProtoMessage(model, ModelInfoCodec),
   );
@@ -246,6 +159,7 @@ async function buildModelFromUrlLocally(
       { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
     );
   }
+
   return model;
 }
 
@@ -272,9 +186,9 @@ function deriveModelIdFromUrl(url: string, name: string): string {
  * Kotlin's `RunAnywhere.registerModel(...)`, Flutter's
  * `RunAnywhere.registerModel(...)`, and Web's `registerModelFromUrl(...)`.
  *
- * Delegates to `registerModel` which routes through the commons
- * `rac_register_model_from_url_proto` factory so format, artifact type,
- * and id are inferred by commons rather than hard-coded by the caller.
+ * Delegates to `registerModel`, which builds a complete `ModelInfo` from the
+ * caller's input and persists it through the registry's proto save path in a
+ * single call.
  */
 export async function registerModelFromUrl(
   url: string,
