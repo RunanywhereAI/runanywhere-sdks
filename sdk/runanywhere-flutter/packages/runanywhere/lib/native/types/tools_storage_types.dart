@@ -52,15 +52,6 @@ base class RacToolCallingOptionsStruct extends Struct {
   external int format;
 }
 
-/// Tool parameter type enum values - matches rac_tool_param_type_t
-abstract class RacToolParamType {
-  static const int string = 0;
-  static const int number = 1;
-  static const int boolean = 2;
-  static const int object = 3;
-  static const int array = 4;
-}
-
 // =============================================================================
 // Structured Output FFI Types (from rac_llm_types.h)
 // =============================================================================

@@ -363,6 +363,33 @@ export interface HybridRoutingContext {
 
 /**
  * ---------------------------------------------------------------------------
+ * Cloud STT backend registration config. Replaces the hand-built
+ * `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
+ * HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
+ * (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
+ * across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
+ * these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
+ * the same keys out of the JSON blob (`config_json["provider"]` etc., see
+ * HybridModelDescriptor.provider).
+ * ---------------------------------------------------------------------------
+ */
+export interface CloudSttBackendConfig {
+  /** HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam". */
+  provider: string;
+  /** Provider-side model id (e.g. "saarika:v2"). */
+  model: string;
+  /** Provider API key / credential. */
+  apiKey: string;
+  /** BCP-47 language hint forwarded to the provider (empty = auto-detect). */
+  languageCode: string;
+  /** Override the provider base URL (empty = provider default). */
+  baseUrl: string;
+  /** Request timeout in milliseconds (0 = engine default). */
+  timeoutMs: number;
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * STT transcription options carried through the router. Sample rate and
  * audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
  * caller-supplied BCP-47 hint (empty = backend auto-detect).
@@ -1219,6 +1246,162 @@ export const HybridRoutingContext: MessageFns<HybridRoutingContext> = {
   },
   fromPartial<I extends Exact<DeepPartial<HybridRoutingContext>, I>>(_: I): HybridRoutingContext {
     const message = createBaseHybridRoutingContext();
+    return message;
+  },
+};
+
+function createBaseCloudSttBackendConfig(): CloudSttBackendConfig {
+  return { provider: "", model: "", apiKey: "", languageCode: "", baseUrl: "", timeoutMs: 0 };
+}
+
+export const CloudSttBackendConfig: MessageFns<CloudSttBackendConfig> = {
+  encode(message: CloudSttBackendConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.provider !== "") {
+      writer.uint32(10).string(message.provider);
+    }
+    if (message.model !== "") {
+      writer.uint32(18).string(message.model);
+    }
+    if (message.apiKey !== "") {
+      writer.uint32(26).string(message.apiKey);
+    }
+    if (message.languageCode !== "") {
+      writer.uint32(34).string(message.languageCode);
+    }
+    if (message.baseUrl !== "") {
+      writer.uint32(42).string(message.baseUrl);
+    }
+    if (message.timeoutMs !== 0) {
+      writer.uint32(48).int32(message.timeoutMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CloudSttBackendConfig {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCloudSttBackendConfig();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.provider = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.model = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.apiKey = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.languageCode = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.baseUrl = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.timeoutMs = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CloudSttBackendConfig {
+    return {
+      provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+      model: isSet(object.model) ? globalThis.String(object.model) : "",
+      apiKey: isSet(object.apiKey)
+        ? globalThis.String(object.apiKey)
+        : isSet(object.api_key)
+        ? globalThis.String(object.api_key)
+        : "",
+      languageCode: isSet(object.languageCode)
+        ? globalThis.String(object.languageCode)
+        : isSet(object.language_code)
+        ? globalThis.String(object.language_code)
+        : "",
+      baseUrl: isSet(object.baseUrl)
+        ? globalThis.String(object.baseUrl)
+        : isSet(object.base_url)
+        ? globalThis.String(object.base_url)
+        : "",
+      timeoutMs: isSet(object.timeoutMs)
+        ? globalThis.Number(object.timeoutMs)
+        : isSet(object.timeout_ms)
+        ? globalThis.Number(object.timeout_ms)
+        : 0,
+    };
+  },
+
+  toJSON(message: CloudSttBackendConfig): unknown {
+    const obj: any = {};
+    if (message.provider !== "") {
+      obj.provider = message.provider;
+    }
+    if (message.model !== "") {
+      obj.model = message.model;
+    }
+    if (message.apiKey !== "") {
+      obj.apiKey = message.apiKey;
+    }
+    if (message.languageCode !== "") {
+      obj.languageCode = message.languageCode;
+    }
+    if (message.baseUrl !== "") {
+      obj.baseUrl = message.baseUrl;
+    }
+    if (message.timeoutMs !== 0) {
+      obj.timeoutMs = Math.round(message.timeoutMs);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CloudSttBackendConfig>, I>>(base?: I): CloudSttBackendConfig {
+    return CloudSttBackendConfig.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CloudSttBackendConfig>, I>>(object: I): CloudSttBackendConfig {
+    const message = createBaseCloudSttBackendConfig();
+    message.provider = object.provider ?? "";
+    message.model = object.model ?? "";
+    message.apiKey = object.apiKey ?? "";
+    message.languageCode = object.languageCode ?? "";
+    message.baseUrl = object.baseUrl ?? "";
+    message.timeoutMs = object.timeoutMs ?? 0;
     return message;
   },
 };

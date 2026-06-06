@@ -31,6 +31,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.DeviceInfo
 import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
@@ -241,6 +242,14 @@ object CppBridgeDevice {
      * string into `rac_device_registration_info_t`. Mirrors Swift's
      * direct pointer fill in `register()` — JSON is the JNI-friendly
      * equivalent of populating the C struct fields.
+     *
+     * The canonical schema is the generated [DeviceInfo] proto: we build
+     * the proto from the device data (19 core fields + `platform_extras`
+     * carrying the Android-only extras), then serialize it to the
+     * snake_case JSON the C++ parser expects. Wire's JSON encoder emits
+     * camelCase keys, so we serialize by hand: the core proto fields as
+     * snake_case keys and each `platform_extras` entry as a top-level
+     * snake_case key.
      */
     @JvmStatic
     fun getDeviceInfoCallback(): String {
@@ -275,42 +284,95 @@ object CppBridgeDevice {
         val efficiencyCores = provider?.getEfficiencyCores() ?: (coreCount - performanceCores)
         val deviceIdValue = deviceId ?: ""
 
+        val deviceInfo =
+            DeviceInfo(
+                device_model = deviceModel,
+                device_name = deviceName,
+                platform = "android",
+                os_version = osVersion,
+                form_factor = formFactor,
+                architecture = architecture,
+                chip_name = chipName,
+                total_memory = totalMemory,
+                available_memory = availableMemory,
+                has_neural_engine = hasNeuralEngine,
+                neural_engine_cores = neuralEngineCores,
+                gpu_family = gpuFamily,
+                battery_level = batteryLevel.toFloat(),
+                battery_state = batteryState,
+                is_low_power_mode = isLowPowerMode,
+                core_count = coreCount,
+                performance_cores = performanceCores,
+                efficiency_cores = efficiencyCores,
+                device_fingerprint = deviceIdValue,
+                // Android-only extras consumed by the C++ parser (`manufacturer`)
+                // plus historical inert fields kept for payload stability.
+                platform_extras =
+                    linkedMapOf(
+                        "device_id" to deviceIdValue,
+                        "device_type" to "mobile",
+                        "os_name" to "Android",
+                        "processor_count" to coreCount.toString(),
+                        "is_simulator" to isEmulator.toString(),
+                        "manufacturer" to manufacturer,
+                        "os_build_id" to osBuildId,
+                        "sdk_version" to sdkVersionString,
+                        "android_api_level" to androidApiLevel.toString(),
+                        "locale" to locale,
+                        "timezone" to timezone,
+                    ),
+            )
+
+        return serializeDeviceInfoJson(deviceInfo)
+    }
+
+    /**
+     * Serialize a [DeviceInfo] proto to the snake_case JSON contract the
+     * C++ device parser (`jni_device_get_info`) consumes. Core proto fields
+     * are emitted under their snake_case names; each `platform_extras` entry
+     * is emitted as a top-level key. Extras whose historical wire value was a
+     * JSON number or boolean (`processor_count`, `android_api_level`,
+     * `is_simulator`) are emitted unquoted; all others are quoted strings.
+     */
+    private fun serializeDeviceInfoJson(info: DeviceInfo): String {
+        val literalExtras = setOf("processor_count", "android_api_level", "is_simulator")
         return buildString {
             append("{")
-            append("\"device_id\":\"${escapeJson(deviceIdValue)}\",")
-            append("\"device_model\":\"${escapeJson(deviceModel)}\",")
-            append("\"device_name\":\"${escapeJson(deviceName)}\",")
-            append("\"platform\":\"android\",")
-            append("\"os_version\":\"${escapeJson(osVersion)}\",")
-            append("\"form_factor\":\"${escapeJson(formFactor)}\",")
-            append("\"architecture\":\"${escapeJson(architecture)}\",")
-            append("\"chip_name\":\"${escapeJson(chipName)}\",")
-            append("\"total_memory\":$totalMemory,")
-            append("\"available_memory\":$availableMemory,")
-            append("\"has_neural_engine\":$hasNeuralEngine,")
-            append("\"neural_engine_cores\":$neuralEngineCores,")
-            append("\"gpu_family\":\"${escapeJson(gpuFamily)}\",")
-            append("\"battery_level\":$batteryLevel,")
-            if (batteryState != null) {
-                append("\"battery_state\":\"${escapeJson(batteryState)}\",")
+            append("\"device_id\":\"${escapeJson(info.platform_extras["device_id"] ?: "")}\",")
+            append("\"device_model\":\"${escapeJson(info.device_model)}\",")
+            append("\"device_name\":\"${escapeJson(info.device_name)}\",")
+            append("\"platform\":\"${escapeJson(info.platform)}\",")
+            append("\"os_version\":\"${escapeJson(info.os_version)}\",")
+            append("\"form_factor\":\"${escapeJson(info.form_factor)}\",")
+            append("\"architecture\":\"${escapeJson(info.architecture)}\",")
+            append("\"chip_name\":\"${escapeJson(info.chip_name)}\",")
+            append("\"total_memory\":${info.total_memory},")
+            append("\"available_memory\":${info.available_memory},")
+            append("\"has_neural_engine\":${info.has_neural_engine},")
+            append("\"neural_engine_cores\":${info.neural_engine_cores},")
+            append("\"gpu_family\":\"${escapeJson(info.gpu_family)}\",")
+            append("\"battery_level\":${info.battery_level},")
+            if (info.battery_state != null) {
+                append("\"battery_state\":\"${escapeJson(info.battery_state)}\",")
             } else {
                 append("\"battery_state\":null,")
             }
-            append("\"is_low_power_mode\":$isLowPowerMode,")
-            append("\"core_count\":$coreCount,")
-            append("\"performance_cores\":$performanceCores,")
-            append("\"efficiency_cores\":$efficiencyCores,")
-            append("\"device_fingerprint\":\"${escapeJson(deviceIdValue)}\",")
-            append("\"device_type\":\"mobile\",")
-            append("\"os_name\":\"Android\",")
-            append("\"processor_count\":$coreCount,")
-            append("\"is_simulator\":$isEmulator,")
-            append("\"manufacturer\":\"${escapeJson(manufacturer)}\",")
-            append("\"os_build_id\":\"${escapeJson(osBuildId)}\",")
-            append("\"sdk_version\":\"${escapeJson(sdkVersionString)}\",")
-            append("\"android_api_level\":$androidApiLevel,")
-            append("\"locale\":\"${escapeJson(locale)}\",")
-            append("\"timezone\":\"${escapeJson(timezone)}\"")
+            append("\"is_low_power_mode\":${info.is_low_power_mode},")
+            append("\"core_count\":${info.core_count},")
+            append("\"performance_cores\":${info.performance_cores},")
+            append("\"efficiency_cores\":${info.efficiency_cores},")
+            append("\"device_fingerprint\":\"${escapeJson(info.device_fingerprint ?: "")}\"")
+            // Top-level snake_case extras (skip device_id; already emitted above).
+            for ((key, value) in info.platform_extras) {
+                if (key == "device_id") continue
+                append(",")
+                append("\"${escapeJson(key)}\":")
+                if (key in literalExtras) {
+                    append(value)
+                } else {
+                    append("\"${escapeJson(value)}\"")
+                }
+            }
             append("}")
         }
     }

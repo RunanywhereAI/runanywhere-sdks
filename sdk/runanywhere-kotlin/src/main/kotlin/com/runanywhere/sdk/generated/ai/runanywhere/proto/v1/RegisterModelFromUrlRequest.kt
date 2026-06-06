@@ -89,6 +89,71 @@ public class RegisterModelFromUrlRequest(
     schemaIndex = 4,
   )
   public val source: ModelSource? = null,
+  /**
+   * Caller-supplied capability fields. When set, the register-from-url C++
+   * path honors them on the saved ModelInfo instead of its inference
+   * defaults (which hardcode supports_lora=false, download_size=0, infer
+   * artifact_type from the URL). This lets every SDK drop the post-register
+   * "patch + resave" pass. Tags 6-13 are free (1-5 stay wire-compatible with
+   * ModelInfoMakeRequest).
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    jsonName = "memoryRequiredBytes",
+    schemaIndex = 5,
+  )
+  public val memory_required_bytes: Long? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "supportsThinking",
+    schemaIndex = 6,
+  )
+  public val supports_thinking: Boolean? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "supportsLora",
+    schemaIndex = 7,
+  )
+  public val supports_lora: Boolean? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.ModelArtifactType#ADAPTER",
+    jsonName = "artifactType",
+    schemaIndex = 8,
+  )
+  public val artifact_type: ModelArtifactType? = null,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "contextLength",
+    schemaIndex = 9,
+  )
+  public val context_length: Int? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 10,
+  )
+  public val description: String? = null,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    jsonName = "downloadSizeBytes",
+    schemaIndex = 11,
+  )
+  public val download_size_bytes: Long? = null,
+  /**
+   * Explicit id override. Empty -> derived from URL/name.
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 12,
+  )
+  public val id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RegisterModelFromUrlRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -106,6 +171,14 @@ public class RegisterModelFromUrlRequest(
     if (framework != other.framework) return false
     if (category != other.category) return false
     if (source != other.source) return false
+    if (memory_required_bytes != other.memory_required_bytes) return false
+    if (supports_thinking != other.supports_thinking) return false
+    if (supports_lora != other.supports_lora) return false
+    if (artifact_type != other.artifact_type) return false
+    if (context_length != other.context_length) return false
+    if (description != other.description) return false
+    if (download_size_bytes != other.download_size_bytes) return false
+    if (id != other.id) return false
     return true
   }
 
@@ -118,6 +191,14 @@ public class RegisterModelFromUrlRequest(
       result = result * 37 + (framework?.hashCode() ?: 0)
       result = result * 37 + (category?.hashCode() ?: 0)
       result = result * 37 + (source?.hashCode() ?: 0)
+      result = result * 37 + (memory_required_bytes?.hashCode() ?: 0)
+      result = result * 37 + (supports_thinking?.hashCode() ?: 0)
+      result = result * 37 + (supports_lora?.hashCode() ?: 0)
+      result = result * 37 + (artifact_type?.hashCode() ?: 0)
+      result = result * 37 + (context_length?.hashCode() ?: 0)
+      result = result * 37 + (description?.hashCode() ?: 0)
+      result = result * 37 + (download_size_bytes?.hashCode() ?: 0)
+      result = result * 37 + (id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -130,6 +211,14 @@ public class RegisterModelFromUrlRequest(
     if (framework != null) result += """framework=$framework"""
     if (category != null) result += """category=$category"""
     if (source != null) result += """source=$source"""
+    if (memory_required_bytes != null) result += """memory_required_bytes=$memory_required_bytes"""
+    if (supports_thinking != null) result += """supports_thinking=$supports_thinking"""
+    if (supports_lora != null) result += """supports_lora=$supports_lora"""
+    if (artifact_type != null) result += """artifact_type=$artifact_type"""
+    if (context_length != null) result += """context_length=$context_length"""
+    if (description != null) result += """description=${sanitize(description)}"""
+    if (download_size_bytes != null) result += """download_size_bytes=$download_size_bytes"""
+    if (id != null) result += """id=${sanitize(id)}"""
     return result.joinToString(prefix = "RegisterModelFromUrlRequest{", separator = ", ", postfix = "}")
   }
 
@@ -139,8 +228,16 @@ public class RegisterModelFromUrlRequest(
     framework: InferenceFramework? = this.framework,
     category: ModelCategory? = this.category,
     source: ModelSource? = this.source,
+    memory_required_bytes: Long? = this.memory_required_bytes,
+    supports_thinking: Boolean? = this.supports_thinking,
+    supports_lora: Boolean? = this.supports_lora,
+    artifact_type: ModelArtifactType? = this.artifact_type,
+    context_length: Int? = this.context_length,
+    description: String? = this.description,
+    download_size_bytes: Long? = this.download_size_bytes,
+    id: String? = this.id,
     unknownFields: ByteString = this.unknownFields,
-  ): RegisterModelFromUrlRequest = RegisterModelFromUrlRequest(url, name, framework, category, source, unknownFields)
+  ): RegisterModelFromUrlRequest = RegisterModelFromUrlRequest(url, name, framework, category, source, memory_required_bytes, supports_thinking, supports_lora, artifact_type, context_length, description, download_size_bytes, id, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,6 +261,14 @@ public class RegisterModelFromUrlRequest(
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(3, value.framework)
         size += ModelCategory.ADAPTER.encodedSizeWithTag(4, value.category)
         size += ModelSource.ADAPTER.encodedSizeWithTag(5, value.source)
+        size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.memory_required_bytes)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.supports_thinking)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.supports_lora)
+        size += ModelArtifactType.ADAPTER.encodedSizeWithTag(9, value.artifact_type)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.context_length)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.description)
+        size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.download_size_bytes)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.id)
         return size
       }
 
@@ -177,11 +282,27 @@ public class RegisterModelFromUrlRequest(
         InferenceFramework.ADAPTER.encodeWithTag(writer, 3, value.framework)
         ModelCategory.ADAPTER.encodeWithTag(writer, 4, value.category)
         ModelSource.ADAPTER.encodeWithTag(writer, 5, value.source)
+        ProtoAdapter.INT64.encodeWithTag(writer, 6, value.memory_required_bytes)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.supports_thinking)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.supports_lora)
+        ModelArtifactType.ADAPTER.encodeWithTag(writer, 9, value.artifact_type)
+        ProtoAdapter.INT32.encodeWithTag(writer, 10, value.context_length)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.description)
+        ProtoAdapter.INT64.encodeWithTag(writer, 12, value.download_size_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RegisterModelFromUrlRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.id)
+        ProtoAdapter.INT64.encodeWithTag(writer, 12, value.download_size_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.description)
+        ProtoAdapter.INT32.encodeWithTag(writer, 10, value.context_length)
+        ModelArtifactType.ADAPTER.encodeWithTag(writer, 9, value.artifact_type)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.supports_lora)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.supports_thinking)
+        ProtoAdapter.INT64.encodeWithTag(writer, 6, value.memory_required_bytes)
         ModelSource.ADAPTER.encodeWithTag(writer, 5, value.source)
         ModelCategory.ADAPTER.encodeWithTag(writer, 4, value.category)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 3, value.framework)
@@ -199,6 +320,14 @@ public class RegisterModelFromUrlRequest(
         var framework: InferenceFramework? = null
         var category: ModelCategory? = null
         var source: ModelSource? = null
+        var memory_required_bytes: Long? = null
+        var supports_thinking: Boolean? = null
+        var supports_lora: Boolean? = null
+        var artifact_type: ModelArtifactType? = null
+        var context_length: Int? = null
+        var description: String? = null
+        var download_size_bytes: Long? = null
+        var id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
@@ -218,6 +347,18 @@ public class RegisterModelFromUrlRequest(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            6 -> memory_required_bytes = ProtoAdapter.INT64.decode(reader)
+            7 -> supports_thinking = ProtoAdapter.BOOL.decode(reader)
+            8 -> supports_lora = ProtoAdapter.BOOL.decode(reader)
+            9 -> try {
+              artifact_type = ModelArtifactType.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            10 -> context_length = ProtoAdapter.INT32.decode(reader)
+            11 -> description = ProtoAdapter.STRING.decode(reader)
+            12 -> download_size_bytes = ProtoAdapter.INT64.decode(reader)
+            13 -> id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -227,6 +368,14 @@ public class RegisterModelFromUrlRequest(
           framework = framework,
           category = category,
           source = source,
+          memory_required_bytes = memory_required_bytes,
+          supports_thinking = supports_thinking,
+          supports_lora = supports_lora,
+          artifact_type = artifact_type,
+          context_length = context_length,
+          description = description,
+          download_size_bytes = download_size_bytes,
+          id = id,
           unknownFields = unknownFields
         )
       }

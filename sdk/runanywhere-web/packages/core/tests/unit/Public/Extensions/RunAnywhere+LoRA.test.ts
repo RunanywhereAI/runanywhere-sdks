@@ -14,7 +14,7 @@ import {
   type LoraAdapterCatalogQuery as ProtoLoraAdapterCatalogQuery,
   type LoraAdapterDownloadCompletedRequest as ProtoLoraAdapterDownloadCompletedRequest,
 } from '@runanywhere/proto-ts/lora_options';
-import { SDKErrorCode } from '../../../../src/Foundation/SDKException';
+import { ProtoErrorCode } from '../../../../src/Foundation/SDKException';
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
 import { LoRA } from '../../../../src/Public/Extensions/RunAnywhere+LoRA';
@@ -141,7 +141,7 @@ describe('LoRA catalog proto facade', () => {
     ]));
 
     await expect(LoRA.catalog.list()).rejects.toMatchObject({
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
     });
   });
 });

@@ -40,8 +40,8 @@ const logger = new SDKLogger('FetchHttpTransport');
 
 // rac_error.h mirrors.
 const RAC_SUCCESS = 0;
-const RAC_ERROR_NETWORK_ERROR = -150;
-const RAC_ERROR_CANCELLED = -233;
+const RAC_ERROR_NETWORK_ERROR = -151;
+const RAC_ERROR_CANCELLED = -380;
 const RAC_TRUE = 1;
 const RAC_FALSE = 0;
 

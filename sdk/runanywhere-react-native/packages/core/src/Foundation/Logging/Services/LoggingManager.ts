@@ -41,20 +41,20 @@ export class ConsoleLogDestination implements LogDestination {
     const logMessage = `[${timestamp}] [${levelStr}] [${entry.category}] ${entry.message}`;
 
     switch (entry.level) {
-      case LogLevel.Debug:
+      case LogLevel.LOG_LEVEL_DEBUG:
         // eslint-disable-next-line no-console
         console.debug(logMessage, entry.metadata ?? '');
         break;
-      case LogLevel.Info:
+      case LogLevel.LOG_LEVEL_INFO:
         // eslint-disable-next-line no-console
         console.info(logMessage, entry.metadata ?? '');
         break;
-      case LogLevel.Warning:
+      case LogLevel.LOG_LEVEL_WARNING:
         // eslint-disable-next-line no-console
         console.warn(logMessage, entry.metadata ?? '');
         break;
-      case LogLevel.Error:
-      case LogLevel.Fault:
+      case LogLevel.LOG_LEVEL_ERROR:
+      case LogLevel.LOG_LEVEL_FATAL:
         // eslint-disable-next-line no-console
         console.error(logMessage, entry.metadata ?? '');
         break;
@@ -181,15 +181,19 @@ export class LoggingManager {
 
 function describeLevel(level: LogLevel): string {
   switch (level) {
-    case LogLevel.Debug:
+    case LogLevel.LOG_LEVEL_DEBUG:
       return 'DEBUG';
-    case LogLevel.Info:
+    case LogLevel.LOG_LEVEL_INFO:
       return 'INFO';
-    case LogLevel.Warning:
+    case LogLevel.LOG_LEVEL_WARNING:
       return 'WARN';
-    case LogLevel.Error:
+    case LogLevel.LOG_LEVEL_ERROR:
       return 'ERROR';
-    case LogLevel.Fault:
+    case LogLevel.LOG_LEVEL_FATAL:
       return 'FAULT';
+    case LogLevel.LOG_LEVEL_TRACE:
+      return 'TRACE';
+    default:
+      return 'INFO';
   }
 }

@@ -56,12 +56,14 @@ class ErrorContext extends $pb.GeneratedMessage {
     $core.String? sourceFile,
     $core.int? sourceLine,
     $core.String? operation,
+    $core.String? fieldPath,
   }) {
     final result = create();
     if (metadata != null) result.metadata.addEntries(metadata);
     if (sourceFile != null) result.sourceFile = sourceFile;
     if (sourceLine != null) result.sourceLine = sourceLine;
     if (operation != null) result.operation = operation;
+    if (fieldPath != null) result.fieldPath = fieldPath;
     return result;
   }
 
@@ -86,6 +88,7 @@ class ErrorContext extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'sourceFile')
     ..aI(3, _omitFieldNames ? '' : 'sourceLine')
     ..aOS(4, _omitFieldNames ? '' : 'operation')
+    ..aOS(5, _omitFieldNames ? '' : 'fieldPath')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -146,6 +149,19 @@ class ErrorContext extends $pb.GeneratedMessage {
   $core.bool hasOperation() => $_has(3);
   @$pb.TagNumber(4)
   void clearOperation() => $_clearField(4);
+
+  /// The structured field path a validation error refers to
+  /// ("<Message>.<field>"). First-class replacement for the
+  /// metadata["field_path"] magic key all five SDKs read/write today; the
+  /// generated convenience validate() already emits this path.
+  @$pb.TagNumber(5)
+  $core.String get fieldPath => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set fieldPath($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFieldPath() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFieldPath() => $_clearField(5);
 }
 
 /// ---------------------------------------------------------------------------

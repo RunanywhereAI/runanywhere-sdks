@@ -1312,8 +1312,16 @@ set(_RAC_PROTO_GENERATED_SOURCES
     # Two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
     # Hybrid LLM router wire shape: descriptor, policy, filter, cascade,
-    # routing context, generate request/response, routed metadata.
+    # routing context, generate request/response, routed metadata,
+    # cloud-STT backend config.
     ${_RAC_PROTO_GEN_DIR}/hybrid_router.pb.cc
+    # Cross-platform logging config + records (LogLevel / LoggingConfiguration
+    # / LogEntry), mirrors the C ABI rac_log_level_t.
+    ${_RAC_PROTO_GEN_DIR}/logging.pb.cc
+    # Cross-platform device telemetry (DeviceInfo).
+    ${_RAC_PROTO_GEN_DIR}/device_info.pb.cc
+    # Plugin loader descriptors (PluginInfo / PluginInfoList).
+    ${_RAC_PROTO_GEN_DIR}/plugin_loader.pb.cc
     # rac_options.proto — custom FieldOptions / EnumValueOptions extensions
     # imported by codegen post-processors and several option protos. Required
     # at link time by every .pb.cc that imports rac_options.proto.

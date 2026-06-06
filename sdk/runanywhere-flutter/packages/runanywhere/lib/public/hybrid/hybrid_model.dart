@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// hybrid_model.dart — Public model / backend identity + transcribe-result
-// types for the STT hybrid router. Mirrors the Kotlin RACModel / Backend /
-// TranscribeResult shapes (sdk/runanywhere-kotlin/.../public/hybrid) and the
-// Swift HybridModel / HybridTranscribeResult, plus the wire enums in
-// idl/hybrid_router.proto.
+// hybrid_model.dart — Public model / backend identity types for the STT hybrid
+// router. Mirrors the Kotlin RACModel / Backend shapes
+// (sdk/runanywhere-kotlin/.../public/hybrid) and the Swift HybridModel, plus the
+// wire enums in idl/hybrid_router.proto. Transcribe options / result / routing
+// metadata are the generated proto types (see note below).
 //
 // `provider` is DATA carried in config / on the descriptor — there is no
 // per-provider Dart class. The generic cloud backend ("cloud") selects the
@@ -109,81 +109,9 @@ enum HybridBackend {
   final String engineHint;
 }
 
-/// STT options carried through the router (mirror of the C `rac_stt_options_t`
-/// knobs the router forwards). All optional with backend-default behaviour.
-class HybridTranscribeOptions {
-  /// Build transcription options for one hybrid request.
-  const HybridTranscribeOptions({
-    this.language = '',
-    this.sampleRate = 0,
-    this.audioFormat = 0,
-  });
-
-  /// BCP-47 hint. Empty = backend auto-detect.
-  final String language;
-
-  /// Sample-rate hint for raw PCM input. 0 = engine default (16000).
-  final int sampleRate;
-
-  /// `rac_audio_format_enum_t`: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
-  /// 0 leaves the format unspecified.
-  final int audioFormat;
-}
-
-/// One transcribe call's outcome through the hybrid STT router.
-class HybridTranscribeResult {
-  /// Build the public result decoded from a HybridSttTranscribeResponse.
-  const HybridTranscribeResult({
-    required this.text,
-    required this.detectedLanguage,
-    required this.routing,
-  });
-
-  /// Transcript text from the chosen backend.
-  final String text;
-
-  /// BCP-47 language code reported by the backend (empty when none surfaced).
-  final String detectedLanguage;
-
-  /// Which side ran, whether it was a fallback, and why the primary failed.
-  final HybridRoutedMetadata routing;
-}
-
-/// Metadata describing the routing decision behind a [HybridTranscribeResult].
-/// Always populated, including on cascade/fallback scenarios.
-class HybridRoutedMetadata {
-  /// Build routing metadata decoded from HybridRoutedMetadata bytes.
-  const HybridRoutedMetadata({
-    required this.chosenModelId,
-    required this.wasFallback,
-    required this.attemptCount,
-    this.primaryErrorCode = 0,
-    this.primaryErrorMessage = '',
-    this.confidence = double.nan,
-    this.primaryConfidence = double.nan,
-  });
-
-  /// Model id of the candidate that produced the result.
-  final String chosenModelId;
-
-  /// True when the secondary served the request after the primary failed or
-  /// scored below the cascade threshold.
-  final bool wasFallback;
-
-  /// Backends invoked (1 = primary only, 2 = primary then secondary).
-  final int attemptCount;
-
-  /// Native `rac_result_t` from the primary when [wasFallback] and the fallback
-  /// fired on an error; else 0.
-  final int primaryErrorCode;
-
-  /// Human-readable reason the primary failed; else empty.
-  final String primaryErrorMessage;
-
-  /// Final confidence of the chosen result. NaN when no quality signal.
-  final double confidence;
-
-  /// Primary's confidence captured before a confidence-based cascade. NaN when
-  /// no confidence cascade occurred.
-  final double primaryConfidence;
-}
+// Transcribe options / result / routing metadata are the generated proto types
+// `HybridSttTranscribeOptions`, `HybridSttTranscribeResponse`, and
+// `HybridRoutedMetadata` from `generated/hybrid_router.pb.dart` (re-exported via
+// `runanywhere_protos.dart`). The hand-written duplicates were removed; the
+// router ([HybridSttRouter.transcribe]) now builds and returns the generated
+// types directly.

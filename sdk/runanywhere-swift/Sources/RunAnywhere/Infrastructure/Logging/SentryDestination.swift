@@ -21,13 +21,13 @@ public final class SentryDestination: LogDestination, @unchecked Sendable {
     }
 
     /// Only send warning level and above to Sentry
-    private let minSentryLevel: LogLevel = .warning
+    private let minSentryLevel: RALogLevel = .warning
 
     public init() {}
 
     // MARK: - LogDestination Operations
 
-    public func write(_ entry: LogEntry) {
+    public func write(_ entry: RALogEntry) {
         guard entry.level >= minSentryLevel, isAvailable else { return }
 
         // Add as breadcrumb for context trail
@@ -46,49 +46,50 @@ public final class SentryDestination: LogDestination, @unchecked Sendable {
 
     // MARK: - Private Helpers
 
-    private func addBreadcrumb(for entry: LogEntry) {
+    private func addBreadcrumb(for entry: RALogEntry) {
         let breadcrumb = Breadcrumb(level: convertToSentryLevel(entry.level), category: entry.category)
         breadcrumb.message = entry.message
-        breadcrumb.timestamp = entry.timestamp
+        breadcrumb.timestamp = Self.timestamp(from: entry)
 
-        if let metadata = entry.metadata {
-            breadcrumb.data = metadata
+        if !entry.metadata.isEmpty {
+            breadcrumb.data = entry.metadata
         }
 
         SentrySDK.addBreadcrumb(breadcrumb)
     }
 
-    private func captureEvent(for entry: LogEntry) {
+    private func captureEvent(for entry: RALogEntry) {
         let event = Event(level: convertToSentryLevel(entry.level))
         event.message = SentryMessage(formatted: entry.message)
-        event.timestamp = entry.timestamp
+        event.timestamp = Self.timestamp(from: entry)
         event.tags = [
             "category": entry.category,
-            "log_level": entry.level.description
+            "log_level": "\(entry.level)"
         ]
 
-        if let metadata = entry.metadata {
-            event.extra = metadata
-        }
-
-        if let deviceInfo = entry.deviceInfo {
-            var extra = event.extra ?? [:]
-            extra["device_model"] = deviceInfo.deviceModel
-            extra["os_version"] = deviceInfo.osVersion
-            extra["platform"] = deviceInfo.platform
-            event.extra = extra
+        // Device metadata is folded into `entry.metadata` SDK-side (RALogEntry
+        // has no native device field): keys device_model / os_version / platform.
+        if !entry.metadata.isEmpty {
+            event.extra = entry.metadata
         }
 
         SentrySDK.capture(event: event)
     }
 
-    private func convertToSentryLevel(_ level: LogLevel) -> SentryLevel {
+    /// Convert the proto's `timestampUnixMs: Int64` back to a `Date`.
+    private static func timestamp(from entry: RALogEntry) -> Date {
+        Date(timeIntervalSince1970: Double(entry.timestampUnixMs) / 1000)
+    }
+
+    private func convertToSentryLevel(_ level: RALogLevel) -> SentryLevel {
         switch level {
+        case .trace: return .debug
         case .debug: return .debug
         case .info: return .info
         case .warning: return .warning
         case .error: return .error
-        case .fault: return .fatal
+        case .fatal: return .fatal
+        case .UNRECOGNIZED: return .info
         }
     }
 }

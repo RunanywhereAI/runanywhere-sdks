@@ -56,7 +56,7 @@
  *    than per-call request/response.
  */
 
-import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { Runtime, type StreamingMode } from '../Foundation/RuntimeConfig';
 import {
@@ -243,7 +243,7 @@ export class OffscreenRuntimeBridge {
         // can never initialise.
         if (!_init) {
           throw new SDKException(
-            SDKErrorCode.WASMNotLoaded,
+            -ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED,
             'OffscreenRuntimeBridge.spawnWorker called with no setStreamWorkerInit payload registered',
           );
         }
@@ -280,7 +280,7 @@ export class OffscreenRuntimeBridge {
           this.pending.delete(handshakeKey);
           settleReject(
             new SDKException(
-              SDKErrorCode.WASMNotLoaded,
+              -ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED,
               `stream worker handshake timed out after ${HANDSHAKE_TIMEOUT_MS}ms — check streamWorkerFactory bundle and setStreamWorkerInit payload`,
             ),
           );
@@ -430,7 +430,7 @@ export class OffscreenRuntimeBridge {
 
   /** Tear down the worker and reject every pending iterator. */
   dispose(): void {
-    this.failAll(new SDKException(SDKErrorCode.WASMNotLoaded, 'OffscreenRuntimeBridge disposed'));
+    this.failAll(new SDKException(-ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED, 'OffscreenRuntimeBridge disposed'));
     this.worker?.terminate();
     this.worker = null;
     this.readyPromise = null;

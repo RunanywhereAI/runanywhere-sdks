@@ -10,56 +10,15 @@ import CRACommons
 import Foundation
 import os
 
-// MARK: - LogLevel
+// MARK: - RALogLevel ordering
 
-/// Log severity levels
-public enum LogLevel: Int, Comparable, CustomStringConvertible, Codable, Sendable {
-    case debug = 0
-    case info = 1
-    case warning = 2
-    case error = 3
-    case fault = 4
-
-    public static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
+/// `RALogLevel` (generated proto) is the canonical severity enum:
+/// `trace(0) < debug(1) < info(2) < warning(3) < error(4) < fatal(5)`.
+/// SwiftProtobuf's generated enum is not `Comparable`, so we add ordered
+/// comparisons here for severity gating (`level >= minLogLevel`).
+extension RALogLevel: @retroactive Comparable {
+    public static func < (lhs: RALogLevel, rhs: RALogLevel) -> Bool {
         lhs.rawValue < rhs.rawValue
-    }
-
-    public var description: String {
-        switch self {
-        case .debug: return "debug"
-        case .info: return "info"
-        case .warning: return "warning"
-        case .error: return "error"
-        case .fault: return "fault"
-        }
-    }
-}
-
-// MARK: - LogEntry
-
-/// Represents a single log message with metadata
-public struct LogEntry: Sendable {
-    public let timestamp: Date
-    public let level: LogLevel
-    public let category: String
-    public let message: String
-    public let metadata: [String: String]?
-    public let deviceInfo: DeviceInfo?
-
-    public init(
-        timestamp: Date = Date(),
-        level: LogLevel,
-        category: String,
-        message: String,
-        metadata: [String: Any]? = nil, // swiftlint:disable:this prefer_concrete_types avoid_any_type
-        deviceInfo: DeviceInfo? = nil
-    ) {
-        self.timestamp = timestamp
-        self.level = level
-        self.category = category
-        self.message = message
-        self.metadata = metadata?.mapValues { String(describing: $0) }
-        self.deviceInfo = deviceInfo
     }
 }
 
@@ -69,58 +28,41 @@ public struct LogEntry: Sendable {
 public protocol LogDestination: AnyObject, Sendable { // swiftlint:disable:this avoid_any_object
     var identifier: String { get }
     var isAvailable: Bool { get }
-    func write(_ entry: LogEntry)
+    func write(_ entry: RALogEntry)
     func flush()
 }
 
-// MARK: - LoggingConfiguration
+// MARK: - RALoggingConfiguration Presets
 
-/// Simple configuration for the logging system
-public struct LoggingConfiguration: Sendable {
-    public var enableLocalLogging: Bool
-    public var minLogLevel: LogLevel
-    public var includeDeviceMetadata: Bool
-    public var enableSentryLogging: Bool
-
-    public init(
-        enableLocalLogging: Bool = true,
-        minLogLevel: LogLevel = .info,
-        includeDeviceMetadata: Bool = true,
-        enableSentryLogging: Bool = false
-    ) {
-        self.enableLocalLogging = enableLocalLogging
-        self.minLogLevel = minLogLevel
-        self.includeDeviceMetadata = includeDeviceMetadata
-        self.enableSentryLogging = enableSentryLogging
+/// Environment presets for the generated `RALoggingConfiguration` proto.
+/// The struct itself is generated under `Sources/RunAnywhere/Generated/`;
+/// these factories supply the dev/staging/prod defaults.
+extension RALoggingConfiguration {
+    public static var development: RALoggingConfiguration {
+        var config = RALoggingConfiguration()
+        config.enableLocalLogging = true
+        config.minLogLevel = .debug
+        config.includeDeviceMetadata = false
+        config.enableSentryLogging = true
+        return config
     }
 
-    // MARK: - Environment Presets
-
-    public static var development: LoggingConfiguration {
-        LoggingConfiguration(
-            enableLocalLogging: true,
-            minLogLevel: .debug,
-            includeDeviceMetadata: false,
-            enableSentryLogging: true
-        )
+    public static var staging: RALoggingConfiguration {
+        var config = RALoggingConfiguration()
+        config.enableLocalLogging = true
+        config.minLogLevel = .info
+        config.includeDeviceMetadata = true
+        config.enableSentryLogging = false
+        return config
     }
 
-    public static var staging: LoggingConfiguration {
-        LoggingConfiguration(
-            enableLocalLogging: true,
-            minLogLevel: .info,
-            includeDeviceMetadata: true,
-            enableSentryLogging: false
-        )
-    }
-
-    public static var production: LoggingConfiguration {
-        LoggingConfiguration(
-            enableLocalLogging: false,
-            minLogLevel: .warning,
-            includeDeviceMetadata: true,
-            enableSentryLogging: false
-        )
+    public static var production: RALoggingConfiguration {
+        var config = RALoggingConfiguration()
+        config.enableLocalLogging = false
+        config.minLogLevel = .warning
+        config.includeDeviceMetadata = true
+        config.enableSentryLogging = false
+        return config
     }
 }
 
@@ -136,16 +78,16 @@ public final class Logging: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock<State>(initialState: State())
 
     private struct State {
-        var configuration: LoggingConfiguration
+        var configuration: RALoggingConfiguration
         var destinations: [LogDestination] = []
 
         init() {
             let environment = RunAnywhere.currentEnvironment ?? .production
-            self.configuration = LoggingConfiguration.forEnvironment(environment)
+            self.configuration = RALoggingConfiguration.forEnvironment(environment)
         }
     }
 
-    public var configuration: LoggingConfiguration {
+    public var configuration: RALoggingConfiguration {
         get { lock.withLock { $0.configuration } }
         set { lock.withLock { $0.configuration = newValue } }
     }
@@ -166,8 +108,8 @@ public final class Logging: @unchecked Sendable {
 
     // MARK: - Configuration
 
-    public func configure(_ config: LoggingConfiguration) {
-        let oldConfig = lock.withLock { state -> LoggingConfiguration in
+    public func configure(_ config: RALoggingConfiguration) {
+        let oldConfig = lock.withLock { state -> RALoggingConfiguration in
             let old = state.configuration
             state.configuration = config
             return old
@@ -187,7 +129,7 @@ public final class Logging: @unchecked Sendable {
         lock.withLock { $0.configuration.enableLocalLogging = enabled }
     }
 
-    public func setMinLogLevel(_ level: LogLevel) {
+    public func setMinLogLevel(_ level: RALogLevel) {
         lock.withLock { $0.configuration.minLogLevel = level }
     }
 
@@ -204,7 +146,7 @@ public final class Logging: @unchecked Sendable {
     // MARK: - Core Logging
 
     public func log(
-        level: LogLevel,
+        level: RALogLevel,
         category: String,
         message: String,
         metadata: [String: Any]? = nil // swiftlint:disable:this prefer_concrete_types avoid_any_type
@@ -213,13 +155,24 @@ public final class Logging: @unchecked Sendable {
 
         guard level >= config.minLogLevel else { return }
 
-        let entry = LogEntry(
-            level: level,
-            category: category,
-            message: message,
-            metadata: sanitizeMetadata(metadata),
-            deviceInfo: config.includeDeviceMetadata ? DeviceInfo.current : nil
-        )
+        // `RALogEntry` (generated proto) has no native `deviceInfo` or `Date`
+        // field, so fold the platform-only bits SDK-side: device metadata goes
+        // into the `metadata` map, and the `Date` timestamp is converted to the
+        // proto's `timestampUnixMs: Int64`.
+        var stringMetadata = (sanitizeMetadata(metadata) ?? [:]).mapValues { String(describing: $0) }
+        if config.includeDeviceMetadata {
+            let deviceInfo = DeviceInfoFactory.current
+            stringMetadata["device_model"] = deviceInfo.deviceModel
+            stringMetadata["os_version"] = deviceInfo.osVersion
+            stringMetadata["platform"] = deviceInfo.platform
+        }
+
+        var entry = RALogEntry()
+        entry.timestampUnixMs = Int64(Date().timeIntervalSince1970 * 1000)
+        entry.level = level
+        entry.category = category
+        entry.message = message
+        entry.metadata = stringMetadata
 
         // Console print is optional; unified logging (OSLog) is always on for
         // simulator/device log capture used by E2E catalog grep markers.
@@ -256,7 +209,7 @@ public final class Logging: @unchecked Sendable {
 
     // MARK: - Private Helpers
 
-    private func syncOSLogDestination(for _: LoggingConfiguration) {
+    private func syncOSLogDestination(for _: RALoggingConfiguration) {
         let hasOSLog = lock.withLock { state in
             state.destinations.contains { $0.identifier == OSLogDestination.destinationID }
         }
@@ -277,19 +230,21 @@ public final class Logging: @unchecked Sendable {
         }
     }
 
-    private func printToConsole(_ entry: LogEntry) {
+    private func printToConsole(_ entry: RALogEntry) {
         let emoji: String
         switch entry.level {
+        case .trace: emoji = "🔬"
         case .debug: emoji = "🔍"
         case .info: emoji = "ℹ️"
         case .warning: emoji = "⚠️"
         case .error: emoji = "❌"
-        case .fault: emoji = "💥"
+        case .fatal: emoji = "💥"
+        case .UNRECOGNIZED: emoji = "❓"
         }
 
         var output = "\(emoji) [\(entry.category)] \(entry.message)"
-        if let metadata = entry.metadata, !metadata.isEmpty {
-            let metaStr = metadata.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
+        if !entry.metadata.isEmpty {
+            let metaStr = entry.metadata.map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
             output += " | \(metaStr)"
         }
 
@@ -329,8 +284,8 @@ public final class Logging: @unchecked Sendable {
 
 // MARK: - Environment Helper
 
-extension LoggingConfiguration {
-    static func forEnvironment(_ environment: SDKEnvironment) -> LoggingConfiguration {
+extension RALoggingConfiguration {
+    static func forEnvironment(_ environment: SDKEnvironment) -> RALoggingConfiguration {
         switch environment {
         case .development:  return .development
         case .staging:      return .staging
@@ -343,7 +298,7 @@ extension LoggingConfiguration {
 extension Logging {
     /// Apply configuration based on SDK environment
     public func applyEnvironmentConfiguration(_ environment: SDKEnvironment) {
-        let config = LoggingConfiguration.forEnvironment(environment)
+        let config = RALoggingConfiguration.forEnvironment(environment)
         configure(config)
     }
 }
@@ -380,7 +335,7 @@ public struct SDKLogger: Sendable {
     }
 
     public func fault(_ message: String, metadata: [String: Any]? = nil) { // swiftlint:disable:this prefer_concrete_types avoid_any_type
-        Logging.shared.log(level: .fault, category: category, message: message, metadata: metadata)
+        Logging.shared.log(level: .fatal, category: category, message: message, metadata: metadata)
     }
 
     // MARK: - Error Logging with Context

@@ -303,11 +303,15 @@ abstract class RacResultCode {
 // Log Levels (from rac_types.h)
 // =============================================================================
 
-/// Log level for logging callback (rac_log_level_t).
+/// Log level for the logging callback (rac_log_level_t), as the raw C-ABI
+/// integers the native layer expects.
 ///
-/// Mirrors `enum rac_log_level` in `include/rac/core/rac_types.h`:
-/// `RAC_LOG_TRACE = 0, RAC_LOG_DEBUG = 1, RAC_LOG_INFO = 2,`
-/// `RAC_LOG_WARNING = 3, RAC_LOG_ERROR = 4, RAC_LOG_FATAL = 5`.
+/// These mirror the generated `LogLevel` proto enum value-for-value
+/// (`LOG_LEVEL_TRACE = 0 … LOG_LEVEL_FATAL = 5`, see `generated/logging.pbenum
+/// .dart`), which is itself aligned with `enum rac_log_level` in
+/// `include/rac/core/rac_types.h`. They are kept as `const int` literals (not
+/// `LogLevel.*.value`) because FFI call sites use them as `switch` `case`
+/// labels, which Dart requires to be compile-time constants.
 abstract class RacLogLevel {
   static const int trace = 0;
   static const int debug = 1;

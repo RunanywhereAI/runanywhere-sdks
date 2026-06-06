@@ -84,11 +84,11 @@ object CppBridgeModelRegistry {
                 ?: throw RuntimeException("Native model registry proto ABI unavailable")
 
         if (result != RunAnywhereBridge.RAC_SUCCESS) {
-            log(LogLevel.ERROR, "Failed to save model: ${model.id}, error=$result")
+            log(CppBridgePlatformAdapter.LogLevel.ERROR, "Failed to save model: ${model.id}, error=$result")
             throw RuntimeException("Failed to save model to C++ registry: $result")
         }
 
-        log(LogLevel.DEBUG, "Model saved to C++ registry: ${model.id}")
+        log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Model saved to C++ registry: ${model.id}")
     }
 
     /**
@@ -112,7 +112,7 @@ object CppBridgeModelRegistry {
             throw SDKException.modelNotFound(model.id)
         }
 
-        log(LogLevel.DEBUG, "Model updated via proto registry: ${model.id}")
+        log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Model updated via proto registry: ${model.id}")
     }
 
     /**
@@ -198,13 +198,12 @@ object CppBridgeModelRegistry {
 
         return try {
             val result = ProtoModelDiscoveryResult.ADAPTER.decode(bytes)
-            log(
-                LogLevel.INFO,
+            log(CppBridgePlatformAdapter.LogLevel.INFO,
                 "Discovery complete via proto: ${result.linked_count} models linked, ${result.scanned_count} scanned",
             )
             result
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Discovery proto decode failed: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Discovery proto decode failed: ${e.message}")
             ProtoModelDiscoveryResult(
                 success = false,
                 error_message = "Failed to decode ModelDiscoveryResult proto: ${e.message}",
@@ -288,7 +287,7 @@ object CppBridgeModelRegistry {
      * @return true if updated successfully
      */
     fun updateDownloadStatus(modelId: String, localPath: String?): Boolean {
-        log(LogLevel.DEBUG, "Updating download status: $modelId -> ${localPath ?: "null"}")
+        log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Updating download status: $modelId -> ${localPath ?: "null"}")
         val current = getProto(modelId) ?: return false
         val updated =
             current.copy(
@@ -300,7 +299,7 @@ object CppBridgeModelRegistry {
             return true
         }
         if (protoResult != null) {
-            log(LogLevel.WARN, "Proto download status update failed for $modelId: $protoResult")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Proto download status update failed for $modelId: $protoResult")
         }
         return false
     }
@@ -356,7 +355,7 @@ object CppBridgeModelRegistry {
         return try {
             ProtoModelInfoList.ADAPTER.decode(bytes)
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Failed to decode ModelInfoList proto: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode ModelInfoList proto: ${e.message}")
             null
         }
     }
@@ -390,7 +389,7 @@ object CppBridgeModelRegistry {
         return try {
             ProtoModelRegistryRefreshResult.ADAPTER.decode(bytes)
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Failed to decode ModelRegistryRefreshResult proto: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode ModelRegistryRefreshResult proto: ${e.message}")
             null
         }
     }
@@ -404,7 +403,7 @@ object CppBridgeModelRegistry {
         try {
             ProtoModelInfo.ADAPTER.decode(bytes)
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Failed to decode ModelInfo proto: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode ModelInfo proto: ${e.message}")
             null
         }
 
@@ -412,7 +411,7 @@ object CppBridgeModelRegistry {
         try {
             ProtoModelInfoList.ADAPTER.decode(bytes)
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Failed to decode $label proto: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode $label proto: ${e.message}")
             null
         }
 
@@ -420,7 +419,7 @@ object CppBridgeModelRegistry {
         try {
             block()
         } catch (e: UnsatisfiedLinkError) {
-            log(LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
             null
         }
 
@@ -428,7 +427,7 @@ object CppBridgeModelRegistry {
         try {
             block()
         } catch (e: UnsatisfiedLinkError) {
-            log(LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
             null
         }
 
@@ -447,16 +446,10 @@ object CppBridgeModelRegistry {
 
     // Logging
 
-    private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
-
-    private fun log(level: LogLevel, message: String) {
-        val adapterLevel =
-            when (level) {
-                LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
-                LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
-                LogLevel.WARN -> CppBridgePlatformAdapter.LogLevel.WARN
-                LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
-            }
-        CppBridgePlatformAdapter.logCallback(adapterLevel, TAG, message)
+    // Log levels share the single source of truth in
+    // CppBridgePlatformAdapter.LogLevel (Int consts mirroring RAC_LOG_LEVEL_*),
+    // rather than a private enum copy that just re-maps onto it.
+    private fun log(level: Int, message: String) {
+        CppBridgePlatformAdapter.logCallback(level, TAG, message)
     }
 }

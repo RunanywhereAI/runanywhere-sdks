@@ -2,6 +2,9 @@
   "name": "runanywhere-ai-example",
   "version": "0.1.0",
   "private": true,
+  "installConfig": {
+    "hoistingLimits": "workspaces"
+  },
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",

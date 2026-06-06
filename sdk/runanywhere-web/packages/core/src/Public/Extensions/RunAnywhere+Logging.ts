@@ -62,7 +62,7 @@ export const Logging = {
    * Matches iOS: static func setDebugMode(_ enabled: Bool)
    */
   setDebugMode(enabled: boolean): void {
-    SDKLogger.setMinLogLevel(enabled ? LogLevel.Debug : LogLevel.Info);
+    SDKLogger.setMinLogLevel(enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
     SDKLogger.setLocalLoggingEnabled(enabled);
   },
 

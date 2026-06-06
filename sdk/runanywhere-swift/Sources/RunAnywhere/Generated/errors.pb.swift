@@ -430,6 +430,9 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
   /// RAC_ERROR_INFERENCE_FAILED
   case inferenceFailed // = 135
 
+  /// RAC_ERROR_GENERATION_CANCELLED
+  case generationCancelled // = 136
+
   /// -- Network (-150..-179) ------------------------------------------------
   case networkUnavailable // = 150
 
@@ -694,6 +697,9 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
   /// RAC_ERROR_RUNTIME_UNAVAILABLE
   case runtimeUnavailable // = 605
 
+  /// RAC_ERROR_BACKEND_ERROR (generic backend failure)
+  case backendError // = 606
+
   /// RAC_ERROR_INVALID_HANDLE
   case invalidHandle // = 610
 
@@ -778,6 +784,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 133: self = .tokenLimitExceeded
     case 134: self = .costLimitExceeded
     case 135: self = .inferenceFailed
+    case 136: self = .generationCancelled
     case 150: self = .networkUnavailable
     case 151: self = .networkError
     case 152: self = .requestFailed
@@ -866,6 +873,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 603: self = .backendBusy
     case 604: self = .backendUnavailable
     case 605: self = .runtimeUnavailable
+    case 606: self = .backendError
     case 610: self = .invalidHandle
     case 700: self = .eventInvalidCategory
     case 701: self = .eventSubscriptionFailed
@@ -912,6 +920,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .tokenLimitExceeded: return 133
     case .costLimitExceeded: return 134
     case .inferenceFailed: return 135
+    case .generationCancelled: return 136
     case .networkUnavailable: return 150
     case .networkError: return 151
     case .requestFailed: return 152
@@ -1000,6 +1009,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .backendBusy: return 603
     case .backendUnavailable: return 604
     case .runtimeUnavailable: return 605
+    case .backendError: return 606
     case .invalidHandle: return 610
     case .eventInvalidCategory: return 700
     case .eventSubscriptionFailed: return 701
@@ -1046,6 +1056,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     .tokenLimitExceeded,
     .costLimitExceeded,
     .inferenceFailed,
+    .generationCancelled,
     .networkUnavailable,
     .networkError,
     .requestFailed,
@@ -1134,6 +1145,7 @@ public nonisolated enum RAErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
     .backendBusy,
     .backendUnavailable,
     .runtimeUnavailable,
+    .backendError,
     .invalidHandle,
     .eventInvalidCategory,
     .eventSubscriptionFailed,
@@ -1230,6 +1242,19 @@ public nonisolated struct RAErrorContext: Sendable {
   /// Clears the value of `operation`. Subsequent reads from it will return its default value.
   public mutating func clearOperation() {self._operation = nil}
 
+  /// The structured field path a validation error refers to
+  /// ("<Message>.<field>"). First-class replacement for the
+  /// metadata["field_path"] magic key all five SDKs read/write today; the
+  /// generated convenience validate() already emits this path.
+  public var fieldPath: String {
+    get {_fieldPath ?? String()}
+    set {_fieldPath = newValue}
+  }
+  /// Returns true if `fieldPath` has been explicitly set.
+  public var hasFieldPath: Bool {self._fieldPath != nil}
+  /// Clears the value of `fieldPath`. Subsequent reads from it will return its default value.
+  public mutating func clearFieldPath() {self._fieldPath = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1237,6 +1262,7 @@ public nonisolated struct RAErrorContext: Sendable {
   fileprivate var _sourceFile: String? = nil
   fileprivate var _sourceLine: Int32? = nil
   fileprivate var _operation: String? = nil
+  fileprivate var _fieldPath: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -1365,12 +1391,12 @@ nonisolated extension RAErrorSeverity: SwiftProtobuf._ProtoNameProviding {
 }
 
 nonisolated extension RAErrorCode: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CODE_UNSPECIFIED\0\u{2}d\u{1}ERROR_CODE_NOT_INITIALIZED\0\u{1}ERROR_CODE_ALREADY_INITIALIZED\0\u{1}ERROR_CODE_INITIALIZATION_FAILED\0\u{1}ERROR_CODE_INVALID_CONFIGURATION\0\u{1}ERROR_CODE_INVALID_API_KEY\0\u{1}ERROR_CODE_ENVIRONMENT_MISMATCH\0\u{1}ERROR_CODE_INVALID_PARAMETER\0\u{2}\u{4}ERROR_CODE_MODEL_NOT_FOUND\0\u{1}ERROR_CODE_MODEL_LOAD_FAILED\0\u{1}ERROR_CODE_MODEL_VALIDATION_FAILED\0\u{1}ERROR_CODE_MODEL_INCOMPATIBLE\0\u{1}ERROR_CODE_INVALID_MODEL_FORMAT\0\u{1}ERROR_CODE_MODEL_STORAGE_CORRUPTED\0\u{1}ERROR_CODE_MODEL_NOT_LOADED\0\u{2}\u{e}ERROR_CODE_GENERATION_FAILED\0\u{1}ERROR_CODE_GENERATION_TIMEOUT\0\u{1}ERROR_CODE_CONTEXT_TOO_LONG\0\u{1}ERROR_CODE_TOKEN_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_COST_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_INFERENCE_FAILED\0\u{2}\u{f}ERROR_CODE_NETWORK_UNAVAILABLE\0\u{1}ERROR_CODE_NETWORK_ERROR\0\u{1}ERROR_CODE_REQUEST_FAILED\0\u{1}ERROR_CODE_DOWNLOAD_FAILED\0\u{1}ERROR_CODE_SERVER_ERROR\0\u{1}ERROR_CODE_TIMEOUT\0\u{1}ERROR_CODE_INVALID_RESPONSE\0\u{1}ERROR_CODE_HTTP_ERROR\0\u{1}ERROR_CODE_CONNECTION_LOST\0\u{1}ERROR_CODE_PARTIAL_DOWNLOAD\0\u{1}ERROR_CODE_HTTP_REQUEST_FAILED\0\u{1}ERROR_CODE_HTTP_NOT_SUPPORTED\0\u{2}\u{13}ERROR_CODE_INSUFFICIENT_STORAGE\0\u{1}ERROR_CODE_STORAGE_FULL\0\u{1}ERROR_CODE_STORAGE_ERROR\0\u{1}ERROR_CODE_FILE_NOT_FOUND\0\u{1}ERROR_CODE_FILE_READ_FAILED\0\u{1}ERROR_CODE_FILE_WRITE_FAILED\0\u{1}ERROR_CODE_PERMISSION_DENIED\0\u{1}ERROR_CODE_DELETE_FAILED\0\u{1}ERROR_CODE_MOVE_FAILED\0\u{1}ERROR_CODE_DIRECTORY_CREATION_FAILED\0\u{1}ERROR_CODE_DIRECTORY_NOT_FOUND\0\u{1}ERROR_CODE_INVALID_PATH\0\u{1}ERROR_CODE_INVALID_FILE_NAME\0\u{1}ERROR_CODE_TEMP_FILE_CREATION_FAILED\0\u{2}\u{1b}ERROR_CODE_HARDWARE_UNSUPPORTED\0\u{1}ERROR_CODE_INSUFFICIENT_MEMORY\0\u{2}\u{9}ERROR_CODE_COMPONENT_NOT_READY\0\u{1}ERROR_CODE_INVALID_STATE\0\u{1}ERROR_CODE_SERVICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_SERVICE_BUSY\0\u{1}ERROR_CODE_PROCESSING_FAILED\0\u{1}ERROR_CODE_START_FAILED\0\u{1}ERROR_CODE_NOT_SUPPORTED\0\u{2}\u{e}ERROR_CODE_VALIDATION_FAILED\0\u{1}ERROR_CODE_INVALID_INPUT\0\u{1}ERROR_CODE_INVALID_FORMAT\0\u{1}ERROR_CODE_EMPTY_INPUT\0\u{1}ERROR_CODE_TEXT_TOO_LONG\0\u{1}ERROR_CODE_INVALID_SSML\0\u{1}ERROR_CODE_INVALID_SPEAKING_RATE\0\u{1}ERROR_CODE_INVALID_PITCH\0\u{1}ERROR_CODE_INVALID_VOLUME\0\u{1}ERROR_CODE_INVALID_ARGUMENT\0\u{1}ERROR_CODE_NULL_POINTER\0\u{1}ERROR_CODE_BUFFER_TOO_SMALL\0\u{1}ERROR_CODE_OUTPUT_TRUNCATED\0\u{2}\u{12}ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED\0\u{1}ERROR_CODE_AUDIO_SESSION_FAILED\0\u{1}ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}ERROR_CODE_INSUFFICIENT_AUDIO_DATA\0\u{1}ERROR_CODE_EMPTY_AUDIO_BUFFER\0\u{1}ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED\0\u{2}\u{f}ERROR_CODE_LANGUAGE_NOT_SUPPORTED\0\u{1}ERROR_CODE_VOICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_STREAMING_NOT_SUPPORTED\0\u{1}ERROR_CODE_STREAM_CANCELLED\0\u{2}\u{11}ERROR_CODE_AUTHENTICATION_FAILED\0\u{1}ERROR_CODE_UNAUTHORIZED\0\u{1}ERROR_CODE_FORBIDDEN\0\u{2}\u{8}ERROR_CODE_KEYCHAIN_ERROR\0\u{1}ERROR_CODE_ENCODING_ERROR\0\u{1}ERROR_CODE_DECODING_ERROR\0\u{1}ERROR_CODE_SECURE_STORAGE_FAILED\0\u{2}\u{11}ERROR_CODE_EXTRACTION_FAILED\0\u{1}ERROR_CODE_CHECKSUM_MISMATCH\0\u{1}ERROR_CODE_UNSUPPORTED_ARCHIVE\0\u{2}\u{12}ERROR_CODE_CALIBRATION_FAILED\0\u{1}ERROR_CODE_CALIBRATION_TIMEOUT\0\u{2}\u{9}ERROR_CODE_CANCELLED\0\u{2}\u{14}ERROR_CODE_MODULE_NOT_FOUND\0\u{1}ERROR_CODE_MODULE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_MODULE_LOAD_FAILED\0\u{2}\u{8}ERROR_CODE_SERVICE_NOT_FOUND\0\u{1}ERROR_CODE_SERVICE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_SERVICE_CREATE_FAILED\0\u{2}\u{8}ERROR_CODE_CAPABILITY_NOT_FOUND\0\u{1}ERROR_CODE_PROVIDER_NOT_FOUND\0\u{1}ERROR_CODE_NO_CAPABLE_PROVIDER\0\u{1}ERROR_CODE_NOT_FOUND\0\u{2}M\u{1}ERROR_CODE_ADAPTER_NOT_SET\0\u{2}d\u{1}ERROR_CODE_BACKEND_NOT_FOUND\0\u{1}ERROR_CODE_BACKEND_NOT_READY\0\u{1}ERROR_CODE_BACKEND_INIT_FAILED\0\u{1}ERROR_CODE_BACKEND_BUSY\0\u{1}ERROR_CODE_BACKEND_UNAVAILABLE\0\u{1}ERROR_CODE_RUNTIME_UNAVAILABLE\0\u{2}\u{5}ERROR_CODE_INVALID_HANDLE\0\u{2}Z\u{1}ERROR_CODE_EVENT_INVALID_CATEGORY\0\u{1}ERROR_CODE_EVENT_SUBSCRIPTION_FAILED\0\u{1}ERROR_CODE_EVENT_PUBLISH_FAILED\0\u{2}b\u{1}ERROR_CODE_NOT_IMPLEMENTED\0\u{1}ERROR_CODE_FEATURE_NOT_AVAILABLE\0\u{1}ERROR_CODE_FRAMEWORK_NOT_AVAILABLE\0\u{1}ERROR_CODE_UNSUPPORTED_MODALITY\0\u{1}ERROR_CODE_UNKNOWN\0\u{1}ERROR_CODE_INTERNAL\0\u{2}\u{5}ERROR_CODE_ABI_VERSION_MISMATCH\0\u{1}ERROR_CODE_CAPABILITY_UNSUPPORTED\0\u{1}ERROR_CODE_PLUGIN_DUPLICATE\0\u{2}\u{8}ERROR_CODE_PLUGIN_LOAD_FAILED\0\u{1}ERROR_CODE_PLUGIN_BUSY\0\u{2}O\u{1}ERROR_CODE_WASM_LOAD_FAILED\0\u{1}ERROR_CODE_WASM_NOT_LOADED\0\u{1}ERROR_CODE_WASM_CALLBACK_ERROR\0\u{1}ERROR_CODE_WASM_MEMORY_ERROR\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CODE_UNSPECIFIED\0\u{2}d\u{1}ERROR_CODE_NOT_INITIALIZED\0\u{1}ERROR_CODE_ALREADY_INITIALIZED\0\u{1}ERROR_CODE_INITIALIZATION_FAILED\0\u{1}ERROR_CODE_INVALID_CONFIGURATION\0\u{1}ERROR_CODE_INVALID_API_KEY\0\u{1}ERROR_CODE_ENVIRONMENT_MISMATCH\0\u{1}ERROR_CODE_INVALID_PARAMETER\0\u{2}\u{4}ERROR_CODE_MODEL_NOT_FOUND\0\u{1}ERROR_CODE_MODEL_LOAD_FAILED\0\u{1}ERROR_CODE_MODEL_VALIDATION_FAILED\0\u{1}ERROR_CODE_MODEL_INCOMPATIBLE\0\u{1}ERROR_CODE_INVALID_MODEL_FORMAT\0\u{1}ERROR_CODE_MODEL_STORAGE_CORRUPTED\0\u{1}ERROR_CODE_MODEL_NOT_LOADED\0\u{2}\u{e}ERROR_CODE_GENERATION_FAILED\0\u{1}ERROR_CODE_GENERATION_TIMEOUT\0\u{1}ERROR_CODE_CONTEXT_TOO_LONG\0\u{1}ERROR_CODE_TOKEN_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_COST_LIMIT_EXCEEDED\0\u{1}ERROR_CODE_INFERENCE_FAILED\0\u{1}ERROR_CODE_GENERATION_CANCELLED\0\u{2}\u{e}ERROR_CODE_NETWORK_UNAVAILABLE\0\u{1}ERROR_CODE_NETWORK_ERROR\0\u{1}ERROR_CODE_REQUEST_FAILED\0\u{1}ERROR_CODE_DOWNLOAD_FAILED\0\u{1}ERROR_CODE_SERVER_ERROR\0\u{1}ERROR_CODE_TIMEOUT\0\u{1}ERROR_CODE_INVALID_RESPONSE\0\u{1}ERROR_CODE_HTTP_ERROR\0\u{1}ERROR_CODE_CONNECTION_LOST\0\u{1}ERROR_CODE_PARTIAL_DOWNLOAD\0\u{1}ERROR_CODE_HTTP_REQUEST_FAILED\0\u{1}ERROR_CODE_HTTP_NOT_SUPPORTED\0\u{2}\u{13}ERROR_CODE_INSUFFICIENT_STORAGE\0\u{1}ERROR_CODE_STORAGE_FULL\0\u{1}ERROR_CODE_STORAGE_ERROR\0\u{1}ERROR_CODE_FILE_NOT_FOUND\0\u{1}ERROR_CODE_FILE_READ_FAILED\0\u{1}ERROR_CODE_FILE_WRITE_FAILED\0\u{1}ERROR_CODE_PERMISSION_DENIED\0\u{1}ERROR_CODE_DELETE_FAILED\0\u{1}ERROR_CODE_MOVE_FAILED\0\u{1}ERROR_CODE_DIRECTORY_CREATION_FAILED\0\u{1}ERROR_CODE_DIRECTORY_NOT_FOUND\0\u{1}ERROR_CODE_INVALID_PATH\0\u{1}ERROR_CODE_INVALID_FILE_NAME\0\u{1}ERROR_CODE_TEMP_FILE_CREATION_FAILED\0\u{2}\u{1b}ERROR_CODE_HARDWARE_UNSUPPORTED\0\u{1}ERROR_CODE_INSUFFICIENT_MEMORY\0\u{2}\u{9}ERROR_CODE_COMPONENT_NOT_READY\0\u{1}ERROR_CODE_INVALID_STATE\0\u{1}ERROR_CODE_SERVICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_SERVICE_BUSY\0\u{1}ERROR_CODE_PROCESSING_FAILED\0\u{1}ERROR_CODE_START_FAILED\0\u{1}ERROR_CODE_NOT_SUPPORTED\0\u{2}\u{e}ERROR_CODE_VALIDATION_FAILED\0\u{1}ERROR_CODE_INVALID_INPUT\0\u{1}ERROR_CODE_INVALID_FORMAT\0\u{1}ERROR_CODE_EMPTY_INPUT\0\u{1}ERROR_CODE_TEXT_TOO_LONG\0\u{1}ERROR_CODE_INVALID_SSML\0\u{1}ERROR_CODE_INVALID_SPEAKING_RATE\0\u{1}ERROR_CODE_INVALID_PITCH\0\u{1}ERROR_CODE_INVALID_VOLUME\0\u{1}ERROR_CODE_INVALID_ARGUMENT\0\u{1}ERROR_CODE_NULL_POINTER\0\u{1}ERROR_CODE_BUFFER_TOO_SMALL\0\u{1}ERROR_CODE_OUTPUT_TRUNCATED\0\u{2}\u{12}ERROR_CODE_AUDIO_FORMAT_NOT_SUPPORTED\0\u{1}ERROR_CODE_AUDIO_SESSION_FAILED\0\u{1}ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}ERROR_CODE_INSUFFICIENT_AUDIO_DATA\0\u{1}ERROR_CODE_EMPTY_AUDIO_BUFFER\0\u{1}ERROR_CODE_AUDIO_SESSION_ACTIVATION_FAILED\0\u{2}\u{f}ERROR_CODE_LANGUAGE_NOT_SUPPORTED\0\u{1}ERROR_CODE_VOICE_NOT_AVAILABLE\0\u{1}ERROR_CODE_STREAMING_NOT_SUPPORTED\0\u{1}ERROR_CODE_STREAM_CANCELLED\0\u{2}\u{11}ERROR_CODE_AUTHENTICATION_FAILED\0\u{1}ERROR_CODE_UNAUTHORIZED\0\u{1}ERROR_CODE_FORBIDDEN\0\u{2}\u{8}ERROR_CODE_KEYCHAIN_ERROR\0\u{1}ERROR_CODE_ENCODING_ERROR\0\u{1}ERROR_CODE_DECODING_ERROR\0\u{1}ERROR_CODE_SECURE_STORAGE_FAILED\0\u{2}\u{11}ERROR_CODE_EXTRACTION_FAILED\0\u{1}ERROR_CODE_CHECKSUM_MISMATCH\0\u{1}ERROR_CODE_UNSUPPORTED_ARCHIVE\0\u{2}\u{12}ERROR_CODE_CALIBRATION_FAILED\0\u{1}ERROR_CODE_CALIBRATION_TIMEOUT\0\u{2}\u{9}ERROR_CODE_CANCELLED\0\u{2}\u{14}ERROR_CODE_MODULE_NOT_FOUND\0\u{1}ERROR_CODE_MODULE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_MODULE_LOAD_FAILED\0\u{2}\u{8}ERROR_CODE_SERVICE_NOT_FOUND\0\u{1}ERROR_CODE_SERVICE_ALREADY_REGISTERED\0\u{1}ERROR_CODE_SERVICE_CREATE_FAILED\0\u{2}\u{8}ERROR_CODE_CAPABILITY_NOT_FOUND\0\u{1}ERROR_CODE_PROVIDER_NOT_FOUND\0\u{1}ERROR_CODE_NO_CAPABLE_PROVIDER\0\u{1}ERROR_CODE_NOT_FOUND\0\u{2}M\u{1}ERROR_CODE_ADAPTER_NOT_SET\0\u{2}d\u{1}ERROR_CODE_BACKEND_NOT_FOUND\0\u{1}ERROR_CODE_BACKEND_NOT_READY\0\u{1}ERROR_CODE_BACKEND_INIT_FAILED\0\u{1}ERROR_CODE_BACKEND_BUSY\0\u{1}ERROR_CODE_BACKEND_UNAVAILABLE\0\u{1}ERROR_CODE_RUNTIME_UNAVAILABLE\0\u{1}ERROR_CODE_BACKEND_ERROR\0\u{2}\u{4}ERROR_CODE_INVALID_HANDLE\0\u{2}Z\u{1}ERROR_CODE_EVENT_INVALID_CATEGORY\0\u{1}ERROR_CODE_EVENT_SUBSCRIPTION_FAILED\0\u{1}ERROR_CODE_EVENT_PUBLISH_FAILED\0\u{2}b\u{1}ERROR_CODE_NOT_IMPLEMENTED\0\u{1}ERROR_CODE_FEATURE_NOT_AVAILABLE\0\u{1}ERROR_CODE_FRAMEWORK_NOT_AVAILABLE\0\u{1}ERROR_CODE_UNSUPPORTED_MODALITY\0\u{1}ERROR_CODE_UNKNOWN\0\u{1}ERROR_CODE_INTERNAL\0\u{2}\u{5}ERROR_CODE_ABI_VERSION_MISMATCH\0\u{1}ERROR_CODE_CAPABILITY_UNSUPPORTED\0\u{1}ERROR_CODE_PLUGIN_DUPLICATE\0\u{2}\u{8}ERROR_CODE_PLUGIN_LOAD_FAILED\0\u{1}ERROR_CODE_PLUGIN_BUSY\0\u{2}O\u{1}ERROR_CODE_WASM_LOAD_FAILED\0\u{1}ERROR_CODE_WASM_NOT_LOADED\0\u{1}ERROR_CODE_WASM_CALLBACK_ERROR\0\u{1}ERROR_CODE_WASM_MEMORY_ERROR\0")
 }
 
 nonisolated extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ErrorContext"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}metadata\0\u{3}source_file\0\u{3}source_line\0\u{1}operation\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}metadata\0\u{3}source_file\0\u{3}source_line\0\u{1}operation\0\u{3}field_path\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1382,6 +1408,7 @@ nonisolated extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 2: try { try decoder.decodeSingularStringField(value: &self._sourceFile) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self._sourceLine) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._operation) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._fieldPath) }()
       default: break
       }
     }
@@ -1404,6 +1431,9 @@ nonisolated extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._Mess
     try { if let v = self._operation {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._fieldPath {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1412,6 +1442,7 @@ nonisolated extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs._sourceFile != rhs._sourceFile {return false}
     if lhs._sourceLine != rhs._sourceLine {return false}
     if lhs._operation != rhs._operation {return false}
+    if lhs._fieldPath != rhs._fieldPath {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

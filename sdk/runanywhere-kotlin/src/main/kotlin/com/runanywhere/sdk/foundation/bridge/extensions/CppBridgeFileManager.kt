@@ -14,8 +14,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 /**
  * File manager bridge to C++ rac_file_manager.
@@ -133,28 +131,6 @@ object CppBridgeFileManager {
         RunAnywhereBridge.racFileManagerModelFolderHasContents(modelId)
 
     /**
-     * Combined storage info — mirrors Swift
-     * `CppBridge.FileManager.getStorageInfo()` (which returns
-     * `rac_file_manager_storage_info_t`).
-     *
-     * The JNI thunk returns a 6 × int64 little-endian payload; this wrapper
-     * decodes it into [StorageInfo]. Returns null on failure.
-     */
-    fun getStorageInfo(): StorageInfo? {
-        val bytes = RunAnywhereBridge.racFileManagerGetStorageInfo() ?: return null
-        if (bytes.size < STORAGE_INFO_PAYLOAD_BYTES) return null
-        val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        return StorageInfo(
-            deviceTotal = buf.long,
-            deviceFree = buf.long,
-            modelsSize = buf.long,
-            cacheSize = buf.long,
-            tempSize = buf.long,
-            totalAppSize = buf.long,
-        )
-    }
-
-    /**
      * Check whether `requiredBytes` are available for download. Mirrors Swift
      * `CppBridge.FileManager.checkStorage(requiredBytes:)` (which returns
      * `rac_storage_availability_t`).
@@ -165,20 +141,6 @@ object CppBridgeFileManager {
     fun checkStorage(requiredBytes: Long): Boolean =
         RunAnywhereBridge.racFileManagerCheckStorage(requiredBytes)
 
-    /**
-     * Decoded form of `rac_file_manager_storage_info_t` — all sizes are in bytes.
-     */
-    data class StorageInfo(
-        val deviceTotal: Long,
-        val deviceFree: Long,
-        val modelsSize: Long,
-        val cacheSize: Long,
-        val tempSize: Long,
-        val totalAppSize: Long,
-    )
-
-    /** Size of the JNI getStorageInfo payload: 6 × int64. */
-    private const val STORAGE_INFO_PAYLOAD_BYTES = 6 * 8
 
     /**
      * Provides platform file I/O methods called by C++ via JNI.

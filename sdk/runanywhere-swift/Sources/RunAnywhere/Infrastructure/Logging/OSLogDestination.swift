@@ -20,7 +20,7 @@ final class OSLogDestination: LogDestination, @unchecked Sendable {
 
     private let loggers = OSAllocatedUnfairLock<[String: Logger]>(initialState: [:])
 
-    func write(_ entry: LogEntry) {
+    func write(_ entry: RALogEntry) {
         let logger = loggers.withLock { cache -> Logger in
             if let existing = cache[entry.category] {
                 return existing
@@ -32,6 +32,8 @@ final class OSLogDestination: LogDestination, @unchecked Sendable {
         }
 
         switch entry.level {
+        case .trace:
+            logger.trace("\(entry.message, privacy: .public)")
         case .debug:
             logger.debug("\(entry.message, privacy: .public)")
         case .info:
@@ -40,8 +42,10 @@ final class OSLogDestination: LogDestination, @unchecked Sendable {
             logger.warning("\(entry.message, privacy: .public)")
         case .error:
             logger.error("\(entry.message, privacy: .public)")
-        case .fault:
+        case .fatal:
             logger.fault("\(entry.message, privacy: .public)")
+        case .UNRECOGNIZED:
+            logger.log("\(entry.message, privacy: .public)")
         }
     }
 

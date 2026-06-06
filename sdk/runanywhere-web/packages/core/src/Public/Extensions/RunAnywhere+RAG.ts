@@ -6,7 +6,7 @@
  * generated proto request/result models.
  */
 
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { RAGProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import type {
@@ -431,7 +431,7 @@ export function unavailableRAGStatistics(reason?: string): RAGStatistics {
   return {
     ...emptyRAGStatistics(createDefaultRAGConfiguration()),
     errorMessage: reason ?? getRAGAvailability().reason,
-    errorCode: SDKErrorCode.BackendNotAvailable,
+    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
   };
 }
 
@@ -447,7 +447,7 @@ export function unavailableRAGResult(question = '', reason?: string): RAGResult 
     completionTokens: 0,
     totalTokens: 0,
     errorMessage: reason ?? getRAGAvailability().reason,
-    errorCode: SDKErrorCode.BackendNotAvailable,
+    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
     requestId: createId(question ? 'rag-query-unavailable' : 'rag-unavailable'),
   };
 }

@@ -906,6 +906,43 @@ message RegisterModelFromUrlRequest {
 
     // Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
     optional ModelSource source = 5;
+
+    // Caller-supplied capability fields. When set, the register-from-url C++
+    // path honors them on the saved ModelInfo instead of its inference
+    // defaults (which hardcode supports_lora=false, download_size=0, infer
+    // artifact_type from the URL). This lets every SDK drop the post-register
+    // "patch + resave" pass. Tags 6-13 are free (1-5 stay wire-compatible with
+    // ModelInfoMakeRequest).
+    optional int64             memory_required_bytes = 6;
+    optional bool              supports_thinking     = 7;
+    optional bool              supports_lora         = 8;
+    optional ModelArtifactType artifact_type         = 9;
+    optional int32             context_length        = 10;
+    optional string            description           = 11;
+    optional int64             download_size_bytes   = 12;
+    // Explicit id override. Empty -> derived from URL/name.
+    optional string            id                    = 13;
+}
+
+// ---------------------------------------------------------------------------
+// Inputs for registering a multi-file model (each file carries its own URL,
+// so there is no model-level URL). Replaces the hand-built MultiFileArtifact
+// ModelInfo every SDK assembles today. Produces the saved ModelInfo.
+// ---------------------------------------------------------------------------
+message RegisterMultiFileModelRequest {
+    string                       id                    = 1;
+    string                       name                  = 2;
+    InferenceFramework           framework             = 3;
+    repeated ModelFileDescriptor files                 = 4;
+    optional ModelCategory       category              = 5;
+    optional ModelFormat         format                = 6;
+    optional int64               memory_required_bytes = 7;
+    optional int64               download_size_bytes   = 8;
+    optional int32               context_length        = 9;
+    optional bool                supports_thinking     = 10;
+    optional bool                supports_lora         = 11;
+    optional string              description           = 12;
+    optional ModelSource         source                = 13;
 }
 
 // Logical ModelRegistry service contract. Platform adapters remain

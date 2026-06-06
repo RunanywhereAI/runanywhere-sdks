@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { SDKErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
 import {
@@ -29,7 +29,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     const result = await VoiceAgent.processTurn(new Float32Array([0, 0, 0, 0]));
 
     expect(result.speechDetected).toBe(false);
-    expect(result.errorCode).toBe(SDKErrorCode.BackendNotAvailable);
+    expect(result.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
     expect(result.errorMessage).toContain('No voice-agent provider or native handle');
     expect(result.finalState?.ready).toBe(false);
   });
@@ -39,7 +39,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     const first = await iterator.next();
 
     expect(first.done).toBe(false);
-    expect(first.value.error?.code).toBe(SDKErrorCode.BackendNotAvailable);
+    expect(first.value.error?.code).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
     expect(first.value.error?.component).toBe('voice-agent');
   });
 
@@ -49,9 +49,9 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     const query = await RAG.query('What is indexed?');
     const stats = await RAG.getStatistics();
 
-    expect(query.errorCode).toBe(SDKErrorCode.BackendNotAvailable);
+    expect(query.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
     expect(query.retrievedChunks).toEqual([]);
-    expect(stats.errorCode).toBe(SDKErrorCode.BackendNotAvailable);
+    expect(stats.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
     expect(stats.indexedDocuments).toBe(0);
   });
 
@@ -64,7 +64,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     expect(availability.available).toBe(false);
     expect(availability.source).toBe('wasm-exports');
     expect(availability.reason).toContain('no RAG provider or session handle');
-    expect(query.errorCode).toBe(SDKErrorCode.BackendNotAvailable);
+    expect(query.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
     expect(query.errorMessage).toContain('no RAG provider or session handle');
   });
 
@@ -86,7 +86,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       persistIndex: true,
       indexPath: 'opfs://runanywhere/rag/docs',
     }))).rejects.toMatchObject({
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       details: expect.stringContaining('browser storage-backed index adapter'),
     });
 
@@ -122,11 +122,11 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
 
     await expect(RAG.listDocuments()).rejects.toMatchObject({
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       details: expect.stringContaining('does not expose document listing'),
     });
     await expect(RAG.removeDocument('doc-1')).rejects.toMatchObject({
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       details: expect.stringContaining('does not expose document-level removal'),
     });
   });
@@ -161,7 +161,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
 
     await expect(RAG.listDocuments()).rejects.toMatchObject({
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       details: expect.stringContaining('does not expose document listing'),
     });
   });
@@ -196,7 +196,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
 
     await expect(RAG.listDocuments()).rejects.toMatchObject({
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
     });
   });
 });

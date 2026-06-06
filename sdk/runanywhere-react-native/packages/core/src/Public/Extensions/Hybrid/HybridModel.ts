@@ -14,9 +14,12 @@
 import {
   HybridBackendKind,
   HybridModelType,
+  type HybridRoutedMetadata,
+  type HybridSttTranscribeOptions,
 } from '@runanywhere/proto-ts/hybrid_router';
 
 export { HybridBackendKind, HybridModelType };
+export type { HybridRoutedMetadata };
 
 /** Default cloud STT provider when a caller omits one. */
 export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
@@ -86,50 +89,15 @@ export function pinnedEngineName(backend: HybridBackendKind): string {
 
 /**
  * STT options carried through the router (mirror of the C `rac_stt_options_t`
- * knobs the router forwards). All optional with backend-default behaviour.
+ * knobs the router forwards). Ergonomic partial of the generated
+ * `HybridSttTranscribeOptions`: all fields optional with backend-default
+ * behaviour; the router fills the proto defaults (`''`/`0`) for omitted knobs.
+ *
+ * Fields: `language` (BCP-47 hint; empty = auto-detect), `sampleRate` (PCM
+ * sample-rate hint; 0 = engine default 16000), `audioFormat`
+ * (`rac_audio_format_enum_t`: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC).
  */
-export interface HybridTranscribeOptions {
-  /** BCP-47 hint. Empty/undefined = backend auto-detect. */
-  language?: string;
-  /** Sample-rate hint for raw PCM input. 0/undefined = engine default (16000). */
-  sampleRate?: number;
-  /**
-   * `rac_audio_format_enum_t`: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
-   * 0/undefined leaves the format unspecified.
-   */
-  audioFormat?: number;
-}
-
-/**
- * Metadata describing the routing decision behind a `HybridTranscribeResult`.
- * Always populated, including on cascade/fallback scenarios where the secondary
- * candidate served the request.
- */
-export interface HybridRoutedMetadata {
-  /** Model id of the candidate that produced the result. */
-  readonly chosenModelId: string;
-  /**
-   * True when the secondary served the request after the primary failed or
-   * scored below the cascade threshold.
-   */
-  readonly wasFallback: boolean;
-  /** Backends invoked (1 = primary only, 2 = primary then secondary). */
-  readonly attemptCount: number;
-  /**
-   * Native rac_result_t from the primary when `wasFallback` and the fallback
-   * fired on an error; else 0.
-   */
-  readonly primaryErrorCode: number;
-  /** Human-readable reason the primary failed; else empty. */
-  readonly primaryErrorMessage: string;
-  /** Final confidence of the chosen result. `NaN` when no quality signal. */
-  readonly confidence: number;
-  /**
-   * Primary's confidence captured before a confidence-based cascade. `NaN` when
-   * no confidence cascade occurred.
-   */
-  readonly primaryConfidence: number;
-}
+export type HybridTranscribeOptions = Partial<HybridSttTranscribeOptions>;
 
 /** One transcribe call's outcome through the hybrid STT router. */
 export interface HybridTranscribeResult {

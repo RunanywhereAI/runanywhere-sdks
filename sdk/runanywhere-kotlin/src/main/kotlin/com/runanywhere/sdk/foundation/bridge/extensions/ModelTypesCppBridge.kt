@@ -128,7 +128,7 @@ internal object ModelTypesCppBridge {
         return try {
             ModelFormatFromUrlResult.ADAPTER.decode(bytes)
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Failed to decode ModelFormatFromUrlResult proto: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode ModelFormatFromUrlResult proto: ${e.message}")
             null
         }
     }
@@ -145,7 +145,7 @@ internal object ModelTypesCppBridge {
         return try {
             ArtifactInferFromUrlResult.ADAPTER.decode(bytes)
         } catch (e: Exception) {
-            log(LogLevel.WARN, "Failed to decode ArtifactInferFromUrlResult proto: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Failed to decode ArtifactInferFromUrlResult proto: ${e.message}")
             null
         }
     }
@@ -154,22 +154,16 @@ internal object ModelTypesCppBridge {
         try {
             block()
         } catch (e: UnsatisfiedLinkError) {
-            log(LogLevel.DEBUG, "Native format/artifact proto ABI unavailable for $operation: ${e.message}")
+            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Native format/artifact proto ABI unavailable for $operation: ${e.message}")
             null
         }
 
     // Logging
 
-    private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
-
-    private fun log(level: LogLevel, message: String) {
-        val adapterLevel =
-            when (level) {
-                LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
-                LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
-                LogLevel.WARN -> CppBridgePlatformAdapter.LogLevel.WARN
-                LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
-            }
-        CppBridgePlatformAdapter.logCallback(adapterLevel, TAG, message)
+    // Log levels share the single source of truth in
+    // CppBridgePlatformAdapter.LogLevel (Int consts mirroring RAC_LOG_LEVEL_*),
+    // rather than a private enum copy that just re-maps onto it.
+    private fun log(level: Int, message: String) {
+        CppBridgePlatformAdapter.logCallback(level, TAG, message)
     }
 }

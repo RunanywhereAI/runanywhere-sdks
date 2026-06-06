@@ -27,7 +27,7 @@ class DartBridgeStorage {
   /// Get value from storage
   Future<String?> get(String key) async {
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
       final getFn = lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>),
           Pointer<Utf8> Function(Pointer<Utf8>)>('rac_storage_get');
 
@@ -48,7 +48,7 @@ class DartBridgeStorage {
   /// Set value in storage
   Future<bool> set(String key, String value) async {
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
       final setFn = lib.lookupFunction<
           Int32 Function(Pointer<Utf8>, Pointer<Utf8>),
           int Function(Pointer<Utf8>, Pointer<Utf8>)>('rac_storage_set');
@@ -71,7 +71,7 @@ class DartBridgeStorage {
   /// Delete value from storage
   Future<bool> delete(String key) async {
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
       final deleteFn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
           int Function(Pointer<Utf8>)>('rac_storage_delete');
 
@@ -91,7 +91,7 @@ class DartBridgeStorage {
   /// Check if key exists in storage
   Future<bool> exists(String key) async {
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
       final existsFn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
           int Function(Pointer<Utf8>)>('rac_storage_exists');
 
@@ -110,7 +110,7 @@ class DartBridgeStorage {
   /// Clear all storage
   Future<bool> clear() async {
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
       final clearFn = lib.lookupFunction<Int32 Function(), int Function()>(
           'rac_storage_clear');
 

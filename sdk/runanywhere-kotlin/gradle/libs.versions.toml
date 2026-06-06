@@ -7,7 +7,12 @@ coreKtx = "1.18.0"
 coroutines = "1.11.0"
 datetime = "0.8.0"
 kotlinxSerialization = "1.11.0"
-wire = "6.4.0"
+# Wire runtime — MUST mirror WIRE_VERSION in sdk/runanywhere-commons/VERSIONS
+# (the single source of truth). The committed Kotlin bindings under
+# src/main/kotlin/.../generated are produced by wire-compiler 5.5.1; 6.x emits
+# 6.x-only runtime APIs (e.g. ProtoAdapter.tryDecode) and reshuffles the
+# runtime, so compiler and runtime are held together at 5.5.1.
+wire = "5.5.1"
 
 junit = "4.13.2"
 junit-vintage = "6.1.0"

@@ -32,6 +32,7 @@
 import CRACommons
 import Foundation
 import os
+import SwiftProtobuf
 
 /// A hybrid STT router pairing one offline + one online speech service.
 ///
@@ -123,6 +124,24 @@ public final class HybridSTTRouter: @unchecked Sendable {
             throw error
         }
 
+        // Serialize all proto bytes (descriptors + policy) up-front via the
+        // generated SwiftProtobuf messages, before mutating any installed state.
+        // A serialization failure only destroys the freshly created services and
+        // leaves the previously installed pair / filters untouched. The router
+        // copies the bytes into its own storage, so each array only needs to
+        // outlive the corresponding call.
+        let offlineDescriptor: [UInt8]
+        let onlineDescriptor: [UInt8]
+        let policyBytes: [UInt8]
+        do {
+            offlineDescriptor = try offline.descriptorBytes()
+            onlineDescriptor = try online.descriptorBytes()
+            policyBytes = try policy.serializedBytes()
+        } catch {
+            destroy(offlineService); destroy(onlineService)
+            throw error
+        }
+
         // Detach + destroy any previously attached services before swapping in
         // the new pair (clear router slots first — see header UAF note), and
         // retire the previous policy's custom-filter predicates so re-pairing
@@ -135,11 +154,6 @@ public final class HybridSTTRouter: @unchecked Sendable {
             return old
         }
         for name in previousFilterNames { HybridCustomFilter.unregister(name: name) }
-
-        // Encode each descriptor once; the router copies the bytes into its own
-        // storage, so the local array only needs to outlive the call.
-        let offlineDescriptor = offline.descriptorBytes()
-        let onlineDescriptor = online.descriptorBytes()
 
         let rcOff = rac_stt_hybrid_router_set_offline_service_proto(
             handle, offlineService.servicePtr,
@@ -176,7 +190,6 @@ public final class HybridSTTRouter: @unchecked Sendable {
             HybridCustomFilter.register(name: filter.name, check: filter.check)
         }
 
-        let policyBytes = policy.serializedBytes()
         let rcPolicy = rac_stt_hybrid_router_set_policy_proto(
             handle, policyBytes, policyBytes.count
         )
@@ -212,13 +225,15 @@ public final class HybridSTTRouter: @unchecked Sendable {
             throw notOpen()
         }
 
-        let requestBytes = HybridSTTWire.encodeRequest(audio: [UInt8](audio), options: options)
+        let requestBytes = try encodeRequest(audio: audio, options: options)
 
         var outBytes: UnsafeMutablePointer<UInt8>?
         var outSize: Int = 0
-        let rc = rac_stt_hybrid_router_transcribe_proto(
-            handle, requestBytes, requestBytes.count, &outBytes, &outSize
-        )
+        let rc = requestBytes.withUnsafeBufferPointer { buffer in
+            rac_stt_hybrid_router_transcribe_proto(
+                handle, buffer.baseAddress, buffer.count, &outBytes, &outSize
+            )
+        }
 
         defer {
             if let outBytes { rac_stt_hybrid_router_proto_buffer_free(outBytes) }
@@ -232,8 +247,49 @@ public final class HybridSTTRouter: @unchecked Sendable {
             )
         }
 
-        let responseBytes = Array(UnsafeBufferPointer(start: outBytes, count: outSize))
-        return try HybridSTTWire.decodeResponse(responseBytes)
+        let responseData = Data(bytes: outBytes, count: outSize)
+        return try decodeResponse(responseData)
+    }
+
+    // MARK: - Request encode / response decode
+
+    /// Build a `runanywhere.v1.HybridSttTranscribeRequest` carrying the audio
+    /// bytes, an (empty, present) routing context, and the options, via the
+    /// generated SwiftProtobuf message.
+    ///
+    /// HybridRoutingContext currently has no fields — device-state lives behind
+    /// the `rac_hybrid_device_state` vtable. The empty message is still set
+    /// explicitly so the wire shape (field 2 present) is stable for future
+    /// per-call hints, matching the C++/JNI peers.
+    private func encodeRequest(audio: Data, options: HybridTranscribeOptions) throws -> [UInt8] {
+        var request = RAHybridSttTranscribeRequest()
+        request.audioBytes = audio
+        request.context = RAHybridRoutingContext()
+        request.options = options
+        return try [UInt8](request.serializedData())
+    }
+
+    /// Decode a `runanywhere.v1.HybridSttTranscribeResponse` into the public
+    /// result, raising the native rc as an `SDKException` when non-zero.
+    private func decodeResponse(_ data: Data) throws -> HybridTranscribeResult {
+        let response = try RAHybridSttTranscribeResponse(serializedBytes: data)
+
+        guard response.rc == 0 else {
+            let message = response.errorMsg.isEmpty
+                ? "Hybrid STT transcribe failed (rc=\(response.rc))"
+                : response.errorMsg
+            throw SDKException(
+                code: .serviceNotAvailable,
+                message: message,
+                category: .component
+            )
+        }
+
+        return HybridTranscribeResult(
+            text: response.text,
+            detectedLanguage: response.detectedLanguage,
+            routing: response.routing
+        )
     }
 
     /// Cancel an in-flight transcribe, if any. (Best-effort: no STT engine
@@ -356,11 +412,11 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// Map a backend kind to the plugin name `rac_plugin_route` pins on.
     private func pinnedEngineName(for backend: HybridBackendKind) -> String {
         switch backend {
-        case .sherpa: return "sherpa"
-        case .cloud: return "cloud"
-        case .llamacpp: return "llamacpp"
-        case .openrouter: return "openrouter"
-        case .unspecified: return ""
+        case .hybridBackendSherpa: return "sherpa"
+        case .hybridBackendCloud: return "cloud"
+        case .hybridBackendLlamacpp: return "llamacpp"
+        case .hybridBackendOpenrouter: return "openrouter"
+        case .hybridBackendUnspecified, .UNRECOGNIZED: return ""
         }
     }
 

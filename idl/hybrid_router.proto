@@ -187,6 +187,31 @@ message HybridRoutingContext {
 }
 
 // ---------------------------------------------------------------------------
+// Cloud STT backend registration config. Replaces the hand-built
+// `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
+// HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
+// (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
+// across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
+// these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
+// the same keys out of the JSON blob (`config_json["provider"]` etc., see
+// HybridModelDescriptor.provider).
+// ---------------------------------------------------------------------------
+message CloudSttBackendConfig {
+    // HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
+    string provider      = 1;
+    // Provider-side model id (e.g. "saarika:v2").
+    string model         = 2;
+    // Provider API key / credential.
+    string api_key       = 3;
+    // BCP-47 language hint forwarded to the provider (empty = auto-detect).
+    string language_code = 4;
+    // Override the provider base URL (empty = provider default).
+    string base_url      = 5;
+    // Request timeout in milliseconds (0 = engine default).
+    int32  timeout_ms    = 6;
+}
+
+// ---------------------------------------------------------------------------
 // STT transcription options carried through the router. Sample rate and
 // audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
 // caller-supplied BCP-47 hint (empty = backend auto-detect).

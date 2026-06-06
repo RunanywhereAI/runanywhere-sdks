@@ -8,31 +8,33 @@
 //
 
 import Foundation
+import SwiftProtobuf
 
 // MARK: - Backend kind
 
-/// Backend identity for a hybrid candidate. Wire values match
-/// `HybridBackendKind` in hybrid_router.proto / `rac_hybrid_backend_kind_t`.
-public enum HybridBackendKind: Int32, Sendable {
-    case unspecified = 0
-    case llamacpp = 1
-    case openrouter = 2
+/// Backend identity for a hybrid candidate. The generated proto enum
+/// (`RAHybridBackendKind` from hybrid_router.proto / `rac_hybrid_backend_kind_t`)
+/// is the source of truth; this binding exposes its cases under the SDK's
+/// ergonomic names.
+public typealias HybridBackendKind = RAHybridBackendKind
+
+public extension HybridBackendKind {
+    static var unspecified: HybridBackendKind { .hybridBackendUnspecified }
+    static var llamacpp: HybridBackendKind { .hybridBackendLlamacpp }
+    static var openrouter: HybridBackendKind { .hybridBackendOpenrouter }
     /// On-device speech (sherpa-onnx Whisper / Zipformer / Paraformer).
-    case sherpa = 3
+    static var sherpa: HybridBackendKind { .hybridBackendSherpa }
     /// Generic cloud speech (the "cloud" engine). The concrete HTTP
     /// provider (Sarvam first) is carried in the descriptor's `provider`
-    /// field. Raw value 4 matches HYBRID_BACKEND_CLOUD on the wire.
-    case cloud = 4
+    /// field. Wire value 4 matches HYBRID_BACKEND_CLOUD.
+    static var cloud: HybridBackendKind { .hybridBackendCloud }
 }
 
 // MARK: - Model type
 
-/// Whether a candidate runs on-device or in the cloud. Wire values match
-/// `HybridModelType` / `rac_hybrid_model_type_t`.
-public enum HybridModelType: Int32, Sendable {
-    case offline = 1
-    case online = 2
-}
+/// Whether a candidate runs on-device or in the cloud. Backed by the generated
+/// `RAHybridModelType` (wire values match `rac_hybrid_model_type_t`).
+public typealias HybridModelType = RAHybridModelType
 
 // MARK: - Model descriptor
 
@@ -79,14 +81,16 @@ public struct HybridModel: Sendable {
     }
 
     /// Encode as `runanywhere.v1.HybridModelDescriptor` bytes for
-    /// `rac_stt_hybrid_router_set_{offline,online}_service_proto`.
-    func descriptorBytes() -> [UInt8] {
-        var writer = ProtoWireWriter()
-        writer.string(1, id)                    // string model_id = 1
-        writer.enumValue(2, modelType.rawValue) // HybridModelType model_type = 2
-        writer.enumValue(3, backend.rawValue)   // HybridBackendKind backend = 3
-        writer.string(4, provider)              // string provider = 4 (cloud only; "" omitted)
-        return writer.bytes
+    /// `rac_stt_hybrid_router_set_{offline,online}_service_proto`, using the
+    /// generated SwiftProtobuf message (canonical proto3 wire bytes the
+    /// C++/JNI side parses).
+    func descriptorBytes() throws -> [UInt8] {
+        var descriptor = RAHybridModelDescriptor()
+        descriptor.modelID = id
+        descriptor.modelType = modelType
+        descriptor.backend = backend
+        descriptor.provider = provider
+        return try [UInt8](descriptor.serializedData())
     }
 }
 
@@ -109,61 +113,16 @@ public struct HybridTranscribeResult: Sendable {
 }
 
 /// Metadata describing the routing decision behind a `HybridTranscribeResult`.
-/// Always populated, including on cascade/fallback scenarios.
-public struct HybridRoutedMetadata: Sendable {
-    /// Model id of the candidate that produced the result.
-    public let chosenModelId: String
-    /// True when the secondary served the request after the primary failed or
-    /// scored below the cascade threshold.
-    public let wasFallback: Bool
-    /// Backends invoked (1 = primary only, 2 = primary then secondary).
-    public let attemptCount: Int32
-    /// Native `rac_result_t` from the primary when `wasFallback` and the
-    /// fallback fired on an error; else 0.
-    public let primaryErrorCode: Int32
-    /// Human-readable reason the primary failed; else empty.
-    public let primaryErrorMessage: String
-    /// Final confidence of the chosen result. `.nan` when no quality signal.
-    public let confidence: Float
-    /// Primary's confidence captured before a confidence-based cascade.
-    /// `.nan` when no confidence cascade occurred.
-    public let primaryConfidence: Float
-
-    public init(
-        chosenModelId: String,
-        wasFallback: Bool,
-        attemptCount: Int32,
-        primaryErrorCode: Int32,
-        primaryErrorMessage: String,
-        confidence: Float,
-        primaryConfidence: Float
-    ) {
-        self.chosenModelId = chosenModelId
-        self.wasFallback = wasFallback
-        self.attemptCount = attemptCount
-        self.primaryErrorCode = primaryErrorCode
-        self.primaryErrorMessage = primaryErrorMessage
-        self.confidence = confidence
-        self.primaryConfidence = primaryConfidence
-    }
-}
+/// Always populated, including on cascade/fallback scenarios. Backed by the
+/// generated `RAHybridRoutedMetadata` (`chosenModelID`, `wasFallback`,
+/// `attemptCount`, `primaryErrorCode`, `primaryErrorMessage`, `confidence`,
+/// `primaryConfidence`).
+public typealias HybridRoutedMetadata = RAHybridRoutedMetadata
 
 // MARK: - Transcribe options
 
 /// STT options carried through the router (mirror of the C `rac_stt_options_t`
 /// knobs the router forwards). All optional with backend-default behaviour.
-public struct HybridTranscribeOptions: Sendable {
-    /// BCP-47 hint. Empty = backend auto-detect.
-    public var language: String
-    /// Sample-rate hint for raw PCM input. 0 = engine default (16000).
-    public var sampleRate: Int32
-    /// `rac_audio_format_enum_t`: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
-    /// 0 leaves the format unspecified.
-    public var audioFormat: Int32
-
-    public init(language: String = "", sampleRate: Int32 = 0, audioFormat: Int32 = 0) {
-        self.language = language
-        self.sampleRate = sampleRate
-        self.audioFormat = audioFormat
-    }
-}
+/// Backed by the generated `RAHybridSttTranscribeOptions` (`language`,
+/// `sampleRate`, `audioFormat`).
+public typealias HybridTranscribeOptions = RAHybridSttTranscribeOptions

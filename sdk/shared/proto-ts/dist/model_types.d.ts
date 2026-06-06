@@ -934,6 +934,45 @@ export interface RegisterModelFromUrlRequest {
     category?: ModelCategory | undefined;
     /** Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE. */
     source?: ModelSource | undefined;
+    /**
+     * Caller-supplied capability fields. When set, the register-from-url C++
+     * path honors them on the saved ModelInfo instead of its inference
+     * defaults (which hardcode supports_lora=false, download_size=0, infer
+     * artifact_type from the URL). This lets every SDK drop the post-register
+     * "patch + resave" pass. Tags 6-13 are free (1-5 stay wire-compatible with
+     * ModelInfoMakeRequest).
+     */
+    memoryRequiredBytes?: number | undefined;
+    supportsThinking?: boolean | undefined;
+    supportsLora?: boolean | undefined;
+    artifactType?: ModelArtifactType | undefined;
+    contextLength?: number | undefined;
+    description?: string | undefined;
+    downloadSizeBytes?: number | undefined;
+    /** Explicit id override. Empty -> derived from URL/name. */
+    id?: string | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * Inputs for registering a multi-file model (each file carries its own URL,
+ * so there is no model-level URL). Replaces the hand-built MultiFileArtifact
+ * ModelInfo every SDK assembles today. Produces the saved ModelInfo.
+ * ---------------------------------------------------------------------------
+ */
+export interface RegisterMultiFileModelRequest {
+    id: string;
+    name: string;
+    framework: InferenceFramework;
+    files: ModelFileDescriptor[];
+    category?: ModelCategory | undefined;
+    format?: ModelFormat | undefined;
+    memoryRequiredBytes?: number | undefined;
+    downloadSizeBytes?: number | undefined;
+    contextLength?: number | undefined;
+    supportsThinking?: boolean | undefined;
+    supportsLora?: boolean | undefined;
+    description?: string | undefined;
+    source?: ModelSource | undefined;
 }
 export declare const ModelInfoMetadata: MessageFns<ModelInfoMetadata>;
 export declare const ModelRuntimeCompatibility: MessageFns<ModelRuntimeCompatibility>;
@@ -974,6 +1013,7 @@ export declare const ModelRegistryFetchAssignmentsRequest: MessageFns<ModelRegis
 export declare const ModelRegistryFetchAssignmentsResult: MessageFns<ModelRegistryFetchAssignmentsResult>;
 export declare const ModelInfoMakeRequest: MessageFns<ModelInfoMakeRequest>;
 export declare const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest>;
+export declare const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

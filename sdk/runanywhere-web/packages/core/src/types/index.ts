@@ -121,10 +121,7 @@ export type {
   TranscriptionMetadata,
 } from '@runanywhere/proto-ts/stt_options';
 export { STTLanguage } from '@runanywhere/proto-ts/stt_options';
-import type { STTOptions, STTOutput, WordTimestamp } from '@runanywhere/proto-ts/stt_options';
-
-export type STTTranscriptionResult = STTOutput;
-export type STTWord = WordTimestamp;
+import type { STTOptions } from '@runanywhere/proto-ts/stt_options';
 
 // Raw browser PCM buffers do not carry sample rate, so the Web adapter accepts
 // that one transport hint alongside canonical STTOptions.
@@ -295,11 +292,11 @@ export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_ser
 export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
 
 export type {
-  DeviceInfoData,
   ModelInfo,
   SDKInitOptions,
   StorageInfo,
   StoredModel,
 } from './models';
+export type { DeviceInfo } from '@runanywhere/proto-ts/device_info';
 export type { ModelInfoMetadata } from '@runanywhere/proto-ts/model_types';
 export type { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';

@@ -6,7 +6,7 @@
  */
 
 export { InitializationPhase } from './InitializationPhase';
-export type { SDKInitParams, InitializationState } from './InitializationState';
+export type { InitializationState } from './InitializationState';
 export {
   createInitialState,
   markCoreInitialized,

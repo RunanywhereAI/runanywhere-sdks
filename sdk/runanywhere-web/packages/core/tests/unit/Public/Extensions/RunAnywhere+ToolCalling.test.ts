@@ -46,7 +46,7 @@ import {
   type ToolDefinition as ProtoToolDefinition,
 } from '@runanywhere/proto-ts/tool_calling';
 
-import { SDKErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
 import {
   clearRunanywhereModule,
   setRunanywhereModule,
@@ -417,7 +417,7 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
 
     expect(captured).toBeInstanceOf(SDKException);
     const sdkErr = captured as SDKException;
-    expect(sdkErr.code).toBe(SDKErrorCode.BackendError);
+    expect(sdkErr.code).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
     expect(sdkErr.message).toMatch(/decode failed/i);
     expect(sdkErr.details ?? '').toMatch(/ToolCallingSessionEvent/i);
   });
@@ -576,7 +576,7 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     }
 
     expect(captured).toBeInstanceOf(SDKException);
-    expect((captured as SDKException).code).toBe(SDKErrorCode.GenerationCancelled);
+    expect((captured as SDKException).code).toBe(-ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
     expect((captured as SDKException).details ?? '').toMatch(/already aborted/i);
     // The eager-abort gate MUST be reached before we touch commons / addFunction.
     expect(createSpy).not.toHaveBeenCalled();

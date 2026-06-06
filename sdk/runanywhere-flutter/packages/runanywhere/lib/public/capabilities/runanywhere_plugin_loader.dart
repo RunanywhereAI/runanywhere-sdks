@@ -9,9 +9,12 @@
 // into that bridge.
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_plugin_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
+
+export 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
 
 /// Plugin Loader capability surface (canonical §12 namespace).
 ///
@@ -75,11 +78,4 @@ class RunAnywherePluginLoaderCapability {
       RacResultCode.getMessage(code),
     );
   }
-}
-
-/// Plugin descriptor returned from `pluginLoader.load(...)`.
-class PluginInfo {
-  final String name;
-  final String path;
-  const PluginInfo({required this.name, required this.path});
 }

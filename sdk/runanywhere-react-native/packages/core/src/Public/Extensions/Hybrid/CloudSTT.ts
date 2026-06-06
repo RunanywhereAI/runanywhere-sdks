@@ -25,30 +25,21 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { CloudSttBackendConfig } from '@runanywhere/proto-ts/hybrid_router';
 import { DEFAULT_CLOUD_PROVIDER } from './HybridModel';
 
 const logger = new SDKLogger('CloudSTT');
 
 /**
- * A registered cloud-STT model: the provider, the wire model string + the
- * credentials the engine needs, keyed by an app-chosen id.
+ * A registered cloud-STT model: the generated `CloudSttBackendConfig`
+ * (provider, wire model string + credentials) keyed by an app-chosen `id`.
+ * The id becomes the online `HybridModel.id`; the rest is the exact wire
+ * config the routed "cloud" plugin's `create` consumes.
  */
-export interface CloudModelEntry {
+export type CloudModelEntry = CloudSttBackendConfig & {
   /** App-supplied registry id (becomes the online HybridModel.id). */
   readonly id: string;
-  /** Cloud provider for this entry (e.g. "sarvam"); forwarded as config_json.provider. */
-  readonly provider: string;
-  /** Provider model id used on the wire (e.g. "saarika:v2.5"). */
-  readonly model: string;
-  /** Provider API subscription key. Sensitive; never logged. */
-  readonly apiKey: string;
-  /** BCP-47 language hint; `undefined` = omit so the provider auto-detects. */
-  readonly languageCode?: string;
-  /** Override of the provider endpoint, if set. */
-  readonly baseUrl?: string;
-  /** Request timeout override (milliseconds), if set. */
-  readonly timeoutMs?: number;
-}
+};
 
 /** Options for registering a cloud STT model. */
 export interface CloudRegisterOptions {
@@ -140,12 +131,14 @@ export const CloudSTT = {
     await this.register();
     registry.set(options.id, {
       id: options.id,
-      provider,
-      model: options.model,
-      apiKey: options.apiKey,
-      languageCode: options.languageCode,
-      baseUrl: options.baseUrl,
-      timeoutMs: options.timeoutMs,
+      ...CloudSttBackendConfig.fromPartial({
+        provider,
+        model: options.model,
+        apiKey: options.apiKey,
+        languageCode: options.languageCode,
+        baseUrl: options.baseUrl,
+        timeoutMs: options.timeoutMs,
+      }),
     });
   },
 
@@ -182,14 +175,18 @@ export const CloudSTT = {
           'Call CloudSTT.register_model({ id, model, apiKey }) at app startup.'
       );
     }
+    // The routed "cloud" plugin's create consumes snake_case keys
+    // (rac_backend_cloud_create), so emit those explicitly from the typed
+    // CloudSttBackendConfig rather than its camelCase proto-JSON. Omit
+    // empty/zero optionals so the provider falls back to its own defaults.
     const json: Record<string, string | number> = {
       provider: entry.provider,
       api_key: entry.apiKey,
       model: entry.model,
     };
-    if (entry.languageCode != null) json.language_code = entry.languageCode;
-    if (entry.baseUrl != null) json.base_url = entry.baseUrl;
-    if (entry.timeoutMs != null) json.timeout_ms = entry.timeoutMs;
+    if (entry.languageCode) json.language_code = entry.languageCode;
+    if (entry.baseUrl) json.base_url = entry.baseUrl;
+    if (entry.timeoutMs) json.timeout_ms = entry.timeoutMs;
     return JSON.stringify(json);
   },
 };

@@ -254,6 +254,8 @@ var ErrorCode;
     ErrorCode[ErrorCode["ERROR_CODE_COST_LIMIT_EXCEEDED"] = 134] = "ERROR_CODE_COST_LIMIT_EXCEEDED";
     /** ERROR_CODE_INFERENCE_FAILED - RAC_ERROR_INFERENCE_FAILED */
     ErrorCode[ErrorCode["ERROR_CODE_INFERENCE_FAILED"] = 135] = "ERROR_CODE_INFERENCE_FAILED";
+    /** ERROR_CODE_GENERATION_CANCELLED - RAC_ERROR_GENERATION_CANCELLED */
+    ErrorCode[ErrorCode["ERROR_CODE_GENERATION_CANCELLED"] = 136] = "ERROR_CODE_GENERATION_CANCELLED";
     /** ERROR_CODE_NETWORK_UNAVAILABLE - -- Network (-150..-179) ------------------------------------------------ */
     ErrorCode[ErrorCode["ERROR_CODE_NETWORK_UNAVAILABLE"] = 150] = "ERROR_CODE_NETWORK_UNAVAILABLE";
     /** ERROR_CODE_NETWORK_ERROR - RAC_ERROR_NETWORK_ERROR */
@@ -430,6 +432,8 @@ var ErrorCode;
     ErrorCode[ErrorCode["ERROR_CODE_BACKEND_UNAVAILABLE"] = 604] = "ERROR_CODE_BACKEND_UNAVAILABLE";
     /** ERROR_CODE_RUNTIME_UNAVAILABLE - RAC_ERROR_RUNTIME_UNAVAILABLE */
     ErrorCode[ErrorCode["ERROR_CODE_RUNTIME_UNAVAILABLE"] = 605] = "ERROR_CODE_RUNTIME_UNAVAILABLE";
+    /** ERROR_CODE_BACKEND_ERROR - RAC_ERROR_BACKEND_ERROR (generic backend failure) */
+    ErrorCode[ErrorCode["ERROR_CODE_BACKEND_ERROR"] = 606] = "ERROR_CODE_BACKEND_ERROR";
     /** ERROR_CODE_INVALID_HANDLE - RAC_ERROR_INVALID_HANDLE */
     ErrorCode[ErrorCode["ERROR_CODE_INVALID_HANDLE"] = 610] = "ERROR_CODE_INVALID_HANDLE";
     /** ERROR_CODE_EVENT_INVALID_CATEGORY - -- Event (-700..-799) ------------------------------------------------- */
@@ -539,6 +543,9 @@ function errorCodeFromJSON(object) {
         case 135:
         case "ERROR_CODE_INFERENCE_FAILED":
             return ErrorCode.ERROR_CODE_INFERENCE_FAILED;
+        case 136:
+        case "ERROR_CODE_GENERATION_CANCELLED":
+            return ErrorCode.ERROR_CODE_GENERATION_CANCELLED;
         case 150:
         case "ERROR_CODE_NETWORK_UNAVAILABLE":
             return ErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE;
@@ -803,6 +810,9 @@ function errorCodeFromJSON(object) {
         case 605:
         case "ERROR_CODE_RUNTIME_UNAVAILABLE":
             return ErrorCode.ERROR_CODE_RUNTIME_UNAVAILABLE;
+        case 606:
+        case "ERROR_CODE_BACKEND_ERROR":
+            return ErrorCode.ERROR_CODE_BACKEND_ERROR;
         case 610:
         case "ERROR_CODE_INVALID_HANDLE":
             return ErrorCode.ERROR_CODE_INVALID_HANDLE;
@@ -910,6 +920,8 @@ function errorCodeToJSON(object) {
             return "ERROR_CODE_COST_LIMIT_EXCEEDED";
         case ErrorCode.ERROR_CODE_INFERENCE_FAILED:
             return "ERROR_CODE_INFERENCE_FAILED";
+        case ErrorCode.ERROR_CODE_GENERATION_CANCELLED:
+            return "ERROR_CODE_GENERATION_CANCELLED";
         case ErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE:
             return "ERROR_CODE_NETWORK_UNAVAILABLE";
         case ErrorCode.ERROR_CODE_NETWORK_ERROR:
@@ -1086,6 +1098,8 @@ function errorCodeToJSON(object) {
             return "ERROR_CODE_BACKEND_UNAVAILABLE";
         case ErrorCode.ERROR_CODE_RUNTIME_UNAVAILABLE:
             return "ERROR_CODE_RUNTIME_UNAVAILABLE";
+        case ErrorCode.ERROR_CODE_BACKEND_ERROR:
+            return "ERROR_CODE_BACKEND_ERROR";
         case ErrorCode.ERROR_CODE_INVALID_HANDLE:
             return "ERROR_CODE_INVALID_HANDLE";
         case ErrorCode.ERROR_CODE_EVENT_INVALID_CATEGORY:
@@ -1130,7 +1144,7 @@ function errorCodeToJSON(object) {
     }
 }
 function createBaseErrorContext() {
-    return { metadata: {}, sourceFile: undefined, sourceLine: undefined, operation: undefined };
+    return { metadata: {}, sourceFile: undefined, sourceLine: undefined, operation: undefined, fieldPath: undefined };
 }
 exports.ErrorContext = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1145,6 +1159,9 @@ exports.ErrorContext = {
         }
         if (message.operation !== undefined) {
             writer.uint32(34).string(message.operation);
+        }
+        if (message.fieldPath !== undefined) {
+            writer.uint32(42).string(message.fieldPath);
         }
         return writer;
     },
@@ -1186,6 +1203,13 @@ exports.ErrorContext = {
                     message.operation = reader.string();
                     continue;
                 }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.fieldPath = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1213,6 +1237,11 @@ exports.ErrorContext = {
                     ? globalThis.Number(object.source_line)
                     : undefined,
             operation: isSet(object.operation) ? globalThis.String(object.operation) : undefined,
+            fieldPath: isSet(object.fieldPath)
+                ? globalThis.String(object.fieldPath)
+                : isSet(object.field_path)
+                    ? globalThis.String(object.field_path)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -1235,6 +1264,9 @@ exports.ErrorContext = {
         if (message.operation !== undefined) {
             obj.operation = message.operation;
         }
+        if (message.fieldPath !== undefined) {
+            obj.fieldPath = message.fieldPath;
+        }
         return obj;
     },
     create(base) {
@@ -1251,6 +1283,7 @@ exports.ErrorContext = {
         message.sourceFile = object.sourceFile ?? undefined;
         message.sourceLine = object.sourceLine ?? undefined;
         message.operation = object.operation ?? undefined;
+        message.fieldPath = object.fieldPath ?? undefined;
         return message;
     },
 };

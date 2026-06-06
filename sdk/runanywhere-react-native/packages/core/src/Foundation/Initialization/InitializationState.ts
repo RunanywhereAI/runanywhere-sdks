@@ -9,27 +9,7 @@
 
 import { InitializationPhase } from './InitializationPhase';
 import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-
-/**
- * Parameters passed to SDK initialization
- * Matches iOS SDKInitParams
- */
-export interface SDKInitParams {
-  /**
-   * API key for backend authentication
-   */
-  apiKey?: string;
-
-  /**
-   * Base URL for API calls
-   */
-  baseURL?: string;
-
-  /**
-   * SDK environment (development, staging, production)
-   */
-  environment: SDKEnvironment;
-}
+import type { SDKInitOptions } from '../../types/models';
 
 /**
  * Complete initialization state of the SDK
@@ -70,7 +50,7 @@ export interface InitializationState {
   /**
    * Stored initialization parameters
    */
-  initParams: SDKInitParams | null;
+  initParams: SDKInitOptions | null;
 
   /**
    * Backend type in use (e.g., 'llamacpp', 'onnx')
@@ -116,14 +96,14 @@ export function createInitialState(): InitializationState {
  */
 export function markCoreInitialized(
   state: InitializationState,
-  params: SDKInitParams,
+  params: SDKInitOptions,
   backendType: string | null
 ): InitializationState {
   return {
     ...state,
     phase: InitializationPhase.CoreInitialized,
     isCoreInitialized: true,
-    environment: params.environment,
+    environment: params.environment ?? null,
     initParams: params,
     backendType,
     coreInitTimestamp: Date.now(),

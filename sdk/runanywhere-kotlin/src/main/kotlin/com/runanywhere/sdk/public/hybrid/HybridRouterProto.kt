@@ -22,7 +22,6 @@ import ai.runanywhere.proto.v1.HybridBackendKind
 import ai.runanywhere.proto.v1.HybridCascade
 import ai.runanywhere.proto.v1.HybridFilter
 import ai.runanywhere.proto.v1.HybridModelDescriptor
-import ai.runanywhere.proto.v1.HybridModelType
 import ai.runanywhere.proto.v1.HybridRank
 import ai.runanywhere.proto.v1.HybridRoutingPolicy
 
@@ -69,7 +68,7 @@ internal object HybridRouterProto {
     fun descriptor(model: RACModel, kind: HybridBackendKind, provider: String = ""): ByteArray {
         val msg = HybridModelDescriptor(
             model_id = model.id,
-            model_type = model.modelType.toProto(),
+            model_type = model.modelType,
             backend = kind,
             provider = provider,
         )
@@ -91,14 +90,14 @@ internal object HybridRouterProto {
             is RACRouter.SimpleRouterPolicy -> {
                 policy.filter?.let { filters.add(filterToProto(it, customs)) }
                 policy.cascade?.let { cascade = cascadeToProto(it) }
-                policy.rank?.let { rank = it.toProto() }
+                policy.rank?.let { rank = it }
             }
             is RACRouter.AdvanceRouterPolicy -> {
                 for (f in policy.hardFilters) {
                     filters.add(filterToProto(f, customs))
                 }
                 policy.cascadeConditions?.let { cascade = cascadeToProto(it) }
-                policy.rankSort?.let { rank = it.toProto() }
+                policy.rankSort?.let { rank = it }
             }
         }
 
@@ -136,15 +135,5 @@ internal object HybridRouterProto {
         is RACRouter.RoutingPolicy.Confidence ->
             HybridCascade(confidence = ConfidenceCascade(threshold = cascade.threshold))
         else -> HybridCascade()
-    }
-
-    private fun ModelType.toProto(): HybridModelType = when (this) {
-        ModelType.OFFLINE -> HybridModelType.HYBRID_MODEL_TYPE_OFFLINE
-        ModelType.ONLINE -> HybridModelType.HYBRID_MODEL_TYPE_ONLINE
-    }
-
-    private fun RACRouter.Rank.toProto(): HybridRank = when (this) {
-        RACRouter.Rank.PreferLocalFirst -> HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST
-        RACRouter.Rank.PreferOnlineFirst -> HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST
     }
 }

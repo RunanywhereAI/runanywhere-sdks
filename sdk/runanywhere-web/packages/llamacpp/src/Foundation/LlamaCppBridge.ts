@@ -16,9 +16,9 @@
 import {
   completeNativePhase1ForModule,
   HTTPAdapter,
+  ProtoErrorCode,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
-  SDKErrorCode,
   SDKLogger,
   registerWasmModule,
   unregisterWasmModule,
@@ -142,7 +142,7 @@ export class LlamaCppBridge {
   get module(): LlamaCppModule {
     if (!this._module) {
       throw new SDKException(
-        SDKErrorCode.WASMNotLoaded,
+        -ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED,
         'LlamaCpp WASM not loaded. Call LlamaCPP.register() first.',
       );
     }
@@ -339,7 +339,7 @@ export class LlamaCppBridge {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load LlamaCpp WASM: ${message}`);
       throw new SDKException(
-        SDKErrorCode.WASMLoadFailed,
+        -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,
         `Failed to load LlamaCpp WASM module: ${message}`,
       );
     }
@@ -460,7 +460,7 @@ export class LlamaCppBridge {
 
     if (typeof m._rac_backend_llamacpp_register !== 'function') {
       throw new SDKException(
-        SDKErrorCode.WASMLoadFailed,
+        -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,
         'WASM module does not export _rac_backend_llamacpp_register; ' +
         'the racommons-llamacpp.wasm artifact is missing the llama.cpp ' +
         'backend. Rebuild it from sdk/runanywhere-web/wasm/CMakeLists.txt.',
@@ -476,7 +476,7 @@ export class LlamaCppBridge {
     )) as number;
     if (llmResult !== 0 && llmResult !== RAC_ERROR_MODULE_ALREADY_REGISTERED) {
       throw new SDKException(
-        SDKErrorCode.WASMLoadFailed,
+        -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,
         `llama.cpp backend registration failed: rac_backend_llamacpp_register returned ${llmResult}.`,
       );
     }

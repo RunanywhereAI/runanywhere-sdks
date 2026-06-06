@@ -5,7 +5,7 @@
 //   protoc               v7.35.0
 // source: hybrid_router.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridRank = exports.HybridModelType = exports.HybridBackendKind = exports.HybridCapability = exports.protobufPackage = void 0;
+exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridRank = exports.HybridModelType = exports.HybridBackendKind = exports.HybridCapability = exports.protobufPackage = void 0;
 exports.hybridCapabilityFromJSON = hybridCapabilityFromJSON;
 exports.hybridCapabilityToJSON = hybridCapabilityToJSON;
 exports.hybridBackendKindFromJSON = hybridBackendKindFromJSON;
@@ -963,6 +963,150 @@ exports.HybridRoutingContext = {
     },
     fromPartial(_) {
         const message = createBaseHybridRoutingContext();
+        return message;
+    },
+};
+function createBaseCloudSttBackendConfig() {
+    return { provider: "", model: "", apiKey: "", languageCode: "", baseUrl: "", timeoutMs: 0 };
+}
+exports.CloudSttBackendConfig = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.provider !== "") {
+            writer.uint32(10).string(message.provider);
+        }
+        if (message.model !== "") {
+            writer.uint32(18).string(message.model);
+        }
+        if (message.apiKey !== "") {
+            writer.uint32(26).string(message.apiKey);
+        }
+        if (message.languageCode !== "") {
+            writer.uint32(34).string(message.languageCode);
+        }
+        if (message.baseUrl !== "") {
+            writer.uint32(42).string(message.baseUrl);
+        }
+        if (message.timeoutMs !== 0) {
+            writer.uint32(48).int32(message.timeoutMs);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCloudSttBackendConfig();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.provider = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.model = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.apiKey = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.languageCode = reader.string();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.baseUrl = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.timeoutMs = reader.int32();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+            model: isSet(object.model) ? globalThis.String(object.model) : "",
+            apiKey: isSet(object.apiKey)
+                ? globalThis.String(object.apiKey)
+                : isSet(object.api_key)
+                    ? globalThis.String(object.api_key)
+                    : "",
+            languageCode: isSet(object.languageCode)
+                ? globalThis.String(object.languageCode)
+                : isSet(object.language_code)
+                    ? globalThis.String(object.language_code)
+                    : "",
+            baseUrl: isSet(object.baseUrl)
+                ? globalThis.String(object.baseUrl)
+                : isSet(object.base_url)
+                    ? globalThis.String(object.base_url)
+                    : "",
+            timeoutMs: isSet(object.timeoutMs)
+                ? globalThis.Number(object.timeoutMs)
+                : isSet(object.timeout_ms)
+                    ? globalThis.Number(object.timeout_ms)
+                    : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.provider !== "") {
+            obj.provider = message.provider;
+        }
+        if (message.model !== "") {
+            obj.model = message.model;
+        }
+        if (message.apiKey !== "") {
+            obj.apiKey = message.apiKey;
+        }
+        if (message.languageCode !== "") {
+            obj.languageCode = message.languageCode;
+        }
+        if (message.baseUrl !== "") {
+            obj.baseUrl = message.baseUrl;
+        }
+        if (message.timeoutMs !== 0) {
+            obj.timeoutMs = Math.round(message.timeoutMs);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.CloudSttBackendConfig.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseCloudSttBackendConfig();
+        message.provider = object.provider ?? "";
+        message.model = object.model ?? "";
+        message.apiKey = object.apiKey ?? "";
+        message.languageCode = object.languageCode ?? "";
+        message.baseUrl = object.baseUrl ?? "";
+        message.timeoutMs = object.timeoutMs ?? 0;
         return message;
     },
 };

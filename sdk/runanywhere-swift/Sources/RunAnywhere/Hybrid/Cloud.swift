@@ -96,16 +96,11 @@ public enum Cloud {
     // MARK: - Credential / model registry
 
     /// A registered cloud-STT model: the provider, the wire model string + the
-    /// credentials the engine needs, keyed by an app-chosen id.
-    public struct ModelEntry: Sendable {
-        public let id: String
-        public let provider: String
-        public let model: String
-        public let apiKey: String
-        public let languageCode: String?
-        public let baseURL: String?
-        public let timeoutMs: Int?
-    }
+    /// credentials the engine needs, keyed by an app-chosen id. Backed by the
+    /// generated `RACloudSttBackendConfig` (provider / model / apiKey /
+    /// languageCode / baseURL / timeoutMs). Unset optionals map to the proto's
+    /// empty-string / zero defaults.
+    public typealias ModelEntry = RACloudSttBackendConfig
 
     /// name → entry. Guarded by `OSAllocatedUnfairLock` (NSLock is forbidden).
     private static let registry =
@@ -138,15 +133,13 @@ public enum Cloud {
         precondition(!provider.isEmpty, "Cloud provider must be non-empty")
         precondition(!model.isEmpty, "Cloud model string must be non-empty")
         precondition(!apiKey.isEmpty, "Cloud apiKey must be non-empty")
-        let entry = ModelEntry(
-            id: id,
-            provider: provider,
-            model: model,
-            apiKey: apiKey,
-            languageCode: languageCode,
-            baseURL: baseURL,
-            timeoutMs: timeoutMs
-        )
+        var entry = ModelEntry()
+        entry.provider = provider
+        entry.model = model
+        entry.apiKey = apiKey
+        if let languageCode { entry.languageCode = languageCode }
+        if let baseURL { entry.baseURL = baseURL }
+        if let timeoutMs { entry.timeoutMs = Int32(timeoutMs) }
         registry.withLock { $0[id] = entry }
     }
 
@@ -184,14 +177,17 @@ public enum Cloud {
                 category: .configuration
             )
         }
+        // snake_case keys: the cloud_stt engine reads snake_case out of the
+        // config_json blob (provider / api_key / model / language_code /
+        // base_url / timeout_ms). Built by hand — NOT via a camelCase encoder.
         var json: [String: Any] = [
             "provider": entry.provider,
             "api_key": entry.apiKey,
             "model": entry.model,
         ]
-        if let languageCode = entry.languageCode { json["language_code"] = languageCode }
-        if let baseURL = entry.baseURL { json["base_url"] = baseURL }
-        if let timeoutMs = entry.timeoutMs { json["timeout_ms"] = timeoutMs }
+        if !entry.languageCode.isEmpty { json["language_code"] = entry.languageCode }
+        if !entry.baseURL.isEmpty { json["base_url"] = entry.baseURL }
+        if entry.timeoutMs != 0 { json["timeout_ms"] = Int(entry.timeoutMs) }
 
         let data = try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
         return String(decoding: data, as: UTF8.self)

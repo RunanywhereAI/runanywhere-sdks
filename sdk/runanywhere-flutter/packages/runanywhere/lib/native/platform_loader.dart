@@ -56,10 +56,6 @@ class PlatformLoader {
     }
   }
 
-  /// Legacy method for backward compatibility.
-  /// Loads the commons library by default.
-  static DynamicLibrary load() => loadCommons();
-
   /// Try to load the commons library, returning null if it fails.
   static DynamicLibrary? tryLoad() {
     try {

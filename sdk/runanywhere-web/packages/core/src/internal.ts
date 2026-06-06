@@ -80,8 +80,10 @@ export {
 export type { AccelerationMode } from './Foundation/WASMBridge';
 
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
-// SDKErrorCode is a @deprecated compat shim; prefer ProtoErrorCode from '@runanywhere/proto-ts/errors'.
-export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
+// For error codes use ProtoErrorCode (positive values from '@runanywhere/proto-ts/errors',
+// re-exported here); negate to get the signed rac_result_t cAbiCode.
+export { SDKException, isSDKException } from './Foundation/SDKException';
+export { ProtoErrorCategory, ProtoErrorCode, ProtoErrorSeverity } from './Foundation/SDKException';
 export type { ProtoSDKError, ProtoErrorContext } from './Foundation/SDKException';
 export {
   RAC_ERROR_NETWORK_UNAVAILABLE,

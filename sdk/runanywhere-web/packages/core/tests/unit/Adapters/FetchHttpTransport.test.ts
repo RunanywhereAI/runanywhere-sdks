@@ -390,7 +390,7 @@ describe('FetchHttpTransport', () => {
     const rc = handle.trampolines.get(streamPtr)!(
       /*user*/0, /*req*/0, handle.chunkCallbackId, /*cbUd*/0, /*outMeta*/0,
     );
-    expect(rc).toBe(-233); // RAC_ERROR_CANCELLED
+    expect(rc).toBe(-380); // RAC_ERROR_CANCELLED
     expect(handle.chunkCalls).toHaveLength(1);
     void transport;
   });
@@ -405,7 +405,7 @@ describe('FetchHttpTransport', () => {
     const rc = handle.trampolines.get(streamPtr)!(
       /*user*/0, /*req*/0, handle.chunkCallbackId, /*cbUd*/0, /*outMeta*/0,
     );
-    expect(rc).toBe(-150); // RAC_ERROR_NETWORK_ERROR
+    expect(rc).toBe(-151); // RAC_ERROR_NETWORK_ERROR
     expect(handle.chunkCalls).toHaveLength(0);
     void transport;
   });

@@ -770,6 +770,137 @@ class HybridRoutingContext extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
+/// Cloud STT backend registration config. Replaces the hand-built
+/// `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
+/// HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
+/// (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
+/// across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
+/// these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
+/// the same keys out of the JSON blob (`config_json["provider"]` etc., see
+/// HybridModelDescriptor.provider).
+/// ---------------------------------------------------------------------------
+class CloudSttBackendConfig extends $pb.GeneratedMessage {
+  factory CloudSttBackendConfig({
+    $core.String? provider,
+    $core.String? model,
+    $core.String? apiKey,
+    $core.String? languageCode,
+    $core.String? baseUrl,
+    $core.int? timeoutMs,
+  }) {
+    final result = create();
+    if (provider != null) result.provider = provider;
+    if (model != null) result.model = model;
+    if (apiKey != null) result.apiKey = apiKey;
+    if (languageCode != null) result.languageCode = languageCode;
+    if (baseUrl != null) result.baseUrl = baseUrl;
+    if (timeoutMs != null) result.timeoutMs = timeoutMs;
+    return result;
+  }
+
+  CloudSttBackendConfig._();
+
+  factory CloudSttBackendConfig.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CloudSttBackendConfig.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CloudSttBackendConfig',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'provider')
+    ..aOS(2, _omitFieldNames ? '' : 'model')
+    ..aOS(3, _omitFieldNames ? '' : 'apiKey')
+    ..aOS(4, _omitFieldNames ? '' : 'languageCode')
+    ..aOS(5, _omitFieldNames ? '' : 'baseUrl')
+    ..aI(6, _omitFieldNames ? '' : 'timeoutMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CloudSttBackendConfig clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CloudSttBackendConfig copyWith(
+          void Function(CloudSttBackendConfig) updates) =>
+      super.copyWith((message) => updates(message as CloudSttBackendConfig))
+          as CloudSttBackendConfig;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CloudSttBackendConfig create() => CloudSttBackendConfig._();
+  @$core.override
+  CloudSttBackendConfig createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CloudSttBackendConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CloudSttBackendConfig>(create);
+  static CloudSttBackendConfig? _defaultInstance;
+
+  /// HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
+  @$pb.TagNumber(1)
+  $core.String get provider => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set provider($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasProvider() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearProvider() => $_clearField(1);
+
+  /// Provider-side model id (e.g. "saarika:v2").
+  @$pb.TagNumber(2)
+  $core.String get model => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set model($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModel() => $_clearField(2);
+
+  /// Provider API key / credential.
+  @$pb.TagNumber(3)
+  $core.String get apiKey => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set apiKey($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasApiKey() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearApiKey() => $_clearField(3);
+
+  /// BCP-47 language hint forwarded to the provider (empty = auto-detect).
+  @$pb.TagNumber(4)
+  $core.String get languageCode => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set languageCode($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasLanguageCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLanguageCode() => $_clearField(4);
+
+  /// Override the provider base URL (empty = provider default).
+  @$pb.TagNumber(5)
+  $core.String get baseUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set baseUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasBaseUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearBaseUrl() => $_clearField(5);
+
+  /// Request timeout in milliseconds (0 = engine default).
+  @$pb.TagNumber(6)
+  $core.int get timeoutMs => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set timeoutMs($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTimeoutMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTimeoutMs() => $_clearField(6);
+}
+
+/// ---------------------------------------------------------------------------
 /// STT transcription options carried through the router. Sample rate and
 /// audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
 /// caller-supplied BCP-47 hint (empty = backend auto-detect).

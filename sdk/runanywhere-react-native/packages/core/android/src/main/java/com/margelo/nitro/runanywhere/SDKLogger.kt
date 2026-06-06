@@ -25,22 +25,29 @@ import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Log severity levels matching TypeScript LogLevel enum
+ * Log severity levels matching the generated proto `LogLevel`
+ * (`@runanywhere/proto-ts/logging`, idl/logging.proto): the C-ABI-aligned
+ * numbering trace=0, debug=1, info=2, warning=3, error=4, fatal=5. The raw
+ * value is forwarded to TypeScript as-is via `NativeLogEntry.level`, so it
+ * MUST stay numerically in lock-step with the proto enum to avoid an
+ * off-by-one when TS decodes it back into `LogLevel`.
  */
 enum class LogLevel(val value: Int) {
-    Debug(0),
-    Info(1),
-    Warning(2),
-    Error(3),
-    Fault(4);
+    Trace(0),
+    Debug(1),
+    Info(2),
+    Warning(3),
+    Error(4),
+    Fatal(5);
 
     val description: String
         get() = when (this) {
+            Trace -> "TRACE"
             Debug -> "DEBUG"
             Info -> "INFO"
             Warning -> "WARN"
             Error -> "ERROR"
-            Fault -> "FAULT"
+            Fatal -> "FATAL"
         }
 
     companion object {
@@ -266,13 +273,13 @@ class SDKLogger(
     }
 
     /**
-     * Log a fault/critical message.
+     * Log a fatal/critical message.
      * @param message Log message
      * @param metadata Optional metadata map
      */
     @JvmOverloads
-    fun fault(message: String, metadata: Map<String, Any?>? = null) {
-        log(LogLevel.Fault, message, metadata)
+    fun fatal(message: String, metadata: Map<String, Any?>? = null) {
+        log(LogLevel.Fatal, message, metadata)
     }
 
     // ==================================================================
@@ -333,11 +340,12 @@ class SDKLogger(
         // Log to Android Log (logcat) if enabled
         if (localLoggingEnabled) {
             when (level) {
+                LogLevel.Trace -> Log.v(category, output)
                 LogLevel.Debug -> Log.d(category, output)
                 LogLevel.Info -> Log.i(category, output)
                 LogLevel.Warning -> Log.w(category, output)
                 LogLevel.Error -> Log.e(category, output)
-                LogLevel.Fault -> Log.wtf(category, output) // "What a Terrible Failure"
+                LogLevel.Fatal -> Log.wtf(category, output) // "What a Terrible Failure"
             }
         }
 

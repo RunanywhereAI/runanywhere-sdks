@@ -18,72 +18,38 @@
 
 import 'dart:convert';
 
+import 'package:runanywhere/generated/hybrid_router.pb.dart'
+    show CloudSttBackendConfig;
 import 'package:runanywhere/native/dart_bridge_hybrid_stt.dart';
 import 'package:runanywhere/public/hybrid/hybrid_model.dart'
     show kHybridDefaultCloudProvider;
 
-/// A registered cloud-STT model: the provider, the wire model string + the
-/// credentials the engine needs, keyed by an app-chosen id. Frozen view
-/// returned by [CloudBackend.lookup].
-class CloudModelEntry {
-  /// Build a frozen registry entry.
-  const CloudModelEntry({
-    required this.id,
-    required this.model,
-    required this.apiKey,
-    this.provider = kHybridDefaultCloudProvider,
-    this.languageCode,
-    this.baseUrl,
-    this.timeoutMs,
-  });
-
-  /// App-chosen registry id (becomes the online [HybridModel.id]).
-  final String id;
-
-  /// Provider model id used on the wire (e.g. "saarika:v2.5" for Sarvam).
-  final String model;
-
-  /// Provider API subscription key. Sensitive; never logged.
-  final String apiKey;
-
-  /// Cloud provider for this entry (e.g. "sarvam"); forwarded to the engine via
-  /// `config_json["provider"]`.
-  final String provider;
-
-  /// BCP-47 language hint, if set. `null` = omit the field so the provider
-  /// auto-detects.
-  final String? languageCode;
-
-  /// Override of the provider endpoint, if set.
-  final String? baseUrl;
-
-  /// Request timeout override (milliseconds), if set.
-  final int? timeoutMs;
-
-  /// Build the config JSON the routed "cloud" plugin's `create` expects.
-  /// Carries `provider` so the engine selects the right HTTP backend. Commons
-  /// injects a default provider too, but we pass it explicitly so the routed
-  /// engine never has to guess (mirrors Kotlin/Swift).
-  String toConfigJson() {
-    final json = <String, Object>{
-      'provider': provider,
-      'api_key': apiKey,
-      'model': model,
-    };
-    final lang = languageCode;
-    if (lang != null) {
-      json['language_code'] = lang;
-    }
-    final url = baseUrl;
-    if (url != null) {
-      json['base_url'] = url;
-    }
-    final timeout = timeoutMs;
-    if (timeout != null) {
-      json['timeout_ms'] = timeout;
-    }
-    return jsonEncode(json);
+/// Serialize a generated [CloudSttBackendConfig] into the `config_json` string
+/// the routed "cloud" plugin's `create` expects. Carries `provider` so the
+/// engine selects the right HTTP backend. Commons injects a default provider
+/// too, but we pass it explicitly so the routed engine never has to guess
+/// (mirrors Kotlin/Swift).
+///
+/// The keys are the snake_case wire names the cloud_stt engine parses
+/// (`api_key`, `language_code`, `base_url`, `timeout_ms`) — NOT the proto-JSON
+/// camelCase names — so a plain `writeToJson()` cannot be used here. Optional
+/// fields are omitted when unset so the provider falls back to its defaults.
+String cloudSttConfigJson(CloudSttBackendConfig config) {
+  final json = <String, Object>{
+    'provider': config.provider,
+    'api_key': config.apiKey,
+    'model': config.model,
+  };
+  if (config.hasLanguageCode()) {
+    json['language_code'] = config.languageCode;
   }
+  if (config.hasBaseUrl()) {
+    json['base_url'] = config.baseUrl;
+  }
+  if (config.hasTimeoutMs()) {
+    json['timeout_ms'] = config.timeoutMs;
+  }
+  return jsonEncode(json);
 }
 
 /// Generic cloud speech-to-text backend. Fronts one or more HTTP STT providers
@@ -111,8 +77,8 @@ class CloudBackend {
   /// Default cloud provider when a registration omits `provider`.
   static const String defaultProvider = kHybridDefaultCloudProvider;
 
-  final Map<String, CloudModelEntry> _registry =
-      <String, CloudModelEntry>{};
+  final Map<String, CloudSttBackendConfig> _registry =
+      <String, CloudSttBackendConfig>{};
   bool _pluginRegistered = false;
 
   /// Register the cloud engine with the commons plugin registry exactly
@@ -164,19 +130,18 @@ class CloudBackend {
       throw ArgumentError('Cloud provider must be non-empty');
     }
     ensurePluginRegistered();
-    _registry[id] = CloudModelEntry(
-      id: id,
+    _registry[id] = CloudSttBackendConfig(
+      provider: provider,
       model: model,
       apiKey: apiKey,
-      provider: provider,
       languageCode: languageCode,
       baseUrl: baseUrl,
       timeoutMs: timeoutMs,
     );
   }
 
-  /// Look up a previously registered model by id.
-  CloudModelEntry? lookup(String id) => _registry[id];
+  /// Look up the registered config for a model by id.
+  CloudSttBackendConfig? lookup(String id) => _registry[id];
 
   /// True iff a model is registered under [id].
   bool isRegistered(String id) => _registry.containsKey(id);

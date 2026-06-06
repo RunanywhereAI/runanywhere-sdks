@@ -256,6 +256,61 @@ extension RAVADConfiguration {
     }
 }
 
+extension RALogLevel {
+    /// Generated from `(runanywhere.v1.rac_display_name)` annotations in idl/.
+    public var displayName: String {
+        switch self {
+        case .trace: return "Trace"
+        case .debug: return "Debug"
+        case .info: return "Info"
+        case .warning: return "Warning"
+        case .error: return "Error"
+        case .fatal: return "Fatal"
+        default: return ""
+        }
+    }
+}
+
+extension RALogLevel {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .trace: return "trace"
+        case .debug: return "debug"
+        case .info: return "info"
+        case .warning: return "warning"
+        case .error: return "error"
+        case .fatal: return "fatal"
+        default: return ""
+        }
+    }
+}
+
+extension RALogLevel {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RALogLevel? {
+        switch wireString.lowercased() {
+        case "trace": return .trace
+        case "debug": return .debug
+        case "info": return .info
+        case "warning": return .warning
+        case "error": return .error
+        case "fatal": return .fatal
+        default: return nil
+        }
+    }
+}
+
+extension RALoggingConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RALoggingConfiguration {
+        var r = RALoggingConfiguration()
+        r.enableLocalLogging = true
+        return r
+    }
+}
+
 extension RARAGConfiguration {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RARAGConfiguration {

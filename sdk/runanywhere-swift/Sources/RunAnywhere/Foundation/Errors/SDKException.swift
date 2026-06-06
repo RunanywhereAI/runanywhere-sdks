@@ -69,11 +69,11 @@ public struct SDKException: Error, LocalizedError, Sendable, CustomStringConvert
     /// callers can programmatically identify the failing field without
     /// parsing the human-readable message.
     ///
-    /// Backed by `proto.context.metadata["field_path"]`, which is the
+    /// Backed by the typed `context.fieldPath` proto field, which is the
     /// wire-canonical carrier shared with Kotlin / Dart / TS.
     public var fieldPath: String? {
-        guard proto.hasContext else { return nil }
-        return proto.context.metadata["field_path"]
+        guard proto.hasContext, proto.context.hasFieldPath else { return nil }
+        return proto.context.fieldPath
     }
 
     // MARK: LocalizedError
@@ -199,7 +199,7 @@ extension SDKException {
         underlying: (any Error)? = nil
     ) -> SDKException {
         var context = RAErrorContext()
-        context.metadata = ["field_path": fieldPath]
+        context.fieldPath = fieldPath
 
         var proto = RASDKError()
         proto.code = .invalidArgument
@@ -360,7 +360,7 @@ extension RAErrorCode {
 extension SDKException {
     /// Log this exception to all configured destinations.
     public func log(file: String = #file, line: Int = #line, function: String = #function) {
-        let level: LogLevel = (proto.code == .cancelled) ? .info : .error
+        let level: RALogLevel = (proto.code == .cancelled) ? .info : .error
         let fileName = (file as NSString).lastPathComponent
 
         var metadata: [String: Any] = [ // swiftlint:disable:this prefer_concrete_types avoid_any_type

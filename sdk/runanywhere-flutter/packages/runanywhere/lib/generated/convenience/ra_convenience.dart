@@ -15,6 +15,7 @@
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
+import 'package:runanywhere/generated/logging.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart';
@@ -294,6 +295,72 @@ extension VADConfigurationValidate on VADConfiguration {
         fieldPath: 'VADConfiguration.threshold',
       );
     }
+  }
+}
+
+extension LogLevelWireString on LogLevel {
+  String get wireString {
+    switch (this) {
+      case LogLevel.LOG_LEVEL_TRACE:
+        return 'trace';
+      case LogLevel.LOG_LEVEL_DEBUG:
+        return 'debug';
+      case LogLevel.LOG_LEVEL_INFO:
+        return 'info';
+      case LogLevel.LOG_LEVEL_WARNING:
+        return 'warning';
+      case LogLevel.LOG_LEVEL_ERROR:
+        return 'error';
+      case LogLevel.LOG_LEVEL_FATAL:
+        return 'fatal';
+    }
+    return '';
+  }
+}
+
+extension LogLevelDisplayName on LogLevel {
+  String get displayName {
+    switch (this) {
+      case LogLevel.LOG_LEVEL_TRACE:
+        return 'Trace';
+      case LogLevel.LOG_LEVEL_DEBUG:
+        return 'Debug';
+      case LogLevel.LOG_LEVEL_INFO:
+        return 'Info';
+      case LogLevel.LOG_LEVEL_WARNING:
+        return 'Warning';
+      case LogLevel.LOG_LEVEL_ERROR:
+        return 'Error';
+      case LogLevel.LOG_LEVEL_FATAL:
+        return 'Fatal';
+    }
+    return '';
+  }
+}
+
+LogLevel? logLevelFromWireString(String value) {
+  switch (value.toLowerCase()) {
+    case 'trace':
+      return LogLevel.LOG_LEVEL_TRACE;
+    case 'debug':
+      return LogLevel.LOG_LEVEL_DEBUG;
+    case 'info':
+      return LogLevel.LOG_LEVEL_INFO;
+    case 'warning':
+      return LogLevel.LOG_LEVEL_WARNING;
+    case 'error':
+      return LogLevel.LOG_LEVEL_ERROR;
+    case 'fatal':
+      return LogLevel.LOG_LEVEL_FATAL;
+  }
+  return null;
+}
+
+extension LoggingConfigurationConvenience on LoggingConfiguration {
+  static LoggingConfiguration defaults() {
+    final r = LoggingConfiguration();
+    r.enableLocalLogging = true;
+    return r;
   }
 }
 

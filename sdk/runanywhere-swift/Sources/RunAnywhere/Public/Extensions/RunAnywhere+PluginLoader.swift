@@ -15,18 +15,13 @@ import Foundation
 
 // MARK: - PluginInfo
 
-/// Information about a loaded plugin.
-public struct PluginInfo: Sendable {
-    /// The plugin name (library stem, e.g. "runanywhere_acmevoice")
-    public let name: String
-
-    /// The file-system path the plugin was loaded from
-    public let path: String
-
-    public init(name: String, path: String) {
-        self.name = name
-        self.path = path
-    }
+/// Information about a loaded plugin. Backed by the generated `RAPluginInfo`
+/// proto (`{name, path}`), shared cross-SDK. Helper to build one locally.
+private func makePluginInfo(name: String, path: String) -> RAPluginInfo {
+    var info = RAPluginInfo()
+    info.name = name
+    info.path = path
+    return info
 }
 
 // MARK: - RunAnywhere.pluginLoader capability
@@ -64,12 +59,12 @@ public extension RunAnywhere {
         /// ```
         ///
         /// - Parameter path: Absolute or relative path to the shared library.
-        /// - Returns: `PluginInfo` describing the loaded plugin. The `name`
+        /// - Returns: `RAPluginInfo` describing the loaded plugin. The `name`
         ///            is the actual registry key (vt->metadata.name), so
         ///            `unload(name: info.name)` always matches.
         /// - Throws: `SDKException` on failure (see error codes below).
         @discardableResult
-        public func load(path: String) throws -> PluginInfo {
+        public func load(path: String) throws -> RAPluginInfo {
             // Snapshot existing registry keys so we can identify the newly
             // registered name after load. The C loader stores the plugin
             // under vt->metadata.name (e.g. "llamacpp" for the in-tree
@@ -85,7 +80,7 @@ public extension RunAnywhere {
 
             let after = registeredNames()
             let registeredName = after.first { !before.contains($0) } ?? deriveStemName(path: path)
-            return PluginInfo(name: registeredName, path: path)
+            return makePluginInfo(name: registeredName, path: path)
         }
 
         /// Mirror the C loader's stem derivation (strip directory, the
@@ -140,11 +135,11 @@ public extension RunAnywhere {
 
         /// Snapshot of all currently-loaded plugins.
         ///
-        /// Returned `PluginInfo` contains the plugin name only; the original
-        /// load path is not persisted by the C registry. Use `registeredNames()`
-        /// if only names are needed.
-        public func listLoaded() -> [PluginInfo] {
-            registeredNames().map { PluginInfo(name: $0, path: "") }
+        /// Returned `RAPluginInfo` contains the plugin name only; the original
+        /// load path is not persisted by the C registry (proto3 `path` defaults
+        /// to ""). Use `registeredNames()` if only names are needed.
+        public func listLoaded() -> [RAPluginInfo] {
+            registeredNames().map { makePluginInfo(name: $0, path: "") }
         }
 
         // MARK: - Private helpers

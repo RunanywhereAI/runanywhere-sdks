@@ -98,6 +98,19 @@ public class ErrorContext(
     schemaIndex = 3,
   )
   public val operation: String? = null,
+  /**
+   * The structured field path a validation error refers to
+   * ("<Message>.<field>"). First-class replacement for the
+   * metadata\["field_path"\] magic key all five SDKs read/write today; the
+   * generated convenience validate() already emits this path.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "fieldPath",
+    schemaIndex = 4,
+  )
+  public val field_path: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ErrorContext, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -127,6 +140,7 @@ public class ErrorContext(
     if (source_file != other.source_file) return false
     if (source_line != other.source_line) return false
     if (operation != other.operation) return false
+    if (field_path != other.field_path) return false
     return true
   }
 
@@ -138,6 +152,7 @@ public class ErrorContext(
       result = result * 37 + (source_file?.hashCode() ?: 0)
       result = result * 37 + (source_line?.hashCode() ?: 0)
       result = result * 37 + (operation?.hashCode() ?: 0)
+      result = result * 37 + (field_path?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -149,6 +164,7 @@ public class ErrorContext(
     if (source_file != null) result += """source_file=${sanitize(source_file)}"""
     if (source_line != null) result += """source_line=$source_line"""
     if (operation != null) result += """operation=${sanitize(operation)}"""
+    if (field_path != null) result += """field_path=${sanitize(field_path)}"""
     return result.joinToString(prefix = "ErrorContext{", separator = ", ", postfix = "}")
   }
 
@@ -157,8 +173,9 @@ public class ErrorContext(
     source_file: String? = this.source_file,
     source_line: Int? = this.source_line,
     operation: String? = this.operation,
+    field_path: String? = this.field_path,
     unknownFields: ByteString = this.unknownFields,
-  ): ErrorContext = ErrorContext(metadata, source_file, source_line, operation, unknownFields)
+  ): ErrorContext = ErrorContext(metadata, source_file, source_line, operation, field_path, unknownFields)
 
   public companion object {
     @JvmField
@@ -179,6 +196,7 @@ public class ErrorContext(
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.source_file)
         size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.source_line)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.operation)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.field_path)
         return size
       }
 
@@ -187,11 +205,13 @@ public class ErrorContext(
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.source_file)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.source_line)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.operation)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.field_path)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ErrorContext) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.field_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.operation)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.source_line)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.source_file)
@@ -203,12 +223,14 @@ public class ErrorContext(
         var source_file: String? = null
         var source_line: Int? = null
         var operation: String? = null
+        var field_path: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> metadata.putAll(metadataAdapter.decode(reader))
             2 -> source_file = ProtoAdapter.STRING.decode(reader)
             3 -> source_line = ProtoAdapter.INT32.decode(reader)
             4 -> operation = ProtoAdapter.STRING.decode(reader)
+            5 -> field_path = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -217,6 +239,7 @@ public class ErrorContext(
           source_file = source_file,
           source_line = source_line,
           operation = operation,
+          field_path = field_path,
           unknownFields = unknownFields
         )
       }

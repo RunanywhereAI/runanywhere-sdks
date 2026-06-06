@@ -104,7 +104,7 @@ class DartBridge {
 
   /// Native library reference
   static DynamicLibrary get lib {
-    _lib ??= PlatformLoader.load();
+    _lib ??= PlatformLoader.loadCommons();
     return _lib!;
   }
 
@@ -139,7 +139,7 @@ class DartBridge {
     });
 
     // Step 1: Load native library
-    _lib = PlatformLoader.load();
+    _lib = PlatformLoader.loadCommons();
     _logger.debug('Native library loaded');
 
     // Step 2: Register platform adapter FIRST (file ops, logging, keychain)

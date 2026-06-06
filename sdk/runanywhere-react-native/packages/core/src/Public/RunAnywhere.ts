@@ -18,10 +18,7 @@ import {
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
 
-import type {
-  InitializationState,
-  SDKInitParams,
-} from '../Foundation/Initialization';
+import type { InitializationState } from '../Foundation/Initialization';
 import {
   createInitialState,
   markCoreInitialized,
@@ -160,7 +157,7 @@ export const RunAnywhere = {
           ? options.apiKey!.trim()
           : '';
 
-        const initParams: SDKInitParams = {
+        const initParams: SDKInitOptions = {
           apiKey: effectiveApiKey,
           baseURL: effectiveBaseURL,
           environment,

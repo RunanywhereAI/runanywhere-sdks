@@ -2695,12 +2695,213 @@ public nonisolated struct RARegisterModelFromUrlRequest: Sendable {
   /// Clears the value of `source`. Subsequent reads from it will return its default value.
   public mutating func clearSource() {self._source = nil}
 
+  /// Caller-supplied capability fields. When set, the register-from-url C++
+  /// path honors them on the saved ModelInfo instead of its inference
+  /// defaults (which hardcode supports_lora=false, download_size=0, infer
+  /// artifact_type from the URL). This lets every SDK drop the post-register
+  /// "patch + resave" pass. Tags 6-13 are free (1-5 stay wire-compatible with
+  /// ModelInfoMakeRequest).
+  public var memoryRequiredBytes: Int64 {
+    get {_memoryRequiredBytes ?? 0}
+    set {_memoryRequiredBytes = newValue}
+  }
+  /// Returns true if `memoryRequiredBytes` has been explicitly set.
+  public var hasMemoryRequiredBytes: Bool {self._memoryRequiredBytes != nil}
+  /// Clears the value of `memoryRequiredBytes`. Subsequent reads from it will return its default value.
+  public mutating func clearMemoryRequiredBytes() {self._memoryRequiredBytes = nil}
+
+  public var supportsThinking: Bool {
+    get {_supportsThinking ?? false}
+    set {_supportsThinking = newValue}
+  }
+  /// Returns true if `supportsThinking` has been explicitly set.
+  public var hasSupportsThinking: Bool {self._supportsThinking != nil}
+  /// Clears the value of `supportsThinking`. Subsequent reads from it will return its default value.
+  public mutating func clearSupportsThinking() {self._supportsThinking = nil}
+
+  public var supportsLora: Bool {
+    get {_supportsLora ?? false}
+    set {_supportsLora = newValue}
+  }
+  /// Returns true if `supportsLora` has been explicitly set.
+  public var hasSupportsLora: Bool {self._supportsLora != nil}
+  /// Clears the value of `supportsLora`. Subsequent reads from it will return its default value.
+  public mutating func clearSupportsLora() {self._supportsLora = nil}
+
+  public var artifactType: RAModelArtifactType {
+    get {_artifactType ?? .unspecified}
+    set {_artifactType = newValue}
+  }
+  /// Returns true if `artifactType` has been explicitly set.
+  public var hasArtifactType: Bool {self._artifactType != nil}
+  /// Clears the value of `artifactType`. Subsequent reads from it will return its default value.
+  public mutating func clearArtifactType() {self._artifactType = nil}
+
+  public var contextLength: Int32 {
+    get {_contextLength ?? 0}
+    set {_contextLength = newValue}
+  }
+  /// Returns true if `contextLength` has been explicitly set.
+  public var hasContextLength: Bool {self._contextLength != nil}
+  /// Clears the value of `contextLength`. Subsequent reads from it will return its default value.
+  public mutating func clearContextLength() {self._contextLength = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var downloadSizeBytes: Int64 {
+    get {_downloadSizeBytes ?? 0}
+    set {_downloadSizeBytes = newValue}
+  }
+  /// Returns true if `downloadSizeBytes` has been explicitly set.
+  public var hasDownloadSizeBytes: Bool {self._downloadSizeBytes != nil}
+  /// Clears the value of `downloadSizeBytes`. Subsequent reads from it will return its default value.
+  public mutating func clearDownloadSizeBytes() {self._downloadSizeBytes = nil}
+
+  /// Explicit id override. Empty -> derived from URL/name.
+  public var id: String {
+    get {_id ?? String()}
+    set {_id = newValue}
+  }
+  /// Returns true if `id` has been explicitly set.
+  public var hasID: Bool {self._id != nil}
+  /// Clears the value of `id`. Subsequent reads from it will return its default value.
+  public mutating func clearID() {self._id = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _framework: RAInferenceFramework? = nil
   fileprivate var _category: RAModelCategory? = nil
+  fileprivate var _source: RAModelSource? = nil
+  fileprivate var _memoryRequiredBytes: Int64? = nil
+  fileprivate var _supportsThinking: Bool? = nil
+  fileprivate var _supportsLora: Bool? = nil
+  fileprivate var _artifactType: RAModelArtifactType? = nil
+  fileprivate var _contextLength: Int32? = nil
+  fileprivate var _description_p: String? = nil
+  fileprivate var _downloadSizeBytes: Int64? = nil
+  fileprivate var _id: String? = nil
+}
+
+/// ---------------------------------------------------------------------------
+/// Inputs for registering a multi-file model (each file carries its own URL,
+/// so there is no model-level URL). Replaces the hand-built MultiFileArtifact
+/// ModelInfo every SDK assembles today. Produces the saved ModelInfo.
+/// ---------------------------------------------------------------------------
+public nonisolated struct RARegisterMultiFileModelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var name: String = String()
+
+  public var framework: RAInferenceFramework = .unspecified
+
+  public var files: [RAModelFileDescriptor] = []
+
+  public var category: RAModelCategory {
+    get {_category ?? .unspecified}
+    set {_category = newValue}
+  }
+  /// Returns true if `category` has been explicitly set.
+  public var hasCategory: Bool {self._category != nil}
+  /// Clears the value of `category`. Subsequent reads from it will return its default value.
+  public mutating func clearCategory() {self._category = nil}
+
+  public var format: RAModelFormat {
+    get {_format ?? .unspecified}
+    set {_format = newValue}
+  }
+  /// Returns true if `format` has been explicitly set.
+  public var hasFormat: Bool {self._format != nil}
+  /// Clears the value of `format`. Subsequent reads from it will return its default value.
+  public mutating func clearFormat() {self._format = nil}
+
+  public var memoryRequiredBytes: Int64 {
+    get {_memoryRequiredBytes ?? 0}
+    set {_memoryRequiredBytes = newValue}
+  }
+  /// Returns true if `memoryRequiredBytes` has been explicitly set.
+  public var hasMemoryRequiredBytes: Bool {self._memoryRequiredBytes != nil}
+  /// Clears the value of `memoryRequiredBytes`. Subsequent reads from it will return its default value.
+  public mutating func clearMemoryRequiredBytes() {self._memoryRequiredBytes = nil}
+
+  public var downloadSizeBytes: Int64 {
+    get {_downloadSizeBytes ?? 0}
+    set {_downloadSizeBytes = newValue}
+  }
+  /// Returns true if `downloadSizeBytes` has been explicitly set.
+  public var hasDownloadSizeBytes: Bool {self._downloadSizeBytes != nil}
+  /// Clears the value of `downloadSizeBytes`. Subsequent reads from it will return its default value.
+  public mutating func clearDownloadSizeBytes() {self._downloadSizeBytes = nil}
+
+  public var contextLength: Int32 {
+    get {_contextLength ?? 0}
+    set {_contextLength = newValue}
+  }
+  /// Returns true if `contextLength` has been explicitly set.
+  public var hasContextLength: Bool {self._contextLength != nil}
+  /// Clears the value of `contextLength`. Subsequent reads from it will return its default value.
+  public mutating func clearContextLength() {self._contextLength = nil}
+
+  public var supportsThinking: Bool {
+    get {_supportsThinking ?? false}
+    set {_supportsThinking = newValue}
+  }
+  /// Returns true if `supportsThinking` has been explicitly set.
+  public var hasSupportsThinking: Bool {self._supportsThinking != nil}
+  /// Clears the value of `supportsThinking`. Subsequent reads from it will return its default value.
+  public mutating func clearSupportsThinking() {self._supportsThinking = nil}
+
+  public var supportsLora: Bool {
+    get {_supportsLora ?? false}
+    set {_supportsLora = newValue}
+  }
+  /// Returns true if `supportsLora` has been explicitly set.
+  public var hasSupportsLora: Bool {self._supportsLora != nil}
+  /// Clears the value of `supportsLora`. Subsequent reads from it will return its default value.
+  public mutating func clearSupportsLora() {self._supportsLora = nil}
+
+  public var description_p: String {
+    get {_description_p ?? String()}
+    set {_description_p = newValue}
+  }
+  /// Returns true if `description_p` has been explicitly set.
+  public var hasDescription_p: Bool {self._description_p != nil}
+  /// Clears the value of `description_p`. Subsequent reads from it will return its default value.
+  public mutating func clearDescription_p() {self._description_p = nil}
+
+  public var source: RAModelSource {
+    get {_source ?? .unspecified}
+    set {_source = newValue}
+  }
+  /// Returns true if `source` has been explicitly set.
+  public var hasSource: Bool {self._source != nil}
+  /// Clears the value of `source`. Subsequent reads from it will return its default value.
+  public mutating func clearSource() {self._source = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _category: RAModelCategory? = nil
+  fileprivate var _format: RAModelFormat? = nil
+  fileprivate var _memoryRequiredBytes: Int64? = nil
+  fileprivate var _downloadSizeBytes: Int64? = nil
+  fileprivate var _contextLength: Int32? = nil
+  fileprivate var _supportsThinking: Bool? = nil
+  fileprivate var _supportsLora: Bool? = nil
+  fileprivate var _description_p: String? = nil
   fileprivate var _source: RAModelSource? = nil
 }
 
@@ -5238,7 +5439,7 @@ nonisolated extension RAModelInfoMakeRequest: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RegisterModelFromUrlRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0\u{3}memory_required_bytes\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{3}artifact_type\0\u{3}context_length\0\u{1}description\0\u{3}download_size_bytes\0\u{1}id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5251,6 +5452,14 @@ nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, Swif
       case 3: try { try decoder.decodeSingularEnumField(value: &self._framework) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self._category) }()
       case 5: try { try decoder.decodeSingularEnumField(value: &self._source) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self._memoryRequiredBytes) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self._supportsThinking) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self._supportsLora) }()
+      case 9: try { try decoder.decodeSingularEnumField(value: &self._artifactType) }()
+      case 10: try { try decoder.decodeSingularInt32Field(value: &self._contextLength) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 12: try { try decoder.decodeSingularInt64Field(value: &self._downloadSizeBytes) }()
+      case 13: try { try decoder.decodeSingularStringField(value: &self._id) }()
       default: break
       }
     }
@@ -5276,6 +5485,30 @@ nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, Swif
     try { if let v = self._source {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
     } }()
+    try { if let v = self._memoryRequiredBytes {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._supportsThinking {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._supportsLora {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
+    } }()
+    try { if let v = self._artifactType {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._contextLength {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
+    try { if let v = self._downloadSizeBytes {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 12)
+    } }()
+    try { if let v = self._id {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5284,6 +5517,108 @@ nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, Swif
     if lhs.name != rhs.name {return false}
     if lhs._framework != rhs._framework {return false}
     if lhs._category != rhs._category {return false}
+    if lhs._source != rhs._source {return false}
+    if lhs._memoryRequiredBytes != rhs._memoryRequiredBytes {return false}
+    if lhs._supportsThinking != rhs._supportsThinking {return false}
+    if lhs._supportsLora != rhs._supportsLora {return false}
+    if lhs._artifactType != rhs._artifactType {return false}
+    if lhs._contextLength != rhs._contextLength {return false}
+    if lhs._description_p != rhs._description_p {return false}
+    if lhs._downloadSizeBytes != rhs._downloadSizeBytes {return false}
+    if lhs._id != rhs._id {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RARegisterMultiFileModelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RegisterMultiFileModelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}framework\0\u{1}files\0\u{1}category\0\u{1}format\0\u{3}memory_required_bytes\0\u{3}download_size_bytes\0\u{3}context_length\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{1}description\0\u{1}source\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.framework) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.files) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._category) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self._format) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self._memoryRequiredBytes) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self._downloadSizeBytes) }()
+      case 9: try { try decoder.decodeSingularInt32Field(value: &self._contextLength) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self._supportsThinking) }()
+      case 11: try { try decoder.decodeSingularBoolField(value: &self._supportsLora) }()
+      case 12: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
+      case 13: try { try decoder.decodeSingularEnumField(value: &self._source) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if self.framework != .unspecified {
+      try visitor.visitSingularEnumField(value: self.framework, fieldNumber: 3)
+    }
+    if !self.files.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.files, fieldNumber: 4)
+    }
+    try { if let v = self._category {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._format {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._memoryRequiredBytes {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._downloadSizeBytes {
+      try visitor.visitSingularInt64Field(value: v, fieldNumber: 8)
+    } }()
+    try { if let v = self._contextLength {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._supportsThinking {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 10)
+    } }()
+    try { if let v = self._supportsLora {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 11)
+    } }()
+    try { if let v = self._description_p {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 12)
+    } }()
+    try { if let v = self._source {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 13)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RARegisterMultiFileModelRequest, rhs: RARegisterMultiFileModelRequest) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.framework != rhs.framework {return false}
+    if lhs.files != rhs.files {return false}
+    if lhs._category != rhs._category {return false}
+    if lhs._format != rhs._format {return false}
+    if lhs._memoryRequiredBytes != rhs._memoryRequiredBytes {return false}
+    if lhs._downloadSizeBytes != rhs._downloadSizeBytes {return false}
+    if lhs._contextLength != rhs._contextLength {return false}
+    if lhs._supportsThinking != rhs._supportsThinking {return false}
+    if lhs._supportsLora != rhs._supportsLora {return false}
+    if lhs._description_p != rhs._description_p {return false}
     if lhs._source != rhs._source {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

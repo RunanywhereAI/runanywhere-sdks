@@ -6,7 +6,7 @@
  * native-handle-backed and flows through generated proto models.
  */
 
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
@@ -341,7 +341,7 @@ export function unavailableVoiceAgentResult(reason?: string): VoiceAgentResult {
     ttsTimeMs: 0,
     totalTimeMs: 0,
     errorMessage: message,
-    errorCode: SDKErrorCode.BackendNotAvailable,
+    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
   };
 }
 
@@ -354,7 +354,7 @@ function unavailableVoiceEvent(reason?: string): VoiceEvent {
     severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
     component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT,
     error: {
-      code: SDKErrorCode.BackendNotAvailable,
+      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       message,
       component: 'voice-agent',
       isRecoverable: false,

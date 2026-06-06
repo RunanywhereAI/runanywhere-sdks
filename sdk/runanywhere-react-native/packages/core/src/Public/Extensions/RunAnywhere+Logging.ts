@@ -61,7 +61,7 @@ export function addLogDestination(destination: LogDestination): void {
  * Matches iOS: static func setDebugMode(_ enabled: Bool)
  */
 export function setDebugMode(enabled: boolean): void {
-  setLogLevel(enabled ? LogLevel.Debug : LogLevel.Info);
+  setLogLevel(enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
   setLocalLoggingEnabled(enabled);
 }
 

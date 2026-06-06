@@ -8,7 +8,8 @@
 
 package com.runanywhere.sdk.infrastructure.logging
 
-import com.runanywhere.sdk.public.extensions.LogLevel
+import ai.runanywhere.proto.v1.LogEntry
+import ai.runanywhere.proto.v1.LogLevel
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryEvent
@@ -41,7 +42,7 @@ class SentryDestination : LogDestination {
     /**
      * Only send warning level and above to Sentry.
      */
-    private val minSentryLevel: LogLevel = LogLevel.WARNING
+    private val minSentryLevel: LogLevel = LogLevel.LOG_LEVEL_WARNING
 
     // Log destination operations
 
@@ -51,9 +52,9 @@ class SentryDestination : LogDestination {
      * @param entry The log entry to write
      */
     override fun write(entry: LogEntry) {
-        // Public LogLevel: larger value = more severe (DEBUG=0, INFO=1,
-        // WARNING=2, ERROR=3, FAULT=4). Send to Sentry iff entry severity
-        // is at or above the min Sentry level.
+        // proto LogLevel: larger value = more severe (TRACE=0, DEBUG=1,
+        // INFO=2, WARNING=3, ERROR=4, FATAL=5). Send to Sentry iff entry
+        // severity is at or above the min Sentry level.
         if (!isAvailable || entry.level.value < minSentryLevel.value) {
             return
         }
@@ -61,8 +62,8 @@ class SentryDestination : LogDestination {
         // Add as breadcrumb for context trail
         addBreadcrumb(entry)
 
-        // ERROR + FAULT capture as Sentry events; WARNING stays a breadcrumb.
-        if (entry.level.value >= LogLevel.ERROR.value) {
+        // ERROR + FATAL capture as Sentry events; WARNING stays a breadcrumb.
+        if (entry.level.value >= LogLevel.LOG_LEVEL_ERROR.value) {
             captureEvent(entry)
         }
     }
@@ -81,13 +82,13 @@ class SentryDestination : LogDestination {
      * Add a breadcrumb for context trail.
      */
     private fun addBreadcrumb(entry: LogEntry) {
-        val timestamp = Date(entry.timestamp)
+        val timestamp = Date(entry.timestamp_unix_ms)
         val breadcrumb =
             Breadcrumb(timestamp).apply {
                 category = entry.category
                 message = entry.message
                 level = convertToSentryLevel(entry.level)
-                entry.metadata?.forEach { (key, value) ->
+                entry.metadata.forEach { (key, value) ->
                     setData(key, value)
                 }
             }
@@ -99,7 +100,7 @@ class SentryDestination : LogDestination {
      * Capture an error event in Sentry.
      */
     private fun captureEvent(entry: LogEntry) {
-        val timestamp = Date(entry.timestamp)
+        val timestamp = Date(entry.timestamp_unix_ms)
         val event =
             SentryEvent(timestamp).apply {
                 level = convertToSentryLevel(entry.level)
@@ -113,19 +114,19 @@ class SentryDestination : LogDestination {
                 setTag("log_level", entry.level.toString())
 
                 // Add metadata as extras
-                entry.metadata?.forEach { (key, value) ->
+                entry.metadata.forEach { (key, value) ->
                     setExtra(key, value)
                 }
 
-                // Add model info if present
-                entry.modelId?.let { setExtra("model_id", it) }
-                entry.framework?.let { setExtra("framework", it) }
-                entry.errorCode?.let { setExtra("error_code", it) }
+                // Add model info if present (proto: "" / 0 means unset)
+                entry.model_id.takeIf { it.isNotEmpty() }?.let { setExtra("model_id", it) }
+                entry.framework.takeIf { it.isNotEmpty() }?.let { setExtra("framework", it) }
+                entry.error_code.takeIf { it != 0 }?.let { setExtra("error_code", it) }
 
                 // Add source location if present
-                entry.file?.let { setExtra("source_file", it) }
-                entry.line?.let { setExtra("source_line", it) }
-                entry.function?.let { setExtra("source_function", it) }
+                entry.file_.takeIf { it.isNotEmpty() }?.let { setExtra("source_file", it) }
+                entry.line.takeIf { it != 0 }?.let { setExtra("source_line", it) }
+                entry.function.takeIf { it.isNotEmpty() }?.let { setExtra("source_function", it) }
             }
 
         Sentry.captureEvent(event)
@@ -136,11 +137,12 @@ class SentryDestination : LogDestination {
      */
     private fun convertToSentryLevel(level: LogLevel): SentryLevel {
         return when (level) {
-            LogLevel.DEBUG -> SentryLevel.DEBUG
-            LogLevel.INFO -> SentryLevel.INFO
-            LogLevel.WARNING -> SentryLevel.WARNING
-            LogLevel.ERROR -> SentryLevel.ERROR
-            LogLevel.FAULT -> SentryLevel.FATAL
+            LogLevel.LOG_LEVEL_TRACE -> SentryLevel.DEBUG
+            LogLevel.LOG_LEVEL_DEBUG -> SentryLevel.DEBUG
+            LogLevel.LOG_LEVEL_INFO -> SentryLevel.INFO
+            LogLevel.LOG_LEVEL_WARNING -> SentryLevel.WARNING
+            LogLevel.LOG_LEVEL_ERROR -> SentryLevel.ERROR
+            LogLevel.LOG_LEVEL_FATAL -> SentryLevel.FATAL
         }
     }
 }

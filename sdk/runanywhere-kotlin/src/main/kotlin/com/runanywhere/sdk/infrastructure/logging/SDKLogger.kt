@@ -1,37 +1,73 @@
 package com.runanywhere.sdk.infrastructure.logging
 
+import ai.runanywhere.proto.v1.LogEntry
+import ai.runanywhere.proto.v1.LogLevel
+import ai.runanywhere.proto.v1.LoggingConfiguration
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
-import com.runanywhere.sdk.public.extensions.LogLevel
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-// LOG LEVEL (consolidated — see com.runanywhere.sdk.public.extensions.LogLevel)
+// LOG LEVEL / LOG ENTRY / LOGGING CONFIGURATION (proto-canonical)
 //
-// The canonical LogLevel is the public API enum defined in
-// RunAnywhereLogging.kt. Values: DEBUG(0), INFO(1), WARNING(2), ERROR(3),
-// FAULT(4). Ordered by severity, larger value = more severe (matches Swift).
-// Filtering semantics: log iff `level.value >= minLogLevel.value`.
+// LogLevel, LogEntry and LoggingConfiguration are now the proto-generated
+// types in ai.runanywhere.proto.v1. LogLevel values: LOG_LEVEL_TRACE(0),
+// LOG_LEVEL_DEBUG(1), LOG_LEVEL_INFO(2), LOG_LEVEL_WARNING(3),
+// LOG_LEVEL_ERROR(4), LOG_LEVEL_FATAL(5). Ordered by severity, larger value =
+// more severe. Filtering: log iff `level.value >= minLogLevel.value`.
+//
+// LogEntry's extra Kotlin context (file/line/function/error_code/model_id/
+// framework) maps onto the proto fields `file_`, `line`, `function`,
+// `error_code`, `model_id`, `framework`; `timestamp_unix_ms` carries the
+// epoch-millis timestamp. Proto fields use scalar defaults ("" / 0) instead of
+// nullable — empty/zero means "unset".
 
-// Log entry
+// Per-environment LoggingConfiguration presets. The proto LoggingConfiguration
+// is a flat message with no companion helpers, so the development/staging/
+// production factories live here.
 
-/**
- * Represents a single log message with metadata.
- * Matches Swift SDK LogEntry structure.
- */
-data class LogEntry(
-    val timestamp: Long = getCurrentTimeMillis(),
-    val level: LogLevel,
-    val category: String,
-    val message: String,
-    val metadata: Map<String, String>? = null,
-    val file: String? = null,
-    val line: Int? = null,
-    val function: String? = null,
-    val errorCode: Int? = null,
-    val modelId: String? = null,
-    val framework: String? = null,
-)
+internal object LoggingConfigurationPresets {
+    /** Development: debug logging + detailed source location. */
+    val development =
+        LoggingConfiguration(
+            enable_local_logging = true,
+            min_log_level = LogLevel.LOG_LEVEL_DEBUG,
+            include_source_location = true,
+            enable_remote_logging = false,
+            enable_sentry_logging = false,
+            include_device_metadata = true,
+        )
+
+    /** Staging: info level with source location for debugging. */
+    val staging =
+        LoggingConfiguration(
+            enable_local_logging = true,
+            min_log_level = LogLevel.LOG_LEVEL_INFO,
+            include_source_location = true,
+            enable_remote_logging = false,
+            enable_sentry_logging = true,
+            include_device_metadata = true,
+        )
+
+    /** Production: warning+ only, Sentry enabled for error tracking. */
+    val production =
+        LoggingConfiguration(
+            enable_local_logging = false,
+            min_log_level = LogLevel.LOG_LEVEL_WARNING,
+            include_source_location = false,
+            enable_remote_logging = false,
+            enable_sentry_logging = true,
+            include_device_metadata = true,
+        )
+
+    fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
+        when (environment) {
+            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> development
+            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> staging
+            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> production
+            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> development
+        }
+}
 
 // Log destination protocol
 
@@ -53,76 +89,6 @@ interface LogDestination {
     fun flush()
 }
 
-// Logging configuration
-
-/**
- * Configuration for the logging system.
- * Matches Swift SDK LoggingConfiguration structure.
- */
-data class LoggingConfiguration(
-    val enableLocalLogging: Boolean = true,
-    val minLogLevel: LogLevel = LogLevel.INFO,
-    val includeSourceLocation: Boolean = false,
-    val enableRemoteLogging: Boolean = false,
-    val enableSentryLogging: Boolean = false,
-    val includeDeviceMetadata: Boolean = false,
-) {
-    companion object {
-        /**
-         * Development environment preset.
-         * Enables debug logging and detailed source location.
-         */
-        val development =
-            LoggingConfiguration(
-                enableLocalLogging = true,
-                minLogLevel = LogLevel.DEBUG,
-                includeSourceLocation = true,
-                enableRemoteLogging = false,
-                enableSentryLogging = false,
-                includeDeviceMetadata = true,
-            )
-
-        /**
-         * Staging environment preset.
-         * Info level with source location for debugging.
-         */
-        val staging =
-            LoggingConfiguration(
-                enableLocalLogging = true,
-                minLogLevel = LogLevel.INFO,
-                includeSourceLocation = true,
-                enableRemoteLogging = false,
-                enableSentryLogging = true,
-                includeDeviceMetadata = true,
-            )
-
-        /**
-         * Production environment preset.
-         * Warning level and above, Sentry enabled for error tracking.
-         */
-        val production =
-            LoggingConfiguration(
-                enableLocalLogging = false,
-                minLogLevel = LogLevel.WARNING,
-                includeSourceLocation = false,
-                enableRemoteLogging = false,
-                enableSentryLogging = true,
-                includeDeviceMetadata = true,
-            )
-
-        /**
-         * Get configuration for a specific environment.
-         */
-        fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
-            when (environment) {
-                SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> development
-                SDKEnvironment.SDK_ENVIRONMENT_STAGING -> staging
-                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> production
-                SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> development
-            }
-    }
-}
-
 // Logging (central service)
 
 /**
@@ -134,7 +100,7 @@ object Logging {
     private val mutex = Mutex()
 
     // Thread-safe state
-    private var _configuration: LoggingConfiguration = LoggingConfiguration.development
+    private var _configuration: LoggingConfiguration = LoggingConfigurationPresets.development
     private val _destinations: MutableList<LogDestination> = mutableListOf()
 
     // Bridge callback for forwarding logs to runanywhere-commons
@@ -168,35 +134,35 @@ object Logging {
      * Apply configuration based on SDK environment.
      */
     fun applyEnvironmentConfiguration(environment: SDKEnvironment) {
-        configure(LoggingConfiguration.forEnvironment(environment))
+        configure(LoggingConfigurationPresets.forEnvironment(environment))
     }
 
     /**
      * Set whether local logging is enabled.
      */
     fun setLocalLoggingEnabled(enabled: Boolean) {
-        _configuration = _configuration.copy(enableLocalLogging = enabled)
+        _configuration = _configuration.copy(enable_local_logging = enabled)
     }
 
     /**
      * Set the minimum log level.
      */
     fun setMinLogLevel(level: LogLevel) {
-        _configuration = _configuration.copy(minLogLevel = level)
+        _configuration = _configuration.copy(min_log_level = level)
     }
 
     /**
      * Set whether to include source location in logs.
      */
     fun setIncludeSourceLocation(include: Boolean) {
-        _configuration = _configuration.copy(includeSourceLocation = include)
+        _configuration = _configuration.copy(include_source_location = include)
     }
 
     /**
      * Set whether to include device metadata in logs.
      */
     fun setIncludeDeviceMetadata(include: Boolean) {
-        _configuration = _configuration.copy(includeDeviceMetadata = include)
+        _configuration = _configuration.copy(include_device_metadata = include)
     }
 
     /**
@@ -207,12 +173,12 @@ object Logging {
      */
     fun setSentryLoggingEnabled(enabled: Boolean) {
         val oldConfig = _configuration
-        _configuration = _configuration.copy(enableSentryLogging = enabled)
+        _configuration = _configuration.copy(enable_sentry_logging = enabled)
 
         // Handle Sentry state changes via the platform-specific hook
-        if (enabled && !oldConfig.enableSentryLogging) {
+        if (enabled && !oldConfig.enable_sentry_logging) {
             sentrySetupHook?.invoke()
-        } else if (!enabled && oldConfig.enableSentryLogging) {
+        } else if (!enabled && oldConfig.enable_sentry_logging) {
             sentryTeardownHook?.invoke()
         }
     }
@@ -269,32 +235,35 @@ object Logging {
     ) {
         val config = _configuration
 
-        // Check if level meets minimum threshold. Public LogLevel values
-        // match Swift severity: DEBUG(0) = least severe, FAULT(4) = most
-        // severe. A log is emitted iff its severity is at least the
-        // configured threshold (mirrors Swift `level >= config.minLogLevel`).
-        if (level.value < config.minLogLevel.value) return
+        // Check if level meets minimum threshold. proto LogLevel severity:
+        // LOG_LEVEL_TRACE(0) = least severe, LOG_LEVEL_FATAL(5) = most severe.
+        // A log is emitted iff its severity is at least the configured
+        // threshold (mirrors Swift `level >= config.minLogLevel`).
+        if (level.value < config.min_log_level.value) return
 
         // Check if any logging is enabled
-        if (!config.enableLocalLogging && !config.enableRemoteLogging && _destinations.isEmpty()) return
+        if (!config.enable_local_logging && !config.enable_remote_logging && _destinations.isEmpty()) return
 
-        // Create log entry
+        // Create log entry. Proto LogEntry uses scalar defaults ("" / 0) for
+        // unset fields rather than nullables.
+        val includeSource = config.include_source_location
         val entry =
             LogEntry(
+                timestamp_unix_ms = getCurrentTimeMillis(),
                 level = level,
                 category = category,
                 message = message,
-                metadata = sanitizeMetadata(metadata),
-                file = if (config.includeSourceLocation) file else null,
-                line = if (config.includeSourceLocation) line else null,
-                function = if (config.includeSourceLocation) function else null,
-                errorCode = errorCode,
-                modelId = modelId,
-                framework = framework,
+                metadata = sanitizeMetadata(metadata) ?: emptyMap(),
+                file_ = if (includeSource) file.orEmpty() else "",
+                line = if (includeSource) (line ?: 0) else 0,
+                function = if (includeSource) function.orEmpty() else "",
+                error_code = errorCode ?: 0,
+                model_id = modelId.orEmpty(),
+                framework = framework.orEmpty(),
             )
 
         // Write to console if local logging enabled
-        if (config.enableLocalLogging) {
+        if (config.enable_local_logging) {
             printToConsole(entry)
         }
 
@@ -362,11 +331,12 @@ object Logging {
     private fun printToConsole(entry: LogEntry) {
         val levelIndicator =
             when (entry.level) {
-                LogLevel.DEBUG -> "[DEBUG]"
-                LogLevel.INFO -> "[INFO]"
-                LogLevel.WARNING -> "[WARN]"
-                LogLevel.ERROR -> "[ERROR]"
-                LogLevel.FAULT -> "[FAULT]"
+                LogLevel.LOG_LEVEL_TRACE -> "[TRACE]"
+                LogLevel.LOG_LEVEL_DEBUG -> "[DEBUG]"
+                LogLevel.LOG_LEVEL_INFO -> "[INFO]"
+                LogLevel.LOG_LEVEL_WARNING -> "[WARN]"
+                LogLevel.LOG_LEVEL_ERROR -> "[ERROR]"
+                LogLevel.LOG_LEVEL_FATAL -> "[FATAL]"
             }
 
         val output =
@@ -378,28 +348,28 @@ object Logging {
                 append(entry.message)
 
                 // Add metadata if present
-                entry.metadata?.takeIf { it.isNotEmpty() }?.let { meta ->
+                entry.metadata.takeIf { it.isNotEmpty() }?.let { meta ->
                     append(" | ")
                     append(meta.entries.joinToString(", ") { "${it.key}=${it.value}" })
                 }
 
-                // Add source location if present
-                if (entry.file != null || entry.function != null) {
+                // Add source location if present (proto: "" / 0 means unset)
+                if (entry.file_.isNotEmpty() || entry.function.isNotEmpty()) {
                     append(" @ ")
-                    entry.file?.let { append(it) }
-                    entry.line?.let { append(":$it") }
-                    entry.function?.let { append(" in $it") }
+                    if (entry.file_.isNotEmpty()) append(entry.file_)
+                    if (entry.line != 0) append(":${entry.line}")
+                    if (entry.function.isNotEmpty()) append(" in ${entry.function}")
                 }
 
                 // Add error code if present
-                entry.errorCode?.let { append(" [code=$it]") }
+                if (entry.error_code != 0) append(" [code=${entry.error_code}]")
 
                 // Add model info if present
-                if (entry.modelId != null || entry.framework != null) {
+                if (entry.model_id.isNotEmpty() || entry.framework.isNotEmpty()) {
                     append(" [")
-                    entry.modelId?.let { append("model=$it") }
-                    if (entry.modelId != null && entry.framework != null) append(", ")
-                    entry.framework?.let { append("framework=$it") }
+                    if (entry.model_id.isNotEmpty()) append("model=${entry.model_id}")
+                    if (entry.model_id.isNotEmpty() && entry.framework.isNotEmpty()) append(", ")
+                    if (entry.framework.isNotEmpty()) append("framework=${entry.framework}")
                     append("]")
                 }
             }
@@ -464,15 +434,15 @@ class SDKLogger(
     // Logging methods
 
     /**
-     * Log a trace-level message (routed to DEBUG in the canonical enum —
-     * Swift parity exposes no separate VERBOSE level).
+     * Log a trace-level message (proto LOG_LEVEL_TRACE — the most verbose
+     * severity, below DEBUG).
      */
     fun trace(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.DEBUG,
+            level = LogLevel.LOG_LEVEL_TRACE,
             category = category,
             message = message,
             metadata = metadata,
@@ -487,7 +457,7 @@ class SDKLogger(
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.DEBUG,
+            level = LogLevel.LOG_LEVEL_DEBUG,
             category = category,
             message = message,
             metadata = metadata,
@@ -502,7 +472,7 @@ class SDKLogger(
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.INFO,
+            level = LogLevel.LOG_LEVEL_INFO,
             category = category,
             message = message,
             metadata = metadata,
@@ -517,7 +487,7 @@ class SDKLogger(
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.WARNING,
+            level = LogLevel.LOG_LEVEL_WARNING,
             category = category,
             message = message,
             metadata = metadata,
@@ -552,7 +522,7 @@ class SDKLogger(
             }
 
         Logging.log(
-            level = LogLevel.ERROR,
+            level = LogLevel.LOG_LEVEL_ERROR,
             category = category,
             message = message,
             metadata = errorMetadata,
@@ -580,7 +550,7 @@ class SDKLogger(
             }
 
         Logging.log(
-            level = LogLevel.FAULT,
+            level = LogLevel.LOG_LEVEL_FATAL,
             category = category,
             message = message,
             metadata = faultMetadata,
@@ -621,7 +591,7 @@ class SDKLogger(
             }
 
         Logging.log(
-            level = LogLevel.ERROR,
+            level = LogLevel.LOG_LEVEL_ERROR,
             category = category,
             message = errorMessage,
             metadata = metadata,
@@ -641,7 +611,7 @@ class SDKLogger(
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.INFO,
+            level = LogLevel.LOG_LEVEL_INFO,
             category = category,
             message = message,
             metadata = metadata,
@@ -661,7 +631,7 @@ class SDKLogger(
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.ERROR,
+            level = LogLevel.LOG_LEVEL_ERROR,
             category = category,
             message = message,
             metadata = metadata,

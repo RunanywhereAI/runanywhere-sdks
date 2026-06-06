@@ -24,7 +24,7 @@
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
-import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import {
@@ -124,7 +124,7 @@ export class CommonsModule {
   get module(): CoreCommonsModule {
     if (!this._module) {
       throw new SDKException(
-        SDKErrorCode.WASMNotLoaded,
+        -ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED,
         'Commons WASM not loaded. Call CommonsModule.shared.ensureLoaded() first.',
       );
     }
@@ -254,7 +254,7 @@ export class CommonsModule {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Failed to load Commons WASM: ${message}`);
       throw new SDKException(
-        SDKErrorCode.WASMLoadFailed,
+        -ProtoErrorCode.ERROR_CODE_WASM_LOAD_FAILED,
         `Failed to load Commons WASM module: ${message}`,
       );
     }

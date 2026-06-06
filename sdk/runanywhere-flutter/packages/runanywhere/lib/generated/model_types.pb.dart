@@ -4691,6 +4691,14 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     InferenceFramework? framework,
     ModelCategory? category,
     ModelSource? source,
+    $fixnum.Int64? memoryRequiredBytes,
+    $core.bool? supportsThinking,
+    $core.bool? supportsLora,
+    ModelArtifactType? artifactType,
+    $core.int? contextLength,
+    $core.String? description,
+    $fixnum.Int64? downloadSizeBytes,
+    $core.String? id,
   }) {
     final result = create();
     if (url != null) result.url = url;
@@ -4698,6 +4706,15 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     if (framework != null) result.framework = framework;
     if (category != null) result.category = category;
     if (source != null) result.source = source;
+    if (memoryRequiredBytes != null)
+      result.memoryRequiredBytes = memoryRequiredBytes;
+    if (supportsThinking != null) result.supportsThinking = supportsThinking;
+    if (supportsLora != null) result.supportsLora = supportsLora;
+    if (artifactType != null) result.artifactType = artifactType;
+    if (contextLength != null) result.contextLength = contextLength;
+    if (description != null) result.description = description;
+    if (downloadSizeBytes != null) result.downloadSizeBytes = downloadSizeBytes;
+    if (id != null) result.id = id;
     return result;
   }
 
@@ -4722,6 +4739,15 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
         enumValues: ModelCategory.values)
     ..aE<ModelSource>(5, _omitFieldNames ? '' : 'source',
         enumValues: ModelSource.values)
+    ..aInt64(6, _omitFieldNames ? '' : 'memoryRequiredBytes')
+    ..aOB(7, _omitFieldNames ? '' : 'supportsThinking')
+    ..aOB(8, _omitFieldNames ? '' : 'supportsLora')
+    ..aE<ModelArtifactType>(9, _omitFieldNames ? '' : 'artifactType',
+        enumValues: ModelArtifactType.values)
+    ..aI(10, _omitFieldNames ? '' : 'contextLength')
+    ..aOS(11, _omitFieldNames ? '' : 'description')
+    ..aInt64(12, _omitFieldNames ? '' : 'downloadSizeBytes')
+    ..aOS(13, _omitFieldNames ? '' : 'id')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4798,6 +4824,291 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
   $core.bool hasSource() => $_has(4);
   @$pb.TagNumber(5)
   void clearSource() => $_clearField(5);
+
+  /// Caller-supplied capability fields. When set, the register-from-url C++
+  /// path honors them on the saved ModelInfo instead of its inference
+  /// defaults (which hardcode supports_lora=false, download_size=0, infer
+  /// artifact_type from the URL). This lets every SDK drop the post-register
+  /// "patch + resave" pass. Tags 6-13 are free (1-5 stay wire-compatible with
+  /// ModelInfoMakeRequest).
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get memoryRequiredBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set memoryRequiredBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasMemoryRequiredBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearMemoryRequiredBytes() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get supportsThinking => $_getBF(6);
+  @$pb.TagNumber(7)
+  set supportsThinking($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasSupportsThinking() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSupportsThinking() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get supportsLora => $_getBF(7);
+  @$pb.TagNumber(8)
+  set supportsLora($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasSupportsLora() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSupportsLora() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  ModelArtifactType get artifactType => $_getN(8);
+  @$pb.TagNumber(9)
+  set artifactType(ModelArtifactType value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasArtifactType() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearArtifactType() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get contextLength => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set contextLength($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasContextLength() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearContextLength() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get description => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set description($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasDescription() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearDescription() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get downloadSizeBytes => $_getI64(11);
+  @$pb.TagNumber(12)
+  set downloadSizeBytes($fixnum.Int64 value) => $_setInt64(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasDownloadSizeBytes() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearDownloadSizeBytes() => $_clearField(12);
+
+  /// Explicit id override. Empty -> derived from URL/name.
+  @$pb.TagNumber(13)
+  $core.String get id => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set id($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasId() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearId() => $_clearField(13);
+}
+
+/// ---------------------------------------------------------------------------
+/// Inputs for registering a multi-file model (each file carries its own URL,
+/// so there is no model-level URL). Replaces the hand-built MultiFileArtifact
+/// ModelInfo every SDK assembles today. Produces the saved ModelInfo.
+/// ---------------------------------------------------------------------------
+class RegisterMultiFileModelRequest extends $pb.GeneratedMessage {
+  factory RegisterMultiFileModelRequest({
+    $core.String? id,
+    $core.String? name,
+    InferenceFramework? framework,
+    $core.Iterable<ModelFileDescriptor>? files,
+    ModelCategory? category,
+    ModelFormat? format,
+    $fixnum.Int64? memoryRequiredBytes,
+    $fixnum.Int64? downloadSizeBytes,
+    $core.int? contextLength,
+    $core.bool? supportsThinking,
+    $core.bool? supportsLora,
+    $core.String? description,
+    ModelSource? source,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (name != null) result.name = name;
+    if (framework != null) result.framework = framework;
+    if (files != null) result.files.addAll(files);
+    if (category != null) result.category = category;
+    if (format != null) result.format = format;
+    if (memoryRequiredBytes != null)
+      result.memoryRequiredBytes = memoryRequiredBytes;
+    if (downloadSizeBytes != null) result.downloadSizeBytes = downloadSizeBytes;
+    if (contextLength != null) result.contextLength = contextLength;
+    if (supportsThinking != null) result.supportsThinking = supportsThinking;
+    if (supportsLora != null) result.supportsLora = supportsLora;
+    if (description != null) result.description = description;
+    if (source != null) result.source = source;
+    return result;
+  }
+
+  RegisterMultiFileModelRequest._();
+
+  factory RegisterMultiFileModelRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RegisterMultiFileModelRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RegisterMultiFileModelRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..aE<InferenceFramework>(3, _omitFieldNames ? '' : 'framework',
+        enumValues: InferenceFramework.values)
+    ..pPM<ModelFileDescriptor>(4, _omitFieldNames ? '' : 'files',
+        subBuilder: ModelFileDescriptor.create)
+    ..aE<ModelCategory>(5, _omitFieldNames ? '' : 'category',
+        enumValues: ModelCategory.values)
+    ..aE<ModelFormat>(6, _omitFieldNames ? '' : 'format',
+        enumValues: ModelFormat.values)
+    ..aInt64(7, _omitFieldNames ? '' : 'memoryRequiredBytes')
+    ..aInt64(8, _omitFieldNames ? '' : 'downloadSizeBytes')
+    ..aI(9, _omitFieldNames ? '' : 'contextLength')
+    ..aOB(10, _omitFieldNames ? '' : 'supportsThinking')
+    ..aOB(11, _omitFieldNames ? '' : 'supportsLora')
+    ..aOS(12, _omitFieldNames ? '' : 'description')
+    ..aE<ModelSource>(13, _omitFieldNames ? '' : 'source',
+        enumValues: ModelSource.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RegisterMultiFileModelRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RegisterMultiFileModelRequest copyWith(
+          void Function(RegisterMultiFileModelRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as RegisterMultiFileModelRequest))
+          as RegisterMultiFileModelRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RegisterMultiFileModelRequest create() =>
+      RegisterMultiFileModelRequest._();
+  @$core.override
+  RegisterMultiFileModelRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RegisterMultiFileModelRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RegisterMultiFileModelRequest>(create);
+  static RegisterMultiFileModelRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  InferenceFramework get framework => $_getN(2);
+  @$pb.TagNumber(3)
+  set framework(InferenceFramework value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFramework() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFramework() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<ModelFileDescriptor> get files => $_getList(3);
+
+  @$pb.TagNumber(5)
+  ModelCategory get category => $_getN(4);
+  @$pb.TagNumber(5)
+  set category(ModelCategory value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCategory() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCategory() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  ModelFormat get format => $_getN(5);
+  @$pb.TagNumber(6)
+  set format(ModelFormat value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasFormat() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFormat() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get memoryRequiredBytes => $_getI64(6);
+  @$pb.TagNumber(7)
+  set memoryRequiredBytes($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasMemoryRequiredBytes() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMemoryRequiredBytes() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get downloadSizeBytes => $_getI64(7);
+  @$pb.TagNumber(8)
+  set downloadSizeBytes($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasDownloadSizeBytes() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearDownloadSizeBytes() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get contextLength => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set contextLength($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasContextLength() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearContextLength() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get supportsThinking => $_getBF(9);
+  @$pb.TagNumber(10)
+  set supportsThinking($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasSupportsThinking() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSupportsThinking() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.bool get supportsLora => $_getBF(10);
+  @$pb.TagNumber(11)
+  set supportsLora($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasSupportsLora() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearSupportsLora() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get description => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set description($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasDescription() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearDescription() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  ModelSource get source => $_getN(12);
+  @$pb.TagNumber(13)
+  set source(ModelSource value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasSource() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearSource() => $_clearField(13);
 }
 
 /// Logical ModelRegistry service contract. Platform adapters remain

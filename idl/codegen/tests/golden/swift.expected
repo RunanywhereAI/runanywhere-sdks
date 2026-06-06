@@ -88,34 +88,34 @@ extension RARacTestConfig {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
         if nameString.isEmpty {
-        throw SDKException.validationFailed(
-            fieldPath: "RacTestConfig.name_string",
-            message: "name_string is required"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "RacTestConfig.name_string",
+                message: "name_string is required"
+            )
         }
         if retriesInt32 < 0 || retriesInt32 > 10 {
-        throw SDKException.validationFailed(
-            fieldPath: "RacTestConfig.retries_int32",
-            message: "retries_int32 must be in 0...10 (got \(retriesInt32))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "RacTestConfig.retries_int32",
+                message: "retries_int32 must be in 0...10 (got \(retriesInt32))"
+            )
         }
         if limitInt64 < 1 || limitInt64 > 65536 {
-        throw SDKException.validationFailed(
-            fieldPath: "RacTestConfig.limit_int64",
-            message: "limit_int64 must be in 1...65536 (got \(limitInt64))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "RacTestConfig.limit_int64",
+                message: "limit_int64 must be in 1...65536 (got \(limitInt64))"
+            )
         }
         if thresholdFloat < 0.0 || thresholdFloat > 1.0 {
-        throw SDKException.validationFailed(
-            fieldPath: "RacTestConfig.threshold_float",
-            message: "threshold_float must be in 0.0...1.0 (got \(thresholdFloat))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "RacTestConfig.threshold_float",
+                message: "threshold_float must be in 0.0...1.0 (got \(thresholdFloat))"
+            )
         }
         if precisionDouble < 0.0 || precisionDouble > 1.0 {
-        throw SDKException.validationFailed(
-            fieldPath: "RacTestConfig.precision_double",
-            message: "precision_double must be in 0.0...1.0 (got \(precisionDouble))"
-        )
+            throw SDKException.validationFailed(
+                fieldPath: "RacTestConfig.precision_double",
+                message: "precision_double must be in 0.0...1.0 (got \(precisionDouble))"
+            )
         }
     }
 }

@@ -47,6 +47,8 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::HybridRoutingContext
         {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
+        // ::runanywhere::v1::CloudSttBackendConfig
+        {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::HybridSttTranscribeOptions
         {&::_pbi::kDescriptorMethods, &::descriptor_table_hybrid_5frouter_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::HybridSttTranscribeRequest
@@ -168,7 +170,7 @@ constexpr auto HybridSttTranscribeOptions::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
+      &file_reflection_data[10],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -1002,6 +1004,201 @@ const ::_pbi::ClassData* ConfidenceCascade_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class CloudSttBackendConfig::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<CloudSttBackendConfig>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_._has_bits_);
+};
+
+constexpr CloudSttBackendConfig::ParseTableT_ CloudSttBackendConfig::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_._has_bits_),
+      0, // no _extensions_
+      6, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967232,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      6,  // num_field_entries
+      0,  // num_aux_entries
+      offsetof(ParseTableT_, field_names),  // no aux_entries
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::CloudSttBackendConfig>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // string provider = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.provider_)}},
+      // string model = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.model_)}},
+      // string api_key = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 2, 0,
+        PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.api_key_)}},
+      // string language_code = 4;
+      {::_pbi::TcParser::FastUS1,
+       {34, 3, 0,
+        PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.language_code_)}},
+      // string base_url = 5;
+      {::_pbi::TcParser::FastUS1,
+       {42, 4, 0,
+        PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.base_url_)}},
+      // int32 timeout_ms = 6;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(CloudSttBackendConfig, _impl_.timeout_ms_), 5>(),
+       {48, 5, 0,
+        PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.timeout_ms_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string provider = 1;
+      {PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.provider_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string model = 2;
+      {PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.model_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string api_key = 3;
+      {PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.api_key_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string language_code = 4;
+      {PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.language_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string base_url = 5;
+      {PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.base_url_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 timeout_ms = 6;
+      {PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_.timeout_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    }},
+    // no aux_entries
+    {{
+      "\44\10\5\7\15\10\0\0"
+      "runanywhere.v1.CloudSttBackendConfig"
+      "provider"
+      "model"
+      "api_key"
+      "language_code"
+      "base_url"
+    }},
+  };
+}
+
+
+inline constexpr CloudSttBackendConfig::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        provider_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        model_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        api_key_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        language_code_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        base_url_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        timeout_ms_{0} {}
+
+template <typename>
+constexpr CloudSttBackendConfig::CloudSttBackendConfig(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL CloudSttBackendConfig::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) CloudSttBackendConfig(arena);
+}
+constexpr auto CloudSttBackendConfig::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(CloudSttBackendConfig), alignof(CloudSttBackendConfig));
+}
+constexpr auto CloudSttBackendConfig::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &CloudSttBackendConfig::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<CloudSttBackendConfig>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &CloudSttBackendConfig::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<CloudSttBackendConfig>(), &CloudSttBackendConfig::ByteSizeLong,
+              &CloudSttBackendConfig::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(CloudSttBackendConfig, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[9],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_hybrid_5frouter_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct CloudSttBackendConfigGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr CloudSttBackendConfigGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 CloudSttBackendConfig_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(CloudSttBackendConfig::InternalGenerateClassData_(
+            _default, &CloudSttBackendConfig_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<CloudSttBackendConfig>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~CloudSttBackendConfigGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) CloudSttBackendConfig _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<CloudSttBackendConfig>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(CloudSttBackendConfigGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST CloudSttBackendConfigGlobalsTypeInternal CloudSttBackendConfig_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* CloudSttBackendConfig_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return CloudSttBackendConfig_globals_.GetClassData();
+#else
+  return CloudSttBackendConfig_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class BatteryFilter::_Internal {
  public:
   using HasBits = decltype(::std::declval<BatteryFilter>()._impl_._has_bits_);
@@ -1281,7 +1478,7 @@ constexpr auto HybridSttTranscribeResponse::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[11],
+      &file_reflection_data[12],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -1450,7 +1647,7 @@ constexpr auto HybridSttTranscribeRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[10],
+      &file_reflection_data[11],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_hybrid_5frouter_2eproto,
@@ -2049,6 +2246,21 @@ const ::uint32_t
         6,
         0x000, // bitmap
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_._has_bits_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_.provider_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_.model_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_.api_key_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_.language_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_.base_url_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CloudSttBackendConfig, _impl_.timeout_ms_),
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeOptions, _impl_._has_bits_),
         6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridSttTranscribeOptions, _impl_.language_),
@@ -2092,9 +2304,10 @@ static const ::_pbi::MigrationSchema
         {37, sizeof(::runanywhere::v1::HybridModelDescriptor)},
         {48, sizeof(::runanywhere::v1::HybridRoutedMetadata)},
         {65, sizeof(::runanywhere::v1::HybridRoutingContext)},
-        {66, sizeof(::runanywhere::v1::HybridSttTranscribeOptions)},
-        {75, sizeof(::runanywhere::v1::HybridSttTranscribeRequest)},
-        {84, sizeof(::runanywhere::v1::HybridSttTranscribeResponse)},
+        {66, sizeof(::runanywhere::v1::CloudSttBackendConfig)},
+        {81, sizeof(::runanywhere::v1::HybridSttTranscribeOptions)},
+        {90, sizeof(::runanywhere::v1::HybridSttTranscribeRequest)},
+        {99, sizeof(::runanywhere::v1::HybridSttTranscribeResponse)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2107,6 +2320,7 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::HybridModelDescriptor_globals_,
         &::runanywhere::v1::HybridRoutedMetadata_globals_,
         &::runanywhere::v1::HybridRoutingContext_globals_,
+        &::runanywhere::v1::CloudSttBackendConfig_globals_,
         &::runanywhere::v1::HybridSttTranscribeOptions_globals_,
         &::runanywhere::v1::HybridSttTranscribeRequest_globals_,
         &::runanywhere::v1::HybridSttTranscribeResponse_globals_,
@@ -2140,48 +2354,51 @@ const char descriptor_table_protodef_hybrid_5frouter_2eproto[] ABSL_ATTRIBUTE_SE
     "idence\030\007 \001(\002\"q\n\024HybridRoutingContextJ\004\010\001"
     "\020\002J\004\010\002\020\003J\004\010\003\020\004J\004\010\004\020\005R\tis_onlineR\022input_i"
     "s_sensitiveR\017battery_percentR\021thermal_th"
-    "rottled\"Y\n\032HybridSttTranscribeOptions\022\020\n"
-    "\010language\030\001 \001(\t\022\023\n\013sample_rate\030\002 \001(\005\022\024\n\014"
-    "audio_format\030\003 \001(\005\"\245\001\n\032HybridSttTranscri"
-    "beRequest\022\023\n\013audio_bytes\030\001 \001(\014\0225\n\007contex"
-    "t\030\002 \001(\0132$.runanywhere.v1.HybridRoutingCo"
-    "ntext\022;\n\007options\030\003 \001(\0132*.runanywhere.v1."
-    "HybridSttTranscribeOptions\"\234\001\n\033HybridStt"
-    "TranscribeResponse\022\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002"
-    " \001(\t\022\031\n\021detected_language\030\003 \001(\t\0225\n\007routi"
-    "ng\030\004 \001(\0132$.runanywhere.v1.HybridRoutedMe"
-    "tadata\022\021\n\terror_msg\030\005 \001(\t*\274\001\n\020HybridCapa"
-    "bility\022!\n\035HYBRID_CAPABILITY_UNSPECIFIED\020"
-    "\000\022\031\n\025HYBRID_CAPABILITY_LLM\020\001\022\031\n\025HYBRID_C"
-    "APABILITY_VLM\020\002\022\031\n\025HYBRID_CAPABILITY_STT"
-    "\020\003\022\031\n\025HYBRID_CAPABILITY_TTS\020\004\022\031\n\025HYBRID_"
-    "CAPABILITY_VAD\020\005*\244\001\n\021HybridBackendKind\022\036"
-    "\n\032HYBRID_BACKEND_UNSPECIFIED\020\000\022\033\n\027HYBRID"
-    "_BACKEND_LLAMACPP\020\001\022\035\n\031HYBRID_BACKEND_OP"
-    "ENROUTER\020\002\022\031\n\025HYBRID_BACKEND_SHERPA\020\003\022\030\n"
-    "\024HYBRID_BACKEND_CLOUD\020\004*q\n\017HybridModelTy"
-    "pe\022!\n\035HYBRID_MODEL_TYPE_UNSPECIFIED\020\000\022\035\n"
-    "\031HYBRID_MODEL_TYPE_OFFLINE\020\001\022\034\n\030HYBRID_M"
-    "ODEL_TYPE_ONLINE\020\002*r\n\nHybridRank\022\033\n\027HYBR"
-    "ID_RANK_UNSPECIFIED\020\000\022\"\n\036HYBRID_RANK_PRE"
-    "FER_LOCAL_FIRST\020\001\022#\n\037HYBRID_RANK_PREFER_"
-    "ONLINE_FIRST\020\002B\214\001\n\027ai.runanywhere.proto."
-    "v1B\021HybridRouterProtoP\001Z<github.com/runa"
-    "nywhere/runanywhere-sdks/idl/v1;runanywh"
-    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
-    "roto3"
+    "rottled\"\206\001\n\025CloudSttBackendConfig\022\020\n\010pro"
+    "vider\030\001 \001(\t\022\r\n\005model\030\002 \001(\t\022\017\n\007api_key\030\003 "
+    "\001(\t\022\025\n\rlanguage_code\030\004 \001(\t\022\020\n\010base_url\030\005"
+    " \001(\t\022\022\n\ntimeout_ms\030\006 \001(\005\"Y\n\032HybridSttTra"
+    "nscribeOptions\022\020\n\010language\030\001 \001(\t\022\023\n\013samp"
+    "le_rate\030\002 \001(\005\022\024\n\014audio_format\030\003 \001(\005\"\245\001\n\032"
+    "HybridSttTranscribeRequest\022\023\n\013audio_byte"
+    "s\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$.runanywhere.v"
+    "1.HybridRoutingContext\022;\n\007options\030\003 \001(\0132"
+    "*.runanywhere.v1.HybridSttTranscribeOpti"
+    "ons\"\234\001\n\033HybridSttTranscribeResponse\022\n\n\002r"
+    "c\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021detected_langua"
+    "ge\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132$.runanywhere."
+    "v1.HybridRoutedMetadata\022\021\n\terror_msg\030\005 \001"
+    "(\t*\274\001\n\020HybridCapability\022!\n\035HYBRID_CAPABI"
+    "LITY_UNSPECIFIED\020\000\022\031\n\025HYBRID_CAPABILITY_"
+    "LLM\020\001\022\031\n\025HYBRID_CAPABILITY_VLM\020\002\022\031\n\025HYBR"
+    "ID_CAPABILITY_STT\020\003\022\031\n\025HYBRID_CAPABILITY"
+    "_TTS\020\004\022\031\n\025HYBRID_CAPABILITY_VAD\020\005*\244\001\n\021Hy"
+    "bridBackendKind\022\036\n\032HYBRID_BACKEND_UNSPEC"
+    "IFIED\020\000\022\033\n\027HYBRID_BACKEND_LLAMACPP\020\001\022\035\n\031"
+    "HYBRID_BACKEND_OPENROUTER\020\002\022\031\n\025HYBRID_BA"
+    "CKEND_SHERPA\020\003\022\030\n\024HYBRID_BACKEND_CLOUD\020\004"
+    "*q\n\017HybridModelType\022!\n\035HYBRID_MODEL_TYPE"
+    "_UNSPECIFIED\020\000\022\035\n\031HYBRID_MODEL_TYPE_OFFL"
+    "INE\020\001\022\034\n\030HYBRID_MODEL_TYPE_ONLINE\020\002*r\n\nH"
+    "ybridRank\022\033\n\027HYBRID_RANK_UNSPECIFIED\020\000\022\""
+    "\n\036HYBRID_RANK_PREFER_LOCAL_FIRST\020\001\022#\n\037HY"
+    "BRID_RANK_PREFER_ONLINE_FIRST\020\002B\214\001\n\027ai.r"
+    "unanywhere.proto.v1B\021HybridRouterProtoP\001"
+    "Z<github.com/runanywhere/runanywhere-sdk"
+    "s/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runan"
+    "ywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_hybrid_5frouter_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5frouter_2eproto = {
     false,
     false,
-    2245,
+    2382,
     descriptor_table_protodef_hybrid_5frouter_2eproto,
     "hybrid_router.proto",
     &descriptor_table_hybrid_5frouter_2eproto_once,
     nullptr,
     0,
-    12,
+    13,
     schemas,
     file_message_globals,
     TableStruct_hybrid_5frouter_2eproto::offsets,
@@ -4511,6 +4728,382 @@ PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const HybridRoutingContext::ParseTableT_
 
 ::google::protobuf::Metadata HybridRoutingContext::GetMetadata() const {
   return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+CloudSttBackendConfig::CloudSttBackendConfig(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, CloudSttBackendConfig_get_class_data()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.CloudSttBackendConfig)
+}
+PROTOBUF_NDEBUG_INLINE CloudSttBackendConfig::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::CloudSttBackendConfig& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        provider_(arena, from.provider_),
+        model_(arena, from.model_),
+        api_key_(arena, from.api_key_),
+        language_code_(arena, from.language_code_),
+        base_url_(arena, from.base_url_) {}
+
+CloudSttBackendConfig::CloudSttBackendConfig(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const CloudSttBackendConfig& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, CloudSttBackendConfig_get_class_data()) {
+
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  CloudSttBackendConfig* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.timeout_ms_ = from._impl_.timeout_ms_;
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.CloudSttBackendConfig)
+}
+PROTOBUF_NDEBUG_INLINE CloudSttBackendConfig::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        provider_(arena),
+        model_(arena),
+        api_key_(arena),
+        language_code_(arena),
+        base_url_(arena) {}
+
+inline void CloudSttBackendConfig::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.timeout_ms_ = {};
+}
+CloudSttBackendConfig::~CloudSttBackendConfig() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.CloudSttBackendConfig)
+  SharedDtor(*this);
+}
+inline void CloudSttBackendConfig::SharedDtor(MessageLite& self) {
+  CloudSttBackendConfig& this_ = static_cast<CloudSttBackendConfig&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.provider_.Destroy();
+  this_._impl_.model_.Destroy();
+  this_._impl_.api_key_.Destroy();
+  this_._impl_.language_code_.Destroy();
+  this_._impl_.base_url_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull CloudSttBackendConfig_class_data_ =
+        CloudSttBackendConfig::InternalGenerateClassData_(CloudSttBackendConfig_globals_._default);
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+CloudSttBackendConfig::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&CloudSttBackendConfig_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(CloudSttBackendConfig_class_data_.tc_table);
+  return CloudSttBackendConfig_class_data_.base();
+}
+#else
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+CloudSttBackendConfig::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&CloudSttBackendConfig_globals_);
+  ::google::protobuf::internal::PrefetchToLocalCache(
+      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&CloudSttBackendConfig_globals_));
+  return CloudSttBackendConfig_globals_.GetClassData();
+}
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const CloudSttBackendConfig::ParseTableT_
+    CloudSttBackendConfig::_table_ =
+        CloudSttBackendConfig::InternalGenerateParseTable_(CloudSttBackendConfig_class_data_.base());
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void CloudSttBackendConfig::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.CloudSttBackendConfig)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.provider_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.model_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.api_key_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.language_code_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _impl_.base_url_.ClearNonDefaultToEmpty();
+    }
+  }
+  _impl_.timeout_ms_ = 0;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL CloudSttBackendConfig::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const CloudSttBackendConfig& this_ = static_cast<const CloudSttBackendConfig&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL CloudSttBackendConfig::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const CloudSttBackendConfig& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.CloudSttBackendConfig)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string provider = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_provider().empty()) {
+      const ::std::string& _s = this_._internal_provider();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.CloudSttBackendConfig.provider");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // string model = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_model().empty()) {
+      const ::std::string& _s = this_._internal_model();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.CloudSttBackendConfig.model");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  // string api_key = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (!this_._internal_api_key().empty()) {
+      const ::std::string& _s = this_._internal_api_key();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.CloudSttBackendConfig.api_key");
+      target = stream->WriteStringMaybeAliased(3, _s, target);
+    }
+  }
+
+  // string language_code = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (!this_._internal_language_code().empty()) {
+      const ::std::string& _s = this_._internal_language_code();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.CloudSttBackendConfig.language_code");
+      target = stream->WriteStringMaybeAliased(4, _s, target);
+    }
+  }
+
+  // string base_url = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (!this_._internal_base_url().empty()) {
+      const ::std::string& _s = this_._internal_base_url();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.CloudSttBackendConfig.base_url");
+      target = stream->WriteStringMaybeAliased(5, _s, target);
+    }
+  }
+
+  // int32 timeout_ms = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_timeout_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
+              stream, this_._internal_timeout_ms(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.CloudSttBackendConfig)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t CloudSttBackendConfig::ByteSizeLong(const MessageLite& base) {
+  const CloudSttBackendConfig& this_ = static_cast<const CloudSttBackendConfig&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t CloudSttBackendConfig::ByteSizeLong() const {
+  const CloudSttBackendConfig& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.CloudSttBackendConfig)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // string provider = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_provider().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_provider());
+      }
+    }
+    // string model = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_model().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_model());
+      }
+    }
+    // string api_key = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!this_._internal_api_key().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_api_key());
+      }
+    }
+    // string language_code = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!this_._internal_language_code().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_language_code());
+      }
+    }
+    // string base_url = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (!this_._internal_base_url().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_base_url());
+      }
+    }
+    // int32 timeout_ms = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_timeout_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_timeout_ms());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void CloudSttBackendConfig::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<CloudSttBackendConfig*>(&to_msg);
+  auto& from = static_cast<const CloudSttBackendConfig&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.CloudSttBackendConfig)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_provider().empty()) {
+        _this->_internal_set_provider(from._internal_provider());
+      } else {
+        if (_this->_impl_.provider_.IsDefault()) {
+          _this->_internal_set_provider("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_model().empty()) {
+        _this->_internal_set_model(from._internal_model());
+      } else {
+        if (_this->_impl_.model_.IsDefault()) {
+          _this->_internal_set_model("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!from._internal_api_key().empty()) {
+        _this->_internal_set_api_key(from._internal_api_key());
+      } else {
+        if (_this->_impl_.api_key_.IsDefault()) {
+          _this->_internal_set_api_key("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!from._internal_language_code().empty()) {
+        _this->_internal_set_language_code(from._internal_language_code());
+      } else {
+        if (_this->_impl_.language_code_.IsDefault()) {
+          _this->_internal_set_language_code("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (!from._internal_base_url().empty()) {
+        _this->_internal_set_base_url(from._internal_base_url());
+      } else {
+        if (_this->_impl_.base_url_.IsDefault()) {
+          _this->_internal_set_base_url("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_timeout_ms() != 0) {
+        _this->_impl_.timeout_ms_ = from._impl_.timeout_ms_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void CloudSttBackendConfig::CopyFrom(const CloudSttBackendConfig& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.CloudSttBackendConfig)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void CloudSttBackendConfig::InternalSwap(CloudSttBackendConfig* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.provider_, &other->_impl_.provider_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_, &other->_impl_.model_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.api_key_, &other->_impl_.api_key_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_code_, &other->_impl_.language_code_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.base_url_, &other->_impl_.base_url_, arena);
+  swap(_impl_.timeout_ms_, other->_impl_.timeout_ms_);
+}
+
+::google::protobuf::Metadata CloudSttBackendConfig::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 

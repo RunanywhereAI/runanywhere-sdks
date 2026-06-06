@@ -35,25 +35,21 @@ import {
 } from '../../../runtime/EmscriptenModule';
 import type { HybridWasmModule } from './HybridWasmModule';
 import { DEFAULT_CLOUD_PROVIDER } from './HybridTypes';
+import { CloudSttBackendConfig } from '@runanywhere/proto-ts/hybrid_router';
 
 const logger = new SDKLogger('CloudSTT');
 
-/** A registered cloud-STT model entry. Mirrors Swift's `CloudSTT.ModelEntry`
- * / Kotlin's `CloudModelEntry`. */
+/** A registered cloud-STT model entry: the app-chosen registry `id` plus the
+ * generated `CloudSttBackendConfig` (provider/model/apiKey/languageCode/baseUrl/
+ * timeoutMs). The backend config carries exactly the fields the cloud engine
+ * reads out of `config_json`, so it is reused directly instead of re-declaring
+ * those fields here. Mirrors Swift's `CloudSTT.ModelEntry` / Kotlin's
+ * `CloudModelEntry`. */
 export interface CloudModelEntry {
+  /** App-chosen registry id (becomes the online HybridModel id). */
   id: string;
-  /** Concrete cloud STT provider ("sarvam" by default). */
-  provider: string;
-  /** Provider model id (e.g. "saaras:v2.5"). */
-  model: string;
-  /** Provider API subscription key. Sensitive; never logged. */
-  apiKey: string;
-  /** Optional BCP-47 hint; omitted ⇒ engine auto-detects. */
-  languageCode?: string;
-  /** Optional endpoint override. */
-  baseURL?: string;
-  /** Optional request timeout in milliseconds. */
-  timeoutMs?: number;
+  /** The cloud backend registration config handed to the cloud engine. */
+  backend: CloudSttBackendConfig;
 }
 
 /** Options accepted by `CloudSTT.register` / the `cloud({...})` config helper. */
@@ -90,12 +86,14 @@ export function cloud(config: CloudSTTConfig): CloudModelEntry {
   if (!provider) throw new Error('CloudSTT cloud(): provider must be non-empty');
   return {
     id: config.id,
-    provider,
-    model: config.model,
-    apiKey: config.apiKey,
-    languageCode: config.languageCode,
-    baseURL: config.baseURL,
-    timeoutMs: config.timeoutMs,
+    backend: CloudSttBackendConfig.fromPartial({
+      provider,
+      model: config.model,
+      apiKey: config.apiKey,
+      languageCode: config.languageCode ?? '',
+      baseUrl: config.baseURL ?? '',
+      timeoutMs: config.timeoutMs ?? 0,
+    }),
   };
 }
 
@@ -144,17 +142,10 @@ export const CloudSTT = {
    * from `onlineCloud(id)`. Accepts either a `CloudSTTConfig` or a pre-built
    * `CloudModelEntry` from `cloud(...)`. */
   register(config: CloudSTTConfig | CloudModelEntry): void {
-    const entry = 'provider' in config && typeof config.provider === 'string'
-      ? cloud({
-          id: config.id,
-          model: config.model,
-          apiKey: config.apiKey,
-          provider: config.provider,
-          languageCode: config.languageCode,
-          baseURL: 'baseURL' in config ? config.baseURL : undefined,
-          timeoutMs: config.timeoutMs,
-        })
-      : cloud(config as CloudSTTConfig);
+    // A pre-built CloudModelEntry already carries the typed `backend` config;
+    // a CloudSTTConfig is the ergonomic input shape that `cloud(...)` validates.
+    const entry: CloudModelEntry =
+      'backend' in config ? config : cloud(config);
     registry.set(entry.id, entry);
     // Best-effort: ensure the engine plugin is registered at the same point
     // the app records credentials (symmetric to Kotlin's ensurePluginRegistered).
@@ -194,16 +185,23 @@ export const CloudSTT = {
           `CloudSTT.register({ id, provider, model, apiKey }) at app startup.`,
       );
     }
-    // Sorted keys so the JSON is byte-stable across SDKs (matches Swift's
-    // JSONSerialization .sortedKeys), which keeps cache keys / logs aligned.
+    // The cloud engine parses snake_case keys out of config_json
+    // (config_json["api_key"], ["language_code"], ["base_url"], ["timeout_ms"];
+    // see engines/cloud/rac_stt_cloud.cpp). The generated CloudSttBackendConfig
+    // .toJSON() emits camelCase, so the snake_case wire object is projected from
+    // the typed proto message rather than hand-assembled from loose strings.
+    // Sorted/conditional keys keep the JSON byte-stable across SDKs (matches
+    // Swift's JSONSerialization .sortedKeys), which keeps cache keys / logs
+    // aligned.
+    const cfg = entry.backend;
     const json: Record<string, string | number> = {
-      api_key: entry.apiKey,
-      model: entry.model,
-      provider: entry.provider,
+      api_key: cfg.apiKey,
+      model: cfg.model,
+      provider: cfg.provider,
     };
-    if (entry.languageCode) json.language_code = entry.languageCode;
-    if (entry.baseURL) json.base_url = entry.baseURL;
-    if (entry.timeoutMs !== undefined) json.timeout_ms = entry.timeoutMs;
+    if (cfg.languageCode) json.language_code = cfg.languageCode;
+    if (cfg.baseUrl) json.base_url = cfg.baseUrl;
+    if (cfg.timeoutMs) json.timeout_ms = cfg.timeoutMs;
     return JSON.stringify(json);
   },
 };

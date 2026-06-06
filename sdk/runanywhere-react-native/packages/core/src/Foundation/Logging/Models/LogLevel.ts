@@ -1,15 +1,11 @@
 /**
  * LogLevel.ts
  *
- * Log severity levels for the SDK.
- *
- * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Logging/Models/LogLevel.swift`.
+ * Log severity levels for the SDK. Re-exports the generated `LogLevel` from
+ * `@runanywhere/proto-ts/logging` so the SDK shares the exact C-ABI numbering
+ * (LOG_LEVEL_TRACE=0 .. LOG_LEVEL_FATAL=5) used across commons and the other
+ * SDKs. The relative ordering (trace < debug < info < warning < error < fatal)
+ * is what the level comparisons in LoggingManager / SentryDestination rely on.
  */
 
-export enum LogLevel {
-  Debug = 0,
-  Info = 1,
-  Warning = 2,
-  Error = 3,
-  Fault = 4,
-}
+export { LogLevel } from '@runanywhere/proto-ts/logging';

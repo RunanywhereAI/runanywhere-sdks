@@ -6,7 +6,7 @@
 // source: model_types.proto
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ArtifactInferFromUrlResult = exports.ArtifactInferFromUrlRequest = exports.ModelFormatFromUrlResult = exports.ModelFormatFromUrlRequest = exports.ModelCompatibilityResult = exports.ModelCompatibilityRequest = exports.ModelDeleteResult = exports.ModelDeleteRequest = exports.CurrentModelResult = exports.CurrentModelRequest = exports.ModelUnloadResult = exports.ModelUnloadRequest = exports.ModelLoadResult = exports.ModelLoadRequest = exports.ModelDiscoveryResult = exports.DiscoveredModel = exports.ModelDiscoveryRequest = exports.ModelImportResult = exports.ModelImportRequest = exports.ModelGetResult = exports.ModelGetRequest = exports.ModelListResult = exports.ModelListRequest = exports.ModelRegistryRefreshResult = exports.ModelRegistryRefreshRequest = exports.ModelQuery = exports.ExpectedModelFiles = exports.MultiFileArtifact = exports.ModelFileDescriptor = exports.ArchiveArtifact = exports.SingleFileArtifact = exports.ModelInfoList = exports.ModelInfo = exports.ModelRuntimeCompatibility = exports.ModelInfoMetadata = exports.RoutingPolicy = exports.ModelFileRole = exports.ModelQuerySortOrder = exports.ModelQuerySortField = exports.ModelRegistryStatus = exports.ModelArtifactType = exports.ArchiveStructure = exports.ArchiveType = exports.ModelSource = exports.SDKEnvironment = exports.ModelCategory = exports.InferenceFramework = exports.ModelFormat = exports.AudioFormat = exports.protobufPackage = void 0;
-exports.RegisterModelFromUrlRequest = exports.ModelInfoMakeRequest = exports.ModelRegistryFetchAssignmentsResult = exports.ModelRegistryFetchAssignmentsRequest = void 0;
+exports.RegisterMultiFileModelRequest = exports.RegisterModelFromUrlRequest = exports.ModelInfoMakeRequest = exports.ModelRegistryFetchAssignmentsResult = exports.ModelRegistryFetchAssignmentsRequest = void 0;
 exports.audioFormatFromJSON = audioFormatFromJSON;
 exports.audioFormatToJSON = audioFormatToJSON;
 exports.modelFormatFromJSON = modelFormatFromJSON;
@@ -7000,7 +7000,21 @@ exports.ModelInfoMakeRequest = {
     },
 };
 function createBaseRegisterModelFromUrlRequest() {
-    return { url: "", name: "", framework: undefined, category: undefined, source: undefined };
+    return {
+        url: "",
+        name: "",
+        framework: undefined,
+        category: undefined,
+        source: undefined,
+        memoryRequiredBytes: undefined,
+        supportsThinking: undefined,
+        supportsLora: undefined,
+        artifactType: undefined,
+        contextLength: undefined,
+        description: undefined,
+        downloadSizeBytes: undefined,
+        id: undefined,
+    };
 }
 exports.RegisterModelFromUrlRequest = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -7018,6 +7032,30 @@ exports.RegisterModelFromUrlRequest = {
         }
         if (message.source !== undefined) {
             writer.uint32(40).int32(message.source);
+        }
+        if (message.memoryRequiredBytes !== undefined) {
+            writer.uint32(48).int64(message.memoryRequiredBytes);
+        }
+        if (message.supportsThinking !== undefined) {
+            writer.uint32(56).bool(message.supportsThinking);
+        }
+        if (message.supportsLora !== undefined) {
+            writer.uint32(64).bool(message.supportsLora);
+        }
+        if (message.artifactType !== undefined) {
+            writer.uint32(72).int32(message.artifactType);
+        }
+        if (message.contextLength !== undefined) {
+            writer.uint32(80).int32(message.contextLength);
+        }
+        if (message.description !== undefined) {
+            writer.uint32(90).string(message.description);
+        }
+        if (message.downloadSizeBytes !== undefined) {
+            writer.uint32(96).int64(message.downloadSizeBytes);
+        }
+        if (message.id !== undefined) {
+            writer.uint32(106).string(message.id);
         }
         return writer;
     },
@@ -7063,6 +7101,62 @@ exports.RegisterModelFromUrlRequest = {
                     message.source = reader.int32();
                     continue;
                 }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.memoryRequiredBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.supportsThinking = reader.bool();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.supportsLora = reader.bool();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.artifactType = reader.int32();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.contextLength = reader.int32();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.description = reader.string();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 96) {
+                        break;
+                    }
+                    message.downloadSizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.id = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -7078,6 +7172,38 @@ exports.RegisterModelFromUrlRequest = {
             framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
             category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
             source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+            memoryRequiredBytes: isSet(object.memoryRequiredBytes)
+                ? globalThis.Number(object.memoryRequiredBytes)
+                : isSet(object.memory_required_bytes)
+                    ? globalThis.Number(object.memory_required_bytes)
+                    : undefined,
+            supportsThinking: isSet(object.supportsThinking)
+                ? globalThis.Boolean(object.supportsThinking)
+                : isSet(object.supports_thinking)
+                    ? globalThis.Boolean(object.supports_thinking)
+                    : undefined,
+            supportsLora: isSet(object.supportsLora)
+                ? globalThis.Boolean(object.supportsLora)
+                : isSet(object.supports_lora)
+                    ? globalThis.Boolean(object.supports_lora)
+                    : undefined,
+            artifactType: isSet(object.artifactType)
+                ? modelArtifactTypeFromJSON(object.artifactType)
+                : isSet(object.artifact_type)
+                    ? modelArtifactTypeFromJSON(object.artifact_type)
+                    : undefined,
+            contextLength: isSet(object.contextLength)
+                ? globalThis.Number(object.contextLength)
+                : isSet(object.context_length)
+                    ? globalThis.Number(object.context_length)
+                    : undefined,
+            description: isSet(object.description) ? globalThis.String(object.description) : undefined,
+            downloadSizeBytes: isSet(object.downloadSizeBytes)
+                ? globalThis.Number(object.downloadSizeBytes)
+                : isSet(object.download_size_bytes)
+                    ? globalThis.Number(object.download_size_bytes)
+                    : undefined,
+            id: isSet(object.id) ? globalThis.String(object.id) : undefined,
         };
     },
     toJSON(message) {
@@ -7097,6 +7223,30 @@ exports.RegisterModelFromUrlRequest = {
         if (message.source !== undefined) {
             obj.source = modelSourceToJSON(message.source);
         }
+        if (message.memoryRequiredBytes !== undefined) {
+            obj.memoryRequiredBytes = Math.round(message.memoryRequiredBytes);
+        }
+        if (message.supportsThinking !== undefined) {
+            obj.supportsThinking = message.supportsThinking;
+        }
+        if (message.supportsLora !== undefined) {
+            obj.supportsLora = message.supportsLora;
+        }
+        if (message.artifactType !== undefined) {
+            obj.artifactType = modelArtifactTypeToJSON(message.artifactType);
+        }
+        if (message.contextLength !== undefined) {
+            obj.contextLength = Math.round(message.contextLength);
+        }
+        if (message.description !== undefined) {
+            obj.description = message.description;
+        }
+        if (message.downloadSizeBytes !== undefined) {
+            obj.downloadSizeBytes = Math.round(message.downloadSizeBytes);
+        }
+        if (message.id !== undefined) {
+            obj.id = message.id;
+        }
         return obj;
     },
     create(base) {
@@ -7108,6 +7258,283 @@ exports.RegisterModelFromUrlRequest = {
         message.name = object.name ?? "";
         message.framework = object.framework ?? undefined;
         message.category = object.category ?? undefined;
+        message.source = object.source ?? undefined;
+        message.memoryRequiredBytes = object.memoryRequiredBytes ?? undefined;
+        message.supportsThinking = object.supportsThinking ?? undefined;
+        message.supportsLora = object.supportsLora ?? undefined;
+        message.artifactType = object.artifactType ?? undefined;
+        message.contextLength = object.contextLength ?? undefined;
+        message.description = object.description ?? undefined;
+        message.downloadSizeBytes = object.downloadSizeBytes ?? undefined;
+        message.id = object.id ?? undefined;
+        return message;
+    },
+};
+function createBaseRegisterMultiFileModelRequest() {
+    return {
+        id: "",
+        name: "",
+        framework: 0,
+        files: [],
+        category: undefined,
+        format: undefined,
+        memoryRequiredBytes: undefined,
+        downloadSizeBytes: undefined,
+        contextLength: undefined,
+        supportsThinking: undefined,
+        supportsLora: undefined,
+        description: undefined,
+        source: undefined,
+    };
+}
+exports.RegisterMultiFileModelRequest = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.id !== "") {
+            writer.uint32(10).string(message.id);
+        }
+        if (message.name !== "") {
+            writer.uint32(18).string(message.name);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(24).int32(message.framework);
+        }
+        for (const v of message.files) {
+            exports.ModelFileDescriptor.encode(v, writer.uint32(34).fork()).join();
+        }
+        if (message.category !== undefined) {
+            writer.uint32(40).int32(message.category);
+        }
+        if (message.format !== undefined) {
+            writer.uint32(48).int32(message.format);
+        }
+        if (message.memoryRequiredBytes !== undefined) {
+            writer.uint32(56).int64(message.memoryRequiredBytes);
+        }
+        if (message.downloadSizeBytes !== undefined) {
+            writer.uint32(64).int64(message.downloadSizeBytes);
+        }
+        if (message.contextLength !== undefined) {
+            writer.uint32(72).int32(message.contextLength);
+        }
+        if (message.supportsThinking !== undefined) {
+            writer.uint32(80).bool(message.supportsThinking);
+        }
+        if (message.supportsLora !== undefined) {
+            writer.uint32(88).bool(message.supportsLora);
+        }
+        if (message.description !== undefined) {
+            writer.uint32(98).string(message.description);
+        }
+        if (message.source !== undefined) {
+            writer.uint32(104).int32(message.source);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseRegisterMultiFileModelRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.id = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.name = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.files.push(exports.ModelFileDescriptor.decode(reader, reader.uint32()));
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.category = reader.int32();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.format = reader.int32();
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.memoryRequiredBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.downloadSizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.contextLength = reader.int32();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.supportsThinking = reader.bool();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.supportsLora = reader.bool();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.description = reader.string();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.source = reader.int32();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            id: isSet(object.id) ? globalThis.String(object.id) : "",
+            name: isSet(object.name) ? globalThis.String(object.name) : "",
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
+            files: globalThis.Array.isArray(object?.files)
+                ? object.files.map((e) => exports.ModelFileDescriptor.fromJSON(e))
+                : [],
+            category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+            format: isSet(object.format) ? modelFormatFromJSON(object.format) : undefined,
+            memoryRequiredBytes: isSet(object.memoryRequiredBytes)
+                ? globalThis.Number(object.memoryRequiredBytes)
+                : isSet(object.memory_required_bytes)
+                    ? globalThis.Number(object.memory_required_bytes)
+                    : undefined,
+            downloadSizeBytes: isSet(object.downloadSizeBytes)
+                ? globalThis.Number(object.downloadSizeBytes)
+                : isSet(object.download_size_bytes)
+                    ? globalThis.Number(object.download_size_bytes)
+                    : undefined,
+            contextLength: isSet(object.contextLength)
+                ? globalThis.Number(object.contextLength)
+                : isSet(object.context_length)
+                    ? globalThis.Number(object.context_length)
+                    : undefined,
+            supportsThinking: isSet(object.supportsThinking)
+                ? globalThis.Boolean(object.supportsThinking)
+                : isSet(object.supports_thinking)
+                    ? globalThis.Boolean(object.supports_thinking)
+                    : undefined,
+            supportsLora: isSet(object.supportsLora)
+                ? globalThis.Boolean(object.supportsLora)
+                : isSet(object.supports_lora)
+                    ? globalThis.Boolean(object.supports_lora)
+                    : undefined,
+            description: isSet(object.description) ? globalThis.String(object.description) : undefined,
+            source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.id !== "") {
+            obj.id = message.id;
+        }
+        if (message.name !== "") {
+            obj.name = message.name;
+        }
+        if (message.framework !== 0) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.files?.length) {
+            obj.files = message.files.map((e) => exports.ModelFileDescriptor.toJSON(e));
+        }
+        if (message.category !== undefined) {
+            obj.category = modelCategoryToJSON(message.category);
+        }
+        if (message.format !== undefined) {
+            obj.format = modelFormatToJSON(message.format);
+        }
+        if (message.memoryRequiredBytes !== undefined) {
+            obj.memoryRequiredBytes = Math.round(message.memoryRequiredBytes);
+        }
+        if (message.downloadSizeBytes !== undefined) {
+            obj.downloadSizeBytes = Math.round(message.downloadSizeBytes);
+        }
+        if (message.contextLength !== undefined) {
+            obj.contextLength = Math.round(message.contextLength);
+        }
+        if (message.supportsThinking !== undefined) {
+            obj.supportsThinking = message.supportsThinking;
+        }
+        if (message.supportsLora !== undefined) {
+            obj.supportsLora = message.supportsLora;
+        }
+        if (message.description !== undefined) {
+            obj.description = message.description;
+        }
+        if (message.source !== undefined) {
+            obj.source = modelSourceToJSON(message.source);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.RegisterMultiFileModelRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseRegisterMultiFileModelRequest();
+        message.id = object.id ?? "";
+        message.name = object.name ?? "";
+        message.framework = object.framework ?? 0;
+        message.files = object.files?.map((e) => exports.ModelFileDescriptor.fromPartial(e)) || [];
+        message.category = object.category ?? undefined;
+        message.format = object.format ?? undefined;
+        message.memoryRequiredBytes = object.memoryRequiredBytes ?? undefined;
+        message.downloadSizeBytes = object.downloadSizeBytes ?? undefined;
+        message.contextLength = object.contextLength ?? undefined;
+        message.supportsThinking = object.supportsThinking ?? undefined;
+        message.supportsLora = object.supportsLora ?? undefined;
+        message.description = object.description ?? undefined;
         message.source = object.source ?? undefined;
         return message;
     },

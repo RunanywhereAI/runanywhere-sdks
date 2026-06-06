@@ -109,7 +109,7 @@ public extension RASDKEnvironment {
     // MARK: - Environment-Specific Settings
 
     /// Determine logging verbosity based on environment.
-    var defaultLogLevel: LogLevel {
+    var defaultLogLevel: RALogLevel {
         switch self {
         case .development: return .debug
         case .staging:     return .info

@@ -20,8 +20,17 @@
 
 package com.runanywhere.sdk.public.hybrid
 
+import ai.runanywhere.proto.v1.HybridRank
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.Closeable
+
+/**
+ * Candidate comparator for a routing policy. Aliased to the generated
+ * [HybridRank] so the wire numbering is maintained in one place;
+ * [RACRouter.RoutingPolicy.PreferLocalFirst] /
+ * [RACRouter.RoutingPolicy.PreferOnlineFirst] expose the ergonomic names.
+ */
+typealias Rank = HybridRank
 
 /**
  * Multi-capability hybrid router.
@@ -74,12 +83,12 @@ class RACRouter internal constructor() : Closeable {
      * [RoutingPolicy.NETWORK], [RoutingPolicy.Quality],
      * [RoutingPolicy.Battery], [RoutingPolicy.CustomDefine]).
      *
-     * @property kind Wire tag (`HybridFilter.kind` in hybrid_router.proto).
+     * The wire shape is the generated `HybridFilter` oneof; the mapping from
+     * each concrete Kotlin filter to its proto field lives in
+     * [HybridRouterProto.policy], so no hand-maintained discriminator is needed
+     * here.
      */
-    interface Filter {
-        /** Discriminator for proto marshalling. */
-        val kind: Int
-    }
+    interface Filter
 
     /**
      * Mid-request fallback trigger. At most one cascade per policy. The
@@ -87,26 +96,11 @@ class RACRouter internal constructor() : Closeable {
      * a sub-threshold confidence signal, OR when the primary errors out
      * (errors are treated as "no confidence" at the C level).
      *
-     * @property kind Wire tag (`HybridCascade.kind` in hybrid_router.proto).
+     * The wire shape is the generated `HybridCascade` oneof; the mapping from
+     * each concrete Kotlin cascade to its proto field lives in
+     * [HybridRouterProto.policy].
      */
-    interface Cascade {
-        /** Discriminator for proto marshalling. */
-        val kind: Int
-    }
-
-    /**
-     * Comparator that orders eligible candidates. Exactly one rank per
-     * policy.
-     *
-     * @property value Wire value matching `HybridRank` in hybrid_router.proto.
-     */
-    enum class Rank(val value: Int) {
-        /** Prefer the offline candidate when both are eligible. */
-        PreferLocalFirst(1),
-
-        /** Prefer the online candidate when both are eligible. */
-        PreferOnlineFirst(2),
-    }
+    interface Cascade
 
     /**
      * Catalog of routing-policy primitives.
@@ -123,9 +117,7 @@ class RACRouter internal constructor() : Closeable {
          * by the SDK internally before each request — callers don't pass
          * it in.
          */
-        class NETWORK : Filter {
-            override val kind: Int = 1
-        }
+        class NETWORK : Filter
 
         /**
          * Filter: requires the candidate to meet at least [tier]. Reserved
@@ -135,9 +127,7 @@ class RACRouter internal constructor() : Closeable {
          *
          * @property tier Minimum tier the candidate must declare.
          */
-        class Quality(val tier: Int = 1) : Filter {
-            override val kind: Int = 3
-        }
+        class Quality(val tier: Int = 1) : Filter
 
         /**
          * Filter: drops online candidates when the device is below
@@ -146,9 +136,7 @@ class RACRouter internal constructor() : Closeable {
          * @property minPercent Minimum battery percentage (0–100) required
          *                      to keep the online candidate eligible.
          */
-        class Battery(val minPercent: Int = 20) : Filter {
-            override val kind: Int = 4
-        }
+        class Battery(val minPercent: Int = 20) : Filter
 
         /**
          * Filter: caller-supplied predicate. The router registers it by
@@ -172,9 +160,7 @@ class RACRouter internal constructor() : Closeable {
             val name: String,
             val description: String,
             val check: (modelId: String) -> Boolean,
-        ) : Filter {
-            override val kind: Int = 5
-        }
+        ) : Filter
 
         /**
          * Cascade: when the primary backend's confidence signal falls
@@ -185,21 +171,19 @@ class RACRouter internal constructor() : Closeable {
          * @property threshold Confidence value `[0..1]` below which the
          *                     cascade fires.
          */
-        class Confidence(val threshold: Float) : Cascade {
-            override val kind: Int = 1
-        }
+        class Confidence(val threshold: Float) : Cascade
 
         /**
          * Prefer the local (offline) candidate when both candidates pass
          * the filter phase.
          */
-        val PreferLocalFirst: Rank = Rank.PreferLocalFirst
+        val PreferLocalFirst: Rank = HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST
 
         /**
          * Prefer the online (cloud) candidate when both candidates pass
          * the filter phase.
          */
-        val PreferOnlineFirst: Rank = Rank.PreferOnlineFirst
+        val PreferOnlineFirst: Rank = HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST
     }
 
     /**
@@ -327,9 +311,9 @@ class RACRouter internal constructor() : Closeable {
          */
         fun addPair(model1: RACModel, model2: RACModel, routerPolicy: RouterPolicyBase) {
             check(nativeHandle != 0L) { "Call RACRouter.stt.init(...) first" }
-            val offModel = if (model1.modelType == ModelType.OFFLINE) model1 else model2
-            val onModel = if (model1.modelType == ModelType.ONLINE) model1 else model2
-            require(offModel.modelType == ModelType.OFFLINE && onModel.modelType == ModelType.ONLINE) {
+            val offModel = if (model1.modelType == ROUTER.OFFLINE) model1 else model2
+            val onModel = if (model1.modelType == ROUTER.ONLINE) model1 else model2
+            require(offModel.modelType == ROUTER.OFFLINE && onModel.modelType == ROUTER.ONLINE) {
                 "addPair requires one OFFLINE and one ONLINE model"
             }
             val offBackend = offlineBackend ?: error("init() not called")

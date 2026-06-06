@@ -251,6 +251,8 @@ export enum ErrorCode {
   ERROR_CODE_COST_LIMIT_EXCEEDED = 134,
   /** ERROR_CODE_INFERENCE_FAILED - RAC_ERROR_INFERENCE_FAILED */
   ERROR_CODE_INFERENCE_FAILED = 135,
+  /** ERROR_CODE_GENERATION_CANCELLED - RAC_ERROR_GENERATION_CANCELLED */
+  ERROR_CODE_GENERATION_CANCELLED = 136,
   /** ERROR_CODE_NETWORK_UNAVAILABLE - -- Network (-150..-179) ------------------------------------------------ */
   ERROR_CODE_NETWORK_UNAVAILABLE = 150,
   /** ERROR_CODE_NETWORK_ERROR - RAC_ERROR_NETWORK_ERROR */
@@ -427,6 +429,8 @@ export enum ErrorCode {
   ERROR_CODE_BACKEND_UNAVAILABLE = 604,
   /** ERROR_CODE_RUNTIME_UNAVAILABLE - RAC_ERROR_RUNTIME_UNAVAILABLE */
   ERROR_CODE_RUNTIME_UNAVAILABLE = 605,
+  /** ERROR_CODE_BACKEND_ERROR - RAC_ERROR_BACKEND_ERROR (generic backend failure) */
+  ERROR_CODE_BACKEND_ERROR = 606,
   /** ERROR_CODE_INVALID_HANDLE - RAC_ERROR_INVALID_HANDLE */
   ERROR_CODE_INVALID_HANDLE = 610,
   /** ERROR_CODE_EVENT_INVALID_CATEGORY - -- Event (-700..-799) ------------------------------------------------- */
@@ -537,6 +541,9 @@ export function errorCodeFromJSON(object: any): ErrorCode {
     case 135:
     case "ERROR_CODE_INFERENCE_FAILED":
       return ErrorCode.ERROR_CODE_INFERENCE_FAILED;
+    case 136:
+    case "ERROR_CODE_GENERATION_CANCELLED":
+      return ErrorCode.ERROR_CODE_GENERATION_CANCELLED;
     case 150:
     case "ERROR_CODE_NETWORK_UNAVAILABLE":
       return ErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE;
@@ -801,6 +808,9 @@ export function errorCodeFromJSON(object: any): ErrorCode {
     case 605:
     case "ERROR_CODE_RUNTIME_UNAVAILABLE":
       return ErrorCode.ERROR_CODE_RUNTIME_UNAVAILABLE;
+    case 606:
+    case "ERROR_CODE_BACKEND_ERROR":
+      return ErrorCode.ERROR_CODE_BACKEND_ERROR;
     case 610:
     case "ERROR_CODE_INVALID_HANDLE":
       return ErrorCode.ERROR_CODE_INVALID_HANDLE;
@@ -909,6 +919,8 @@ export function errorCodeToJSON(object: ErrorCode): string {
       return "ERROR_CODE_COST_LIMIT_EXCEEDED";
     case ErrorCode.ERROR_CODE_INFERENCE_FAILED:
       return "ERROR_CODE_INFERENCE_FAILED";
+    case ErrorCode.ERROR_CODE_GENERATION_CANCELLED:
+      return "ERROR_CODE_GENERATION_CANCELLED";
     case ErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE:
       return "ERROR_CODE_NETWORK_UNAVAILABLE";
     case ErrorCode.ERROR_CODE_NETWORK_ERROR:
@@ -1085,6 +1097,8 @@ export function errorCodeToJSON(object: ErrorCode): string {
       return "ERROR_CODE_BACKEND_UNAVAILABLE";
     case ErrorCode.ERROR_CODE_RUNTIME_UNAVAILABLE:
       return "ERROR_CODE_RUNTIME_UNAVAILABLE";
+    case ErrorCode.ERROR_CODE_BACKEND_ERROR:
+      return "ERROR_CODE_BACKEND_ERROR";
     case ErrorCode.ERROR_CODE_INVALID_HANDLE:
       return "ERROR_CODE_INVALID_HANDLE";
     case ErrorCode.ERROR_CODE_EVENT_INVALID_CATEGORY:
@@ -1182,7 +1196,16 @@ export interface ErrorContext {
    * we use the more generic "operation" name because some platforms (C++,
    * Swift) symbolicate the function name from the stack frame instead.
    */
-  operation?: string | undefined;
+  operation?:
+    | string
+    | undefined;
+  /**
+   * The structured field path a validation error refers to
+   * ("<Message>.<field>"). First-class replacement for the
+   * metadata["field_path"] magic key all five SDKs read/write today; the
+   * generated convenience validate() already emits this path.
+   */
+  fieldPath?: string | undefined;
 }
 
 export interface ErrorContext_MetadataEntry {
@@ -1272,7 +1295,7 @@ export interface SDKError {
 }
 
 function createBaseErrorContext(): ErrorContext {
-  return { metadata: {}, sourceFile: undefined, sourceLine: undefined, operation: undefined };
+  return { metadata: {}, sourceFile: undefined, sourceLine: undefined, operation: undefined, fieldPath: undefined };
 }
 
 export const ErrorContext: MessageFns<ErrorContext> = {
@@ -1288,6 +1311,9 @@ export const ErrorContext: MessageFns<ErrorContext> = {
     }
     if (message.operation !== undefined) {
       writer.uint32(34).string(message.operation);
+    }
+    if (message.fieldPath !== undefined) {
+      writer.uint32(42).string(message.fieldPath);
     }
     return writer;
   },
@@ -1334,6 +1360,14 @@ export const ErrorContext: MessageFns<ErrorContext> = {
           message.operation = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.fieldPath = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1365,6 +1399,11 @@ export const ErrorContext: MessageFns<ErrorContext> = {
         ? globalThis.Number(object.source_line)
         : undefined,
       operation: isSet(object.operation) ? globalThis.String(object.operation) : undefined,
+      fieldPath: isSet(object.fieldPath)
+        ? globalThis.String(object.fieldPath)
+        : isSet(object.field_path)
+        ? globalThis.String(object.field_path)
+        : undefined,
     };
   },
 
@@ -1388,6 +1427,9 @@ export const ErrorContext: MessageFns<ErrorContext> = {
     if (message.operation !== undefined) {
       obj.operation = message.operation;
     }
+    if (message.fieldPath !== undefined) {
+      obj.fieldPath = message.fieldPath;
+    }
     return obj;
   },
 
@@ -1408,6 +1450,7 @@ export const ErrorContext: MessageFns<ErrorContext> = {
     message.sourceFile = object.sourceFile ?? undefined;
     message.sourceLine = object.sourceLine ?? undefined;
     message.operation = object.operation ?? undefined;
+    message.fieldPath = object.fieldPath ?? undefined;
     return message;
   },
 };

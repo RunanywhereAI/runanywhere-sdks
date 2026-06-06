@@ -36,13 +36,13 @@ import { VAD as VADCapability } from './RunAnywhere+VAD';
 import { RAG as RAGCapability } from './RunAnywhere+RAG';
 import { VoiceAgent as VoiceAgentCapability } from './RunAnywhere+VoiceAgent';
 import { VisionLanguage as VisionLanguageCapability } from './RunAnywhere+VisionLanguage';
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import type { CancellableCall } from '../RunAnywhere';
 
 function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
   if (signal?.aborted) {
     throw SDKException.fromCode(
-      SDKErrorCode.GenerationCancelled,
+      -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
       `${verb} cancelled`,
       'AbortSignal was already aborted before the call was invoked',
     );

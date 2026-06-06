@@ -96,7 +96,7 @@ extension CppBridge {
             activeEnvironment.withLock { $0 = environment }
 
             let deviceId = CppBridge.Device.persistentId
-            let deviceInfo = DeviceInfo.current
+            let deviceInfo = DeviceInfoFactory.current
 
             let createdPtr: OpaquePointer? = deviceId.withCString { did in
                 SDKConstants.platform.withCString { plat in

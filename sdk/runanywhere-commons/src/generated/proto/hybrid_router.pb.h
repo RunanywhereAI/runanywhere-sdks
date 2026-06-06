@@ -73,6 +73,14 @@ extern const ::google::protobuf::internal::ClassDataFull BatteryFilter_class_dat
 #else
 extern const BatteryFilterGlobalsTypeInternal BatteryFilter_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
+class CloudSttBackendConfig;
+struct CloudSttBackendConfigGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern CloudSttBackendConfigGlobalsTypeInternal CloudSttBackendConfig_globals_;
+extern const ::google::protobuf::internal::ClassDataFull CloudSttBackendConfig_class_data_;
+#else
+extern const CloudSttBackendConfigGlobalsTypeInternal CloudSttBackendConfig_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
 class ConfidenceCascade;
 struct ConfidenceCascadeGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -415,7 +423,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeOptions final : 
   [[nodiscard]] static const HybridSttTranscribeOptions& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridSttTranscribeOptions>(&HybridSttTranscribeOptions_globals_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(HybridSttTranscribeOptions& a, HybridSttTranscribeOptions& b) { a.Swap(&b); }
   inline void Swap(HybridSttTranscribeOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1681,6 +1689,292 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConfidenceCascade final : public ::
 };
 // -------------------------------------------------------------------
 
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CloudSttBackendConfig final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.CloudSttBackendConfig) */ {
+ public:
+  inline CloudSttBackendConfig() : CloudSttBackendConfig(nullptr) {}
+  ~CloudSttBackendConfig() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(CloudSttBackendConfig* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(CloudSttBackendConfig));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr CloudSttBackendConfig(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline CloudSttBackendConfig(const CloudSttBackendConfig& from) : CloudSttBackendConfig(nullptr, from) {}
+  inline CloudSttBackendConfig(CloudSttBackendConfig&& from) noexcept : CloudSttBackendConfig(nullptr, ::std::move(from)) {}
+  inline CloudSttBackendConfig& operator=(const CloudSttBackendConfig& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline CloudSttBackendConfig& operator=(CloudSttBackendConfig&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const CloudSttBackendConfig& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<CloudSttBackendConfig>(&CloudSttBackendConfig_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 9;
+  friend void swap(CloudSttBackendConfig& a, CloudSttBackendConfig& b) { a.Swap(&b); }
+  inline void Swap(CloudSttBackendConfig* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(CloudSttBackendConfig* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] CloudSttBackendConfig* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<CloudSttBackendConfig>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const CloudSttBackendConfig& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const CloudSttBackendConfig& from) { CloudSttBackendConfig::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(CloudSttBackendConfig* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.CloudSttBackendConfig"; }
+
+  explicit CloudSttBackendConfig(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  CloudSttBackendConfig(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const CloudSttBackendConfig& from);
+  CloudSttBackendConfig(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, CloudSttBackendConfig&& from) noexcept
+      : CloudSttBackendConfig(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kProviderFieldNumber = 1,
+    kModelFieldNumber = 2,
+    kApiKeyFieldNumber = 3,
+    kLanguageCodeFieldNumber = 4,
+    kBaseUrlFieldNumber = 5,
+    kTimeoutMsFieldNumber = 6,
+  };
+  // string provider = 1;
+  void clear_provider() ;
+  [[nodiscard]] const ::std::string& provider() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_provider(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_provider();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_provider();
+  void set_allocated_provider(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_provider() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_provider(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_provider();
+
+  public:
+  // string model = 2;
+  void clear_model() ;
+  [[nodiscard]] const ::std::string& model() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model();
+  void set_allocated_model(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model();
+
+  public:
+  // string api_key = 3;
+  void clear_api_key() ;
+  [[nodiscard]] const ::std::string& api_key() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_api_key(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_api_key();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_api_key();
+  void set_allocated_api_key(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_api_key() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_api_key(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_api_key();
+
+  public:
+  // string language_code = 4;
+  void clear_language_code() ;
+  [[nodiscard]] const ::std::string& language_code() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_language_code(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_language_code();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
+  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_language_code() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
+
+  public:
+  // string base_url = 5;
+  void clear_base_url() ;
+  [[nodiscard]] const ::std::string& base_url() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_base_url(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_base_url();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_base_url();
+  void set_allocated_base_url(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_base_url() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_base_url(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_base_url();
+
+  public:
+  // int32 timeout_ms = 6;
+  void clear_timeout_ms() ;
+  [[nodiscard]] ::int32_t timeout_ms() const;
+  void set_timeout_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_timeout_ms() const;
+  void _internal_set_timeout_ms(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.CloudSttBackendConfig)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 6,
+                          0, 86,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const CloudSttBackendConfig& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr provider_;
+    ::google::protobuf::internal::ArenaStringPtr model_;
+    ::google::protobuf::internal::ArenaStringPtr api_key_;
+    ::google::protobuf::internal::ArenaStringPtr language_code_;
+    ::google::protobuf::internal::ArenaStringPtr base_url_;
+    ::int32_t timeout_ms_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_hybrid_5frouter_2eproto;
+};
+// -------------------------------------------------------------------
+
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED BatteryFilter final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.BatteryFilter) */ {
  public:
@@ -1938,7 +2232,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeResponse final :
   [[nodiscard]] static const HybridSttTranscribeResponse& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridSttTranscribeResponse>(&HybridSttTranscribeResponse_globals_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 12;
   friend void swap(HybridSttTranscribeResponse& a, HybridSttTranscribeResponse& b) { a.Swap(&b); }
   inline void Swap(HybridSttTranscribeResponse* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2208,7 +2502,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridSttTranscribeRequest final : 
   [[nodiscard]] static const HybridSttTranscribeRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<HybridSttTranscribeRequest>(&HybridSttTranscribeRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(HybridSttTranscribeRequest& a, HybridSttTranscribeRequest& b) { a.Swap(&b); }
   inline void Swap(HybridSttTranscribeRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4293,6 +4587,354 @@ inline void HybridRoutedMetadata::_internal_set_primary_confidence(float value) 
 // -------------------------------------------------------------------
 
 // HybridRoutingContext
+
+// -------------------------------------------------------------------
+
+// CloudSttBackendConfig
+
+// string provider = 1;
+inline void CloudSttBackendConfig::clear_provider() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.provider_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::std::string& CloudSttBackendConfig::provider() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CloudSttBackendConfig.provider)
+  return _internal_provider();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void CloudSttBackendConfig::set_provider(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.provider_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CloudSttBackendConfig.provider)
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::mutable_provider()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_provider();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.CloudSttBackendConfig.provider)
+  return _s;
+}
+inline const ::std::string& CloudSttBackendConfig::_internal_provider() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.provider_.Get();
+}
+inline void CloudSttBackendConfig::_internal_set_provider(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.provider_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::_internal_mutable_provider() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.provider_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE CloudSttBackendConfig::release_provider() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.CloudSttBackendConfig.provider)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.provider_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.provider_.Set("", GetArena());
+  }
+  return released;
+}
+inline void CloudSttBackendConfig::set_allocated_provider(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.provider_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.provider_.IsDefault()) {
+    _impl_.provider_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.CloudSttBackendConfig.provider)
+}
+
+// string model = 2;
+inline void CloudSttBackendConfig::clear_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::std::string& CloudSttBackendConfig::model() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CloudSttBackendConfig.model)
+  return _internal_model();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void CloudSttBackendConfig::set_model(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CloudSttBackendConfig.model)
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::mutable_model()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.CloudSttBackendConfig.model)
+  return _s;
+}
+inline const ::std::string& CloudSttBackendConfig::_internal_model() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_.Get();
+}
+inline void CloudSttBackendConfig::_internal_set_model(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::_internal_mutable_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE CloudSttBackendConfig::release_model() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.CloudSttBackendConfig.model)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_.Set("", GetArena());
+  }
+  return released;
+}
+inline void CloudSttBackendConfig::set_allocated_model(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_.IsDefault()) {
+    _impl_.model_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.CloudSttBackendConfig.model)
+}
+
+// string api_key = 3;
+inline void CloudSttBackendConfig::clear_api_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.api_key_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline const ::std::string& CloudSttBackendConfig::api_key() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CloudSttBackendConfig.api_key)
+  return _internal_api_key();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void CloudSttBackendConfig::set_api_key(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.api_key_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CloudSttBackendConfig.api_key)
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::mutable_api_key()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_api_key();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.CloudSttBackendConfig.api_key)
+  return _s;
+}
+inline const ::std::string& CloudSttBackendConfig::_internal_api_key() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.api_key_.Get();
+}
+inline void CloudSttBackendConfig::_internal_set_api_key(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.api_key_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::_internal_mutable_api_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.api_key_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE CloudSttBackendConfig::release_api_key() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.CloudSttBackendConfig.api_key)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.api_key_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.api_key_.Set("", GetArena());
+  }
+  return released;
+}
+inline void CloudSttBackendConfig::set_allocated_api_key(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.api_key_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.api_key_.IsDefault()) {
+    _impl_.api_key_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.CloudSttBackendConfig.api_key)
+}
+
+// string language_code = 4;
+inline void CloudSttBackendConfig::clear_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.language_code_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline const ::std::string& CloudSttBackendConfig::language_code() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CloudSttBackendConfig.language_code)
+  return _internal_language_code();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void CloudSttBackendConfig::set_language_code(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CloudSttBackendConfig.language_code)
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::mutable_language_code()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_language_code();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.CloudSttBackendConfig.language_code)
+  return _s;
+}
+inline const ::std::string& CloudSttBackendConfig::_internal_language_code() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.language_code_.Get();
+}
+inline void CloudSttBackendConfig::_internal_set_language_code(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.language_code_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::_internal_mutable_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.language_code_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE CloudSttBackendConfig::release_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.CloudSttBackendConfig.language_code)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.language_code_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.language_code_.Set("", GetArena());
+  }
+  return released;
+}
+inline void CloudSttBackendConfig::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.language_code_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
+    _impl_.language_code_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.CloudSttBackendConfig.language_code)
+}
+
+// string base_url = 5;
+inline void CloudSttBackendConfig::clear_base_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.base_url_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline const ::std::string& CloudSttBackendConfig::base_url() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CloudSttBackendConfig.base_url)
+  return _internal_base_url();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void CloudSttBackendConfig::set_base_url(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.base_url_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CloudSttBackendConfig.base_url)
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::mutable_base_url()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_base_url();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.CloudSttBackendConfig.base_url)
+  return _s;
+}
+inline const ::std::string& CloudSttBackendConfig::_internal_base_url() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.base_url_.Get();
+}
+inline void CloudSttBackendConfig::_internal_set_base_url(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.base_url_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL CloudSttBackendConfig::_internal_mutable_base_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.base_url_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE CloudSttBackendConfig::release_base_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.CloudSttBackendConfig.base_url)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.base_url_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.base_url_.Set("", GetArena());
+  }
+  return released;
+}
+inline void CloudSttBackendConfig::set_allocated_base_url(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.base_url_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.base_url_.IsDefault()) {
+    _impl_.base_url_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.CloudSttBackendConfig.base_url)
+}
+
+// int32 timeout_ms = 6;
+inline void CloudSttBackendConfig::clear_timeout_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.timeout_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline ::int32_t CloudSttBackendConfig::timeout_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.CloudSttBackendConfig.timeout_ms)
+  return _internal_timeout_ms();
+}
+inline void CloudSttBackendConfig::set_timeout_ms(::int32_t value) {
+  _internal_set_timeout_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.CloudSttBackendConfig.timeout_ms)
+}
+inline ::int32_t CloudSttBackendConfig::_internal_timeout_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.timeout_ms_;
+}
+inline void CloudSttBackendConfig::_internal_set_timeout_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.timeout_ms_ = value;
+}
 
 // -------------------------------------------------------------------
 

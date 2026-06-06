@@ -12,7 +12,7 @@ package com.runanywhere.sdk.foundation.errors
 
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.extensions.LogLevel
+import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 import ai.runanywhere.proto.v1.ErrorContext as ProtoErrorContext
@@ -55,10 +55,10 @@ class SDKException(
      * so callers can programmatically identify the failing field without
      * parsing the human-readable message.
      *
-     * Backed by `error.context.metadata["field_path"]` — the wire-canonical
-     * carrier shared with Swift / Dart / TS.
+     * Backed by the typed `error.context.field_path` proto field.
      */
-    val fieldPath: String? get() = error.context?.metadata?.get("field_path")
+    val fieldPath: String? get() =
+        error.context?.field_path?.takeIf { it.isNotEmpty() }
 
     override fun toString(): String =
         "SDKException[$category] ${code.name}: ${error.message}"
@@ -176,7 +176,7 @@ class SDKException(
                             message = message,
                             context =
                                 ProtoErrorContext(
-                                    metadata = mapOf("field_path" to fieldPath),
+                                    field_path = fieldPath,
                                 ),
                             c_abi_code = roundTripCAbiCode(code),
                             nested_message = cause?.message,
@@ -520,8 +520,8 @@ private val SDKException.failureReason: String
  * Log this exception to the central [Logging] service.
  *
  * Mirrors Swift's `SDKException.log(file:line:function:)`. The level is
- * downgraded to [LogLevel.INFO] for [ProtoErrorCode.ERROR_CODE_CANCELLED];
- * all other codes log at [LogLevel.ERROR]. Call sites should typically gate
+ * downgraded to [LogLevel.LOG_LEVEL_INFO] for [ProtoErrorCode.ERROR_CODE_CANCELLED];
+ * all other codes log at [LogLevel.LOG_LEVEL_ERROR]. Call sites should typically gate
  * with `!code.isExpected` (the [SDKException.Companion.make] factory does
  * this automatically).
  *
@@ -534,7 +534,7 @@ fun SDKException.log(
     line: Int = 0,
     function: String = "",
 ) {
-    val level: LogLevel = if (this.code == ProtoErrorCode.ERROR_CODE_CANCELLED) LogLevel.INFO else LogLevel.ERROR
+    val level: LogLevel = if (this.code == ProtoErrorCode.ERROR_CODE_CANCELLED) LogLevel.LOG_LEVEL_INFO else LogLevel.LOG_LEVEL_ERROR
     val fileName = file.substringAfterLast('/')
 
     val metadata =

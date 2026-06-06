@@ -46,14 +46,6 @@ public enum RunAnywhere {
     /// Check if SDK is initialized (Phase 1 complete).
     public static var isInitialized: Bool { isInitializedFlag }
 
-    /// Backward-compatible alias for `isInitialized`.
-    /// Pre-refactor callers spelled the property `isSDKInitialized`; keep the
-    /// old spelling alive as a soft-deprecation so consumers built against the
-    /// previous symbol still compile and link. Pinned for removal so downstream
-    /// apps have a concrete migration deadline rather than an open-ended warning.
-    @available(*, deprecated, renamed: "isInitialized", message: "Use isInitialized; this backwards-compat alias will be removed in v0.21.0")
-    public static var isSDKInitialized: Bool { isInitialized }
-
     /// Check if services are fully ready (Phase 2 complete)
     public static var areServicesReady: Bool { hasCompletedServicesInit }
 

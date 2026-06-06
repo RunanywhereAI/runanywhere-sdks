@@ -154,6 +154,39 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     rac_proto_buffer_free(&make_buffer);
 
     // -------------------------------------------------------------------------
+    // 1a) Overlay caller-supplied capability fields onto the made ModelInfo.
+    //     rac_model_info_make_proto infers these from the URL/name and stamps
+    //     conservative defaults (supports_lora=false, download_size=0). When the
+    //     caller supplied an explicit value we honor it, so SDKs no longer need
+    //     a post-register "patch + resave" pass. Done BEFORE the id-keyed
+    //     merge below so an explicit id override is respected.
+    // -------------------------------------------------------------------------
+    if (!request.id().empty()) {
+        made_model.set_id(request.id());
+    }
+    if (request.has_memory_required_bytes()) {
+        made_model.set_memory_required_bytes(request.memory_required_bytes());
+    }
+    if (request.has_supports_thinking()) {
+        made_model.set_supports_thinking(request.supports_thinking());
+    }
+    if (request.has_supports_lora()) {
+        made_model.set_supports_lora(request.supports_lora());
+    }
+    if (request.has_artifact_type()) {
+        made_model.set_artifact_type(request.artifact_type());
+    }
+    if (request.has_context_length()) {
+        made_model.set_context_length(request.context_length());
+    }
+    if (request.has_description()) {
+        made_model.set_description(request.description());
+    }
+    if (request.has_download_size_bytes()) {
+        made_model.set_download_size_bytes(request.download_size_bytes());
+    }
+
+    // -------------------------------------------------------------------------
     // 2) Persist via the existing registry save path.
     //    rac_model_registry_register_proto_buffer accepts serialized ModelInfo
     //    bytes and returns the saved (normalized) ModelInfo bytes — exactly
@@ -224,6 +257,130 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
 
     RAC_LOG_DEBUG(LOG_CAT, "registered model from url=%s (saved %zu bytes)", request.url().c_str(),
                   out_proto->size);
+    return RAC_SUCCESS;
+#endif
+}
+
+extern "C" rac_result_t rac_register_multi_file_model_proto(const uint8_t* in_request_bytes,
+                                                            size_t in_size,
+                                                            rac_proto_buffer_t* out_proto) {
+    if (!out_proto) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)in_request_bytes;
+    (void)in_size;
+    return rac_proto_buffer_set_error(out_proto, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    if (!valid_bytes(in_request_bytes, in_size)) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "RegisterMultiFileModelRequest bytes are invalid");
+    }
+
+    runanywhere::v1::RegisterMultiFileModelRequest request;
+    if (in_size > 0 && !request.ParseFromArray(in_request_bytes, static_cast<int>(in_size))) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse RegisterMultiFileModelRequest");
+    }
+    if (request.id().empty()) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
+                                          "RegisterMultiFileModelRequest.id must not be empty");
+    }
+    if (request.files().empty()) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
+                                          "RegisterMultiFileModelRequest.files must not be empty");
+    }
+
+    // Build the ModelInfo with a MultiFileArtifact directly — the file URLs make
+    // the make()/inference path inapplicable.
+    runanywhere::v1::ModelInfo model;
+    model.set_id(request.id());
+    model.set_name(request.name());
+    model.set_framework(request.framework());
+    if (request.has_category()) {
+        model.set_category(request.category());
+    }
+    if (request.has_format()) {
+        model.set_format(request.format());
+    }
+    if (request.has_source()) {
+        model.set_source(request.source());
+    }
+    if (request.has_memory_required_bytes()) {
+        model.set_memory_required_bytes(request.memory_required_bytes());
+    }
+    if (request.has_download_size_bytes()) {
+        model.set_download_size_bytes(request.download_size_bytes());
+    }
+    if (request.has_context_length()) {
+        model.set_context_length(request.context_length());
+    }
+    if (request.has_supports_thinking()) {
+        model.set_supports_thinking(request.supports_thinking());
+    }
+    if (request.has_supports_lora()) {
+        model.set_supports_lora(request.supports_lora());
+    }
+    if (request.has_description()) {
+        model.set_description(request.description());
+    }
+    *model.mutable_multi_file()->mutable_files() = request.files();
+
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_NOT_INITIALIZED,
+                                          "global model registry is not available");
+    }
+
+    // Merge-not-replace on re-seed: carry an existing entry's runtime download
+    // state forward so re-registering a curated catalog on launch doesn't
+    // clobber recorded progress (mirrors the from-url path above).
+    {
+        uint8_t* existing_bytes = nullptr;
+        size_t existing_size = 0;
+        if (rac_model_registry_get_proto(registry, model.id().c_str(), &existing_bytes,
+                                         &existing_size) == RAC_SUCCESS) {
+            runanywhere::v1::ModelInfo existing;
+            if (existing.ParseFromArray(existing_bytes, static_cast<int>(existing_size))) {
+                if (!existing.local_path().empty()) {
+                    model.set_local_path(existing.local_path());
+                }
+                if (existing.has_is_downloaded()) {
+                    model.set_is_downloaded(existing.is_downloaded());
+                }
+                if (existing.has_is_available()) {
+                    model.set_is_available(existing.is_available());
+                }
+                if (existing.has_checksum_sha256()) {
+                    model.set_checksum_sha256(existing.checksum_sha256());
+                }
+                if (existing.has_registry_status()) {
+                    model.set_registry_status(existing.registry_status());
+                }
+            }
+            rac_model_registry_proto_free(existing_bytes);
+        }
+    }
+
+    std::string model_bytes;
+    if (!model.SerializeToString(&model_bytes)) {
+        return rac_proto_buffer_set_error(out_proto, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize multi-file ModelInfo");
+    }
+
+    rac_result_t save_rc = rac_model_registry_register_proto_buffer(
+        registry, reinterpret_cast<const uint8_t*>(model_bytes.data()), model_bytes.size(),
+        out_proto);
+    if (save_rc != RAC_SUCCESS) {
+        return save_rc;
+    }
+    if (out_proto->status != RAC_SUCCESS) {
+        return out_proto->status;
+    }
+
+    RAC_LOG_DEBUG(LOG_CAT, "registered multi-file model id=%s (%d files, saved %zu bytes)",
+                  request.id().c_str(), request.files_size(), out_proto->size);
     return RAC_SUCCESS;
 #endif
 }

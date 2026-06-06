@@ -135,6 +135,8 @@ export declare enum ErrorCode {
     ERROR_CODE_COST_LIMIT_EXCEEDED = 134,
     /** ERROR_CODE_INFERENCE_FAILED - RAC_ERROR_INFERENCE_FAILED */
     ERROR_CODE_INFERENCE_FAILED = 135,
+    /** ERROR_CODE_GENERATION_CANCELLED - RAC_ERROR_GENERATION_CANCELLED */
+    ERROR_CODE_GENERATION_CANCELLED = 136,
     /** ERROR_CODE_NETWORK_UNAVAILABLE - -- Network (-150..-179) ------------------------------------------------ */
     ERROR_CODE_NETWORK_UNAVAILABLE = 150,
     /** ERROR_CODE_NETWORK_ERROR - RAC_ERROR_NETWORK_ERROR */
@@ -311,6 +313,8 @@ export declare enum ErrorCode {
     ERROR_CODE_BACKEND_UNAVAILABLE = 604,
     /** ERROR_CODE_RUNTIME_UNAVAILABLE - RAC_ERROR_RUNTIME_UNAVAILABLE */
     ERROR_CODE_RUNTIME_UNAVAILABLE = 605,
+    /** ERROR_CODE_BACKEND_ERROR - RAC_ERROR_BACKEND_ERROR (generic backend failure) */
+    ERROR_CODE_BACKEND_ERROR = 606,
     /** ERROR_CODE_INVALID_HANDLE - RAC_ERROR_INVALID_HANDLE */
     ERROR_CODE_INVALID_HANDLE = 610,
     /** ERROR_CODE_EVENT_INVALID_CATEGORY - -- Event (-700..-799) ------------------------------------------------- */
@@ -409,6 +413,13 @@ export interface ErrorContext {
      * Swift) symbolicate the function name from the stack frame instead.
      */
     operation?: string | undefined;
+    /**
+     * The structured field path a validation error refers to
+     * ("<Message>.<field>"). First-class replacement for the
+     * metadata["field_path"] magic key all five SDKs read/write today; the
+     * generated convenience validate() already emits this path.
+     */
+    fieldPath?: string | undefined;
 }
 export interface ErrorContext_MetadataEntry {
     key: string;

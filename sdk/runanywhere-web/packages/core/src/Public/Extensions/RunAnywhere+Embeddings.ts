@@ -19,7 +19,7 @@ import type {
   EmbeddingsRequest,
   EmbeddingsResult,
 } from '@runanywhere/proto-ts/embeddings_options';
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { EmbeddingsProtoAdapter } from '../../Adapters/EmbeddingsProtoAdapter';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
@@ -54,7 +54,7 @@ function requireInitialized(): void {
   // backend that can serve the WASM.
   if (!WebModelLifecycle.supportsNativeLifecycle()) {
     throw SDKException.fromCode(
-      SDKErrorCode.NotInitialized,
+      -ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
       'SDK not initialized or no backend registered',
       'Embeddings',
     );
@@ -90,7 +90,7 @@ async function ensureLoaded(modelID: string): Promise<void> {
   if (!result?.success) {
     const msg = result?.errorMessage || 'Embeddings lifecycle load failed';
     logger.warning(`ensureLoaded(${modelID}) failed: ${msg}`);
-    throw SDKException.fromCode(SDKErrorCode.ModelLoadFailed, msg, 'Embeddings.ensureLoaded');
+    throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED, msg, 'Embeddings.ensureLoaded');
   }
 }
 
@@ -121,7 +121,7 @@ async function embedBatch(
 
   if (request.modelId !== undefined && request.modelId !== '' && request.modelId !== modelID) {
     throw SDKException.fromCode(
-      SDKErrorCode.InvalidParameter,
+      -ProtoErrorCode.ERROR_CODE_INVALID_PARAMETER,
       'EmbeddingsRequest.modelId does not match requested modelID',
       'Embeddings.embedBatch',
     );
@@ -150,7 +150,7 @@ async function embedBatch(
 
   if (result.errorCode !== 0) {
     const msg = result.errorMessage || 'Embeddings embed failed';
-    throw SDKException.fromCode(SDKErrorCode.GenerationFailed, msg, 'Embeddings.embedBatch');
+    throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_GENERATION_FAILED, msg, 'Embeddings.embedBatch');
   }
 
   return result;
@@ -182,7 +182,7 @@ async function unload(): Promise<void> {
 
   if (!result?.success) {
     const msg = result?.errorMessage || 'Embeddings lifecycle unload failed';
-    throw SDKException.fromCode(SDKErrorCode.GenerationFailed, msg, 'Embeddings.unload');
+    throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_GENERATION_FAILED, msg, 'Embeddings.unload');
   }
 }
 

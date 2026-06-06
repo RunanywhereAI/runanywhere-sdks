@@ -55,19 +55,16 @@ export class SDKException extends Error {
   /**
    * Structured validation field-path accessor.
    *
-   * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter SDKException.
-   * Reads `context.metadata['field_path']` populated by
-   * `SDKException.validationFailed(...)` (see below). Cross-SDK consumer
-   * code can rely on `e.fieldPath === 'X.y'` regardless of which SDK
-   * threw the exception. Returns `undefined` when the metadata entry is
-   * absent (e.g. non-validation exceptions).
+   * Byte-isomorphic with Swift/Kotlin/Flutter SDKException: reads the typed
+   * `ErrorContext.fieldPath` proto field. Cross-SDK consumer code can rely on
+   * `e.fieldPath === 'X.y'` regardless of which SDK threw the exception.
+   * Returns `undefined` when no value is carried (e.g. non-validation
+   * exceptions).
    */
   get fieldPath(): string | undefined {
-    const meta = this.proto.context?.metadata;
-    if (!meta) return undefined;
-    // proto-ts emits map<string,string> as a JS object literal.
-    const raw = (meta as Record<string, string>)['field_path'];
-    return raw && raw.length > 0 ? raw : undefined;
+    const ctx = this.proto.context;
+    const path = ctx?.fieldPath;
+    return path && path.length > 0 ? path : undefined;
   }
 
   /**
@@ -175,8 +172,8 @@ export class SDKException extends Error {
    *
    * pass3-syn-031: byte-isomorphic with Swift/Kotlin/Flutter
    * `SDKException.validationFailed(...)`. Encodes the structured field
-   * path into `proto.context.metadata['field_path']` so consumers can
-   * read it back uniformly across SDKs via {@link fieldPath}.
+   * path into the typed `proto.context.fieldPath` so consumers can read it
+   * back uniformly across SDKs via {@link fieldPath}.
    *
    * Recommended usage from generated `validate<Msg>` helpers:
    *
@@ -201,10 +198,11 @@ export class SDKException extends Error {
         category: ErrorCategoryProto.ERROR_CATEGORY_VALIDATION,
         cAbiCode: -259,
         nestedMessage: args.cause?.message,
-        // ErrorContext.metadata carries the structured field path so the
+        // ErrorContext.fieldPath carries the structured field path so the
         // accessor `e.fieldPath` returns the value across SDKs.
         context: {
-          metadata: { field_path: args.fieldPath },
+          metadata: {},
+          fieldPath: args.fieldPath,
           sourceFile: undefined,
           sourceLine: undefined,
           operation: undefined,

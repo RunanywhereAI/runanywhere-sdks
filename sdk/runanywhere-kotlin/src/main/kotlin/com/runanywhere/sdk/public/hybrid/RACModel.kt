@@ -8,6 +8,8 @@
 
 package com.runanywhere.sdk.public.hybrid
 
+import ai.runanywhere.proto.v1.HybridModelType
+
 /**
  * Identifies one of the two models a hybrid router dispatches between.
  *
@@ -32,15 +34,14 @@ class RACModel(
 
 /**
  * Whether a registered model is served on-device or via a cloud backend.
- * Wire values match `HybridModelType` in idl/hybrid_router.proto.
+ *
+ * Aliased to the generated [HybridModelType] (the wire schema's
+ * `HybridModelType` in idl/hybrid_router.proto) so the wire numbering is
+ * maintained in one place. [ROUTER.OFFLINE] / [ROUTER.ONLINE] keep the
+ * ergonomic short names; `RACModel.modelType` carries the proto enum directly,
+ * so descriptor marshalling needs no Kotlin→proto translation.
  */
-enum class ModelType(val value: Int) {
-    /** On-device backend (e.g. sherpa). */
-    OFFLINE(1),
-
-    /** Cloud backend (e.g. the Sarvam provider). */
-    ONLINE(2),
-}
+typealias ModelType = HybridModelType
 
 /**
  * Convenience accessor for the two model types:
@@ -49,9 +50,9 @@ enum class ModelType(val value: Int) {
  *     RACModel(id = "saaras", modelType = ROUTER.ONLINE)
  */
 object ROUTER {
-    /** Shortcut for [ModelType.OFFLINE]. */
-    val OFFLINE: ModelType = ModelType.OFFLINE
+    /** Shortcut for the offline (on-device) model type. */
+    val OFFLINE: ModelType = HybridModelType.HYBRID_MODEL_TYPE_OFFLINE
 
-    /** Shortcut for [ModelType.ONLINE]. */
-    val ONLINE: ModelType = ModelType.ONLINE
+    /** Shortcut for the online (cloud) model type. */
+    val ONLINE: ModelType = HybridModelType.HYBRID_MODEL_TYPE_ONLINE
 }

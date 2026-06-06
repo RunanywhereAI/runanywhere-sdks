@@ -19,6 +19,7 @@
 //
 
 import Foundation
+import SwiftProtobuf
 
 // MARK: - Filter
 
@@ -50,16 +51,6 @@ public enum HybridFilter: Sendable {
     /// The closure runs synchronously on the router's request thread and may
     /// be invoked concurrently — keep it fast, reentrant, and side-effect-free.
     case custom(name: String, description: String = "", check: @Sendable (_ modelId: String) -> Bool)
-
-    /// Wire tag (`HybridFilter.kind` field number in hybrid_router.proto).
-    var kind: Int32 {
-        switch self {
-        case .network: return 1
-        case .quality: return 3
-        case .battery: return 4
-        case .custom: return 5
-        }
-    }
 }
 
 // MARK: - Cascade
@@ -82,13 +73,10 @@ public let RAHybridSTTConfidenceThreshold: Float = 0.5
 // MARK: - Rank
 
 /// Comparator that orders eligible candidates. Exactly one rank per policy.
-/// Wire values match `HybridRank` in hybrid_router.proto.
-public enum HybridRank: Int32, Sendable {
-    /// Prefer the offline candidate when both are eligible.
-    case preferLocalFirst = 1
-    /// Prefer the online candidate when both are eligible.
-    case preferOnlineFirst = 2
-}
+/// Backed by the generated `RAHybridRank` (wire values match
+/// `HybridRank` in hybrid_router.proto): `.preferLocalFirst` (1) prefers the
+/// offline candidate, `.preferOnlineFirst` (2) prefers the online candidate.
+public typealias HybridRank = RAHybridRank
 
 // MARK: - Routing policy
 
@@ -147,51 +135,49 @@ extension HybridRoutingPolicy {
     }
 
     /// Encode this policy as `runanywhere.v1.HybridRoutingPolicy` bytes for
-    /// `rac_stt_hybrid_router_set_policy_proto`. Pure: no FFI, no state.
-    func serializedBytes() -> [UInt8] {
-        var writer = ProtoWireWriter()
-        for filter in hardFilters {
-            // field 1 (repeated HybridFilter), always present even when the
-            // inner oneof would otherwise serialize to empty (e.g. network=false).
-            writer.message(1, encodeFilter(filter))
-        }
+    /// `rac_stt_hybrid_router_set_policy_proto`, via the generated SwiftProtobuf
+    /// message. Pure: no FFI, no state. The generated encoder emits the same
+    /// canonical proto3 wire bytes the C++/JNI router parses.
+    func serializedBytes() throws -> [UInt8] {
+        var message = RAHybridRoutingPolicy()
+        message.hardFilters = hardFilters.map(encodeFilter)
         if let cascade {
-            writer.message(2, encodeCascade(cascade))
+            message.cascade = encodeCascade(cascade)
         }
-        writer.enumValue(3, rank.rawValue)
-        return writer.bytes
+        message.rank = rank
+        return try [UInt8](message.serializedData())
     }
 
-    private func encodeFilter(_ filter: HybridFilter) -> [UInt8] {
-        var writer = ProtoWireWriter()
+    private func encodeFilter(_ filter: HybridFilter) -> RAHybridFilter {
+        var proto = RAHybridFilter()
         switch filter {
         case .network:
-            // bool network = 1. Emit `true` explicitly (don't skip the
-            // default) so the oneof case is set on the wire.
-            writer.bool(1, true, skipDefault: false)
+            // bool network = 1. Setting the oneof case emits field 1 even when
+            // the value is the proto default, matching the prior encoder.
+            proto.network = true
         case let .quality(tier):
-            writer.int32(3, tier, skipDefault: false)
+            proto.qualityTier = tier
         case let .battery(minPercent):
-            var battery = ProtoWireWriter()
-            battery.int32(1, minPercent, skipDefault: false)
-            writer.message(4, battery.bytes)   // BatteryFilter battery = 4
+            var battery = RABatteryFilter()
+            battery.minBatteryPercent = minPercent
+            proto.battery = battery
         case let .custom(name, description, _):
-            var custom = ProtoWireWriter()
-            custom.string(1, name)             // string name = 1
-            custom.string(2, description)      // string description = 2
-            writer.message(5, custom.bytes)    // CustomFilter custom = 5
+            var custom = RACustomFilter()
+            custom.name = name
+            custom.description_p = description
+            proto.custom = custom
         }
-        return writer.bytes
+        return proto
     }
 
-    private func encodeCascade(_ cascade: HybridCascade) -> [UInt8] {
-        var writer = ProtoWireWriter()
+    private func encodeCascade(_ cascade: HybridCascade) -> RAHybridCascade {
+        var proto = RAHybridCascade()
         switch cascade {
         case let .confidence(threshold):
-            var confidence = ProtoWireWriter()
-            confidence.float(1, threshold, skipDefault: false)  // float threshold = 1
-            writer.message(1, confidence.bytes)                 // ConfidenceCascade confidence = 1
+            var confidence = RAConfidenceCascade()
+            confidence.threshold = threshold
+            proto.confidence = confidence
         }
-        return writer.bytes
+        return proto
     }
 }

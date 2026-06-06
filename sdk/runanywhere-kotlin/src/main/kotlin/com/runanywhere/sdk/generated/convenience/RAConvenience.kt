@@ -20,6 +20,8 @@ import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.EmbeddingsConfiguration
 import ai.runanywhere.proto.v1.EmbeddingsOptions
+import ai.runanywhere.proto.v1.LogLevel
+import ai.runanywhere.proto.v1.LoggingConfiguration
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.RAGConfiguration
@@ -224,6 +226,48 @@ public fun VADConfiguration.validate() {
         )
     }
 }
+
+/** Generated from `(runanywhere.v1.rac_display_name)` annotations in idl/. */
+public val LogLevel.displayName: String
+    get() = when (this) {
+        LogLevel.LOG_LEVEL_TRACE -> "Trace"
+        LogLevel.LOG_LEVEL_DEBUG -> "Debug"
+        LogLevel.LOG_LEVEL_INFO -> "Info"
+        LogLevel.LOG_LEVEL_WARNING -> "Warning"
+        LogLevel.LOG_LEVEL_ERROR -> "Error"
+        LogLevel.LOG_LEVEL_FATAL -> "Fatal"
+        else -> ""
+    }
+
+/** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
+public val LogLevel.wireString: String
+    get() = when (this) {
+        LogLevel.LOG_LEVEL_TRACE -> "trace"
+        LogLevel.LOG_LEVEL_DEBUG -> "debug"
+        LogLevel.LOG_LEVEL_INFO -> "info"
+        LogLevel.LOG_LEVEL_WARNING -> "warning"
+        LogLevel.LOG_LEVEL_ERROR -> "error"
+        LogLevel.LOG_LEVEL_FATAL -> "fatal"
+        else -> ""
+    }
+
+/** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */
+public fun LogLevel.Companion.fromWireString(value: String): LogLevel? =
+    when (value.lowercase()) {
+        "trace" -> LogLevel.LOG_LEVEL_TRACE
+        "debug" -> LogLevel.LOG_LEVEL_DEBUG
+        "info" -> LogLevel.LOG_LEVEL_INFO
+        "warning" -> LogLevel.LOG_LEVEL_WARNING
+        "error" -> LogLevel.LOG_LEVEL_ERROR
+        "fatal" -> LogLevel.LOG_LEVEL_FATAL
+        else -> null
+    }
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun LoggingConfiguration.Companion.defaults(): LoggingConfiguration =
+    LoggingConfiguration(
+        enable_local_logging = true,
+    )
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun RAGConfiguration.Companion.defaults(): RAGConfiguration =

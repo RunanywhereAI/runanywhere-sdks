@@ -9,10 +9,9 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_plugin_loader.dart'
-    show PluginInfo;
 
 /// Result of loading a plugin: registered name + return code (0 ok).
 class PluginLoadResult {

@@ -7,15 +7,14 @@
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
+import type { PluginInfo } from '@runanywhere/proto-ts/plugin_loader';
 
 /**
  * Information about a loaded plugin.
+ * Generated from idl/plugin_loader.proto (`@runanywhere/proto-ts/plugin_loader`).
  * Matches Swift: PluginInfo.
  */
-export interface PluginInfo {
-  name: string;
-  path: string;
-}
+export type { PluginInfo };
 
 /**
  * Runtime plugin management namespace.

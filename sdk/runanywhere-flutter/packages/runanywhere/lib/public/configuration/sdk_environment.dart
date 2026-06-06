@@ -62,13 +62,13 @@ extension SDKEnvironmentExtension on SDKEnvironment {
   LogLevel get defaultLogLevel {
     switch (this) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-        return LogLevel.debug;
+        return LogLevel.LOG_LEVEL_DEBUG;
       case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return LogLevel.info;
+        return LogLevel.LOG_LEVEL_INFO;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-        return LogLevel.warning;
+        return LogLevel.LOG_LEVEL_WARNING;
       default:
-        return LogLevel.info;
+        return LogLevel.LOG_LEVEL_INFO;
     }
   }
 

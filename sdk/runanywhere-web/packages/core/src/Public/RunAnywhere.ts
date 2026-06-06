@@ -51,7 +51,7 @@ import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
 } from '../Infrastructure/FrameworkOPFSPaths';
-import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import { Embeddings as EmbeddingsCapability } from './Extensions/RunAnywhere+Embeddings';
@@ -257,7 +257,7 @@ function invokeSdkInitProto(
 function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string): void {
   if (!result) {
     throw SDKException.fromCode(
-      SDKErrorCode.InitializationFailed,
+      -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
       `${phase} returned no sdk-init result.`,
     );
   }
@@ -265,7 +265,7 @@ function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string):
     throw new SDKException(result.error ?? {
       category: 0,
       code: 0,
-      cAbiCode: SDKErrorCode.InitializationFailed,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
       message: `${phase} failed.`,
       nestedMessage: result.warning || undefined,
       context: undefined,
@@ -351,7 +351,7 @@ export interface CancellableCall {
 function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
   if (signal?.aborted) {
     throw SDKException.fromCode(
-      SDKErrorCode.GenerationCancelled,
+      -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
       `${verb} cancelled`,
       'AbortSignal was already aborted before the call was invoked',
     );
@@ -534,7 +534,7 @@ async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
       await VisionLanguageCapability.unloadModel();
     }
   } catch (err) {
-    if (err instanceof SDKException && err.code === SDKErrorCode.BackendNotAvailable) {
+    if (err instanceof SDKException && err.code === -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE) {
       return;
     }
     logger.debug(
@@ -756,14 +756,14 @@ export const RunAnywhere = {
         _initOptions = { ...options, environment: env };
 
         if (options.debug) {
-          SDKLogger.level = LogLevel.Debug;
+          SDKLogger.level = LogLevel.LOG_LEVEL_DEBUG;
         }
 
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
         if (typeof ReadableStream === 'undefined') {
           throw SDKException.fromCode(
-            SDKErrorCode.InitializationFailed,
+            -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
             'ReadableStream is not available in this environment. ' +
             'The RunAnywhere Web SDK requires the Fetch Streams API ' +
             '(Chrome 43+, Firefox 65+, Safari 14.1+, Edge 79+).',
@@ -1053,7 +1053,7 @@ export const RunAnywhere = {
   /** Voice activity detection — `RunAnywhere.vad.create()` / `process(handle, samples)` etc. */
   vad: VADCapability,
 
-  /** Logging control — `RunAnywhere.logging.setLevel(LogLevel.Debug)` */
+  /** Logging control — `RunAnywhere.logging.setLevel(LogLevel.LOG_LEVEL_DEBUG)` */
   logging: LoggingCapability,
 
   /** LoRA adapter management — `RunAnywhere.lora.apply(request)` etc. */
@@ -1277,7 +1277,7 @@ export const RunAnywhere = {
           );
         } catch (err) {
           throw SDKException.fromCode(
-            SDKErrorCode.StorageError,
+            -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
             err instanceof Error ? err.message : String(err),
             'downloadModel',
           );

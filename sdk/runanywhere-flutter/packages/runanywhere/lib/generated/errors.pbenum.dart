@@ -190,6 +190,8 @@ class ErrorCode extends $pb.ProtobufEnum {
       ErrorCode._(134, _omitEnumNames ? '' : 'ERROR_CODE_COST_LIMIT_EXCEEDED');
   static const ErrorCode ERROR_CODE_INFERENCE_FAILED =
       ErrorCode._(135, _omitEnumNames ? '' : 'ERROR_CODE_INFERENCE_FAILED');
+  static const ErrorCode ERROR_CODE_GENERATION_CANCELLED =
+      ErrorCode._(136, _omitEnumNames ? '' : 'ERROR_CODE_GENERATION_CANCELLED');
 
   /// -- Network (-150..-179) ------------------------------------------------
   static const ErrorCode ERROR_CODE_NETWORK_UNAVAILABLE =
@@ -397,6 +399,8 @@ class ErrorCode extends $pb.ProtobufEnum {
       ErrorCode._(604, _omitEnumNames ? '' : 'ERROR_CODE_BACKEND_UNAVAILABLE');
   static const ErrorCode ERROR_CODE_RUNTIME_UNAVAILABLE =
       ErrorCode._(605, _omitEnumNames ? '' : 'ERROR_CODE_RUNTIME_UNAVAILABLE');
+  static const ErrorCode ERROR_CODE_BACKEND_ERROR =
+      ErrorCode._(606, _omitEnumNames ? '' : 'ERROR_CODE_BACKEND_ERROR');
   static const ErrorCode ERROR_CODE_INVALID_HANDLE =
       ErrorCode._(610, _omitEnumNames ? '' : 'ERROR_CODE_INVALID_HANDLE');
 
@@ -471,6 +475,7 @@ class ErrorCode extends $pb.ProtobufEnum {
     ERROR_CODE_TOKEN_LIMIT_EXCEEDED,
     ERROR_CODE_COST_LIMIT_EXCEEDED,
     ERROR_CODE_INFERENCE_FAILED,
+    ERROR_CODE_GENERATION_CANCELLED,
     ERROR_CODE_NETWORK_UNAVAILABLE,
     ERROR_CODE_NETWORK_ERROR,
     ERROR_CODE_REQUEST_FAILED,
@@ -559,6 +564,7 @@ class ErrorCode extends $pb.ProtobufEnum {
     ERROR_CODE_BACKEND_BUSY,
     ERROR_CODE_BACKEND_UNAVAILABLE,
     ERROR_CODE_RUNTIME_UNAVAILABLE,
+    ERROR_CODE_BACKEND_ERROR,
     ERROR_CODE_INVALID_HANDLE,
     ERROR_CODE_EVENT_INVALID_CATEGORY,
     ERROR_CODE_EVENT_SUBSCRIPTION_FAILED,

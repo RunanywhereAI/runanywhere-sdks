@@ -278,6 +278,7 @@ enum ErrorCode {
     ERROR_CODE_TOKEN_LIMIT_EXCEEDED       = 133;  // RAC_ERROR_TOKEN_LIMIT_EXCEEDED
     ERROR_CODE_COST_LIMIT_EXCEEDED        = 134;  // RAC_ERROR_COST_LIMIT_EXCEEDED
     ERROR_CODE_INFERENCE_FAILED           = 135;  // RAC_ERROR_INFERENCE_FAILED
+    ERROR_CODE_GENERATION_CANCELLED       = 136;  // RAC_ERROR_GENERATION_CANCELLED
 
     // -- Network (-150..-179) ------------------------------------------------
     ERROR_CODE_NETWORK_UNAVAILABLE        = 150;  // RAC_ERROR_NETWORK_UNAVAILABLE
@@ -396,6 +397,7 @@ enum ErrorCode {
     ERROR_CODE_BACKEND_BUSY               = 603;  // RAC_ERROR_BACKEND_BUSY
     ERROR_CODE_BACKEND_UNAVAILABLE        = 604;  // RAC_ERROR_BACKEND_UNAVAILABLE
     ERROR_CODE_RUNTIME_UNAVAILABLE        = 605;  // RAC_ERROR_RUNTIME_UNAVAILABLE
+    ERROR_CODE_BACKEND_ERROR              = 606;  // RAC_ERROR_BACKEND_ERROR (generic backend failure)
     ERROR_CODE_INVALID_HANDLE             = 610;  // RAC_ERROR_INVALID_HANDLE
 
     // -- Event (-700..-799) -------------------------------------------------
@@ -477,6 +479,12 @@ message ErrorContext {
     // we use the more generic "operation" name because some platforms (C++,
     // Swift) symbolicate the function name from the stack frame instead.
     optional string operation   = 4;
+
+    // The structured field path a validation error refers to
+    // ("<Message>.<field>"). First-class replacement for the
+    // metadata["field_path"] magic key all five SDKs read/write today; the
+    // generated convenience validate() already emits this path.
+    optional string field_path  = 5;
 }
 
 // ---------------------------------------------------------------------------

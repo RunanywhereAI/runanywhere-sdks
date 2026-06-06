@@ -799,6 +799,24 @@ RAC_API rac_result_t rac_register_model_from_url_proto(const uint8_t* in_request
                                                        size_t in_size,
                                                        rac_proto_buffer_t* out_proto);
 
+/**
+ * Register a multi-file model from a RegisterMultiFileModelRequest.
+ *
+ * Builds a ModelInfo carrying a MultiFileArtifact (one ModelFileDescriptor per
+ * file) plus the caller-supplied capability fields, and persists it through the
+ * same registry save path. Replaces the hand-built MultiFileArtifact ModelInfo
+ * every SDK assembles today.
+ *
+ * @param in_request_bytes Serialized RegisterMultiFileModelRequest bytes.
+ * @param in_size          Byte count.
+ * @param out_proto        Receives serialized runanywhere.v1.ModelInfo bytes on
+ *                         success or an error status on failure.
+ * @return RAC_SUCCESS on success, or a negative rac_result_t on failure.
+ */
+RAC_API rac_result_t rac_register_multi_file_model_proto(const uint8_t* in_request_bytes,
+                                                         size_t in_size,
+                                                         rac_proto_buffer_t* out_proto);
+
 #ifdef __cplusplus
 }
 #endif

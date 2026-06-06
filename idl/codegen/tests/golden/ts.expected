@@ -118,10 +118,4 @@ export const validateRacTestConfig = (m: RacTestConfig): void => {
       message: `precision_double must be in 0.0...1.0 (got ${m.precisionDouble})`,
     });
   }
-  if (m.enableFeatureBool === false) {
-    throw new ValidationError({
-      fieldPath: 'RacTestConfig.enable_feature_bool',
-      message: 'enable_feature_bool is required',
-    });
-  }
 };

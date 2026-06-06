@@ -22,76 +22,7 @@ import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
 import type { SDKLogger } from './SDKLogger';
 
 /**
- * @deprecated Compat shim — use `ProtoErrorCode` (positive values from
- * `@runanywhere/proto-ts/errors`) instead. The canonical path is already
- * wired: `SDKException.protoCode` returns `ProtoErrorCode`, `isExpected()`
- * accepts `ProtoErrorCode`, and the WASM bridge round-trips `cAbiCode`
- * directly from `rac_result_t`. This enum will be removed in a follow-up
- * once all internal call sites in CommonsModule / OffscreenRuntimeBridge /
- * Extensions / HTTPAdapter / RunAnywhere.ts are migrated.
- *
- * Migration: replace `SDKErrorCode.Foo` (negative) with
- * `-ProtoErrorCode.ERROR_CODE_FOO` as the cAbiCode literal; pass the
- * proto code directly to `SDKException` constructors.
- */
-export enum SDKErrorCode {
-  // Success
-  Success = 0,
-
-  // Initialization errors (-100 to -109)
-  NotInitialized = -100,
-  AlreadyInitialized = -101,
-  InvalidConfiguration = -102,
-  InitializationFailed = -103,
-
-  // Model errors (-110 to -129)
-  ModelNotFound = -110,
-  ModelLoadFailed = -111,
-  ModelInvalidFormat = -112,
-  ModelNotLoaded = -113,
-  ModelAlreadyLoaded = -114,
-
-  // Generation errors (-130 to -149)
-  GenerationFailed = -130,
-  GenerationCancelled = -131,
-  GenerationTimeout = -132,
-  InvalidPrompt = -133,
-  ContextLengthExceeded = -134,
-
-  // Network errors (-150 to -179)
-  NetworkError = -150,
-  NetworkTimeout = -151,
-  AuthenticationFailed = -152,
-  DownloadFailed = -160,
-  DownloadCancelled = -161,
-
-  // Storage errors (-180 to -219)
-  StorageError = -180,
-  InsufficientStorage = -181,
-  FileNotFound = -182,
-  FileWriteFailed = -183,
-
-  // Parameter errors (-220 to -229)
-  InvalidParameter = -220,
-
-  // Component errors (-230 to -249)
-  ComponentNotReady = -230,
-  ComponentBusy = -231,
-  InvalidState = -232,
-
-  // Backend errors (-600 to -699)
-  BackendNotAvailable = -600,
-  BackendError = -601,
-
-  // WASM-specific errors (-900 to -999)
-  WASMLoadFailed = -900,
-  WASMNotLoaded = -901,
-  WASMCallbackError = -902,
-  WASMMemoryError = -903,
-}
-
-/**
- * Map a signed-negative `SDKErrorCode` to the matching proto-ts `ErrorCategory`.
+ * Map a signed-negative `rac_result_t` code to the matching proto-ts `ErrorCategory`.
  *
  * Verbatim port of the canonical 18-range table in
  * `sdk/runanywhere-commons/src/core/rac_error_proto.cpp::category_for_code()`.
@@ -99,7 +30,7 @@ export enum SDKErrorCode {
  * table is replicated here; any change to the canonical mapping MUST be
  * mirrored in this function (and in the RN equivalent).
  */
-function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
+function categoryForCode(code: number): ProtoErrorCategory {
   if (code === 0) return ProtoErrorCategory.ERROR_CATEGORY_UNSPECIFIED;
   const abs = Math.abs(code);
   if (abs >= 100 && abs <= 109) return ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION;
@@ -128,10 +59,10 @@ function categoryForCode(code: SDKErrorCode): ProtoErrorCategory {
 }
 
 /**
- * Map a signed-negative SDKErrorCode to the matching proto-ts ErrorCode
+ * Map a signed-negative `rac_result_t` code to the matching proto-ts ErrorCode
  * (positive values, since proto3 forbids negative enum literals).
  */
-function protoCodeForSDKCode(code: SDKErrorCode): ProtoErrorCode {
+function protoCodeForSDKCode(code: number): ProtoErrorCode {
   const positive = Math.abs(code);
   if (Object.values(ProtoErrorCode).includes(positive)) {
     return positive as ProtoErrorCode;
@@ -139,14 +70,14 @@ function protoCodeForSDKCode(code: SDKErrorCode): ProtoErrorCode {
   return ProtoErrorCode.ERROR_CODE_UNSPECIFIED;
 }
 
-function severityForCode(code: SDKErrorCode): ProtoErrorSeverity {
-  return code === SDKErrorCode.Success
+function severityForCode(code: number): ProtoErrorSeverity {
+  return code === 0
     ? ProtoErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
     : ProtoErrorSeverity.ERROR_SEVERITY_ERROR;
 }
 
-function componentForCode(code: SDKErrorCode): string {
-  if (code === SDKErrorCode.Success) return 'sdk';
+function componentForCode(code: number): string {
+  if (code === 0) return 'sdk';
   const abs = Math.abs(code);
   if (abs >= 100 && abs <= 109) return 'sdk';
   if (abs >= 110 && abs <= 129) return 'model';
@@ -176,7 +107,7 @@ function componentForCode(code: SDKErrorCode): string {
 export class SDKException extends Error {
   readonly proto: ProtoSDKError;
 
-  constructor(codeOrProto: SDKErrorCode | ProtoSDKError, message?: string, details?: string) {
+  constructor(codeOrProto: number | ProtoSDKError, message?: string, details?: string) {
     if (typeof codeOrProto === 'number') {
       const code = codeOrProto;
       const msg = message ?? `SDK error: ${code}`;
@@ -203,9 +134,9 @@ export class SDKException extends Error {
     }
   }
 
-  /** The signed-negative SDKErrorCode (matches rac_result_t). */
-  get code(): SDKErrorCode {
-    return (this.proto.cAbiCode as SDKErrorCode) ?? SDKErrorCode.Success;
+  /** The signed-negative C ABI code (matches rac_result_t). */
+  get code(): number {
+    return this.proto.cAbiCode ?? 0;
   }
 
   /** The positive proto ErrorCode value (matches Swift proto.code / RAErrorCode.rawValue). */
@@ -221,19 +152,14 @@ export class SDKException extends Error {
   /**
    * Structured validation field-path accessor.
    *
-   * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException.
-   * Reads `context.metadata['field_path']` populated by
-   * `SDKException.validationFailed(...)` (see below). Cross-SDK consumer
-   * code can rely on `e.fieldPath === 'X.y'` regardless of which SDK
-   * threw the exception. Returns `undefined` when the metadata entry is
-   * absent (e.g. non-validation exceptions).
+   * Byte-isomorphic with Swift/Kotlin/Flutter/RN SDKException. Reads the typed
+   * `context.fieldPath` (first-class proto field) so cross-SDK consumer code
+   * can rely on `e.fieldPath === 'X.y'` regardless of which SDK threw the
+   * exception. Returns `undefined` when absent (e.g. non-validation exceptions).
    */
   get fieldPath(): string | undefined {
-    const meta = this.proto.context?.metadata;
-    if (!meta) return undefined;
-    // proto-ts emits map<string,string> as a JS object literal.
-    const raw = (meta as Record<string, string>)['field_path'];
-    return raw && raw.length > 0 ? raw : undefined;
+    const typed = this.proto.context?.fieldPath;
+    return typed && typed.length > 0 ? typed : undefined;
   }
 
   /** Whether the result code indicates success (code === 0). */
@@ -241,8 +167,8 @@ export class SDKException extends Error {
     return resultCode === 0;
   }
 
-  /** Build an SDKException from a signed numeric SDKErrorCode + message. */
-  static fromCode(code: SDKErrorCode, message: string, details?: string): SDKException {
+  /** Build an SDKException from a signed numeric `rac_result_t` code + message. */
+  static fromCode(code: number, message: string, details?: string): SDKException {
     return new SDKException(code, message, details);
   }
 
@@ -269,7 +195,7 @@ export class SDKException extends Error {
       }
     }
     const message = `RACommons error: ${resultCode}`;
-    return SDKException.fromCode(resultCode as SDKErrorCode, message, details);
+    return SDKException.fromCode(resultCode, message, details);
   }
 
   /**
@@ -307,13 +233,13 @@ export class SDKException extends Error {
     const proto: ProtoSDKError = {
       category: ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
       code: ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
-      cAbiCode: SDKErrorCode.NotInitialized,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
       message,
       nestedMessage: undefined,
       context: undefined,
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
-      component: componentForCode(SDKErrorCode.NotInitialized),
+      component: componentForCode(-ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED),
       retryable: false,
       remediationHint: '',
       correlationId: '',
@@ -348,19 +274,19 @@ export class SDKException extends Error {
   }
 
   static wasmNotLoaded(message = 'WASM module not loaded'): SDKException {
-    return SDKException.fromCode(SDKErrorCode.WASMNotLoaded, message);
+    return SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED, message);
   }
 
   static modelNotFound(modelId: string): SDKException {
     return SDKException.fromCode(
-      SDKErrorCode.ModelNotFound,
+      -ProtoErrorCode.ERROR_CODE_MODEL_NOT_FOUND,
       `Model not found: ${modelId}`,
     );
   }
 
   static componentNotReady(component: string, details?: string): SDKException {
     return SDKException.fromCode(
-      SDKErrorCode.ComponentNotReady,
+      -ProtoErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
       `Component not ready: ${component}`,
       details,
     );
@@ -368,7 +294,7 @@ export class SDKException extends Error {
 
   static generationFailed(details?: string): SDKException {
     return SDKException.fromCode(
-      SDKErrorCode.GenerationFailed,
+      -ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
       'Generation failed',
       details,
     );
@@ -376,14 +302,14 @@ export class SDKException extends Error {
 
   static backendNotAvailable(feature: string, details?: string): SDKException {
     return SDKException.fromCode(
-      SDKErrorCode.BackendNotAvailable,
+      -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
       `Backend not available for: ${feature}`,
       details,
     );
   }
 
   static invalidInput(message: string, details?: string): SDKException {
-    return SDKException.fromCode(SDKErrorCode.InvalidParameter, message, details);
+    return SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_INVALID_PARAMETER, message, details);
   }
 
   /**
@@ -391,7 +317,7 @@ export class SDKException extends Error {
    *
    * Byte-isomorphic with Swift/Kotlin/Flutter/RN
    * `SDKException.validationFailed(...)`. Encodes the structured field
-   * path into `proto.context.metadata['field_path']` so consumers can
+   * path into the typed `proto.context.fieldPath` so consumers can
    * read it back uniformly across SDKs via {@link fieldPath}.
    *
    * Recommended usage from generated `validate<Msg>` helpers:
@@ -416,13 +342,14 @@ export class SDKException extends Error {
       cAbiCode: -259,
       message: args.message,
       nestedMessage: args.cause?.message,
-      // ErrorContext.metadata carries the structured field path so the
+      // ErrorContext.fieldPath carries the structured field path so the
       // accessor `e.fieldPath` returns the value across SDKs.
       context: {
-        metadata: { field_path: args.fieldPath },
+        metadata: {},
         sourceFile: undefined,
         sourceLine: undefined,
         operation: undefined,
+        fieldPath: args.fieldPath,
       },
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,

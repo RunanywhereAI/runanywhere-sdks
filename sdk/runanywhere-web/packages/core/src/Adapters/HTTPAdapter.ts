@@ -36,7 +36,7 @@
 
 import { HttpDownloadStatus } from '@runanywhere/proto-ts/download_service';
 
-import { SDKException, SDKErrorCode } from '../Foundation/SDKException';
+import { SDKException, ProtoErrorCode } from '../Foundation/SDKException';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { FetchHttpTransport } from './FetchHttpTransport';
 
@@ -266,7 +266,7 @@ function readBytes(m: HTTPModule, srcPtr: number, length: number): Uint8Array {
 function required<T>(fn: T | undefined, name: string): T {
   if (fn === undefined || fn === null) {
     throw SDKException.fromCode(
-      SDKErrorCode.WASMNotLoaded,
+      -ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED,
       `HTTPAdapter: WASM module is missing export '${name}'. ` +
       `Rebuild the WASM target with the HTTP exports enabled.`,
     );
@@ -371,7 +371,7 @@ export class HTTPAdapter {
       const rc = await this.ccall('rac_http_request_send', 'number', ['number', 'number', 'number'], [clientPtr, reqPtr, respPtr]);
       if (rc !== 0) {
         throw SDKException.fromCode(
-          SDKErrorCode.NetworkError,
+          -ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
           `rac_http_request_send failed: rc=${rc} url=${req.url}`,
         );
       }
@@ -443,7 +443,7 @@ export class HTTPAdapter {
       if (rc !== 0) {
         const reason = cancelled ? 'cancelled by chunk handler' : `rc=${rc}`;
         throw SDKException.fromCode(
-          cancelled ? SDKErrorCode.DownloadCancelled : SDKErrorCode.NetworkError,
+          cancelled ? -ProtoErrorCode.ERROR_CODE_CANCELLED : -ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
           `rac_http_request_stream failed: ${reason} url=${req.url}`,
         );
       }
@@ -531,14 +531,14 @@ export class HTTPAdapter {
       const rc = await this.ccall('rac_http_client_create', 'number', ['number'], [outPtrPtr]) as number;
       if (rc !== 0) {
         throw SDKException.fromCode(
-          SDKErrorCode.NetworkError,
+          -ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
           `rac_http_client_create failed: rc=${rc}`,
         );
       }
       const clientPtr = this.m.getValue(outPtrPtr, '*');
       if (clientPtr === 0) {
         throw SDKException.fromCode(
-          SDKErrorCode.NetworkError,
+          -ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
           'rac_http_client_create returned NULL',
         );
       }

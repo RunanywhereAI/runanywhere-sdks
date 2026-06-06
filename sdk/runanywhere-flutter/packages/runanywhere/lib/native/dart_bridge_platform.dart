@@ -308,7 +308,7 @@ class DartBridgePlatform {
     await loadSecureStorageCache();
 
     try {
-      final lib = PlatformLoader.load();
+      final lib = PlatformLoader.loadCommons();
 
       final registerCallback = lib
           .lookupFunction<

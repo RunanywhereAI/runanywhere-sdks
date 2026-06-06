@@ -107,6 +107,8 @@ extern "C" {
 #define RAC_ERROR_COST_LIMIT_EXCEEDED ((rac_result_t) - 134)
 /** Inference failed */
 #define RAC_ERROR_INFERENCE_FAILED ((rac_result_t) - 135)
+/** Generation cancelled by the caller */
+#define RAC_ERROR_GENERATION_CANCELLED ((rac_result_t) - 136)
 
 // =============================================================================
 // NETWORK ERRORS (-150 to -179)
@@ -381,6 +383,8 @@ extern "C" {
  *  runtime-availability filter. Engines with `runtimes == NULL` bypass the
  *  filter and never produce this error. */
 #define RAC_ERROR_RUNTIME_UNAVAILABLE ((rac_result_t) - 605)
+/** Generic backend failure (no more specific backend code applies) */
+#define RAC_ERROR_BACKEND_ERROR ((rac_result_t) - 606)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 

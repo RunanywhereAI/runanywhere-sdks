@@ -4,14 +4,13 @@
 /// Matches iOS SDKLogger from Foundation/Logging/SDKLogger.swift
 library;
 
-/// Log levels
-enum LogLevel {
-  debug,
-  info,
-  warning,
-  error,
-  fault,
-}
+import 'package:runanywhere/generated/logging.pbenum.dart' show LogLevel;
+
+// Re-export the canonical generated severity enum so the ~40 call sites that
+// `import '.../sdk_logger.dart'` keep resolving `LogLevel`. The hand-written
+// `enum LogLevel { debug, info, warning, error, fault }` was deleted in favour
+// of the generated `LogLevel` (LOG_LEVEL_TRACE = 0 … LOG_LEVEL_FATAL = 5).
+export 'package:runanywhere/generated/logging.pbenum.dart' show LogLevel;
 
 /// Centralized logging utility
 /// Aligned with iOS: Sources/RunAnywhere/Foundation/Logging/Logger/SDKLogger.swift
@@ -26,17 +25,17 @@ class SDKLogger {
 
   /// Log a debug message
   void debug(String message, {Map<String, dynamic>? metadata}) {
-    _log(LogLevel.debug, message, metadata: metadata);
+    _log(LogLevel.LOG_LEVEL_DEBUG, message, metadata: metadata);
   }
 
   /// Log an info message
   void info(String message, {Map<String, dynamic>? metadata}) {
-    _log(LogLevel.info, message, metadata: metadata);
+    _log(LogLevel.LOG_LEVEL_INFO, message, metadata: metadata);
   }
 
   /// Log a warning message
   void warning(String message, {Map<String, dynamic>? metadata}) {
-    _log(LogLevel.warning, message, metadata: metadata);
+    _log(LogLevel.LOG_LEVEL_WARNING, message, metadata: metadata);
   }
 
   /// Log an error message
@@ -50,7 +49,7 @@ class SDKLogger {
       enrichedMetadata['stackTrace'] = stackTrace.toString();
     }
 
-    _log(LogLevel.error, message, metadata: enrichedMetadata);
+    _log(LogLevel.LOG_LEVEL_ERROR, message, metadata: enrichedMetadata);
   }
 
   /// Log a fault message (highest severity)
@@ -64,7 +63,9 @@ class SDKLogger {
       enrichedMetadata['stackTrace'] = stackTrace.toString();
     }
 
-    _log(LogLevel.fault, message, metadata: enrichedMetadata);
+    // `fault` is the legacy name; the generated enum's highest severity is
+    // LOG_LEVEL_FATAL.
+    _log(LogLevel.LOG_LEVEL_FATAL, message, metadata: enrichedMetadata);
   }
 
   /// Log a message with a specific level
@@ -82,14 +83,17 @@ class SDKLogger {
     enrichedMetadata['value'] = value;
     enrichedMetadata['type'] = 'performance';
 
-    _log(LogLevel.info, '$metric: $value', metadata: enrichedMetadata);
+    _log(LogLevel.LOG_LEVEL_INFO, '$metric: $value',
+        metadata: enrichedMetadata);
   }
 
   // MARK: - Private Methods
 
   void _log(LogLevel level, String message, {Map<String, dynamic>? metadata}) {
     final timestamp = DateTime.now().toIso8601String();
-    final levelStr = level.name.toUpperCase();
+    // Generated enum names are `LOG_LEVEL_<SEVERITY>`; strip the prefix for a
+    // readable console tag (e.g. `DEBUG`).
+    final levelStr = level.name.replaceFirst('LOG_LEVEL_', '');
 
     // For now, just print to console
     // In production, this would route to native logging via FFI

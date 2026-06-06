@@ -61,7 +61,7 @@ import {
   type ToolResult,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
 import {
@@ -218,7 +218,7 @@ function readToolPromptFormat(
   }
   if (result.errorCode !== 0) {
     throw SDKException.fromCode(
-      SDKErrorCode.BackendError,
+      -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
       'Tool prompt formatting failed',
       result.errorMessage,
     );
@@ -532,7 +532,7 @@ export const ToolCalling = {
     // saves the wasted generate cycle.
     if (extra.signal?.aborted) {
       throw SDKException.fromCode(
-        SDKErrorCode.GenerationCancelled,
+        -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
         'Tool-calling generation cancelled',
         'AbortSignal was already aborted before generateWithTools was invoked',
       );
@@ -631,7 +631,7 @@ export const ToolCalling = {
       ));
       if (createRc !== 0) {
         throw SDKException.fromCode(
-          SDKErrorCode.BackendError,
+          -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
           'rac_tool_calling_session_create_proto failed',
           `rc=${createRc}`,
         );
@@ -674,7 +674,7 @@ export const ToolCalling = {
         }
         if (errorBytes) {
           throw SDKException.fromCode(
-            SDKErrorCode.BackendError,
+            -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
             'Tool-calling session failed',
             `commons error_bytes (${errorBytes.length}B)`,
           );
@@ -689,7 +689,7 @@ export const ToolCalling = {
           // build, or an addFunction wiring bug).
           if (decodeFailure) {
             throw SDKException.fromCode(
-              SDKErrorCode.BackendError,
+              -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
               'Tool-calling session event decode failed',
               `failed to decode ToolCallingSessionEvent: ${(decodeFailure as Error).message}`,
             );
@@ -698,7 +698,7 @@ export const ToolCalling = {
           // one of these terminal events at end of the synchronous step.
           // Treat as an internal protocol violation.
           throw SDKException.fromCode(
-            SDKErrorCode.BackendError,
+            -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
             'Tool-calling session stalled',
             'commons returned no event after step_with_result',
           );
@@ -718,7 +718,7 @@ export const ToolCalling = {
         ));
         if (stepRc !== 0) {
           throw SDKException.fromCode(
-            SDKErrorCode.BackendError,
+            -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
             'rac_tool_calling_session_step_with_result_proto failed',
             `rc=${stepRc}`,
           );

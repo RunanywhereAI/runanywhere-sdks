@@ -68,7 +68,7 @@ export class SentryDestination implements LogDestination {
   private initialized = false;
 
   /** Minimum level to send to Sentry (warning and above) */
-  private readonly minSentryLevel: LogLevel = LogLevel.Warning;
+  private readonly minSentryLevel: LogLevel = LogLevel.LOG_LEVEL_WARNING;
 
   constructor(sentry?: SentryInterface) {
     if (sentry) {
@@ -112,7 +112,7 @@ export class SentryDestination implements LogDestination {
     this.addBreadcrumb(entry);
 
     // For error and fault levels, capture as Sentry event
-    if (entry.level >= LogLevel.Error) {
+    if (entry.level >= LogLevel.LOG_LEVEL_ERROR) {
       this.captureEvent(entry);
     }
   }
@@ -176,16 +176,18 @@ export class SentryDestination implements LogDestination {
     level: LogLevel
   ): 'fatal' | 'error' | 'warning' | 'info' | 'debug' {
     switch (level) {
-      case LogLevel.Debug:
+      case LogLevel.LOG_LEVEL_DEBUG:
         return 'debug';
-      case LogLevel.Info:
+      case LogLevel.LOG_LEVEL_INFO:
         return 'info';
-      case LogLevel.Warning:
+      case LogLevel.LOG_LEVEL_WARNING:
         return 'warning';
-      case LogLevel.Error:
+      case LogLevel.LOG_LEVEL_ERROR:
         return 'error';
-      case LogLevel.Fault:
+      case LogLevel.LOG_LEVEL_FATAL:
         return 'fatal';
+      default:
+        return 'debug';
     }
   }
 
@@ -194,16 +196,20 @@ export class SentryDestination implements LogDestination {
    */
   private getLogLevelDescription(level: LogLevel): string {
     switch (level) {
-      case LogLevel.Debug:
+      case LogLevel.LOG_LEVEL_DEBUG:
         return 'debug';
-      case LogLevel.Info:
+      case LogLevel.LOG_LEVEL_INFO:
         return 'info';
-      case LogLevel.Warning:
+      case LogLevel.LOG_LEVEL_WARNING:
         return 'warning';
-      case LogLevel.Error:
+      case LogLevel.LOG_LEVEL_ERROR:
         return 'error';
-      case LogLevel.Fault:
+      case LogLevel.LOG_LEVEL_FATAL:
         return 'fault';
+      case LogLevel.LOG_LEVEL_TRACE:
+        return 'trace';
+      default:
+        return 'info';
     }
   }
 }

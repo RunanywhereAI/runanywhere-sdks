@@ -52,25 +52,14 @@ Exit codes:
 
 ## CI integration
 
-Currently the smoke test is run manually / on demand. The existing
-`idl-drift-check.yml` workflow catches drift (forgotten regen) but cannot
-catch a generator that produces stably-wrong output — see the pass2-syn-056
-record for the dormant-bug surface.
-
-Wiring this script into `.github/workflows/pr-build.yml` as a fast-running
-job is a follow-up. The smallest addition is:
-
-```yaml
-convenience-smoke:
-  runs-on: ubuntu-latest
-  needs: idl-drift-check
-  steps:
-    - uses: actions/checkout@v4
-    - run: |
-        sudo apt-get update && sudo apt-get install -y protobuf-compiler
-        pip install protobuf
-    - run: python3 idl/codegen/tests/test_convenience_generators.py
-```
+Wired into `.github/workflows/idl-drift-check.yml` as the **Convenience
+generator smoke test** step, which runs before the drift check on the same
+runner (protoc + Python protobuf are already installed there). It runs without
+`--update-golden`, so a generator that produces stably-wrong output — or a
+golden that has rotted out of sync with the generators — fails the job. This
+complements the drift check, which only catches forgotten regeneration, not
+stably-wrong generator output (see the pass2-syn-056 record for the
+dormant-bug surface).
 
 ## Manual verification (no Python harness)
 

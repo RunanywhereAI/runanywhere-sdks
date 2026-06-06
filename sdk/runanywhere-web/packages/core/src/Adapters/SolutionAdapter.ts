@@ -18,14 +18,11 @@
 
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import { SDKException } from '../Foundation/SDKException';
+import { RAC_OK, RAC_ERROR_FEATURE_NOT_AVAILABLE } from '../Foundation/RACErrors';
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../runtime/EmscriptenModule';
-
-/** Mirrors `RAC_SUCCESS` from `rac_error.h`. */
-const RAC_SUCCESS = 0;
-const RAC_ERROR_FEATURE_NOT_AVAILABLE = -801;
 
 function assertOk(op: string, rc: number): void {
   if (rc === RAC_ERROR_FEATURE_NOT_AVAILABLE) {
@@ -36,7 +33,7 @@ function assertOk(op: string, rc: number): void {
     );
   }
 
-  if (rc !== RAC_SUCCESS) {
+  if (rc !== RAC_OK) {
     throw new Error(`rac_solution_${op} failed (rc=${rc})`);
   }
 }

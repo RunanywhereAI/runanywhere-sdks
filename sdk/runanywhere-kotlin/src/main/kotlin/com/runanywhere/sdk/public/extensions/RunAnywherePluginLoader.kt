@@ -12,26 +12,16 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.PluginInfo
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// PluginInfo — lightweight descriptor for a loaded plugin.
-
-/**
- * Descriptor for a plugin loaded at runtime.
- *
- * @param name Plugin name / library stem (without `lib` prefix or extension, e.g. "runanywhere_acmevoice")
- * @param path Absolute path to the shared library on disk, if known
- */
-data class PluginInfo(
-    val name: String,
-    val path: String? = null,
-)
-
 // PluginLoader — namespaced capability class
+// PluginInfo is the proto-generated descriptor (ai.runanywhere.proto.v1.PluginInfo);
+// `path` is "" for plugins the native registry reports by name only.
 
 // RunAnywhere.pluginLoader accessor
 

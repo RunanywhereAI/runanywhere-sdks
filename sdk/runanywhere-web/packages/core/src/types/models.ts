@@ -41,15 +41,3 @@ export interface SDKInitOptions {
 
 export type StorageInfo = ProtoStorageInfo;
 export type StoredModel = ProtoStoredModel;
-
-export interface DeviceInfoData {
-  model: string;
-  name: string;
-  osVersion: string;
-  totalMemory: number;
-  architecture: string;
-  /** Whether WebGPU is available */
-  hasWebGPU: boolean;
-  /** Whether SharedArrayBuffer is available (pthreads) */
-  hasSharedArrayBuffer: boolean;
-}

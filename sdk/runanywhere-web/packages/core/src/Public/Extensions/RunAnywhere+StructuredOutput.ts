@@ -27,7 +27,7 @@ import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
-import { generateStructuredStream } from './RunAnywhere+TextGeneration';
+import { generateStructuredStream, type JSONSchemaDescriptor } from './RunAnywhere+TextGeneration';
 
 export type {
   StructuredOutputOptions,
@@ -44,8 +44,12 @@ type StructuredOutputExport =
   | '_rac_structured_output_prepare_prompt_proto'
   | '_rac_structured_output_validate_proto';
 
-type StructuredOutputSchema<T = unknown> = {
-  jsonSchema: string;
+// Schema accepted by the structured-output verbs. Composed from the canonical
+// `JSONSchemaDescriptor` (jsonSchema + parse) so there is a single source of
+// truth for the descriptor shape; the typed `parse` override narrows the
+// return type to `T` and the structured-output knobs are pulled from the
+// generated `StructuredOutputOptions` message.
+type StructuredOutputSchema<T = unknown> = Omit<JSONSchemaDescriptor, 'parse'> & {
   parse?: (text: string) => T;
 } & Partial<Pick<
   StructuredOutputOptions,

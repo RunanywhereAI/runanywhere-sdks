@@ -21,27 +21,35 @@
  */
 
 import {
-  BatteryFilter,
-  ConfidenceCascade,
-  CustomFilter,
   HybridBackendKind,
-  HybridCascade,
-  HybridFilter,
   HybridModelDescriptor,
   HybridModelType,
   HybridRank,
-  HybridRoutedMetadata as ProtoHybridRoutedMetadata,
-  HybridRoutingContext,
+  HybridRoutedMetadata,
   HybridRoutingPolicy,
-  HybridSttTranscribeOptions,
   HybridSttTranscribeRequest,
   HybridSttTranscribeResponse,
+} from '@runanywhere/proto-ts/hybrid_router';
+import type {
+  BatteryFilter,
+  ConfidenceCascade,
+  CustomFilter,
+  HybridCascade,
+  HybridFilter,
+  HybridRoutingContext,
+  HybridSttTranscribeOptions,
 } from '@runanywhere/proto-ts/hybrid_router';
 
 // Re-export the wire enums so callers can use them directly without importing
 // from `@runanywhere/proto-ts` (the structured-types-as-data rule: provider is
 // data, backend is a wire enum).
 export { HybridBackendKind, HybridModelType, HybridRank };
+
+// Re-export the generated routing metadata so downstream consumers keep a
+// stable `HybridRoutedMetadata` import path from this module. The hand-written
+// copy was field-for-field identical to the proto type, so it was deleted in
+// favour of the generated one (idl/hybrid_router.proto).
+export { HybridRoutedMetadata };
 
 /** Default cloud STT provider when a caller omits one. Mirrors
  * `CloudSTT.defaultProvider` (Swift) / `BACKEND.DEFAULT_PROVIDER` (Kotlin). */
@@ -204,27 +212,6 @@ export interface HybridTranscribeOptions {
   audioFormat?: number;
 }
 
-/** Metadata describing the routing decision behind a transcribe result. */
-export interface HybridRoutedMetadata {
-  /** Model id of the candidate that produced the result. */
-  chosenModelId: string;
-  /** True when the secondary served the request after the primary failed or
-   * scored below the cascade threshold. */
-  wasFallback: boolean;
-  /** Backends invoked (1 = primary only, 2 = primary then secondary). */
-  attemptCount: number;
-  /** Native rac_result_t from the primary when `wasFallback` fired on an
-   * error; else 0. */
-  primaryErrorCode: number;
-  /** Human-readable reason the primary failed; else empty. */
-  primaryErrorMessage: string;
-  /** Final confidence of the chosen result. `NaN` when no quality signal. */
-  confidence: number;
-  /** Primary's confidence captured before a confidence-based cascade.
-   * `NaN` when no confidence cascade occurred. */
-  primaryConfidence: number;
-}
-
 /** One transcribe call's outcome through the hybrid STT router. */
 export interface HybridTranscribeResult {
   /** Transcript text from the chosen backend. */
@@ -325,7 +312,7 @@ export function encodeTranscribeRequest(
 }
 
 function decodeRoutedMetadata(
-  routing: ProtoHybridRoutedMetadata | undefined,
+  routing: HybridRoutedMetadata | undefined,
 ): HybridRoutedMetadata {
   // proto3 drops 0.0 on the wire, but commons sends NaN explicitly via the C++
   // encoder when no quality signal exists, so a present 0.0 stays 0.0. When the

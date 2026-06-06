@@ -115,8 +115,8 @@ export type {
 export { setStreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
 export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
 
-// SDKErrorCode is a @deprecated compat shim; prefer ProtoErrorCode from '@runanywhere/proto-ts/errors'.
-export { SDKErrorCode, SDKException, isSDKException } from './Foundation/SDKException';
+// For error codes use ProtoErrorCode from '@runanywhere/proto-ts/errors' (re-exported below).
+export { SDKException, isSDKException } from './Foundation/SDKException';
 export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException';
 export {
   ProtoErrorCategory,

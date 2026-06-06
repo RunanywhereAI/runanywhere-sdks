@@ -27,6 +27,7 @@ public val RacTestMode.displayName: String
         RacTestMode.RAC_TEST_MODE_FAST -> "Fast"
         RacTestMode.RAC_TEST_MODE_BALANCED -> "Balanced"
         RacTestMode.RAC_TEST_MODE_ACCURATE -> "Accurate"
+        else -> ""
     }
 
 /** Generated from `(runanywhere.v1.rac_analytics_key)` annotations in idl/. */
@@ -36,6 +37,7 @@ public val RacTestMode.analyticsKey: String
         RacTestMode.RAC_TEST_MODE_FAST -> "fast"
         RacTestMode.RAC_TEST_MODE_BALANCED -> "balanced"
         RacTestMode.RAC_TEST_MODE_ACCURATE -> "accurate"
+        else -> ""
     }
 
 /** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
@@ -45,6 +47,7 @@ public val RacTestMode.wireString: String
         RacTestMode.RAC_TEST_MODE_FAST -> "fast"
         RacTestMode.RAC_TEST_MODE_BALANCED -> "balanced"
         RacTestMode.RAC_TEST_MODE_ACCURATE -> "accurate"
+        else -> ""
     }
 
 /** Generated reverse of the `rac_wire_string` accessor. Case-insensitive. */

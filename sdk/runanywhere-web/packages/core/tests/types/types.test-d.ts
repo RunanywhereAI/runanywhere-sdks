@@ -7,7 +7,7 @@ import {
   RunAnywhere,
   SDKEnvironment,
   SDKException,
-  SDKErrorCode,
+  ProtoErrorCode,
   isSDKException,
   DownloadStage,
   DownloadState,
@@ -47,10 +47,10 @@ const genOpts: Partial<LLMGenerationOptions> = { temperature: 0.8 };
 expectType<number | undefined>(genOpts.temperature);
 
 // isSDKException must be a type guard
-const e: unknown = new SDKException(SDKErrorCode.NotInitialized, 'test');
+const e: unknown = new SDKException(-ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED, 'test');
 if (isSDKException(e)) {
-  const code: SDKErrorCode = e.code;
-  expectType<SDKErrorCode>(code);
+  const code: number = e.code;
+  expectType<number>(code);
 }
 
 const msg: ChatMessage = {

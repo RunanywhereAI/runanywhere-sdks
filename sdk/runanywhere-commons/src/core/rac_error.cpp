@@ -77,6 +77,8 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Cost limit exceeded";
         case RAC_ERROR_INFERENCE_FAILED:
             return "Inference failed";
+        case RAC_ERROR_GENERATION_CANCELLED:
+            return "Generation cancelled";
 
         // =================================================================
         // NETWORK ERRORS (-150 to -179)
@@ -315,6 +317,8 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_RUNTIME_UNAVAILABLE:
             return "No registered L1 runtime satisfies the engine's "
                    "declared runtimes on this host";
+        case RAC_ERROR_BACKEND_ERROR:
+            return "Backend error";
         case RAC_ERROR_INVALID_HANDLE:
             return "Invalid handle";
 

@@ -47,7 +47,7 @@ object BACKEND {
     object SHERPA {
         /** Speech-to-text capability over sherpa-onnx. */
         val STT: BackendId =
-            BackendId(kind = 3, family = "SHERPA", capability = "STT")
+            BackendId(kind = HybridBackendKind.HYBRID_BACKEND_SHERPA, family = "SHERPA", capability = "STT")
     }
 
     /**
@@ -64,7 +64,12 @@ object BACKEND {
          * come from the [register] entry looked up at service-create time.
          */
         val STT: BackendId =
-            BackendId(kind = 4, family = "CLOUD", capability = "STT", provider = DEFAULT_PROVIDER)
+            BackendId(
+                kind = HybridBackendKind.HYBRID_BACKEND_CLOUD,
+                family = "CLOUD",
+                capability = "STT",
+                provider = DEFAULT_PROVIDER,
+            )
 
         private val registry = ConcurrentHashMap<String, CloudModelEntry>()
 
@@ -282,10 +287,12 @@ object BACKEND {
  * callers receive these values and pass them to the router without ever
  * constructing them directly.
  *
- * @property kind        Wire value matching `HybridBackendKind` in the
- *                       hybrid_router.proto schema.
+ * @property kind        Structured backend identity (generated
+ *                       `HybridBackendKind` from the hybrid_router.proto
+ *                       schema). The adapter dispatches on this proto enum
+ *                       (not the [family] string) when routing service
+ *                       creation through the unified plugin registry.
  * @property family      Backend family name ("SHERPA", "CLOUD", ...).
- *                       The Kotlin adapter dispatches on [kindEnum], not this.
  * @property capability  Capability name ("STT", ...).
  * @property provider    Concrete cloud provider for a
  *                       [HybridBackendKind.HYBRID_BACKEND_CLOUD] backend
@@ -293,19 +300,14 @@ object BACKEND {
  *                       `provider` field. Empty for non-cloud backends.
  */
 class BackendId internal constructor(
-    val kind: Int,
+    val kind: HybridBackendKind,
     val family: String,
     val capability: String,
     val provider: String = "",
 ) {
-    /**
-     * Structured backend identity derived from [kind]. The adapter dispatches
-     * on this proto enum (not the [family] string) when routing service
-     * creation through the unified plugin registry. Unknown [kind] values map
-     * to [HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED].
-     */
+    /** Alias for [kind]; the adapter dispatches on this proto enum. */
     internal val kindEnum: HybridBackendKind
-        get() = HybridBackendKind.fromValue(kind) ?: HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
+        get() = kind
 }
 
 /**

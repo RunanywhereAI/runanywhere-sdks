@@ -5,37 +5,31 @@
  * Routes to console.* methods in the browser.
  */
 
-export enum LogLevel {
-  Trace = 0,
-  Debug = 1,
-  Info = 2,
-  Warning = 3,
-  Error = 4,
-  Fatal = 5,
-}
+// `LogLevel` and `LoggingConfiguration` are the generated proto types
+// (idl/logging.proto). The proto `LogLevel` mirrors the C ABI rac_log_level_t
+// (LOG_LEVEL_TRACE=0 .. LOG_LEVEL_FATAL=5), which is numerically identical to
+// the Web SDK's previous hand-written enum, so adopting it is value-stable.
+// Severity ordering ("larger = more severe") holds, so the `<` comparisons in
+// `log()` keep working. The hand-written `LoggingConfiguration` was a subset of
+// the generated one (which additionally carries enableRemoteLogging /
+// includeSourceLocation / includeDeviceMetadata); the console logger only acts
+// on the three fields it supported before and ignores the rest.
+import { LogLevel, type LoggingConfiguration } from '@runanywhere/proto-ts/logging';
 
-/** Map LogLevel to RACommons rac_log_level_t values */
+export { LogLevel };
+export type { LoggingConfiguration };
+
+/** Map LogLevel to RACommons rac_log_level_t values. Values are already
+ * C-ABI-aligned, so this is the identity mapping. */
 export const LOG_LEVEL_TO_RAC: Record<LogLevel, number> = {
-  [LogLevel.Trace]: 0,
-  [LogLevel.Debug]: 1,
-  [LogLevel.Info]: 2,
-  [LogLevel.Warning]: 3,
-  [LogLevel.Error]: 4,
-  [LogLevel.Fatal]: 5,
+  [LogLevel.LOG_LEVEL_TRACE]: 0,
+  [LogLevel.LOG_LEVEL_DEBUG]: 1,
+  [LogLevel.LOG_LEVEL_INFO]: 2,
+  [LogLevel.LOG_LEVEL_WARNING]: 3,
+  [LogLevel.LOG_LEVEL_ERROR]: 4,
+  [LogLevel.LOG_LEVEL_FATAL]: 5,
+  [LogLevel.UNRECOGNIZED]: -1,
 };
-
-/**
- * Configuration shape for the SDK logging system.
- * Mirrors Swift `LoggingConfiguration` in SDKLogger.swift.
- */
-export interface LoggingConfiguration {
-  /** Enable local console logging. */
-  enableLocalLogging: boolean;
-  /** Minimum severity to emit. */
-  minLogLevel: LogLevel;
-  /** Enable Sentry error forwarding. */
-  enableSentryLogging: boolean;
-}
 
 /**
  * Represents a destination that can receive log entries.
@@ -48,7 +42,7 @@ export interface LogDestination {
 }
 
 export class SDKLogger {
-  private static _level: LogLevel = LogLevel.Info;
+  private static _level: LogLevel = LogLevel.LOG_LEVEL_INFO;
   private static _enabled = true;
   private static _sentryEnabled = false;
   private static _extraDestinations: Map<string, LogDestination> = new Map();
@@ -116,23 +110,23 @@ export class SDKLogger {
   }
 
   trace(message: string): void {
-    this.log(LogLevel.Trace, message);
+    this.log(LogLevel.LOG_LEVEL_TRACE, message);
   }
 
   debug(message: string): void {
-    this.log(LogLevel.Debug, message);
+    this.log(LogLevel.LOG_LEVEL_DEBUG, message);
   }
 
   info(message: string): void {
-    this.log(LogLevel.Info, message);
+    this.log(LogLevel.LOG_LEVEL_INFO, message);
   }
 
   warning(message: string): void {
-    this.log(LogLevel.Warning, message);
+    this.log(LogLevel.LOG_LEVEL_WARNING, message);
   }
 
   error(message: string): void {
-    this.log(LogLevel.Error, message);
+    this.log(LogLevel.LOG_LEVEL_ERROR, message);
   }
 
   private log(level: LogLevel, message: string): void {
@@ -145,18 +139,21 @@ export class SDKLogger {
       const prefix = `[RunAnywhere:${this.category}]`;
 
       switch (level) {
-        case LogLevel.Trace:
-        case LogLevel.Debug:
+        case LogLevel.LOG_LEVEL_TRACE:
+        case LogLevel.LOG_LEVEL_DEBUG:
           console.debug(prefix, message);
           break;
-        case LogLevel.Info:
+        case LogLevel.LOG_LEVEL_INFO:
           console.info(prefix, message);
           break;
-        case LogLevel.Warning:
+        case LogLevel.LOG_LEVEL_WARNING:
           console.warn(prefix, message);
           break;
-        case LogLevel.Error:
-        case LogLevel.Fatal:
+        case LogLevel.LOG_LEVEL_ERROR:
+        case LogLevel.LOG_LEVEL_FATAL:
+          console.error(prefix, message);
+          break;
+        case LogLevel.UNRECOGNIZED:
           console.error(prefix, message);
           break;
       }

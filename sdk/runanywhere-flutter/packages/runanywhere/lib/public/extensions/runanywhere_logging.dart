@@ -12,105 +12,65 @@
 //   - setDebugMode(bool)
 //   - flushLogs()
 //
-// Public types (matches Swift):
-//   - LogLevel             (re-exported from foundation/logging/sdk_logger.dart)
-//   - LoggingConfiguration (struct with .development/.staging/.production presets)
-//   - LogDestination       (abstract sink interface)
-//   - LogEntry             (single log record)
+// Public types:
+//   - LogLevel             (generated, re-exported via sdk_logger.dart)
+//   - LoggingConfiguration (generated proto message; per-environment presets
+//                           below stay in Dart as factory helpers)
+//   - LogEntry             (generated proto message — single log record)
+//   - LogDestination       (hand-written host-side sink interface)
 
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/logging.pb.dart'
+    show LoggingConfiguration, LogEntry;
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 
-/// Convert [LogLevel] to the C++ log level integer (`rac_log_level_t`).
-///
-/// C++ enum ordering: `TRACE=0, DEBUG=1, INFO=2, WARNING=3, ERROR=4,
-/// FATAL=5`. Swift's `.fault` (the highest level) maps to C++ `FATAL`.
-/// Mirrors Swift `LogLevel` raw values via the same DEBUG..FAULT order.
-extension LogLevelC on LogLevel {
-  int toC() {
-    switch (this) {
-      case LogLevel.debug:
-        return 1;
-      case LogLevel.info:
-        return 2;
-      case LogLevel.warning:
-        return 3;
-      case LogLevel.error:
-        return 4;
-      case LogLevel.fault:
-        return 5;
-    }
-  }
-}
+/// Per-environment [LoggingConfiguration] presets. The generated proto message
+/// cannot be `const`-constructed, so the development/staging/production presets
+/// that used to be `static const` fields on the hand-written class now live
+/// here as factory helpers (mirrors Swift's environment factory helpers).
+class LoggingConfigurations {
+  LoggingConfigurations._();
 
-/// Single log message with metadata. Mirrors Swift's `LogEntry`.
-class LogEntry {
-  final DateTime timestamp;
-  final LogLevel level;
-  final String category;
-  final String message;
-  final Map<String, String>? metadata;
-
-  LogEntry({
-    DateTime? timestamp,
-    required this.level,
-    required this.category,
-    required this.message,
-    this.metadata,
-  }) : timestamp = timestamp ?? DateTime.now();
-}
-
-/// SDK logging configuration. Mirrors Swift's `LoggingConfiguration` struct.
-class LoggingConfiguration {
-  /// Whether local console logging is enabled.
-  final bool enableLocalLogging;
-
-  /// Minimum log level — messages below this severity are dropped.
-  final LogLevel minLogLevel;
-
-  /// Whether to attach device metadata (model, OS version, etc.) to
-  /// each log entry.
-  final bool includeDeviceMetadata;
-
-  /// Whether to ship error-level events to Sentry.
-  final bool enableSentryLogging;
-
-  const LoggingConfiguration({
-    this.enableLocalLogging = true,
-    this.minLogLevel = LogLevel.info,
-    this.includeDeviceMetadata = true,
-    this.enableSentryLogging = false,
-  });
+  /// Default configuration: local logging on, INFO floor, device metadata on,
+  /// Sentry off. Replaces the old `const LoggingConfiguration()` default.
+  static LoggingConfiguration get defaults => LoggingConfiguration(
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_INFO,
+        includeDeviceMetadata: true,
+        enableSentryLogging: false,
+      );
 
   /// Development preset — verbose logging, Sentry on (matches Swift).
-  static const development = LoggingConfiguration(
-    enableLocalLogging: true,
-    minLogLevel: LogLevel.debug,
-    includeDeviceMetadata: false,
-    enableSentryLogging: true,
-  );
+  static LoggingConfiguration get development => LoggingConfiguration(
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
+        includeDeviceMetadata: false,
+        enableSentryLogging: true,
+      );
 
   /// Staging preset — info-level logging, Sentry off (matches Swift).
-  static const staging = LoggingConfiguration(
-    enableLocalLogging: true,
-    minLogLevel: LogLevel.info,
-    includeDeviceMetadata: true,
-    enableSentryLogging: false,
-  );
+  static LoggingConfiguration get staging => LoggingConfiguration(
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_INFO,
+        includeDeviceMetadata: true,
+        enableSentryLogging: false,
+      );
 
   /// Production preset — warnings + errors only, local logging off,
   /// Sentry off (matches Swift).
-  static const production = LoggingConfiguration(
-    enableLocalLogging: false,
-    minLogLevel: LogLevel.warning,
-    includeDeviceMetadata: true,
-    enableSentryLogging: false,
-  );
+  static LoggingConfiguration get production => LoggingConfiguration(
+        enableLocalLogging: false,
+        minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+        includeDeviceMetadata: true,
+        enableSentryLogging: false,
+      );
 }
 
 /// A pluggable log sink. Implement this to route SDK logs to your own
 /// telemetry/file/network destination. Mirrors Swift's `LogDestination`
-/// protocol.
+/// protocol. This is a host-side interface (carries no wire payload) and so
+/// stays hand-written rather than moving to the proto contract.
 abstract class LogDestination {
   /// Stable identifier for this destination (e.g. `"console"`,
   /// `"sentry"`, `"file"`). Used to deduplicate registrations.
@@ -186,7 +146,8 @@ class RunAnywhereLogging {
   /// Enable verbose debugging mode.
   /// Mirrors Swift's `setDebugMode(_:)`.
   static void setDebugMode(bool enabled) {
-    setLogLevel(enabled ? LogLevel.debug : LogLevel.info);
+    setLogLevel(
+        enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
     setLocalLoggingEnabled(enabled);
   }
 
@@ -207,7 +168,7 @@ class SDKLoggerConfig {
   SDKLoggerConfig._();
   static final SDKLoggerConfig shared = SDKLoggerConfig._();
 
-  LoggingConfiguration _configuration = const LoggingConfiguration();
+  LoggingConfiguration _configuration = LoggingConfigurations.defaults;
   final List<LogDestination> _destinations = <LogDestination>[];
 
   LoggingConfiguration get configuration => _configuration;
@@ -219,30 +180,15 @@ class SDKLoggerConfig {
   }
 
   void setMinLogLevel(LogLevel level) {
-    _configuration = LoggingConfiguration(
-      enableLocalLogging: _configuration.enableLocalLogging,
-      minLogLevel: level,
-      includeDeviceMetadata: _configuration.includeDeviceMetadata,
-      enableSentryLogging: _configuration.enableSentryLogging,
-    );
+    _configuration = _configuration.deepCopy()..minLogLevel = level;
   }
 
   void setLocalLoggingEnabled(bool enabled) {
-    _configuration = LoggingConfiguration(
-      enableLocalLogging: enabled,
-      minLogLevel: _configuration.minLogLevel,
-      includeDeviceMetadata: _configuration.includeDeviceMetadata,
-      enableSentryLogging: _configuration.enableSentryLogging,
-    );
+    _configuration = _configuration.deepCopy()..enableLocalLogging = enabled;
   }
 
   void setSentryLoggingEnabled(bool enabled) {
-    _configuration = LoggingConfiguration(
-      enableLocalLogging: _configuration.enableLocalLogging,
-      minLogLevel: _configuration.minLogLevel,
-      includeDeviceMetadata: _configuration.includeDeviceMetadata,
-      enableSentryLogging: enabled,
-    );
+    _configuration = _configuration.deepCopy()..enableSentryLogging = enabled;
   }
 
   void addDestination(LogDestination destination) {

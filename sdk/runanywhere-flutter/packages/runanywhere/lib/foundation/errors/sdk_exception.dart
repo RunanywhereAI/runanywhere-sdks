@@ -37,12 +37,12 @@ class SDKException implements Exception {
   /// programmatically identify the failing field without parsing the
   /// human-readable message.
   ///
-  /// Backed by `error.context.metadata["field_path"]` — the wire-canonical
-  /// carrier shared with Swift / Kotlin / TS.
+  /// Backed by the typed `error.context.fieldPath` proto field — the
+  /// wire-canonical carrier shared with Swift / Kotlin / TS.
   String? get fieldPath {
     if (!error.hasContext()) return null;
-    final m = error.context.metadata;
-    return m['field_path'];
+    final fieldPath = error.context.fieldPath;
+    return fieldPath.isNotEmpty ? fieldPath : null;
   }
 
   @override
@@ -72,8 +72,7 @@ class SDKException implements Exception {
       err.cAbiCode = -raw;
     }
     if (fieldPath != null) {
-      err.context =
-          pb.ErrorContext(metadata: <String, String>{'field_path': fieldPath}.entries);
+      err.context = pb.ErrorContext(fieldPath: fieldPath);
     }
     return SDKException(
       err,
@@ -289,8 +288,8 @@ class SDKException implements Exception {
   ///
   /// When [fieldPath] is provided (e.g. `"STTOptions.sampleRate"`), the
   /// canonical proto code switches to `ERROR_CODE_INVALID_ARGUMENT` and
-  /// the field path is stored on `error.context.metadata["field_path"]` —
-  /// matching the shape emitted by `idl/codegen/generate_*_convenience.py`
+  /// the field path is stored on the typed `error.context.fieldPath` proto
+  /// field — matching the shape emitted by `idl/codegen/generate_*_convenience.py`
   /// across Swift / Kotlin / TS.
   ///
   /// Without [fieldPath], retains the legacy "Validation failed: …"

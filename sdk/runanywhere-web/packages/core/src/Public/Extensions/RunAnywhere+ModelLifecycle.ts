@@ -16,7 +16,7 @@ import type {
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
 import { prepareModelLoad, recoverModelLoadFailure } from '../../Foundation/RuntimeConfig';
-import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
+import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
 import {
@@ -144,7 +144,7 @@ export const WebModelLifecycle = {
           }
         } catch (err) {
           throw SDKException.fromCode(
-            SDKErrorCode.ModelLoadFailed,
+            -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
             err instanceof Error ? err.message : String(err),
             'loadModel',
           );

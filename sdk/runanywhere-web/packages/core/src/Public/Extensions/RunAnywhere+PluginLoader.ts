@@ -6,16 +6,14 @@
  * host exposes the dynamic loader ABI.
  */
 
+import type { PluginInfo } from '@runanywhere/proto-ts/plugin_loader';
 import { SDKException } from '../../Foundation/SDKException';
 import {
   tryRunanywhereModule,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
 
-export interface PluginInfo {
-  name: string;
-  path: string;
-}
+export type { PluginInfo };
 
 interface PluginLoaderModule extends EmscriptenRunanywhereModule {
   _rac_plugin_api_version?(): number;

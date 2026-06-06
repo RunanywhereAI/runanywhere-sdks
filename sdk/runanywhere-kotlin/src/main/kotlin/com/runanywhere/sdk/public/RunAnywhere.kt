@@ -33,7 +33,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.extensions.LogLevel
+import ai.runanywhere.proto.v1.LogLevel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -327,10 +327,10 @@ object RunAnywhere {
                 // `Logging.shared.applyEnvironmentConfiguration(params.environment)`.
                 val logLevel =
                     when (params.environment) {
-                        SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
-                        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
-                        SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
-                        SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.DEBUG
+                        SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.LOG_LEVEL_DEBUG
+                        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.LOG_LEVEL_INFO
+                        SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.LOG_LEVEL_WARNING
+                        SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.LOG_LEVEL_DEBUG
                     }
                 SDKLogger.setLevel(logLevel)
 

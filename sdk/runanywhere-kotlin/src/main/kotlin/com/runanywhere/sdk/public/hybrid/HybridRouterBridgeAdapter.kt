@@ -26,6 +26,7 @@
 
 package com.runanywhere.sdk.public.hybrid
 
+import ai.runanywhere.proto.v1.CloudSttBackendConfig
 import ai.runanywhere.proto.v1.HybridBackendKind
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import org.json.JSONObject
@@ -113,19 +114,44 @@ internal object HybridRouterBridgeAdapter {
                     "Call BACKEND.CLOUD.register(id, model, apiKey) at app startup.",
             )
         val provider = entry.provider.ifBlank { backendProvider }.ifBlank { BACKEND.DEFAULT_PROVIDER }
-        val configJson = JSONObject()
-            .put("provider", provider)
-            .put("api_key", entry.apiKey)
-            .put("model", entry.model)
-        entry.languageCode?.let { configJson.put("language_code", it) }
-        entry.baseUrl?.let { configJson.put("base_url", it) }
-        entry.timeoutMs?.let { configJson.put("timeout_ms", it) }
+        // Carry the cloud config in the generated wire-schema shape. The
+        // optional fields stay at their proto defaults (empty/0) when the entry
+        // omits them; toSnakeCaseJson() then drops those so the provider
+        // auto-detects (language) / uses its own default (base URL / timeout)
+        // rather than seeing a literal empty value.
+        val config = CloudSttBackendConfig(
+            provider = provider,
+            model = entry.model,
+            api_key = entry.apiKey,
+            language_code = entry.languageCode.orEmpty(),
+            base_url = entry.baseUrl.orEmpty(),
+            timeout_ms = entry.timeoutMs ?: 0,
+        )
         return RunAnywhereBridge.racSttHybridRouterCreateService(
             engineHint = CLOUD_ENGINE_HINT,
             // Cloud engine takes everything via config_json; no model path.
             modelIdOrPath = "",
-            configJson = configJson.toString(),
+            configJson = config.toSnakeCaseJson(),
         )
+    }
+
+    /**
+     * Serialise a [CloudSttBackendConfig] to the snake_case JSON the cloud_stt
+     * engine reads. The generated Wire JSON encoder emits camelCase
+     * (`apiKey`, `languageCode`, …) per the proto `jsonName`, which the engine
+     * does NOT understand — so build the snake_case object explicitly here.
+     * Optional fields at their proto default are omitted so the provider
+     * auto-detects / falls back to its own defaults.
+     */
+    private fun CloudSttBackendConfig.toSnakeCaseJson(): String {
+        val json = JSONObject()
+            .put("provider", provider)
+            .put("api_key", api_key)
+            .put("model", model)
+        if (language_code.isNotEmpty()) json.put("language_code", language_code)
+        if (base_url.isNotEmpty()) json.put("base_url", base_url)
+        if (timeout_ms != 0) json.put("timeout_ms", timeout_ms)
+        return json.toString()
     }
 
     /** Engine hint pinned as `preferred_engine_name` for the cloud route. */

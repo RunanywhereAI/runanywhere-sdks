@@ -54,7 +54,7 @@ import 'package:runanywhere/public/hybrid/hybrid_routing_policy.dart';
 ///   ),
 /// );
 /// final result = router.transcribe(audioBytes,
-///     options: const HybridTranscribeOptions(audioFormat: 1));
+///     options: pb.HybridSttTranscribeOptions(audioFormat: 1));
 /// router.close();
 /// ```
 class HybridSttRouter {
@@ -163,9 +163,16 @@ class HybridSttRouter {
   /// [audioBytes] is file-encoded audio (wav/mp3/flac/...) OR raw PCM; each
   /// engine decodes per its own expectations. Throws [HybridTranscribeException]
   /// when the backend reports a non-zero rc, [StateError] on native failure.
-  HybridTranscribeResult transcribe(
+  ///
+  /// Returns the generated `HybridSttTranscribeResponse` (rc is always 0 on a
+  /// successful return; the transcript is in `.text`, the routing decision in
+  /// `.routing`). On the `.routing` metadata, `confidence` /
+  /// `primaryConfidence` are absent (`hasConfidence()` / `hasPrimaryConfidence()`
+  /// are false) when the engine surfaced no quality signal — guard on those
+  /// accessors rather than reading the 0.0 default.
+  pb.HybridSttTranscribeResponse transcribe(
     Uint8List audioBytes, {
-    HybridTranscribeOptions options = const HybridTranscribeOptions(),
+    pb.HybridSttTranscribeOptions? options,
   }) {
     _ensureOpen();
     if (_offline == null || _online == null) {
@@ -179,11 +186,7 @@ class HybridSttRouter {
     final request = pb.HybridSttTranscribeRequest(
       audioBytes: audioBytes,
       context: pb.HybridRoutingContext(),
-      options: pb.HybridSttTranscribeOptions(
-        language: options.language,
-        sampleRate: options.sampleRate,
-        audioFormat: options.audioFormat,
-      ),
+      options: options ?? pb.HybridSttTranscribeOptions(),
     );
 
     final responseBytes = _bridge.transcribe(_handle, request.writeToBuffer());
@@ -215,7 +218,7 @@ class HybridSttRouter {
           'RunAnywhere.hybrid.cloud.register(id, model, apiKey) at app startup.',
         );
       }
-      configJson = entry.toConfigJson();
+      configJson = cloudSttConfigJson(entry);
       // Cloud engine takes everything via config_json; no model path.
       return _bridge.createService(
         engineHint: model.backend.engineHint,
@@ -269,7 +272,7 @@ class HybridSttRouter {
     }
   }
 
-  HybridTranscribeResult _decodeResponse(Uint8List bytes) {
+  pb.HybridSttTranscribeResponse _decodeResponse(Uint8List bytes) {
     final response = pb.HybridSttTranscribeResponse.fromBuffer(bytes);
     if (response.rc != 0) {
       throw HybridTranscribeException(
@@ -279,24 +282,7 @@ class HybridSttRouter {
             : response.errorMsg,
       );
     }
-    final routing = response.routing;
-    return HybridTranscribeResult(
-      text: response.text,
-      detectedLanguage: response.detectedLanguage,
-      routing: HybridRoutedMetadata(
-        chosenModelId: routing.chosenModelId,
-        wasFallback: routing.wasFallback,
-        attemptCount: routing.attemptCount,
-        primaryErrorCode: routing.primaryErrorCode,
-        primaryErrorMessage: routing.primaryErrorMessage,
-        // Default to NaN when the engine surfaced no quality signal (the field
-        // is then absent on the wire).
-        confidence: routing.hasConfidence() ? routing.confidence : double.nan,
-        primaryConfidence: routing.hasPrimaryConfidence()
-            ? routing.primaryConfidence
-            : double.nan,
-      ),
-    );
+    return response;
   }
 }
 

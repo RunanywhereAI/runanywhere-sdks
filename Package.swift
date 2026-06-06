@@ -53,7 +53,7 @@ import Foundation
 // the same — it's been renamed to `useLocalNatives` for consistency with the
 // equivalent toggle in the other client SDKs (Kotlin, Flutter, React Native).
 // =============================================================================
-let useLocalNatives = false // Toggle: false for release (default committed to main); local devs flip to true and run ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+let useLocalNatives = true // Toggle: false for release (default committed to main); local devs flip to true and run ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases.

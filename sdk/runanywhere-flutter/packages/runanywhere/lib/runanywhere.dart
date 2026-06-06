@@ -53,13 +53,13 @@ export 'public/extensions/runanywhere_structured_output.dart'
 export 'public/extensions/stt/stt_options_helpers.dart';
 // Hybrid STT router public types (model/backend identity, routing policy,
 // cloud-backend registry, device-state provider, router + result). The
-// capability facade is `RunAnywhere.hybrid`. The friendly type names
-// (HybridFilter/HybridCascade/HybridRoutingPolicy/HybridRoutedMetadata) shadow
-// the same-named raw proto messages in the unprefixed barrel — those proto
-// messages stay reachable via `import '.../runanywhere_protos.dart' as ra_proto`
-// (see the hide on the runanywhere_protos export below).
+// capability facade is `RunAnywhere.hybrid`. The friendly policy type names
+// (HybridFilter/HybridCascade/HybridRoutingPolicy) shadow the same-named raw
+// proto messages in the unprefixed barrel — those proto messages stay reachable
+// via `import '.../runanywhere_protos.dart' as ra_proto` (see the hide on the
+// runanywhere_protos export below).
 export 'public/hybrid/hybrid_cloud_backend.dart'
-    show CloudBackend, CloudModelEntry;
+    show CloudBackend, cloudSttConfigJson;
 export 'public/hybrid/hybrid_device_state.dart'
     show HybridDeviceState, HybridDeviceStateProvider;
 export 'public/hybrid/hybrid_model.dart'
@@ -67,9 +67,6 @@ export 'public/hybrid/hybrid_model.dart'
         HybridBackend,
         HybridModel,
         HybridModelKind,
-        HybridRoutedMetadata,
-        HybridTranscribeOptions,
-        HybridTranscribeResult,
         kHybridDefaultCloudProvider;
 export 'public/hybrid/hybrid_routing_policy.dart'
     show
@@ -87,9 +84,13 @@ export 'public/hybrid/hybrid_stt_router.dart'
     show HybridSttRouter, HybridTranscribeException;
 export 'public/runanywhere.dart' show RunAnywhere;
 export 'public/system_tts.dart' show SystemTTS;
-// Hide the four hybrid proto messages whose names the friendly public hybrid
-// types above re-use, so the unprefixed barrel resolves them to the public
-// types. The raw messages remain available via the prefixed
-// `runanywhere_protos.dart` import.
+// Hide the hybrid proto messages whose names the friendly public hybrid policy
+// types above re-use (the sealed-class HybridFilter/HybridCascade facades that
+// carry host-side closures), so the unprefixed barrel resolves them to the
+// public types. The raw messages remain available via the prefixed
+// `runanywhere_protos.dart` import. `HybridRoutedMetadata`,
+// `HybridSttTranscribeOptions`, and `HybridSttTranscribeResponse` are NOT
+// hidden — they are now the canonical generated transcribe types exposed
+// directly by [HybridSttRouter.transcribe].
 export 'runanywhere_protos.dart'
-    hide HybridCascade, HybridFilter, HybridRoutedMetadata, HybridRoutingPolicy;
+    hide HybridCascade, HybridFilter, HybridRoutingPolicy;
