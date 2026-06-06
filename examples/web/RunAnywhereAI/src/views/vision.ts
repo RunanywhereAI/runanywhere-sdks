@@ -19,8 +19,8 @@
 import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
+  ProtoErrorCode,
   RunAnywhere,
-  SDKErrorCode,
   VLMImageFormat,
   VLMModelFamily,
   isSDKException,
@@ -121,7 +121,7 @@ async function syncVisionLanguageProvider(): Promise<void> {
     // Provider not registered yet (LlamaCPP backend missing or still
     // initializing) is expected; surface real failures via status panel
     // so the user can see why Analyze keeps rejecting.
-    if (isSDKException(err) && err.code === SDKErrorCode.BackendNotAvailable) return;
+    if (isSDKException(err) && err.protoCode === ProtoErrorCode.ERROR_CODE_BACKEND_NOT_FOUND) return;
     setStatus(`VLM provider sync failed: ${formatErr(err)}`);
   }
 }
