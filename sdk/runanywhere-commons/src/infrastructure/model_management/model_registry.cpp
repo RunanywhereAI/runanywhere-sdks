@@ -1535,28 +1535,57 @@ static InferenceFramework infer_framework_from_format(ModelFormat format) {
 // This mirrors the pre-v2 Swift ModelInfoService.discoverDownloadedModels()
 // behavior behind the shared C ABI so every SDK benefits once.
 
-static bool directory_contains_recognizable_model_file(const std::filesystem::path& dir) {
-    namespace fs = std::filesystem;
-    std::error_code ec;
-    if (!fs::is_directory(dir, ec)) {
+// Forward declaration — defined later in this TU. Reused here so cold-launch
+// reconciliation enumerates folders through the platform adapter (works on
+// native AND Web/OPFS, where std::filesystem sees nothing).
+rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, const char* dir_path,
+                                        std::vector<rac_directory_entry_t>* out_entries);
+
+// Recognize a model file purely by extension (ModelFormat-agnostic).
+static bool is_recognizable_model_filename(const std::string& name) {
+    const size_t dot = name.find_last_of('.');
+    if (dot == std::string::npos) {
         return false;
     }
-    // ModelFormat-agnostic recognition: any known model-file extension counts.
-    for (fs::recursive_directory_iterator
-             it(dir, fs::directory_options::skip_permission_denied, ec),
-         end;
-         !ec && it != end; it.increment(ec)) {
-        if (!it->is_regular_file(ec)) {
+    const std::string ext = lowercase_copy(name.substr(dot + 1));
+    return ext == "gguf" || ext == "ggml" || ext == "onnx" || ext == "ort" || ext == "bin" ||
+           ext == "mlmodel" || ext == "mlpackage" || ext == "mlmodelc" || ext == "tflite" ||
+           ext == "safetensors";
+}
+
+// Does `dir` (one level, plus one nested level for archive-extracted layouts
+// like sherpa) contain a recognizable model file? Enumerates through the
+// platform adapter so this works identically on native and Web/OPFS —
+// std::filesystem cannot see the OPFS virtual filesystem, which is why the Web
+// SDK previously needed its own hydrateModelRegistry pass.
+static bool directory_contains_recognizable_model_file(const std::string& dir) {
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (!adapter || !adapter->file_list_directory) {
+        RAC_LOG_WARNING("ModelRegistry",
+                        "file_list_directory adapter slot is NULL — cannot reconcile '%s'",
+                        dir.c_str());
+        return false;
+    }
+    std::vector<rac_directory_entry_t> entries;
+    if (list_directory_via_adapter(adapter, dir.c_str(), &entries) != RAC_SUCCESS) {
+        return false;
+    }
+    for (const rac_directory_entry_t& entry : entries) {
+        if (!entry.is_dir) {
+            if (is_recognizable_model_filename(entry.name)) {
+                return true;
+            }
             continue;
         }
-        std::string ext = lowercase_copy(it->path().extension().generic_string());
-        if (!ext.empty() && ext.front() == '.') {
-            ext.erase(ext.begin());
-        }
-        if (ext == "gguf" || ext == "ggml" || ext == "onnx" || ext == "ort" || ext == "bin" ||
-            ext == "mlmodel" || ext == "mlpackage" || ext == "mlmodelc" || ext == "tflite" ||
-            ext == "safetensors") {
-            return true;
+        // One level of recursion for nested model folders.
+        std::vector<rac_directory_entry_t> nested;
+        const std::string subdir = dir + "/" + entry.name;
+        if (list_directory_via_adapter(adapter, subdir.c_str(), &nested) == RAC_SUCCESS) {
+            for (const rac_directory_entry_t& sub : nested) {
+                if (!sub.is_dir && is_recognizable_model_filename(sub.name)) {
+                    return true;
+                }
+            }
         }
     }
     return false;
@@ -1604,7 +1633,7 @@ static bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t ha
         return false;
     }
     const std::filesystem::path folder = canonical_model_folder_for(model->id, model->framework);
-    if (folder.empty() || !directory_contains_recognizable_model_file(folder)) {
+    if (folder.empty() || !directory_contains_recognizable_model_file(folder.generic_string())) {
         return false;
     }
 
