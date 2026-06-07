@@ -5,7 +5,7 @@
 //   protoc               v7.35.0
 // source: sdk_events.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SDKEvent = exports.FailureEvent = exports.CancellationEvent = exports.TelemetryEvent_AttributesEntry = exports.TelemetryEvent = exports.CapabilityOperationEvent = exports.HardwareRoutingEvent = exports.StorageLifecycleEvent = exports.DownloadEvent = exports.ModelRegistryEvent = exports.AuthEvent = exports.SessionEvent = exports.ComponentLifecycleEvent = exports.ComponentLifecycleSnapshotResult = exports.ComponentLifecycleSnapshotRequest = exports.ComponentLifecycleSnapshot = exports.ComponentInitializationEvent = exports.DeviceEvent = exports.FrameworkEvent = exports.StorageEvent = exports.NetworkEvent = exports.PerformanceEvent = exports.VoiceLifecycleEvent = exports.ModelEvent = exports.GenerationEvent = exports.ConfigurationEvent = exports.InitializationEvent = exports.CancellationEventKind = exports.TelemetryEventKind = exports.CapabilityOperationEventKind = exports.HardwareRoutingEventKind = exports.StorageLifecycleEventKind = exports.DownloadEventKind = exports.ModelRegistryEventKind = exports.AuthEventKind = exports.SessionEventKind = exports.ComponentInitializationEventKind = exports.DeviceEventKind = exports.FrameworkEventKind = exports.StorageEventKind = exports.NetworkEventKind = exports.PerformanceEventKind = exports.VoiceEventKind = exports.ModelEventKind = exports.GenerationEventKind = exports.ConfigurationEventKind = exports.InitializationStage = exports.EventDestination = exports.SDKComponent = exports.protobufPackage = void 0;
+exports.SDKEvent = exports.FailureEvent = exports.CancellationEvent = exports.TelemetryEvent_AttributesEntry = exports.TelemetryEvent = exports.PerformanceEvent = exports.HardwareRoutingEvent = exports.FrameworkEvent = exports.NetworkEvent = exports.DeviceEvent = exports.AuthEvent = exports.StorageLifecycleEvent = exports.StorageEvent = exports.DownloadEvent = exports.ModelRegistryEvent = exports.ModelEvent = exports.CapabilityOperationEvent = exports.VoiceLifecycleEvent = exports.GenerationEvent = exports.SessionEvent = exports.ComponentLifecycleEvent = exports.ComponentLifecycleSnapshotResult = exports.ComponentLifecycleSnapshotRequest = exports.ComponentLifecycleSnapshot = exports.ComponentInitializationEvent = exports.ConfigurationEvent = exports.InitializationEvent = exports.CancellationEventKind = exports.TelemetryEventKind = exports.PerformanceEventKind = exports.HardwareRoutingEventKind = exports.FrameworkEventKind = exports.NetworkEventKind = exports.DeviceEventKind = exports.AuthEventKind = exports.StorageLifecycleEventKind = exports.StorageEventKind = exports.DownloadEventKind = exports.ModelRegistryEventKind = exports.ModelEventKind = exports.CapabilityOperationEventKind = exports.VoiceEventKind = exports.GenerationEventKind = exports.SessionEventKind = exports.ComponentInitializationEventKind = exports.ConfigurationEventKind = exports.InitializationStage = exports.EventDestination = exports.SDKComponent = exports.protobufPackage = void 0;
 exports.SDKEventSubscribeRequest = exports.SDKEventPublishResult = exports.SDKEventPublishRequest = exports.SDKEventFilter = exports.SDKEvent_PropertiesEntry = void 0;
 exports.sDKComponentFromJSON = sDKComponentFromJSON;
 exports.sDKComponentToJSON = sDKComponentToJSON;
@@ -15,38 +15,38 @@ exports.initializationStageFromJSON = initializationStageFromJSON;
 exports.initializationStageToJSON = initializationStageToJSON;
 exports.configurationEventKindFromJSON = configurationEventKindFromJSON;
 exports.configurationEventKindToJSON = configurationEventKindToJSON;
-exports.generationEventKindFromJSON = generationEventKindFromJSON;
-exports.generationEventKindToJSON = generationEventKindToJSON;
-exports.modelEventKindFromJSON = modelEventKindFromJSON;
-exports.modelEventKindToJSON = modelEventKindToJSON;
-exports.voiceEventKindFromJSON = voiceEventKindFromJSON;
-exports.voiceEventKindToJSON = voiceEventKindToJSON;
-exports.performanceEventKindFromJSON = performanceEventKindFromJSON;
-exports.performanceEventKindToJSON = performanceEventKindToJSON;
-exports.networkEventKindFromJSON = networkEventKindFromJSON;
-exports.networkEventKindToJSON = networkEventKindToJSON;
-exports.storageEventKindFromJSON = storageEventKindFromJSON;
-exports.storageEventKindToJSON = storageEventKindToJSON;
-exports.frameworkEventKindFromJSON = frameworkEventKindFromJSON;
-exports.frameworkEventKindToJSON = frameworkEventKindToJSON;
-exports.deviceEventKindFromJSON = deviceEventKindFromJSON;
-exports.deviceEventKindToJSON = deviceEventKindToJSON;
 exports.componentInitializationEventKindFromJSON = componentInitializationEventKindFromJSON;
 exports.componentInitializationEventKindToJSON = componentInitializationEventKindToJSON;
 exports.sessionEventKindFromJSON = sessionEventKindFromJSON;
 exports.sessionEventKindToJSON = sessionEventKindToJSON;
-exports.authEventKindFromJSON = authEventKindFromJSON;
-exports.authEventKindToJSON = authEventKindToJSON;
+exports.generationEventKindFromJSON = generationEventKindFromJSON;
+exports.generationEventKindToJSON = generationEventKindToJSON;
+exports.voiceEventKindFromJSON = voiceEventKindFromJSON;
+exports.voiceEventKindToJSON = voiceEventKindToJSON;
+exports.capabilityOperationEventKindFromJSON = capabilityOperationEventKindFromJSON;
+exports.capabilityOperationEventKindToJSON = capabilityOperationEventKindToJSON;
+exports.modelEventKindFromJSON = modelEventKindFromJSON;
+exports.modelEventKindToJSON = modelEventKindToJSON;
 exports.modelRegistryEventKindFromJSON = modelRegistryEventKindFromJSON;
 exports.modelRegistryEventKindToJSON = modelRegistryEventKindToJSON;
 exports.downloadEventKindFromJSON = downloadEventKindFromJSON;
 exports.downloadEventKindToJSON = downloadEventKindToJSON;
+exports.storageEventKindFromJSON = storageEventKindFromJSON;
+exports.storageEventKindToJSON = storageEventKindToJSON;
 exports.storageLifecycleEventKindFromJSON = storageLifecycleEventKindFromJSON;
 exports.storageLifecycleEventKindToJSON = storageLifecycleEventKindToJSON;
+exports.authEventKindFromJSON = authEventKindFromJSON;
+exports.authEventKindToJSON = authEventKindToJSON;
+exports.deviceEventKindFromJSON = deviceEventKindFromJSON;
+exports.deviceEventKindToJSON = deviceEventKindToJSON;
+exports.networkEventKindFromJSON = networkEventKindFromJSON;
+exports.networkEventKindToJSON = networkEventKindToJSON;
+exports.frameworkEventKindFromJSON = frameworkEventKindFromJSON;
+exports.frameworkEventKindToJSON = frameworkEventKindToJSON;
 exports.hardwareRoutingEventKindFromJSON = hardwareRoutingEventKindFromJSON;
 exports.hardwareRoutingEventKindToJSON = hardwareRoutingEventKindToJSON;
-exports.capabilityOperationEventKindFromJSON = capabilityOperationEventKindFromJSON;
-exports.capabilityOperationEventKindToJSON = capabilityOperationEventKindToJSON;
+exports.performanceEventKindFromJSON = performanceEventKindFromJSON;
+exports.performanceEventKindToJSON = performanceEventKindToJSON;
 exports.telemetryEventKindFromJSON = telemetryEventKindFromJSON;
 exports.telemetryEventKindToJSON = telemetryEventKindToJSON;
 exports.cancellationEventKindFromJSON = cancellationEventKindFromJSON;
@@ -174,16 +174,22 @@ function sDKComponentToJSON(object) {
  *   Kotlin SDKEvent.kt:24-33          — PUBLIC_ONLY / ANALYTICS_ONLY / ALL
  *   Dart   sdk_event.dart:20-29       — all / publicOnly / analyticsOnly
  * ---------------------------------------------------------------------------
+ * Bitmask routing destination. Values are powers of two so they can be OR'd
+ * together; proto3 enums are open ints, so combinations round-trip on the wire
+ * without named constants. The C++ destination router reads this as a bitmask.
+ *   PUBLIC    — app-facing canonical SDKEvent proto stream
+ *   TELEMETRY — telemetry_manager / server analytics
+ *   LOG       — structured local log sink (opt-in)
+ *   ALL       — PUBLIC | TELEMETRY (legacy "all" parity; the publish() default)
  */
 var EventDestination;
 (function (EventDestination) {
     EventDestination[EventDestination["EVENT_DESTINATION_UNSPECIFIED"] = 0] = "EVENT_DESTINATION_UNSPECIFIED";
-    /** EVENT_DESTINATION_ALL - EventBus + Analytics (default) */
-    EventDestination[EventDestination["EVENT_DESTINATION_ALL"] = 1] = "EVENT_DESTINATION_ALL";
-    /** EVENT_DESTINATION_PUBLIC_ONLY - EventBus only */
-    EventDestination[EventDestination["EVENT_DESTINATION_PUBLIC_ONLY"] = 2] = "EVENT_DESTINATION_PUBLIC_ONLY";
-    /** EVENT_DESTINATION_ANALYTICS_ONLY - Analytics/telemetry only */
-    EventDestination[EventDestination["EVENT_DESTINATION_ANALYTICS_ONLY"] = 3] = "EVENT_DESTINATION_ANALYTICS_ONLY";
+    EventDestination[EventDestination["EVENT_DESTINATION_PUBLIC"] = 1] = "EVENT_DESTINATION_PUBLIC";
+    EventDestination[EventDestination["EVENT_DESTINATION_TELEMETRY"] = 2] = "EVENT_DESTINATION_TELEMETRY";
+    /** EVENT_DESTINATION_ALL - PUBLIC | TELEMETRY */
+    EventDestination[EventDestination["EVENT_DESTINATION_ALL"] = 3] = "EVENT_DESTINATION_ALL";
+    EventDestination[EventDestination["EVENT_DESTINATION_LOG"] = 4] = "EVENT_DESTINATION_LOG";
     EventDestination[EventDestination["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(EventDestination || (exports.EventDestination = EventDestination = {}));
 function eventDestinationFromJSON(object) {
@@ -192,14 +198,17 @@ function eventDestinationFromJSON(object) {
         case "EVENT_DESTINATION_UNSPECIFIED":
             return EventDestination.EVENT_DESTINATION_UNSPECIFIED;
         case 1:
+        case "EVENT_DESTINATION_PUBLIC":
+            return EventDestination.EVENT_DESTINATION_PUBLIC;
+        case 2:
+        case "EVENT_DESTINATION_TELEMETRY":
+            return EventDestination.EVENT_DESTINATION_TELEMETRY;
+        case 3:
         case "EVENT_DESTINATION_ALL":
             return EventDestination.EVENT_DESTINATION_ALL;
-        case 2:
-        case "EVENT_DESTINATION_PUBLIC_ONLY":
-            return EventDestination.EVENT_DESTINATION_PUBLIC_ONLY;
-        case 3:
-        case "EVENT_DESTINATION_ANALYTICS_ONLY":
-            return EventDestination.EVENT_DESTINATION_ANALYTICS_ONLY;
+        case 4:
+        case "EVENT_DESTINATION_LOG":
+            return EventDestination.EVENT_DESTINATION_LOG;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -210,12 +219,14 @@ function eventDestinationToJSON(object) {
     switch (object) {
         case EventDestination.EVENT_DESTINATION_UNSPECIFIED:
             return "EVENT_DESTINATION_UNSPECIFIED";
+        case EventDestination.EVENT_DESTINATION_PUBLIC:
+            return "EVENT_DESTINATION_PUBLIC";
+        case EventDestination.EVENT_DESTINATION_TELEMETRY:
+            return "EVENT_DESTINATION_TELEMETRY";
         case EventDestination.EVENT_DESTINATION_ALL:
             return "EVENT_DESTINATION_ALL";
-        case EventDestination.EVENT_DESTINATION_PUBLIC_ONLY:
-            return "EVENT_DESTINATION_PUBLIC_ONLY";
-        case EventDestination.EVENT_DESTINATION_ANALYTICS_ONLY:
-            return "EVENT_DESTINATION_ANALYTICS_ONLY";
+        case EventDestination.EVENT_DESTINATION_LOG:
+            return "EVENT_DESTINATION_LOG";
         case EventDestination.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -417,1077 +428,6 @@ function configurationEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-var GenerationEventKind;
-(function (GenerationEventKind) {
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_UNSPECIFIED"] = 0] = "GENERATION_EVENT_KIND_UNSPECIFIED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_SESSION_STARTED"] = 1] = "GENERATION_EVENT_KIND_SESSION_STARTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_SESSION_ENDED"] = 2] = "GENERATION_EVENT_KIND_SESSION_ENDED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STARTED"] = 3] = "GENERATION_EVENT_KIND_STARTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED"] = 4] = "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOKEN_GENERATED"] = 5] = "GENERATION_EVENT_KIND_TOKEN_GENERATED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAMING_UPDATE"] = 6] = "GENERATION_EVENT_KIND_STREAMING_UPDATE";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_COMPLETED"] = 7] = "GENERATION_EVENT_KIND_COMPLETED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_FAILED"] = 8] = "GENERATION_EVENT_KIND_FAILED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_MODEL_LOADED"] = 9] = "GENERATION_EVENT_KIND_MODEL_LOADED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_MODEL_UNLOADED"] = 10] = "GENERATION_EVENT_KIND_MODEL_UNLOADED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_COST_CALCULATED"] = 11] = "GENERATION_EVENT_KIND_COST_CALCULATED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_ROUTING_DECISION"] = 12] = "GENERATION_EVENT_KIND_ROUTING_DECISION";
-    /** GENERATION_EVENT_KIND_STREAM_COMPLETED - Kotlin LLMEvent.STREAM_COMPLETED */
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAM_COMPLETED"] = 13] = "GENERATION_EVENT_KIND_STREAM_COMPLETED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCEL_REQUESTED"] = 14] = "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCELLED"] = 15] = "GENERATION_EVENT_KIND_CANCELLED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_STARTED"] = 16] = "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED"] = 17] = "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_FAILED"] = 18] = "GENERATION_EVENT_KIND_TOOL_CALL_FAILED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED"] = 19] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED"] = 20] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED"] = 21] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_STARTED"] = 22] = "GENERATION_EVENT_KIND_THINKING_STARTED";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_DELTA"] = 23] = "GENERATION_EVENT_KIND_THINKING_DELTA";
-    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_COMPLETED"] = 24] = "GENERATION_EVENT_KIND_THINKING_COMPLETED";
-    GenerationEventKind[GenerationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(GenerationEventKind || (exports.GenerationEventKind = GenerationEventKind = {}));
-function generationEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "GENERATION_EVENT_KIND_UNSPECIFIED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "GENERATION_EVENT_KIND_SESSION_STARTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_SESSION_STARTED;
-        case 2:
-        case "GENERATION_EVENT_KIND_SESSION_ENDED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_SESSION_ENDED;
-        case 3:
-        case "GENERATION_EVENT_KIND_STARTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STARTED;
-        case 4:
-        case "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED;
-        case 5:
-        case "GENERATION_EVENT_KIND_TOKEN_GENERATED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED;
-        case 6:
-        case "GENERATION_EVENT_KIND_STREAMING_UPDATE":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STREAMING_UPDATE;
-        case 7:
-        case "GENERATION_EVENT_KIND_COMPLETED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED;
-        case 8:
-        case "GENERATION_EVENT_KIND_FAILED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_FAILED;
-        case 9:
-        case "GENERATION_EVENT_KIND_MODEL_LOADED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED;
-        case 10:
-        case "GENERATION_EVENT_KIND_MODEL_UNLOADED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED;
-        case 11:
-        case "GENERATION_EVENT_KIND_COST_CALCULATED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_COST_CALCULATED;
-        case 12:
-        case "GENERATION_EVENT_KIND_ROUTING_DECISION":
-            return GenerationEventKind.GENERATION_EVENT_KIND_ROUTING_DECISION;
-        case 13:
-        case "GENERATION_EVENT_KIND_STREAM_COMPLETED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED;
-        case 14:
-        case "GENERATION_EVENT_KIND_CANCEL_REQUESTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED;
-        case 15:
-        case "GENERATION_EVENT_KIND_CANCELLED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED;
-        case 16:
-        case "GENERATION_EVENT_KIND_TOOL_CALL_STARTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED;
-        case 17:
-        case "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED;
-        case 18:
-        case "GENERATION_EVENT_KIND_TOOL_CALL_FAILED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_FAILED;
-        case 19:
-        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED;
-        case 20:
-        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED;
-        case 21:
-        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED;
-        case 22:
-        case "GENERATION_EVENT_KIND_THINKING_STARTED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_STARTED;
-        case 23:
-        case "GENERATION_EVENT_KIND_THINKING_DELTA":
-            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_DELTA;
-        case 24:
-        case "GENERATION_EVENT_KIND_THINKING_COMPLETED":
-            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_COMPLETED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return GenerationEventKind.UNRECOGNIZED;
-    }
-}
-function generationEventKindToJSON(object) {
-    switch (object) {
-        case GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED:
-            return "GENERATION_EVENT_KIND_UNSPECIFIED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_SESSION_STARTED:
-            return "GENERATION_EVENT_KIND_SESSION_STARTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_SESSION_ENDED:
-            return "GENERATION_EVENT_KIND_SESSION_ENDED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STARTED:
-            return "GENERATION_EVENT_KIND_STARTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED:
-            return "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED:
-            return "GENERATION_EVENT_KIND_TOKEN_GENERATED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STREAMING_UPDATE:
-            return "GENERATION_EVENT_KIND_STREAMING_UPDATE";
-        case GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED:
-            return "GENERATION_EVENT_KIND_COMPLETED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_FAILED:
-            return "GENERATION_EVENT_KIND_FAILED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED:
-            return "GENERATION_EVENT_KIND_MODEL_LOADED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED:
-            return "GENERATION_EVENT_KIND_MODEL_UNLOADED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_COST_CALCULATED:
-            return "GENERATION_EVENT_KIND_COST_CALCULATED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_ROUTING_DECISION:
-            return "GENERATION_EVENT_KIND_ROUTING_DECISION";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED:
-            return "GENERATION_EVENT_KIND_STREAM_COMPLETED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED:
-            return "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED:
-            return "GENERATION_EVENT_KIND_CANCELLED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED:
-            return "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED:
-            return "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_FAILED:
-            return "GENERATION_EVENT_KIND_TOOL_CALL_FAILED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED:
-            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED:
-            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED:
-            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_STARTED:
-            return "GENERATION_EVENT_KIND_THINKING_STARTED";
-        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_DELTA:
-            return "GENERATION_EVENT_KIND_THINKING_DELTA";
-        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_COMPLETED:
-            return "GENERATION_EVENT_KIND_THINKING_COMPLETED";
-        case GenerationEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var ModelEventKind;
-(function (ModelEventKind) {
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNSPECIFIED"] = 0] = "MODEL_EVENT_KIND_UNSPECIFIED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_STARTED"] = 1] = "MODEL_EVENT_KIND_LOAD_STARTED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_PROGRESS"] = 2] = "MODEL_EVENT_KIND_LOAD_PROGRESS";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_COMPLETED"] = 3] = "MODEL_EVENT_KIND_LOAD_COMPLETED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_FAILED"] = 4] = "MODEL_EVENT_KIND_LOAD_FAILED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNLOAD_STARTED"] = 5] = "MODEL_EVENT_KIND_UNLOAD_STARTED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNLOAD_COMPLETED"] = 6] = "MODEL_EVENT_KIND_UNLOAD_COMPLETED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNLOAD_FAILED"] = 7] = "MODEL_EVENT_KIND_UNLOAD_FAILED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_STARTED"] = 8] = "MODEL_EVENT_KIND_DOWNLOAD_STARTED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PROGRESS"] = 9] = "MODEL_EVENT_KIND_DOWNLOAD_PROGRESS";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_COMPLETED"] = 10] = "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_FAILED"] = 11] = "MODEL_EVENT_KIND_DOWNLOAD_FAILED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_CANCELLED"] = 12] = "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_REQUESTED"] = 13] = "MODEL_EVENT_KIND_LIST_REQUESTED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_COMPLETED"] = 14] = "MODEL_EVENT_KIND_LIST_COMPLETED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_FAILED"] = 15] = "MODEL_EVENT_KIND_LIST_FAILED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_CATALOG_LOADED"] = 16] = "MODEL_EVENT_KIND_CATALOG_LOADED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DELETE_STARTED"] = 17] = "MODEL_EVENT_KIND_DELETE_STARTED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DELETE_COMPLETED"] = 18] = "MODEL_EVENT_KIND_DELETE_COMPLETED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DELETE_FAILED"] = 19] = "MODEL_EVENT_KIND_DELETE_FAILED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED"] = 20] = "MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED";
-    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_BUILT_IN_REGISTERED"] = 21] = "MODEL_EVENT_KIND_BUILT_IN_REGISTERED";
-    ModelEventKind[ModelEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(ModelEventKind || (exports.ModelEventKind = ModelEventKind = {}));
-function modelEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "MODEL_EVENT_KIND_UNSPECIFIED":
-            return ModelEventKind.MODEL_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "MODEL_EVENT_KIND_LOAD_STARTED":
-            return ModelEventKind.MODEL_EVENT_KIND_LOAD_STARTED;
-        case 2:
-        case "MODEL_EVENT_KIND_LOAD_PROGRESS":
-            return ModelEventKind.MODEL_EVENT_KIND_LOAD_PROGRESS;
-        case 3:
-        case "MODEL_EVENT_KIND_LOAD_COMPLETED":
-            return ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED;
-        case 4:
-        case "MODEL_EVENT_KIND_LOAD_FAILED":
-            return ModelEventKind.MODEL_EVENT_KIND_LOAD_FAILED;
-        case 5:
-        case "MODEL_EVENT_KIND_UNLOAD_STARTED":
-            return ModelEventKind.MODEL_EVENT_KIND_UNLOAD_STARTED;
-        case 6:
-        case "MODEL_EVENT_KIND_UNLOAD_COMPLETED":
-            return ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED;
-        case 7:
-        case "MODEL_EVENT_KIND_UNLOAD_FAILED":
-            return ModelEventKind.MODEL_EVENT_KIND_UNLOAD_FAILED;
-        case 8:
-        case "MODEL_EVENT_KIND_DOWNLOAD_STARTED":
-            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED;
-        case 9:
-        case "MODEL_EVENT_KIND_DOWNLOAD_PROGRESS":
-            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PROGRESS;
-        case 10:
-        case "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED":
-            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED;
-        case 11:
-        case "MODEL_EVENT_KIND_DOWNLOAD_FAILED":
-            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED;
-        case 12:
-        case "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED":
-            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED;
-        case 13:
-        case "MODEL_EVENT_KIND_LIST_REQUESTED":
-            return ModelEventKind.MODEL_EVENT_KIND_LIST_REQUESTED;
-        case 14:
-        case "MODEL_EVENT_KIND_LIST_COMPLETED":
-            return ModelEventKind.MODEL_EVENT_KIND_LIST_COMPLETED;
-        case 15:
-        case "MODEL_EVENT_KIND_LIST_FAILED":
-            return ModelEventKind.MODEL_EVENT_KIND_LIST_FAILED;
-        case 16:
-        case "MODEL_EVENT_KIND_CATALOG_LOADED":
-            return ModelEventKind.MODEL_EVENT_KIND_CATALOG_LOADED;
-        case 17:
-        case "MODEL_EVENT_KIND_DELETE_STARTED":
-            return ModelEventKind.MODEL_EVENT_KIND_DELETE_STARTED;
-        case 18:
-        case "MODEL_EVENT_KIND_DELETE_COMPLETED":
-            return ModelEventKind.MODEL_EVENT_KIND_DELETE_COMPLETED;
-        case 19:
-        case "MODEL_EVENT_KIND_DELETE_FAILED":
-            return ModelEventKind.MODEL_EVENT_KIND_DELETE_FAILED;
-        case 20:
-        case "MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED":
-            return ModelEventKind.MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED;
-        case 21:
-        case "MODEL_EVENT_KIND_BUILT_IN_REGISTERED":
-            return ModelEventKind.MODEL_EVENT_KIND_BUILT_IN_REGISTERED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return ModelEventKind.UNRECOGNIZED;
-    }
-}
-function modelEventKindToJSON(object) {
-    switch (object) {
-        case ModelEventKind.MODEL_EVENT_KIND_UNSPECIFIED:
-            return "MODEL_EVENT_KIND_UNSPECIFIED";
-        case ModelEventKind.MODEL_EVENT_KIND_LOAD_STARTED:
-            return "MODEL_EVENT_KIND_LOAD_STARTED";
-        case ModelEventKind.MODEL_EVENT_KIND_LOAD_PROGRESS:
-            return "MODEL_EVENT_KIND_LOAD_PROGRESS";
-        case ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED:
-            return "MODEL_EVENT_KIND_LOAD_COMPLETED";
-        case ModelEventKind.MODEL_EVENT_KIND_LOAD_FAILED:
-            return "MODEL_EVENT_KIND_LOAD_FAILED";
-        case ModelEventKind.MODEL_EVENT_KIND_UNLOAD_STARTED:
-            return "MODEL_EVENT_KIND_UNLOAD_STARTED";
-        case ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED:
-            return "MODEL_EVENT_KIND_UNLOAD_COMPLETED";
-        case ModelEventKind.MODEL_EVENT_KIND_UNLOAD_FAILED:
-            return "MODEL_EVENT_KIND_UNLOAD_FAILED";
-        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED:
-            return "MODEL_EVENT_KIND_DOWNLOAD_STARTED";
-        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PROGRESS:
-            return "MODEL_EVENT_KIND_DOWNLOAD_PROGRESS";
-        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED:
-            return "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED";
-        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED:
-            return "MODEL_EVENT_KIND_DOWNLOAD_FAILED";
-        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED:
-            return "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED";
-        case ModelEventKind.MODEL_EVENT_KIND_LIST_REQUESTED:
-            return "MODEL_EVENT_KIND_LIST_REQUESTED";
-        case ModelEventKind.MODEL_EVENT_KIND_LIST_COMPLETED:
-            return "MODEL_EVENT_KIND_LIST_COMPLETED";
-        case ModelEventKind.MODEL_EVENT_KIND_LIST_FAILED:
-            return "MODEL_EVENT_KIND_LIST_FAILED";
-        case ModelEventKind.MODEL_EVENT_KIND_CATALOG_LOADED:
-            return "MODEL_EVENT_KIND_CATALOG_LOADED";
-        case ModelEventKind.MODEL_EVENT_KIND_DELETE_STARTED:
-            return "MODEL_EVENT_KIND_DELETE_STARTED";
-        case ModelEventKind.MODEL_EVENT_KIND_DELETE_COMPLETED:
-            return "MODEL_EVENT_KIND_DELETE_COMPLETED";
-        case ModelEventKind.MODEL_EVENT_KIND_DELETE_FAILED:
-            return "MODEL_EVENT_KIND_DELETE_FAILED";
-        case ModelEventKind.MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED:
-            return "MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED";
-        case ModelEventKind.MODEL_EVENT_KIND_BUILT_IN_REGISTERED:
-            return "MODEL_EVENT_KIND_BUILT_IN_REGISTERED";
-        case ModelEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var VoiceEventKind;
-(function (VoiceEventKind) {
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_UNSPECIFIED"] = 0] = "VOICE_EVENT_KIND_UNSPECIFIED";
-    /** VOICE_EVENT_KIND_LISTENING_STARTED - Listening / detection. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LISTENING_STARTED"] = 1] = "VOICE_EVENT_KIND_LISTENING_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LISTENING_ENDED"] = 2] = "VOICE_EVENT_KIND_LISTENING_ENDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_DETECTED"] = 3] = "VOICE_EVENT_KIND_SPEECH_DETECTED";
-    /** VOICE_EVENT_KIND_TRANSCRIPTION_STARTED - Transcription. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_STARTED"] = 4] = "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL"] = 5] = "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_FINAL"] = 6] = "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL";
-    /** VOICE_EVENT_KIND_RESPONSE_GENERATED - Response generation / synthesis. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_RESPONSE_GENERATED"] = 7] = "VOICE_EVENT_KIND_RESPONSE_GENERATED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SYNTHESIS_STARTED"] = 8] = "VOICE_EVENT_KIND_SYNTHESIS_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_AUDIO_GENERATED"] = 9] = "VOICE_EVENT_KIND_AUDIO_GENERATED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SYNTHESIS_COMPLETED"] = 10] = "VOICE_EVENT_KIND_SYNTHESIS_COMPLETED";
-    /** VOICE_EVENT_KIND_SYNTHESIS_FAILED - Kotlin TTSEvent.SYNTHESIS_FAILED */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SYNTHESIS_FAILED"] = 11] = "VOICE_EVENT_KIND_SYNTHESIS_FAILED";
-    /** VOICE_EVENT_KIND_PIPELINE_STARTED - Pipeline lifecycle (high-level orchestration). */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PIPELINE_STARTED"] = 12] = "VOICE_EVENT_KIND_PIPELINE_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PIPELINE_COMPLETED"] = 13] = "VOICE_EVENT_KIND_PIPELINE_COMPLETED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PIPELINE_ERROR"] = 14] = "VOICE_EVENT_KIND_PIPELINE_ERROR";
-    /** VOICE_EVENT_KIND_VAD_STARTED - VAD. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_STARTED"] = 15] = "VOICE_EVENT_KIND_VAD_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_DETECTED"] = 16] = "VOICE_EVENT_KIND_VAD_DETECTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_ENDED"] = 17] = "VOICE_EVENT_KIND_VAD_ENDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_INITIALIZED"] = 18] = "VOICE_EVENT_KIND_VAD_INITIALIZED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_STOPPED"] = 19] = "VOICE_EVENT_KIND_VAD_STOPPED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_CLEANED_UP"] = 20] = "VOICE_EVENT_KIND_VAD_CLEANED_UP";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_STARTED"] = 21] = "VOICE_EVENT_KIND_SPEECH_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_ENDED"] = 22] = "VOICE_EVENT_KIND_SPEECH_ENDED";
-    /** VOICE_EVENT_KIND_STT_PROCESSING - Per-stage processing markers. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_PROCESSING"] = 23] = "VOICE_EVENT_KIND_STT_PROCESSING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_PARTIAL_RESULT"] = 24] = "VOICE_EVENT_KIND_STT_PARTIAL_RESULT";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_COMPLETED"] = 25] = "VOICE_EVENT_KIND_STT_COMPLETED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_FAILED"] = 26] = "VOICE_EVENT_KIND_STT_FAILED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LLM_PROCESSING"] = 27] = "VOICE_EVENT_KIND_LLM_PROCESSING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TTS_PROCESSING"] = 28] = "VOICE_EVENT_KIND_TTS_PROCESSING";
-    /** VOICE_EVENT_KIND_RECORDING_STARTED - Recording. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_RECORDING_STARTED"] = 29] = "VOICE_EVENT_KIND_RECORDING_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_RECORDING_STOPPED"] = 30] = "VOICE_EVENT_KIND_RECORDING_STOPPED";
-    /** VOICE_EVENT_KIND_PLAYBACK_STARTED - Playback. */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_STARTED"] = 31] = "VOICE_EVENT_KIND_PLAYBACK_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_COMPLETED"] = 32] = "VOICE_EVENT_KIND_PLAYBACK_COMPLETED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_STOPPED"] = 33] = "VOICE_EVENT_KIND_PLAYBACK_STOPPED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_PAUSED"] = 34] = "VOICE_EVENT_KIND_PLAYBACK_PAUSED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_RESUMED"] = 35] = "VOICE_EVENT_KIND_PLAYBACK_RESUMED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_FAILED"] = 36] = "VOICE_EVENT_KIND_PLAYBACK_FAILED";
-    /** VOICE_EVENT_KIND_VOICE_SESSION_STARTED - Voice session orchestration (RN events.ts:177-187). */
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_STARTED"] = 37] = "VOICE_EVENT_KIND_VOICE_SESSION_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_LISTENING"] = 38] = "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED"] = 39] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED"] = 40] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING"] = 41] = "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED"] = 42] = "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED"] = 43] = "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING"] = 44] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED"] = 45] = "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_STOPPED"] = 46] = "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED";
-    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_ERROR"] = 47] = "VOICE_EVENT_KIND_VOICE_SESSION_ERROR";
-    VoiceEventKind[VoiceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(VoiceEventKind || (exports.VoiceEventKind = VoiceEventKind = {}));
-function voiceEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "VOICE_EVENT_KIND_UNSPECIFIED":
-            return VoiceEventKind.VOICE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "VOICE_EVENT_KIND_LISTENING_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_LISTENING_STARTED;
-        case 2:
-        case "VOICE_EVENT_KIND_LISTENING_ENDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_LISTENING_ENDED;
-        case 3:
-        case "VOICE_EVENT_KIND_SPEECH_DETECTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_DETECTED;
-        case 4:
-        case "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_STARTED;
-        case 5:
-        case "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL":
-            return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL;
-        case 6:
-        case "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL":
-            return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_FINAL;
-        case 7:
-        case "VOICE_EVENT_KIND_RESPONSE_GENERATED":
-            return VoiceEventKind.VOICE_EVENT_KIND_RESPONSE_GENERATED;
-        case 8:
-        case "VOICE_EVENT_KIND_SYNTHESIS_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_STARTED;
-        case 9:
-        case "VOICE_EVENT_KIND_AUDIO_GENERATED":
-            return VoiceEventKind.VOICE_EVENT_KIND_AUDIO_GENERATED;
-        case 10:
-        case "VOICE_EVENT_KIND_SYNTHESIS_COMPLETED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_COMPLETED;
-        case 11:
-        case "VOICE_EVENT_KIND_SYNTHESIS_FAILED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_FAILED;
-        case 12:
-        case "VOICE_EVENT_KIND_PIPELINE_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_STARTED;
-        case 13:
-        case "VOICE_EVENT_KIND_PIPELINE_COMPLETED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_COMPLETED;
-        case 14:
-        case "VOICE_EVENT_KIND_PIPELINE_ERROR":
-            return VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_ERROR;
-        case 15:
-        case "VOICE_EVENT_KIND_VAD_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VAD_STARTED;
-        case 16:
-        case "VOICE_EVENT_KIND_VAD_DETECTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VAD_DETECTED;
-        case 17:
-        case "VOICE_EVENT_KIND_VAD_ENDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VAD_ENDED;
-        case 18:
-        case "VOICE_EVENT_KIND_VAD_INITIALIZED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VAD_INITIALIZED;
-        case 19:
-        case "VOICE_EVENT_KIND_VAD_STOPPED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VAD_STOPPED;
-        case 20:
-        case "VOICE_EVENT_KIND_VAD_CLEANED_UP":
-            return VoiceEventKind.VOICE_EVENT_KIND_VAD_CLEANED_UP;
-        case 21:
-        case "VOICE_EVENT_KIND_SPEECH_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_STARTED;
-        case 22:
-        case "VOICE_EVENT_KIND_SPEECH_ENDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_ENDED;
-        case 23:
-        case "VOICE_EVENT_KIND_STT_PROCESSING":
-            return VoiceEventKind.VOICE_EVENT_KIND_STT_PROCESSING;
-        case 24:
-        case "VOICE_EVENT_KIND_STT_PARTIAL_RESULT":
-            return VoiceEventKind.VOICE_EVENT_KIND_STT_PARTIAL_RESULT;
-        case 25:
-        case "VOICE_EVENT_KIND_STT_COMPLETED":
-            return VoiceEventKind.VOICE_EVENT_KIND_STT_COMPLETED;
-        case 26:
-        case "VOICE_EVENT_KIND_STT_FAILED":
-            return VoiceEventKind.VOICE_EVENT_KIND_STT_FAILED;
-        case 27:
-        case "VOICE_EVENT_KIND_LLM_PROCESSING":
-            return VoiceEventKind.VOICE_EVENT_KIND_LLM_PROCESSING;
-        case 28:
-        case "VOICE_EVENT_KIND_TTS_PROCESSING":
-            return VoiceEventKind.VOICE_EVENT_KIND_TTS_PROCESSING;
-        case 29:
-        case "VOICE_EVENT_KIND_RECORDING_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STARTED;
-        case 30:
-        case "VOICE_EVENT_KIND_RECORDING_STOPPED":
-            return VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STOPPED;
-        case 31:
-        case "VOICE_EVENT_KIND_PLAYBACK_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STARTED;
-        case 32:
-        case "VOICE_EVENT_KIND_PLAYBACK_COMPLETED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_COMPLETED;
-        case 33:
-        case "VOICE_EVENT_KIND_PLAYBACK_STOPPED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STOPPED;
-        case 34:
-        case "VOICE_EVENT_KIND_PLAYBACK_PAUSED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_PAUSED;
-        case 35:
-        case "VOICE_EVENT_KIND_PLAYBACK_RESUMED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_RESUMED;
-        case 36:
-        case "VOICE_EVENT_KIND_PLAYBACK_FAILED":
-            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_FAILED;
-        case 37:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STARTED;
-        case 38:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_LISTENING;
-        case 39:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED;
-        case 40:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED;
-        case 41:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING;
-        case 42:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED;
-        case 43:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED;
-        case 44:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING;
-        case 45:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED;
-        case 46:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STOPPED;
-        case 47:
-        case "VOICE_EVENT_KIND_VOICE_SESSION_ERROR":
-            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_ERROR;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return VoiceEventKind.UNRECOGNIZED;
-    }
-}
-function voiceEventKindToJSON(object) {
-    switch (object) {
-        case VoiceEventKind.VOICE_EVENT_KIND_UNSPECIFIED:
-            return "VOICE_EVENT_KIND_UNSPECIFIED";
-        case VoiceEventKind.VOICE_EVENT_KIND_LISTENING_STARTED:
-            return "VOICE_EVENT_KIND_LISTENING_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_LISTENING_ENDED:
-            return "VOICE_EVENT_KIND_LISTENING_ENDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_DETECTED:
-            return "VOICE_EVENT_KIND_SPEECH_DETECTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_STARTED:
-            return "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL:
-            return "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL";
-        case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_FINAL:
-            return "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL";
-        case VoiceEventKind.VOICE_EVENT_KIND_RESPONSE_GENERATED:
-            return "VOICE_EVENT_KIND_RESPONSE_GENERATED";
-        case VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_STARTED:
-            return "VOICE_EVENT_KIND_SYNTHESIS_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_AUDIO_GENERATED:
-            return "VOICE_EVENT_KIND_AUDIO_GENERATED";
-        case VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_COMPLETED:
-            return "VOICE_EVENT_KIND_SYNTHESIS_COMPLETED";
-        case VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_FAILED:
-            return "VOICE_EVENT_KIND_SYNTHESIS_FAILED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_STARTED:
-            return "VOICE_EVENT_KIND_PIPELINE_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_COMPLETED:
-            return "VOICE_EVENT_KIND_PIPELINE_COMPLETED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_ERROR:
-            return "VOICE_EVENT_KIND_PIPELINE_ERROR";
-        case VoiceEventKind.VOICE_EVENT_KIND_VAD_STARTED:
-            return "VOICE_EVENT_KIND_VAD_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VAD_DETECTED:
-            return "VOICE_EVENT_KIND_VAD_DETECTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VAD_ENDED:
-            return "VOICE_EVENT_KIND_VAD_ENDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VAD_INITIALIZED:
-            return "VOICE_EVENT_KIND_VAD_INITIALIZED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VAD_STOPPED:
-            return "VOICE_EVENT_KIND_VAD_STOPPED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VAD_CLEANED_UP:
-            return "VOICE_EVENT_KIND_VAD_CLEANED_UP";
-        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_STARTED:
-            return "VOICE_EVENT_KIND_SPEECH_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_ENDED:
-            return "VOICE_EVENT_KIND_SPEECH_ENDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_STT_PROCESSING:
-            return "VOICE_EVENT_KIND_STT_PROCESSING";
-        case VoiceEventKind.VOICE_EVENT_KIND_STT_PARTIAL_RESULT:
-            return "VOICE_EVENT_KIND_STT_PARTIAL_RESULT";
-        case VoiceEventKind.VOICE_EVENT_KIND_STT_COMPLETED:
-            return "VOICE_EVENT_KIND_STT_COMPLETED";
-        case VoiceEventKind.VOICE_EVENT_KIND_STT_FAILED:
-            return "VOICE_EVENT_KIND_STT_FAILED";
-        case VoiceEventKind.VOICE_EVENT_KIND_LLM_PROCESSING:
-            return "VOICE_EVENT_KIND_LLM_PROCESSING";
-        case VoiceEventKind.VOICE_EVENT_KIND_TTS_PROCESSING:
-            return "VOICE_EVENT_KIND_TTS_PROCESSING";
-        case VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STARTED:
-            return "VOICE_EVENT_KIND_RECORDING_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STOPPED:
-            return "VOICE_EVENT_KIND_RECORDING_STOPPED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STARTED:
-            return "VOICE_EVENT_KIND_PLAYBACK_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_COMPLETED:
-            return "VOICE_EVENT_KIND_PLAYBACK_COMPLETED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STOPPED:
-            return "VOICE_EVENT_KIND_PLAYBACK_STOPPED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_PAUSED:
-            return "VOICE_EVENT_KIND_PLAYBACK_PAUSED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_RESUMED:
-            return "VOICE_EVENT_KIND_PLAYBACK_RESUMED";
-        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_FAILED:
-            return "VOICE_EVENT_KIND_PLAYBACK_FAILED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STARTED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_LISTENING:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STOPPED:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED";
-        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_ERROR:
-            return "VOICE_EVENT_KIND_VOICE_SESSION_ERROR";
-        case VoiceEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var PerformanceEventKind;
-(function (PerformanceEventKind) {
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_UNSPECIFIED"] = 0] = "PERFORMANCE_EVENT_KIND_UNSPECIFIED";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_MEMORY_WARNING"] = 1] = "PERFORMANCE_EVENT_KIND_MEMORY_WARNING";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED"] = 2] = "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_LATENCY_MEASURED"] = 3] = "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED";
-    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED"] = 4] = "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED";
-    PerformanceEventKind[PerformanceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(PerformanceEventKind || (exports.PerformanceEventKind = PerformanceEventKind = {}));
-function performanceEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "PERFORMANCE_EVENT_KIND_UNSPECIFIED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "PERFORMANCE_EVENT_KIND_MEMORY_WARNING":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_MEMORY_WARNING;
-        case 2:
-        case "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED;
-        case 3:
-        case "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_LATENCY_MEASURED;
-        case 4:
-        case "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED":
-            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return PerformanceEventKind.UNRECOGNIZED;
-    }
-}
-function performanceEventKindToJSON(object) {
-    switch (object) {
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED:
-            return "PERFORMANCE_EVENT_KIND_UNSPECIFIED";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_MEMORY_WARNING:
-            return "PERFORMANCE_EVENT_KIND_MEMORY_WARNING";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED:
-            return "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_LATENCY_MEASURED:
-            return "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED";
-        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED:
-            return "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED";
-        case PerformanceEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var NetworkEventKind;
-(function (NetworkEventKind) {
-    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_UNSPECIFIED"] = 0] = "NETWORK_EVENT_KIND_UNSPECIFIED";
-    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_STARTED"] = 1] = "NETWORK_EVENT_KIND_REQUEST_STARTED";
-    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_COMPLETED"] = 2] = "NETWORK_EVENT_KIND_REQUEST_COMPLETED";
-    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_FAILED"] = 3] = "NETWORK_EVENT_KIND_REQUEST_FAILED";
-    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_TIMEOUT"] = 4] = "NETWORK_EVENT_KIND_REQUEST_TIMEOUT";
-    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED"] = 5] = "NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED";
-    NetworkEventKind[NetworkEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(NetworkEventKind || (exports.NetworkEventKind = NetworkEventKind = {}));
-function networkEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "NETWORK_EVENT_KIND_UNSPECIFIED":
-            return NetworkEventKind.NETWORK_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "NETWORK_EVENT_KIND_REQUEST_STARTED":
-            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_STARTED;
-        case 2:
-        case "NETWORK_EVENT_KIND_REQUEST_COMPLETED":
-            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_COMPLETED;
-        case 3:
-        case "NETWORK_EVENT_KIND_REQUEST_FAILED":
-            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_FAILED;
-        case 4:
-        case "NETWORK_EVENT_KIND_REQUEST_TIMEOUT":
-            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_TIMEOUT;
-        case 5:
-        case "NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED":
-            return NetworkEventKind.NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return NetworkEventKind.UNRECOGNIZED;
-    }
-}
-function networkEventKindToJSON(object) {
-    switch (object) {
-        case NetworkEventKind.NETWORK_EVENT_KIND_UNSPECIFIED:
-            return "NETWORK_EVENT_KIND_UNSPECIFIED";
-        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_STARTED:
-            return "NETWORK_EVENT_KIND_REQUEST_STARTED";
-        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_COMPLETED:
-            return "NETWORK_EVENT_KIND_REQUEST_COMPLETED";
-        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_FAILED:
-            return "NETWORK_EVENT_KIND_REQUEST_FAILED";
-        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_TIMEOUT:
-            return "NETWORK_EVENT_KIND_REQUEST_TIMEOUT";
-        case NetworkEventKind.NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED:
-            return "NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED";
-        case NetworkEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var StorageEventKind;
-(function (StorageEventKind) {
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_UNSPECIFIED"] = 0] = "STORAGE_EVENT_KIND_UNSPECIFIED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_INFO_REQUESTED"] = 1] = "STORAGE_EVENT_KIND_INFO_REQUESTED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_INFO_RETRIEVED"] = 2] = "STORAGE_EVENT_KIND_INFO_RETRIEVED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_MODELS_REQUESTED"] = 3] = "STORAGE_EVENT_KIND_MODELS_REQUESTED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_MODELS_RETRIEVED"] = 4] = "STORAGE_EVENT_KIND_MODELS_RETRIEVED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED"] = 5] = "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED"] = 6] = "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED"] = 7] = "STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED"] = 8] = "STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED"] = 9] = "STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED"] = 10] = "STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_MODEL_STARTED"] = 11] = "STORAGE_EVENT_KIND_DELETE_MODEL_STARTED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED"] = 12] = "STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_MODEL_FAILED"] = 13] = "STORAGE_EVENT_KIND_DELETE_MODEL_FAILED";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_HIT"] = 14] = "STORAGE_EVENT_KIND_CACHE_HIT";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_MISS"] = 15] = "STORAGE_EVENT_KIND_CACHE_MISS";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_EVICTION"] = 16] = "STORAGE_EVENT_KIND_EVICTION";
-    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DISK_FULL"] = 17] = "STORAGE_EVENT_KIND_DISK_FULL";
-    StorageEventKind[StorageEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(StorageEventKind || (exports.StorageEventKind = StorageEventKind = {}));
-function storageEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "STORAGE_EVENT_KIND_UNSPECIFIED":
-            return StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "STORAGE_EVENT_KIND_INFO_REQUESTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_INFO_REQUESTED;
-        case 2:
-        case "STORAGE_EVENT_KIND_INFO_RETRIEVED":
-            return StorageEventKind.STORAGE_EVENT_KIND_INFO_RETRIEVED;
-        case 3:
-        case "STORAGE_EVENT_KIND_MODELS_REQUESTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_MODELS_REQUESTED;
-        case 4:
-        case "STORAGE_EVENT_KIND_MODELS_RETRIEVED":
-            return StorageEventKind.STORAGE_EVENT_KIND_MODELS_RETRIEVED;
-        case 5:
-        case "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED;
-        case 6:
-        case "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED":
-            return StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED;
-        case 7:
-        case "STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED":
-            return StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED;
-        case 8:
-        case "STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED;
-        case 9:
-        case "STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED":
-            return StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED;
-        case 10:
-        case "STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED":
-            return StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED;
-        case 11:
-        case "STORAGE_EVENT_KIND_DELETE_MODEL_STARTED":
-            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_STARTED;
-        case 12:
-        case "STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED":
-            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED;
-        case 13:
-        case "STORAGE_EVENT_KIND_DELETE_MODEL_FAILED":
-            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_FAILED;
-        case 14:
-        case "STORAGE_EVENT_KIND_CACHE_HIT":
-            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_HIT;
-        case 15:
-        case "STORAGE_EVENT_KIND_CACHE_MISS":
-            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_MISS;
-        case 16:
-        case "STORAGE_EVENT_KIND_EVICTION":
-            return StorageEventKind.STORAGE_EVENT_KIND_EVICTION;
-        case 17:
-        case "STORAGE_EVENT_KIND_DISK_FULL":
-            return StorageEventKind.STORAGE_EVENT_KIND_DISK_FULL;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return StorageEventKind.UNRECOGNIZED;
-    }
-}
-function storageEventKindToJSON(object) {
-    switch (object) {
-        case StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED:
-            return "STORAGE_EVENT_KIND_UNSPECIFIED";
-        case StorageEventKind.STORAGE_EVENT_KIND_INFO_REQUESTED:
-            return "STORAGE_EVENT_KIND_INFO_REQUESTED";
-        case StorageEventKind.STORAGE_EVENT_KIND_INFO_RETRIEVED:
-            return "STORAGE_EVENT_KIND_INFO_RETRIEVED";
-        case StorageEventKind.STORAGE_EVENT_KIND_MODELS_REQUESTED:
-            return "STORAGE_EVENT_KIND_MODELS_REQUESTED";
-        case StorageEventKind.STORAGE_EVENT_KIND_MODELS_RETRIEVED:
-            return "STORAGE_EVENT_KIND_MODELS_RETRIEVED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED:
-            return "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED:
-            return "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED:
-            return "STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED:
-            return "STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED:
-            return "STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED:
-            return "STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED";
-        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_STARTED:
-            return "STORAGE_EVENT_KIND_DELETE_MODEL_STARTED";
-        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED:
-            return "STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED";
-        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_FAILED:
-            return "STORAGE_EVENT_KIND_DELETE_MODEL_FAILED";
-        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_HIT:
-            return "STORAGE_EVENT_KIND_CACHE_HIT";
-        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_MISS:
-            return "STORAGE_EVENT_KIND_CACHE_MISS";
-        case StorageEventKind.STORAGE_EVENT_KIND_EVICTION:
-            return "STORAGE_EVENT_KIND_EVICTION";
-        case StorageEventKind.STORAGE_EVENT_KIND_DISK_FULL:
-            return "STORAGE_EVENT_KIND_DISK_FULL";
-        case StorageEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var FrameworkEventKind;
-(function (FrameworkEventKind) {
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_UNSPECIFIED"] = 0] = "FRAMEWORK_EVENT_KIND_UNSPECIFIED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED"] = 1] = "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED"] = 2] = "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED"] = 3] = "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED"] = 4] = "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED"] = 5] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED"] = 6] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED"] = 7] = "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED"] = 8] = "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED"] = 9] = "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED"] = 10] = "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED"] = 11] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED"] = 12] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED";
-    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ERROR"] = 13] = "FRAMEWORK_EVENT_KIND_ERROR";
-    FrameworkEventKind[FrameworkEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(FrameworkEventKind || (exports.FrameworkEventKind = FrameworkEventKind = {}));
-function frameworkEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "FRAMEWORK_EVENT_KIND_UNSPECIFIED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED;
-        case 2:
-        case "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED;
-        case 3:
-        case "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED;
-        case 4:
-        case "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED;
-        case 5:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED;
-        case 6:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED;
-        case 7:
-        case "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED;
-        case 8:
-        case "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED;
-        case 9:
-        case "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED;
-        case 10:
-        case "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED;
-        case 11:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED;
-        case 12:
-        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED;
-        case 13:
-        case "FRAMEWORK_EVENT_KIND_ERROR":
-            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ERROR;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return FrameworkEventKind.UNRECOGNIZED;
-    }
-}
-function frameworkEventKindToJSON(object) {
-    switch (object) {
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED:
-            return "FRAMEWORK_EVENT_KIND_UNSPECIFIED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED:
-            return "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED:
-            return "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED:
-            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED";
-        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ERROR:
-            return "FRAMEWORK_EVENT_KIND_ERROR";
-        case FrameworkEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var DeviceEventKind;
-(function (DeviceEventKind) {
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_UNSPECIFIED"] = 0] = "DEVICE_EVENT_KIND_UNSPECIFIED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED"] = 1] = "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED"] = 2] = "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED"] = 3] = "DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED"] = 4] = "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED"] = 5] = "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED"] = 6] = "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED"] = 7] = "DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_BATTERY_CHANGED"] = 8] = "DEVICE_EVENT_KIND_BATTERY_CHANGED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_THERMAL_CHANGED"] = 9] = "DEVICE_EVENT_KIND_THERMAL_CHANGED";
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED"] = 10] = "DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED";
-    /** DEVICE_EVENT_KIND_DEVICE_REGISTERED - Dart DeviceRegistered */
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_REGISTERED"] = 11] = "DEVICE_EVENT_KIND_DEVICE_REGISTERED";
-    /** DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED - Dart DeviceRegistrationFailed */
-    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED"] = 12] = "DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
-    DeviceEventKind[DeviceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(DeviceEventKind || (exports.DeviceEventKind = DeviceEventKind = {}));
-function deviceEventKindFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "DEVICE_EVENT_KIND_UNSPECIFIED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_UNSPECIFIED;
-        case 1:
-        case "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED;
-        case 2:
-        case "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED;
-        case 3:
-        case "DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED;
-        case 4:
-        case "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED;
-        case 5:
-        case "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED;
-        case 6:
-        case "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED;
-        case 7:
-        case "DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED;
-        case 8:
-        case "DEVICE_EVENT_KIND_BATTERY_CHANGED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_BATTERY_CHANGED;
-        case 9:
-        case "DEVICE_EVENT_KIND_THERMAL_CHANGED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_THERMAL_CHANGED;
-        case 10:
-        case "DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED;
-        case 11:
-        case "DEVICE_EVENT_KIND_DEVICE_REGISTERED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTERED;
-        case 12:
-        case "DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED":
-            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return DeviceEventKind.UNRECOGNIZED;
-    }
-}
-function deviceEventKindToJSON(object) {
-    switch (object) {
-        case DeviceEventKind.DEVICE_EVENT_KIND_UNSPECIFIED:
-            return "DEVICE_EVENT_KIND_UNSPECIFIED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED:
-            return "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED:
-            return "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED:
-            return "DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED:
-            return "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED:
-            return "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED:
-            return "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED:
-            return "DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_BATTERY_CHANGED:
-            return "DEVICE_EVENT_KIND_BATTERY_CHANGED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_THERMAL_CHANGED:
-            return "DEVICE_EVENT_KIND_THERMAL_CHANGED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED:
-            return "DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTERED:
-            return "DEVICE_EVENT_KIND_DEVICE_REGISTERED";
-        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
-            return "DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
-        case DeviceEventKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var ComponentInitializationEventKind;
 (function (ComponentInitializationEventKind) {
     ComponentInitializationEventKind[ComponentInitializationEventKind["COMPONENT_INIT_EVENT_KIND_UNSPECIFIED"] = 0] = "COMPONENT_INIT_EVENT_KIND_UNSPECIFIED";
@@ -1670,69 +610,810 @@ function sessionEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-var AuthEventKind;
-(function (AuthEventKind) {
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_UNSPECIFIED"] = 0] = "AUTH_EVENT_KIND_UNSPECIFIED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_REQUESTED"] = 1] = "AUTH_EVENT_KIND_REQUESTED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_SUCCEEDED"] = 2] = "AUTH_EVENT_KIND_SUCCEEDED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_FAILED"] = 3] = "AUTH_EVENT_KIND_FAILED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_TOKEN_REFRESHED"] = 4] = "AUTH_EVENT_KIND_TOKEN_REFRESHED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_TOKEN_EXPIRED"] = 5] = "AUTH_EVENT_KIND_TOKEN_EXPIRED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_DEVICE_REGISTERED"] = 6] = "AUTH_EVENT_KIND_DEVICE_REGISTERED";
-    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED"] = 7] = "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
-    AuthEventKind[AuthEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(AuthEventKind || (exports.AuthEventKind = AuthEventKind = {}));
-function authEventKindFromJSON(object) {
+var GenerationEventKind;
+(function (GenerationEventKind) {
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_UNSPECIFIED"] = 0] = "GENERATION_EVENT_KIND_UNSPECIFIED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_SESSION_STARTED"] = 1] = "GENERATION_EVENT_KIND_SESSION_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_SESSION_ENDED"] = 2] = "GENERATION_EVENT_KIND_SESSION_ENDED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STARTED"] = 3] = "GENERATION_EVENT_KIND_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED"] = 4] = "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOKEN_GENERATED"] = 5] = "GENERATION_EVENT_KIND_TOKEN_GENERATED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAMING_UPDATE"] = 6] = "GENERATION_EVENT_KIND_STREAMING_UPDATE";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_COMPLETED"] = 7] = "GENERATION_EVENT_KIND_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_FAILED"] = 8] = "GENERATION_EVENT_KIND_FAILED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_MODEL_LOADED"] = 9] = "GENERATION_EVENT_KIND_MODEL_LOADED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_MODEL_UNLOADED"] = 10] = "GENERATION_EVENT_KIND_MODEL_UNLOADED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_COST_CALCULATED"] = 11] = "GENERATION_EVENT_KIND_COST_CALCULATED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_ROUTING_DECISION"] = 12] = "GENERATION_EVENT_KIND_ROUTING_DECISION";
+    /** GENERATION_EVENT_KIND_STREAM_COMPLETED - Kotlin LLMEvent.STREAM_COMPLETED */
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STREAM_COMPLETED"] = 13] = "GENERATION_EVENT_KIND_STREAM_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCEL_REQUESTED"] = 14] = "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_CANCELLED"] = 15] = "GENERATION_EVENT_KIND_CANCELLED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_STARTED"] = 16] = "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED"] = 17] = "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_TOOL_CALL_FAILED"] = 18] = "GENERATION_EVENT_KIND_TOOL_CALL_FAILED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED"] = 19] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED"] = 20] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED"] = 21] = "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_STARTED"] = 22] = "GENERATION_EVENT_KIND_THINKING_STARTED";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_DELTA"] = 23] = "GENERATION_EVENT_KIND_THINKING_DELTA";
+    GenerationEventKind[GenerationEventKind["GENERATION_EVENT_KIND_THINKING_COMPLETED"] = 24] = "GENERATION_EVENT_KIND_THINKING_COMPLETED";
+    GenerationEventKind[GenerationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(GenerationEventKind || (exports.GenerationEventKind = GenerationEventKind = {}));
+function generationEventKindFromJSON(object) {
     switch (object) {
         case 0:
-        case "AUTH_EVENT_KIND_UNSPECIFIED":
-            return AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED;
+        case "GENERATION_EVENT_KIND_UNSPECIFIED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED;
         case 1:
-        case "AUTH_EVENT_KIND_REQUESTED":
-            return AuthEventKind.AUTH_EVENT_KIND_REQUESTED;
+        case "GENERATION_EVENT_KIND_SESSION_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_SESSION_STARTED;
         case 2:
-        case "AUTH_EVENT_KIND_SUCCEEDED":
-            return AuthEventKind.AUTH_EVENT_KIND_SUCCEEDED;
+        case "GENERATION_EVENT_KIND_SESSION_ENDED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_SESSION_ENDED;
         case 3:
-        case "AUTH_EVENT_KIND_FAILED":
-            return AuthEventKind.AUTH_EVENT_KIND_FAILED;
+        case "GENERATION_EVENT_KIND_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STARTED;
         case 4:
-        case "AUTH_EVENT_KIND_TOKEN_REFRESHED":
-            return AuthEventKind.AUTH_EVENT_KIND_TOKEN_REFRESHED;
+        case "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED;
         case 5:
-        case "AUTH_EVENT_KIND_TOKEN_EXPIRED":
-            return AuthEventKind.AUTH_EVENT_KIND_TOKEN_EXPIRED;
+        case "GENERATION_EVENT_KIND_TOKEN_GENERATED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED;
         case 6:
-        case "AUTH_EVENT_KIND_DEVICE_REGISTERED":
-            return AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTERED;
+        case "GENERATION_EVENT_KIND_STREAMING_UPDATE":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STREAMING_UPDATE;
         case 7:
-        case "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED":
-            return AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED;
+        case "GENERATION_EVENT_KIND_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED;
+        case 8:
+        case "GENERATION_EVENT_KIND_FAILED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_FAILED;
+        case 9:
+        case "GENERATION_EVENT_KIND_MODEL_LOADED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED;
+        case 10:
+        case "GENERATION_EVENT_KIND_MODEL_UNLOADED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED;
+        case 11:
+        case "GENERATION_EVENT_KIND_COST_CALCULATED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_COST_CALCULATED;
+        case 12:
+        case "GENERATION_EVENT_KIND_ROUTING_DECISION":
+            return GenerationEventKind.GENERATION_EVENT_KIND_ROUTING_DECISION;
+        case 13:
+        case "GENERATION_EVENT_KIND_STREAM_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED;
+        case 14:
+        case "GENERATION_EVENT_KIND_CANCEL_REQUESTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED;
+        case 15:
+        case "GENERATION_EVENT_KIND_CANCELLED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED;
+        case 16:
+        case "GENERATION_EVENT_KIND_TOOL_CALL_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED;
+        case 17:
+        case "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED;
+        case 18:
+        case "GENERATION_EVENT_KIND_TOOL_CALL_FAILED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_FAILED;
+        case 19:
+        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED;
+        case 20:
+        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED;
+        case 21:
+        case "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED;
+        case 22:
+        case "GENERATION_EVENT_KIND_THINKING_STARTED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_STARTED;
+        case 23:
+        case "GENERATION_EVENT_KIND_THINKING_DELTA":
+            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_DELTA;
+        case 24:
+        case "GENERATION_EVENT_KIND_THINKING_COMPLETED":
+            return GenerationEventKind.GENERATION_EVENT_KIND_THINKING_COMPLETED;
         case -1:
         case "UNRECOGNIZED":
         default:
-            return AuthEventKind.UNRECOGNIZED;
+            return GenerationEventKind.UNRECOGNIZED;
     }
 }
-function authEventKindToJSON(object) {
+function generationEventKindToJSON(object) {
     switch (object) {
-        case AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED:
-            return "AUTH_EVENT_KIND_UNSPECIFIED";
-        case AuthEventKind.AUTH_EVENT_KIND_REQUESTED:
-            return "AUTH_EVENT_KIND_REQUESTED";
-        case AuthEventKind.AUTH_EVENT_KIND_SUCCEEDED:
-            return "AUTH_EVENT_KIND_SUCCEEDED";
-        case AuthEventKind.AUTH_EVENT_KIND_FAILED:
-            return "AUTH_EVENT_KIND_FAILED";
-        case AuthEventKind.AUTH_EVENT_KIND_TOKEN_REFRESHED:
-            return "AUTH_EVENT_KIND_TOKEN_REFRESHED";
-        case AuthEventKind.AUTH_EVENT_KIND_TOKEN_EXPIRED:
-            return "AUTH_EVENT_KIND_TOKEN_EXPIRED";
-        case AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTERED:
-            return "AUTH_EVENT_KIND_DEVICE_REGISTERED";
-        case AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
-            return "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
-        case AuthEventKind.UNRECOGNIZED:
+        case GenerationEventKind.GENERATION_EVENT_KIND_UNSPECIFIED:
+            return "GENERATION_EVENT_KIND_UNSPECIFIED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_SESSION_STARTED:
+            return "GENERATION_EVENT_KIND_SESSION_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_SESSION_ENDED:
+            return "GENERATION_EVENT_KIND_SESSION_ENDED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STARTED:
+            return "GENERATION_EVENT_KIND_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED:
+            return "GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED:
+            return "GENERATION_EVENT_KIND_TOKEN_GENERATED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STREAMING_UPDATE:
+            return "GENERATION_EVENT_KIND_STREAMING_UPDATE";
+        case GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED:
+            return "GENERATION_EVENT_KIND_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_FAILED:
+            return "GENERATION_EVENT_KIND_FAILED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED:
+            return "GENERATION_EVENT_KIND_MODEL_LOADED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED:
+            return "GENERATION_EVENT_KIND_MODEL_UNLOADED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_COST_CALCULATED:
+            return "GENERATION_EVENT_KIND_COST_CALCULATED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_ROUTING_DECISION:
+            return "GENERATION_EVENT_KIND_ROUTING_DECISION";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED:
+            return "GENERATION_EVENT_KIND_STREAM_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_CANCEL_REQUESTED:
+            return "GENERATION_EVENT_KIND_CANCEL_REQUESTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_CANCELLED:
+            return "GENERATION_EVENT_KIND_CANCELLED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_STARTED:
+            return "GENERATION_EVENT_KIND_TOOL_CALL_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED:
+            return "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_TOOL_CALL_FAILED:
+            return "GENERATION_EVENT_KIND_TOOL_CALL_FAILED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED:
+            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED:
+            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPLETED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED:
+            return "GENERATION_EVENT_KIND_STRUCTURED_OUTPUT_FAILED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_STARTED:
+            return "GENERATION_EVENT_KIND_THINKING_STARTED";
+        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_DELTA:
+            return "GENERATION_EVENT_KIND_THINKING_DELTA";
+        case GenerationEventKind.GENERATION_EVENT_KIND_THINKING_COMPLETED:
+            return "GENERATION_EVENT_KIND_THINKING_COMPLETED";
+        case GenerationEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+var VoiceEventKind;
+(function (VoiceEventKind) {
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_UNSPECIFIED"] = 0] = "VOICE_EVENT_KIND_UNSPECIFIED";
+    /** VOICE_EVENT_KIND_LISTENING_STARTED - Listening / detection. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LISTENING_STARTED"] = 1] = "VOICE_EVENT_KIND_LISTENING_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LISTENING_ENDED"] = 2] = "VOICE_EVENT_KIND_LISTENING_ENDED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_DETECTED"] = 3] = "VOICE_EVENT_KIND_SPEECH_DETECTED";
+    /** VOICE_EVENT_KIND_TRANSCRIPTION_STARTED - Transcription. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_STARTED"] = 4] = "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL"] = 5] = "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TRANSCRIPTION_FINAL"] = 6] = "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL";
+    /** VOICE_EVENT_KIND_RESPONSE_GENERATED - Response generation / synthesis. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_RESPONSE_GENERATED"] = 7] = "VOICE_EVENT_KIND_RESPONSE_GENERATED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SYNTHESIS_STARTED"] = 8] = "VOICE_EVENT_KIND_SYNTHESIS_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_AUDIO_GENERATED"] = 9] = "VOICE_EVENT_KIND_AUDIO_GENERATED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SYNTHESIS_COMPLETED"] = 10] = "VOICE_EVENT_KIND_SYNTHESIS_COMPLETED";
+    /** VOICE_EVENT_KIND_SYNTHESIS_FAILED - Kotlin TTSEvent.SYNTHESIS_FAILED */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SYNTHESIS_FAILED"] = 11] = "VOICE_EVENT_KIND_SYNTHESIS_FAILED";
+    /** VOICE_EVENT_KIND_PIPELINE_STARTED - Pipeline lifecycle (high-level orchestration). */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PIPELINE_STARTED"] = 12] = "VOICE_EVENT_KIND_PIPELINE_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PIPELINE_COMPLETED"] = 13] = "VOICE_EVENT_KIND_PIPELINE_COMPLETED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PIPELINE_ERROR"] = 14] = "VOICE_EVENT_KIND_PIPELINE_ERROR";
+    /** VOICE_EVENT_KIND_VAD_STARTED - VAD. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_STARTED"] = 15] = "VOICE_EVENT_KIND_VAD_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_DETECTED"] = 16] = "VOICE_EVENT_KIND_VAD_DETECTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_ENDED"] = 17] = "VOICE_EVENT_KIND_VAD_ENDED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_INITIALIZED"] = 18] = "VOICE_EVENT_KIND_VAD_INITIALIZED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_STOPPED"] = 19] = "VOICE_EVENT_KIND_VAD_STOPPED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_CLEANED_UP"] = 20] = "VOICE_EVENT_KIND_VAD_CLEANED_UP";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_STARTED"] = 21] = "VOICE_EVENT_KIND_SPEECH_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_SPEECH_ENDED"] = 22] = "VOICE_EVENT_KIND_SPEECH_ENDED";
+    /** VOICE_EVENT_KIND_STT_PROCESSING - Per-stage processing markers. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_PROCESSING"] = 23] = "VOICE_EVENT_KIND_STT_PROCESSING";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_PARTIAL_RESULT"] = 24] = "VOICE_EVENT_KIND_STT_PARTIAL_RESULT";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_COMPLETED"] = 25] = "VOICE_EVENT_KIND_STT_COMPLETED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_STT_FAILED"] = 26] = "VOICE_EVENT_KIND_STT_FAILED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_LLM_PROCESSING"] = 27] = "VOICE_EVENT_KIND_LLM_PROCESSING";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_TTS_PROCESSING"] = 28] = "VOICE_EVENT_KIND_TTS_PROCESSING";
+    /** VOICE_EVENT_KIND_RECORDING_STARTED - Recording. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_RECORDING_STARTED"] = 29] = "VOICE_EVENT_KIND_RECORDING_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_RECORDING_STOPPED"] = 30] = "VOICE_EVENT_KIND_RECORDING_STOPPED";
+    /** VOICE_EVENT_KIND_PLAYBACK_STARTED - Playback. */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_STARTED"] = 31] = "VOICE_EVENT_KIND_PLAYBACK_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_COMPLETED"] = 32] = "VOICE_EVENT_KIND_PLAYBACK_COMPLETED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_STOPPED"] = 33] = "VOICE_EVENT_KIND_PLAYBACK_STOPPED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_PAUSED"] = 34] = "VOICE_EVENT_KIND_PLAYBACK_PAUSED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_RESUMED"] = 35] = "VOICE_EVENT_KIND_PLAYBACK_RESUMED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_PLAYBACK_FAILED"] = 36] = "VOICE_EVENT_KIND_PLAYBACK_FAILED";
+    /** VOICE_EVENT_KIND_VOICE_SESSION_STARTED - Voice session orchestration (RN events.ts:177-187). */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_STARTED"] = 37] = "VOICE_EVENT_KIND_VOICE_SESSION_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_LISTENING"] = 38] = "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED"] = 39] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED"] = 40] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING"] = 41] = "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED"] = 42] = "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED"] = 43] = "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING"] = 44] = "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED"] = 45] = "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_STOPPED"] = 46] = "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VOICE_SESSION_ERROR"] = 47] = "VOICE_EVENT_KIND_VOICE_SESSION_ERROR";
+    /** VOICE_EVENT_KIND_VAD_PAUSED - VAD pause/resume (telemetry-only metrics). */
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_PAUSED"] = 48] = "VOICE_EVENT_KIND_VAD_PAUSED";
+    VoiceEventKind[VoiceEventKind["VOICE_EVENT_KIND_VAD_RESUMED"] = 49] = "VOICE_EVENT_KIND_VAD_RESUMED";
+    VoiceEventKind[VoiceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(VoiceEventKind || (exports.VoiceEventKind = VoiceEventKind = {}));
+function voiceEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "VOICE_EVENT_KIND_UNSPECIFIED":
+            return VoiceEventKind.VOICE_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "VOICE_EVENT_KIND_LISTENING_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_LISTENING_STARTED;
+        case 2:
+        case "VOICE_EVENT_KIND_LISTENING_ENDED":
+            return VoiceEventKind.VOICE_EVENT_KIND_LISTENING_ENDED;
+        case 3:
+        case "VOICE_EVENT_KIND_SPEECH_DETECTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_DETECTED;
+        case 4:
+        case "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_STARTED;
+        case 5:
+        case "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL":
+            return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL;
+        case 6:
+        case "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL":
+            return VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_FINAL;
+        case 7:
+        case "VOICE_EVENT_KIND_RESPONSE_GENERATED":
+            return VoiceEventKind.VOICE_EVENT_KIND_RESPONSE_GENERATED;
+        case 8:
+        case "VOICE_EVENT_KIND_SYNTHESIS_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_STARTED;
+        case 9:
+        case "VOICE_EVENT_KIND_AUDIO_GENERATED":
+            return VoiceEventKind.VOICE_EVENT_KIND_AUDIO_GENERATED;
+        case 10:
+        case "VOICE_EVENT_KIND_SYNTHESIS_COMPLETED":
+            return VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_COMPLETED;
+        case 11:
+        case "VOICE_EVENT_KIND_SYNTHESIS_FAILED":
+            return VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_FAILED;
+        case 12:
+        case "VOICE_EVENT_KIND_PIPELINE_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_STARTED;
+        case 13:
+        case "VOICE_EVENT_KIND_PIPELINE_COMPLETED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_COMPLETED;
+        case 14:
+        case "VOICE_EVENT_KIND_PIPELINE_ERROR":
+            return VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_ERROR;
+        case 15:
+        case "VOICE_EVENT_KIND_VAD_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_STARTED;
+        case 16:
+        case "VOICE_EVENT_KIND_VAD_DETECTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_DETECTED;
+        case 17:
+        case "VOICE_EVENT_KIND_VAD_ENDED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_ENDED;
+        case 18:
+        case "VOICE_EVENT_KIND_VAD_INITIALIZED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_INITIALIZED;
+        case 19:
+        case "VOICE_EVENT_KIND_VAD_STOPPED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_STOPPED;
+        case 20:
+        case "VOICE_EVENT_KIND_VAD_CLEANED_UP":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_CLEANED_UP;
+        case 21:
+        case "VOICE_EVENT_KIND_SPEECH_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_STARTED;
+        case 22:
+        case "VOICE_EVENT_KIND_SPEECH_ENDED":
+            return VoiceEventKind.VOICE_EVENT_KIND_SPEECH_ENDED;
+        case 23:
+        case "VOICE_EVENT_KIND_STT_PROCESSING":
+            return VoiceEventKind.VOICE_EVENT_KIND_STT_PROCESSING;
+        case 24:
+        case "VOICE_EVENT_KIND_STT_PARTIAL_RESULT":
+            return VoiceEventKind.VOICE_EVENT_KIND_STT_PARTIAL_RESULT;
+        case 25:
+        case "VOICE_EVENT_KIND_STT_COMPLETED":
+            return VoiceEventKind.VOICE_EVENT_KIND_STT_COMPLETED;
+        case 26:
+        case "VOICE_EVENT_KIND_STT_FAILED":
+            return VoiceEventKind.VOICE_EVENT_KIND_STT_FAILED;
+        case 27:
+        case "VOICE_EVENT_KIND_LLM_PROCESSING":
+            return VoiceEventKind.VOICE_EVENT_KIND_LLM_PROCESSING;
+        case 28:
+        case "VOICE_EVENT_KIND_TTS_PROCESSING":
+            return VoiceEventKind.VOICE_EVENT_KIND_TTS_PROCESSING;
+        case 29:
+        case "VOICE_EVENT_KIND_RECORDING_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STARTED;
+        case 30:
+        case "VOICE_EVENT_KIND_RECORDING_STOPPED":
+            return VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STOPPED;
+        case 31:
+        case "VOICE_EVENT_KIND_PLAYBACK_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STARTED;
+        case 32:
+        case "VOICE_EVENT_KIND_PLAYBACK_COMPLETED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_COMPLETED;
+        case 33:
+        case "VOICE_EVENT_KIND_PLAYBACK_STOPPED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STOPPED;
+        case 34:
+        case "VOICE_EVENT_KIND_PLAYBACK_PAUSED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_PAUSED;
+        case 35:
+        case "VOICE_EVENT_KIND_PLAYBACK_RESUMED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_RESUMED;
+        case 36:
+        case "VOICE_EVENT_KIND_PLAYBACK_FAILED":
+            return VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_FAILED;
+        case 37:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STARTED;
+        case 38:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_LISTENING;
+        case 39:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED;
+        case 40:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED;
+        case 41:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING;
+        case 42:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED;
+        case 43:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED;
+        case 44:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING;
+        case 45:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED;
+        case 46:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STOPPED;
+        case 47:
+        case "VOICE_EVENT_KIND_VOICE_SESSION_ERROR":
+            return VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_ERROR;
+        case 48:
+        case "VOICE_EVENT_KIND_VAD_PAUSED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_PAUSED;
+        case 49:
+        case "VOICE_EVENT_KIND_VAD_RESUMED":
+            return VoiceEventKind.VOICE_EVENT_KIND_VAD_RESUMED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return VoiceEventKind.UNRECOGNIZED;
+    }
+}
+function voiceEventKindToJSON(object) {
+    switch (object) {
+        case VoiceEventKind.VOICE_EVENT_KIND_UNSPECIFIED:
+            return "VOICE_EVENT_KIND_UNSPECIFIED";
+        case VoiceEventKind.VOICE_EVENT_KIND_LISTENING_STARTED:
+            return "VOICE_EVENT_KIND_LISTENING_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_LISTENING_ENDED:
+            return "VOICE_EVENT_KIND_LISTENING_ENDED";
+        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_DETECTED:
+            return "VOICE_EVENT_KIND_SPEECH_DETECTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_STARTED:
+            return "VOICE_EVENT_KIND_TRANSCRIPTION_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL:
+            return "VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL";
+        case VoiceEventKind.VOICE_EVENT_KIND_TRANSCRIPTION_FINAL:
+            return "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL";
+        case VoiceEventKind.VOICE_EVENT_KIND_RESPONSE_GENERATED:
+            return "VOICE_EVENT_KIND_RESPONSE_GENERATED";
+        case VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_STARTED:
+            return "VOICE_EVENT_KIND_SYNTHESIS_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_AUDIO_GENERATED:
+            return "VOICE_EVENT_KIND_AUDIO_GENERATED";
+        case VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_COMPLETED:
+            return "VOICE_EVENT_KIND_SYNTHESIS_COMPLETED";
+        case VoiceEventKind.VOICE_EVENT_KIND_SYNTHESIS_FAILED:
+            return "VOICE_EVENT_KIND_SYNTHESIS_FAILED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_STARTED:
+            return "VOICE_EVENT_KIND_PIPELINE_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_COMPLETED:
+            return "VOICE_EVENT_KIND_PIPELINE_COMPLETED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PIPELINE_ERROR:
+            return "VOICE_EVENT_KIND_PIPELINE_ERROR";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_STARTED:
+            return "VOICE_EVENT_KIND_VAD_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_DETECTED:
+            return "VOICE_EVENT_KIND_VAD_DETECTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_ENDED:
+            return "VOICE_EVENT_KIND_VAD_ENDED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_INITIALIZED:
+            return "VOICE_EVENT_KIND_VAD_INITIALIZED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_STOPPED:
+            return "VOICE_EVENT_KIND_VAD_STOPPED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_CLEANED_UP:
+            return "VOICE_EVENT_KIND_VAD_CLEANED_UP";
+        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_STARTED:
+            return "VOICE_EVENT_KIND_SPEECH_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_SPEECH_ENDED:
+            return "VOICE_EVENT_KIND_SPEECH_ENDED";
+        case VoiceEventKind.VOICE_EVENT_KIND_STT_PROCESSING:
+            return "VOICE_EVENT_KIND_STT_PROCESSING";
+        case VoiceEventKind.VOICE_EVENT_KIND_STT_PARTIAL_RESULT:
+            return "VOICE_EVENT_KIND_STT_PARTIAL_RESULT";
+        case VoiceEventKind.VOICE_EVENT_KIND_STT_COMPLETED:
+            return "VOICE_EVENT_KIND_STT_COMPLETED";
+        case VoiceEventKind.VOICE_EVENT_KIND_STT_FAILED:
+            return "VOICE_EVENT_KIND_STT_FAILED";
+        case VoiceEventKind.VOICE_EVENT_KIND_LLM_PROCESSING:
+            return "VOICE_EVENT_KIND_LLM_PROCESSING";
+        case VoiceEventKind.VOICE_EVENT_KIND_TTS_PROCESSING:
+            return "VOICE_EVENT_KIND_TTS_PROCESSING";
+        case VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STARTED:
+            return "VOICE_EVENT_KIND_RECORDING_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_RECORDING_STOPPED:
+            return "VOICE_EVENT_KIND_RECORDING_STOPPED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STARTED:
+            return "VOICE_EVENT_KIND_PLAYBACK_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_COMPLETED:
+            return "VOICE_EVENT_KIND_PLAYBACK_COMPLETED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_STOPPED:
+            return "VOICE_EVENT_KIND_PLAYBACK_STOPPED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_PAUSED:
+            return "VOICE_EVENT_KIND_PLAYBACK_PAUSED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_RESUMED:
+            return "VOICE_EVENT_KIND_PLAYBACK_RESUMED";
+        case VoiceEventKind.VOICE_EVENT_KIND_PLAYBACK_FAILED:
+            return "VOICE_EVENT_KIND_PLAYBACK_FAILED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STARTED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_LISTENING:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_LISTENING";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_STARTED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_PROCESSING";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_TRANSCRIBED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_RESPONDED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_SPEAKING";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_STOPPED:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_STOPPED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VOICE_SESSION_ERROR:
+            return "VOICE_EVENT_KIND_VOICE_SESSION_ERROR";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_PAUSED:
+            return "VOICE_EVENT_KIND_VAD_PAUSED";
+        case VoiceEventKind.VOICE_EVENT_KIND_VAD_RESUMED:
+            return "VOICE_EVENT_KIND_VAD_RESUMED";
+        case VoiceEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+var CapabilityOperationEventKind;
+(function (CapabilityOperationEventKind) {
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED"] = 0] = "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED"] = 1] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED"] = 2] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED"] = 3] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED"] = 4] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS"] = 5] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED"] = 6] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED"] = 7] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED"] = 8] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED"] = 9] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED"] = 10] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED"] = 11] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED"] = 12] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED"] = 13] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED"] = 14] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED"] = 15] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED"] = 16] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED"] = 17] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED"] = 18] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED";
+    CapabilityOperationEventKind[CapabilityOperationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(CapabilityOperationEventKind || (exports.CapabilityOperationEventKind = CapabilityOperationEventKind = {}));
+function capabilityOperationEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED;
+        case 2:
+        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED;
+        case 3:
+        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED;
+        case 4:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED;
+        case 5:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS;
+        case 6:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED;
+        case 7:
+        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED;
+        case 8:
+        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED;
+        case 9:
+        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED;
+        case 10:
+        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED;
+        case 11:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED;
+        case 12:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED;
+        case 13:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED;
+        case 14:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED;
+        case 15:
+        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED;
+        case 16:
+        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED;
+        case 17:
+        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED;
+        case 18:
+        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED":
+            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return CapabilityOperationEventKind.UNRECOGNIZED;
+    }
+}
+function capabilityOperationEventKindToJSON(object) {
+    switch (object) {
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED";
+        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED:
+            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED";
+        case CapabilityOperationEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+var ModelEventKind;
+(function (ModelEventKind) {
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNSPECIFIED"] = 0] = "MODEL_EVENT_KIND_UNSPECIFIED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_STARTED"] = 1] = "MODEL_EVENT_KIND_LOAD_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_PROGRESS"] = 2] = "MODEL_EVENT_KIND_LOAD_PROGRESS";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_COMPLETED"] = 3] = "MODEL_EVENT_KIND_LOAD_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LOAD_FAILED"] = 4] = "MODEL_EVENT_KIND_LOAD_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNLOAD_STARTED"] = 5] = "MODEL_EVENT_KIND_UNLOAD_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNLOAD_COMPLETED"] = 6] = "MODEL_EVENT_KIND_UNLOAD_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_UNLOAD_FAILED"] = 7] = "MODEL_EVENT_KIND_UNLOAD_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_STARTED"] = 8] = "MODEL_EVENT_KIND_DOWNLOAD_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_PROGRESS"] = 9] = "MODEL_EVENT_KIND_DOWNLOAD_PROGRESS";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_COMPLETED"] = 10] = "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_FAILED"] = 11] = "MODEL_EVENT_KIND_DOWNLOAD_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DOWNLOAD_CANCELLED"] = 12] = "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_REQUESTED"] = 13] = "MODEL_EVENT_KIND_LIST_REQUESTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_COMPLETED"] = 14] = "MODEL_EVENT_KIND_LIST_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_LIST_FAILED"] = 15] = "MODEL_EVENT_KIND_LIST_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_CATALOG_LOADED"] = 16] = "MODEL_EVENT_KIND_CATALOG_LOADED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DELETE_STARTED"] = 17] = "MODEL_EVENT_KIND_DELETE_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DELETE_COMPLETED"] = 18] = "MODEL_EVENT_KIND_DELETE_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_DELETE_FAILED"] = 19] = "MODEL_EVENT_KIND_DELETE_FAILED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED"] = 20] = "MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_BUILT_IN_REGISTERED"] = 21] = "MODEL_EVENT_KIND_BUILT_IN_REGISTERED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_STARTED"] = 22] = "MODEL_EVENT_KIND_EXTRACTION_STARTED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_PROGRESS"] = 23] = "MODEL_EVENT_KIND_EXTRACTION_PROGRESS";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_COMPLETED"] = 24] = "MODEL_EVENT_KIND_EXTRACTION_COMPLETED";
+    ModelEventKind[ModelEventKind["MODEL_EVENT_KIND_EXTRACTION_FAILED"] = 25] = "MODEL_EVENT_KIND_EXTRACTION_FAILED";
+    ModelEventKind[ModelEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ModelEventKind || (exports.ModelEventKind = ModelEventKind = {}));
+function modelEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "MODEL_EVENT_KIND_UNSPECIFIED":
+            return ModelEventKind.MODEL_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "MODEL_EVENT_KIND_LOAD_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_LOAD_STARTED;
+        case 2:
+        case "MODEL_EVENT_KIND_LOAD_PROGRESS":
+            return ModelEventKind.MODEL_EVENT_KIND_LOAD_PROGRESS;
+        case 3:
+        case "MODEL_EVENT_KIND_LOAD_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED;
+        case 4:
+        case "MODEL_EVENT_KIND_LOAD_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_LOAD_FAILED;
+        case 5:
+        case "MODEL_EVENT_KIND_UNLOAD_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_UNLOAD_STARTED;
+        case 6:
+        case "MODEL_EVENT_KIND_UNLOAD_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED;
+        case 7:
+        case "MODEL_EVENT_KIND_UNLOAD_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_UNLOAD_FAILED;
+        case 8:
+        case "MODEL_EVENT_KIND_DOWNLOAD_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED;
+        case 9:
+        case "MODEL_EVENT_KIND_DOWNLOAD_PROGRESS":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PROGRESS;
+        case 10:
+        case "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED;
+        case 11:
+        case "MODEL_EVENT_KIND_DOWNLOAD_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED;
+        case 12:
+        case "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED":
+            return ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED;
+        case 13:
+        case "MODEL_EVENT_KIND_LIST_REQUESTED":
+            return ModelEventKind.MODEL_EVENT_KIND_LIST_REQUESTED;
+        case 14:
+        case "MODEL_EVENT_KIND_LIST_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_LIST_COMPLETED;
+        case 15:
+        case "MODEL_EVENT_KIND_LIST_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_LIST_FAILED;
+        case 16:
+        case "MODEL_EVENT_KIND_CATALOG_LOADED":
+            return ModelEventKind.MODEL_EVENT_KIND_CATALOG_LOADED;
+        case 17:
+        case "MODEL_EVENT_KIND_DELETE_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_DELETE_STARTED;
+        case 18:
+        case "MODEL_EVENT_KIND_DELETE_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_DELETE_COMPLETED;
+        case 19:
+        case "MODEL_EVENT_KIND_DELETE_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_DELETE_FAILED;
+        case 20:
+        case "MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED":
+            return ModelEventKind.MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED;
+        case 21:
+        case "MODEL_EVENT_KIND_BUILT_IN_REGISTERED":
+            return ModelEventKind.MODEL_EVENT_KIND_BUILT_IN_REGISTERED;
+        case 22:
+        case "MODEL_EVENT_KIND_EXTRACTION_STARTED":
+            return ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_STARTED;
+        case 23:
+        case "MODEL_EVENT_KIND_EXTRACTION_PROGRESS":
+            return ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_PROGRESS;
+        case 24:
+        case "MODEL_EVENT_KIND_EXTRACTION_COMPLETED":
+            return ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_COMPLETED;
+        case 25:
+        case "MODEL_EVENT_KIND_EXTRACTION_FAILED":
+            return ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ModelEventKind.UNRECOGNIZED;
+    }
+}
+function modelEventKindToJSON(object) {
+    switch (object) {
+        case ModelEventKind.MODEL_EVENT_KIND_UNSPECIFIED:
+            return "MODEL_EVENT_KIND_UNSPECIFIED";
+        case ModelEventKind.MODEL_EVENT_KIND_LOAD_STARTED:
+            return "MODEL_EVENT_KIND_LOAD_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_LOAD_PROGRESS:
+            return "MODEL_EVENT_KIND_LOAD_PROGRESS";
+        case ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED:
+            return "MODEL_EVENT_KIND_LOAD_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_LOAD_FAILED:
+            return "MODEL_EVENT_KIND_LOAD_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_UNLOAD_STARTED:
+            return "MODEL_EVENT_KIND_UNLOAD_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED:
+            return "MODEL_EVENT_KIND_UNLOAD_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_UNLOAD_FAILED:
+            return "MODEL_EVENT_KIND_UNLOAD_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_STARTED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_PROGRESS:
+            return "MODEL_EVENT_KIND_DOWNLOAD_PROGRESS";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_FAILED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_CANCELLED:
+            return "MODEL_EVENT_KIND_DOWNLOAD_CANCELLED";
+        case ModelEventKind.MODEL_EVENT_KIND_LIST_REQUESTED:
+            return "MODEL_EVENT_KIND_LIST_REQUESTED";
+        case ModelEventKind.MODEL_EVENT_KIND_LIST_COMPLETED:
+            return "MODEL_EVENT_KIND_LIST_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_LIST_FAILED:
+            return "MODEL_EVENT_KIND_LIST_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_CATALOG_LOADED:
+            return "MODEL_EVENT_KIND_CATALOG_LOADED";
+        case ModelEventKind.MODEL_EVENT_KIND_DELETE_STARTED:
+            return "MODEL_EVENT_KIND_DELETE_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_DELETE_COMPLETED:
+            return "MODEL_EVENT_KIND_DELETE_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_DELETE_FAILED:
+            return "MODEL_EVENT_KIND_DELETE_FAILED";
+        case ModelEventKind.MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED:
+            return "MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED";
+        case ModelEventKind.MODEL_EVENT_KIND_BUILT_IN_REGISTERED:
+            return "MODEL_EVENT_KIND_BUILT_IN_REGISTERED";
+        case ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_STARTED:
+            return "MODEL_EVENT_KIND_EXTRACTION_STARTED";
+        case ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_PROGRESS:
+            return "MODEL_EVENT_KIND_EXTRACTION_PROGRESS";
+        case ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_COMPLETED:
+            return "MODEL_EVENT_KIND_EXTRACTION_COMPLETED";
+        case ModelEventKind.MODEL_EVENT_KIND_EXTRACTION_FAILED:
+            return "MODEL_EVENT_KIND_EXTRACTION_FAILED";
+        case ModelEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1979,6 +1660,133 @@ function downloadEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+var StorageEventKind;
+(function (StorageEventKind) {
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_UNSPECIFIED"] = 0] = "STORAGE_EVENT_KIND_UNSPECIFIED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_INFO_REQUESTED"] = 1] = "STORAGE_EVENT_KIND_INFO_REQUESTED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_INFO_RETRIEVED"] = 2] = "STORAGE_EVENT_KIND_INFO_RETRIEVED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_MODELS_REQUESTED"] = 3] = "STORAGE_EVENT_KIND_MODELS_REQUESTED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_MODELS_RETRIEVED"] = 4] = "STORAGE_EVENT_KIND_MODELS_RETRIEVED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED"] = 5] = "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED"] = 6] = "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED"] = 7] = "STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED"] = 8] = "STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED"] = 9] = "STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED"] = 10] = "STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_MODEL_STARTED"] = 11] = "STORAGE_EVENT_KIND_DELETE_MODEL_STARTED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED"] = 12] = "STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DELETE_MODEL_FAILED"] = 13] = "STORAGE_EVENT_KIND_DELETE_MODEL_FAILED";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_HIT"] = 14] = "STORAGE_EVENT_KIND_CACHE_HIT";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_CACHE_MISS"] = 15] = "STORAGE_EVENT_KIND_CACHE_MISS";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_EVICTION"] = 16] = "STORAGE_EVENT_KIND_EVICTION";
+    StorageEventKind[StorageEventKind["STORAGE_EVENT_KIND_DISK_FULL"] = 17] = "STORAGE_EVENT_KIND_DISK_FULL";
+    StorageEventKind[StorageEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(StorageEventKind || (exports.StorageEventKind = StorageEventKind = {}));
+function storageEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "STORAGE_EVENT_KIND_UNSPECIFIED":
+            return StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "STORAGE_EVENT_KIND_INFO_REQUESTED":
+            return StorageEventKind.STORAGE_EVENT_KIND_INFO_REQUESTED;
+        case 2:
+        case "STORAGE_EVENT_KIND_INFO_RETRIEVED":
+            return StorageEventKind.STORAGE_EVENT_KIND_INFO_RETRIEVED;
+        case 3:
+        case "STORAGE_EVENT_KIND_MODELS_REQUESTED":
+            return StorageEventKind.STORAGE_EVENT_KIND_MODELS_REQUESTED;
+        case 4:
+        case "STORAGE_EVENT_KIND_MODELS_RETRIEVED":
+            return StorageEventKind.STORAGE_EVENT_KIND_MODELS_RETRIEVED;
+        case 5:
+        case "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED;
+        case 6:
+        case "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED;
+        case 7:
+        case "STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED;
+        case 8:
+        case "STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED;
+        case 9:
+        case "STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED;
+        case 10:
+        case "STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED":
+            return StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED;
+        case 11:
+        case "STORAGE_EVENT_KIND_DELETE_MODEL_STARTED":
+            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_STARTED;
+        case 12:
+        case "STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED":
+            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED;
+        case 13:
+        case "STORAGE_EVENT_KIND_DELETE_MODEL_FAILED":
+            return StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_FAILED;
+        case 14:
+        case "STORAGE_EVENT_KIND_CACHE_HIT":
+            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_HIT;
+        case 15:
+        case "STORAGE_EVENT_KIND_CACHE_MISS":
+            return StorageEventKind.STORAGE_EVENT_KIND_CACHE_MISS;
+        case 16:
+        case "STORAGE_EVENT_KIND_EVICTION":
+            return StorageEventKind.STORAGE_EVENT_KIND_EVICTION;
+        case 17:
+        case "STORAGE_EVENT_KIND_DISK_FULL":
+            return StorageEventKind.STORAGE_EVENT_KIND_DISK_FULL;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return StorageEventKind.UNRECOGNIZED;
+    }
+}
+function storageEventKindToJSON(object) {
+    switch (object) {
+        case StorageEventKind.STORAGE_EVENT_KIND_UNSPECIFIED:
+            return "STORAGE_EVENT_KIND_UNSPECIFIED";
+        case StorageEventKind.STORAGE_EVENT_KIND_INFO_REQUESTED:
+            return "STORAGE_EVENT_KIND_INFO_REQUESTED";
+        case StorageEventKind.STORAGE_EVENT_KIND_INFO_RETRIEVED:
+            return "STORAGE_EVENT_KIND_INFO_RETRIEVED";
+        case StorageEventKind.STORAGE_EVENT_KIND_MODELS_REQUESTED:
+            return "STORAGE_EVENT_KIND_MODELS_REQUESTED";
+        case StorageEventKind.STORAGE_EVENT_KIND_MODELS_RETRIEVED:
+            return "STORAGE_EVENT_KIND_MODELS_RETRIEVED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED:
+            return "STORAGE_EVENT_KIND_CLEAR_CACHE_STARTED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED:
+            return "STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED:
+            return "STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED:
+            return "STORAGE_EVENT_KIND_CLEAN_TEMP_STARTED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED:
+            return "STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED:
+            return "STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED";
+        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_STARTED:
+            return "STORAGE_EVENT_KIND_DELETE_MODEL_STARTED";
+        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED:
+            return "STORAGE_EVENT_KIND_DELETE_MODEL_COMPLETED";
+        case StorageEventKind.STORAGE_EVENT_KIND_DELETE_MODEL_FAILED:
+            return "STORAGE_EVENT_KIND_DELETE_MODEL_FAILED";
+        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_HIT:
+            return "STORAGE_EVENT_KIND_CACHE_HIT";
+        case StorageEventKind.STORAGE_EVENT_KIND_CACHE_MISS:
+            return "STORAGE_EVENT_KIND_CACHE_MISS";
+        case StorageEventKind.STORAGE_EVENT_KIND_EVICTION:
+            return "STORAGE_EVENT_KIND_EVICTION";
+        case StorageEventKind.STORAGE_EVENT_KIND_DISK_FULL:
+            return "STORAGE_EVENT_KIND_DISK_FULL";
+        case StorageEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 var StorageLifecycleEventKind;
 (function (StorageLifecycleEventKind) {
     StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED"] = 0] = "STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED";
@@ -2082,6 +1890,330 @@ function storageLifecycleEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+var AuthEventKind;
+(function (AuthEventKind) {
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_UNSPECIFIED"] = 0] = "AUTH_EVENT_KIND_UNSPECIFIED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_REQUESTED"] = 1] = "AUTH_EVENT_KIND_REQUESTED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_SUCCEEDED"] = 2] = "AUTH_EVENT_KIND_SUCCEEDED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_FAILED"] = 3] = "AUTH_EVENT_KIND_FAILED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_TOKEN_REFRESHED"] = 4] = "AUTH_EVENT_KIND_TOKEN_REFRESHED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_TOKEN_EXPIRED"] = 5] = "AUTH_EVENT_KIND_TOKEN_EXPIRED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_DEVICE_REGISTERED"] = 6] = "AUTH_EVENT_KIND_DEVICE_REGISTERED";
+    AuthEventKind[AuthEventKind["AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED"] = 7] = "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
+    AuthEventKind[AuthEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(AuthEventKind || (exports.AuthEventKind = AuthEventKind = {}));
+function authEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "AUTH_EVENT_KIND_UNSPECIFIED":
+            return AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "AUTH_EVENT_KIND_REQUESTED":
+            return AuthEventKind.AUTH_EVENT_KIND_REQUESTED;
+        case 2:
+        case "AUTH_EVENT_KIND_SUCCEEDED":
+            return AuthEventKind.AUTH_EVENT_KIND_SUCCEEDED;
+        case 3:
+        case "AUTH_EVENT_KIND_FAILED":
+            return AuthEventKind.AUTH_EVENT_KIND_FAILED;
+        case 4:
+        case "AUTH_EVENT_KIND_TOKEN_REFRESHED":
+            return AuthEventKind.AUTH_EVENT_KIND_TOKEN_REFRESHED;
+        case 5:
+        case "AUTH_EVENT_KIND_TOKEN_EXPIRED":
+            return AuthEventKind.AUTH_EVENT_KIND_TOKEN_EXPIRED;
+        case 6:
+        case "AUTH_EVENT_KIND_DEVICE_REGISTERED":
+            return AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTERED;
+        case 7:
+        case "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED":
+            return AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return AuthEventKind.UNRECOGNIZED;
+    }
+}
+function authEventKindToJSON(object) {
+    switch (object) {
+        case AuthEventKind.AUTH_EVENT_KIND_UNSPECIFIED:
+            return "AUTH_EVENT_KIND_UNSPECIFIED";
+        case AuthEventKind.AUTH_EVENT_KIND_REQUESTED:
+            return "AUTH_EVENT_KIND_REQUESTED";
+        case AuthEventKind.AUTH_EVENT_KIND_SUCCEEDED:
+            return "AUTH_EVENT_KIND_SUCCEEDED";
+        case AuthEventKind.AUTH_EVENT_KIND_FAILED:
+            return "AUTH_EVENT_KIND_FAILED";
+        case AuthEventKind.AUTH_EVENT_KIND_TOKEN_REFRESHED:
+            return "AUTH_EVENT_KIND_TOKEN_REFRESHED";
+        case AuthEventKind.AUTH_EVENT_KIND_TOKEN_EXPIRED:
+            return "AUTH_EVENT_KIND_TOKEN_EXPIRED";
+        case AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTERED:
+            return "AUTH_EVENT_KIND_DEVICE_REGISTERED";
+        case AuthEventKind.AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
+            return "AUTH_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
+        case AuthEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+var DeviceEventKind;
+(function (DeviceEventKind) {
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_UNSPECIFIED"] = 0] = "DEVICE_EVENT_KIND_UNSPECIFIED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED"] = 1] = "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED"] = 2] = "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED"] = 3] = "DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED"] = 4] = "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED"] = 5] = "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED"] = 6] = "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED"] = 7] = "DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_BATTERY_CHANGED"] = 8] = "DEVICE_EVENT_KIND_BATTERY_CHANGED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_THERMAL_CHANGED"] = 9] = "DEVICE_EVENT_KIND_THERMAL_CHANGED";
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED"] = 10] = "DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED";
+    /** DEVICE_EVENT_KIND_DEVICE_REGISTERED - Dart DeviceRegistered */
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_REGISTERED"] = 11] = "DEVICE_EVENT_KIND_DEVICE_REGISTERED";
+    /** DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED - Dart DeviceRegistrationFailed */
+    DeviceEventKind[DeviceEventKind["DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED"] = 12] = "DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
+    DeviceEventKind[DeviceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(DeviceEventKind || (exports.DeviceEventKind = DeviceEventKind = {}));
+function deviceEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "DEVICE_EVENT_KIND_UNSPECIFIED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED;
+        case 2:
+        case "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED;
+        case 3:
+        case "DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED;
+        case 4:
+        case "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED;
+        case 5:
+        case "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED;
+        case 6:
+        case "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED;
+        case 7:
+        case "DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED;
+        case 8:
+        case "DEVICE_EVENT_KIND_BATTERY_CHANGED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_BATTERY_CHANGED;
+        case 9:
+        case "DEVICE_EVENT_KIND_THERMAL_CHANGED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_THERMAL_CHANGED;
+        case 10:
+        case "DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED;
+        case 11:
+        case "DEVICE_EVENT_KIND_DEVICE_REGISTERED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTERED;
+        case 12:
+        case "DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED":
+            return DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return DeviceEventKind.UNRECOGNIZED;
+    }
+}
+function deviceEventKindToJSON(object) {
+    switch (object) {
+        case DeviceEventKind.DEVICE_EVENT_KIND_UNSPECIFIED:
+            return "DEVICE_EVENT_KIND_UNSPECIFIED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED:
+            return "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED:
+            return "DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTION_FAILED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED:
+            return "DEVICE_EVENT_KIND_DEVICE_INFO_REFRESHED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED:
+            return "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STARTED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED:
+            return "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLETED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED:
+            return "DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED:
+            return "DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_BATTERY_CHANGED:
+            return "DEVICE_EVENT_KIND_BATTERY_CHANGED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_THERMAL_CHANGED:
+            return "DEVICE_EVENT_KIND_THERMAL_CHANGED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED:
+            return "DEVICE_EVENT_KIND_CONNECTIVITY_CHANGED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTERED:
+            return "DEVICE_EVENT_KIND_DEVICE_REGISTERED";
+        case DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
+            return "DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED";
+        case DeviceEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+var NetworkEventKind;
+(function (NetworkEventKind) {
+    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_UNSPECIFIED"] = 0] = "NETWORK_EVENT_KIND_UNSPECIFIED";
+    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_STARTED"] = 1] = "NETWORK_EVENT_KIND_REQUEST_STARTED";
+    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_COMPLETED"] = 2] = "NETWORK_EVENT_KIND_REQUEST_COMPLETED";
+    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_FAILED"] = 3] = "NETWORK_EVENT_KIND_REQUEST_FAILED";
+    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_REQUEST_TIMEOUT"] = 4] = "NETWORK_EVENT_KIND_REQUEST_TIMEOUT";
+    NetworkEventKind[NetworkEventKind["NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED"] = 5] = "NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED";
+    NetworkEventKind[NetworkEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(NetworkEventKind || (exports.NetworkEventKind = NetworkEventKind = {}));
+function networkEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "NETWORK_EVENT_KIND_UNSPECIFIED":
+            return NetworkEventKind.NETWORK_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "NETWORK_EVENT_KIND_REQUEST_STARTED":
+            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_STARTED;
+        case 2:
+        case "NETWORK_EVENT_KIND_REQUEST_COMPLETED":
+            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_COMPLETED;
+        case 3:
+        case "NETWORK_EVENT_KIND_REQUEST_FAILED":
+            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_FAILED;
+        case 4:
+        case "NETWORK_EVENT_KIND_REQUEST_TIMEOUT":
+            return NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_TIMEOUT;
+        case 5:
+        case "NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED":
+            return NetworkEventKind.NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return NetworkEventKind.UNRECOGNIZED;
+    }
+}
+function networkEventKindToJSON(object) {
+    switch (object) {
+        case NetworkEventKind.NETWORK_EVENT_KIND_UNSPECIFIED:
+            return "NETWORK_EVENT_KIND_UNSPECIFIED";
+        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_STARTED:
+            return "NETWORK_EVENT_KIND_REQUEST_STARTED";
+        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_COMPLETED:
+            return "NETWORK_EVENT_KIND_REQUEST_COMPLETED";
+        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_FAILED:
+            return "NETWORK_EVENT_KIND_REQUEST_FAILED";
+        case NetworkEventKind.NETWORK_EVENT_KIND_REQUEST_TIMEOUT:
+            return "NETWORK_EVENT_KIND_REQUEST_TIMEOUT";
+        case NetworkEventKind.NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED:
+            return "NETWORK_EVENT_KIND_CONNECTIVITY_CHANGED";
+        case NetworkEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+var FrameworkEventKind;
+(function (FrameworkEventKind) {
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_UNSPECIFIED"] = 0] = "FRAMEWORK_EVENT_KIND_UNSPECIFIED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED"] = 1] = "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED"] = 2] = "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED"] = 3] = "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED"] = 4] = "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED"] = 5] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED"] = 6] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED"] = 7] = "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED"] = 8] = "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED"] = 9] = "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED"] = 10] = "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED"] = 11] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED"] = 12] = "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED";
+    FrameworkEventKind[FrameworkEventKind["FRAMEWORK_EVENT_KIND_ERROR"] = 13] = "FRAMEWORK_EVENT_KIND_ERROR";
+    FrameworkEventKind[FrameworkEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(FrameworkEventKind || (exports.FrameworkEventKind = FrameworkEventKind = {}));
+function frameworkEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "FRAMEWORK_EVENT_KIND_UNSPECIFIED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED;
+        case 2:
+        case "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED;
+        case 3:
+        case "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED;
+        case 4:
+        case "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED;
+        case 5:
+        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED;
+        case 6:
+        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED;
+        case 7:
+        case "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED;
+        case 8:
+        case "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED;
+        case 9:
+        case "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED;
+        case 10:
+        case "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED;
+        case 11:
+        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED;
+        case 12:
+        case "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED;
+        case 13:
+        case "FRAMEWORK_EVENT_KIND_ERROR":
+            return FrameworkEventKind.FRAMEWORK_EVENT_KIND_ERROR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return FrameworkEventKind.UNRECOGNIZED;
+    }
+}
+function frameworkEventKindToJSON(object) {
+    switch (object) {
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_UNSPECIFIED:
+            return "FRAMEWORK_EVENT_KIND_UNSPECIFIED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED:
+            return "FRAMEWORK_EVENT_KIND_ADAPTER_REGISTERED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED:
+            return "FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTERED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED:
+            return "FRAMEWORK_EVENT_KIND_ADAPTERS_REQUESTED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED:
+            return "FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED:
+            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_REQUESTED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED:
+            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED:
+            return "FRAMEWORK_EVENT_KIND_AVAILABILITY_REQUESTED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED:
+            return "FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRIEVED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED:
+            return "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_REQUESTED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED:
+            return "FRAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED:
+            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_REQUESTED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED:
+            return "FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED";
+        case FrameworkEventKind.FRAMEWORK_EVENT_KIND_ERROR:
+            return "FRAMEWORK_EVENT_KIND_ERROR";
+        case FrameworkEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 var HardwareRoutingEventKind;
 (function (HardwareRoutingEventKind) {
     HardwareRoutingEventKind[HardwareRoutingEventKind["HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED"] = 0] = "HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED";
@@ -2149,135 +2281,51 @@ function hardwareRoutingEventKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-var CapabilityOperationEventKind;
-(function (CapabilityOperationEventKind) {
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED"] = 0] = "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED"] = 1] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED"] = 2] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED"] = 3] = "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED"] = 4] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS"] = 5] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED"] = 6] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED"] = 7] = "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED"] = 8] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED"] = 9] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED"] = 10] = "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED"] = 11] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED"] = 12] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED"] = 13] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED"] = 14] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED"] = 15] = "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED"] = 16] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED"] = 17] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED"] = 18] = "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED";
-    CapabilityOperationEventKind[CapabilityOperationEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(CapabilityOperationEventKind || (exports.CapabilityOperationEventKind = CapabilityOperationEventKind = {}));
-function capabilityOperationEventKindFromJSON(object) {
+var PerformanceEventKind;
+(function (PerformanceEventKind) {
+    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_UNSPECIFIED"] = 0] = "PERFORMANCE_EVENT_KIND_UNSPECIFIED";
+    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_MEMORY_WARNING"] = 1] = "PERFORMANCE_EVENT_KIND_MEMORY_WARNING";
+    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED"] = 2] = "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED";
+    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_LATENCY_MEASURED"] = 3] = "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED";
+    PerformanceEventKind[PerformanceEventKind["PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED"] = 4] = "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED";
+    PerformanceEventKind[PerformanceEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(PerformanceEventKind || (exports.PerformanceEventKind = PerformanceEventKind = {}));
+function performanceEventKindFromJSON(object) {
     switch (object) {
         case 0:
-        case "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED;
+        case "PERFORMANCE_EVENT_KIND_UNSPECIFIED":
+            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED;
         case 1:
-        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED;
+        case "PERFORMANCE_EVENT_KIND_MEMORY_WARNING":
+            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_MEMORY_WARNING;
         case 2:
-        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED;
+        case "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED":
+            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED;
         case 3:
-        case "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED;
+        case "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED":
+            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_LATENCY_MEASURED;
         case 4:
-        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED;
-        case 5:
-        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS;
-        case 6:
-        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED;
-        case 7:
-        case "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED;
-        case 8:
-        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED;
-        case 9:
-        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED;
-        case 10:
-        case "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED;
-        case 11:
-        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED;
-        case 12:
-        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED;
-        case 13:
-        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED;
-        case 14:
-        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED;
-        case 15:
-        case "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED;
-        case 16:
-        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED;
-        case 17:
-        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED;
-        case 18:
-        case "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED":
-            return CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED;
+        case "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED":
+            return PerformanceEventKind.PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED;
         case -1:
         case "UNRECOGNIZED":
         default:
-            return CapabilityOperationEventKind.UNRECOGNIZED;
+            return PerformanceEventKind.UNRECOGNIZED;
     }
 }
-function capabilityOperationEventKindToJSON(object) {
+function performanceEventKindToJSON(object) {
     switch (object) {
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS:
-            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED";
-        case CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED:
-            return "CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED";
-        case CapabilityOperationEventKind.UNRECOGNIZED:
+        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_UNSPECIFIED:
+            return "PERFORMANCE_EVENT_KIND_UNSPECIFIED";
+        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_MEMORY_WARNING:
+            return "PERFORMANCE_EVENT_KIND_MEMORY_WARNING";
+        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED:
+            return "PERFORMANCE_EVENT_KIND_THERMAL_STATE_CHANGED";
+        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_LATENCY_MEASURED:
+            return "PERFORMANCE_EVENT_KIND_LATENCY_MEASURED";
+        case PerformanceEventKind.PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED:
+            return "PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASURED";
+        case PerformanceEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -2702,2008 +2750,6 @@ exports.ConfigurationEvent = {
         message.analyticsEnabled = object.analyticsEnabled ?? false;
         message.oldValueJson = object.oldValueJson ?? "";
         message.newValueJson = object.newValueJson ?? "";
-        return message;
-    },
-};
-function createBaseGenerationEvent() {
-    return {
-        kind: 0,
-        sessionId: "",
-        prompt: "",
-        token: "",
-        streamingText: "",
-        tokensCount: 0,
-        response: "",
-        tokensUsed: 0,
-        latencyMs: 0,
-        firstTokenLatencyMs: 0,
-        error: "",
-        modelId: "",
-        costAmount: 0,
-        costSavedAmount: 0,
-        routingTarget: "",
-        routingReason: "",
-        cancelReason: "",
-        toolCallId: "",
-        toolName: "",
-        toolPayloadJson: "",
-        structuredSchemaJson: "",
-        structuredOutputJson: "",
-        thinkingText: "",
-        inputTokens: 0,
-    };
-}
-exports.GenerationEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.sessionId !== "") {
-            writer.uint32(18).string(message.sessionId);
-        }
-        if (message.prompt !== "") {
-            writer.uint32(26).string(message.prompt);
-        }
-        if (message.token !== "") {
-            writer.uint32(34).string(message.token);
-        }
-        if (message.streamingText !== "") {
-            writer.uint32(42).string(message.streamingText);
-        }
-        if (message.tokensCount !== 0) {
-            writer.uint32(48).int32(message.tokensCount);
-        }
-        if (message.response !== "") {
-            writer.uint32(58).string(message.response);
-        }
-        if (message.tokensUsed !== 0) {
-            writer.uint32(64).int32(message.tokensUsed);
-        }
-        if (message.latencyMs !== 0) {
-            writer.uint32(72).int64(message.latencyMs);
-        }
-        if (message.firstTokenLatencyMs !== 0) {
-            writer.uint32(80).int64(message.firstTokenLatencyMs);
-        }
-        if (message.error !== "") {
-            writer.uint32(90).string(message.error);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(98).string(message.modelId);
-        }
-        if (message.costAmount !== 0) {
-            writer.uint32(105).double(message.costAmount);
-        }
-        if (message.costSavedAmount !== 0) {
-            writer.uint32(113).double(message.costSavedAmount);
-        }
-        if (message.routingTarget !== "") {
-            writer.uint32(122).string(message.routingTarget);
-        }
-        if (message.routingReason !== "") {
-            writer.uint32(130).string(message.routingReason);
-        }
-        if (message.cancelReason !== "") {
-            writer.uint32(138).string(message.cancelReason);
-        }
-        if (message.toolCallId !== "") {
-            writer.uint32(146).string(message.toolCallId);
-        }
-        if (message.toolName !== "") {
-            writer.uint32(154).string(message.toolName);
-        }
-        if (message.toolPayloadJson !== "") {
-            writer.uint32(162).string(message.toolPayloadJson);
-        }
-        if (message.structuredSchemaJson !== "") {
-            writer.uint32(170).string(message.structuredSchemaJson);
-        }
-        if (message.structuredOutputJson !== "") {
-            writer.uint32(178).string(message.structuredOutputJson);
-        }
-        if (message.thinkingText !== "") {
-            writer.uint32(186).string(message.thinkingText);
-        }
-        if (message.inputTokens !== 0) {
-            writer.uint32(192).int32(message.inputTokens);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseGenerationEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.sessionId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.prompt = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.token = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.streamingText = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.tokensCount = reader.int32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.response = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.tokensUsed = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.latencyMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.firstTokenLatencyMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 105) {
-                        break;
-                    }
-                    message.costAmount = reader.double();
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 113) {
-                        break;
-                    }
-                    message.costSavedAmount = reader.double();
-                    continue;
-                }
-                case 15: {
-                    if (tag !== 122) {
-                        break;
-                    }
-                    message.routingTarget = reader.string();
-                    continue;
-                }
-                case 16: {
-                    if (tag !== 130) {
-                        break;
-                    }
-                    message.routingReason = reader.string();
-                    continue;
-                }
-                case 17: {
-                    if (tag !== 138) {
-                        break;
-                    }
-                    message.cancelReason = reader.string();
-                    continue;
-                }
-                case 18: {
-                    if (tag !== 146) {
-                        break;
-                    }
-                    message.toolCallId = reader.string();
-                    continue;
-                }
-                case 19: {
-                    if (tag !== 154) {
-                        break;
-                    }
-                    message.toolName = reader.string();
-                    continue;
-                }
-                case 20: {
-                    if (tag !== 162) {
-                        break;
-                    }
-                    message.toolPayloadJson = reader.string();
-                    continue;
-                }
-                case 21: {
-                    if (tag !== 170) {
-                        break;
-                    }
-                    message.structuredSchemaJson = reader.string();
-                    continue;
-                }
-                case 22: {
-                    if (tag !== 178) {
-                        break;
-                    }
-                    message.structuredOutputJson = reader.string();
-                    continue;
-                }
-                case 23: {
-                    if (tag !== 186) {
-                        break;
-                    }
-                    message.thinkingText = reader.string();
-                    continue;
-                }
-                case 24: {
-                    if (tag !== 192) {
-                        break;
-                    }
-                    message.inputTokens = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? generationEventKindFromJSON(object.kind) : 0,
-            sessionId: isSet(object.sessionId)
-                ? globalThis.String(object.sessionId)
-                : isSet(object.session_id)
-                    ? globalThis.String(object.session_id)
-                    : "",
-            prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-            token: isSet(object.token) ? globalThis.String(object.token) : "",
-            streamingText: isSet(object.streamingText)
-                ? globalThis.String(object.streamingText)
-                : isSet(object.streaming_text)
-                    ? globalThis.String(object.streaming_text)
-                    : "",
-            tokensCount: isSet(object.tokensCount)
-                ? globalThis.Number(object.tokensCount)
-                : isSet(object.tokens_count)
-                    ? globalThis.Number(object.tokens_count)
-                    : 0,
-            response: isSet(object.response) ? globalThis.String(object.response) : "",
-            tokensUsed: isSet(object.tokensUsed)
-                ? globalThis.Number(object.tokensUsed)
-                : isSet(object.tokens_used)
-                    ? globalThis.Number(object.tokens_used)
-                    : 0,
-            latencyMs: isSet(object.latencyMs)
-                ? globalThis.Number(object.latencyMs)
-                : isSet(object.latency_ms)
-                    ? globalThis.Number(object.latency_ms)
-                    : 0,
-            firstTokenLatencyMs: isSet(object.firstTokenLatencyMs)
-                ? globalThis.Number(object.firstTokenLatencyMs)
-                : isSet(object.first_token_latency_ms)
-                    ? globalThis.Number(object.first_token_latency_ms)
-                    : 0,
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            costAmount: isSet(object.costAmount)
-                ? globalThis.Number(object.costAmount)
-                : isSet(object.cost_amount)
-                    ? globalThis.Number(object.cost_amount)
-                    : 0,
-            costSavedAmount: isSet(object.costSavedAmount)
-                ? globalThis.Number(object.costSavedAmount)
-                : isSet(object.cost_saved_amount)
-                    ? globalThis.Number(object.cost_saved_amount)
-                    : 0,
-            routingTarget: isSet(object.routingTarget)
-                ? globalThis.String(object.routingTarget)
-                : isSet(object.routing_target)
-                    ? globalThis.String(object.routing_target)
-                    : "",
-            routingReason: isSet(object.routingReason)
-                ? globalThis.String(object.routingReason)
-                : isSet(object.routing_reason)
-                    ? globalThis.String(object.routing_reason)
-                    : "",
-            cancelReason: isSet(object.cancelReason)
-                ? globalThis.String(object.cancelReason)
-                : isSet(object.cancel_reason)
-                    ? globalThis.String(object.cancel_reason)
-                    : "",
-            toolCallId: isSet(object.toolCallId)
-                ? globalThis.String(object.toolCallId)
-                : isSet(object.tool_call_id)
-                    ? globalThis.String(object.tool_call_id)
-                    : "",
-            toolName: isSet(object.toolName)
-                ? globalThis.String(object.toolName)
-                : isSet(object.tool_name)
-                    ? globalThis.String(object.tool_name)
-                    : "",
-            toolPayloadJson: isSet(object.toolPayloadJson)
-                ? globalThis.String(object.toolPayloadJson)
-                : isSet(object.tool_payload_json)
-                    ? globalThis.String(object.tool_payload_json)
-                    : "",
-            structuredSchemaJson: isSet(object.structuredSchemaJson)
-                ? globalThis.String(object.structuredSchemaJson)
-                : isSet(object.structured_schema_json)
-                    ? globalThis.String(object.structured_schema_json)
-                    : "",
-            structuredOutputJson: isSet(object.structuredOutputJson)
-                ? globalThis.String(object.structuredOutputJson)
-                : isSet(object.structured_output_json)
-                    ? globalThis.String(object.structured_output_json)
-                    : "",
-            thinkingText: isSet(object.thinkingText)
-                ? globalThis.String(object.thinkingText)
-                : isSet(object.thinking_text)
-                    ? globalThis.String(object.thinking_text)
-                    : "",
-            inputTokens: isSet(object.inputTokens)
-                ? globalThis.Number(object.inputTokens)
-                : isSet(object.input_tokens)
-                    ? globalThis.Number(object.input_tokens)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = generationEventKindToJSON(message.kind);
-        }
-        if (message.sessionId !== "") {
-            obj.sessionId = message.sessionId;
-        }
-        if (message.prompt !== "") {
-            obj.prompt = message.prompt;
-        }
-        if (message.token !== "") {
-            obj.token = message.token;
-        }
-        if (message.streamingText !== "") {
-            obj.streamingText = message.streamingText;
-        }
-        if (message.tokensCount !== 0) {
-            obj.tokensCount = Math.round(message.tokensCount);
-        }
-        if (message.response !== "") {
-            obj.response = message.response;
-        }
-        if (message.tokensUsed !== 0) {
-            obj.tokensUsed = Math.round(message.tokensUsed);
-        }
-        if (message.latencyMs !== 0) {
-            obj.latencyMs = Math.round(message.latencyMs);
-        }
-        if (message.firstTokenLatencyMs !== 0) {
-            obj.firstTokenLatencyMs = Math.round(message.firstTokenLatencyMs);
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.costAmount !== 0) {
-            obj.costAmount = message.costAmount;
-        }
-        if (message.costSavedAmount !== 0) {
-            obj.costSavedAmount = message.costSavedAmount;
-        }
-        if (message.routingTarget !== "") {
-            obj.routingTarget = message.routingTarget;
-        }
-        if (message.routingReason !== "") {
-            obj.routingReason = message.routingReason;
-        }
-        if (message.cancelReason !== "") {
-            obj.cancelReason = message.cancelReason;
-        }
-        if (message.toolCallId !== "") {
-            obj.toolCallId = message.toolCallId;
-        }
-        if (message.toolName !== "") {
-            obj.toolName = message.toolName;
-        }
-        if (message.toolPayloadJson !== "") {
-            obj.toolPayloadJson = message.toolPayloadJson;
-        }
-        if (message.structuredSchemaJson !== "") {
-            obj.structuredSchemaJson = message.structuredSchemaJson;
-        }
-        if (message.structuredOutputJson !== "") {
-            obj.structuredOutputJson = message.structuredOutputJson;
-        }
-        if (message.thinkingText !== "") {
-            obj.thinkingText = message.thinkingText;
-        }
-        if (message.inputTokens !== 0) {
-            obj.inputTokens = Math.round(message.inputTokens);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.GenerationEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseGenerationEvent();
-        message.kind = object.kind ?? 0;
-        message.sessionId = object.sessionId ?? "";
-        message.prompt = object.prompt ?? "";
-        message.token = object.token ?? "";
-        message.streamingText = object.streamingText ?? "";
-        message.tokensCount = object.tokensCount ?? 0;
-        message.response = object.response ?? "";
-        message.tokensUsed = object.tokensUsed ?? 0;
-        message.latencyMs = object.latencyMs ?? 0;
-        message.firstTokenLatencyMs = object.firstTokenLatencyMs ?? 0;
-        message.error = object.error ?? "";
-        message.modelId = object.modelId ?? "";
-        message.costAmount = object.costAmount ?? 0;
-        message.costSavedAmount = object.costSavedAmount ?? 0;
-        message.routingTarget = object.routingTarget ?? "";
-        message.routingReason = object.routingReason ?? "";
-        message.cancelReason = object.cancelReason ?? "";
-        message.toolCallId = object.toolCallId ?? "";
-        message.toolName = object.toolName ?? "";
-        message.toolPayloadJson = object.toolPayloadJson ?? "";
-        message.structuredSchemaJson = object.structuredSchemaJson ?? "";
-        message.structuredOutputJson = object.structuredOutputJson ?? "";
-        message.thinkingText = object.thinkingText ?? "";
-        message.inputTokens = object.inputTokens ?? 0;
-        return message;
-    },
-};
-function createBaseModelEvent() {
-    return {
-        kind: 0,
-        modelId: "",
-        taskId: "",
-        progress: 0,
-        bytesDownloaded: 0,
-        totalBytes: 0,
-        downloadState: "",
-        localPath: "",
-        error: "",
-        modelCount: 0,
-        customModelName: "",
-        customModelUrl: "",
-    };
-}
-exports.ModelEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(18).string(message.modelId);
-        }
-        if (message.taskId !== "") {
-            writer.uint32(26).string(message.taskId);
-        }
-        if (message.progress !== 0) {
-            writer.uint32(37).float(message.progress);
-        }
-        if (message.bytesDownloaded !== 0) {
-            writer.uint32(40).int64(message.bytesDownloaded);
-        }
-        if (message.totalBytes !== 0) {
-            writer.uint32(48).int64(message.totalBytes);
-        }
-        if (message.downloadState !== "") {
-            writer.uint32(58).string(message.downloadState);
-        }
-        if (message.localPath !== "") {
-            writer.uint32(66).string(message.localPath);
-        }
-        if (message.error !== "") {
-            writer.uint32(74).string(message.error);
-        }
-        if (message.modelCount !== 0) {
-            writer.uint32(80).int32(message.modelCount);
-        }
-        if (message.customModelName !== "") {
-            writer.uint32(90).string(message.customModelName);
-        }
-        if (message.customModelUrl !== "") {
-            writer.uint32(98).string(message.customModelUrl);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseModelEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.taskId = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.progress = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.bytesDownloaded = longToNumber(reader.int64());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.totalBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.downloadState = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.localPath = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.modelCount = reader.int32();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.customModelName = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.customModelUrl = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? modelEventKindFromJSON(object.kind) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            taskId: isSet(object.taskId)
-                ? globalThis.String(object.taskId)
-                : isSet(object.task_id)
-                    ? globalThis.String(object.task_id)
-                    : "",
-            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-            bytesDownloaded: isSet(object.bytesDownloaded)
-                ? globalThis.Number(object.bytesDownloaded)
-                : isSet(object.bytes_downloaded)
-                    ? globalThis.Number(object.bytes_downloaded)
-                    : 0,
-            totalBytes: isSet(object.totalBytes)
-                ? globalThis.Number(object.totalBytes)
-                : isSet(object.total_bytes)
-                    ? globalThis.Number(object.total_bytes)
-                    : 0,
-            downloadState: isSet(object.downloadState)
-                ? globalThis.String(object.downloadState)
-                : isSet(object.download_state)
-                    ? globalThis.String(object.download_state)
-                    : "",
-            localPath: isSet(object.localPath)
-                ? globalThis.String(object.localPath)
-                : isSet(object.local_path)
-                    ? globalThis.String(object.local_path)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            modelCount: isSet(object.modelCount)
-                ? globalThis.Number(object.modelCount)
-                : isSet(object.model_count)
-                    ? globalThis.Number(object.model_count)
-                    : 0,
-            customModelName: isSet(object.customModelName)
-                ? globalThis.String(object.customModelName)
-                : isSet(object.custom_model_name)
-                    ? globalThis.String(object.custom_model_name)
-                    : "",
-            customModelUrl: isSet(object.customModelUrl)
-                ? globalThis.String(object.customModelUrl)
-                : isSet(object.custom_model_url)
-                    ? globalThis.String(object.custom_model_url)
-                    : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = modelEventKindToJSON(message.kind);
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.taskId !== "") {
-            obj.taskId = message.taskId;
-        }
-        if (message.progress !== 0) {
-            obj.progress = message.progress;
-        }
-        if (message.bytesDownloaded !== 0) {
-            obj.bytesDownloaded = Math.round(message.bytesDownloaded);
-        }
-        if (message.totalBytes !== 0) {
-            obj.totalBytes = Math.round(message.totalBytes);
-        }
-        if (message.downloadState !== "") {
-            obj.downloadState = message.downloadState;
-        }
-        if (message.localPath !== "") {
-            obj.localPath = message.localPath;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.modelCount !== 0) {
-            obj.modelCount = Math.round(message.modelCount);
-        }
-        if (message.customModelName !== "") {
-            obj.customModelName = message.customModelName;
-        }
-        if (message.customModelUrl !== "") {
-            obj.customModelUrl = message.customModelUrl;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ModelEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseModelEvent();
-        message.kind = object.kind ?? 0;
-        message.modelId = object.modelId ?? "";
-        message.taskId = object.taskId ?? "";
-        message.progress = object.progress ?? 0;
-        message.bytesDownloaded = object.bytesDownloaded ?? 0;
-        message.totalBytes = object.totalBytes ?? 0;
-        message.downloadState = object.downloadState ?? "";
-        message.localPath = object.localPath ?? "";
-        message.error = object.error ?? "";
-        message.modelCount = object.modelCount ?? 0;
-        message.customModelName = object.customModelName ?? "";
-        message.customModelUrl = object.customModelUrl ?? "";
-        return message;
-    },
-};
-function createBaseVoiceLifecycleEvent() {
-    return {
-        kind: 0,
-        sessionId: "",
-        text: "",
-        confidence: 0,
-        responseText: "",
-        audioBase64: "",
-        durationMs: 0,
-        audioLevel: 0,
-        transcription: "",
-        turnResponse: "",
-        turnAudioBase64: "",
-        error: "",
-    };
-}
-exports.VoiceLifecycleEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.sessionId !== "") {
-            writer.uint32(18).string(message.sessionId);
-        }
-        if (message.text !== "") {
-            writer.uint32(26).string(message.text);
-        }
-        if (message.confidence !== 0) {
-            writer.uint32(37).float(message.confidence);
-        }
-        if (message.responseText !== "") {
-            writer.uint32(42).string(message.responseText);
-        }
-        if (message.audioBase64 !== "") {
-            writer.uint32(50).string(message.audioBase64);
-        }
-        if (message.durationMs !== 0) {
-            writer.uint32(56).int64(message.durationMs);
-        }
-        if (message.audioLevel !== 0) {
-            writer.uint32(69).float(message.audioLevel);
-        }
-        if (message.transcription !== "") {
-            writer.uint32(74).string(message.transcription);
-        }
-        if (message.turnResponse !== "") {
-            writer.uint32(82).string(message.turnResponse);
-        }
-        if (message.turnAudioBase64 !== "") {
-            writer.uint32(90).string(message.turnAudioBase64);
-        }
-        if (message.error !== "") {
-            writer.uint32(98).string(message.error);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseVoiceLifecycleEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.sessionId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.text = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.confidence = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.responseText = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.audioBase64 = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.durationMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 69) {
-                        break;
-                    }
-                    message.audioLevel = reader.float();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.transcription = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.turnResponse = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 90) {
-                        break;
-                    }
-                    message.turnAudioBase64 = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? voiceEventKindFromJSON(object.kind) : 0,
-            sessionId: isSet(object.sessionId)
-                ? globalThis.String(object.sessionId)
-                : isSet(object.session_id)
-                    ? globalThis.String(object.session_id)
-                    : "",
-            text: isSet(object.text) ? globalThis.String(object.text) : "",
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-            responseText: isSet(object.responseText)
-                ? globalThis.String(object.responseText)
-                : isSet(object.response_text)
-                    ? globalThis.String(object.response_text)
-                    : "",
-            audioBase64: isSet(object.audioBase64)
-                ? globalThis.String(object.audioBase64)
-                : isSet(object.audio_base64)
-                    ? globalThis.String(object.audio_base64)
-                    : "",
-            durationMs: isSet(object.durationMs)
-                ? globalThis.Number(object.durationMs)
-                : isSet(object.duration_ms)
-                    ? globalThis.Number(object.duration_ms)
-                    : 0,
-            audioLevel: isSet(object.audioLevel)
-                ? globalThis.Number(object.audioLevel)
-                : isSet(object.audio_level)
-                    ? globalThis.Number(object.audio_level)
-                    : 0,
-            transcription: isSet(object.transcription) ? globalThis.String(object.transcription) : "",
-            turnResponse: isSet(object.turnResponse)
-                ? globalThis.String(object.turnResponse)
-                : isSet(object.turn_response)
-                    ? globalThis.String(object.turn_response)
-                    : "",
-            turnAudioBase64: isSet(object.turnAudioBase64)
-                ? globalThis.String(object.turnAudioBase64)
-                : isSet(object.turn_audio_base64)
-                    ? globalThis.String(object.turn_audio_base64)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = voiceEventKindToJSON(message.kind);
-        }
-        if (message.sessionId !== "") {
-            obj.sessionId = message.sessionId;
-        }
-        if (message.text !== "") {
-            obj.text = message.text;
-        }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
-        }
-        if (message.responseText !== "") {
-            obj.responseText = message.responseText;
-        }
-        if (message.audioBase64 !== "") {
-            obj.audioBase64 = message.audioBase64;
-        }
-        if (message.durationMs !== 0) {
-            obj.durationMs = Math.round(message.durationMs);
-        }
-        if (message.audioLevel !== 0) {
-            obj.audioLevel = message.audioLevel;
-        }
-        if (message.transcription !== "") {
-            obj.transcription = message.transcription;
-        }
-        if (message.turnResponse !== "") {
-            obj.turnResponse = message.turnResponse;
-        }
-        if (message.turnAudioBase64 !== "") {
-            obj.turnAudioBase64 = message.turnAudioBase64;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.VoiceLifecycleEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseVoiceLifecycleEvent();
-        message.kind = object.kind ?? 0;
-        message.sessionId = object.sessionId ?? "";
-        message.text = object.text ?? "";
-        message.confidence = object.confidence ?? 0;
-        message.responseText = object.responseText ?? "";
-        message.audioBase64 = object.audioBase64 ?? "";
-        message.durationMs = object.durationMs ?? 0;
-        message.audioLevel = object.audioLevel ?? 0;
-        message.transcription = object.transcription ?? "";
-        message.turnResponse = object.turnResponse ?? "";
-        message.turnAudioBase64 = object.turnAudioBase64 ?? "";
-        message.error = object.error ?? "";
-        return message;
-    },
-};
-function createBasePerformanceEvent() {
-    return { kind: 0, memoryBytes: 0, thermalState: "", operation: "", milliseconds: 0, tokensPerSecond: 0 };
-}
-exports.PerformanceEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.memoryBytes !== 0) {
-            writer.uint32(16).int64(message.memoryBytes);
-        }
-        if (message.thermalState !== "") {
-            writer.uint32(26).string(message.thermalState);
-        }
-        if (message.operation !== "") {
-            writer.uint32(34).string(message.operation);
-        }
-        if (message.milliseconds !== 0) {
-            writer.uint32(40).int64(message.milliseconds);
-        }
-        if (message.tokensPerSecond !== 0) {
-            writer.uint32(49).double(message.tokensPerSecond);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBasePerformanceEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.memoryBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.thermalState = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.operation = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.milliseconds = longToNumber(reader.int64());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 49) {
-                        break;
-                    }
-                    message.tokensPerSecond = reader.double();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? performanceEventKindFromJSON(object.kind) : 0,
-            memoryBytes: isSet(object.memoryBytes)
-                ? globalThis.Number(object.memoryBytes)
-                : isSet(object.memory_bytes)
-                    ? globalThis.Number(object.memory_bytes)
-                    : 0,
-            thermalState: isSet(object.thermalState)
-                ? globalThis.String(object.thermalState)
-                : isSet(object.thermal_state)
-                    ? globalThis.String(object.thermal_state)
-                    : "",
-            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
-            milliseconds: isSet(object.milliseconds) ? globalThis.Number(object.milliseconds) : 0,
-            tokensPerSecond: isSet(object.tokensPerSecond)
-                ? globalThis.Number(object.tokensPerSecond)
-                : isSet(object.tokens_per_second)
-                    ? globalThis.Number(object.tokens_per_second)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = performanceEventKindToJSON(message.kind);
-        }
-        if (message.memoryBytes !== 0) {
-            obj.memoryBytes = Math.round(message.memoryBytes);
-        }
-        if (message.thermalState !== "") {
-            obj.thermalState = message.thermalState;
-        }
-        if (message.operation !== "") {
-            obj.operation = message.operation;
-        }
-        if (message.milliseconds !== 0) {
-            obj.milliseconds = Math.round(message.milliseconds);
-        }
-        if (message.tokensPerSecond !== 0) {
-            obj.tokensPerSecond = message.tokensPerSecond;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.PerformanceEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBasePerformanceEvent();
-        message.kind = object.kind ?? 0;
-        message.memoryBytes = object.memoryBytes ?? 0;
-        message.thermalState = object.thermalState ?? "";
-        message.operation = object.operation ?? "";
-        message.milliseconds = object.milliseconds ?? 0;
-        message.tokensPerSecond = object.tokensPerSecond ?? 0;
-        return message;
-    },
-};
-function createBaseNetworkEvent() {
-    return { kind: 0, url: "", statusCode: 0, isOnline: false, error: "", latencyMs: 0 };
-}
-exports.NetworkEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.url !== "") {
-            writer.uint32(18).string(message.url);
-        }
-        if (message.statusCode !== 0) {
-            writer.uint32(24).int32(message.statusCode);
-        }
-        if (message.isOnline !== false) {
-            writer.uint32(32).bool(message.isOnline);
-        }
-        if (message.error !== "") {
-            writer.uint32(42).string(message.error);
-        }
-        if (message.latencyMs !== 0) {
-            writer.uint32(48).int64(message.latencyMs);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseNetworkEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.url = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.statusCode = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.isOnline = reader.bool();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.latencyMs = longToNumber(reader.int64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? networkEventKindFromJSON(object.kind) : 0,
-            url: isSet(object.url) ? globalThis.String(object.url) : "",
-            statusCode: isSet(object.statusCode)
-                ? globalThis.Number(object.statusCode)
-                : isSet(object.status_code)
-                    ? globalThis.Number(object.status_code)
-                    : 0,
-            isOnline: isSet(object.isOnline)
-                ? globalThis.Boolean(object.isOnline)
-                : isSet(object.is_online)
-                    ? globalThis.Boolean(object.is_online)
-                    : false,
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            latencyMs: isSet(object.latencyMs)
-                ? globalThis.Number(object.latencyMs)
-                : isSet(object.latency_ms)
-                    ? globalThis.Number(object.latency_ms)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = networkEventKindToJSON(message.kind);
-        }
-        if (message.url !== "") {
-            obj.url = message.url;
-        }
-        if (message.statusCode !== 0) {
-            obj.statusCode = Math.round(message.statusCode);
-        }
-        if (message.isOnline !== false) {
-            obj.isOnline = message.isOnline;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.latencyMs !== 0) {
-            obj.latencyMs = Math.round(message.latencyMs);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.NetworkEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseNetworkEvent();
-        message.kind = object.kind ?? 0;
-        message.url = object.url ?? "";
-        message.statusCode = object.statusCode ?? 0;
-        message.isOnline = object.isOnline ?? false;
-        message.error = object.error ?? "";
-        message.latencyMs = object.latencyMs ?? 0;
-        return message;
-    },
-};
-function createBaseStorageEvent() {
-    return {
-        kind: 0,
-        modelId: "",
-        error: "",
-        totalBytes: 0,
-        availableBytes: 0,
-        usedBytes: 0,
-        storedModelCount: 0,
-        cacheKey: "",
-        evictedBytes: 0,
-    };
-}
-exports.StorageEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.modelId !== "") {
-            writer.uint32(18).string(message.modelId);
-        }
-        if (message.error !== "") {
-            writer.uint32(26).string(message.error);
-        }
-        if (message.totalBytes !== 0) {
-            writer.uint32(32).int64(message.totalBytes);
-        }
-        if (message.availableBytes !== 0) {
-            writer.uint32(40).int64(message.availableBytes);
-        }
-        if (message.usedBytes !== 0) {
-            writer.uint32(48).int64(message.usedBytes);
-        }
-        if (message.storedModelCount !== 0) {
-            writer.uint32(56).int32(message.storedModelCount);
-        }
-        if (message.cacheKey !== "") {
-            writer.uint32(66).string(message.cacheKey);
-        }
-        if (message.evictedBytes !== 0) {
-            writer.uint32(72).int64(message.evictedBytes);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseStorageEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.modelId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.totalBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.availableBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.usedBytes = longToNumber(reader.int64());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.storedModelCount = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.cacheKey = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.evictedBytes = longToNumber(reader.int64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? storageEventKindFromJSON(object.kind) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            totalBytes: isSet(object.totalBytes)
-                ? globalThis.Number(object.totalBytes)
-                : isSet(object.total_bytes)
-                    ? globalThis.Number(object.total_bytes)
-                    : 0,
-            availableBytes: isSet(object.availableBytes)
-                ? globalThis.Number(object.availableBytes)
-                : isSet(object.available_bytes)
-                    ? globalThis.Number(object.available_bytes)
-                    : 0,
-            usedBytes: isSet(object.usedBytes)
-                ? globalThis.Number(object.usedBytes)
-                : isSet(object.used_bytes)
-                    ? globalThis.Number(object.used_bytes)
-                    : 0,
-            storedModelCount: isSet(object.storedModelCount)
-                ? globalThis.Number(object.storedModelCount)
-                : isSet(object.stored_model_count)
-                    ? globalThis.Number(object.stored_model_count)
-                    : 0,
-            cacheKey: isSet(object.cacheKey)
-                ? globalThis.String(object.cacheKey)
-                : isSet(object.cache_key)
-                    ? globalThis.String(object.cache_key)
-                    : "",
-            evictedBytes: isSet(object.evictedBytes)
-                ? globalThis.Number(object.evictedBytes)
-                : isSet(object.evicted_bytes)
-                    ? globalThis.Number(object.evicted_bytes)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = storageEventKindToJSON(message.kind);
-        }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.totalBytes !== 0) {
-            obj.totalBytes = Math.round(message.totalBytes);
-        }
-        if (message.availableBytes !== 0) {
-            obj.availableBytes = Math.round(message.availableBytes);
-        }
-        if (message.usedBytes !== 0) {
-            obj.usedBytes = Math.round(message.usedBytes);
-        }
-        if (message.storedModelCount !== 0) {
-            obj.storedModelCount = Math.round(message.storedModelCount);
-        }
-        if (message.cacheKey !== "") {
-            obj.cacheKey = message.cacheKey;
-        }
-        if (message.evictedBytes !== 0) {
-            obj.evictedBytes = Math.round(message.evictedBytes);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.StorageEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseStorageEvent();
-        message.kind = object.kind ?? 0;
-        message.modelId = object.modelId ?? "";
-        message.error = object.error ?? "";
-        message.totalBytes = object.totalBytes ?? 0;
-        message.availableBytes = object.availableBytes ?? 0;
-        message.usedBytes = object.usedBytes ?? 0;
-        message.storedModelCount = object.storedModelCount ?? 0;
-        message.cacheKey = object.cacheKey ?? "";
-        message.evictedBytes = object.evictedBytes ?? 0;
-        return message;
-    },
-};
-function createBaseFrameworkEvent() {
-    return {
-        kind: 0,
-        framework: 0,
-        adapterName: "",
-        adapterCount: 0,
-        frameworkCount: 0,
-        modelCount: 0,
-        modality: "",
-        error: "",
-    };
-}
-exports.FrameworkEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.framework !== 0) {
-            writer.uint32(16).int32(message.framework);
-        }
-        if (message.adapterName !== "") {
-            writer.uint32(26).string(message.adapterName);
-        }
-        if (message.adapterCount !== 0) {
-            writer.uint32(32).int32(message.adapterCount);
-        }
-        if (message.frameworkCount !== 0) {
-            writer.uint32(40).int32(message.frameworkCount);
-        }
-        if (message.modelCount !== 0) {
-            writer.uint32(48).int32(message.modelCount);
-        }
-        if (message.modality !== "") {
-            writer.uint32(58).string(message.modality);
-        }
-        if (message.error !== "") {
-            writer.uint32(66).string(message.error);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseFrameworkEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.framework = reader.int32();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.adapterName = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.adapterCount = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.frameworkCount = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.modelCount = reader.int32();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.modality = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? frameworkEventKindFromJSON(object.kind) : 0,
-            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
-            adapterName: isSet(object.adapterName)
-                ? globalThis.String(object.adapterName)
-                : isSet(object.adapter_name)
-                    ? globalThis.String(object.adapter_name)
-                    : "",
-            adapterCount: isSet(object.adapterCount)
-                ? globalThis.Number(object.adapterCount)
-                : isSet(object.adapter_count)
-                    ? globalThis.Number(object.adapter_count)
-                    : 0,
-            frameworkCount: isSet(object.frameworkCount)
-                ? globalThis.Number(object.frameworkCount)
-                : isSet(object.framework_count)
-                    ? globalThis.Number(object.framework_count)
-                    : 0,
-            modelCount: isSet(object.modelCount)
-                ? globalThis.Number(object.modelCount)
-                : isSet(object.model_count)
-                    ? globalThis.Number(object.model_count)
-                    : 0,
-            modality: isSet(object.modality) ? globalThis.String(object.modality) : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = frameworkEventKindToJSON(message.kind);
-        }
-        if (message.framework !== 0) {
-            obj.framework = Math.round(message.framework);
-        }
-        if (message.adapterName !== "") {
-            obj.adapterName = message.adapterName;
-        }
-        if (message.adapterCount !== 0) {
-            obj.adapterCount = Math.round(message.adapterCount);
-        }
-        if (message.frameworkCount !== 0) {
-            obj.frameworkCount = Math.round(message.frameworkCount);
-        }
-        if (message.modelCount !== 0) {
-            obj.modelCount = Math.round(message.modelCount);
-        }
-        if (message.modality !== "") {
-            obj.modality = message.modality;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.FrameworkEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseFrameworkEvent();
-        message.kind = object.kind ?? 0;
-        message.framework = object.framework ?? 0;
-        message.adapterName = object.adapterName ?? "";
-        message.adapterCount = object.adapterCount ?? 0;
-        message.frameworkCount = object.frameworkCount ?? 0;
-        message.modelCount = object.modelCount ?? 0;
-        message.modality = object.modality ?? "";
-        message.error = object.error ?? "";
-        return message;
-    },
-};
-function createBaseDeviceEvent() {
-    return {
-        kind: 0,
-        deviceId: "",
-        osName: "",
-        osVersion: "",
-        model: "",
-        error: "",
-        property: "",
-        newValue: "",
-        oldValue: "",
-        batteryLevel: 0,
-        isCharging: false,
-        thermalState: "",
-        isConnected: false,
-        connectionType: "",
-    };
-}
-exports.DeviceEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.kind !== 0) {
-            writer.uint32(8).int32(message.kind);
-        }
-        if (message.deviceId !== "") {
-            writer.uint32(18).string(message.deviceId);
-        }
-        if (message.osName !== "") {
-            writer.uint32(26).string(message.osName);
-        }
-        if (message.osVersion !== "") {
-            writer.uint32(34).string(message.osVersion);
-        }
-        if (message.model !== "") {
-            writer.uint32(42).string(message.model);
-        }
-        if (message.error !== "") {
-            writer.uint32(50).string(message.error);
-        }
-        if (message.property !== "") {
-            writer.uint32(58).string(message.property);
-        }
-        if (message.newValue !== "") {
-            writer.uint32(66).string(message.newValue);
-        }
-        if (message.oldValue !== "") {
-            writer.uint32(74).string(message.oldValue);
-        }
-        if (message.batteryLevel !== 0) {
-            writer.uint32(85).float(message.batteryLevel);
-        }
-        if (message.isCharging !== false) {
-            writer.uint32(88).bool(message.isCharging);
-        }
-        if (message.thermalState !== "") {
-            writer.uint32(98).string(message.thermalState);
-        }
-        if (message.isConnected !== false) {
-            writer.uint32(104).bool(message.isConnected);
-        }
-        if (message.connectionType !== "") {
-            writer.uint32(114).string(message.connectionType);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseDeviceEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.kind = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.deviceId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.osName = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.osVersion = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.model = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.property = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.newValue = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.oldValue = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 85) {
-                        break;
-                    }
-                    message.batteryLevel = reader.float();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.isCharging = reader.bool();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 98) {
-                        break;
-                    }
-                    message.thermalState = reader.string();
-                    continue;
-                }
-                case 13: {
-                    if (tag !== 104) {
-                        break;
-                    }
-                    message.isConnected = reader.bool();
-                    continue;
-                }
-                case 14: {
-                    if (tag !== 114) {
-                        break;
-                    }
-                    message.connectionType = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            kind: isSet(object.kind) ? deviceEventKindFromJSON(object.kind) : 0,
-            deviceId: isSet(object.deviceId)
-                ? globalThis.String(object.deviceId)
-                : isSet(object.device_id)
-                    ? globalThis.String(object.device_id)
-                    : "",
-            osName: isSet(object.osName)
-                ? globalThis.String(object.osName)
-                : isSet(object.os_name)
-                    ? globalThis.String(object.os_name)
-                    : "",
-            osVersion: isSet(object.osVersion)
-                ? globalThis.String(object.osVersion)
-                : isSet(object.os_version)
-                    ? globalThis.String(object.os_version)
-                    : "",
-            model: isSet(object.model) ? globalThis.String(object.model) : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
-            property: isSet(object.property) ? globalThis.String(object.property) : "",
-            newValue: isSet(object.newValue)
-                ? globalThis.String(object.newValue)
-                : isSet(object.new_value)
-                    ? globalThis.String(object.new_value)
-                    : "",
-            oldValue: isSet(object.oldValue)
-                ? globalThis.String(object.oldValue)
-                : isSet(object.old_value)
-                    ? globalThis.String(object.old_value)
-                    : "",
-            batteryLevel: isSet(object.batteryLevel)
-                ? globalThis.Number(object.batteryLevel)
-                : isSet(object.battery_level)
-                    ? globalThis.Number(object.battery_level)
-                    : 0,
-            isCharging: isSet(object.isCharging)
-                ? globalThis.Boolean(object.isCharging)
-                : isSet(object.is_charging)
-                    ? globalThis.Boolean(object.is_charging)
-                    : false,
-            thermalState: isSet(object.thermalState)
-                ? globalThis.String(object.thermalState)
-                : isSet(object.thermal_state)
-                    ? globalThis.String(object.thermal_state)
-                    : "",
-            isConnected: isSet(object.isConnected)
-                ? globalThis.Boolean(object.isConnected)
-                : isSet(object.is_connected)
-                    ? globalThis.Boolean(object.is_connected)
-                    : false,
-            connectionType: isSet(object.connectionType)
-                ? globalThis.String(object.connectionType)
-                : isSet(object.connection_type)
-                    ? globalThis.String(object.connection_type)
-                    : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.kind !== 0) {
-            obj.kind = deviceEventKindToJSON(message.kind);
-        }
-        if (message.deviceId !== "") {
-            obj.deviceId = message.deviceId;
-        }
-        if (message.osName !== "") {
-            obj.osName = message.osName;
-        }
-        if (message.osVersion !== "") {
-            obj.osVersion = message.osVersion;
-        }
-        if (message.model !== "") {
-            obj.model = message.model;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
-        if (message.property !== "") {
-            obj.property = message.property;
-        }
-        if (message.newValue !== "") {
-            obj.newValue = message.newValue;
-        }
-        if (message.oldValue !== "") {
-            obj.oldValue = message.oldValue;
-        }
-        if (message.batteryLevel !== 0) {
-            obj.batteryLevel = message.batteryLevel;
-        }
-        if (message.isCharging !== false) {
-            obj.isCharging = message.isCharging;
-        }
-        if (message.thermalState !== "") {
-            obj.thermalState = message.thermalState;
-        }
-        if (message.isConnected !== false) {
-            obj.isConnected = message.isConnected;
-        }
-        if (message.connectionType !== "") {
-            obj.connectionType = message.connectionType;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.DeviceEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseDeviceEvent();
-        message.kind = object.kind ?? 0;
-        message.deviceId = object.deviceId ?? "";
-        message.osName = object.osName ?? "";
-        message.osVersion = object.osVersion ?? "";
-        message.model = object.model ?? "";
-        message.error = object.error ?? "";
-        message.property = object.property ?? "";
-        message.newValue = object.newValue ?? "";
-        message.oldValue = object.oldValue ?? "";
-        message.batteryLevel = object.batteryLevel ?? 0;
-        message.isCharging = object.isCharging ?? false;
-        message.thermalState = object.thermalState ?? "";
-        message.isConnected = object.isConnected ?? false;
-        message.connectionType = object.connectionType ?? "";
         return message;
     },
 };
@@ -5945,32 +3991,150 @@ exports.SessionEvent = {
         return message;
     },
 };
-function createBaseAuthEvent() {
-    return { kind: 0, provider: "", subjectId: "", scope: "", error: "" };
+function createBaseGenerationEvent() {
+    return {
+        kind: 0,
+        sessionId: "",
+        prompt: "",
+        token: "",
+        streamingText: "",
+        tokensCount: 0,
+        response: "",
+        tokensUsed: 0,
+        latencyMs: 0,
+        firstTokenLatencyMs: 0,
+        error: "",
+        modelId: "",
+        costAmount: 0,
+        costSavedAmount: 0,
+        routingTarget: "",
+        routingReason: "",
+        cancelReason: "",
+        toolCallId: "",
+        toolName: "",
+        toolPayloadJson: "",
+        structuredSchemaJson: "",
+        structuredOutputJson: "",
+        thinkingText: "",
+        inputTokens: 0,
+        tokensPerSecond: 0,
+        timeToFirstTokenMs: 0,
+        isStreaming: false,
+        temperature: 0,
+        maxTokens: 0,
+        contextLength: 0,
+        modelName: "",
+        durationMs: 0,
+        framework: 0,
+    };
 }
-exports.AuthEvent = {
+exports.GenerationEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.kind !== 0) {
             writer.uint32(8).int32(message.kind);
         }
-        if (message.provider !== "") {
-            writer.uint32(18).string(message.provider);
+        if (message.sessionId !== "") {
+            writer.uint32(18).string(message.sessionId);
         }
-        if (message.subjectId !== "") {
-            writer.uint32(26).string(message.subjectId);
+        if (message.prompt !== "") {
+            writer.uint32(26).string(message.prompt);
         }
-        if (message.scope !== "") {
-            writer.uint32(34).string(message.scope);
+        if (message.token !== "") {
+            writer.uint32(34).string(message.token);
+        }
+        if (message.streamingText !== "") {
+            writer.uint32(42).string(message.streamingText);
+        }
+        if (message.tokensCount !== 0) {
+            writer.uint32(48).int32(message.tokensCount);
+        }
+        if (message.response !== "") {
+            writer.uint32(58).string(message.response);
+        }
+        if (message.tokensUsed !== 0) {
+            writer.uint32(64).int32(message.tokensUsed);
+        }
+        if (message.latencyMs !== 0) {
+            writer.uint32(72).int64(message.latencyMs);
+        }
+        if (message.firstTokenLatencyMs !== 0) {
+            writer.uint32(80).int64(message.firstTokenLatencyMs);
         }
         if (message.error !== "") {
-            writer.uint32(42).string(message.error);
+            writer.uint32(90).string(message.error);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(98).string(message.modelId);
+        }
+        if (message.costAmount !== 0) {
+            writer.uint32(105).double(message.costAmount);
+        }
+        if (message.costSavedAmount !== 0) {
+            writer.uint32(113).double(message.costSavedAmount);
+        }
+        if (message.routingTarget !== "") {
+            writer.uint32(122).string(message.routingTarget);
+        }
+        if (message.routingReason !== "") {
+            writer.uint32(130).string(message.routingReason);
+        }
+        if (message.cancelReason !== "") {
+            writer.uint32(138).string(message.cancelReason);
+        }
+        if (message.toolCallId !== "") {
+            writer.uint32(146).string(message.toolCallId);
+        }
+        if (message.toolName !== "") {
+            writer.uint32(154).string(message.toolName);
+        }
+        if (message.toolPayloadJson !== "") {
+            writer.uint32(162).string(message.toolPayloadJson);
+        }
+        if (message.structuredSchemaJson !== "") {
+            writer.uint32(170).string(message.structuredSchemaJson);
+        }
+        if (message.structuredOutputJson !== "") {
+            writer.uint32(178).string(message.structuredOutputJson);
+        }
+        if (message.thinkingText !== "") {
+            writer.uint32(186).string(message.thinkingText);
+        }
+        if (message.inputTokens !== 0) {
+            writer.uint32(192).int32(message.inputTokens);
+        }
+        if (message.tokensPerSecond !== 0) {
+            writer.uint32(201).double(message.tokensPerSecond);
+        }
+        if (message.timeToFirstTokenMs !== 0) {
+            writer.uint32(208).int64(message.timeToFirstTokenMs);
+        }
+        if (message.isStreaming !== false) {
+            writer.uint32(216).bool(message.isStreaming);
+        }
+        if (message.temperature !== 0) {
+            writer.uint32(229).float(message.temperature);
+        }
+        if (message.maxTokens !== 0) {
+            writer.uint32(232).int32(message.maxTokens);
+        }
+        if (message.contextLength !== 0) {
+            writer.uint32(240).int32(message.contextLength);
+        }
+        if (message.modelName !== "") {
+            writer.uint32(250).string(message.modelName);
+        }
+        if (message.durationMs !== 0) {
+            writer.uint32(257).double(message.durationMs);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(264).int32(message.framework);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseAuthEvent();
+        const message = createBaseGenerationEvent();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -5985,25 +4149,1190 @@ exports.AuthEvent = {
                     if (tag !== 18) {
                         break;
                     }
-                    message.provider = reader.string();
+                    message.sessionId = reader.string();
                     continue;
                 }
                 case 3: {
                     if (tag !== 26) {
                         break;
                     }
-                    message.subjectId = reader.string();
+                    message.prompt = reader.string();
                     continue;
                 }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
-                    message.scope = reader.string();
+                    message.token = reader.string();
                     continue;
                 }
                 case 5: {
                     if (tag !== 42) {
+                        break;
+                    }
+                    message.streamingText = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.tokensCount = reader.int32();
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.response = reader.string();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.tokensUsed = reader.int32();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.latencyMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.firstTokenLatencyMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 105) {
+                        break;
+                    }
+                    message.costAmount = reader.double();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 113) {
+                        break;
+                    }
+                    message.costSavedAmount = reader.double();
+                    continue;
+                }
+                case 15: {
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.routingTarget = reader.string();
+                    continue;
+                }
+                case 16: {
+                    if (tag !== 130) {
+                        break;
+                    }
+                    message.routingReason = reader.string();
+                    continue;
+                }
+                case 17: {
+                    if (tag !== 138) {
+                        break;
+                    }
+                    message.cancelReason = reader.string();
+                    continue;
+                }
+                case 18: {
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.toolCallId = reader.string();
+                    continue;
+                }
+                case 19: {
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.toolName = reader.string();
+                    continue;
+                }
+                case 20: {
+                    if (tag !== 162) {
+                        break;
+                    }
+                    message.toolPayloadJson = reader.string();
+                    continue;
+                }
+                case 21: {
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.structuredSchemaJson = reader.string();
+                    continue;
+                }
+                case 22: {
+                    if (tag !== 178) {
+                        break;
+                    }
+                    message.structuredOutputJson = reader.string();
+                    continue;
+                }
+                case 23: {
+                    if (tag !== 186) {
+                        break;
+                    }
+                    message.thinkingText = reader.string();
+                    continue;
+                }
+                case 24: {
+                    if (tag !== 192) {
+                        break;
+                    }
+                    message.inputTokens = reader.int32();
+                    continue;
+                }
+                case 25: {
+                    if (tag !== 201) {
+                        break;
+                    }
+                    message.tokensPerSecond = reader.double();
+                    continue;
+                }
+                case 26: {
+                    if (tag !== 208) {
+                        break;
+                    }
+                    message.timeToFirstTokenMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 27: {
+                    if (tag !== 216) {
+                        break;
+                    }
+                    message.isStreaming = reader.bool();
+                    continue;
+                }
+                case 28: {
+                    if (tag !== 229) {
+                        break;
+                    }
+                    message.temperature = reader.float();
+                    continue;
+                }
+                case 29: {
+                    if (tag !== 232) {
+                        break;
+                    }
+                    message.maxTokens = reader.int32();
+                    continue;
+                }
+                case 30: {
+                    if (tag !== 240) {
+                        break;
+                    }
+                    message.contextLength = reader.int32();
+                    continue;
+                }
+                case 31: {
+                    if (tag !== 250) {
+                        break;
+                    }
+                    message.modelName = reader.string();
+                    continue;
+                }
+                case 32: {
+                    if (tag !== 257) {
+                        break;
+                    }
+                    message.durationMs = reader.double();
+                    continue;
+                }
+                case 33: {
+                    if (tag !== 264) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? generationEventKindFromJSON(object.kind) : 0,
+            sessionId: isSet(object.sessionId)
+                ? globalThis.String(object.sessionId)
+                : isSet(object.session_id)
+                    ? globalThis.String(object.session_id)
+                    : "",
+            prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
+            token: isSet(object.token) ? globalThis.String(object.token) : "",
+            streamingText: isSet(object.streamingText)
+                ? globalThis.String(object.streamingText)
+                : isSet(object.streaming_text)
+                    ? globalThis.String(object.streaming_text)
+                    : "",
+            tokensCount: isSet(object.tokensCount)
+                ? globalThis.Number(object.tokensCount)
+                : isSet(object.tokens_count)
+                    ? globalThis.Number(object.tokens_count)
+                    : 0,
+            response: isSet(object.response) ? globalThis.String(object.response) : "",
+            tokensUsed: isSet(object.tokensUsed)
+                ? globalThis.Number(object.tokensUsed)
+                : isSet(object.tokens_used)
+                    ? globalThis.Number(object.tokens_used)
+                    : 0,
+            latencyMs: isSet(object.latencyMs)
+                ? globalThis.Number(object.latencyMs)
+                : isSet(object.latency_ms)
+                    ? globalThis.Number(object.latency_ms)
+                    : 0,
+            firstTokenLatencyMs: isSet(object.firstTokenLatencyMs)
+                ? globalThis.Number(object.firstTokenLatencyMs)
+                : isSet(object.first_token_latency_ms)
+                    ? globalThis.Number(object.first_token_latency_ms)
+                    : 0,
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            modelId: isSet(object.modelId)
+                ? globalThis.String(object.modelId)
+                : isSet(object.model_id)
+                    ? globalThis.String(object.model_id)
+                    : "",
+            costAmount: isSet(object.costAmount)
+                ? globalThis.Number(object.costAmount)
+                : isSet(object.cost_amount)
+                    ? globalThis.Number(object.cost_amount)
+                    : 0,
+            costSavedAmount: isSet(object.costSavedAmount)
+                ? globalThis.Number(object.costSavedAmount)
+                : isSet(object.cost_saved_amount)
+                    ? globalThis.Number(object.cost_saved_amount)
+                    : 0,
+            routingTarget: isSet(object.routingTarget)
+                ? globalThis.String(object.routingTarget)
+                : isSet(object.routing_target)
+                    ? globalThis.String(object.routing_target)
+                    : "",
+            routingReason: isSet(object.routingReason)
+                ? globalThis.String(object.routingReason)
+                : isSet(object.routing_reason)
+                    ? globalThis.String(object.routing_reason)
+                    : "",
+            cancelReason: isSet(object.cancelReason)
+                ? globalThis.String(object.cancelReason)
+                : isSet(object.cancel_reason)
+                    ? globalThis.String(object.cancel_reason)
+                    : "",
+            toolCallId: isSet(object.toolCallId)
+                ? globalThis.String(object.toolCallId)
+                : isSet(object.tool_call_id)
+                    ? globalThis.String(object.tool_call_id)
+                    : "",
+            toolName: isSet(object.toolName)
+                ? globalThis.String(object.toolName)
+                : isSet(object.tool_name)
+                    ? globalThis.String(object.tool_name)
+                    : "",
+            toolPayloadJson: isSet(object.toolPayloadJson)
+                ? globalThis.String(object.toolPayloadJson)
+                : isSet(object.tool_payload_json)
+                    ? globalThis.String(object.tool_payload_json)
+                    : "",
+            structuredSchemaJson: isSet(object.structuredSchemaJson)
+                ? globalThis.String(object.structuredSchemaJson)
+                : isSet(object.structured_schema_json)
+                    ? globalThis.String(object.structured_schema_json)
+                    : "",
+            structuredOutputJson: isSet(object.structuredOutputJson)
+                ? globalThis.String(object.structuredOutputJson)
+                : isSet(object.structured_output_json)
+                    ? globalThis.String(object.structured_output_json)
+                    : "",
+            thinkingText: isSet(object.thinkingText)
+                ? globalThis.String(object.thinkingText)
+                : isSet(object.thinking_text)
+                    ? globalThis.String(object.thinking_text)
+                    : "",
+            inputTokens: isSet(object.inputTokens)
+                ? globalThis.Number(object.inputTokens)
+                : isSet(object.input_tokens)
+                    ? globalThis.Number(object.input_tokens)
+                    : 0,
+            tokensPerSecond: isSet(object.tokensPerSecond)
+                ? globalThis.Number(object.tokensPerSecond)
+                : isSet(object.tokens_per_second)
+                    ? globalThis.Number(object.tokens_per_second)
+                    : 0,
+            timeToFirstTokenMs: isSet(object.timeToFirstTokenMs)
+                ? globalThis.Number(object.timeToFirstTokenMs)
+                : isSet(object.time_to_first_token_ms)
+                    ? globalThis.Number(object.time_to_first_token_ms)
+                    : 0,
+            isStreaming: isSet(object.isStreaming)
+                ? globalThis.Boolean(object.isStreaming)
+                : isSet(object.is_streaming)
+                    ? globalThis.Boolean(object.is_streaming)
+                    : false,
+            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+            maxTokens: isSet(object.maxTokens)
+                ? globalThis.Number(object.maxTokens)
+                : isSet(object.max_tokens)
+                    ? globalThis.Number(object.max_tokens)
+                    : 0,
+            contextLength: isSet(object.contextLength)
+                ? globalThis.Number(object.contextLength)
+                : isSet(object.context_length)
+                    ? globalThis.Number(object.context_length)
+                    : 0,
+            modelName: isSet(object.modelName)
+                ? globalThis.String(object.modelName)
+                : isSet(object.model_name)
+                    ? globalThis.String(object.model_name)
+                    : "",
+            durationMs: isSet(object.durationMs)
+                ? globalThis.Number(object.durationMs)
+                : isSet(object.duration_ms)
+                    ? globalThis.Number(object.duration_ms)
+                    : 0,
+            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = generationEventKindToJSON(message.kind);
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.prompt !== "") {
+            obj.prompt = message.prompt;
+        }
+        if (message.token !== "") {
+            obj.token = message.token;
+        }
+        if (message.streamingText !== "") {
+            obj.streamingText = message.streamingText;
+        }
+        if (message.tokensCount !== 0) {
+            obj.tokensCount = Math.round(message.tokensCount);
+        }
+        if (message.response !== "") {
+            obj.response = message.response;
+        }
+        if (message.tokensUsed !== 0) {
+            obj.tokensUsed = Math.round(message.tokensUsed);
+        }
+        if (message.latencyMs !== 0) {
+            obj.latencyMs = Math.round(message.latencyMs);
+        }
+        if (message.firstTokenLatencyMs !== 0) {
+            obj.firstTokenLatencyMs = Math.round(message.firstTokenLatencyMs);
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.costAmount !== 0) {
+            obj.costAmount = message.costAmount;
+        }
+        if (message.costSavedAmount !== 0) {
+            obj.costSavedAmount = message.costSavedAmount;
+        }
+        if (message.routingTarget !== "") {
+            obj.routingTarget = message.routingTarget;
+        }
+        if (message.routingReason !== "") {
+            obj.routingReason = message.routingReason;
+        }
+        if (message.cancelReason !== "") {
+            obj.cancelReason = message.cancelReason;
+        }
+        if (message.toolCallId !== "") {
+            obj.toolCallId = message.toolCallId;
+        }
+        if (message.toolName !== "") {
+            obj.toolName = message.toolName;
+        }
+        if (message.toolPayloadJson !== "") {
+            obj.toolPayloadJson = message.toolPayloadJson;
+        }
+        if (message.structuredSchemaJson !== "") {
+            obj.structuredSchemaJson = message.structuredSchemaJson;
+        }
+        if (message.structuredOutputJson !== "") {
+            obj.structuredOutputJson = message.structuredOutputJson;
+        }
+        if (message.thinkingText !== "") {
+            obj.thinkingText = message.thinkingText;
+        }
+        if (message.inputTokens !== 0) {
+            obj.inputTokens = Math.round(message.inputTokens);
+        }
+        if (message.tokensPerSecond !== 0) {
+            obj.tokensPerSecond = message.tokensPerSecond;
+        }
+        if (message.timeToFirstTokenMs !== 0) {
+            obj.timeToFirstTokenMs = Math.round(message.timeToFirstTokenMs);
+        }
+        if (message.isStreaming !== false) {
+            obj.isStreaming = message.isStreaming;
+        }
+        if (message.temperature !== 0) {
+            obj.temperature = message.temperature;
+        }
+        if (message.maxTokens !== 0) {
+            obj.maxTokens = Math.round(message.maxTokens);
+        }
+        if (message.contextLength !== 0) {
+            obj.contextLength = Math.round(message.contextLength);
+        }
+        if (message.modelName !== "") {
+            obj.modelName = message.modelName;
+        }
+        if (message.durationMs !== 0) {
+            obj.durationMs = message.durationMs;
+        }
+        if (message.framework !== 0) {
+            obj.framework = Math.round(message.framework);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.GenerationEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseGenerationEvent();
+        message.kind = object.kind ?? 0;
+        message.sessionId = object.sessionId ?? "";
+        message.prompt = object.prompt ?? "";
+        message.token = object.token ?? "";
+        message.streamingText = object.streamingText ?? "";
+        message.tokensCount = object.tokensCount ?? 0;
+        message.response = object.response ?? "";
+        message.tokensUsed = object.tokensUsed ?? 0;
+        message.latencyMs = object.latencyMs ?? 0;
+        message.firstTokenLatencyMs = object.firstTokenLatencyMs ?? 0;
+        message.error = object.error ?? "";
+        message.modelId = object.modelId ?? "";
+        message.costAmount = object.costAmount ?? 0;
+        message.costSavedAmount = object.costSavedAmount ?? 0;
+        message.routingTarget = object.routingTarget ?? "";
+        message.routingReason = object.routingReason ?? "";
+        message.cancelReason = object.cancelReason ?? "";
+        message.toolCallId = object.toolCallId ?? "";
+        message.toolName = object.toolName ?? "";
+        message.toolPayloadJson = object.toolPayloadJson ?? "";
+        message.structuredSchemaJson = object.structuredSchemaJson ?? "";
+        message.structuredOutputJson = object.structuredOutputJson ?? "";
+        message.thinkingText = object.thinkingText ?? "";
+        message.inputTokens = object.inputTokens ?? 0;
+        message.tokensPerSecond = object.tokensPerSecond ?? 0;
+        message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
+        message.isStreaming = object.isStreaming ?? false;
+        message.temperature = object.temperature ?? 0;
+        message.maxTokens = object.maxTokens ?? 0;
+        message.contextLength = object.contextLength ?? 0;
+        message.modelName = object.modelName ?? "";
+        message.durationMs = object.durationMs ?? 0;
+        message.framework = object.framework ?? 0;
+        return message;
+    },
+};
+function createBaseVoiceLifecycleEvent() {
+    return {
+        kind: 0,
+        sessionId: "",
+        text: "",
+        confidence: 0,
+        responseText: "",
+        audioBase64: "",
+        durationMs: 0,
+        audioLevel: 0,
+        transcription: "",
+        turnResponse: "",
+        turnAudioBase64: "",
+        error: "",
+        modelId: "",
+        modelName: "",
+        audioLengthMs: 0,
+        audioSizeBytes: 0,
+        wordCount: 0,
+        realTimeFactor: 0,
+        language: "",
+        sampleRate: 0,
+        isStreaming: false,
+        framework: 0,
+        characterCount: 0,
+        audioDurationMs: 0,
+        audioSizeBytesTts: 0,
+        processingDurationMs: 0,
+        charactersPerSecond: 0,
+    };
+}
+exports.VoiceLifecycleEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.sessionId !== "") {
+            writer.uint32(18).string(message.sessionId);
+        }
+        if (message.text !== "") {
+            writer.uint32(26).string(message.text);
+        }
+        if (message.confidence !== 0) {
+            writer.uint32(37).float(message.confidence);
+        }
+        if (message.responseText !== "") {
+            writer.uint32(42).string(message.responseText);
+        }
+        if (message.audioBase64 !== "") {
+            writer.uint32(50).string(message.audioBase64);
+        }
+        if (message.durationMs !== 0) {
+            writer.uint32(56).int64(message.durationMs);
+        }
+        if (message.audioLevel !== 0) {
+            writer.uint32(69).float(message.audioLevel);
+        }
+        if (message.transcription !== "") {
+            writer.uint32(74).string(message.transcription);
+        }
+        if (message.turnResponse !== "") {
+            writer.uint32(82).string(message.turnResponse);
+        }
+        if (message.turnAudioBase64 !== "") {
+            writer.uint32(90).string(message.turnAudioBase64);
+        }
+        if (message.error !== "") {
+            writer.uint32(98).string(message.error);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(106).string(message.modelId);
+        }
+        if (message.modelName !== "") {
+            writer.uint32(114).string(message.modelName);
+        }
+        if (message.audioLengthMs !== 0) {
+            writer.uint32(120).int64(message.audioLengthMs);
+        }
+        if (message.audioSizeBytes !== 0) {
+            writer.uint32(128).int32(message.audioSizeBytes);
+        }
+        if (message.wordCount !== 0) {
+            writer.uint32(136).int32(message.wordCount);
+        }
+        if (message.realTimeFactor !== 0) {
+            writer.uint32(145).double(message.realTimeFactor);
+        }
+        if (message.language !== "") {
+            writer.uint32(154).string(message.language);
+        }
+        if (message.sampleRate !== 0) {
+            writer.uint32(160).int32(message.sampleRate);
+        }
+        if (message.isStreaming !== false) {
+            writer.uint32(168).bool(message.isStreaming);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(176).int32(message.framework);
+        }
+        if (message.characterCount !== 0) {
+            writer.uint32(184).int32(message.characterCount);
+        }
+        if (message.audioDurationMs !== 0) {
+            writer.uint32(192).int64(message.audioDurationMs);
+        }
+        if (message.audioSizeBytesTts !== 0) {
+            writer.uint32(200).int32(message.audioSizeBytesTts);
+        }
+        if (message.processingDurationMs !== 0) {
+            writer.uint32(208).int64(message.processingDurationMs);
+        }
+        if (message.charactersPerSecond !== 0) {
+            writer.uint32(217).double(message.charactersPerSecond);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceLifecycleEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.text = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 37) {
+                        break;
+                    }
+                    message.confidence = reader.float();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.responseText = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.audioBase64 = reader.string();
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.durationMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 69) {
+                        break;
+                    }
+                    message.audioLevel = reader.float();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.transcription = reader.string();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.turnResponse = reader.string();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.turnAudioBase64 = reader.string();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.modelName = reader.string();
+                    continue;
+                }
+                case 15: {
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.audioLengthMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 16: {
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.audioSizeBytes = reader.int32();
+                    continue;
+                }
+                case 17: {
+                    if (tag !== 136) {
+                        break;
+                    }
+                    message.wordCount = reader.int32();
+                    continue;
+                }
+                case 18: {
+                    if (tag !== 145) {
+                        break;
+                    }
+                    message.realTimeFactor = reader.double();
+                    continue;
+                }
+                case 19: {
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.language = reader.string();
+                    continue;
+                }
+                case 20: {
+                    if (tag !== 160) {
+                        break;
+                    }
+                    message.sampleRate = reader.int32();
+                    continue;
+                }
+                case 21: {
+                    if (tag !== 168) {
+                        break;
+                    }
+                    message.isStreaming = reader.bool();
+                    continue;
+                }
+                case 22: {
+                    if (tag !== 176) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                }
+                case 23: {
+                    if (tag !== 184) {
+                        break;
+                    }
+                    message.characterCount = reader.int32();
+                    continue;
+                }
+                case 24: {
+                    if (tag !== 192) {
+                        break;
+                    }
+                    message.audioDurationMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 25: {
+                    if (tag !== 200) {
+                        break;
+                    }
+                    message.audioSizeBytesTts = reader.int32();
+                    continue;
+                }
+                case 26: {
+                    if (tag !== 208) {
+                        break;
+                    }
+                    message.processingDurationMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 27: {
+                    if (tag !== 217) {
+                        break;
+                    }
+                    message.charactersPerSecond = reader.double();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? voiceEventKindFromJSON(object.kind) : 0,
+            sessionId: isSet(object.sessionId)
+                ? globalThis.String(object.sessionId)
+                : isSet(object.session_id)
+                    ? globalThis.String(object.session_id)
+                    : "",
+            text: isSet(object.text) ? globalThis.String(object.text) : "",
+            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+            responseText: isSet(object.responseText)
+                ? globalThis.String(object.responseText)
+                : isSet(object.response_text)
+                    ? globalThis.String(object.response_text)
+                    : "",
+            audioBase64: isSet(object.audioBase64)
+                ? globalThis.String(object.audioBase64)
+                : isSet(object.audio_base64)
+                    ? globalThis.String(object.audio_base64)
+                    : "",
+            durationMs: isSet(object.durationMs)
+                ? globalThis.Number(object.durationMs)
+                : isSet(object.duration_ms)
+                    ? globalThis.Number(object.duration_ms)
+                    : 0,
+            audioLevel: isSet(object.audioLevel)
+                ? globalThis.Number(object.audioLevel)
+                : isSet(object.audio_level)
+                    ? globalThis.Number(object.audio_level)
+                    : 0,
+            transcription: isSet(object.transcription) ? globalThis.String(object.transcription) : "",
+            turnResponse: isSet(object.turnResponse)
+                ? globalThis.String(object.turnResponse)
+                : isSet(object.turn_response)
+                    ? globalThis.String(object.turn_response)
+                    : "",
+            turnAudioBase64: isSet(object.turnAudioBase64)
+                ? globalThis.String(object.turnAudioBase64)
+                : isSet(object.turn_audio_base64)
+                    ? globalThis.String(object.turn_audio_base64)
+                    : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            modelId: isSet(object.modelId)
+                ? globalThis.String(object.modelId)
+                : isSet(object.model_id)
+                    ? globalThis.String(object.model_id)
+                    : "",
+            modelName: isSet(object.modelName)
+                ? globalThis.String(object.modelName)
+                : isSet(object.model_name)
+                    ? globalThis.String(object.model_name)
+                    : "",
+            audioLengthMs: isSet(object.audioLengthMs)
+                ? globalThis.Number(object.audioLengthMs)
+                : isSet(object.audio_length_ms)
+                    ? globalThis.Number(object.audio_length_ms)
+                    : 0,
+            audioSizeBytes: isSet(object.audioSizeBytes)
+                ? globalThis.Number(object.audioSizeBytes)
+                : isSet(object.audio_size_bytes)
+                    ? globalThis.Number(object.audio_size_bytes)
+                    : 0,
+            wordCount: isSet(object.wordCount)
+                ? globalThis.Number(object.wordCount)
+                : isSet(object.word_count)
+                    ? globalThis.Number(object.word_count)
+                    : 0,
+            realTimeFactor: isSet(object.realTimeFactor)
+                ? globalThis.Number(object.realTimeFactor)
+                : isSet(object.real_time_factor)
+                    ? globalThis.Number(object.real_time_factor)
+                    : 0,
+            language: isSet(object.language) ? globalThis.String(object.language) : "",
+            sampleRate: isSet(object.sampleRate)
+                ? globalThis.Number(object.sampleRate)
+                : isSet(object.sample_rate)
+                    ? globalThis.Number(object.sample_rate)
+                    : 0,
+            isStreaming: isSet(object.isStreaming)
+                ? globalThis.Boolean(object.isStreaming)
+                : isSet(object.is_streaming)
+                    ? globalThis.Boolean(object.is_streaming)
+                    : false,
+            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+            characterCount: isSet(object.characterCount)
+                ? globalThis.Number(object.characterCount)
+                : isSet(object.character_count)
+                    ? globalThis.Number(object.character_count)
+                    : 0,
+            audioDurationMs: isSet(object.audioDurationMs)
+                ? globalThis.Number(object.audioDurationMs)
+                : isSet(object.audio_duration_ms)
+                    ? globalThis.Number(object.audio_duration_ms)
+                    : 0,
+            audioSizeBytesTts: isSet(object.audioSizeBytesTts)
+                ? globalThis.Number(object.audioSizeBytesTts)
+                : isSet(object.audio_size_bytes_tts)
+                    ? globalThis.Number(object.audio_size_bytes_tts)
+                    : 0,
+            processingDurationMs: isSet(object.processingDurationMs)
+                ? globalThis.Number(object.processingDurationMs)
+                : isSet(object.processing_duration_ms)
+                    ? globalThis.Number(object.processing_duration_ms)
+                    : 0,
+            charactersPerSecond: isSet(object.charactersPerSecond)
+                ? globalThis.Number(object.charactersPerSecond)
+                : isSet(object.characters_per_second)
+                    ? globalThis.Number(object.characters_per_second)
+                    : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = voiceEventKindToJSON(message.kind);
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.text !== "") {
+            obj.text = message.text;
+        }
+        if (message.confidence !== 0) {
+            obj.confidence = message.confidence;
+        }
+        if (message.responseText !== "") {
+            obj.responseText = message.responseText;
+        }
+        if (message.audioBase64 !== "") {
+            obj.audioBase64 = message.audioBase64;
+        }
+        if (message.durationMs !== 0) {
+            obj.durationMs = Math.round(message.durationMs);
+        }
+        if (message.audioLevel !== 0) {
+            obj.audioLevel = message.audioLevel;
+        }
+        if (message.transcription !== "") {
+            obj.transcription = message.transcription;
+        }
+        if (message.turnResponse !== "") {
+            obj.turnResponse = message.turnResponse;
+        }
+        if (message.turnAudioBase64 !== "") {
+            obj.turnAudioBase64 = message.turnAudioBase64;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.modelName !== "") {
+            obj.modelName = message.modelName;
+        }
+        if (message.audioLengthMs !== 0) {
+            obj.audioLengthMs = Math.round(message.audioLengthMs);
+        }
+        if (message.audioSizeBytes !== 0) {
+            obj.audioSizeBytes = Math.round(message.audioSizeBytes);
+        }
+        if (message.wordCount !== 0) {
+            obj.wordCount = Math.round(message.wordCount);
+        }
+        if (message.realTimeFactor !== 0) {
+            obj.realTimeFactor = message.realTimeFactor;
+        }
+        if (message.language !== "") {
+            obj.language = message.language;
+        }
+        if (message.sampleRate !== 0) {
+            obj.sampleRate = Math.round(message.sampleRate);
+        }
+        if (message.isStreaming !== false) {
+            obj.isStreaming = message.isStreaming;
+        }
+        if (message.framework !== 0) {
+            obj.framework = Math.round(message.framework);
+        }
+        if (message.characterCount !== 0) {
+            obj.characterCount = Math.round(message.characterCount);
+        }
+        if (message.audioDurationMs !== 0) {
+            obj.audioDurationMs = Math.round(message.audioDurationMs);
+        }
+        if (message.audioSizeBytesTts !== 0) {
+            obj.audioSizeBytesTts = Math.round(message.audioSizeBytesTts);
+        }
+        if (message.processingDurationMs !== 0) {
+            obj.processingDurationMs = Math.round(message.processingDurationMs);
+        }
+        if (message.charactersPerSecond !== 0) {
+            obj.charactersPerSecond = message.charactersPerSecond;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.VoiceLifecycleEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceLifecycleEvent();
+        message.kind = object.kind ?? 0;
+        message.sessionId = object.sessionId ?? "";
+        message.text = object.text ?? "";
+        message.confidence = object.confidence ?? 0;
+        message.responseText = object.responseText ?? "";
+        message.audioBase64 = object.audioBase64 ?? "";
+        message.durationMs = object.durationMs ?? 0;
+        message.audioLevel = object.audioLevel ?? 0;
+        message.transcription = object.transcription ?? "";
+        message.turnResponse = object.turnResponse ?? "";
+        message.turnAudioBase64 = object.turnAudioBase64 ?? "";
+        message.error = object.error ?? "";
+        message.modelId = object.modelId ?? "";
+        message.modelName = object.modelName ?? "";
+        message.audioLengthMs = object.audioLengthMs ?? 0;
+        message.audioSizeBytes = object.audioSizeBytes ?? 0;
+        message.wordCount = object.wordCount ?? 0;
+        message.realTimeFactor = object.realTimeFactor ?? 0;
+        message.language = object.language ?? "";
+        message.sampleRate = object.sampleRate ?? 0;
+        message.isStreaming = object.isStreaming ?? false;
+        message.framework = object.framework ?? 0;
+        message.characterCount = object.characterCount ?? 0;
+        message.audioDurationMs = object.audioDurationMs ?? 0;
+        message.audioSizeBytesTts = object.audioSizeBytesTts ?? 0;
+        message.processingDurationMs = object.processingDurationMs ?? 0;
+        message.charactersPerSecond = object.charactersPerSecond ?? 0;
+        return message;
+    },
+};
+function createBaseCapabilityOperationEvent() {
+    return {
+        kind: 0,
+        component: 0,
+        modelId: "",
+        operationId: "",
+        operation: "",
+        progress: 0,
+        inputCount: 0,
+        outputCount: 0,
+        resultJson: "",
+        error: "",
+    };
+}
+exports.CapabilityOperationEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.component !== 0) {
+            writer.uint32(16).int32(message.component);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(26).string(message.modelId);
+        }
+        if (message.operationId !== "") {
+            writer.uint32(34).string(message.operationId);
+        }
+        if (message.operation !== "") {
+            writer.uint32(42).string(message.operation);
+        }
+        if (message.progress !== 0) {
+            writer.uint32(53).float(message.progress);
+        }
+        if (message.inputCount !== 0) {
+            writer.uint32(56).int64(message.inputCount);
+        }
+        if (message.outputCount !== 0) {
+            writer.uint32(64).int64(message.outputCount);
+        }
+        if (message.resultJson !== "") {
+            writer.uint32(74).string(message.resultJson);
+        }
+        if (message.error !== "") {
+            writer.uint32(82).string(message.error);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseCapabilityOperationEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.operationId = reader.string();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.operation = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 53) {
+                        break;
+                    }
+                    message.progress = reader.float();
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.inputCount = longToNumber(reader.int64());
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.outputCount = longToNumber(reader.int64());
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.resultJson = reader.string();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 82) {
                         break;
                     }
                     message.error = reader.string();
@@ -6019,30 +5348,66 @@ exports.AuthEvent = {
     },
     fromJSON(object) {
         return {
-            kind: isSet(object.kind) ? authEventKindFromJSON(object.kind) : 0,
-            provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
-            subjectId: isSet(object.subjectId)
-                ? globalThis.String(object.subjectId)
-                : isSet(object.subject_id)
-                    ? globalThis.String(object.subject_id)
+            kind: isSet(object.kind) ? capabilityOperationEventKindFromJSON(object.kind) : 0,
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            modelId: isSet(object.modelId)
+                ? globalThis.String(object.modelId)
+                : isSet(object.model_id)
+                    ? globalThis.String(object.model_id)
                     : "",
-            scope: isSet(object.scope) ? globalThis.String(object.scope) : "",
+            operationId: isSet(object.operationId)
+                ? globalThis.String(object.operationId)
+                : isSet(object.operation_id)
+                    ? globalThis.String(object.operation_id)
+                    : "",
+            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+            inputCount: isSet(object.inputCount)
+                ? globalThis.Number(object.inputCount)
+                : isSet(object.input_count)
+                    ? globalThis.Number(object.input_count)
+                    : 0,
+            outputCount: isSet(object.outputCount)
+                ? globalThis.Number(object.outputCount)
+                : isSet(object.output_count)
+                    ? globalThis.Number(object.output_count)
+                    : 0,
+            resultJson: isSet(object.resultJson)
+                ? globalThis.String(object.resultJson)
+                : isSet(object.result_json)
+                    ? globalThis.String(object.result_json)
+                    : "",
             error: isSet(object.error) ? globalThis.String(object.error) : "",
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.kind !== 0) {
-            obj.kind = authEventKindToJSON(message.kind);
+            obj.kind = capabilityOperationEventKindToJSON(message.kind);
         }
-        if (message.provider !== "") {
-            obj.provider = message.provider;
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
         }
-        if (message.subjectId !== "") {
-            obj.subjectId = message.subjectId;
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
         }
-        if (message.scope !== "") {
-            obj.scope = message.scope;
+        if (message.operationId !== "") {
+            obj.operationId = message.operationId;
+        }
+        if (message.operation !== "") {
+            obj.operation = message.operation;
+        }
+        if (message.progress !== 0) {
+            obj.progress = message.progress;
+        }
+        if (message.inputCount !== 0) {
+            obj.inputCount = Math.round(message.inputCount);
+        }
+        if (message.outputCount !== 0) {
+            obj.outputCount = Math.round(message.outputCount);
+        }
+        if (message.resultJson !== "") {
+            obj.resultJson = message.resultJson;
         }
         if (message.error !== "") {
             obj.error = message.error;
@@ -6050,15 +5415,363 @@ exports.AuthEvent = {
         return obj;
     },
     create(base) {
-        return exports.AuthEvent.fromPartial(base ?? {});
+        return exports.CapabilityOperationEvent.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseAuthEvent();
+        const message = createBaseCapabilityOperationEvent();
         message.kind = object.kind ?? 0;
-        message.provider = object.provider ?? "";
-        message.subjectId = object.subjectId ?? "";
-        message.scope = object.scope ?? "";
+        message.component = object.component ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.operationId = object.operationId ?? "";
+        message.operation = object.operation ?? "";
+        message.progress = object.progress ?? 0;
+        message.inputCount = object.inputCount ?? 0;
+        message.outputCount = object.outputCount ?? 0;
+        message.resultJson = object.resultJson ?? "";
         message.error = object.error ?? "";
+        return message;
+    },
+};
+function createBaseModelEvent() {
+    return {
+        kind: 0,
+        modelId: "",
+        taskId: "",
+        progress: 0,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        downloadState: "",
+        localPath: "",
+        error: "",
+        modelCount: 0,
+        customModelName: "",
+        customModelUrl: "",
+        modelName: "",
+        modelSizeBytes: 0,
+        durationMs: 0,
+        framework: 0,
+    };
+}
+exports.ModelEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.taskId !== "") {
+            writer.uint32(26).string(message.taskId);
+        }
+        if (message.progress !== 0) {
+            writer.uint32(37).float(message.progress);
+        }
+        if (message.bytesDownloaded !== 0) {
+            writer.uint32(40).int64(message.bytesDownloaded);
+        }
+        if (message.totalBytes !== 0) {
+            writer.uint32(48).int64(message.totalBytes);
+        }
+        if (message.downloadState !== "") {
+            writer.uint32(58).string(message.downloadState);
+        }
+        if (message.localPath !== "") {
+            writer.uint32(66).string(message.localPath);
+        }
+        if (message.error !== "") {
+            writer.uint32(74).string(message.error);
+        }
+        if (message.modelCount !== 0) {
+            writer.uint32(80).int32(message.modelCount);
+        }
+        if (message.customModelName !== "") {
+            writer.uint32(90).string(message.customModelName);
+        }
+        if (message.customModelUrl !== "") {
+            writer.uint32(98).string(message.customModelUrl);
+        }
+        if (message.modelName !== "") {
+            writer.uint32(106).string(message.modelName);
+        }
+        if (message.modelSizeBytes !== 0) {
+            writer.uint32(112).int64(message.modelSizeBytes);
+        }
+        if (message.durationMs !== 0) {
+            writer.uint32(120).int64(message.durationMs);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(128).int32(message.framework);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.taskId = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 37) {
+                        break;
+                    }
+                    message.progress = reader.float();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.bytesDownloaded = longToNumber(reader.int64());
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.totalBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.downloadState = reader.string();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.localPath = reader.string();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.modelCount = reader.int32();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.customModelName = reader.string();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.customModelUrl = reader.string();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.modelName = reader.string();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 112) {
+                        break;
+                    }
+                    message.modelSizeBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 15: {
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.durationMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 16: {
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? modelEventKindFromJSON(object.kind) : 0,
+            modelId: isSet(object.modelId)
+                ? globalThis.String(object.modelId)
+                : isSet(object.model_id)
+                    ? globalThis.String(object.model_id)
+                    : "",
+            taskId: isSet(object.taskId)
+                ? globalThis.String(object.taskId)
+                : isSet(object.task_id)
+                    ? globalThis.String(object.task_id)
+                    : "",
+            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+            bytesDownloaded: isSet(object.bytesDownloaded)
+                ? globalThis.Number(object.bytesDownloaded)
+                : isSet(object.bytes_downloaded)
+                    ? globalThis.Number(object.bytes_downloaded)
+                    : 0,
+            totalBytes: isSet(object.totalBytes)
+                ? globalThis.Number(object.totalBytes)
+                : isSet(object.total_bytes)
+                    ? globalThis.Number(object.total_bytes)
+                    : 0,
+            downloadState: isSet(object.downloadState)
+                ? globalThis.String(object.downloadState)
+                : isSet(object.download_state)
+                    ? globalThis.String(object.download_state)
+                    : "",
+            localPath: isSet(object.localPath)
+                ? globalThis.String(object.localPath)
+                : isSet(object.local_path)
+                    ? globalThis.String(object.local_path)
+                    : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            modelCount: isSet(object.modelCount)
+                ? globalThis.Number(object.modelCount)
+                : isSet(object.model_count)
+                    ? globalThis.Number(object.model_count)
+                    : 0,
+            customModelName: isSet(object.customModelName)
+                ? globalThis.String(object.customModelName)
+                : isSet(object.custom_model_name)
+                    ? globalThis.String(object.custom_model_name)
+                    : "",
+            customModelUrl: isSet(object.customModelUrl)
+                ? globalThis.String(object.customModelUrl)
+                : isSet(object.custom_model_url)
+                    ? globalThis.String(object.custom_model_url)
+                    : "",
+            modelName: isSet(object.modelName)
+                ? globalThis.String(object.modelName)
+                : isSet(object.model_name)
+                    ? globalThis.String(object.model_name)
+                    : "",
+            modelSizeBytes: isSet(object.modelSizeBytes)
+                ? globalThis.Number(object.modelSizeBytes)
+                : isSet(object.model_size_bytes)
+                    ? globalThis.Number(object.model_size_bytes)
+                    : 0,
+            durationMs: isSet(object.durationMs)
+                ? globalThis.Number(object.durationMs)
+                : isSet(object.duration_ms)
+                    ? globalThis.Number(object.duration_ms)
+                    : 0,
+            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = modelEventKindToJSON(message.kind);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.taskId !== "") {
+            obj.taskId = message.taskId;
+        }
+        if (message.progress !== 0) {
+            obj.progress = message.progress;
+        }
+        if (message.bytesDownloaded !== 0) {
+            obj.bytesDownloaded = Math.round(message.bytesDownloaded);
+        }
+        if (message.totalBytes !== 0) {
+            obj.totalBytes = Math.round(message.totalBytes);
+        }
+        if (message.downloadState !== "") {
+            obj.downloadState = message.downloadState;
+        }
+        if (message.localPath !== "") {
+            obj.localPath = message.localPath;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.modelCount !== 0) {
+            obj.modelCount = Math.round(message.modelCount);
+        }
+        if (message.customModelName !== "") {
+            obj.customModelName = message.customModelName;
+        }
+        if (message.customModelUrl !== "") {
+            obj.customModelUrl = message.customModelUrl;
+        }
+        if (message.modelName !== "") {
+            obj.modelName = message.modelName;
+        }
+        if (message.modelSizeBytes !== 0) {
+            obj.modelSizeBytes = Math.round(message.modelSizeBytes);
+        }
+        if (message.durationMs !== 0) {
+            obj.durationMs = Math.round(message.durationMs);
+        }
+        if (message.framework !== 0) {
+            obj.framework = Math.round(message.framework);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.ModelEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelEvent();
+        message.kind = object.kind ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.taskId = object.taskId ?? "";
+        message.progress = object.progress ?? 0;
+        message.bytesDownloaded = object.bytesDownloaded ?? 0;
+        message.totalBytes = object.totalBytes ?? 0;
+        message.downloadState = object.downloadState ?? "";
+        message.localPath = object.localPath ?? "";
+        message.error = object.error ?? "";
+        message.modelCount = object.modelCount ?? 0;
+        message.customModelName = object.customModelName ?? "";
+        message.customModelUrl = object.customModelUrl ?? "";
+        message.modelName = object.modelName ?? "";
+        message.modelSizeBytes = object.modelSizeBytes ?? 0;
+        message.durationMs = object.durationMs ?? 0;
+        message.framework = object.framework ?? 0;
         return message;
     },
 };
@@ -6600,6 +6313,237 @@ exports.DownloadEvent = {
         return message;
     },
 };
+function createBaseStorageEvent() {
+    return {
+        kind: 0,
+        modelId: "",
+        error: "",
+        totalBytes: 0,
+        availableBytes: 0,
+        usedBytes: 0,
+        storedModelCount: 0,
+        cacheKey: "",
+        evictedBytes: 0,
+        freedBytes: 0,
+    };
+}
+exports.StorageEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.error !== "") {
+            writer.uint32(26).string(message.error);
+        }
+        if (message.totalBytes !== 0) {
+            writer.uint32(32).int64(message.totalBytes);
+        }
+        if (message.availableBytes !== 0) {
+            writer.uint32(40).int64(message.availableBytes);
+        }
+        if (message.usedBytes !== 0) {
+            writer.uint32(48).int64(message.usedBytes);
+        }
+        if (message.storedModelCount !== 0) {
+            writer.uint32(56).int32(message.storedModelCount);
+        }
+        if (message.cacheKey !== "") {
+            writer.uint32(66).string(message.cacheKey);
+        }
+        if (message.evictedBytes !== 0) {
+            writer.uint32(72).int64(message.evictedBytes);
+        }
+        if (message.freedBytes !== 0) {
+            writer.uint32(80).int64(message.freedBytes);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseStorageEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.totalBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.availableBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.usedBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.storedModelCount = reader.int32();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.cacheKey = reader.string();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.evictedBytes = longToNumber(reader.int64());
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.freedBytes = longToNumber(reader.int64());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? storageEventKindFromJSON(object.kind) : 0,
+            modelId: isSet(object.modelId)
+                ? globalThis.String(object.modelId)
+                : isSet(object.model_id)
+                    ? globalThis.String(object.model_id)
+                    : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            totalBytes: isSet(object.totalBytes)
+                ? globalThis.Number(object.totalBytes)
+                : isSet(object.total_bytes)
+                    ? globalThis.Number(object.total_bytes)
+                    : 0,
+            availableBytes: isSet(object.availableBytes)
+                ? globalThis.Number(object.availableBytes)
+                : isSet(object.available_bytes)
+                    ? globalThis.Number(object.available_bytes)
+                    : 0,
+            usedBytes: isSet(object.usedBytes)
+                ? globalThis.Number(object.usedBytes)
+                : isSet(object.used_bytes)
+                    ? globalThis.Number(object.used_bytes)
+                    : 0,
+            storedModelCount: isSet(object.storedModelCount)
+                ? globalThis.Number(object.storedModelCount)
+                : isSet(object.stored_model_count)
+                    ? globalThis.Number(object.stored_model_count)
+                    : 0,
+            cacheKey: isSet(object.cacheKey)
+                ? globalThis.String(object.cacheKey)
+                : isSet(object.cache_key)
+                    ? globalThis.String(object.cache_key)
+                    : "",
+            evictedBytes: isSet(object.evictedBytes)
+                ? globalThis.Number(object.evictedBytes)
+                : isSet(object.evicted_bytes)
+                    ? globalThis.Number(object.evicted_bytes)
+                    : 0,
+            freedBytes: isSet(object.freedBytes)
+                ? globalThis.Number(object.freedBytes)
+                : isSet(object.freed_bytes)
+                    ? globalThis.Number(object.freed_bytes)
+                    : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = storageEventKindToJSON(message.kind);
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.totalBytes !== 0) {
+            obj.totalBytes = Math.round(message.totalBytes);
+        }
+        if (message.availableBytes !== 0) {
+            obj.availableBytes = Math.round(message.availableBytes);
+        }
+        if (message.usedBytes !== 0) {
+            obj.usedBytes = Math.round(message.usedBytes);
+        }
+        if (message.storedModelCount !== 0) {
+            obj.storedModelCount = Math.round(message.storedModelCount);
+        }
+        if (message.cacheKey !== "") {
+            obj.cacheKey = message.cacheKey;
+        }
+        if (message.evictedBytes !== 0) {
+            obj.evictedBytes = Math.round(message.evictedBytes);
+        }
+        if (message.freedBytes !== 0) {
+            obj.freedBytes = Math.round(message.freedBytes);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.StorageEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseStorageEvent();
+        message.kind = object.kind ?? 0;
+        message.modelId = object.modelId ?? "";
+        message.error = object.error ?? "";
+        message.totalBytes = object.totalBytes ?? 0;
+        message.availableBytes = object.availableBytes ?? 0;
+        message.usedBytes = object.usedBytes ?? 0;
+        message.storedModelCount = object.storedModelCount ?? 0;
+        message.cacheKey = object.cacheKey ?? "";
+        message.evictedBytes = object.evictedBytes ?? 0;
+        message.freedBytes = object.freedBytes ?? 0;
+        return message;
+    },
+};
 function createBaseStorageLifecycleEvent() {
     return {
         kind: 0,
@@ -6815,6 +6759,749 @@ exports.StorageLifecycleEvent = {
         return message;
     },
 };
+function createBaseAuthEvent() {
+    return { kind: 0, provider: "", subjectId: "", scope: "", error: "" };
+}
+exports.AuthEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.provider !== "") {
+            writer.uint32(18).string(message.provider);
+        }
+        if (message.subjectId !== "") {
+            writer.uint32(26).string(message.subjectId);
+        }
+        if (message.scope !== "") {
+            writer.uint32(34).string(message.scope);
+        }
+        if (message.error !== "") {
+            writer.uint32(42).string(message.error);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseAuthEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.provider = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.subjectId = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.scope = reader.string();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? authEventKindFromJSON(object.kind) : 0,
+            provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
+            subjectId: isSet(object.subjectId)
+                ? globalThis.String(object.subjectId)
+                : isSet(object.subject_id)
+                    ? globalThis.String(object.subject_id)
+                    : "",
+            scope: isSet(object.scope) ? globalThis.String(object.scope) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = authEventKindToJSON(message.kind);
+        }
+        if (message.provider !== "") {
+            obj.provider = message.provider;
+        }
+        if (message.subjectId !== "") {
+            obj.subjectId = message.subjectId;
+        }
+        if (message.scope !== "") {
+            obj.scope = message.scope;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.AuthEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseAuthEvent();
+        message.kind = object.kind ?? 0;
+        message.provider = object.provider ?? "";
+        message.subjectId = object.subjectId ?? "";
+        message.scope = object.scope ?? "";
+        message.error = object.error ?? "";
+        return message;
+    },
+};
+function createBaseDeviceEvent() {
+    return {
+        kind: 0,
+        deviceId: "",
+        osName: "",
+        osVersion: "",
+        model: "",
+        error: "",
+        property: "",
+        newValue: "",
+        oldValue: "",
+        batteryLevel: 0,
+        isCharging: false,
+        thermalState: "",
+        isConnected: false,
+        connectionType: "",
+    };
+}
+exports.DeviceEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.deviceId !== "") {
+            writer.uint32(18).string(message.deviceId);
+        }
+        if (message.osName !== "") {
+            writer.uint32(26).string(message.osName);
+        }
+        if (message.osVersion !== "") {
+            writer.uint32(34).string(message.osVersion);
+        }
+        if (message.model !== "") {
+            writer.uint32(42).string(message.model);
+        }
+        if (message.error !== "") {
+            writer.uint32(50).string(message.error);
+        }
+        if (message.property !== "") {
+            writer.uint32(58).string(message.property);
+        }
+        if (message.newValue !== "") {
+            writer.uint32(66).string(message.newValue);
+        }
+        if (message.oldValue !== "") {
+            writer.uint32(74).string(message.oldValue);
+        }
+        if (message.batteryLevel !== 0) {
+            writer.uint32(85).float(message.batteryLevel);
+        }
+        if (message.isCharging !== false) {
+            writer.uint32(88).bool(message.isCharging);
+        }
+        if (message.thermalState !== "") {
+            writer.uint32(98).string(message.thermalState);
+        }
+        if (message.isConnected !== false) {
+            writer.uint32(104).bool(message.isConnected);
+        }
+        if (message.connectionType !== "") {
+            writer.uint32(114).string(message.connectionType);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseDeviceEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.deviceId = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.osName = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.osVersion = reader.string();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.model = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.property = reader.string();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.newValue = reader.string();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.oldValue = reader.string();
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 85) {
+                        break;
+                    }
+                    message.batteryLevel = reader.float();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.isCharging = reader.bool();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.thermalState = reader.string();
+                    continue;
+                }
+                case 13: {
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.isConnected = reader.bool();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.connectionType = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? deviceEventKindFromJSON(object.kind) : 0,
+            deviceId: isSet(object.deviceId)
+                ? globalThis.String(object.deviceId)
+                : isSet(object.device_id)
+                    ? globalThis.String(object.device_id)
+                    : "",
+            osName: isSet(object.osName)
+                ? globalThis.String(object.osName)
+                : isSet(object.os_name)
+                    ? globalThis.String(object.os_name)
+                    : "",
+            osVersion: isSet(object.osVersion)
+                ? globalThis.String(object.osVersion)
+                : isSet(object.os_version)
+                    ? globalThis.String(object.os_version)
+                    : "",
+            model: isSet(object.model) ? globalThis.String(object.model) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            property: isSet(object.property) ? globalThis.String(object.property) : "",
+            newValue: isSet(object.newValue)
+                ? globalThis.String(object.newValue)
+                : isSet(object.new_value)
+                    ? globalThis.String(object.new_value)
+                    : "",
+            oldValue: isSet(object.oldValue)
+                ? globalThis.String(object.oldValue)
+                : isSet(object.old_value)
+                    ? globalThis.String(object.old_value)
+                    : "",
+            batteryLevel: isSet(object.batteryLevel)
+                ? globalThis.Number(object.batteryLevel)
+                : isSet(object.battery_level)
+                    ? globalThis.Number(object.battery_level)
+                    : 0,
+            isCharging: isSet(object.isCharging)
+                ? globalThis.Boolean(object.isCharging)
+                : isSet(object.is_charging)
+                    ? globalThis.Boolean(object.is_charging)
+                    : false,
+            thermalState: isSet(object.thermalState)
+                ? globalThis.String(object.thermalState)
+                : isSet(object.thermal_state)
+                    ? globalThis.String(object.thermal_state)
+                    : "",
+            isConnected: isSet(object.isConnected)
+                ? globalThis.Boolean(object.isConnected)
+                : isSet(object.is_connected)
+                    ? globalThis.Boolean(object.is_connected)
+                    : false,
+            connectionType: isSet(object.connectionType)
+                ? globalThis.String(object.connectionType)
+                : isSet(object.connection_type)
+                    ? globalThis.String(object.connection_type)
+                    : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = deviceEventKindToJSON(message.kind);
+        }
+        if (message.deviceId !== "") {
+            obj.deviceId = message.deviceId;
+        }
+        if (message.osName !== "") {
+            obj.osName = message.osName;
+        }
+        if (message.osVersion !== "") {
+            obj.osVersion = message.osVersion;
+        }
+        if (message.model !== "") {
+            obj.model = message.model;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.property !== "") {
+            obj.property = message.property;
+        }
+        if (message.newValue !== "") {
+            obj.newValue = message.newValue;
+        }
+        if (message.oldValue !== "") {
+            obj.oldValue = message.oldValue;
+        }
+        if (message.batteryLevel !== 0) {
+            obj.batteryLevel = message.batteryLevel;
+        }
+        if (message.isCharging !== false) {
+            obj.isCharging = message.isCharging;
+        }
+        if (message.thermalState !== "") {
+            obj.thermalState = message.thermalState;
+        }
+        if (message.isConnected !== false) {
+            obj.isConnected = message.isConnected;
+        }
+        if (message.connectionType !== "") {
+            obj.connectionType = message.connectionType;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.DeviceEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseDeviceEvent();
+        message.kind = object.kind ?? 0;
+        message.deviceId = object.deviceId ?? "";
+        message.osName = object.osName ?? "";
+        message.osVersion = object.osVersion ?? "";
+        message.model = object.model ?? "";
+        message.error = object.error ?? "";
+        message.property = object.property ?? "";
+        message.newValue = object.newValue ?? "";
+        message.oldValue = object.oldValue ?? "";
+        message.batteryLevel = object.batteryLevel ?? 0;
+        message.isCharging = object.isCharging ?? false;
+        message.thermalState = object.thermalState ?? "";
+        message.isConnected = object.isConnected ?? false;
+        message.connectionType = object.connectionType ?? "";
+        return message;
+    },
+};
+function createBaseNetworkEvent() {
+    return { kind: 0, url: "", statusCode: 0, isOnline: false, error: "", latencyMs: 0 };
+}
+exports.NetworkEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.url !== "") {
+            writer.uint32(18).string(message.url);
+        }
+        if (message.statusCode !== 0) {
+            writer.uint32(24).int32(message.statusCode);
+        }
+        if (message.isOnline !== false) {
+            writer.uint32(32).bool(message.isOnline);
+        }
+        if (message.error !== "") {
+            writer.uint32(42).string(message.error);
+        }
+        if (message.latencyMs !== 0) {
+            writer.uint32(48).int64(message.latencyMs);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseNetworkEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.url = reader.string();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.statusCode = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.isOnline = reader.bool();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.latencyMs = longToNumber(reader.int64());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? networkEventKindFromJSON(object.kind) : 0,
+            url: isSet(object.url) ? globalThis.String(object.url) : "",
+            statusCode: isSet(object.statusCode)
+                ? globalThis.Number(object.statusCode)
+                : isSet(object.status_code)
+                    ? globalThis.Number(object.status_code)
+                    : 0,
+            isOnline: isSet(object.isOnline)
+                ? globalThis.Boolean(object.isOnline)
+                : isSet(object.is_online)
+                    ? globalThis.Boolean(object.is_online)
+                    : false,
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+            latencyMs: isSet(object.latencyMs)
+                ? globalThis.Number(object.latencyMs)
+                : isSet(object.latency_ms)
+                    ? globalThis.Number(object.latency_ms)
+                    : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = networkEventKindToJSON(message.kind);
+        }
+        if (message.url !== "") {
+            obj.url = message.url;
+        }
+        if (message.statusCode !== 0) {
+            obj.statusCode = Math.round(message.statusCode);
+        }
+        if (message.isOnline !== false) {
+            obj.isOnline = message.isOnline;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        if (message.latencyMs !== 0) {
+            obj.latencyMs = Math.round(message.latencyMs);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.NetworkEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseNetworkEvent();
+        message.kind = object.kind ?? 0;
+        message.url = object.url ?? "";
+        message.statusCode = object.statusCode ?? 0;
+        message.isOnline = object.isOnline ?? false;
+        message.error = object.error ?? "";
+        message.latencyMs = object.latencyMs ?? 0;
+        return message;
+    },
+};
+function createBaseFrameworkEvent() {
+    return {
+        kind: 0,
+        framework: 0,
+        adapterName: "",
+        adapterCount: 0,
+        frameworkCount: 0,
+        modelCount: 0,
+        modality: "",
+        error: "",
+    };
+}
+exports.FrameworkEvent = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.kind !== 0) {
+            writer.uint32(8).int32(message.kind);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(16).int32(message.framework);
+        }
+        if (message.adapterName !== "") {
+            writer.uint32(26).string(message.adapterName);
+        }
+        if (message.adapterCount !== 0) {
+            writer.uint32(32).int32(message.adapterCount);
+        }
+        if (message.frameworkCount !== 0) {
+            writer.uint32(40).int32(message.frameworkCount);
+        }
+        if (message.modelCount !== 0) {
+            writer.uint32(48).int32(message.modelCount);
+        }
+        if (message.modality !== "") {
+            writer.uint32(58).string(message.modality);
+        }
+        if (message.error !== "") {
+            writer.uint32(66).string(message.error);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseFrameworkEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.adapterName = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.adapterCount = reader.int32();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.frameworkCount = reader.int32();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.modelCount = reader.int32();
+                    continue;
+                }
+                case 7: {
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.modality = reader.string();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.error = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            kind: isSet(object.kind) ? frameworkEventKindFromJSON(object.kind) : 0,
+            framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+            adapterName: isSet(object.adapterName)
+                ? globalThis.String(object.adapterName)
+                : isSet(object.adapter_name)
+                    ? globalThis.String(object.adapter_name)
+                    : "",
+            adapterCount: isSet(object.adapterCount)
+                ? globalThis.Number(object.adapterCount)
+                : isSet(object.adapter_count)
+                    ? globalThis.Number(object.adapter_count)
+                    : 0,
+            frameworkCount: isSet(object.frameworkCount)
+                ? globalThis.Number(object.frameworkCount)
+                : isSet(object.framework_count)
+                    ? globalThis.Number(object.framework_count)
+                    : 0,
+            modelCount: isSet(object.modelCount)
+                ? globalThis.Number(object.modelCount)
+                : isSet(object.model_count)
+                    ? globalThis.Number(object.model_count)
+                    : 0,
+            modality: isSet(object.modality) ? globalThis.String(object.modality) : "",
+            error: isSet(object.error) ? globalThis.String(object.error) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.kind !== 0) {
+            obj.kind = frameworkEventKindToJSON(message.kind);
+        }
+        if (message.framework !== 0) {
+            obj.framework = Math.round(message.framework);
+        }
+        if (message.adapterName !== "") {
+            obj.adapterName = message.adapterName;
+        }
+        if (message.adapterCount !== 0) {
+            obj.adapterCount = Math.round(message.adapterCount);
+        }
+        if (message.frameworkCount !== 0) {
+            obj.frameworkCount = Math.round(message.frameworkCount);
+        }
+        if (message.modelCount !== 0) {
+            obj.modelCount = Math.round(message.modelCount);
+        }
+        if (message.modality !== "") {
+            obj.modality = message.modality;
+        }
+        if (message.error !== "") {
+            obj.error = message.error;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.FrameworkEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseFrameworkEvent();
+        message.kind = object.kind ?? 0;
+        message.framework = object.framework ?? 0;
+        message.adapterName = object.adapterName ?? "";
+        message.adapterCount = object.adapterCount ?? 0;
+        message.frameworkCount = object.frameworkCount ?? 0;
+        message.modelCount = object.modelCount ?? 0;
+        message.modality = object.modality ?? "";
+        message.error = object.error ?? "";
+        return message;
+    },
+};
 function createBaseHardwareRoutingEvent() {
     return {
         kind: 0,
@@ -6988,58 +7675,35 @@ exports.HardwareRoutingEvent = {
         return message;
     },
 };
-function createBaseCapabilityOperationEvent() {
-    return {
-        kind: 0,
-        component: 0,
-        modelId: "",
-        operationId: "",
-        operation: "",
-        progress: 0,
-        inputCount: 0,
-        outputCount: 0,
-        resultJson: "",
-        error: "",
-    };
+function createBasePerformanceEvent() {
+    return { kind: 0, memoryBytes: 0, thermalState: "", operation: "", milliseconds: 0, tokensPerSecond: 0 };
 }
-exports.CapabilityOperationEvent = {
+exports.PerformanceEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.kind !== 0) {
             writer.uint32(8).int32(message.kind);
         }
-        if (message.component !== 0) {
-            writer.uint32(16).int32(message.component);
+        if (message.memoryBytes !== 0) {
+            writer.uint32(16).int64(message.memoryBytes);
         }
-        if (message.modelId !== "") {
-            writer.uint32(26).string(message.modelId);
-        }
-        if (message.operationId !== "") {
-            writer.uint32(34).string(message.operationId);
+        if (message.thermalState !== "") {
+            writer.uint32(26).string(message.thermalState);
         }
         if (message.operation !== "") {
-            writer.uint32(42).string(message.operation);
+            writer.uint32(34).string(message.operation);
         }
-        if (message.progress !== 0) {
-            writer.uint32(53).float(message.progress);
+        if (message.milliseconds !== 0) {
+            writer.uint32(40).int64(message.milliseconds);
         }
-        if (message.inputCount !== 0) {
-            writer.uint32(56).int64(message.inputCount);
-        }
-        if (message.outputCount !== 0) {
-            writer.uint32(64).int64(message.outputCount);
-        }
-        if (message.resultJson !== "") {
-            writer.uint32(74).string(message.resultJson);
-        }
-        if (message.error !== "") {
-            writer.uint32(82).string(message.error);
+        if (message.tokensPerSecond !== 0) {
+            writer.uint32(49).double(message.tokensPerSecond);
         }
         return writer;
     },
     decode(input, length) {
         const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
         const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseCapabilityOperationEvent();
+        const message = createBasePerformanceEvent();
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
@@ -7054,63 +7718,35 @@ exports.CapabilityOperationEvent = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.component = reader.int32();
+                    message.memoryBytes = longToNumber(reader.int64());
                     continue;
                 }
                 case 3: {
                     if (tag !== 26) {
                         break;
                     }
-                    message.modelId = reader.string();
+                    message.thermalState = reader.string();
                     continue;
                 }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
-                    message.operationId = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
                     message.operation = reader.string();
                     continue;
                 }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.milliseconds = longToNumber(reader.int64());
+                    continue;
+                }
                 case 6: {
-                    if (tag !== 53) {
+                    if (tag !== 49) {
                         break;
                     }
-                    message.progress = reader.float();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.inputCount = longToNumber(reader.int64());
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.outputCount = longToNumber(reader.int64());
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.resultJson = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.error = reader.string();
+                    message.tokensPerSecond = reader.double();
                     continue;
                 }
             }
@@ -7123,87 +7759,59 @@ exports.CapabilityOperationEvent = {
     },
     fromJSON(object) {
         return {
-            kind: isSet(object.kind) ? capabilityOperationEventKindFromJSON(object.kind) : 0,
-            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
-            modelId: isSet(object.modelId)
-                ? globalThis.String(object.modelId)
-                : isSet(object.model_id)
-                    ? globalThis.String(object.model_id)
-                    : "",
-            operationId: isSet(object.operationId)
-                ? globalThis.String(object.operationId)
-                : isSet(object.operation_id)
-                    ? globalThis.String(object.operation_id)
+            kind: isSet(object.kind) ? performanceEventKindFromJSON(object.kind) : 0,
+            memoryBytes: isSet(object.memoryBytes)
+                ? globalThis.Number(object.memoryBytes)
+                : isSet(object.memory_bytes)
+                    ? globalThis.Number(object.memory_bytes)
+                    : 0,
+            thermalState: isSet(object.thermalState)
+                ? globalThis.String(object.thermalState)
+                : isSet(object.thermal_state)
+                    ? globalThis.String(object.thermal_state)
                     : "",
             operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
-            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-            inputCount: isSet(object.inputCount)
-                ? globalThis.Number(object.inputCount)
-                : isSet(object.input_count)
-                    ? globalThis.Number(object.input_count)
+            milliseconds: isSet(object.milliseconds) ? globalThis.Number(object.milliseconds) : 0,
+            tokensPerSecond: isSet(object.tokensPerSecond)
+                ? globalThis.Number(object.tokensPerSecond)
+                : isSet(object.tokens_per_second)
+                    ? globalThis.Number(object.tokens_per_second)
                     : 0,
-            outputCount: isSet(object.outputCount)
-                ? globalThis.Number(object.outputCount)
-                : isSet(object.output_count)
-                    ? globalThis.Number(object.output_count)
-                    : 0,
-            resultJson: isSet(object.resultJson)
-                ? globalThis.String(object.resultJson)
-                : isSet(object.result_json)
-                    ? globalThis.String(object.result_json)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
         };
     },
     toJSON(message) {
         const obj = {};
         if (message.kind !== 0) {
-            obj.kind = capabilityOperationEventKindToJSON(message.kind);
+            obj.kind = performanceEventKindToJSON(message.kind);
         }
-        if (message.component !== 0) {
-            obj.component = sDKComponentToJSON(message.component);
+        if (message.memoryBytes !== 0) {
+            obj.memoryBytes = Math.round(message.memoryBytes);
         }
-        if (message.modelId !== "") {
-            obj.modelId = message.modelId;
-        }
-        if (message.operationId !== "") {
-            obj.operationId = message.operationId;
+        if (message.thermalState !== "") {
+            obj.thermalState = message.thermalState;
         }
         if (message.operation !== "") {
             obj.operation = message.operation;
         }
-        if (message.progress !== 0) {
-            obj.progress = message.progress;
+        if (message.milliseconds !== 0) {
+            obj.milliseconds = Math.round(message.milliseconds);
         }
-        if (message.inputCount !== 0) {
-            obj.inputCount = Math.round(message.inputCount);
-        }
-        if (message.outputCount !== 0) {
-            obj.outputCount = Math.round(message.outputCount);
-        }
-        if (message.resultJson !== "") {
-            obj.resultJson = message.resultJson;
-        }
-        if (message.error !== "") {
-            obj.error = message.error;
+        if (message.tokensPerSecond !== 0) {
+            obj.tokensPerSecond = message.tokensPerSecond;
         }
         return obj;
     },
     create(base) {
-        return exports.CapabilityOperationEvent.fromPartial(base ?? {});
+        return exports.PerformanceEvent.fromPartial(base ?? {});
     },
     fromPartial(object) {
-        const message = createBaseCapabilityOperationEvent();
+        const message = createBasePerformanceEvent();
         message.kind = object.kind ?? 0;
-        message.component = object.component ?? 0;
-        message.modelId = object.modelId ?? "";
-        message.operationId = object.operationId ?? "";
+        message.memoryBytes = object.memoryBytes ?? 0;
+        message.thermalState = object.thermalState ?? "";
         message.operation = object.operation ?? "";
-        message.progress = object.progress ?? 0;
-        message.inputCount = object.inputCount ?? 0;
-        message.outputCount = object.outputCount ?? 0;
-        message.resultJson = object.resultJson ?? "";
-        message.error = object.error ?? "";
+        message.milliseconds = object.milliseconds ?? 0;
+        message.tokensPerSecond = object.tokensPerSecond ?? 0;
         return message;
     },
 };
