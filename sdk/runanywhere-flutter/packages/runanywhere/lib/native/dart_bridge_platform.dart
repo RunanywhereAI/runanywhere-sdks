@@ -180,12 +180,6 @@ class DartBridgePlatform {
             _exceptionalReturnInt32,
           );
 
-      // Error tracking (Sentry)
-      adapter.ref.trackError =
-          Pointer.fromFunction<RacTrackErrorCallbackNative>(
-            _platformTrackErrorCallback,
-          );
-
       // HTTP download callbacks — disabled because OkHttp transport vtable
       // handles all HTTP. Pointer.fromFunction trampolines are not safe to
       // call from the C++ worker thread spawned by the download orchestrator.
@@ -838,26 +832,6 @@ int _platformGetMemoryInfoCallback(
   memoryInfo.usedBytes = usedBytes;
 
   return RacResultCode.success;
-}
-
-/// Error tracking callback - sends to Sentry
-void _platformTrackErrorCallback(
-  Pointer<Utf8> errorJson,
-  Pointer<Void> userData,
-) {
-  if (errorJson == nullptr) return;
-
-  try {
-    final jsonString = errorJson.toDartString();
-
-    // Log the error from C++ layer
-    // Note: For production, integrate with crash reporting (e.g., Sentry, Firebase Crashlytics)
-    SDKLogger(
-      'DartBridge.ErrorTracking',
-    ).error('C++ error received', metadata: {'error_json': jsonString});
-  } catch (_) {
-    // Ignore errors in error handling
-  }
 }
 
 // =============================================================================

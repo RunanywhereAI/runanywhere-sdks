@@ -473,23 +473,4 @@ class DartBridgeDevConfig {
       return null;
     }
   }
-
-  /// Get Sentry DSN for crash reporting (optional)
-  /// Returns null if not configured
-  static String? get sentryDSN {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getDsn = lib
-          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
-        'rac_dev_config_get_sentry_dsn',
-      );
-
-      final result = getDsn();
-      if (result == nullptr) return null;
-      return result.toDartString();
-    } catch (e) {
-      _logger.debug('rac_dev_config_get_sentry_dsn not available: $e');
-      return null;
-    }
-  }
 }

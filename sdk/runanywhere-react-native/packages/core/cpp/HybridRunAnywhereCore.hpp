@@ -165,14 +165,6 @@ public:
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
 
   // ============================================================================
-  // Hardware - Delegates to commons hardware proto ABI
-  // ============================================================================
-
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hardwareProfileProto() override;
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> setAcceleratorPreferenceProto(
-    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
-
-  // ============================================================================
   // Events - Native SDK event proto bridge
   // ============================================================================
 

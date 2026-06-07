@@ -57,7 +57,6 @@ import * as VLM from './Extensions/VLM/RunAnywhere+VisionLanguage';
 import { lora as LoRACapability } from './Extensions/LLM/RunAnywhere+LoRA';
 import { solutions as SolutionsCapability } from './Extensions/Solutions/RunAnywhere+Solutions';
 import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
-import { Hardware as HardwareNamespace } from './Extensions/RunAnywhere+Hardware';
 import { formatFramework } from './Helpers/formatFramework';
 import { EventBus } from './Events/EventBus';
 import { SDKException } from '../Foundation/Errors/SDKException';
@@ -589,12 +588,6 @@ export const RunAnywhere = {
   downloadModel: ModelManagement.downloadModel,
   downloadModelWithProgress: ModelManagement.downloadModelWithProgress,
   getDefaultFramework: ModelManagement.getDefaultFramework,
-
-  // ============================================================================
-  // Hardware namespace (CANONICAL_API §14)
-  // ============================================================================
-
-  hardware: HardwareNamespace,
 
   // ============================================================================
   // Display helpers (proxies for commons C ABI tables)

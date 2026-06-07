@@ -71,7 +71,7 @@ export function onlineCloud(
   };
 }
 
-/** Map a backend kind to the plugin name `rac_plugin_route` pins on. */
+/** Map a backend kind to the plugin name `rac_plugin_find_for_engine` pins on. */
 export function pinnedEngineName(backend: HybridBackendKind): string {
   switch (backend) {
     case HybridBackendKind.HYBRID_BACKEND_SHERPA:

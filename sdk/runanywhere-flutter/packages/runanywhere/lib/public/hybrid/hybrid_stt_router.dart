@@ -11,7 +11,7 @@
 // binding only:
 //   1. creates the router handle,
 //   2. creates the two STT services through the registry-routed creation path
-//      (rac_plugin_route(TRANSCRIBE, hint="sherpa"/"cloud") →
+//      (rac_plugin_find_for_engine(TRANSCRIBE, "sherpa"/"cloud") →
 //      stt_ops->create) and attaches them with their HybridModelDescriptor bytes,
 //   3. registers any custom-filter predicates and installs the policy bytes,
 //   4. drives the router's transcribe and decodes the response.

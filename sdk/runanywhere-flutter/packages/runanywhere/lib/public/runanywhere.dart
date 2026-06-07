@@ -68,7 +68,6 @@ import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_hardware.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_lora.dart';
@@ -696,10 +695,6 @@ abstract final class RunAnywhere {
   /// LoRA (Low-Rank Adaptation) capability — load, remove, register,
   /// query loaded/registered adapters. Canonical §3 namespace.
   static RunAnywhereLoRACapability get lora => RunAnywhereLoRACapability.shared;
-
-  /// Hardware profile (chip, NPU presence, acceleration mode).
-  /// Canonical §14 namespace.
-  static RunAnywhereHardware get hardware => RunAnywhereHardware.shared;
 
   /// Hybrid STT router — per-request dispatch between an on-device (offline,
   /// sherpa) and a cloud (online, cloud) speech service. Vends the router

@@ -91,7 +91,8 @@ class HybridModel {
 
 /// Backend identity for a hybrid candidate. Wire values match
 /// `HybridBackendKind` in hybrid_router.proto / `rac_hybrid_backend_kind_t`.
-/// Carries the engine hint `rac_plugin_route` pins on for service creation.
+/// Carries the engine name `rac_plugin_find_for_engine` pins on for service
+/// creation.
 enum HybridBackend {
   /// On-device speech (sherpa-onnx Whisper / Zipformer / Paraformer).
   sherpa(HybridBackendKind.HYBRID_BACKEND_SHERPA, 'sherpa'),
@@ -105,7 +106,7 @@ enum HybridBackend {
   /// The generated proto enum this maps to on the wire.
   final HybridBackendKind proto;
 
-  /// The plugin name `rac_plugin_route` hard-pins for this backend.
+  /// The plugin name `rac_plugin_find_for_engine` hard-pins for this backend.
   final String engineHint;
 }
 

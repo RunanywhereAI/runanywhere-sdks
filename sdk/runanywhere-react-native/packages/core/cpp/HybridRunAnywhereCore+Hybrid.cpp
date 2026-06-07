@@ -7,10 +7,10 @@
  * the device-state + custom-filter callbacks — ranking, and the confidence
  * cascade with primary->secondary fallback). This bridge only:
  *   1. creates the router handle (rac_stt_hybrid_router_create),
- *   2. creates the two STT services through the registry route
- *      (rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint) -> stt_ops->create ->
- *      heap-wrap), replicating the commons JNI create_stt_service_via_registry
- *      recipe verbatim,
+ *   2. creates the two STT services through the registry
+ *      (rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engine) ->
+ *      stt_ops->create -> heap-wrap), replicating the commons JNI
+ *      create_stt_service_via_registry recipe verbatim,
  *   3. attaches the services + descriptor bytes and installs the policy bytes
  *      (rac_stt_hybrid_router_set_{offline,online}_service_proto / _set_policy_proto),
  *   4. installs the cross-SDK device-state vtable (rac_hybrid_set_device_state)
@@ -57,8 +57,6 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
 #include "rac/routing/rac_hybrid_custom_filter.h"
 #include "rac/routing/rac_hybrid_device_state.h"
 #include "rac/routing/rac_hybrid_types.h"
@@ -84,9 +82,8 @@ using HybridRouterTranscribeProtoFn = rac_result_t (*)(
 using HybridRouterProtoBufferFreeFn = void (*)(uint8_t*);
 using HybridRouterCancelFn = rac_result_t (*)(rac_handle_t);
 
-using PluginRouteFn = rac_result_t (*)(
-    rac_primitive_t, uint32_t, const rac_routing_hints_t*,
-    const rac_engine_vtable_t**);
+using PluginFindForEngineFn = const rac_engine_vtable_t* (*)(
+    rac_primitive_t, const char*);
 using SttDestroyFn = void (*)(rac_handle_t);
 
 using HybridSetDeviceStateFn = rac_result_t (*)(
@@ -118,34 +115,31 @@ std::vector<uint8_t> copyHybridArrayBufferBytes(
 //
 // Mirrors the commons JNI create_stt_service_via_registry
 // (sdk/runanywhere-commons/src/jni/rac_stt_hybrid_router_jni.cpp) and the Swift
-// HybridSTTRouter.createService: route to the TRANSCRIBE plugin pinned by
-// `engineHint`, call its create op, and heap-wrap the impl in a
-// rac_stt_service_t the router holds by handle. Like Swift, we pin
-// `no_fallback = 1` so a missing pinned engine surfaces a clear error instead of
-// silently routing elsewhere. The cloud provider, when relevant, already rides
-// in `configJson` (the TS CloudSTT layer injects it, matching the Kotlin
-// HybridRouterBridgeAdapter), and the commons cloud engine defaults it too—
-// so we forward config verbatim.
+// HybridSTTRouter.createService: resolve the TRANSCRIBE engine pinned by
+// `engineHint` via rac_plugin_find_for_engine, call its create op, and heap-wrap
+// the impl in a rac_stt_service_t the router holds by handle. The lookup is
+// engine-name-pinned, so a missing engine surfaces a clear error (null vtable)
+// instead of silently routing elsewhere. The cloud provider, when relevant,
+// already rides in `configJson` (the TS CloudSTT layer injects it, matching the
+// Kotlin HybridRouterBridgeAdapter), and the commons cloud engine defaults it
+// too — so we forward config verbatim.
 rac_stt_service_t* createSttServiceViaRegistry(const std::string& engineHint,
                                                const std::string& modelOrPath,
                                                const std::string& configJson) {
-    auto route = proto_compat::symbol<PluginRouteFn>("rac_plugin_route");
-    if (!route) {
-        LOGE("hybridSttRouterCreateService: rac_plugin_route ABI unavailable");
+    auto findForEngine =
+        proto_compat::symbol<PluginFindForEngineFn>("rac_plugin_find_for_engine");
+    if (!findForEngine) {
+        LOGE("hybridSttRouterCreateService: rac_plugin_find_for_engine ABI "
+             "unavailable");
         return nullptr;
     }
 
-    rac_routing_hints_t hints{};
-    hints.preferred_engine_name = engineHint.empty() ? nullptr : engineHint.c_str();
-    hints.no_fallback = 1;  // fail if the pinned engine is absent
-
-    const rac_engine_vtable_t* vt = nullptr;
-    const rac_result_t routeRc =
-        route(RAC_PRIMITIVE_TRANSCRIBE, /*format=*/0, &hints, &vt);
-    if (routeRc != RAC_SUCCESS || vt == nullptr || vt->stt_ops == nullptr ||
+    const rac_engine_vtable_t* vt =
+        findForEngine(RAC_PRIMITIVE_TRANSCRIBE, engineHint.c_str());
+    if (vt == nullptr || vt->stt_ops == nullptr ||
         vt->stt_ops->create == nullptr) {
-        LOGE("hybridSttRouterCreateService: route failed hint='%s' rc=%d",
-             engineHint.c_str(), routeRc);
+        LOGE("hybridSttRouterCreateService: no TRANSCRIBE engine for hint='%s'",
+             engineHint.c_str());
         return nullptr;
     }
 

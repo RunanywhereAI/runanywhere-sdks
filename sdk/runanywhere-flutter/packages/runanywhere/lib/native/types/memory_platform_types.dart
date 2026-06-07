@@ -100,12 +100,6 @@ typedef RacLogCallbackNative = Void Function(
   Pointer<Void> userData,
 );
 
-/// Track error callback: void (*track_error)(const char* error_json, void* user_data)
-typedef RacTrackErrorCallbackNative = Void Function(
-  Pointer<Utf8> errorJson,
-  Pointer<Void> userData,
-);
-
 /// Now ms callback: int64_t (*now_ms)(void* user_data)
 typedef RacNowMsCallbackNative = Int64 Function(Pointer<Void> userData);
 
@@ -216,7 +210,6 @@ base class RacPlatformAdapterStruct extends Struct {
   external Pointer<NativeFunction<RacSecureSetCallbackNative>> secureSet;
   external Pointer<NativeFunction<RacSecureDeleteCallbackNative>> secureDelete;
   external Pointer<NativeFunction<RacLogCallbackNative>> log;
-  external Pointer<NativeFunction<RacTrackErrorCallbackNative>> trackError;
   external Pointer<NativeFunction<RacNowMsCallbackNative>> nowMs;
   external Pointer<NativeFunction<RacGetMemoryInfoCallbackNative>>
       getMemoryInfo;

@@ -13,9 +13,9 @@
 //   1. allocates / destroys the router handle
 //      (rac_stt_hybrid_router_create / _destroy),
 //   2. creates the two STT services through the SAME registry-routed creation
-//      path commons uses (rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint) →
-//      vt->stt_ops->create → wrap in a heap-stable rac_stt_service_t), pinning
-//      the engine by name ("sherpa" / "cloud"),
+//      path commons uses (rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE,
+//      engineName) → vt->stt_ops->create → wrap in a heap-stable
+//      rac_stt_service_t), pinning the engine by name ("sherpa" / "cloud"),
 //   3. attaches each service + its serialized HybridModelDescriptor bytes
 //      (rac_stt_hybrid_router_set_{offline,online}_service_proto),
 //   4. installs the serialized HybridRoutingPolicy bytes
@@ -29,7 +29,7 @@
 //
 // Mirrors the Kotlin HybridRouterBridgeAdapter + RunAnywhereBridge JNI thunks
 // (create_stt_service_via_registry) and the Swift HybridSTTRouter's
-// rac_plugin_route → stt_ops->create dance, adapted to Dart FFI.
+// rac_plugin_find_for_engine → stt_ops->create dance, adapted to Dart FFI.
 //
 // Service-creation note: the JNI helper `racSttHybridRouterCreateService` is a
 // `Java_...` thunk, not a C ABI export, so Flutter FFI cannot call it. Instead
@@ -62,27 +62,6 @@ const int _kPrimitiveTranscribe = 2;
 // field list is mirrored so Dart's Struct layout reproduces the C alignment /
 // padding exactly and the consumed offsets are correct.
 // ============================================================================
-
-/// Mirrors `rac_routing_hints_t` (rac/router/rac_routing_hints.h, 24 bytes on
-/// 64-bit). Only `preferredEngineName` + `noFallback` are set; the rest stay
-/// zero (calloc-initialised).
-final class _RacRoutingHints extends Struct {
-  external Pointer<Utf8> preferredEngineName;
-
-  @Int32()
-  external int preferredRuntime;
-
-  @Uint8()
-  external int noFallback;
-
-  /// `uint8_t _reserved[3]` — padding to 8-byte alignment. Must stay zero;
-  /// present only so `estimatedMemoryBytes` lands at the right offset.
-  @Array(3)
-  external Array<Uint8> reserved;
-
-  @Uint64()
-  external int estimatedMemoryBytes;
-}
 
 /// Mirrors `rac_engine_metadata_t` (rac/plugin/rac_engine_vtable.h). Consumed
 /// only as the leading block of `_RacEngineVtable` so `sttOps` lands at the
@@ -277,10 +256,10 @@ typedef _RouterTranscribeProtoDart = int Function(
 typedef _RouterProtoBufferFreeNative = Void Function(Pointer<Uint8>);
 typedef _RouterProtoBufferFreeDart = void Function(Pointer<Uint8>);
 
-typedef _RouteNative = Int32 Function(
-    Int32, Uint32, Pointer<_RacRoutingHints>, Pointer<Pointer<_RacEngineVtable>>);
-typedef _RouteDart = int Function(
-    int, int, Pointer<_RacRoutingHints>, Pointer<Pointer<_RacEngineVtable>>);
+typedef _FindForEngineNative = Pointer<_RacEngineVtable> Function(
+    Int32, Pointer<Utf8>);
+typedef _FindForEngineDart = Pointer<_RacEngineVtable> Function(
+    int, Pointer<Utf8>);
 
 typedef _HybridSetDeviceStateNative = Int32 Function(
     Pointer<_RacHybridDeviceStateOps>);
@@ -359,8 +338,9 @@ class DartBridgeHybridStt {
               _RouterProtoBufferFreeDart>(
           'rac_stt_hybrid_router_proto_buffer_free');
 
-  static final _RouteDart _pluginRoute =
-      _lib.lookupFunction<_RouteNative, _RouteDart>('rac_plugin_route');
+  static final _FindForEngineDart _pluginFindForEngine =
+      _lib.lookupFunction<_FindForEngineNative, _FindForEngineDart>(
+          'rac_plugin_find_for_engine');
 
   static final _HybridSetDeviceStateDart _setDeviceState = _lib.lookupFunction<
       _HybridSetDeviceStateNative,
@@ -404,10 +384,11 @@ class DartBridgeHybridStt {
   // --- Registry-routed service creation ------------------------------------
 
   /// Create an STT service via the plugin registry, pinning [engineHint]
-  /// ("sherpa" / "cloud") as `preferred_engine_name` and forwarding
-  /// [modelIdOrPath] + [configJson] to the routed engine's `stt_ops->create`.
-  /// Wraps the backend impl in a heap-stable `rac_stt_service_t` the router can
-  /// hold by pointer. Throws [StateError] on route/create failure.
+  /// ("sherpa" / "cloud") as the engine name passed to
+  /// `rac_plugin_find_for_engine` and forwarding [modelIdOrPath] + [configJson]
+  /// to the routed engine's `stt_ops->create`. Wraps the backend impl in a
+  /// heap-stable `rac_stt_service_t` the router can hold by pointer. Throws
+  /// [StateError] on lookup/create failure.
   ///
   /// Mirrors commons' `create_stt_service_via_registry` exactly (route → slot →
   /// create → wrap), the single creation path BOTH router sides use.
@@ -416,20 +397,12 @@ class DartBridgeHybridStt {
     String modelIdOrPath = '',
     String? configJson,
   }) {
-    final hints = calloc<_RacRoutingHints>();
-    final outVtable = calloc<Pointer<_RacEngineVtable>>();
     final hintPtr = engineHint.toNativeUtf8();
     try {
-      hints.ref
-        ..preferredEngineName = hintPtr
-        ..noFallback = 1; // hard-pin: fail if the engine is absent
-
-      final routeRc =
-          _pluginRoute(_kPrimitiveTranscribe, 0, hints, outVtable);
-      final vtable = outVtable.value;
-      if (routeRc != RAC_SUCCESS || vtable == nullptr) {
+      final vtable = _pluginFindForEngine(_kPrimitiveTranscribe, hintPtr);
+      if (vtable == nullptr) {
         throw StateError(
-          "No '$engineHint' STT plugin registered (rc=$routeRc). Register the "
+          "No '$engineHint' STT plugin registered. Register the "
           'backend first (the on-device sherpa engine, or cloud via '
           'BACKEND.cloud.register / RunAnywhere.hybrid.registerCloud).',
         );
@@ -482,8 +455,6 @@ class DartBridgeHybridStt {
         }
       }
     } finally {
-      calloc.free(hints);
-      calloc.free(outVtable);
       calloc.free(hintPtr);
     }
   }
@@ -656,7 +627,7 @@ class DartBridgeHybridStt {
   // --- cloud plugin registration -------------------------------------------
 
   /// Register the cloud engine with the commons plugin registry so it is
-  /// routable via `rac_plugin_route(TRANSCRIBE, hint="cloud")`. Tolerant of
+  /// routable via `rac_plugin_find_for_engine(TRANSCRIBE, "cloud")`. Tolerant of
   /// double-registration (RAC_ERROR_MODULE_ALREADY_REGISTERED is treated as
   /// success). Returns the native rc, or null when the symbol is unavailable in
   /// this build (e.g. cloud engine not linked into the loaded .so).

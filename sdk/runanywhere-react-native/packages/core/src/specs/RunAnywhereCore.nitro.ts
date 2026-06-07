@@ -301,24 +301,6 @@ export interface RunAnywhereCore extends HybridObject<{
   storageDeleteProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ============================================================================
-  // Hardware
-  // Matches commons rac_hardware_profile_get proto ABI
-  // ============================================================================
-
-  /**
-   * Get serialized runanywhere.v1.HardwareProfileResult bytes.
-   */
-  hardwareProfileProto(): Promise<ArrayBuffer>;
-
-  /**
-   * Set the accelerator preference on commons via
-   * `rac_hardware_set_accelerator_preference`.
-   * Request bytes are a serialized runanywhere.v1.HardwareAcceleratorPreferenceRequest;
-   * response bytes are a serialized runanywhere.v1.HardwareAcceleratorPreferenceResult.
-   */
-  setAcceleratorPreferenceProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
-
-  // ============================================================================
   // Events
   // Matches Swift: CppBridge+Events.swift
   // ============================================================================
@@ -533,8 +515,9 @@ export interface RunAnywhereCore extends HybridObject<{
   /**
    * Create one registry-routed `rac_stt_service_t` for the offline or online
    * side. Replicates the commons JNI `create_stt_service_via_registry` recipe:
-   * `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint)` -> `stt_ops->create` ->
-   * heap-wrap. The cloud provider (default "sarvam") rides in `configJson`.
+   * `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engine)` ->
+   * `stt_ops->create` -> heap-wrap. The cloud provider (default "sarvam") rides
+   * in `configJson`.
    *
    * @param engineHint    "sherpa" | "cloud" — pinned as preferred engine.
    * @param modelIdOrPath On-device model path for sherpa, "" for cloud.

@@ -1277,13 +1277,6 @@ static rac_result_t platformGetMemoryInfoCallback(rac_memory_info_t* outInfo, vo
     return RAC_SUCCESS;
 }
 
-static void platformTrackErrorCallback(const char* errorJson, void* userData) {
-    // Forward error tracking to logging for now
-    if (errorJson) {
-        LOGE("Track error: %s", errorJson);
-    }
-}
-
 // =============================================================================
 // Directory Enumeration + Vendor ID Callbacks (Platform Adapter)
 //
@@ -1545,9 +1538,6 @@ void InitBridge::registerPlatformAdapter() {
 
     // Memory info
     adapter_.get_memory_info = platformGetMemoryInfoCallback;
-
-    // Error tracking
-    adapter_.track_error = platformTrackErrorCallback;
 
     // HTTP download fallback for RACommons platform-adapter callers.
     // Public RN model downloads use the rac_download_*_proto ABI.

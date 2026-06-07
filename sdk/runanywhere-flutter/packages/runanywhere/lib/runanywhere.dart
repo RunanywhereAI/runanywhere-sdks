@@ -20,7 +20,6 @@ export 'public/capabilities/runanywhere_downloads.dart'
     show RunAnywhereDownloads;
 export 'public/capabilities/runanywhere_embeddings.dart'
     show RunAnywhereEmbeddings;
-export 'public/capabilities/runanywhere_hardware.dart' show RunAnywhereHardware;
 export 'public/capabilities/runanywhere_hybrid.dart' show RunAnywhereHybrid;
 export 'public/capabilities/runanywhere_llm.dart' show RunAnywhereLLM;
 export 'public/capabilities/runanywhere_lora.dart'

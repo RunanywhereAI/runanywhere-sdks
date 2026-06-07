@@ -9,7 +9,7 @@
 // registry via `rac_backend_cloud_register()` (the exact mirror of the
 // on-device backend's register). Once registered the unified "cloud" plugin
 // serves RAC_PRIMITIVE_TRANSCRIBE and is routable via
-// `rac_plugin_route(TRANSCRIBE, hint="cloud")`, which is how the hybrid
+// `rac_plugin_find_for_engine(TRANSCRIBE, "cloud")`, which is how the hybrid
 // router creates the online STT service.
 //
 // The concrete HTTP provider (Sarvam first) is DATA carried in each registered
@@ -84,7 +84,7 @@ class CloudBackend {
   /// Register the cloud engine with the commons plugin registry exactly
   /// once per process (idempotent). Mirrors the on-device backend's register —
   /// the engine must be routable before the hybrid router can create the online
-  /// side via `rac_plugin_route(TRANSCRIBE, hint="cloud")`. Tolerant of the
+  /// side via `rac_plugin_find_for_engine(TRANSCRIBE, "cloud")`. Tolerant of the
   /// native already-registered code so repeated calls are safe.
   ///
   /// Returns true when the plugin is registered (or already was). Returns false
