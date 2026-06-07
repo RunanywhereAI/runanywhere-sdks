@@ -57,6 +57,11 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
+            // The SDK + backend AARs each bundle the NDK runtime
+            // (libc++_shared.so) for every ABI, so the merge collides on the
+            // duplicate — take the first. (Backends currently ship as
+            // monolithic AARs; tracked as issues 002/005.)
+            pickFirsts += "**/libc++_shared.so"
         }
     }
 }

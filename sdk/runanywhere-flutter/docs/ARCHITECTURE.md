@@ -362,7 +362,7 @@ melos version          # bump versions + generate workspace CHANGELOG
 ### 10.1 Adding a New Backend
 
 1. Create a new Flutter plugin package.
-2. Implement a C++ backend with the standard `rac_engine_vtable_t` (v3).
+2. Implement a C++ backend with the standard `rac_engine_vtable_t` (v4).
 3. Vendor the resulting `.xcframework` / `.so` in your package.
 4. Expose Dart FFI bindings + a `register()` entry point that calls
    `rac_backend_<name>_register()`.

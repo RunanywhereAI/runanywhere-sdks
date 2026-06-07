@@ -38,6 +38,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "foundation/rac_proto_marshal_internal.h"
 #include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "tts_options.pb.h"
@@ -89,27 +90,16 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes != nullptr) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return rac::proto::bytes_valid(bytes, size);
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
-    static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+    return rac::proto::parse_bytes(bytes, size);
 }
 
 rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
                                 rac_proto_buffer_t* out) {
-    if (!out) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize TTS proto result");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize TTS proto result");
 }
 
 runanywhere::v1::AudioFormat proto_audio_format(rac_audio_format_enum_t format) {
@@ -1050,30 +1040,19 @@ namespace {
 // Internal linkage keeps these distinct from the component-section helpers above
 // (proto_bytes_valid / proto_parse_data / copy_proto_message) — no ODR clash.
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes != nullptr) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return rac::proto::bytes_valid(bytes, size);
 }
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
-    static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+    return rac::proto::parse_bytes(bytes, size);
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize proto result");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
 rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
-    return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
+    return rac::proto::parse_error(out, message);
 }
 
 void free_tts_options(rac_tts_options_t* options) {

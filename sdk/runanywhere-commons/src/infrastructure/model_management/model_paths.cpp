@@ -26,6 +26,8 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
+#include "infrastructure/rac_path_safety_internal.h"
+
 // =============================================================================
 // STATIC STATE
 // =============================================================================
@@ -42,14 +44,7 @@ namespace fs = std::filesystem;
 // applied (security-privacy-storage-network-001-followup-model-id).
 namespace {
 bool is_safe_model_id_segment(const char* model_id) {
-    if (!model_id || model_id[0] == '\0') {
-        return false;
-    }
-    const std::string_view sv{model_id};
-    if (sv == "." || sv == "..") {
-        return false;
-    }
-    return sv.find('/') == std::string_view::npos && sv.find('\\') == std::string_view::npos;
+    return model_id != nullptr && rac::path::is_safe_path_segment(model_id);
 }
 }  // namespace
 

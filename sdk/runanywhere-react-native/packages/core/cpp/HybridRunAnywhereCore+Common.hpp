@@ -18,7 +18,6 @@
 #include "bridges/StorageBridge.hpp"
 #include "bridges/ModelRegistryBridge.hpp"
 #include "bridges/HTTPBridge.hpp"
-#include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
 #include "bridges/FileManagerBridge.hpp"
 

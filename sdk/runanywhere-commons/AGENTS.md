@@ -99,18 +99,18 @@ scripts/build-windows.bat
 │  Owns lifecycle, emits analytics, exposes clean public API       │
 │  LLM | STT | TTS | VAD | VLM | Diffusion | Embeddings          │
 └──────────────────────────┬──────────────────────────────────────┘
-                           │ rac_*_create() → plugin route → vtable dispatch
+                           │ rac_*_create() → rac_plugin_find() → vtable dispatch
 ┌──────────────────────────▼──────────────────────────────────────┐
 │  Service Layer  (rac_*_service.cpp)                              │
-│  Looks up model in registry → resolves framework → pins plugin   │
-│  name → calls rac_plugin_route() → gets rac_engine_vtable_t*    │
+│  Looks up model in registry → resolves framework → optional      │
+│  engine pin → rac_plugin_find[_for_engine]() → vtable dispatch    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────────┐
-│  Plugin Registry + Engine Router  (src/plugin/, src/router/)     │
-│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 3u)    │
-│  Priority scoring: base priority + runtime bonus + format bonus  │
-│  + pinned-engine bonus. Static (RAC_STATIC_PLUGIN_REGISTER) or   │
+│  Plugin Registry  (src/plugin/)                                 │
+│  ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION = 4u)    │
+│  Priority order: highest-priority plugin per primitive wins, no  │
+│  scoring. Static (RAC_STATIC_PLUGIN_REGISTER) or                 │
 │  dynamic (rac_registry_load_plugin / dlopen).                    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
@@ -126,13 +126,13 @@ scripts/build-windows.bat
 
 Every AI capability follows the same two-layer design:
 
-1. **Service layer** (`src/features/*/rac_*_service.cpp`): Thin dispatch. Looks up model in registry, resolves `rac_inference_framework_t` → plugin name string, calls `rac_plugin_route()` to get the highest-scoring `rac_engine_vtable_t*`, calls `vt->*_ops->create()` to instantiate backend, wraps in a `rac_*_service_t{ops, impl, model_id}` struct.
+1. **Service layer** (`src/features/*/rac_*_service.cpp`): Thin dispatch. Looks up model in registry, resolves `rac_inference_framework_t` → optional engine-name pin, calls `rac_plugin_find()` (or `rac_plugin_find_for_engine()` when pinned) to get the highest-priority `rac_engine_vtable_t*`, calls `vt->*_ops->create()` to instantiate backend, wraps in a `rac_*_service_t{ops, impl, model_id}` struct.
 
 2. **Component layer** (`src/features/*/llm_component.cpp` etc.): Owns model lifecycle via `rac_lifecycle_t`, emits analytics events (`RAC_EVENT_*`), handles cancel, streams tokens/audio, exposes the public `rac_*_component_*()` API that platform SDKs call.
 
-### Unified Plugin ABI (v3)
+### Unified Plugin ABI (v4)
 
-All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with slots for 8 primitives:
+All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with slots for 7 primitives (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
 
 | Primitive | vtable field | Backends |
 |-----------|-------------|----------|
@@ -141,11 +141,10 @@ All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vta
 | `RAC_PRIMITIVE_SYNTHESIZE` | `tts_ops` | sherpa, platform, metalrt |
 | `RAC_PRIMITIVE_DETECT_VOICE` | `vad_ops` | sherpa (Silero), energy-based (built-in) |
 | `RAC_PRIMITIVE_EMBED` | `embedding_ops` | onnx |
-| `RAC_PRIMITIVE_RERANK` | `rerank_ops` | (reserved) |
 | `RAC_PRIMITIVE_VLM` | `vlm_ops` | llamacpp-vlm, metalrt |
 | `RAC_PRIMITIVE_DIFFUSION` | `diffusion_ops` | platform (CoreML) |
 
-NULL slot = "not supported." ABI version mismatch → immediate rejection at registration.
+NULL slot = "not supported." ABI version mismatch → immediate rejection at registration. (Wire value 6, formerly `RAC_PRIMITIVE_RERANK`/`rerank_ops`, is retired — no backend implemented it — which is why the ABI is now v4.)
 
 ### Platform Adapter Inversion-of-Control
 
@@ -277,7 +276,7 @@ ctest --test-dir build --output-on-failure
 
 # Run a single test
 ./build/tests/test_core
-./build/tests/test_engine_router
+./build/tests/test_engine_vtable
 ./build/tests/test_llm_thinking
 
 # Tests requiring backends (must enable the backend)

@@ -311,13 +311,13 @@ rac_result_t rac_registry_load_plugin(const char* path);
 rac_result_t rac_registry_unload_plugin(const char* name);
 uint32_t     rac_plugin_api_version(void);
 
-// Dispatch: the engine router picks a capable, highest-scoring plugin for a
-// (primitive, model-format) request (rac/router/rac_route.h). Frontends reach
-// it through the C ABI wrapper rac_plugin_route; the public primitive APIs
-// (rac_llm_create, rac_stt_create, ...) resolve through it internally.
-rac_result_t rac_plugin_route(rac_primitive_t primitive, uint32_t format,
-                              const rac_routing_hints_t* hints,
-                              const rac_engine_vtable_t** out_vtable);
+// Dispatch: the registry returns the highest-priority plugin that serves a
+// primitive (plain priority order — no scoring). The public primitive APIs
+// (rac_llm_create, rac_stt_create, ...) resolve through it internally; a
+// specific engine can be pinned by name via rac_plugin_find_for_engine.
+const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
+const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
+                                                      const char* engine_name);
 ```
 
 > Historical: v2 used a separate capability-oriented service registry

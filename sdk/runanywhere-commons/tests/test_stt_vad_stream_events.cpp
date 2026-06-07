@@ -279,7 +279,7 @@ void install_persistent_stt_plugin() {
 int test_stt_persistent_stream_handle() {
     install_persistent_stt_plugin();
     // Keep the simpler mock (which doesn't implement stream_create) out of
-    // the router's way so rac_plugin_route consistently picks the
+    // the registry's way so rac_plugin_find consistently picks the
     // persistent plugin for this test.
     (void)rac_plugin_unregister("cpp-stream-event-stt");
 

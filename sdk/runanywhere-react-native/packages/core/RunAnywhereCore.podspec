@@ -49,6 +49,20 @@ Pod::Spec.new do |s|
     "ios/URLSessionHttpTransport/URLSessionHttpTransportImpl.inc.mm",
   ]
 
+  # The .inc.mm is an include-only implementation fragment: it is guarded by an
+  # `#error` unless the wrapper (ios/URLSessionHttpTransport.mm) defines
+  # RAC_URLS_C_PREFIX/RAC_URLS_OBJC_PREFIX before `#include`-ing it. The broad
+  # `ios/**/*.{h,m,mm}` source glob above would otherwise compile it as its own
+  # translation unit and trip that guard — CocoaPods compiles every .mm matched
+  # by source_files, and preserve_paths does NOT remove a file from compilation.
+  # Exclude it from compiled sources: it still ships on disk via preserve_paths
+  # and is pulled in through the wrapper's `#include`. Mirrors the Flutter plugin,
+  # which keeps the shared .inc.mm outside its Classes/ source glob for the same
+  # reason.
+  s.exclude_files = [
+    "ios/**/*.inc.mm",
+  ]
+
   # Build header search paths: include the Headers root (for qualified includes
   # like "rac/core/rac_types.h") plus every subdirectory (for flat includes
   # like "rac_types.h").  Computed dynamically so new xcframework subdirectories

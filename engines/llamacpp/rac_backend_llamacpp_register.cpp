@@ -286,7 +286,7 @@ static rac_result_t llamacpp_vtable_clear_context(void* impl) {
 // has been dropped so the entry point TU can `extern` it; visibility is still
 // limited to the backend library via symbol hiding (the struct is `const`).
 // The `create` adapter called by commons rac_llm_create() after
-// rac_plugin_route picks this plugin. Replaces the legacy factory that was
+// rac_plugin_find picks this plugin. Replaces the legacy factory that was
 // registered via rac_service_provider_t::create. The config_json parameter is
 // reserved for future engine-specific tuning (num_threads, gpu_layers, etc.);
 // today we pass nullptr to rac_llm_llamacpp_create to use defaults.
@@ -385,10 +385,10 @@ LlamaCPPRegistryState& get_state() {
 
 // `llamacpp_can_handle` (rac_service_can_handle_fn) and
 // `llamacpp_create_service` (rac_service_create_fn) removed. The commons
-// consumer (rac_llm_create) now goes through rac_plugin_route →
+// consumer (rac_llm_create) now goes through rac_plugin_find →
 // g_llamacpp_ops.create which calls llamacpp_llm_create_impl (defined above).
-// Model-format gating is handled by the router via g_llamacpp_engine_vtable's
-// metadata.formats table in rac_plugin_entry_llamacpp.cpp.
+// g_llamacpp_engine_vtable's metadata.formats table (in
+// rac_plugin_entry_llamacpp.cpp) is advisory metadata, not used for selection.
 
 }  // namespace
 
@@ -418,7 +418,7 @@ rac_result_t rac_backend_llamacpp_register(void) {
     // fires if the carrier `librunanywhere_llamacpp.so` is dlopened — which
     // Kotlin/JNI does not do (it loads `librac_backend_llamacpp_jni.so`, which
     // links the backend directly). Register the plugin entry here so
-    // rac_plugin_route(framework=llamacpp) can find the unified vtable (with
+    // rac_plugin_find can find the unified vtable (with
     // both llm_ops and vlm_ops slots filled). Mirrors the pattern in
     // rac_backend_onnx_register.cpp.
     // The unified llamacpp plugin already serves both LLM and VLM primitives

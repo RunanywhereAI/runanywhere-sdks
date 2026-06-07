@@ -38,6 +38,7 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "diffusion_options.pb.h"
+#include "foundation/rac_proto_marshal_internal.h"
 #include "sdk_events.pb.h"
 #endif
 
@@ -741,30 +742,21 @@ std::string event_id() {
 }
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
-    static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+    return rac::proto::parse_bytes(bytes, size);
 }
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return size == 0 || bytes != nullptr;
+    return rac::proto::bytes_valid(bytes, size);
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out)
-        return RAC_ERROR_NULL_POINTER;
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize proto result");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
 // Carried from rac_nonllm_lifecycle_proto_abi.cpp — needed by the lifecycle
 // generate verb below. Internal linkage; no ODR clash.
 rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
-    return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
+    return rac::proto::parse_error(out, message);
 }
 
 rac_result_t check_model_id(const std::string& requested, const char* loaded, const char* message,

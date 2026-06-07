@@ -27,6 +27,9 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#if defined(RAC_HAVE_PROTOBUF)
+#include "foundation/rac_proto_marshal_internal.h"
+#endif
 
 // Voice agent proto path consults the global model lifecycle (level 1:
 // impl + ops) instead of dereferencing the per-component handles stored on
@@ -66,27 +69,16 @@ InFlightGuard::~InFlightGuard() {
 #if defined(RAC_HAVE_PROTOBUF)
 
 bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes != nullptr) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return rac::proto::bytes_valid(bytes, size);
 }
 
 const void* proto_parse_data(const uint8_t* bytes, size_t size) {
-    static const char kEmpty[] = "";
-    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+    return rac::proto::parse_bytes(bytes, size);
 }
 
 rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
                                 rac_proto_buffer_t* out) {
-    if (!out) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize voice-agent proto result");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize voice-agent proto result");
 }
 
 std::string event_id(const char* prefix) {

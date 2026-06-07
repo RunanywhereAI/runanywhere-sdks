@@ -99,10 +99,9 @@ typedef struct rac_llm_service_ops {
     /**
      * Allocate a backend-specific impl for a new service instance.
      *
-     * v3 (RAC_PLUGIN_API_VERSION=3u): replaces the legacy
-     * rac_service_provider_t::create callback from the deleted
-     * service_registry.cpp. Called by commons rac_llm_create() after
-     * rac_plugin_route picks this plugin; the returned impl is passed
+     * Replaces the legacy rac_service_provider_t::create callback from the
+     * deleted service_registry.cpp. Called by commons rac_llm_create() after
+     * rac_plugin_find picks this plugin; the returned impl is passed
      * to every other ops method (initialize, generate, ..., destroy).
      *
      * @param model_id    Model ID or filesystem path. Caller-owned; copy if retaining.

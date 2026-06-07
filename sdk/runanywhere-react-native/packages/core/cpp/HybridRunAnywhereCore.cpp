@@ -164,14 +164,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             // Continue - not fatal
         }
 
-        // 5. Initialize download manager
-        result = DownloadBridge::shared().initialize();
-        if (result != RAC_SUCCESS) {
-            LOGE("Failed to initialize download manager: %d", result);
-            // Continue - not fatal
-        }
-
-        // 6. Configure HTTP only for deployable backend configs. Development
+        // 5. Configure HTTP only for deployable backend configs. Development
         // mode uses the C++ dev config directly in telemetry/device callbacks.
         if (env != RAC_ENV_DEVELOPMENT &&
             config::isUsableHttpUrl(baseURL) &&
@@ -327,7 +320,6 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
 
         // Cleanup bridges in reverse-init order.
         TelemetryBridge::shared().shutdown();  // Flush and destroy telemetry first
-        DownloadBridge::shared().shutdown();
         FileManagerBridge::shared().shutdown();
         StorageBridge::shared().shutdown();
         ModelRegistryBridge::shared().shutdown();

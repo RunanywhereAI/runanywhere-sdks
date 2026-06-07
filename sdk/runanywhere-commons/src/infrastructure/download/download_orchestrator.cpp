@@ -55,6 +55,7 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
+#include "infrastructure/rac_path_safety_internal.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -69,7 +70,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/foundation/rac_proto_buffer.h"
-#include "rac/infrastructure/download/rac_download.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
@@ -401,11 +401,7 @@ std::string join_path(const std::string& lhs, const std::string& rhs) {
 // model_id is concatenated into the per-model folder root and then used as
 // a fallback filename; allowing separators or '..' lets a malicious id pivot
 // the storage root before any descriptor path is even applied.
-bool is_safe_path_segment(const std::string& component) {
-    if (component.empty() || component == "." || component == "..")
-        return false;
-    return component.find('/') == std::string::npos && component.find('\\') == std::string::npos;
-}
+using rac::path::is_safe_path_segment;
 
 // Whitelist platform-trusted absolute path prefixes that the C++ writer is
 // allowed to honor verbatim from descriptor metadata.
@@ -943,6 +939,239 @@ bool validate_resume_offset(const proto_plan_file& file, int64_t requested_resum
     return true;
 }
 
+// Result of processing one planned file. STOP means a terminal
+// (CANCELLED/FAILED) progress event was already emitted and the worker should
+// return; CONTINUE means proceed to the next file.
+enum class plan_file_step { CONTINUE, STOP };
+
+// Download (and optionally extract) one planned file. On cancel / HTTP failure
+// / extraction failure it emits the terminal progress event, stops the task and
+// returns STOP. On success it sets `final_path` for this file and advances
+// `completed_before_file`, returning CONTINUE.
+plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& task,
+                                 const proto_plan_file& file, size_t i, int64_t total_expected,
+                                 uint64_t file_resume_from, int64_t& completed_before_file,
+                                 std::string& final_path) {
+    proto_download_callback_ctx cb_ctx;
+    cb_ctx.task = task;
+    cb_ctx.file_index = static_cast<int>(i);
+    cb_ctx.completed_before_file = completed_before_file;
+    cb_ctx.total_expected = total_expected;
+    cb_ctx.storage_key = file.storage_key;
+    cb_ctx.destination_path = file.destination_path;
+
+    rac_http_download_request_t req{};
+    req.url = file.url.c_str();
+    req.destination_path = file.destination_path.c_str();
+    req.timeout_ms = 0;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = file_resume_from;
+    req.expected_sha256_hex =
+        file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
+
+    int32_t http_status = 0;
+    rac_http_download_status_t status =
+        rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
+
+    if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
+        int64_t file_partial = file_size_or_zero(file.destination_path);
+        int64_t deleted = 0;
+        bool delete_partial = false;
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            delete_partial = task->delete_partial_on_cancel;
+        }
+        if (delete_partial) {
+            deleted = delete_partial_file(file.destination_path);
+            file_partial = 0;
+        }
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            task->last_deleted_bytes = deleted;
+            task->last_partial_bytes = completed_before_file + file_partial;
+        }
+        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
+                          rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          completed_before_file + file_partial, total_expected,
+                          static_cast<int32_t>(i), file.storage_key, "", "download cancelled");
+        mark_task_stopped(task);
+        emit_progress(task);
+        return plan_file_step::STOP;
+    }
+
+    if (status != RAC_HTTP_DL_OK) {
+        std::string error = http_status_message(status, http_status);
+        int64_t partial = completed_before_file + file_size_or_zero(file.destination_path);
+        {
+            std::lock_guard<std::mutex> lock(task->mutex);
+            task->last_partial_bytes = partial;
+        }
+        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                          partial, total_expected, static_cast<int32_t>(i), file.storage_key,
+                          "", error);
+        mark_task_stopped(task);
+        emit_progress(task);
+        return plan_file_step::STOP;
+    }
+
+    if (file.requires_extraction) {
+        set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING,
+                          rav1::DOWNLOAD_STAGE_EXTRACTING,
+                          total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                          total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
+        emit_progress(task);
+
+        // Ensure the per-model folder exists. When `rac_download_start_proto`
+        // resolved `model_folder_path` via `rac_model_paths_get_model_folder`
+        // (archive flow) the folder does not exist yet — libarchive's native
+        // extractor silently degrades if the output directory is missing.
+        mkdir_p(task->model_folder_path.c_str());
+
+        rac_extraction_result_t extraction_result{};
+        rac_result_t extract_rc = rac_extract_archive_native(
+            file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
+            nullptr, &extraction_result);
+        if (extract_rc != RAC_SUCCESS) {
+            set_task_progress(
+                task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
+                total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                total_expected, static_cast<int32_t>(i), file.storage_key, "",
+                "archive extraction failed");
+            mark_task_stopped(task);
+            emit_progress(task);
+            return plan_file_step::STOP;
+        }
+
+        delete_file(file.destination_path.c_str());
+
+        // Sherpa-ONNX archives (Piper TTS VITS, Whisper STT) ship as
+        // `<name>/<files>` — a single top-level nested directory. When
+        // we extract into `Models/Sherpa/<model_id>/` we therefore end
+        // up with `Models/Sherpa/<model_id>/<nested>/<files>`. Collapse
+        // to the nested path so the backend's `load_model()` sees the
+        // directory that actually contains `model.onnx`/`tokens.txt`/
+        // `espeak-ng-data/`.
+        char resolved_path[4096];
+        rac_result_t find_rc = rac_find_model_path_after_extraction(
+            task->model_folder_path.c_str(), task->archive_structure, task->framework,
+            task->format, resolved_path, sizeof(resolved_path));
+        if (find_rc == RAC_SUCCESS && resolved_path[0] != '\0') {
+            final_path = resolved_path;
+        } else {
+            final_path = task->model_folder_path;
+        }
+    } else {
+        final_path = file.destination_path;
+    }
+
+    if (total_expected > 0) {
+        completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
+    } else {
+        completed_before_file += file_size_or_zero(final_path);
+    }
+    return plan_file_step::CONTINUE;
+}
+
+// Post-finalize size guard.
+//
+// The per-file HTTP runner already enforces a strict body-validation gate
+// for tiny error-stub responses (in rac_http_download.cpp), but a download
+// orchestration can still finish with a file that is structurally smaller than
+// the expected payload — e.g. when the server streams 200 with a short body
+// that doesn't match the descriptor's expected_bytes, or when an extraction
+// step silently produces a smaller artifact than the archive headers claimed.
+// Before registering `is_downloaded = true`, verify each file's on-disk size
+// against the descriptor's expected size. If any file is < 80% of its expected
+// payload, return false so the task is marked FAILED and callers retry.
+//
+// 80% (not 100%) because real-world deltas exist: descriptors sometimes round
+// expected_bytes from CDN HEAD probes, archive extraction emits files whose
+// summed size doesn't equal the archive size, and a few gguf quants ship with a
+// smaller-than-declared payload. 20% slack catches the catastrophic case (49 B
+// HTML stub for a 386 MB gguf) without false-positives on the slop.
+//
+// On failure, `failing_index` is set to the offending file so the FAILED event
+// reports the actual offender instead of the last file of the plan.
+bool validate_downloaded_sizes(const std::shared_ptr<proto_download_task>& task,
+                               size_t& failing_index, std::string& sanity_error) {
+    if (task->files.empty()) {
+        return true;
+    }
+    for (size_t i = 0; i < task->files.size(); ++i) {
+        const auto& file = task->files[i];
+        if (file.expected_bytes <= 0) {
+            // No expected size declared (e.g. some archives w/ unknown
+            // payloads). Skip — we have no ground truth to compare to.
+            continue;
+        }
+        if (file.requires_extraction) {
+            // Archive entries were extracted into model_folder_path and the raw
+            // archive was deleted. Comparing against expected_bytes would
+            // require summing the extracted tree; treat the extraction step as
+            // authoritative and skip the per-file size guard for it.
+            continue;
+        }
+        int64_t actual = file_size_or_zero(file.destination_path);
+        // 80% threshold via integer math (actual * 5 >= expected * 4) to avoid
+        // the floating-point round-trip and stay overflow-safe for 64-bit sizes.
+        if (actual * 5 < file.expected_bytes * 4) {
+            failing_index = i;
+            sanity_error = "post-finalize size guard tripped: file " + file.filename + " is " +
+                           std::to_string(actual) + " bytes on disk but expected " +
+                           std::to_string(file.expected_bytes) + " bytes (< 80% threshold)";
+            RAC_LOG_ERROR(
+                LOG_TAG,
+                "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
+                "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
+                task->task_id.c_str(), i, static_cast<long long>(actual),
+                static_cast<long long>(file.expected_bytes));
+            return false;
+        }
+    }
+    return true;
+}
+
+// For multi-file downloads (e.g. VLM primary .gguf + mmproj, MiniLM model.onnx +
+// vocab.txt) report the model *folder* as the resolved local_path instead of the
+// last file's destination path. Downstream path resolution scans the folder to
+// discover every role (primary_model, vision_projector, tokenizer, ...); a
+// last-file local_path made it scan a single file (often the mmproj) and the VLM
+// load failed with "primary model not found". Single-file archive extracts must
+// do the same so self-heal records the folder, not a discovered sub-file.
+std::string resolve_completion_local_path(const std::shared_ptr<proto_download_task>& task,
+                                          const std::string& final_path) {
+    std::string completion_local_path = final_path;
+    if (!task->model_folder_path.empty() && task->model_folder_path != ".") {
+        const bool multi_file_plan = task->files.size() > 1;
+        const bool archive_extracted =
+            task->files.size() == 1 && !task->files.empty() && task->files[0].requires_extraction;
+        if (multi_file_plan || archive_extracted) {
+            completion_local_path = task->model_folder_path;
+        }
+    }
+    return completion_local_path;
+}
+
+// Registry self-heal: when the SDK requested update_registry_on_completion, mark
+// the model downloaded and write its resolved local_path back into the registry.
+// Replaces the per-SDK self-heal (e.g. Kotlin's markModelDownloadedInRegistry()).
+void self_heal_registry(const std::shared_ptr<proto_download_task>& task,
+                        const std::string& completion_local_path) {
+    if (task->update_registry_on_completion && !completion_local_path.empty()) {
+        rac_result_t update_rc = rac_model_registry_update_download_status(
+            rac_get_model_registry(), task->model_id.c_str(), completion_local_path.c_str());
+        if (update_rc == RAC_SUCCESS) {
+            RAC_LOG_INFO(LOG_TAG, "Registry self-heal: marked '%s' downloaded with local_path '%s'",
+                         task->model_id.c_str(), completion_local_path.c_str());
+            RAC_LOG_INFO(LOG_TAG, "Registered downloaded model %s", task->model_id.c_str());
+        } else {
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Registry self-heal failed for '%s' (rc=%d); SDK fallback may apply",
+                            task->model_id.c_str(), update_rc);
+        }
+    }
+}
+
 void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
                                int64_t resume_from) {
     if (!task) {
@@ -969,122 +1198,9 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
             file_resume_from = static_cast<uint64_t>(resume_from);
         }
 
-        proto_download_callback_ctx cb_ctx;
-        cb_ctx.task = task;
-        cb_ctx.file_index = static_cast<int>(i);
-        cb_ctx.completed_before_file = completed_before_file;
-        cb_ctx.total_expected = total_expected;
-        cb_ctx.storage_key = file.storage_key;
-        cb_ctx.destination_path = file.destination_path;
-
-        rac_http_download_request_t req{};
-        req.url = file.url.c_str();
-        req.destination_path = file.destination_path.c_str();
-        req.timeout_ms = 0;
-        req.follow_redirects = RAC_TRUE;
-        req.resume_from_byte = file_resume_from;
-        req.expected_sha256_hex =
-            file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
-
-        int32_t http_status = 0;
-        rac_http_download_status_t status =
-            rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
-
-        if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
-            int64_t file_partial = file_size_or_zero(file.destination_path);
-            int64_t deleted = 0;
-            bool delete_partial = false;
-            {
-                std::lock_guard<std::mutex> lock(task->mutex);
-                delete_partial = task->delete_partial_on_cancel;
-            }
-            if (delete_partial) {
-                deleted = delete_partial_file(file.destination_path);
-                file_partial = 0;
-            }
-            {
-                std::lock_guard<std::mutex> lock(task->mutex);
-                task->last_deleted_bytes = deleted;
-                task->last_partial_bytes = completed_before_file + file_partial;
-            }
-            set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
-                              rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                              completed_before_file + file_partial, total_expected,
-                              static_cast<int32_t>(i), file.storage_key, "", "download cancelled");
-            mark_task_stopped(task);
-            emit_progress(task);
+        if (process_plan_file(task, file, i, total_expected, file_resume_from,
+                              completed_before_file, final_path) == plan_file_step::STOP) {
             return;
-        }
-
-        if (status != RAC_HTTP_DL_OK) {
-            std::string error = http_status_message(status, http_status);
-            int64_t partial = completed_before_file + file_size_or_zero(file.destination_path);
-            {
-                std::lock_guard<std::mutex> lock(task->mutex);
-                task->last_partial_bytes = partial;
-            }
-            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                              partial, total_expected, static_cast<int32_t>(i), file.storage_key,
-                              "", error);
-            mark_task_stopped(task);
-            emit_progress(task);
-            return;
-        }
-
-        if (file.requires_extraction) {
-            set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING,
-                              rav1::DOWNLOAD_STAGE_EXTRACTING,
-                              total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
-                              total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
-            emit_progress(task);
-
-            // Ensure the per-model folder exists. When `rac_download_start_proto`
-            // resolved `model_folder_path` via `rac_model_paths_get_model_folder`
-            // (archive flow) the folder does not exist yet — libarchive's native
-            // extractor silently degrades if the output directory is missing.
-            mkdir_p(task->model_folder_path.c_str());
-
-            rac_extraction_result_t extraction_result{};
-            rac_result_t extract_rc = rac_extract_archive_native(
-                file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
-                nullptr, &extraction_result);
-            if (extract_rc != RAC_SUCCESS) {
-                set_task_progress(
-                    task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
-                    total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
-                    total_expected, static_cast<int32_t>(i), file.storage_key, "",
-                    "archive extraction failed");
-                mark_task_stopped(task);
-                emit_progress(task);
-                return;
-            }
-
-            delete_file(file.destination_path.c_str());
-
-            // Sherpa-ONNX archives (Piper TTS VITS, Whisper STT) ship as
-            // `<name>/<files>` — a single top-level nested directory. When
-            // we extract into `Models/Sherpa/<model_id>/` we therefore end
-            // up with `Models/Sherpa/<model_id>/<nested>/<files>`. Collapse
-            // to the nested path so the backend's `load_model()` sees the
-            // directory that actually contains `model.onnx`/`tokens.txt`/
-            // `espeak-ng-data/`.
-            char resolved_path[4096];
-            rac_result_t find_rc = rac_find_model_path_after_extraction(
-                task->model_folder_path.c_str(), task->archive_structure, task->framework,
-                task->format, resolved_path, sizeof(resolved_path));
-            if (find_rc == RAC_SUCCESS && resolved_path[0] != '\0') {
-                final_path = resolved_path;
-            } else {
-                final_path = task->model_folder_path;
-            }
-        } else {
-            final_path = file.destination_path;
-        }
-
-        if (total_expected > 0) {
-            completed_before_file += std::max<int64_t>(file.expected_bytes, 0);
-        } else {
-            completed_before_file += file_size_or_zero(final_path);
         }
     }
 
@@ -1098,72 +1214,11 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
 
     int64_t completed_bytes = total_expected > 0 ? total_expected : completed_before_file;
 
-    // Post-finalize size guard.
-    //
-    // The per-file HTTP runner already enforces a strict body-validation gate
-    // for tiny error-stub responses (in rac_http_download.cpp),
-    // but a download orchestration can still finish with a file that is
-    // structurally smaller than the expected payload — e.g. when the server
-    // streams 200 with a short body that doesn't match the descriptor's
-    // expected_bytes, or when an extraction step silently produces a smaller
-    // artifact than the archive headers claimed. Before we register
-    // `is_downloaded = true` and bind a local_path into the model registry,
-    // verify each file's on-disk size against the descriptor's expected size.
-    // If any file is < 80% of its expected payload, refuse to register and
-    // mark the task FAILED so callers retry from scratch.
-    //
-    // We use 80% (not 100%) because real-world deltas exist: descriptors
-    // sometimes round expected_bytes from CDN HEAD probes, archive extraction
-    // emits files whose summed size doesn't equal the archive size, and a few
-    // gguf quants ship with a smaller-than-declared payload after the format
-    // upgrade. 20% slack catches the catastrophic case (49 B HTML stub
-    // standing in for a 386 MB gguf, or a 152 MB partial standing in for a
-    // 386 MB final) without forcing a false-positive failure on the slop.
-    bool sanity_check_passed = true;
-    std::string sanity_error;
-    // Track the index of the file that tripped the guard so the
-    // FAILED progress event reports the actual offender (current_file_index +
-    // storage_key) instead of mislabelling it as the LAST file of the plan.
+    // Post-finalize size guard: refuse to register if any non-extracted file is
+    // < 80% of its declared expected_bytes (see validate_downloaded_sizes).
     size_t failing_index = 0;
-    if (!task->files.empty()) {
-        for (size_t i = 0; i < task->files.size(); ++i) {
-            const auto& file = task->files[i];
-            if (file.expected_bytes <= 0) {
-                // No expected size declared (e.g. some archives w/ unknown
-                // payloads). Skip — we have no ground truth to compare to.
-                continue;
-            }
-            if (file.requires_extraction) {
-                // Archive entries were extracted into model_folder_path and
-                // the raw archive was deleted by run_proto_download_worker.
-                // Comparing against expected_bytes would require summing the
-                // extracted tree; we treat the extraction step as authoritative
-                // and skip the per-file size guard for extracted artifacts.
-                continue;
-            }
-            int64_t actual = file_size_or_zero(file.destination_path);
-            // 80% threshold: actual >= 0.8 * expected to pass.
-            // Using integer math (actual * 5 >= expected * 4) avoids the
-            // floating-point round-trip and keeps the check overflow-safe
-            // for any 64-bit file size.
-            if (actual * 5 < file.expected_bytes * 4) {
-                sanity_check_passed = false;
-                failing_index = i;
-                sanity_error = "post-finalize size guard tripped: file " + file.filename + " is " +
-                               std::to_string(actual) + " bytes on disk but expected " +
-                               std::to_string(file.expected_bytes) +
-                               " bytes (< 80% threshold)";
-                RAC_LOG_ERROR(
-                    LOG_TAG,
-                    "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
-                    "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
-                    task->task_id.c_str(), i, static_cast<long long>(actual),
-                    static_cast<long long>(file.expected_bytes));
-                break;
-            }
-        }
-    }
-    if (!sanity_check_passed) {
+    std::string sanity_error;
+    if (!validate_downloaded_sizes(task, failing_index, sanity_error)) {
         int64_t failed_bytes = total_expected > 0 ? completed_before_file : 0;
         set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
                           failed_bytes, total_expected, static_cast<int32_t>(failing_index),
@@ -1173,27 +1228,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
         return;
     }
 
-    // For multi-file downloads (e.g. VLM primary .gguf + mmproj, MiniLM
-    // model.onnx + vocab.txt) report the model *folder* as the resolved
-    // local_path instead of the last file's destination path. Downstream
-    // path resolution (`rac_model_paths_resolve_artifact`) scans the folder
-    // to discover every role (primary_model, vision_projector, tokenizer,
-    // ...). When `local_path` pointed at the last file we ended up scanning
-    // a single file — typically the mmproj — and the VLM load failed with
-    // "primary model not found".
-    std::string completion_local_path = final_path;
-    if (!task->model_folder_path.empty() && task->model_folder_path != ".") {
-        // Multi-file plans (VLM primary + mmproj, MiniLM onnx + vocab) always
-        // register the per-model folder. Single-file archive extracts (SmolVLM
-        // tarball, Sherpa STT/TTS) must do the same — otherwise self-heal can
-        // record the last discovered file (often mmproj) and VLM load fails.
-        const bool multi_file_plan = task->files.size() > 1;
-        const bool archive_extracted =
-            task->files.size() == 1 && !task->files.empty() && task->files[0].requires_extraction;
-        if (multi_file_plan || archive_extracted) {
-            completion_local_path = task->model_folder_path;
-        }
-    }
+    std::string completion_local_path = resolve_completion_local_path(task, final_path);
     set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
                       completed_bytes, total_expected, static_cast<int32_t>(task->files.size() - 1),
                       task->files.empty() ? "" : task->files.back().storage_key,
@@ -1201,23 +1236,7 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     mark_task_stopped(task);
     emit_progress(task);
 
-    // Registry self-heal: when the SDK requested
-    // update_registry_on_completion, mark the model as downloaded and write
-    // its resolved local_path back into the registry. Replaces the per-SDK
-    // self-heal (e.g. Kotlin's markModelDownloadedInRegistry()).
-    if (task->update_registry_on_completion && !completion_local_path.empty()) {
-        rac_result_t update_rc = rac_model_registry_update_download_status(
-            rac_get_model_registry(), task->model_id.c_str(), completion_local_path.c_str());
-        if (update_rc == RAC_SUCCESS) {
-            RAC_LOG_INFO(LOG_TAG, "Registry self-heal: marked '%s' downloaded with local_path '%s'",
-                         task->model_id.c_str(), completion_local_path.c_str());
-            RAC_LOG_INFO(LOG_TAG, "Registered downloaded model %s", task->model_id.c_str());
-        } else {
-            RAC_LOG_WARNING(LOG_TAG,
-                            "Registry self-heal failed for '%s' (rc=%d); SDK fallback may apply",
-                            task->model_id.c_str(), update_rc);
-        }
-    }
+    self_heal_registry(task, completion_local_path);
 }
 
 #ifdef __EMSCRIPTEN__

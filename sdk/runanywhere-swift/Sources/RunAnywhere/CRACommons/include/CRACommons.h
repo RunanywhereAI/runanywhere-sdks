@@ -111,7 +111,6 @@
 #include "rac_sdk_event_stream.h"
 
 // Download management
-#include "rac_download.h"
 #include "rac_download_orchestrator.h"
 
 // Model management

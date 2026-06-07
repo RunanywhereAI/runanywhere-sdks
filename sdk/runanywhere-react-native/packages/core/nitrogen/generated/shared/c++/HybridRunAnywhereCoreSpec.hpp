@@ -92,8 +92,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeletePlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeleteProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hardwareProfileProto() = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> setAcceleratorPreferenceProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<double>> subscribeSDKEventsProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<void>> unsubscribeSDKEventsProto(double subscriptionId) = 0;
       virtual std::shared_ptr<Promise<bool>> publishSDKEventProto(const std::shared_ptr<ArrayBuffer>& eventBytes) = 0;

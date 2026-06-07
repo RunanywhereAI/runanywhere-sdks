@@ -116,9 +116,9 @@ rac_registry_unload_plugin("llamacpp");
    `RAC_ERROR_ABI_VERSION_MISMATCH`.
 2. `capability_check` is invoked once; a non-zero return rejects the
    plugin silently (e.g. Metal-only engines on Linux).
-3. The engine router (`include/rac/router/rac_engine_router.h`) scores the
-   remaining plugins against the hardware profile + routing hints and
-   dispatches the request through the matching primitive's op-struct.
+3. The registry (`include/rac/plugin/rac_plugin_entry.h`) returns the
+   highest-priority plugin that serves the requested primitive (plain priority
+   order via `rac_plugin_find`) and dispatches through its op-struct.
 
 ---
 
@@ -147,9 +147,9 @@ rac_registry_unload_plugin("llamacpp");
 │  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘  └─────┬─────┘ │
 │          │                  │                  │                │       │
 │  ┌───────▼──────────────────▼──────────────────▼────────────────▼─────┐ │
-│  │              Plugin Registry + Engine Router                        │ │
-│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 3u)   │ │
-│  │   hardware profile + hints → primitive op-struct dispatch           │ │
+│  │                      Plugin Registry                               │ │
+│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 4u)   │ │
+│  │   priority-order primitive op-struct dispatch (rac_plugin_find)     │ │
 │  └────────────────────────────────┬────────────────────────────────────┘ │
 └───────────────────────────────────│─────────────────────────────────────┘
                                     │
@@ -353,11 +353,10 @@ rac_llm_create("my-model-id", &llm);   // router picks a capable plugin
    rejected.
 2. `capability_check` is invoked once; non-zero quietly filters the
    plugin out (e.g. Metal engines on Linux).
-3. The engine router (`include/rac/router/rac_engine_router.h`) scores
-   the surviving plugins against the detected hardware profile and
-   caller-supplied `rac_routing_hints`; the highest-scoring plugin whose
-   primitive op-struct for the requested capability is non-NULL handles
-   the call.
+3. The registry (`include/rac/plugin/rac_plugin_entry.h`) selects the
+   highest-priority plugin whose op-struct for the requested primitive is
+   non-NULL (plain priority order via `rac_plugin_find`); a name-pinned
+   engine can be requested via `rac_plugin_find_for_engine`.
 
 **Runtimes** (`include/rac/plugin/rac_runtime_vtable.h`) describe the
 compute target an engine runs on. Only the built-in CPU runtime fills the

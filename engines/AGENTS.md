@@ -23,8 +23,8 @@ An **engine is an op-table adapter for modalities.** Concretely, an engine:
    (`sdk/runanywhere-commons/include/rac/plugin/rac_engine_vtable.h`) — a struct
    of per-modality op-table slots:
    `llm_ops` / `stt_ops` / `tts_ops` / `vad_ops` / `embedding_ops` / `vlm_ops` /
-   `diffusion_ops` (8 live primitive slots; `rerank_ops` is a **permanently
-   dormant** ABI slot, never routable — see below). A **NULL slot means "I do
+   `diffusion_ops` (7 live primitive slots; the former `rerank_ops` was removed
+   in ABI v4 — see below). A **NULL slot means "I do
    not serve that primitive."** Serving more than one modality just means filling
    more than one slot (llama.cpp fills `llm_ops` + `vlm_ops`; sherpa fills
    `stt_ops` + `tts_ops` + `vad_ops`).
@@ -35,12 +35,13 @@ An **engine is an op-table adapter for modalities.** Concretely, an engine:
    `rac_engine_entry_with_manifest()` helper which attaches the manifest then
    registers).
 
-Dispatch happens through the router: callers in commons go through
-`rac_plugin_route(primitive, format, hints, &vtable)`
-(`sdk/runanywhere-commons/include/rac/router/rac_route.h`), which scores every
-registered engine that serves the requested primitive and returns the winner's
-vtable. The caller then invokes `vtable->{primitive}_ops->create(...)` and the
-rest of the op-table.
+Dispatch happens through the plugin registry: callers in commons go through
+`rac_plugin_find(primitive)` (or `rac_plugin_find_for_engine(primitive,
+engine_name)` to pin a specific engine), declared in
+`sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h`. Selection is
+plain priority order — the highest-`priority` registered engine that serves the
+requested primitive wins (no scoring). The caller then invokes
+`vtable->{primitive}_ops->create(...)` and the rest of the op-table.
 
 ### An engine is named by its IDENTITY, never by a modality
 
@@ -80,11 +81,11 @@ engine exists in this tree.
 | **genie** | none (all-NULL stub) | Qualcomm Genie (NPU) SDK — not in-tree | — (shell) | **OFF** | Bare stub via `RAC_ENGINE_UNAVAILABLE_PLUGIN`. `RAC_GENIE_LLM_OPS_AVAILABLE=0` pinned in CMake; never routable in-tree. First consumer of the shared unavailable shell. |
 | **metalrt** | none by default (all-NULL stub); LLM+STT+TTS+VLM when binary linked | private, **closed-source** MetalRT lib (`libmetalrt_engine.a`) | **1** (when present) — custom Metal shaders | **OFF (reserved)** | priority 120 when routable. **RESERVED / experimental** — not a live boundary member. Apple-only, stub when the binary is absent. See "Stubs & reserved engines". |
 
-`rerank_ops` / `RAC_PRIMITIVE_RERANK` (wire value 6) is a **permanently dormant**
-ABI slot: absent from `RAC_PRIMITIVE_TABLE`, `rac_engine_vtable_slot()` returns
-NULL for it, the registry rejects manifests that declare it, and
-`rac_primitive_name()` returns `"reserved_6"`. No engine fills it; promoting it
-requires bumping `RAC_PLUGIN_API_VERSION`.
+`RAC_PRIMITIVE_RERANK` (wire value 6) and its former `rerank_ops` slot were
+**removed in ABI v4**: there is no `rerank_ops` field on `rac_engine_vtable_t`,
+the value is absent from `RAC_PRIMITIVE_TABLE`, and the registry rejects
+manifests that declare wire value 6. Re-introducing it requires bumping
+`RAC_PLUGIN_API_VERSION`.
 
 ---
 
@@ -105,7 +106,7 @@ tripwire in the vtable initializer is what keeps the ABI from drifting silently.
      there is no local model file, e.g. cloud).
    - `availability` (PUBLIC / PRIVATE), `priority`, package owner/name.
 2. **A `rac_engine_vtable_t`**: the served-primitive slots non-NULL, **every
-   other slot explicit NULL** (8 primitive slots + 10 reserved slots). Lives in
+   other slot explicit NULL** (7 primitive slots + 10 reserved slots). Lives in
    `.rodata` (no runtime allocation). A future reserved-slot promotion turns the
    aggregate initializer into a compile error — the intended tripwire.
 3. **The uniform MODEL LIFECYCLE** on each served op-table (verified in
@@ -121,9 +122,9 @@ tripwire in the vtable initializer is what keeps the ABI from drifting silently.
         → destroy(impl)                    // free the impl
    ```
 
-   `create` is the v3 (`RAC_PLUGIN_API_VERSION = 3u`) slot that replaced the
+   `create` is the v4 (`RAC_PLUGIN_API_VERSION = 4u`) slot that replaced the
    deleted `rac_service_provider_t` factory; commons' `rac_<primitive>_create()`
-   calls it after `rac_plugin_route` picks the engine. `config_json` is
+   calls it after `rac_plugin_find` picks the engine. `config_json` is
    advisory: engines that don't understand it **must** ignore it and succeed with
    defaults.
 4. **`capability_check`** — use the shared 3-way helper
@@ -219,27 +220,24 @@ own section. (See `runtimes/` for the L1 device-runtime adapters.)
 > **Declare a runtime in the manifest `runtimes[]` if-and-only-if your execution
 > depends on that device being present.**
 
-The declaration is an **availability/routing contract**, *not* a claim that you
-call the runtime's vtable:
+The declaration is **advisory metadata**, *not* a claim that you call the
+runtime's vtable — and since the scoring `EngineRouter` was removed it is **not**
+used for selection today:
 
-- The router **hard-rejects** an engine when **all** of its declared L1 runtimes
-  are unregistered on this host, surfacing `RAC_ERROR_RUNTIME_UNAVAILABLE`
-  through `rac_plugin_route` (e.g. an engine pinned to CoreML on Android). See
-  `rac_route.h` and `EngineRouter::score()` in
-  `sdk/runanywhere-commons/src/router/rac_engine_router.cpp` (the
-  `has_registered_declared_runtime` gate).
-- **Zero declared runtimes = "no runtime bonus, never runtime-rejected"** —
-  always eligible. That is exactly why `cloud` declares none.
-- A declared-but-unmatched runtime still scores (a small
-  `kRuntimeCompatibilityWeight` bonus); a match with the caller's
-  `preferred_runtime` adds the hardware-profile bonus. Base score is
-  `metadata.priority`; a `pinned_engine` name match short-circuits with a
-  `+10000` bonus.
+- Selection is plain priority order via `rac_plugin_find` (highest
+  `metadata.priority` wins), or an explicit name pin via
+  `rac_plugin_find_for_engine`. There is no runtime/format scoring, no
+  `preferred_runtime` matching, and no pinned-engine bonus.
+- Declared L1 runtimes are validated for consistency at registration (the
+  manifest must match `metadata.runtimes`), but the registry does **not**
+  hard-reject an engine whose declared runtimes are unregistered.
+  `RAC_ERROR_RUNTIME_UNAVAILABLE` is reserved and currently not produced.
+- `cloud` declaring zero runtimes is therefore informational only.
 
-Corollary: llamacpp declares CUDA only when built with `GGML_USE_CUDA`, because
-advertising a runtime the linked ggml was not compiled with would make the router
-a liar (it would match llamacpp for `preferred_runtime=CUDA` then fall back to
-CPU or fail at first decode).
+Corollary: llamacpp still declares CUDA only when built with `GGML_USE_CUDA`, so
+its advertised runtimes honestly reflect the linked ggml. Selection no longer
+consults them, but keeping the metadata truthful avoids misleading tooling and
+telemetry.
 
 ---
 

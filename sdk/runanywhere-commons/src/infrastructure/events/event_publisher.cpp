@@ -128,25 +128,6 @@ std::string lowercase(const char* value) {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-runanywhere::v1::EventCategory category_for_error(rac_result_t code) {
-    if (code <= -150 && code >= -179)
-        return runanywhere::v1::EVENT_CATEGORY_NETWORK;
-    if (code <= -250 && code >= -279)
-        return runanywhere::v1::EVENT_CATEGORY_ERROR;
-    if (code <= -110 && code >= -129)
-        return runanywhere::v1::EVENT_CATEGORY_MODEL;
-    if (code <= -230 && code >= -249)
-        return runanywhere::v1::EVENT_CATEGORY_COMPONENT;
-    if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299)) {
-        return runanywhere::v1::EVENT_CATEGORY_STORAGE;
-    }
-    if (code <= -320 && code >= -329)
-        return runanywhere::v1::EVENT_CATEGORY_AUTH;
-    if (code <= -100 && code >= -109)
-        return runanywhere::v1::EVENT_CATEGORY_INITIALIZATION;
-    return runanywhere::v1::EVENT_CATEGORY_FAILURE;
-}
-
 runanywhere::v1::ErrorCategory error_category_for_code(rac_result_t code) {
     if (code <= -150 && code >= -179)
         return runanywhere::v1::ERROR_CATEGORY_NETWORK;
@@ -190,49 +171,6 @@ runanywhere::v1::SDKComponent component_from_string(const char* component) {
     if (c == "wakeword" || c == "wake_word")
         return runanywhere::v1::SDK_COMPONENT_WAKEWORD;
     return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
-}
-
-runanywhere::v1::SDKComponent component_for_primitive(rac_primitive_t primitive) {
-    switch (primitive) {
-        case RAC_PRIMITIVE_GENERATE_TEXT:
-            return runanywhere::v1::SDK_COMPONENT_LLM;
-        case RAC_PRIMITIVE_TRANSCRIBE:
-            return runanywhere::v1::SDK_COMPONENT_STT;
-        case RAC_PRIMITIVE_SYNTHESIZE:
-            return runanywhere::v1::SDK_COMPONENT_TTS;
-        case RAC_PRIMITIVE_DETECT_VOICE:
-            return runanywhere::v1::SDK_COMPONENT_VAD;
-        case RAC_PRIMITIVE_EMBED:
-            return runanywhere::v1::SDK_COMPONENT_EMBEDDINGS;
-        case RAC_PRIMITIVE_VLM:
-            return runanywhere::v1::SDK_COMPONENT_VLM;
-        case RAC_PRIMITIVE_DIFFUSION:
-            return runanywhere::v1::SDK_COMPONENT_DIFFUSION;
-        default:
-            return runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
-    }
-}
-
-runanywhere::v1::InferenceFramework framework_for_engine(const rac_engine_vtable_t* vtable) {
-    if (!vtable || !vtable->metadata.name)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
-    const std::string name = lowercase(vtable->metadata.name);
-    if (name.find("onnx") != std::string::npos)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_ONNX;
-    if (name.find("llama") != std::string::npos) {
-        return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
-    }
-    if (name.find("coreml") != std::string::npos)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-    if (name.find("metal") != std::string::npos)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-    if (name.find("genie") != std::string::npos)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
-    if (name.find("sherpa") != std::string::npos)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
-    if (name.find("piper") != std::string::npos)
-        return runanywhere::v1::INFERENCE_FRAMEWORK_PIPER_TTS;
-    return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
 }
 
 void populate_envelope(
@@ -816,82 +754,6 @@ rac_result_t publish_auth_failed(rac_result_t error_code, const char* message, c
     (void)provider;
     (void)scope;
     (void)operation;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#endif
-}
-
-rac_result_t publish_hardware_profile_completed(const uint8_t* profile_bytes, size_t profile_size) {
-#if defined(RAC_HAVE_PROTOBUF)
-    runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_HARDWARE,
-                      runanywhere::v1::ERROR_SEVERITY_INFO);
-    auto* hardware = event.mutable_hardware_routing();
-    hardware->set_kind(runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED);
-    hardware->set_capability("hardware_profile");
-    if (profile_bytes && profile_size > 0) {
-        if (!hardware->mutable_hardware_profile()->ParseFromArray(profile_bytes,
-                                                                  static_cast<int>(profile_size))) {
-            hardware->set_error("failed to decode HardwareProfileResult");
-            populate_error(event.mutable_error(), RAC_ERROR_DECODING_ERROR,
-                           "failed to decode HardwareProfileResult",
-                           runanywhere::v1::SDK_COMPONENT_UNSPECIFIED);
-            event.set_severity(runanywhere::v1::ERROR_SEVERITY_ERROR);
-        }
-    }
-    return publish_message(event);
-#else
-    (void)profile_bytes;
-    (void)profile_size;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#endif
-}
-
-rac_result_t publish_route_selected(rac_primitive_t primitive, const rac_engine_vtable_t* vtable,
-                                    const char* reason) {
-#if defined(RAC_HAVE_PROTOBUF)
-    const auto component = component_for_primitive(primitive);
-    runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_ROUTING,
-                      runanywhere::v1::ERROR_SEVERITY_INFO, component);
-    auto* routing = event.mutable_hardware_routing();
-    routing->set_kind(runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED);
-    routing->set_component(component);
-    routing->set_framework(framework_for_engine(vtable));
-    routing->set_capability(rac_primitive_name(primitive));
-    if (vtable && vtable->metadata.name)
-        routing->set_route(vtable->metadata.name);
-    if (reason)
-        routing->set_reason(reason);
-    return publish_message(event);
-#else
-    (void)primitive;
-    (void)vtable;
-    (void)reason;
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#endif
-}
-
-rac_result_t publish_route_failed(rac_primitive_t primitive, rac_result_t error_code,
-                                  const char* reason) {
-#if defined(RAC_HAVE_PROTOBUF)
-    const auto component = component_for_primitive(primitive);
-    runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, category_for_error(error_code), runanywhere::v1::ERROR_SEVERITY_ERROR,
-                      component);
-    auto* routing = event.mutable_hardware_routing();
-    routing->set_kind(runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISSING);
-    routing->set_component(component);
-    routing->set_capability(rac_primitive_name(primitive));
-    if (reason) {
-        routing->set_reason(reason);
-        routing->set_error(reason);
-    }
-    populate_error(event.mutable_error(), error_code, reason, component);
-    return publish_message(event);
-#else
-    (void)primitive;
-    (void)error_code;
-    (void)reason;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
 }

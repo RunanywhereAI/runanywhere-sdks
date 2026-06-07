@@ -573,15 +573,6 @@ RAC_API rac_result_t rac_extract_archive(const char* archive_path, const char* d
                                          rac_extract_progress_callback_fn progress_callback,
                                          void* callback_user_data);
 
-/**
- * Check if a model framework is a platform service (Swift-native).
- * Platform services are handled via service registry callbacks, not C++ backends.
- *
- * @param framework Framework to check
- * @return RAC_TRUE if platform service, RAC_FALSE if C++ backend
- */
-RAC_API rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework);
-
 #ifdef __cplusplus
 }
 #endif

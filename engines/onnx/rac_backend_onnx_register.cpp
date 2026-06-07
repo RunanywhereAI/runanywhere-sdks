@@ -41,7 +41,7 @@ rac_result_t rac_backend_onnx_register(void) {
     // Android-fix: on Android the JNI bridges call
     // this `rac_backend_*_register` function but the unified plugin registry
     // is never populated through dlopen+dlsym. Register the plugin entry here
-    // so `rac_plugin_route` can find the ONNX-backed STT/TTS/VAD primitives.
+    // so `rac_plugin_find` can find the ONNX-backed STT/TTS/VAD primitives.
     extern const rac_engine_vtable_t* rac_plugin_entry_onnx(void);
     const rac_engine_vtable_t* vt = rac_plugin_entry_onnx();
     if (vt != nullptr) {
@@ -65,7 +65,7 @@ rac_result_t rac_backend_onnx_unregister(void) {
 
     // Mirror register(): the unified plugin registry was populated via
     // rac_plugin_register(rac_plugin_entry_onnx()), so teardown must remove the
-    // ONNX vtable from rac_plugin_route's by-name and primitive routing buckets.
+    // ONNX vtable from the registry's primitive buckets (rac_plugin_find / _for_engine).
     // Otherwise EMBED (and any other primitive the plugin populates) stays
     // routable after the module/JNI surface reports unregistered, causing stale
     // is-registered state and asymmetric teardown vs. the Sherpa path.

@@ -7,7 +7,7 @@
  * removed. All engine backends (llamacpp, onnx, sherpa, metalrt,
  * platform) register via
  * `rac_plugin_register(rac_plugin_entry_<name>())`, and commons consumers
- * route through `rac_plugin_route` + `vt->ops->create`.
+ * route through `rac_plugin_find` + `vt->ops->create`.
  */
 
 #include "plugin_registry_internal.h"
@@ -63,15 +63,6 @@ struct State {
         manifests_by_vtable;
     /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
     std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
-    /** Process-wide count of routers that have snapshotted vtable
-     *  pointers from `rac_plugin_list` and are still dereferencing them.
-     *  `rac_registry_unload_plugin` spin-waits this to zero AFTER the plugin
-     *  is unregistered but BEFORE the OS library mapping is `dlclose`d, so
-     *  any router that observed a vtable can finish reading its `.rodata`
-     *  before that memory is unmapped. Sequentially consistent so the
-     *  enter-from-router and the unload-side observe each other's
-     *  monotonic transitions without surprises. */
-    std::atomic<size_t> router_inflight{0};
 };
 
 State& state() {
@@ -720,32 +711,6 @@ size_t rac_plugin_registry_snapshot_names(const char*** out_names) noexcept {
         }
         return 0;
     }
-}
-
-// =============================================================================
-// Router in-flight bookkeeping (plugin_registry_internal.h)
-// =============================================================================
-//
-// EngineRouter::route brackets its snapshot/score/sort window with
-// router_enter()/router_exit(). rac_registry_unload_plugin spin-waits the
-// in-flight counter to zero AFTER `rac_plugin_unregister` returns (so no new
-// router can observe the unregistered vtable through `rac_plugin_list`) but
-// BEFORE `dlclose` unmaps the plugin's `.rodata`. That drains any router
-// already holding a raw vtable pointer.
-
-void rac_plugin_registry_router_enter(void) noexcept {
-    auto& s = state();
-    s.router_inflight.fetch_add(1, std::memory_order_seq_cst);
-}
-
-void rac_plugin_registry_router_exit(void) noexcept {
-    auto& s = state();
-    s.router_inflight.fetch_sub(1, std::memory_order_seq_cst);
-}
-
-size_t rac_plugin_registry_router_inflight(void) noexcept {
-    auto& s = state();
-    return s.router_inflight.load(std::memory_order_seq_cst);
 }
 
 // =============================================================================

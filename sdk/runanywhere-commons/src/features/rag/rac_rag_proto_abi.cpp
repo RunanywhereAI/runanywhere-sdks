@@ -288,11 +288,11 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
 
     // Reranking is part of the public RAGConfiguration surface (rag.proto:128,
     // rag.proto:130) but no rerank backend is wired up: rag_pipeline_graph
-    // skips the rerank step (rag_pipeline_graph.h:20-25) and every engine sets
-    // rac_engine_vtable_t::rerank_ops = nullptr. Silently honoring the request
-    // would let callers ship "reranked" RAG that is plain RRF fusion. Fail
-    // fast until the rerank vtable lands so misconfiguration surfaces at
-    // session-create instead of looking exactly like a working baseline.
+    // skips the rerank step (rag_pipeline_graph.h), and the rerank primitive +
+    // rerank_ops vtable slot were removed in plugin ABI v4. Silently honoring
+    // the request would let callers ship "reranked" RAG that is plain RRF
+    // fusion. Fail fast so misconfiguration surfaces at session-create instead
+    // of looking exactly like a working baseline.
     const bool rerank_requested =
         proto.rerank_results() ||
         (proto.has_reranker_model_id() && !proto.reranker_model_id().empty());

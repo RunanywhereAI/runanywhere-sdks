@@ -95,8 +95,8 @@ _rac_device_set_callbacks
 # struct-based APIs are internal commons helpers (still used by JNI
 # during migration). SDK-facing surfaces use the proto-byte ABIs:
 # rac_model_lifecycle_*_proto, rac_model_registry_*_proto,
-# rac_component_lifecycle_snapshot_proto, rac_hardware_*. Plugin/router
-# routing is on rac_plugin_* / rac_plugin_route in rac/plugin/.
+# rac_component_lifecycle_snapshot_proto. Plugin selection is on
+# rac_plugin_* (rac_plugin_find / rac_plugin_find_for_engine) in rac/plugin/.
 
 # LLM Component — non-proto component create/load/generate/etc. APIs are
 # now internal (used by JNI bridge during migration). SDK-facing surface is
@@ -487,7 +487,6 @@ _rac_validation_error_message
 # Dev-only config (Sentry DSN, Supabase URL/key, build token) — reached
 # through CppBridge+Environment.swift.
 _rac_dev_config_get_build_token
-_rac_dev_config_get_sentry_dsn
 _rac_dev_config_get_supabase_key
 _rac_dev_config_get_supabase_url
 _rac_dev_config_has_build_token
@@ -801,23 +800,9 @@ _rac_lora_entry_array_free
 _rac_lora_registry_get
 _rac_lora_registry_get_all
 
-# Download manager + orchestrator non-proto ABI — still called by RN
-# DownloadBridge.cpp and other SDK adapters during migration.
+# Download orchestrator non-proto helpers (used by the proto download path).
 _rac_download_compute_destination
-_rac_download_manager_cancel
-_rac_download_manager_create
-_rac_download_manager_destroy
-_rac_download_manager_get_active_tasks
-_rac_download_manager_get_progress
-_rac_download_manager_is_healthy
-_rac_download_manager_mark_complete
-_rac_download_manager_mark_failed
-_rac_download_manager_pause_all
-_rac_download_manager_resume_all
-_rac_download_manager_start
-_rac_download_manager_update_progress
 _rac_download_requires_extraction
-_rac_download_task_ids_free
 
 # Archive extraction helpers (ONNX .tar.bz2, diffusion bundles, etc.).
 _rac_extract_archive
@@ -951,14 +936,9 @@ _rac_diffusion_tokenizer_download_file
 _rac_diffusion_tokenizer_ensure_files
 _rac_diffusion_tokenizer_get_base_url
 _rac_diffusion_tokenizer_get_file_url
-_rac_download_manager_mark_extraction_complete
-_rac_download_manager_mark_extraction_failed
 _rac_download_result_free
-_rac_download_stage_display_name
-_rac_download_stage_progress_range
 _rac_download_strategy_get
 _rac_download_strategy_register
-_rac_download_task_free
 _rac_embeddings_cleanup
 _rac_embeddings_component_cleanup
 _rac_embeddings_component_configure
@@ -1038,7 +1018,6 @@ _rac_file_manager_clear_directory
 _rac_framework_analytics_key
 _rac_framework_display_name
 _rac_framework_get_supported_formats
-_rac_framework_is_platform_service
 _rac_framework_supports_format
 _rac_framework_supports_llm
 _rac_framework_supports_stt
@@ -1057,18 +1036,6 @@ _rac_generation_analytics_track_streaming_update
 _rac_get_last_error
 _rac_get_model_by_path
 _rac_http_request_resume
-_rac_image_calc_resize
-_rac_image_convert_bgra_to_rgb
-_rac_image_convert_rgba_to_rgb
-_rac_image_decode_base64
-_rac_image_decode_bytes
-_rac_image_float_free
-_rac_image_free
-_rac_image_load_file
-_rac_image_normalize
-_rac_image_resize
-_rac_image_resize_max
-_rac_image_to_chw
 _rac_lifecycle_acquire_service
 _rac_lifecycle_create
 _rac_lifecycle_destroy

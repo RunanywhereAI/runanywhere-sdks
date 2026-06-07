@@ -177,7 +177,7 @@ Both follow the same pattern: thin Android-library sub-modules that register a C
 - **Platform file naming:** `AndroidTTSService.kt` — keep the `Android` prefix on platform-bound services so future JVM/desktop or KMP reintroductions stay low-friction.
 - **Proto types over hand-rolled types.** Use Wire-generated types from `generated/` as the canonical representation; construct them directly with named arguments. Do not re-introduce a `foundation/protoext/` wrapper package.
 - **Structured types, never raw strings.** Use enums, sealed classes, and data classes for all configuration and return values.
-- **VLM on Android routes through core JNI, not llamacpp-JNI.** The dedicated `librac_backend_llamacpp_jni.so` bridge only exposes LLM primitives (`nativeCreate`, `nativeGenerate`, `nativeCancel`) plus the two registration shims. Kotlin VLM callers invoke the commons `rac_vlm_component_*` proto APIs via `librunanywhere_jni.so` (same path iOS uses via `CppBridgeVLM`). Do not add `nativeCreateVLM` / `nativeProcessVLM` entry points to the llamacpp JNI — the VLM plugin registers its vtable, and `rac_plugin_route` dispatches from core.
+- **VLM on Android routes through core JNI, not llamacpp-JNI.** The dedicated `librac_backend_llamacpp_jni.so` bridge only exposes LLM primitives (`nativeCreate`, `nativeGenerate`, `nativeCancel`) plus the two registration shims. Kotlin VLM callers invoke the commons `rac_vlm_component_*` proto APIs via `librunanywhere_jni.so` (same path iOS uses via `CppBridgeVLM`). Do not add `nativeCreateVLM` / `nativeProcessVLM` entry points to the llamacpp JNI — the VLM plugin registers its vtable, and `rac_plugin_find` dispatches from core.
 
 ## Build System Details
 

@@ -108,10 +108,10 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                     ┌───────────────▼───────────────┐
                     │      runanywhere-commons       │
                     │  Component Layer (lifecycle)   │
-                    │  Service Layer (routing)       │
-                    │  Plugin Registry + Router      │
+                    │  Service Layer (dispatch)      │
+                    │  Plugin Registry               │
                     └───────────────┬───────────────┘
-                                    │ rac_engine_vtable_t (v3)
+                                    │ rac_engine_vtable_t (v4)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
       llamacpp      sherpa-onnx  metalrt    platform        onnx
@@ -124,7 +124,7 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
 
 **Two-Phase SDK Initialization**: All SDKs follow the same pattern: Phase 1 (synchronous — register platform adapter, load native libs, configure logging) then Phase 2 (async — authenticate, register device, fetch model assignments, discover downloaded models).
 
-**Plugin ABI v3**: Every backend publishes a `rac_engine_vtable_t` with 8 primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `rerank_ops`, `vlm_ops`, `diffusion_ops`). NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 3u` — version mismatch causes immediate rejection.
+**Plugin ABI v4**: Every backend publishes a `rac_engine_vtable_t` with 7 primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`). NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 4u` — version mismatch causes immediate rejection. (Wire value 6, formerly `rerank_ops`/`RAC_PRIMITIVE_RERANK`, is retired.)
 
 **Static vs Dynamic Plugins**: iOS and WASM force `RAC_STATIC_PLUGINS=ON` (no `dlopen`). Android/Linux/macOS default to dynamic loading via `rac_registry_load_plugin()`. Static registration uses `RAC_STATIC_PLUGIN_REGISTER(name)` macro with `-force_load` / `--whole-archive` linker flags.
 
@@ -458,10 +458,10 @@ Platform-specific code should only handle: native library loading, platform adap
 All SDKs follow the same pattern:
 1. Load the backend native library
 2. Call `rac_backend_*_register()` (which registers the engine's vtable with the plugin registry)
-3. The router scores registered plugins by priority + runtime + format compatibility
-4. On inference, the highest-scoring plugin's vtable ops are invoked
+3. The registry orders registered plugins by base priority, per primitive
+4. On inference, the highest-priority plugin that serves the primitive is selected via `rac_plugin_find()` (or `rac_plugin_find_for_engine()` for a name-pinned engine)
 
-Backend priorities: metalrt=120 (highest, Apple-only), llamacpp=100, sherpa=90. Pinned engine matches get +10000.
+Backend base priorities: metalrt=120 (highest, Apple-only), llamacpp=100, sherpa=90, onnx=50. Selection is plain priority order — there is no runtime/format scoring or pinned-engine bonus; an explicit engine name is honored via `rac_plugin_find_for_engine()`.
 
 ### HTTP Transport is Platform-Provided
 libcurl was removed. Each SDK registers a `rac_http_transport_ops_t` vtable: Swift uses URLSession, Kotlin/Flutter/RN use OkHttp (Android) or URLSession (iOS), Web uses `emscripten_fetch`.

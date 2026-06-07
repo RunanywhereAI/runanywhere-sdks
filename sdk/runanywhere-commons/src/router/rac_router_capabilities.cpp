@@ -45,10 +45,7 @@ std::string to_lower(std::string_view s) {
     return out;
 }
 
-/* Mirror of the plugin-name → InferenceFramework heuristic used by
- * src/infrastructure/events/event_publisher.cpp::framework_for_engine.
- * Kept intentionally local — bumping these two helpers in lock-step is cheaper
- * than publishing a new internal header for one extra call site. */
+/* Local plugin-name → InferenceFramework heuristic for capability reporting. */
 runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable_t* vt) {
     if (!vt || !vt->metadata.name) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
@@ -112,9 +109,8 @@ std::vector<rac_primitive_t> primitives_for_component(runanywhere::v1::SDKCompon
     }
 }
 
-/* Snapshot the registry for one primitive via the public C ABI. Max cap
- * mirrors rac_engine_router.cpp::snapshot_for_primitive — no realistic
- * deployment has more engines per primitive. */
+/* Snapshot the registry for one primitive via the public C ABI. The cap is
+ * generous — no realistic deployment has more engines per primitive. */
 std::vector<const rac_engine_vtable_t*> list_plugins_for_primitive(rac_primitive_t p) {
     constexpr size_t kMax = 64;
     const rac_engine_vtable_t* buf[kMax] = {nullptr};

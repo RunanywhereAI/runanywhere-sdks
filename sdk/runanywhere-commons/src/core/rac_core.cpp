@@ -456,18 +456,6 @@ rac_result_t rac_get_model_by_path(const char* local_path, rac_model_info_t** ou
     return rac_model_registry_get_by_path(registry, local_path, out_model);
 }
 
-rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework) {
-    // Platform services are Swift-native implementations
-    // that use service registry callbacks rather than C++ backends
-    switch (framework) {
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:
-        case RAC_FRAMEWORK_SYSTEM_TTS:
-            return RAC_TRUE;
-        default:
-            return RAC_FALSE;
-    }
-}
-
 // =============================================================================
 // GLOBAL LORA REGISTRY
 // =============================================================================

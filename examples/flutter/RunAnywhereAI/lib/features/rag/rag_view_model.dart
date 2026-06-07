@@ -8,8 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' hide ModelInfo;
 import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
-import 'package:runanywhere_ai/features/rag/document_service.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
+import 'package:runanywhere_ai/features/rag/document_service.dart';
 
 /// A single message in the RAG conversation.
 ///

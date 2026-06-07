@@ -376,7 +376,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
 
     # Service registry
     # Legacy rac_service_* exports DELETED. Use rac_plugin_*
-    # from rac/plugin/rac_plugin_entry.h and rac/router/rac_route.h.
+    # from rac/plugin/rac_plugin_entry.h.
 
     # Events
     "_rac_event_subscribe"

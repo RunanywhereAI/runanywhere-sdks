@@ -99,7 +99,7 @@ int main() {
 
     if (cap == RAC_SUCCESS) {
         // Routable build: this is the live image-generation path. Lock the full
-        // routing contract the EngineRouter relies on to select coreml engine
+        // routing contract the registry relies on to select coreml engine
         // for RAC_PRIMITIVE_DIFFUSION. Primitive routability is expressed via the
         // vtable's diffusion_ops slot (verified below) — rac_engine_metadata no
         // longer carries a primitives[] array.

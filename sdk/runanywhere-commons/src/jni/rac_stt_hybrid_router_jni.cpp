@@ -10,8 +10,8 @@
  *
  * Service handles (offline / online) cross the JNI as raw `jlong`
  * (reinterpret_cast'd `rac_stt_service_t*`). BOTH sides are created through the
- * SAME registry path — rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, …,
- * hint=<"sherpa"|"cloud">) → vt->stt_ops->create — via
+ * SAME registry path — rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE,
+ * <"sherpa"|"cloud">) → vt->stt_ops->create — via
  * create_stt_service_via_registry(): the offline side enters it from
  * racSttServiceCreate (model-registry path resolution for in-tree backends
  * like sherpa-onnx), the online side from racSttHybridRouterCreateService
@@ -104,7 +104,7 @@ const char* framework_to_plugin_hint(rac_inference_framework_t fw) {
         // RAC_FRAMEWORK_WHISPERKIT_COREML (retired enum value 9) intentionally
         // dropped: the whisperkit_coreml engine was removed, so no plugin hint
         // can resolve to it. Unmapped frameworks fall through to the default
-        // (nullptr), letting rac_plugin_route pick by primitive/format.
+        // (nullptr), letting rac_plugin_find pick by primitive/format.
         case RAC_FRAMEWORK_FOUNDATION_MODELS: return "platform";
         case RAC_FRAMEWORK_SYSTEM_TTS:        return "platform";
         case RAC_FRAMEWORK_COREML:            return "platform";
@@ -144,7 +144,7 @@ std::string ensure_cloud_provider(const std::string& engine_hint,
 // Unified "create an STT service by engine hint + config" path. BOTH the
 // offline (sherpa) and online (cloud, provider=sarvam) sides of the hybrid
 // router go through this single function so service creation always resolves the
-// engine through the plugin registry (rac_plugin_route → vt->stt_ops->create) —
+// engine through the plugin registry (rac_plugin_find_for_engine → vt->stt_ops->create) —
 // there is no bespoke per-engine factory on the router path.
 //
 //   - engine_hint    : "sherpa" | "cloud" | … pinned as preferred_engine_name.
@@ -222,7 +222,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceCreate(
     // Route to the matching STT plugin and call its create op with our
     // resolved path through the shared registry helper. Bypasses
     // rac_stt_create()'s path-override logic; the create itself goes through
-    // rac_plugin_route exactly like every other commons consumer.
+    // rac_plugin_find exactly like every other commons consumer.
     const char* hint = framework_to_plugin_hint(framework);
     const jlong svc = create_stt_service_via_registry(
         hint != nullptr ? std::string(hint) : std::string(),

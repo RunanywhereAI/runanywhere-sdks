@@ -31,7 +31,6 @@
 #include "rac_error.h"
 #include "rac_types.h"
 #include "rac_proto_buffer.h"
-#include "rac_download.h"
 #include "rac_model_types.h"
 
 #ifdef __cplusplus

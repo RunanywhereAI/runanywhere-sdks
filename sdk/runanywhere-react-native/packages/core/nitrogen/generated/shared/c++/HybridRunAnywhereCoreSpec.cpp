@@ -54,8 +54,6 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("storageAvailabilityProto", &HybridRunAnywhereCoreSpec::storageAvailabilityProto);
       prototype.registerHybridMethod("storageDeletePlanProto", &HybridRunAnywhereCoreSpec::storageDeletePlanProto);
       prototype.registerHybridMethod("storageDeleteProto", &HybridRunAnywhereCoreSpec::storageDeleteProto);
-      prototype.registerHybridMethod("hardwareProfileProto", &HybridRunAnywhereCoreSpec::hardwareProfileProto);
-      prototype.registerHybridMethod("setAcceleratorPreferenceProto", &HybridRunAnywhereCoreSpec::setAcceleratorPreferenceProto);
       prototype.registerHybridMethod("subscribeSDKEventsProto", &HybridRunAnywhereCoreSpec::subscribeSDKEventsProto);
       prototype.registerHybridMethod("unsubscribeSDKEventsProto", &HybridRunAnywhereCoreSpec::unsubscribeSDKEventsProto);
       prototype.registerHybridMethod("publishSDKEventProto", &HybridRunAnywhereCoreSpec::publishSDKEventProto);

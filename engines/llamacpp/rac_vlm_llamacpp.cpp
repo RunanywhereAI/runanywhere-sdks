@@ -37,7 +37,6 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/utils/rac_image_utils.h"
 
 static const char* LOG_CAT = "VLM.LlamaCPP";
 

@@ -17,10 +17,10 @@
  * drains, the scheduler joins, and tokens are forwarded to the caller's
  * callback as they stream out of the LLM node.
  *
- * Rerank: skipped here. The unified plugin vtable forward-declares
- * `rac_rerank_service_ops` but no concrete ops are wired up in main yet
- * (no backend implements them; `rac_engine_vtable_t::rerank_ops` is
- * always NULL today). When a backend lands, slot a `RerankNode` between
+ * Rerank: not supported. The `RAC_PRIMITIVE_RERANK` primitive and its
+ * `rerank_ops` vtable slot were removed in plugin ABI v4 (no backend ever
+ * implemented reranking), so this step is skipped. If reranking is
+ * reintroduced it would need a new primitive plus a `RerankNode` between
  * Retrieve and ContextAssembly with the same per-query construction.
  */
 

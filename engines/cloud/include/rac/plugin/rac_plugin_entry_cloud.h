@@ -7,7 +7,7 @@
  * ops; future modalities (TTS / LLM / embeddings) plug in by filling the
  * corresponding ops slots in the engine vtable. It publishes a single `"cloud"`
  * engine plugin so it becomes routable via
- * `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, …, hint="cloud")` — exactly the
+ * `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")` — exactly the
  * same registry path as the in-tree sherpa STT plugin. Callers pick the provider
  * via the create config (`{"provider":"sarvam"}`).
  *

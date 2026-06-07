@@ -2256,17 +2256,17 @@ Swift manages this in `NativeProtoABI`:
 
 NULL fields cause C++ to fall back or return `RAC_ERROR_NOT_SUPPORTED`. See §6.5.19 for the Swift implementation of each slot.
 
-### §13.4 Plugin ABI v3 — `rac_engine_vtable_t`
+### §13.4 Plugin ABI v4 — `rac_engine_vtable_t`
 
 Every backend publishes a single `rac_engine_vtable_t`:
 
 - `rac_engine_metadata_t metadata` — `abi_version` (must equal `RAC_PLUGIN_API_VERSION`), `name`, `display_name`, `engine_version`, `priority`, `capability_flags`, optional `runtimes[]` + `formats[]`.
 - `rac_result_t (*capability_check)(void)` — called once after ABI version validation.
 - `void (*on_unload)(void)` — called on unload.
-- 8 named primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `rerank_ops`, `vlm_ops`, `diffusion_ops`. NULL means the engine does not serve that primitive.
+- 7 named primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`. NULL means the engine does not serve that primitive. (The former `rerank_ops` was removed in ABI v4.)
 - 10 `const void* reserved_slot_N` fields.
 
-`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `3u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
+`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `4u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
 
 ### §13.5 Streaming fan-out — `HandleStreamAdapter`
 

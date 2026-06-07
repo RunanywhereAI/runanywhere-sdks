@@ -490,8 +490,8 @@ rac_result_t rac_backend_metalrt_register(void) {
 
     // Service routing dispatches from the unified plugin registry, so the
     // vtable must be installed there — otherwise
-    // rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT|TRANSCRIBE|SYNTHESIZE|VLM,
-    // framework=metalrt) returns BACKEND_NOT_FOUND. Mirrors the Sherpa pattern.
+    // rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT|TRANSCRIBE|SYNTHESIZE|VLM)
+    // would not find metalrt's vtable. Mirrors the Sherpa pattern.
     const rac_engine_vtable_t* vt = rac_plugin_entry_metalrt();
     if (vt != nullptr) {
         rac_result_t plugin_rc = rac_plugin_register(vt);

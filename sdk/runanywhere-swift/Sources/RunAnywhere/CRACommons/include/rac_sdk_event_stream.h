@@ -113,9 +113,6 @@ RAC_API void rac_events_set_telemetry_sink(void* telemetry_manager);
 }
 // NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)
 
-#include "rac_engine_vtable.h"
-#include "rac_primitive.h"
-
 namespace rac::events {
 
 rac_result_t publish_initialization_started();
@@ -132,11 +129,6 @@ rac_result_t publish_auth_token_refreshed(const char* subject_id, const char* pr
                                           const char* device_id);
 rac_result_t publish_auth_failed(rac_result_t error_code, const char* message, const char* provider,
                                  const char* scope, const char* operation);
-rac_result_t publish_hardware_profile_completed(const uint8_t* profile_bytes, size_t profile_size);
-rac_result_t publish_route_selected(rac_primitive_t primitive, const rac_engine_vtable_t* vtable,
-                                    const char* reason);
-rac_result_t publish_route_failed(rac_primitive_t primitive, rac_result_t error_code,
-                                  const char* reason);
 
 }  // namespace rac::events
 #endif

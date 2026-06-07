@@ -403,7 +403,7 @@ rac_result_t rac_stt_hybrid_router_cancel(rac_handle_t handle) {
 // Unified registry-backed STT service factory used by BOTH router sides. The
 // offline (sherpa) and online (cloud) services are created the same way so
 // service creation always resolves the engine through the plugin registry
-// (rac_plugin_route → vt->stt_ops->create) — there is no bespoke per-engine
+// (rac_plugin_find_for_engine → vt->stt_ops->create) — there is no bespoke per-engine
 // factory on the router path. The JNI service-create thunks delegate here so
 // there is one implementation (the heap-wrap + ownership live in commons, where
 // the routed vtable is dereferenced without crossing the proto-byte boundary).

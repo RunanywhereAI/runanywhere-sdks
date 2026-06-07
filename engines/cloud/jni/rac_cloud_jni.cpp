@@ -8,7 +8,7 @@
  *      nativeRegister/nativeUnregister/nativeIsRegistered/nativeGetVersion, so
  *      Kotlin's CloudBridge can register the "cloud" engine PLUGIN with the
  *      registry (routable via
- *      rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, …, hint="cloud")) — like
+ *      rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")) — like
  *      onnx / llamacpp, except WITHOUT its own JNI_OnLoad: this TU folds into
  *      runanywhere_commons_jni, which already provides JNI_OnLoad (see the
  *      bridge invocation below for why).

@@ -261,7 +261,7 @@ public enum ONNX {
 }
 ```
 
-`ONNX` is a thin `public enum` namespace. Model-to-backend routing (STT / TTS / VAD) is performed by the C++ plugin router (`rac_router_*` / `rac_plugin_route`) using the proto-typed `RAInferenceFramework` / `RAModelCategory` tables — there are no Swift-side `canHandleSTT` / `canHandleTTS` / `canHandleVAD` methods or `capabilities` set.
+`ONNX` is a thin `public enum` namespace. Model-to-backend routing (STT / TTS / VAD) is performed by the C++ plugin registry (`rac_plugin_find` / `rac_plugin_find_for_engine`) using the proto-typed `RAInferenceFramework` / `RAModelCategory` tables — there are no Swift-side `canHandleSTT` / `canHandleTTS` / `canHandleVAD` methods or `capabilities` set.
 
 ### Model Compatibility
 

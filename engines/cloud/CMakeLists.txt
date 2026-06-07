@@ -5,7 +5,7 @@
 # the plugin registry. Its NAME is modality-agnostic — it serves
 # RAC_PRIMITIVE_TRANSCRIBE (STT) today via its STT-modality op-table, and future
 # modalities (TTS / LLM / embeddings) attach by filling more vtable op-tables.
-# Routable via `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, …, hint="cloud")`.
+# Routable via `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")`.
 # The concrete provider is chosen per-service from the create config
 # (`{"provider":"sarvam"}`). Cloud engine: no local runtime / model file — the
 # manifest declares zero runtimes + zero formats (see rac_plugin_entry_cloud.cpp),

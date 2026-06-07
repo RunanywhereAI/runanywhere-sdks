@@ -8,7 +8,7 @@
  * and future modalities (TTS / LLM / embeddings) attach by filling more ops
  * slots in the engine vtable below. Mirrors the sherpa plugin (manifest + engine
  * vtable + RAC_PLUGIN_ENTRY_DEF) so the engine is routable through the plugin
- * registry via `rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, …, hint="cloud")`. The
+ * registry via `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")`. The
  * concrete provider is selected per-service from the create config
  * (`{"provider":"sarvam"}`), not at the manifest level.
  *

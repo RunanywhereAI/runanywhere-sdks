@@ -32,6 +32,8 @@ option(RAC_BUILD_JNI "Build JNI bridge for Android/JVM" OFF)
 option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
+# Consumed by the root CMakeLists + engines/ (per-engine compilation); this file
+# does not branch on it — RAG is folded into rac_commons independently (see below).
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, RAG)" OFF)
 
 # Ensure EMSCRIPTEN is always defined so
@@ -739,7 +741,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/plugin/rac_runtime_registry.cpp
     # Proto-serialised SDKComponent → [InferenceFramework] query.
     src/router/rac_router_capabilities.cpp
-    src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     # model_registry.cpp was split per SRP into five TUs (slim core + struct
     # CRUD, proto<->C conversion, proto-byte ABI, filesystem discovery, and
