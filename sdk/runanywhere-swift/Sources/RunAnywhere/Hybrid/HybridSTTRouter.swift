@@ -340,20 +340,18 @@ public final class HybridSTTRouter: @unchecked Sendable {
     private func createService(for model: HybridModel) throws -> AttachedService {
         let engineName = pinnedEngineName(for: model.backend)
 
-        var vtable: UnsafePointer<rac_engine_vtable_t>?
-        let routeRC = engineName.withCString { namePtr -> rac_result_t in
-            var hints = rac_routing_hints_t()
-            hints.preferred_engine_name = namePtr   // hard pin to this engine
-            hints.no_fallback = 1                    // fail if the pinned engine is absent
-            return rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, 0, &hints, &vtable)
+        // Pin the named engine (offline "sherpa" vs cloud "cloud") — simple
+        // priority order cannot distinguish two TRANSCRIBE plugins, so select
+        // by name via the commons helper.
+        let vtable: UnsafePointer<rac_engine_vtable_t>? = engineName.withCString { namePtr in
+            rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, namePtr)
         }
 
-        guard routeRC == RAC_SUCCESS, let vtable, let sttOps = vtable.pointee.stt_ops else {
+        guard let vtable, let sttOps = vtable.pointee.stt_ops else {
             throw SDKException(
                 code: .serviceNotAvailable,
-                message: "No '\(engineName)' STT plugin registered "
-                    + "(rc=\(routeRC)). Register the backend first "
-                    + "(ONNX.register() for sherpa, Cloud.register() for cloud).",
+                message: "No '\(engineName)' STT plugin registered. Register the "
+                    + "backend first (ONNX.register() for sherpa, Cloud.register() for cloud).",
                 category: .component
             )
         }
