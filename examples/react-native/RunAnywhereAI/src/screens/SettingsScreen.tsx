@@ -63,7 +63,6 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import type { HardwareProfileResult } from '@runanywhere/proto-ts/hardware_profile';
 import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
 import {
   isModelLoadedForCategory,
@@ -179,11 +178,6 @@ export const SettingsScreen: React.FC = () => {
     useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0'); // SDK State
-
-  const [hardwareProfile, setHardwareProfile] =
-    useState<HardwareProfileResult | null>(null);
-  const [totalRAMBytes, setTotalRAMBytes] = useState<number>(0);
-  const [cpuCores, setCpuCores] = useState<number>(0);
 
   // Model catalog state
 
@@ -522,16 +516,6 @@ export const SettingsScreen: React.FC = () => {
         }
       } catch (err) {
         console.warn('[Settings] Failed to get storage info:', err);
-      }
-
-      try {
-        const profile = await RunAnywhere.hardware.getProfile();
-        console.warn('[Settings] Hardware profile:', profile);
-        setHardwareProfile(profile);
-        setTotalRAMBytes(profile.profile?.totalMemoryBytes ?? 0);
-        setCpuCores(profile.profile?.coreCount ?? 0);
-      } catch (err) {
-        console.warn('[Settings] Failed to get hardware profile:', err);
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -1169,64 +1153,6 @@ export const SettingsScreen: React.FC = () => {
                         Tools allow the LLM to call external APIs and functions
             to get real-time data.          {' '}
           </Text>
-        </View>
-        {/* Hardware Info */}
-        {renderSectionHeader('Hardware')}
-        <View style={styles.section}>
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>Chip</Text>
-            <Text style={styles.settingValue}>
-              {hardwareProfile?.profile?.chip ?? '—'}
-            </Text>
-          </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>Neural Engine</Text>
-            <Text
-              style={[
-                styles.apiConfigValue,
-                {
-                  color: hardwareProfile?.profile?.hasNeuralEngine
-                    ? Colors.primaryGreen
-                    : Colors.textSecondary,
-                },
-              ]}
-            >
-              {hardwareProfile
-                ? hardwareProfile.profile?.hasNeuralEngine
-                  ? 'Available'
-                  : 'Unavailable'
-                : '—'}
-            </Text>
-          </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>Acceleration</Text>
-            <Text style={styles.settingValue}>
-              {hardwareProfile?.profile?.accelerationMode ?? '—'}
-            </Text>
-          </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>Memory</Text>
-            <Text style={styles.settingValue}>
-              {totalRAMBytes > 0 ? formatBytes(totalRAMBytes) : '—'}
-            </Text>
-          </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>CPU Cores</Text>
-            <Text style={styles.settingValue}>
-              {cpuCores > 0 ? String(cpuCores) : '—'}
-            </Text>
-          </View>
-          <View style={styles.apiConfigDivider} />
-          <View style={styles.apiConfigRow}>
-            <Text style={styles.apiConfigLabel}>Platform</Text>
-            <Text style={styles.settingValue}>
-              {hardwareProfile?.profile?.platform ?? '—'}
-            </Text>
-          </View>
         </View>
         {/* Storage Overview - Matches iOS CombinedSettingsView */}
         {renderSectionHeader('Storage Overview')}

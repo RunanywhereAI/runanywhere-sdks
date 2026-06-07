@@ -515,7 +515,15 @@ async function planDownload(
     return plan;
   }
 
-  let RNFS: typeof import('react-native-fs');
+  // react-native-fs is an optional peer dependency and the require() below is
+  // guarded. Type it with a minimal local interface (only the members used) so
+  // the SDK source type-checks even when the module's declarations are not
+  // resolvable from the consumer's resolution context (e.g. an app that maps
+  // the SDK to source rather than its built types).
+  let RNFS: {
+    exists(path: string): Promise<boolean>;
+    unlink(path: string): Promise<void>;
+  };
   try {
     RNFS = require('react-native-fs');
   } catch {

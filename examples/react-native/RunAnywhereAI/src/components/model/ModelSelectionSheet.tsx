@@ -49,7 +49,6 @@ import {
   ModelFormat,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import type { HardwareProfile } from '@runanywhere/proto-ts/hardware_profile';
 
 // Canonical SDK methods (Swift parity).
 const downloadModelHelper = RunAnywhere.downloadModel;
@@ -203,11 +202,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const [downloadingModels, setDownloadingModels] = useState<
     Record<string, number>
   >({});
-  const [deviceInfo, setDeviceInfo] = useState<HardwareProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   /**
-   * Load available models and device info
+   * Load available models
    */
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -244,18 +242,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         : allModels;
 
       setAvailableModels(filteredModels);
-
-      // Load canonical hardware profile via the SDK (proto-backed).
-      try {
-        const result = await RunAnywhere.hardware.getProfile();
-        setDeviceInfo(result.profile ?? null);
-      } catch (error) {
-        console.warn(
-          '[ModelSelectionSheet] Failed to load hardware profile:',
-          error
-        );
-        setDeviceInfo(null);
-      }
     } catch (error) {
       console.error('[ModelSelectionSheet] Error loading data:', error);
     } finally {
@@ -421,101 +407,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       console.error('[ModelSelectionSheet] Error selecting System TTS:', error);
     }
   };
-
-  /**
-   * Render device status section
-   */
-  const renderDeviceStatus = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Device Status</Text>
-      {deviceInfo ? (
-        <View style={styles.card}>
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="hardware-chip-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>Chip</Text>
-            </View>
-            <Text style={styles.infoValue}>{deviceInfo.chip || 'Unknown'}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="server-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>Memory</Text>
-            </View>
-            <Text style={styles.infoValue}>
-              {formatBytes(deviceInfo.totalMemoryBytes)}
-            </Text>
-          </View>
-
-          {deviceInfo.coreCount > 0 && (
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabel}>
-                <Icon
-                  name="speedometer-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <Text style={styles.infoLabelText}>CPU Cores</Text>
-              </View>
-              <Text style={styles.infoValue}>{deviceInfo.coreCount}</Text>
-            </View>
-          )}
-
-          {deviceInfo.accelerationMode !== '' && (
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabel}>
-                <Icon
-                  name="flash-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <Text style={styles.infoLabelText}>Acceleration</Text>
-              </View>
-              <Text style={styles.infoValue}>
-                {deviceInfo.accelerationMode.toUpperCase()}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="flash-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>NPU/Neural Engine</Text>
-            </View>
-            <Icon
-              name={
-                deviceInfo.hasNeuralEngine ? 'checkmark-circle' : 'close-circle'
-              }
-              size={20}
-              color={
-                deviceInfo.hasNeuralEngine
-                  ? Colors.statusGreen
-                  : Colors.statusRed
-              }
-            />
-          </View>
-        </View>
-      ) : (
-        <View style={styles.card}>
-          <ActivityIndicator size="small" color={Colors.primaryBlue} />
-          <Text style={styles.loadingText}>Loading device info...</Text>
-        </View>
-      )}
-    </View>
-  );
 
   /**
    * Render framework row
@@ -832,8 +723,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             </View>
           ) : (
             <>
-              {renderDeviceStatus()}
-
               {/* Frameworks Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Available Frameworks</Text>
@@ -928,28 +817,6 @@ const styles = StyleSheet.create({
     marginHorizontal: Padding.padding16,
     borderRadius: BorderRadius.medium,
     overflow: 'hidden',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Padding.padding12,
-    paddingHorizontal: Padding.padding16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-  },
-  infoLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-  },
-  infoLabelText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  infoValue: {
-    ...Typography.body,
-    color: Colors.textSecondary,
   },
   frameworkRow: {
     flexDirection: 'row',
