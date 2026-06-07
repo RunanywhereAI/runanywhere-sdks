@@ -36,12 +36,9 @@ typedef enum rac_primitive {
     RAC_PRIMITIVE_SYNTHESIZE = 3,    /**< Text-to-Speech. */
     RAC_PRIMITIVE_DETECT_VOICE = 4,  /**< Voice Activity Detection. */
     RAC_PRIMITIVE_EMBED = 5,         /**< Embedding / vectorization. */
-    RAC_PRIMITIVE_RERANK = 6,        /**< PERMANENTLY DORMANT ABI slot — reserves wire value 6 +
-                                      *   the rerank_ops byte offset; NOT routable (absent from
-                                      *   RAC_PRIMITIVE_TABLE, rac_engine_vtable_slot() returns NULL,
-                                      *   registry rejects manifests declaring it,
-                                      *   rac_primitive_name() returns "reserved_6"); promoting it
-                                      *   requires bumping RAC_PLUGIN_API_VERSION. */
+    /* Wire value 6 retired (was RAC_PRIMITIVE_RERANK — never routable, no
+     * backend ever implemented it). Left as a gap so the values below stay
+     * wire-stable; do not reuse 6 without bumping RAC_PLUGIN_API_VERSION. */
     RAC_PRIMITIVE_VLM = 7,           /**< Vision-Language Models. */
     RAC_PRIMITIVE_DIFFUSION = 8,     /**< Text-to-Image / Image-to-Image diffusion. */
 

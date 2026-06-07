@@ -48,7 +48,6 @@ static const rac_engine_vtable_t g_test_static_vtable = {
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
     nullptr,

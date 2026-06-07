@@ -202,8 +202,6 @@ runanywhere::v1::SDKComponent component_for_primitive(rac_primitive_t primitive)
             return runanywhere::v1::SDK_COMPONENT_VAD;
         case RAC_PRIMITIVE_EMBED:
             return runanywhere::v1::SDK_COMPONENT_EMBEDDINGS;
-        case RAC_PRIMITIVE_RERANK:
-            return runanywhere::v1::SDK_COMPONENT_RAG;
         case RAC_PRIMITIVE_VLM:
             return runanywhere::v1::SDK_COMPONENT_VLM;
         case RAC_PRIMITIVE_DIFFUSION:

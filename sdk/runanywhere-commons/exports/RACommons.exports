@@ -222,12 +222,6 @@ _rac_platform_diffusion_set_callbacks
 # Image Utilities — internal helpers used by VLM/diffusion preprocessing.
 # SDK-facing image/audio bytes always cross via generated proto results.
 
-# Hardware Profile ABI
-_rac_hardware_profile_get
-_rac_hardware_profile_free
-_rac_hardware_get_accelerators
-_rac_hardware_set_accelerator_preference
-
 # Shared proto buffer ABI
 _rac_proto_buffer_init
 _rac_proto_buffer_copy
@@ -380,10 +374,8 @@ _rac_registry_unload_plugin
 # CUDA, …). Mirrors the engine plugin loader but keyed by rac_runtime_id_t.
 _rac_runtime_unload
 
-# Plugin router — primitive → vtable resolution. NOTE: declared in
-# include/rac/router/rac_route.h WITHOUT RAC_API today; the annotation still
-# needs adding. Keeping exported so commons built as dynamic lib works.
-_rac_plugin_route
+# Name-pinned plugin selection (hybrid STT router: offline vs cloud).
+_rac_plugin_find_for_engine
 
 # SDKComponent → [InferenceFramework] query (proto ABI).
 _rac_router_frameworks_for_capability_proto

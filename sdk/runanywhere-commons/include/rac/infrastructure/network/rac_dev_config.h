@@ -56,12 +56,6 @@ RAC_API const char* rac_dev_config_get_supabase_key(void);
  */
 RAC_API const char* rac_dev_config_get_build_token(void);
 
-/**
- * @brief Get Sentry DSN for crash reporting (optional)
- * @return Sentry DSN string, or NULL if not configured
- */
-RAC_API const char* rac_dev_config_get_sentry_dsn(void);
-
 // =============================================================================
 // Convenience Functions
 // =============================================================================

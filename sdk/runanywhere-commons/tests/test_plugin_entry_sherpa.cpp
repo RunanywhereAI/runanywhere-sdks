@@ -62,7 +62,7 @@ int main() {
         // must publish zero routing surface. Registry insertion must be refused.
         if (vt->llm_ops != nullptr || vt->stt_ops != nullptr || vt->tts_ops != nullptr ||
             vt->vad_ops != nullptr || vt->vlm_ops != nullptr || vt->embedding_ops != nullptr ||
-            vt->rerank_ops != nullptr || vt->diffusion_ops != nullptr) {
+            vt->diffusion_ops != nullptr) {
             std::fprintf(stderr, "SDK-unavailable Sherpa advertised an ops slot\n");
             return 1;
         }
@@ -103,7 +103,7 @@ int main() {
         return 1;
     }
     if (vt->llm_ops != nullptr || vt->vlm_ops != nullptr || vt->embedding_ops != nullptr ||
-        vt->diffusion_ops != nullptr || vt->rerank_ops != nullptr) {
+        vt->diffusion_ops != nullptr) {
         std::fprintf(stderr, "Sherpa advertised a non-speech ops slot\n");
         return 1;
     }

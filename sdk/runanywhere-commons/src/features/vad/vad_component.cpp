@@ -39,8 +39,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "sdk_events.pb.h"
@@ -672,20 +671,16 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
 
-    // Route through the plugin registry.
-    // VAD doesn't take a framework hint from the model_info registry
-    // today (Swift VADCapability only passes model_path), so we rely
-    // purely on format/priority scoring. onnx_vad (priority 100) will
-    // win for model-based VAD; energy VAD is not plugin-registered
-    // since it's not a full ops-based engine.
-    const rac_engine_vtable_t* vt = nullptr;
-    rac_result_t result = rac_plugin_route(RAC_PRIMITIVE_DETECT_VOICE,
-                                           /*format=*/0,
-                                           /*hints=*/nullptr, &vt);
-    if (result != RAC_SUCCESS || !vt || !vt->vad_ops || !vt->vad_ops->create) {
-        RAC_LOG_ERROR("VAD.Component", "rac_plugin_route failed for VAD");
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    // Pick the highest-priority plugin that serves DETECT_VOICE (priority
+    // assigned at backend registration; no hardware/format scoring). onnx_vad
+    // wins for model-based VAD; energy VAD is not plugin-registered since it's
+    // not a full ops-based engine.
+    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_DETECT_VOICE);
+    if (!vt || !vt->vad_ops || !vt->vad_ops->create) {
+        RAC_LOG_ERROR("VAD.Component", "no registered plugin serves DETECT_VOICE");
+        return RAC_ERROR_BACKEND_NOT_FOUND;
     }
+    rac_result_t result = RAC_SUCCESS;
 
     void* impl = nullptr;
     result = vt->vad_ops->create(model_path, /*config_json=*/nullptr, &impl);

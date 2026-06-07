@@ -85,7 +85,6 @@ static const rac_engine_vtable_t g_platform_engine_vtable = {
     /* tts_ops          */ &g_platform_tts_ops,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ &g_platform_diffusion_ops,
 

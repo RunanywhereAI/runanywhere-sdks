@@ -48,7 +48,7 @@ int main() {
 
     // Every primitive op-table slot is NULL — the shell serves no primitive.
     if (vt->llm_ops != nullptr || vt->stt_ops != nullptr || vt->tts_ops != nullptr ||
-        vt->vad_ops != nullptr || vt->embedding_ops != nullptr || vt->rerank_ops != nullptr ||
+        vt->vad_ops != nullptr || vt->embedding_ops != nullptr ||
         vt->vlm_ops != nullptr || vt->diffusion_ops != nullptr) {
         std::fprintf(stderr, "not-routable Genie advertised primitive ops\n");
         return 1;

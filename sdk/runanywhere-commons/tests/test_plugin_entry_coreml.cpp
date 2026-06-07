@@ -119,8 +119,7 @@ int main() {
         }
         // Disjoint-slot invariant: coreml engine is a DIFFUSION-only engine.
         if (vt->llm_ops != nullptr || vt->stt_ops != nullptr || vt->tts_ops != nullptr ||
-            vt->vad_ops != nullptr || vt->vlm_ops != nullptr || vt->embedding_ops != nullptr ||
-            vt->rerank_ops != nullptr) {
+            vt->vad_ops != nullptr || vt->vlm_ops != nullptr || vt->embedding_ops != nullptr) {
             std::fprintf(stderr, "coreml engine advertised a non-DIFFUSION ops slot\n");
             return 1;
         }
@@ -159,7 +158,7 @@ int main() {
     }
     if (vt->diffusion_ops != nullptr || vt->llm_ops != nullptr || vt->stt_ops != nullptr ||
         vt->tts_ops != nullptr || vt->vad_ops != nullptr || vt->vlm_ops != nullptr ||
-        vt->embedding_ops != nullptr || vt->rerank_ops != nullptr) {
+        vt->embedding_ops != nullptr) {
         std::fprintf(stderr, "stub coreml engine advertised an ops slot\n");
         return 1;
     }

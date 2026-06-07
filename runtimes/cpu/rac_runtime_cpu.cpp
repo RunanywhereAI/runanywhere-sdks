@@ -11,8 +11,8 @@
  * Lifecycle:
  *   init    — no-op, reports success.
  *   destroy — no-op.
- *   device_info — synthesizes a descriptor from `HardwareProfile::cached()`
- *                 so the `device_id` reflects the actual host CPU.
+ *   device_info — reports a static CPU descriptor; `device_id` is derived from
+ *                 the target architecture at compile time.
  *   capabilities — dynamic, advertises the union of primitives across all
  *                  currently registered CPU providers. Flags (FP16 + quantised
  *                  paths) are static because every modern CPU backend supports
@@ -43,7 +43,6 @@
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
-#include "rac/router/rac_hardware_profile.h"
 #include "rac/runtime/rac_runtime_helpers.h"
 #include "rac/runtime/rac_runtime_provider_registry.h"
 
@@ -132,41 +131,30 @@ void cpu_destroy(void) {
     /* Nothing to tear down — the CPU runtime is stateless. */
 }
 
-/** Mapping from detected CpuVendor / GpuVendor to a stable device id string.
- *  The string is returned as a pointer into process-constant storage; the
- *  registry stores only the pointer. */
-const char* cpu_device_id_from_profile() {
-    using rac::router::CpuVendor;
-    using rac::router::HardwareProfile;
-    const HardwareProfile hp = HardwareProfile::cached();
-    switch (hp.cpu_vendor) {
-        case CpuVendor::Apple:
-            return "cpu-apple";
-        case CpuVendor::Intel:
-            return "cpu-intel";
-        case CpuVendor::Amd:
-            return "cpu-amd";
-        case CpuVendor::Arm:
-            return "cpu-arm";
-        case CpuVendor::Qualcomm:
-            return "cpu-qualcomm";
-        case CpuVendor::Other:
-            return "cpu-other";
-        case CpuVendor::Unknown:
-        default:
-            return "cpu-generic";
-    }
+/** Stable CPU device id derived from the target architecture at compile time.
+ *  The richer runtime CPU-vendor probe was removed with the routing scorer —
+ *  backend selection no longer needs hardware detection. The string points into
+ *  process-constant storage; the registry stores only the pointer. */
+const char* cpu_device_id() {
+#if defined(__APPLE__)
+    return "cpu-apple";
+#elif defined(__aarch64__) || defined(__arm__)
+    return "cpu-arm";
+#elif defined(__x86_64__) || defined(__i386__)
+    return "cpu-x86";
+#else
+    return "cpu-generic";
+#endif
 }
 
 rac_result_t cpu_device_info(rac_runtime_device_info_t* out) {
     if (out == nullptr)
         return RAC_ERROR_NULL_POINTER;
-    const rac::router::HardwareProfile hp = rac::router::HardwareProfile::cached();
     *out = rac_runtime_device_info_t{};
     out->device_class = RAC_DEVICE_CLASS_CPU;
-    out->device_id = cpu_device_id_from_profile();
+    out->device_id = cpu_device_id();
     out->display_name = "CPU (generic)";
-    out->memory_bytes = static_cast<uint64_t>(hp.total_ram_bytes);
+    out->memory_bytes = 0; /* host RAM probe removed with HardwareProfile */
     return RAC_SUCCESS;
 }
 

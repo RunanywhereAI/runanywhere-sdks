@@ -96,48 +96,6 @@ rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component)
     }
 }
 
-const char* framework_to_plugin_name(runanywhere::v1::InferenceFramework framework,
-                                     rac_primitive_t primitive) {
-    switch (framework) {
-        case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
-            // After the LLM/VLM plugin unification, llama.cpp publishes ONE
-            // vtable named "llamacpp" with both llm_ops and vlm_ops slots
-            // filled. Routing is by primitive on the same plugin entry, so
-            // both LLM and VLM resolve to the same plugin name.
-            (void)primitive;
-            return "llamacpp";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
-            // Voice primitives on ONNX-format models are typically served by
-            // the Sherpa plugin (it advertises STT/TTS/VAD ops over ONNX
-            // Runtime); the production "onnx" plugin only exposes embedding
-            // ops. We intentionally do NOT pin to "sherpa" here so the router
-            // picks the highest-priority registered plugin that actually
-            // advertises the voice primitive — letting alternate voice
-            // backends or test mocks load when sherpa is not present
-            // without hard-failing the load. The router's
-            // primitive-support filter (rac_engine_router.cpp) skips engines
-            // missing the requested ops, so non-voice plugins ("onnx" in
-            // production) are still excluded.
-            if (primitive == RAC_PRIMITIVE_DETECT_VOICE || primitive == RAC_PRIMITIVE_TRANSCRIBE ||
-                primitive == RAC_PRIMITIVE_SYNTHESIZE) {
-                return nullptr;
-            }
-            return "onnx";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
-            return "sherpa";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
-            return "metalrt";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
-            return "genie";
-        case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
-            return "platform";
-        default:
-            return nullptr;
-    }
-}
-
 rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory category) {
     switch (category) {
         case runanywhere::v1::MODEL_CATEGORY_LANGUAGE:

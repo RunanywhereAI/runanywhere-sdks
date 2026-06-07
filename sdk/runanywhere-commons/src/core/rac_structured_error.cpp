@@ -976,16 +976,6 @@ rac_result_t rac_error_log_and_track(rac_result_t code, rac_error_category_t cat
     meta.error_code = code;
     rac_logger_log(RAC_LOG_ERROR, rac_error_category_name(category), message, &meta);
 
-    // Track error via platform adapter (for Sentry)
-    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
-    if (adapter && adapter->track_error) {
-        char* json = rac_error_to_json(error);
-        if (json) {
-            adapter->track_error(json, adapter->user_data);
-            rac_free(json);
-        }
-    }
-
     rac_error_destroy(error);
     return code;
 }
@@ -1024,16 +1014,6 @@ rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_category
     meta.model_id = model_id;
     meta.framework = framework;
     rac_logger_log(RAC_LOG_ERROR, rac_error_category_name(category), message, &meta);
-
-    // Track error via platform adapter (for Sentry)
-    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
-    if (adapter && adapter->track_error) {
-        char* json = rac_error_to_json(error);
-        if (json) {
-            adapter->track_error(json, adapter->user_data);
-            rac_free(json);
-        }
-    }
 
     rac_error_destroy(error);
     return code;

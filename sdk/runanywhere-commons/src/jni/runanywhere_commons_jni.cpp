@@ -112,7 +112,6 @@
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 #include "rac/plugin/rac_plugin_loader.h"
-#include "rac/router/rac_hardware_abi.h"
 #include "rac/router/rac_router_capabilities.h"
 
 // NOTE: Backend headers are NOT included here.
@@ -2745,16 +2744,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetBuildTok
         return nullptr;
     }
     return env->NewStringUTF(token);
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetSentryDsn(JNIEnv* env,
-                                                                                  jclass clazz) {
-    const char* dsn = rac_dev_config_get_sentry_dsn();
-    if (dsn == nullptr || strlen(dsn) == 0) {
-        return nullptr;
-    }
-    return env->NewStringUTF(dsn);
 }
 
 // =============================================================================
@@ -5770,37 +5759,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDefaultHeaders(J
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Hardware Profile
-// Mirrors Swift's RunAnywhere+Hardware.swift / Kotlin's hardware namespace.
-// =============================================================================
-
-JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareProfileGet(JNIEnv* env,
-                                                                               jclass clazz) {
-    uint8_t* bytes = nullptr;
-    size_t size = 0;
-    rac_result_t rc = rac_hardware_profile_get(&bytes, &size);
-    if (rc != RAC_SUCCESS || bytes == nullptr) {
-        LOGe("racHardwareProfileGet: failed with code %d", rc);
-        return nullptr;
-    }
-
-    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
-    if (jArr == nullptr) {
-        rac_hardware_profile_free(bytes);
-        LOGe("racHardwareProfileGet: failed to allocate jbyteArray");
-        return nullptr;
-    }
-
-    if (size > 0) {
-        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
-                                reinterpret_cast<const jbyte*>(bytes));
-    }
-    rac_hardware_profile_free(bytes);
-    return jArr;
-}
-
-// =============================================================================
 // JNI FUNCTIONS - Engine Router Capabilities
 //
 // `rac_router_frameworks_for_capability_proto` consumes a serialized
@@ -5917,48 +5875,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
 // =============================================================================
 
 // ---------- Component metadata getters --------------------------------
-
-JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareGetAccelerators(JNIEnv* env,
-                                                                                    jclass clazz) {
-    (void)clazz;
-    uint8_t* bytes = nullptr;
-    size_t size = 0;
-    rac_result_t rc = rac_hardware_get_accelerators(&bytes, &size);
-    if (rc != RAC_SUCCESS || bytes == nullptr) {
-        LOGe("racHardwareGetAccelerators: failed with code %d", rc);
-        return nullptr;
-    }
-    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
-    if (jArr == nullptr) {
-        rac_hardware_profile_free(bytes);
-        return nullptr;
-    }
-    if (size > 0) {
-        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
-                                reinterpret_cast<const jbyte*>(bytes));
-    }
-    rac_hardware_profile_free(bytes);
-    return env->ExceptionCheck() ? nullptr : jArr;
-}
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareSetAcceleratorPreference(
-    JNIEnv* env, jclass clazz, jbyteArray bytes) {
-    (void)clazz;
-    // Accept either a single-byte enum or a proto with the enum encoded as the
-    // first byte. Either way we forward an int preference to the C ABI.
-    int preference = 0;
-    if (bytes != nullptr) {
-        const jsize len = env->GetArrayLength(bytes);
-        if (len > 0) {
-            jbyte first = 0;
-            env->GetByteArrayRegion(bytes, 0, 1, &first);
-            preference = static_cast<int>(static_cast<unsigned char>(first));
-        }
-    }
-    return static_cast<jint>(rac_hardware_set_accelerator_preference(preference));
-}
 
 JNIEXPORT jboolean JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentIsInitialized(

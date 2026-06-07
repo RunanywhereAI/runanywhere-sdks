@@ -96,7 +96,6 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
 #else
     /* embedding_ops    */ nullptr,
 #endif
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
 

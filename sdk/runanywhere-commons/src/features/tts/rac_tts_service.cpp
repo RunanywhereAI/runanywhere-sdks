@@ -18,38 +18,10 @@
 #include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
 
 static const char* LOG_CAT = "TTS.Service";
-
-// Engine independence refactor: identity stringify of the
-// framework enum to the plugin's metadata.name. Sherpa now declares
-// framework = RAC_FRAMEWORK_SHERPA in the registry, so we no longer
-// need the legacy ONNX -> "sherpa" hack. All 4 service files
-// (stt/tts/llm/embeddings) carry the same definition; if it drifts,
-// move to a shared header in rac/router/.
-static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
-    switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:
-            return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:
-            return "onnx";
-        case RAC_FRAMEWORK_SHERPA:
-            return "sherpa";
-        case RAC_FRAMEWORK_METALRT:
-            return "metalrt";
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:
-            return "platform";
-        case RAC_FRAMEWORK_SYSTEM_TTS:
-            return "platform";
-        case RAC_FRAMEWORK_COREML:
-            return "platform";
-        default:
-            return nullptr;
-    }
-}
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -102,20 +74,16 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
                       model_info->id ? model_info->id : "NULL", framework);
     }
 
-    // Route through the plugin registry.
-    rac_routing_hints_t hints = {};
-    hints.preferred_engine_name = framework_to_plugin_name(framework);
-
-    const rac_engine_vtable_t* vt = nullptr;
-    result = rac_plugin_route(RAC_PRIMITIVE_SYNTHESIZE,
-                              /*format=*/0, &hints, &vt);
+    // Pick the highest-priority registered plugin that serves this primitive
+    // (priority assigned at backend registration; no hardware/format scoring).
+    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_SYNTHESIZE);
     if (model_info) {
         rac_model_info_free(model_info);
         model_info = nullptr;
     }
-    if (result != RAC_SUCCESS || !vt || !vt->tts_ops || !vt->tts_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    if (!vt || !vt->tts_ops || !vt->tts_ops->create) {
+        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves SYNTHESIZE");
+        return RAC_ERROR_BACKEND_NOT_FOUND;
     }
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 

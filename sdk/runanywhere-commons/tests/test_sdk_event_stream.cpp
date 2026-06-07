@@ -15,8 +15,6 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/plugin/rac_plugin_entry.h"
-#include "rac/router/rac_hardware_abi.h"
-#include "rac/router/rac_route.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "sdk_events.pb.h"
@@ -220,41 +218,9 @@ int main() {
           "state shutdown after shutdown emits no SDKEvent");
     rac_proto_buffer_free(&noop_shutdown_poll);
 
-    rac_sdk_event_clear_queue();
-    uint8_t* profile_bytes = nullptr;
-    size_t profile_size = 0;
-    rc = rac_hardware_profile_get(&profile_bytes, &profile_size);
-    CHECK(rc == RAC_SUCCESS && profile_bytes != nullptr && profile_size > 0,
-          "hardware profile ABI returns proto bytes");
-    runanywhere::v1::SDKEvent hardware_event;
-    CHECK(poll_event(&hardware_event), "hardware profile query publishes SDKEvent");
-    CHECK(hardware_event.category() == runanywhere::v1::EVENT_CATEGORY_HARDWARE,
-          "hardware event category is canonical");
-    CHECK(hardware_event.has_hardware_routing(), "hardware event uses typed payload");
-    CHECK(hardware_event.hardware_routing().kind() ==
-              runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED,
-          "hardware event kind is profile completed");
-    CHECK(hardware_event.hardware_routing().hardware_profile().has_profile(),
-          "hardware event embeds HardwareProfileResult");
-    rac_hardware_profile_free(profile_bytes);
-
-    rac_sdk_event_clear_queue();
-    auto vtable = make_llm_vtable("llamacpp_test", 100);
-    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "test plugin registers");
-    const rac_engine_vtable_t* selected = nullptr;
-    rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &selected);
-    CHECK(rc == RAC_SUCCESS && selected == &vtable, "route selects test plugin");
-    runanywhere::v1::SDKEvent route_event;
-    CHECK(poll_event(&route_event), "route publishes SDKEvent");
-    CHECK(route_event.category() == runanywhere::v1::EVENT_CATEGORY_ROUTING,
-          "route event category is canonical");
-    CHECK(route_event.has_hardware_routing(), "route event uses typed payload");
-    CHECK(route_event.hardware_routing().kind() ==
-              runanywhere::v1::HARDWARE_ROUTING_EVENT_KIND_ROUTE_SELECTED,
-          "route event kind is route selected");
-    CHECK(route_event.hardware_routing().route() == "llamacpp_test",
-          "route event carries selected engine");
-    rac_plugin_unregister("llamacpp_test");
+    // Hardware-profile and engine-route SDKEvents were removed with the routing
+    // scorer — backend selection is now simple priority order via
+    // rac_plugin_find, which emits no hardware/route events.
 
     rac_state_shutdown();
 

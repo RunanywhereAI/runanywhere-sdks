@@ -40,8 +40,7 @@
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
+#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/routing/rac_hybrid_custom_filter.h"
 #include "rac/routing/rac_hybrid_types.h"
 
@@ -411,18 +410,14 @@ rac_result_t rac_stt_hybrid_router_cancel(rac_handle_t handle) {
 rac_stt_service_t* rac_stt_hybrid_router_create_service(const char* engine_hint,
                                                         const char* model_id_or_path,
                                                         const char* config_json) {
-    rac_routing_hints_t hints{};
-    // Pin the requested engine as preferred. Empty/NULL hint lets the registry
-    // pick by primitive/format. Fallback is left enabled to match the
-    // historical registry-create behavior the JNI thunks relied on.
-    hints.preferred_engine_name =
-        (engine_hint != nullptr && engine_hint[0] != '\0') ? engine_hint : nullptr;
-
-    const rac_engine_vtable_t* vt = nullptr;
-    const rac_result_t route_rc =
-        rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, /*format=*/0, &hints, &vt);
-    if (route_rc != RAC_SUCCESS || vt == nullptr || vt->stt_ops == nullptr ||
-        vt->stt_ops->create == nullptr) {
+    // Select the STT plugin. When an engine is named (offline "sherpa" vs
+    // online "cloud") pin it by name — priority order cannot distinguish two
+    // TRANSCRIBE plugins. With no hint, fall back to the highest-priority one.
+    const rac_engine_vtable_t* vt =
+        (engine_hint != nullptr && engine_hint[0] != '\0')
+            ? rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engine_hint)
+            : rac_plugin_find(RAC_PRIMITIVE_TRANSCRIBE);
+    if (vt == nullptr || vt->stt_ops == nullptr || vt->stt_ops->create == nullptr) {
         return nullptr;
     }
 

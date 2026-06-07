@@ -153,7 +153,6 @@ const rac_engine_vtable_t k_manifest_vtable = {
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
     nullptr,
@@ -239,24 +238,6 @@ int main() {
         CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_GENERATE_TEXT) == nullptr,
               "null-slot: slot NULL");
         rac_plugin_unregister("null-slot");
-    }
-
-    // (4b) Rerank remains a solution operator name, not a routable engine
-    // primitive. The old vtable slot may exist in the struct, but the
-    // registry must treat it as dormant until a real rerank implementation
-    // and public primitive contract are added.
-    {
-        auto vt = make_vt("dormant-rerank", 50, RAC_PLUGIN_API_VERSION, nullptr, nullptr);
-        vt.rerank_ops =
-            reinterpret_cast<const struct rac_rerank_service_ops*>(&k_fake_llm_ops_sentinel);
-        rac_result_t rc = rac_plugin_register(&vt);
-        CHECK(rc == RAC_SUCCESS, "rerank-dormant: register ok");
-        CHECK(rac_engine_vtable_slot(&vt, RAC_PRIMITIVE_RERANK) == nullptr,
-              "rerank-dormant: slot hidden");
-        CHECK(rac_plugin_find(RAC_PRIMITIVE_RERANK) == nullptr, "rerank-dormant: not discoverable");
-        CHECK(std::strcmp(rac_primitive_name(RAC_PRIMITIVE_RERANK), "rerank") != 0,
-              "rerank-dormant: primitive name is not advertised");
-        rac_plugin_unregister("dormant-rerank");
     }
 
     // (5) unregister nonexistent

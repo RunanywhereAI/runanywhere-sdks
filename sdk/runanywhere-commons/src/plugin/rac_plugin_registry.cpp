@@ -562,6 +562,33 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) noexcept {
     }
 }
 
+const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
+                                                      const char* engine_name) noexcept {
+    /* C ABI boundary: noexcept. Returns the plugin registered under
+     * `engine_name` IFF it serves `primitive`, else nullptr. Lets the hybrid
+     * STT router pin a specific engine where priority order cannot distinguish
+     * two plugins serving one primitive. */
+    if (engine_name == nullptr || engine_name[0] == '\0') {
+        return nullptr;
+    }
+    try {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+        auto it = s.by_primitive.find(primitive);
+        if (it == s.by_primitive.end()) {
+            return nullptr;
+        }
+        for (const auto& entry : it->second) {
+            if (entry.name == engine_name) {
+                return entry.vtable;
+            }
+        }
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
 rac_result_t rac_plugin_list(rac_primitive_t primitive, const rac_engine_vtable_t** out_plugins,
                              size_t max, size_t* out_count) noexcept {
     /* C ABI boundary: noexcept. */
@@ -734,11 +761,6 @@ const char* rac_primitive_name(rac_primitive_t p) {
         return NAME;
         RAC_PRIMITIVE_TABLE(X)
 #undef X
-        /* Non-table cases kept explicit. RERANK is the dormant slot: it must
-         * report "reserved_6" (NOT "rerank") so it reads as a reserved slot;
-         * a test asserts this. */
-        case RAC_PRIMITIVE_RERANK:
-            return "reserved_6";
         case RAC_PRIMITIVE_UNSPECIFIED:
             return "unspecified";
         default:

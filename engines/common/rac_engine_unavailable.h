@@ -221,7 +221,6 @@ static inline rac_result_t rac_engine_unavailable_capability(int platform_suppor
         /* tts_ops          */ RAC_NULL,                                                     \
         /* vad_ops          */ RAC_NULL,                                                     \
         /* embedding_ops    */ RAC_NULL,                                                     \
-        /* rerank_ops       */ RAC_NULL,                                                     \
         /* vlm_ops          */ RAC_NULL,                                                     \
         /* diffusion_ops    */ RAC_NULL,                                                     \
                                                                                             \

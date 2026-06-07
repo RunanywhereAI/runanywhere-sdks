@@ -36,8 +36,7 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 namespace rac::core::model_lifecycle::detail {
 
@@ -438,17 +437,11 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                     runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                                     request.model_id(), nullptr, nullptr, nullptr);
 
-    rac_routing_hints_t hints = {};
-    hints.preferred_engine_name = detail::framework_to_plugin_name(framework, primitive);
-    hints.no_fallback = hints.preferred_engine_name ? RAC_TRUE : RAC_FALSE;
-    const rac_engine_vtable_t* vt = nullptr;
-    rc = rac_plugin_route(primitive, static_cast<uint32_t>(model.format()), &hints, &vt);
-    if (rc != RAC_SUCCESS || !vt) {
-        std::string error = "no backend route supports requested model";
-        if (hints.preferred_engine_name) {
-            error += " for framework ";
-            error += hints.preferred_engine_name;
-        }
+    // Pick the highest-priority registered plugin that serves this primitive
+    // (priority assigned at backend registration; no hardware/format scoring).
+    const rac_engine_vtable_t* vt = rac_plugin_find(primitive);
+    if (!vt) {
+        std::string error = "no registered backend serves the requested primitive";
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
                                      artifact_resolution.artifacts, 0, error);

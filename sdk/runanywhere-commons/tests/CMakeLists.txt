@@ -458,39 +458,6 @@ rac_link_archive_deps(test_legacy_coexistence)
 target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
 add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
 
-# Engine router + hardware profile tests (always built;
-# pure C++, no backend dependency).
-add_executable(test_engine_router test_engine_router.cpp)
-target_include_directories(test_engine_router PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_engine_router PRIVATE rac_commons)
-rac_link_archive_deps(test_engine_router)
-target_compile_features(test_engine_router PRIVATE cxx_std_17)
-add_test(NAME engine_router_tests COMMAND test_engine_router)
-
-add_executable(test_engine_capability_honesty test_engine_capability_honesty.cpp)
-target_include_directories(test_engine_capability_honesty PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_engine_capability_honesty PRIVATE rac_commons)
-rac_link_archive_deps(test_engine_capability_honesty)
-target_compile_features(test_engine_capability_honesty PRIVATE cxx_std_17)
-add_test(NAME engine_capability_honesty_tests COMMAND test_engine_capability_honesty)
-
-add_executable(test_hardware_profile test_hardware_profile.cpp)
-target_include_directories(test_hardware_profile PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_hardware_profile PRIVATE rac_commons)
-rac_link_archive_deps(test_hardware_profile)
-target_compile_features(test_hardware_profile PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_hardware_profile)
-add_test(NAME hardware_profile_tests COMMAND test_hardware_profile)
-
 # --- Shared C ABI proto-byte buffer ownership tests -------------------------
 add_executable(test_proto_buffer test_proto_buffer.cpp)
 target_include_directories(test_proto_buffer PRIVATE

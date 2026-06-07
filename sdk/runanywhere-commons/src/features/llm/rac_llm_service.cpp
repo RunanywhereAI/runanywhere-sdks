@@ -26,37 +26,10 @@
 #include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
 
 static const char* LOG_CAT = "LLM.Service";
-
-// Identity stringify of the
-// framework enum to the plugin's metadata.name. Kept identical to the
-// matching helpers in rac_stt_service.cpp / rac_tts_service.cpp /
-// rac_embeddings_service.cpp; if this drifts, move to a shared header
-// in rac/router/. Returning NULL = no pin (router picks by format/priority).
-static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
-    switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:
-            return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:
-            return "onnx";
-        case RAC_FRAMEWORK_SHERPA:
-            return "sherpa";
-        case RAC_FRAMEWORK_METALRT:
-            return "metalrt";
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:
-            return "platform";
-        case RAC_FRAMEWORK_SYSTEM_TTS:
-            return "platform";
-        case RAC_FRAMEWORK_COREML:
-            return "platform";
-        default:
-            return nullptr;
-    }
-}
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -124,26 +97,17 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
                         result, static_cast<int>(framework));
     }
 
-    // Route through the unified plugin registry instead of the
-    // deleted rac_service_create path. framework -> plugin-name pin is a
-    // HINT; the router may still fall back to any primitive-compatible
-    // plugin if the pinned one is unavailable (e.g. when the app
-    // launched without linking the specific engine binary).
-    rac_routing_hints_t hints = {};
-    hints.preferred_engine_name = framework_to_plugin_name(framework);
-
-    const rac_engine_vtable_t* vt = nullptr;
-    result = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT,
-                              /*format=*/0, /* no format hint; rely on framework pin */
-                              &hints, &vt);
+    // Pick the highest-priority registered plugin that serves this primitive.
+    // Backend priority is assigned at registration (SDK init); there is no
+    // hardware/format/accelerator scoring.
+    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT);
     if (model_info) {
         rac_model_info_free(model_info);
         model_info = nullptr;
     }
-    if (result != RAC_SUCCESS || !vt || !vt->llm_ops || !vt->llm_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d (vt=%p, llm_ops.create=%p)", result,
-                      (const void*)vt, vt ? (const void*)vt->llm_ops : nullptr);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    if (!vt || !vt->llm_ops || !vt->llm_ops->create) {
+        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves GENERATE_TEXT (vt=%p)", (const void*)vt);
+        return RAC_ERROR_BACKEND_NOT_FOUND;
     }
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 

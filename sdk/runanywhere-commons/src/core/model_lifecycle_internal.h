@@ -125,8 +125,6 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 
 runanywhere::v1::SDKComponent component_for_category(runanywhere::v1::ModelCategory category);
 rac_primitive_t primitive_for_component(runanywhere::v1::SDKComponent component);
-const char* framework_to_plugin_name(runanywhere::v1::InferenceFramework framework,
-                                     rac_primitive_t primitive);
 
 rac_model_category_t c_category_from_proto(runanywhere::v1::ModelCategory category);
 rac_model_format_t c_format_from_proto(runanywhere::v1::ModelFormat format);

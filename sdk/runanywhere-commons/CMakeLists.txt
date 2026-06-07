@@ -733,13 +733,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
     # rac_commons by the root CMakeLists so the registry is never empty.
     src/plugin/rac_runtime_registry.cpp
-    # HardwareProfile + EngineRouter (hardware-aware plugin scoring).
-    src/router/rac_hardware_profile.cpp
-    src/router/rac_engine_router.cpp
-    # C ABI wrapper around EngineRouter (rac_plugin_route).
-    src/router/rac_route.cpp
-    # Proto-serialised hardware profile C ABI for all 5 frontends.
-    src/router/rac_hardware_abi.cpp
     # Proto-serialised SDKComponent → [InferenceFramework] query.
     src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_manager.cpp

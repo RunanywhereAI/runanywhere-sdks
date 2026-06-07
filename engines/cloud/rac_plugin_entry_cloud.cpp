@@ -86,7 +86,6 @@ static const rac_engine_vtable_t g_cloud_engine_vtable = {
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
 

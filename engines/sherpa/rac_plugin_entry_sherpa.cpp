@@ -138,7 +138,6 @@ static const rac_engine_vtable_t g_sherpa_engine_vtable = {
     nullptr,
 #endif
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
 

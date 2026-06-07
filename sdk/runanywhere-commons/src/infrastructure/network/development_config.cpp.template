@@ -38,11 +38,6 @@ constexpr const char* SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 // Get this from your team's credential storage, or use a debug token for local dev
 constexpr const char* BUILD_TOKEN = "YOUR_BUILD_TOKEN";
 
-// Sentry DSN for crash reporting (optional)
-// Get this from: https://sentry.io → Your Project → Settings → Client Keys (DSN)
-// Set to nullptr if not using Sentry
-constexpr const char* SENTRY_DSN = nullptr;
-
 std::string trim(const char* value) {
     if (!value) {
         return {};
@@ -125,10 +120,6 @@ const char* rac_dev_config_get_supabase_key(void) {
 
 const char* rac_dev_config_get_build_token(void) {
     return BUILD_TOKEN;
-}
-
-const char* rac_dev_config_get_sentry_dsn(void) {
-    return SENTRY_DSN;
 }
 
 bool rac_dev_config_has_supabase(void) {

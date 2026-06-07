@@ -78,8 +78,12 @@ extern "C" {
  *                 `rac_plugin_unregister`. The shims can be deleted once
  *                 every shipped Genie / RN / Flutter binary has been
  *                 rebuilt against v3.
+ *   4u — removed the never-implemented rerank_ops vtable slot and the
+ *                 RAC_PRIMITIVE_RERANK primitive (wire value 6 retired). All
+ *                 engines rebuild against v4; v3 plugins are rejected at
+ *                 register time with RAC_ERROR_ABI_VERSION_MISMATCH.
  */
-#define RAC_PLUGIN_API_VERSION 3u
+#define RAC_PLUGIN_API_VERSION 4u
 
 /* ===========================================================================
  * Plugin entry-point signature
@@ -360,6 +364,18 @@ rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEP
  * the registry (i.e. until `rac_plugin_unregister` is called for this name).
  */
 const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/**
+ * @brief Look up the plugin registered under `engine_name` IFF it serves
+ *        `primitive`, else NULL. Used to pin a specific engine (e.g. the hybrid
+ *        STT router's offline "sherpa" vs online "cloud") where simple priority
+ *        order cannot distinguish two plugins that serve the same primitive.
+ *
+ * Thread-safe.
+ */
+const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
+                                                      const char* engine_name)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Iterate all plugins registered for `primitive`, in descending

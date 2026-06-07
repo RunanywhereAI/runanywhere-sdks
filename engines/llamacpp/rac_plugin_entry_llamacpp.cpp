@@ -140,7 +140,6 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
     /* vlm_ops          */ &g_llamacpp_vlm_ops,
     /* diffusion_ops    */ nullptr,
 

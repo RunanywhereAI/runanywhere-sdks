@@ -18,28 +18,10 @@
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/router/rac_route.h"
-#include "rac/router/rac_routing_hints.h"
 
 static const char* LOG_CAT = "VLM.Service";
-
-static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
-    switch (fw) {
-        case RAC_FRAMEWORK_LLAMACPP:
-            // After the LLM/VLM plugin unification, llama.cpp publishes ONE
-            // vtable named "llamacpp" with both llm_ops and vlm_ops slots
-            // filled. The router dispatches by primitive (VLM) on the same
-            // plugin entry.
-            return "llamacpp";
-        case RAC_FRAMEWORK_ONNX:
-            return "onnx";
-        case RAC_FRAMEWORK_METALRT:
-            return "metalrt";
-        default:
-            return nullptr;
-    }
-}
 
 static std::string json_escape(const char* value) {
     std::string out;
@@ -139,19 +121,14 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
     // v3 Phase B8: route through the plugin registry. For local VLM
     // directories, resolve companion files in C++ and pass mmproj_path to the
     // backend instead of requiring SDK-local filename inference.
-    rac_routing_hints_t hints = {};
-    hints.preferred_engine_name = framework_to_plugin_name(framework);
-
-    const rac_engine_vtable_t* vt = nullptr;
-    result = rac_plugin_route(RAC_PRIMITIVE_VLM,
-                              /*format=*/0, &hints, &vt);
+    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_VLM);
     if (model_info) {
         rac_model_info_free(model_info);
         model_info = nullptr;
     }
-    if (result != RAC_SUCCESS || !vt || !vt->vlm_ops || !vt->vlm_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    if (!vt || !vt->vlm_ops || !vt->vlm_ops->create) {
+        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves VLM");
+        return RAC_ERROR_BACKEND_NOT_FOUND;
     }
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 

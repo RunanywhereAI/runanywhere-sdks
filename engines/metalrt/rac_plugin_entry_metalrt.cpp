@@ -168,7 +168,6 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
 #endif
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
-    /* rerank_ops       */ nullptr,
 /* vlm_ops          */
 #if RAC_METALRT_ROUTABLE
     &g_metalrt_vlm_ops,

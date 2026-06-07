@@ -51,7 +51,6 @@ struct rac_stt_service_ops;        /* rac/features/stt/rac_stt_service.h */
 struct rac_tts_service_ops;        /* rac/features/tts/rac_tts_service.h */
 struct rac_vad_service_ops;        /* rac/features/vad/rac_vad_service.h */
 struct rac_embeddings_service_ops; /* rac/features/embeddings/rac_embeddings_service.h */
-struct rac_rerank_service_ops;     /* dormant ABI slot — never defined; see rerank_ops below */
 struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 
@@ -145,7 +144,7 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (8 active) ─────────── */
+    /* ─────────── Primitive slot groups (7 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
     const struct rac_llm_service_ops* llm_ops;
@@ -161,13 +160,6 @@ typedef struct rac_engine_vtable {
 
     /** Text / multimodal embeddings (`RAC_PRIMITIVE_EMBED`). */
     const struct rac_embeddings_service_ops* embedding_ops;
-
-    /** PERMANENTLY DORMANT ABI slot — reserves wire value 6 + the rerank_ops
-     * byte offset; NOT routable (absent from RAC_PRIMITIVE_TABLE,
-     * rac_engine_vtable_slot() returns NULL, registry rejects manifests
-     * declaring it, rac_primitive_name() returns "reserved_6"); promoting it
-     * requires bumping RAC_PLUGIN_API_VERSION. */
-    const struct rac_rerank_service_ops* rerank_ops;
 
     /** Vision-Language Model (`RAC_PRIMITIVE_VLM`). */
     const struct rac_vlm_service_ops* vlm_ops;
@@ -213,10 +205,8 @@ typedef struct rac_engine_vtable {
  * C switch/if bodies (no template metaprogramming) and expands to nothing in
  * the struct itself.
  *
- * RERANK is intentionally ABSENT: it is a permanently dormant ABI slot, not a
- * routable primitive (see the `rerank_ops` field above and
- * `RAC_PRIMITIVE_RERANK` in rac_primitive.h). Its exclusion from routing,
- * naming, and manifest validation falls out of its absence from this table.
+ * Wire value 6 (formerly RERANK) is retired — no backend implemented it and it
+ * was never routable. It has no vtable slot and no table row.
  *
  * Adding a modality is now THREE edits (down from ~8 scattered sites):
  *   1. Add one X(...) row here (and the matching `const struct ..._ops*` slot
