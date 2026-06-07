@@ -2991,8 +2991,8 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
         return 0;
     }
 
-    // Same framework set used by rac_model_registry_discover_downloaded so the
-    // ABI refresh path covers every backend an SDK can install.
+    // Scan the framework set covering every backend an SDK can install so the
+    // ABI refresh path links downloads regardless of which backend produced them.
     const rac_inference_framework_t frameworks[] = {
         RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
         RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
@@ -3032,10 +3032,9 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
             const std::string model_path = std::string(framework_dir) + "/" + model_id;
 
             // Verify the model folder contains at least one regular file —
-            // mirrors the Kotlin self-heal heuristic and the legacy
-            // is_valid_model_folder() shape (file existence is enough; we
-            // don't filter by extension because each backend defines its own
-            // file shape and platform `is_model_file` callback is optional).
+            // mirrors the Kotlin self-heal heuristic (file existence is enough;
+            // we don't filter by extension because each backend defines its own
+            // file shape).
             if (list_directory_via_adapter(adapter, model_path.c_str(), &model_entries) !=
                 RAC_SUCCESS) {
                 continue;
@@ -3049,7 +3048,7 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
             }
             if (!has_regular_file) {
                 // Allow one level of nested folder (sherpa-onnx archives ship
-                // as <name>/<files>) — match is_valid_model_folder semantics.
+                // as <name>/<files>).
                 for (const rac_directory_entry_t& child : model_entries) {
                     if (child.is_dir != RAC_TRUE || child.name[0] == '.') {
                         continue;
@@ -3242,281 +3241,6 @@ rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_mode
 }
 
 // =============================================================================
-// PUBLIC API - MODEL DISCOVERY
-// =============================================================================
-
-// Helper: extract a lower-cased file extension from a path or filename.
-// Returns "" if the basename has no '.' or starts with '.' (hidden file).
-static std::string extension_from_path(const char* path) {
-    if (!path)
-        return {};
-    std::string s(path);
-    size_t slash = s.find_last_of('/');
-    std::string base = (slash == std::string::npos) ? s : s.substr(slash + 1);
-    if (base.empty() || base.front() == '.')
-        return {};
-    size_t dot = base.find_last_of('.');
-    if (dot == std::string::npos || dot + 1 >= base.size())
-        return {};
-    std::string ext = base.substr(dot + 1);
-    std::ranges::transform(ext, ext.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return ext;
-}
-
-// Helper: ask the canonical commons mapping whether a path is a model file
-// for a given framework, replacing the legacy
-// rac_discovery_callbacks_t.is_model_file callback that each SDK had to
-// wire up previously.
-static bool path_is_model_file(const char* path, rac_inference_framework_t framework) {
-    std::string ext = extension_from_path(path);
-    rac_bool_t out = RAC_FALSE;
-    rac_result_t rc = rac_model_format_for_framework(framework, ext.c_str(), &out);
-    return rc == RAC_SUCCESS && out == RAC_TRUE;
-}
-
-// Helper to check if a folder contains valid model files for a framework
-static bool is_valid_model_folder(const rac_discovery_callbacks_t* callbacks,
-                                  const char* folder_path, rac_inference_framework_t framework) {
-    if (!callbacks || !callbacks->list_directory || !folder_path) {
-        return false;
-    }
-
-    char** entries = nullptr;
-    size_t count = 0;
-
-    // List directory contents
-    if (callbacks->list_directory(folder_path, &entries, &count, callbacks->user_data) !=
-        RAC_SUCCESS) {
-        return false;
-    }
-
-    bool found_model_file = false;
-
-    for (size_t i = 0; i < count && !found_model_file; i++) {
-        if (!entries[i])
-            continue;
-
-        // Build full path
-        std::string full_path = std::string(folder_path) + "/" + entries[i];
-
-        // Check if it's a model file for this framework via the canonical
-        // commons mapping (replaces the legacy is_model_file callback).
-        if (path_is_model_file(full_path.c_str(), framework)) {
-            found_model_file = true;
-        }
-
-        // For nested directories, recursively check (one level deep)
-        if (!found_model_file && callbacks->is_directory) {
-            if (callbacks->is_directory(full_path.c_str(), callbacks->user_data) == RAC_TRUE) {
-                // Check subdirectory for model files
-                char** sub_entries = nullptr;
-                size_t sub_count = 0;
-                if (callbacks->list_directory(full_path.c_str(), &sub_entries, &sub_count,
-                                              callbacks->user_data) == RAC_SUCCESS) {
-                    for (size_t j = 0; j < sub_count && !found_model_file; j++) {
-                        if (!sub_entries[j])
-                            continue;
-                        std::string sub_path = full_path + "/" + sub_entries[j];
-                        if (path_is_model_file(sub_path.c_str(), framework)) {
-                            found_model_file = true;
-                        }
-                    }
-                    if (callbacks->free_entries) {
-                        callbacks->free_entries(sub_entries, sub_count, callbacks->user_data);
-                    }
-                }
-            }
-        }
-    }
-
-    if (callbacks->free_entries) {
-        callbacks->free_entries(entries, count, callbacks->user_data);
-    }
-
-    return found_model_file;
-}
-
-rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t handle,
-                                                    const rac_discovery_callbacks_t* callbacks,
-                                                    rac_discovery_result_t* out_result) {
-    if (!handle || !callbacks || !out_result) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    // Initialize result
-    out_result->discovered_count = 0;
-    out_result->discovered_models = nullptr;
-    out_result->unregistered_count = 0;
-
-    // Check required callbacks
-    if (!callbacks->list_directory || !callbacks->path_exists || !callbacks->is_directory) {
-        RAC_LOG_WARNING("ModelRegistry", "Discovery: Missing required callbacks");
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    RAC_LOG_INFO("ModelRegistry", "Starting model discovery scan...");
-
-    // Get models directory path
-    char models_dir[1024];
-    if (rac_model_paths_get_models_directory(models_dir, sizeof(models_dir)) != RAC_SUCCESS) {
-        RAC_LOG_WARNING("ModelRegistry", "Discovery: Base directory not configured");
-        return RAC_SUCCESS;  // Not an error, just nothing to discover
-    }
-
-    // Check if models directory exists
-    if (callbacks->path_exists(models_dir, callbacks->user_data) != RAC_TRUE) {
-        RAC_LOG_DEBUG("ModelRegistry", "Discovery: Models directory does not exist yet");
-        return RAC_SUCCESS;
-    }
-
-    // Frameworks to scan - include all frameworks that can have downloaded models
-    // Note: RAC_FRAMEWORK_UNKNOWN is included to recover models that were incorrectly
-    // stored in the "Unknown" directory due to missing framework mappings
-    rac_inference_framework_t frameworks[] = {
-        RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
-        RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
-        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_METALRT,
-        RAC_FRAMEWORK_GENIE,       RAC_FRAMEWORK_SHERPA,
-        RAC_FRAMEWORK_UNKNOWN};
-    size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
-
-    // Lock-copy-dispatch: snapshot the registered ids (and which ones already
-    // have a local_path) under the lock, then drop it for the entire
-    // filesystem scan. Platform callbacks (Swift FileManager, Kotlin
-    // Files.exists, dart_ffi) MUST NOT be invoked while holding handle->mutex
-    // — they can stall on cold OS caches and may re-enter registry APIs via
-    // SDK glue, which would deadlock. Matches the event publisher's
-    // lock-copy-dispatch pattern documented in commons AGENTS.md.
-    std::map<std::string, bool> needs_link_by_id;
-    {
-        std::lock_guard<std::mutex> lock(handle->mutex);
-        for (const auto& pair : handle->models) {
-            const rac_model_info_t* model = pair.second;
-            const bool needs_link = !model || !model->local_path || model->local_path[0] == '\0';
-            needs_link_by_id.emplace(pair.first, needs_link);
-        }
-    }
-
-    // Collect discovered models (unlocked phase — no handle->mutex held).
-    std::vector<rac_discovered_model_t> discovered;
-    size_t unregistered = 0;
-
-    for (size_t f = 0; f < framework_count; f++) {
-        rac_inference_framework_t framework = frameworks[f];
-
-        // Get framework directory path
-        char framework_dir[1024];
-        if (rac_model_paths_get_framework_directory(framework, framework_dir,
-                                                    sizeof(framework_dir)) != RAC_SUCCESS) {
-            continue;
-        }
-
-        // Check if framework directory exists
-        if (callbacks->path_exists(framework_dir, callbacks->user_data) != RAC_TRUE) {
-            continue;
-        }
-
-        // List model folders in this framework directory
-        char** model_folders = nullptr;
-        size_t folder_count = 0;
-
-        if (callbacks->list_directory(framework_dir, &model_folders, &folder_count,
-                                      callbacks->user_data) != RAC_SUCCESS) {
-            // Defensive guard. The list_directory
-            // contract says "no allocation on failure"; the C ABI is
-            // implemented by every platform SDK and a future regression
-            // could leave a partial allocation here. If callers DID populate
-            // model_folders before returning non-success, free it through
-            // their canonical entry point so we don't leak.
-            if (model_folders && callbacks->free_entries) {
-                callbacks->free_entries(model_folders, folder_count, callbacks->user_data);
-            }
-            continue;
-        }
-
-        for (size_t i = 0; i < folder_count; i++) {
-            if (!model_folders[i])
-                continue;
-
-            // Skip hidden files
-            if (model_folders[i][0] == '.')
-                continue;
-
-            const char* model_id = model_folders[i];
-
-            // Build full path to model folder
-            std::string model_path = std::string(framework_dir) + "/" + model_id;
-
-            // Check if it's a directory
-            if (callbacks->is_directory(model_path.c_str(), callbacks->user_data) != RAC_TRUE) {
-                continue;
-            }
-
-            // Check if it contains valid model files
-            if (!is_valid_model_folder(callbacks, model_path.c_str(), framework)) {
-                continue;
-            }
-
-            // Check if this model is registered (using snapshot taken above)
-            auto snap_it = needs_link_by_id.find(model_id);
-            if (snap_it == needs_link_by_id.end()) {
-                // Model folder exists but not registered
-                unregistered++;
-                RAC_LOG_DEBUG("ModelRegistry", "Found unregistered model folder");
-                continue;
-            }
-            if (!snap_it->second) {
-                // Already linked at snapshot time — nothing to do.
-                continue;
-            }
-
-            // Apply the link under the registry's own lock via the canonical
-            // update entry point (it takes/releases handle->mutex briefly).
-            rac_result_t link_rc =
-                rac_model_registry_update_download_status(handle, model_id, model_path.c_str());
-            if (link_rc != RAC_SUCCESS) {
-                RAC_LOG_WARNING("ModelRegistry", "Discovery: failed to link '%s' (rc=%d)", model_id,
-                                static_cast<int>(link_rc));
-                continue;
-            }
-
-            // Add to discovered list
-            rac_discovered_model_t disc;
-            disc.model_id = rac_strdup(model_id);
-            disc.local_path = rac_strdup(model_path.c_str());
-            disc.framework = framework;
-            discovered.push_back(disc);
-
-            RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
-        }
-
-        if (callbacks->free_entries) {
-            callbacks->free_entries(model_folders, folder_count, callbacks->user_data);
-        }
-    }
-
-    // Build result
-    out_result->discovered_count = discovered.size();
-    out_result->unregistered_count = unregistered;
-
-    if (!discovered.empty()) {
-        out_result->discovered_models = static_cast<rac_discovered_model_t*>(
-            malloc(sizeof(rac_discovered_model_t) * discovered.size()));
-        if (out_result->discovered_models) {
-            for (size_t i = 0; i < discovered.size(); i++) {
-                out_result->discovered_models[i] = discovered[i];
-            }
-        }
-    }
-
-    RAC_LOG_INFO("ModelRegistry", "Model discovery complete");
-
-    return RAC_SUCCESS;
-}
-
-// =============================================================================
 // PUBLIC API - REFRESH
 // =============================================================================
 
@@ -3552,82 +3276,15 @@ rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
         }
     }
 
-    // Step 2: Rescan local filesystem and link discovered downloads.
-    if (opts.rescan_local == RAC_TRUE) {
-        if (opts.discovery_callbacks) {
-            rac_discovery_result_t disc = {};
-            rac_result_t rescan_rc =
-                rac_model_registry_discover_downloaded(handle, opts.discovery_callbacks, &disc);
-            if (rescan_rc == RAC_SUCCESS) {
-                RAC_LOG_INFO("ModelRegistry",
-                             "Local rescan complete (%zu discovered, %zu unregistered)",
-                             disc.discovered_count, disc.unregistered_count);
-            } else {
-                RAC_LOG_WARNING("ModelRegistry", "Local rescan failed: %d", rescan_rc);
-                if (first_error == RAC_SUCCESS)
-                    first_error = rescan_rc;
-            }
-            rac_discovery_result_free(&disc);
-        } else {
-            RAC_LOG_DEBUG("ModelRegistry",
-                          "Rescan local requested but discovery_callbacks is NULL; skipping");
-        }
-    }
-
-    // Step 3: Prune orphaned local_path entries.
-    if (opts.prune_orphans == RAC_TRUE) {
-        if (opts.discovery_callbacks && opts.discovery_callbacks->path_exists) {
-            std::lock_guard<std::mutex> lock(handle->mutex);
-            size_t pruned = 0;
-            for (auto& pair : handle->models) {
-                rac_model_info_t* model = pair.second;
-                if (!model || !model->local_path || strlen(model->local_path) == 0) {
-                    continue;
-                }
-                rac_bool_t exists = opts.discovery_callbacks->path_exists(
-                    model->local_path, opts.discovery_callbacks->user_data);
-                if (exists != RAC_TRUE) {
-                    free(model->local_path);
-                    model->local_path = nullptr;
-                    model->updated_at = rac_get_current_time_ms() / 1000;
-#ifdef RAC_HAVE_PROTOBUF
-                    store_proto_snapshot_locked(handle, pair.first, model,
-                                                /*preserve_proto_only_fields=*/true,
-                                                /*overwrite_registry_state=*/true);
-#endif
-                    ++pruned;
-                }
-            }
-            RAC_LOG_INFO("ModelRegistry", "Pruned %zu orphaned local_path entries", pruned);
-        } else {
-            RAC_LOG_DEBUG(
-                "ModelRegistry",
-                "Prune orphans requested but discovery_callbacks/path_exists is NULL; skipping");
-        }
-    }
+    // The legacy filesystem-discovery branches (rescan_local / prune_orphans
+    // driven by opts.discovery_callbacks) have been removed: every SDK now
+    // passes discovery_callbacks=nullptr and routes cold-launch reconciliation
+    // through the platform adapter via rac_model_registry_refresh_proto (which
+    // calls rescan_local_via_platform_adapter separately). The opts struct
+    // retains rescan_local / prune_orphans / discovery_callbacks fields only
+    // for ABI stability; they are intentionally no-ops here.
 
     return first_error;
-}
-
-void rac_discovery_result_free(rac_discovery_result_t* result) {
-    if (!result)
-        return;
-
-    if (result->discovered_models) {
-        for (size_t i = 0; i < result->discovered_count; i++) {
-            if (result->discovered_models[i].model_id) {
-                free(const_cast<char*>(result->discovered_models[i].model_id));
-            }
-            if (result->discovered_models[i].local_path) {
-                free(const_cast<char*>(result->discovered_models[i].local_path));
-            }
-        }
-        free(result->discovered_models);
-    }
-
-    result->discovered_models = nullptr;
-    result->discovered_count = 0;
-    result->unregistered_count = 0;
 }
 
 // =============================================================================

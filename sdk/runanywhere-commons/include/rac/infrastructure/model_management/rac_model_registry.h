@@ -557,51 +557,6 @@ typedef struct {
     void* user_data;
 } rac_discovery_callbacks_t;
 
-/**
- * @brief Discovery result for a single model
- */
-typedef struct {
-    /** Model ID that was discovered */
-    const char* model_id;
-    /** Path where model was found */
-    const char* local_path;
-    /** Framework of the model */
-    rac_inference_framework_t framework;
-} rac_discovered_model_t;
-
-/**
- * @brief Result of model discovery scan
- */
-typedef struct {
-    /** Number of models discovered as downloaded */
-    size_t discovered_count;
-    /** Array of discovered models */
-    rac_discovered_model_t* discovered_models;
-    /** Number of unregistered model folders found */
-    size_t unregistered_count;
-} rac_discovery_result_t;
-
-/**
- * @brief Discover downloaded models on the file system.
- *
- * Scans the models directory for each framework, checks if folders
- * contain valid model files, and updates the registry for registered models.
- *
- * @param handle Registry handle
- * @param callbacks Platform file operation callbacks
- * @param out_result Output: Discovery result (caller must call rac_discovery_result_free)
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_model_registry_discover_downloaded(
-    rac_model_registry_handle_t handle, const rac_discovery_callbacks_t* callbacks,
-    rac_discovery_result_t* out_result);
-
-/**
- * @brief Free discovery result
- * @param result Discovery result to free
- */
-RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
-
 // =============================================================================
 // REFRESH - Unified cross-SDK registry refresh
 // =============================================================================
@@ -609,29 +564,22 @@ RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
 /**
  * @brief Options for rac_model_registry_refresh().
  *
- * Semantic fields (per task spec):
+ * Semantic fields:
  *   - include_remote_catalog: RAC_TRUE to fetch the remote model assignment
  *       catalog via rac_model_assignment_fetch(force_refresh=TRUE). Requires
  *       that rac_model_assignment_set_callbacks() has previously been called
  *       (usually at SDK init); otherwise this step no-ops and returns success.
- *   - rescan_local: RAC_TRUE to rescan on-disk model folders and link any
- *       newly-discovered downloads back to registered model entries.
- *       Requires discovery_callbacks to be non-NULL; otherwise this step is
- *       skipped silently.
- *   - prune_orphans: RAC_TRUE to clear local_path on models whose recorded
- *       path no longer exists on disk (detected via
- *       discovery_callbacks->path_exists). Requires discovery_callbacks to
- *       be non-NULL; otherwise this step is skipped silently.
- *
- * discovery_callbacks mirrors rac_model_registry_discover_downloaded's
- * callback struct. It stays optional in the ABI so consumers that only want
- * `include_remote_catalog` don't have to wire platform file-IO stubs.
+ *   - rescan_local / prune_orphans: deprecated no-ops in this struct-based
+ *       entry point. Cold-launch filesystem reconciliation now runs through
+ *       the platform adapter via rac_model_registry_refresh_proto (which calls
+ *       rescan_local_via_platform_adapter). These fields are retained only for
+ *       ABI stability and are ignored here.
  */
 typedef struct {
     rac_bool_t include_remote_catalog;
-    rac_bool_t rescan_local;
-    rac_bool_t prune_orphans;
-    /** Optional — required only when rescan_local or prune_orphans is set. */
+    rac_bool_t rescan_local;  /* deprecated: ignored; rescan runs via the proto/adapter path */
+    rac_bool_t prune_orphans; /* deprecated: ignored; rescan runs via the proto/adapter path */
+    /* deprecated: unused; always NULL */
     const rac_discovery_callbacks_t* discovery_callbacks;
 } rac_model_registry_refresh_opts_t;
 

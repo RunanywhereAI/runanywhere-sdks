@@ -718,7 +718,6 @@ _rac_model_info_is_downloaded
 _rac_model_info_is_small_model_proto
 _rac_model_info_parameter_count_b_proto
 _rac_model_registry_create
-_rac_model_registry_discover_downloaded
 _rac_model_registry_get
 _rac_model_registry_get_all
 _rac_model_registry_get_downloaded
@@ -796,7 +795,6 @@ _rac_archive_structure_from_proto
 _rac_archive_structure_to_proto
 
 # Model registry supporting result/freeing helpers.
-_rac_discovery_result_free
 _rac_find_model_path_after_extraction
 _rac_model_path_resolution_free
 
