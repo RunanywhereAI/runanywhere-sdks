@@ -339,8 +339,11 @@ int test_unsupported_route(rac_model_registry_handle_t registry) {
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
           "unsupported route returns parsable ModelLoadResult");
     CHECK(!result.success(), "unsupported route reports success=false");
-    CHECK(result.error_message().find("route") != std::string::npos,
-          "unsupported route carries route error");
+    // W1 removed the routing scorer: an unserviceable primitive now fails in
+    // rac_plugin_find (no registered backend) rather than the old route scorer,
+    // so the error names the missing backend instead of a "route".
+    CHECK(result.error_message().find("backend") != std::string::npos,
+          "unsupported route carries no-backend error");
     rac_proto_buffer_free(&out);
     rac_model_lifecycle_reset();
     return 0;

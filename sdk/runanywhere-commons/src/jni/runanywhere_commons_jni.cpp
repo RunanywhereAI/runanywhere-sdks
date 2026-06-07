@@ -1318,6 +1318,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     // Initialize the C adapter struct with our JNI callbacks
     memset(&g_c_adapter, 0, sizeof(g_c_adapter));
+    // ABI guard (W3-hardening): rac_init validates these two head fields and
+    // rejects the adapter with RAC_ERROR_ABI_VERSION_MISMATCH if they are unset.
+    g_c_adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    g_c_adapter.struct_size = sizeof(g_c_adapter);
     g_c_adapter.log = jni_log_callback;
     g_c_adapter.file_exists = jni_file_exists_callback;
     g_c_adapter.file_read = jni_file_read_callback;
