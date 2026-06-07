@@ -45,12 +45,19 @@ project(runanywhere
     HOMEPAGE_URL "https://github.com/RunanywhereAI/runanywhere-sdks"
 )
 
-# Enable Objective-C++ at the root project level so
-# engines/coreml/*.mm (and any future Apple-framework
-# bridge TU) compile correctly. `enable_language` inside a subdirectory
-# doesn't populate the CMAKE_OBJCXX_* toolchain variables the build
-# generator needs — it must be called before the subdirectories run.
+# Enable Objective-C AND Objective-C++ at the root project level.
+#   - OBJCXX: engines/coreml/*.mm and any Apple-framework bridge TU.
+#   - OBJC:   vendored llama.cpp ggml-metal *.m. These are plain Objective-C
+#             (C-style implicit void*->T* conversions, e.g. `calloc`). Without
+#             OBJC enabled, the Makefiles/Ninja generators have no Objective-C
+#             language and fall back to compiling .m as Objective-C++ (clang++
+#             -std=c++17), which rejects those conversions and breaks the Metal
+#             build. (The Xcode generator used for the iOS presets maps .m->OBJC
+#             natively, which is why device builds were unaffected.)
+# `enable_language` inside a subdirectory doesn't populate the CMAKE_OBJC*_*
+# toolchain variables the generator needs — it must run before subdirectories.
 if(APPLE)
+    enable_language(OBJC)
     enable_language(OBJCXX)
 endif()
 
