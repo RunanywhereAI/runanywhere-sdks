@@ -161,10 +161,6 @@ object CppBridgeDevConfig {
     val buildToken: String?
         get() = RunAnywhereBridge.racDevConfigGetBuildToken()?.takeIf { isUsableCredential(it) }
 
-    /** Sentry DSN for crash reporting (optional). Mirrors Swift's `DevConfig.sentryDSN`. */
-    val sentryDSN: String?
-        get() = RunAnywhereBridge.racDevConfigGetSentryDsn()
-
     /**
      * Whether the dev Supabase config is present and not a template
      * placeholder. Mirrors Swift's `DevConfig.hasUsableSupabaseConfig`.

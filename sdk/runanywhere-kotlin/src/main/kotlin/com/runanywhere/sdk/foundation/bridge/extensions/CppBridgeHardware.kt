@@ -43,55 +43,6 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 object CppBridgeHardware {
     private const val TAG = "CppBridgeHardware"
 
-    /**
-     * Retrieve the full hardware profile.
-     *
-     * Returns the decoded [HardwareProfileResult] from the native
-     * `rac_hardware_profile_get` thunk, or an empty default if the C++
-     * implementation has not yet populated the profile.
-     */
-    fun getProfile(): HardwareProfileResult {
-        val bytes = RunAnywhereBridge.racHardwareProfileGet()
-        return if (bytes != null && bytes.isNotEmpty()) {
-            HardwareProfileResult.ADAPTER.decode(bytes)
-        } else {
-            HardwareProfileResult()
-        }
-    }
-
-    /**
-     * Decode the lightweight accelerator-only `HardwareProfileResult` returned
-     * by `rac_hardware_get_accelerators` and surface just its `accelerators`
-     * list. Mirrors Swift `CppBridge.Hardware.getAccelerators()`. Returns an
-     * empty list when the commons ABI returns null/empty (matches Swift's
-     * empty-`accelerators` result when the symbol is missing).
-     */
-    fun getAccelerators(): List<AcceleratorInfo> {
-        val bytes = RunAnywhereBridge.racHardwareGetAccelerators()
-        return if (bytes != null && bytes.isNotEmpty()) {
-            HardwareProfileResult.ADAPTER.decode(bytes).accelerators
-        } else {
-            emptyList()
-        }
-    }
-
-    /**
-     * Set the preferred accelerator for subsequent routing / inference calls.
-     * Mirrors Swift `CppBridge.Hardware.setAcceleratorPreference(_:)`: throws
-     * `SDKException` when the commons ABI returns a non-success `rac_result_t`.
-     */
-    fun setAcceleratorPreference(pref: AccelerationPreference) {
-        val rc =
-            RunAnywhereBridge.racHardwareSetAcceleratorPreference(
-                AccelerationPreference.ADAPTER.encode(pref),
-            )
-        if (rc != 0) {
-            throw SDKException.operation(
-                "Failed to set accelerator preference: rc=$rc",
-            )
-        }
-    }
-
     // Platform fallbacks (CPU / RAM / NPU / GPU)
     //
     // These helpers run on Android via reflection so the SDK keeps building

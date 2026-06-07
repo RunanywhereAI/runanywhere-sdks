@@ -805,13 +805,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDevConfigGetBuildToken(): String?
 
-    /**
-     * Get Sentry DSN for crash reporting.
-     * @return Sentry DSN or null if not configured
-     */
-    @JvmStatic
-    external fun racDevConfigGetSentryDsn(): String?
-
     // SDK configuration initialization
 
     /**
@@ -1353,14 +1346,6 @@ object RunAnywhereBridge {
 
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
     //
-    // JNI thunk for rac_hardware_profile_get. Returns a serialized
-    // HardwareProfileResult proto, or null if the C++ implementation is not
-    // wired yet.
-
-    /** Get the hardware profile for the current device.
-     *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
-    @JvmStatic external fun racHardwareProfileGet(): ByteArray?
-
     // ENGINE ROUTER — CAPABILITY QUERIES
     //
     // `rac_router_frameworks_for_capability_proto` consumes a serialized
@@ -1368,22 +1353,6 @@ object RunAnywhereBridge {
     // `runanywhere.v1.FrameworksForCapabilityResponse`. Replaces the local
     // SDKComponent → ModelCategory → framework mapping that used to live in
     // Kotlin.
-
-    // HARDWARE ACCELERATORS (Swift-alignment)
-    //
-    // Surface the lightweight accelerator list and preference setter that
-    // Swift's CppBridge+Hardware uses (rac_hardware_get_accelerators /
-    // rac_hardware_set_accelerator_preference). Different from
-    // racHardwareProfileGet, which returns the full HardwareProfileResult.
-
-    /** Get the accelerator list only (HardwareProfileResult with profile field empty).
-     *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
-    @JvmStatic external fun racHardwareGetAccelerators(): ByteArray?
-
-    /** Set the accelerator preference for subsequent inference calls.
-     *  @param bytes serialized AcceleratorPreference proto bytes (or single-byte enum).
-     *  @return rac_result_t (0 = success). */
-    @JvmStatic external fun racHardwareSetAcceleratorPreference(bytes: ByteArray): Int
 
     // VAD COMPONENT METADATA (Swift-alignment)
 

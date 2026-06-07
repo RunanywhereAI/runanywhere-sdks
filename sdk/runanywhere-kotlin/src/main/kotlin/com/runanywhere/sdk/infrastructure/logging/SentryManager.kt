@@ -36,7 +36,7 @@ object SentryManager {
     /**
      * Initialize Sentry with the configured DSN.
      *
-     * @param dsn Sentry DSN (if null, uses C++ config sentryDSN)
+     * @param dsn Sentry DSN (if null, crash reporting stays disabled)
      * @param environment SDK environment for tagging events
      */
     fun initialize(
@@ -47,8 +47,9 @@ object SentryManager {
             return
         }
 
-        // Use provided DSN or fallback to C++ config
-        val sentryDSN = dsn ?: getSentryDsnFromConfig()
+        // DSN is supplied by the app/SDK config; it is no longer sourced from
+        // C++ (commons holds no Sentry configuration).
+        val sentryDSN = dsn
 
         if (sentryDSN.isNullOrEmpty() || sentryDSN == "YOUR_SENTRY_DSN_HERE") {
             SDKLogger(TAG).debug("Sentry DSN not configured. Crash reporting disabled.")
@@ -86,17 +87,6 @@ object SentryManager {
             SDKLogger(TAG).debug("Sentry initialized successfully")
         } catch (e: Exception) {
             SDKLogger(TAG).error("Failed to initialize Sentry: ${e.message}")
-        }
-    }
-
-    /**
-     * Get Sentry DSN from C++ dev config.
-     */
-    private fun getSentryDsnFromConfig(): String? {
-        return try {
-            RunAnywhereBridge.racDevConfigGetSentryDsn()
-        } catch (e: Exception) {
-            null
         }
     }
 
