@@ -104,7 +104,6 @@ static rac_platform_adapter_t make_test_adapter() {
     adapter.secure_set = test_secure_set;
     adapter.secure_delete = test_secure_delete;
     adapter.log = test_log;
-    adapter.track_error = nullptr;
     adapter.now_ms = test_now_ms;
     adapter.get_memory_info = test_get_memory_info;
     adapter.http_download = nullptr;

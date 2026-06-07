@@ -52,7 +52,6 @@ static const rac_platform_adapter_t test_adapter = {
     /* secure_set        */ nullptr,
     /* secure_delete     */ nullptr,
     /* log               */ test_log_callback,
-    /* track_error       */ nullptr,
     /* now_ms            */ test_now_ms,
     /* get_memory_info   */ nullptr,
     /* http_download     */ nullptr,
