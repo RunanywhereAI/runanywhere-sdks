@@ -101,10 +101,12 @@ export type {
 } from './Public/Extensions/Backends/onnxStatus';
 export { LogLevel } from './Public/Extensions/RunAnywhere+Logging';
 export type { LoggingConfiguration, LogDestination } from './Public/Extensions/RunAnywhere+Logging';
+// Hardware profile types are proto-generated; import them directly from
+// `@runanywhere/proto-ts/hardware_profile` if needed.
 export type {
   HardwareProfile,
   HardwareProfileResult,
-} from './Public/Extensions/RunAnywhere+Hardware';
+} from '@runanywhere/proto-ts/hardware_profile';
 
 // T6.1 — Worker streaming path. Backend packages
 // (`@runanywhere/web-llamacpp`, `@runanywhere/web-onnx`) call

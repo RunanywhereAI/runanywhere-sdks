@@ -62,7 +62,6 @@ import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downl
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
 import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
 import { WebModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
-import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
 import { TextGeneration as TextGenerationCapability } from './Extensions/RunAnywhere+TextGeneration';
 import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
 import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
@@ -1078,9 +1077,6 @@ export const RunAnywhere = {
   /** Runtime plugin loader — unavailable on plain WASM unless host exports the ABI. */
   pluginLoader: PluginLoaderCapability,
 
-  /** Hardware profile — `RunAnywhere.hardware.getProfile()` etc. */
-  hardware: HardwareCapability,
-
   /**
    * Backend availability snapshots — `RunAnywhere.backends.onnxStatus()`
    * etc. Returns build-flag-free reasons that example apps can render
@@ -1542,10 +1538,10 @@ export const RunAnywhere = {
     logger.info('Shutting down RunAnywhere Web SDK...');
 
     // Clear every WASM adapter singleton that `setRunanywhereModule()`
-    // installed (DownloadAdapter, HardwareAdapter, ModelLifecycleAdapter,
+    // installed (DownloadAdapter, ModelLifecycleAdapter,
     // ModelRegistryAdapter, ModalityProtoAdapter, SDKEventStreamAdapter)
     // and null the global module so post-shutdown calls into
-    // ModalityProtoAdapter / HardwareAdapter / tryRunanywhereModule()
+    // ModalityProtoAdapter / tryRunanywhereModule()
     // can't acquire stale references to a torn-down backend.
     clearRunanywhereModule();
     // HTTPAdapter and StorageAdapter are owned outside setRunanywhereModule(),

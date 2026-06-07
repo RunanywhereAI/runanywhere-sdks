@@ -121,8 +121,6 @@ export { ModelLifecycleAdapter } from './Adapters/ModelLifecycleAdapter';
 export type { ModelLifecycleModule } from './Adapters/ModelLifecycleAdapter';
 export { DownloadAdapter } from './Adapters/DownloadAdapter';
 export type { DownloadModule, ProtoDownloadProgressHandler } from './Adapters/DownloadAdapter';
-export { HardwareAdapter } from './Adapters/HardwareAdapter';
-export type { HardwareModule } from './Adapters/HardwareAdapter';
 export { StorageAdapter } from './Adapters/StorageAdapter';
 export type { StorageModule } from './Adapters/StorageAdapter';
 export { SDKEventStreamAdapter } from './Adapters/SDKEventStreamAdapter';

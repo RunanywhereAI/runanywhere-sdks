@@ -24,7 +24,6 @@
  */
 
 import { DownloadAdapter } from '../Adapters/DownloadAdapter';
-import { HardwareAdapter } from '../Adapters/HardwareAdapter';
 import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import { ModalityProtoAdapter } from '../Adapters/ModalityProtoAdapter';
@@ -524,14 +523,6 @@ export interface EmscriptenRunanywhereModule {
   _rac_model_registry_proto_free?(protoBytes: number): void;
 
   // -----------------------------------------------------------------------------
-  // Hardware profile proto-byte ABI
-  // -----------------------------------------------------------------------------
-  _rac_hardware_profile_get?(protoBytesOut: number, protoSizeOut: number): number;
-  _rac_hardware_profile_free?(protoBytes: number): void;
-  _rac_hardware_get_accelerators?(protoBytesOut: number, protoSizeOut: number): number;
-  _rac_hardware_set_accelerator_preference?(preference: number): number;
-
-  // -----------------------------------------------------------------------------
   // Model lifecycle proto-byte ABI
   // -----------------------------------------------------------------------------
   _rac_model_lifecycle_load_proto?(
@@ -784,9 +775,10 @@ const _moduleByCapability = new Map<WasmCapability, EmscriptenRunanywhereModule>
 
 /**
  * Framework → module map. Each backend WASM owns its own static
- * `s_plugin_registry`; `rac_plugin_route` only finds the framework's plugin
- * inside the WASM that ran the backend's `rac_backend_*_register()` call.
- * Web-only: native SDKs share a single process-wide plugin registry.
+ * `s_plugin_registry`; the plugin registry lookup (`rac_plugin_find*`) only
+ * finds the framework's plugin inside the WASM that ran the backend's
+ * `rac_backend_*_register()` call. Web-only: native SDKs share a single
+ * process-wide plugin registry.
  */
 const _moduleByFramework = new Map<string, EmscriptenRunanywhereModule>();
 
@@ -817,14 +809,13 @@ export function registerWasmModule(
   for (const fw of frameworks) {
     if (fw) _moduleByFramework.set(fw.toLowerCase(), mod);
   }
-  // Commons-level adapters (model registry, downloads, hardware, events)
+  // Commons-level adapters (model registry, downloads, events)
   // follow the 'commons' capability — they target SDK-state surface exports
   // that live in racommons.wasm. Routing them by capability prevents a
   // later llamacpp/onnx bridge from clobbering the core's installed
   // adapters when it registers its own narrower capabilities.
   if (capabilities.includes('commons')) {
     DownloadAdapter.setDefaultModule(mod);
-    HardwareAdapter.setDefaultModule(mod);
     ModelRegistryAdapter.setDefaultModule(mod);
     SDKEventStreamAdapter.setDefaultModule(mod);
     // Pre-bind ModelLifecycleAdapter to commons too — backend bridges
@@ -834,7 +825,7 @@ export function registerWasmModule(
     ModelLifecycleAdapter.setDefaultModule(mod);
   }
   // Model lifecycle + model registry routing — special case. The C++
-  // `rac_plugin_route` call (driven by ModelLifecycleAdapter.load) lives
+  // plugin-registry route (driven by ModelLifecycleAdapter.load) lives
   // inside whichever WASM module's `s_plugin_registry` was populated by
   // the backend's `rac_backend_*_register()` call. The commons artifact
   // has NO backend plugins linked in, so routing model loads through
@@ -879,12 +870,11 @@ export function unregisterWasmModule(mod: EmscriptenRunanywhereModule): void {
   // regardless of which capability it owned — the broadcast list mirrors
   // every WASM that has ever called `setDefaultModule`. If commons was
   // released we also clear the other commons-level adapters (Download,
-  // Hardware, ModelLifecycle, SDKEventStream) because they still track a
+  // ModelLifecycle, SDKEventStream) because they still track a
   // single primary slot. Re-registration by another module reinstalls them.
   ModelRegistryAdapter.unregisterModule(mod);
   if (releasedCapabilities.includes('commons')) {
     DownloadAdapter.clearDefaultModule();
-    HardwareAdapter.clearDefaultModule();
     ModelLifecycleAdapter.clearDefaultModule();
     SDKEventStreamAdapter.clearDefaultModule();
   }
@@ -942,7 +932,6 @@ export function clearRunanywhereModule(): void {
   // routing 'llamacpp' to a torn-down WASM instance).
   _moduleByFramework.clear();
   DownloadAdapter.clearDefaultModule();
-  HardwareAdapter.clearDefaultModule();
   ModelLifecycleAdapter.clearDefaultModule();
   ModelRegistryAdapter.clearDefaultModule();
   ModalityProtoAdapter.clearDefaultModule();

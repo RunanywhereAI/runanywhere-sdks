@@ -57,15 +57,14 @@
  *          -DRAC_STATIC_PLUGINS=ON, the same path iOS uses).
  *
  *   D. Service creation. The router needs a `rac_stt_service_t*` for each side.
- *      The JNI path builds it with `create_stt_service_via_registry()`
- *      (rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint) → vt->stt_ops->create
- *      → wrap in a heap rac_stt_service_t) and the Swift binding does the same
- *      via rac_plugin_route directly. Neither shape is reachable from JS: it
- *      requires dereferencing a function pointer INSIDE a returned vtable
- *      struct, which the Web SDK deliberately never does (it uses proto-byte
- *      ABIs + offset helpers, never raw vtable deref). The clean WASM-shaped
- *      fix is a tiny commons C ABI convenience export that mirrors the JNI
- *      helper 1:1:
+ *      Plugin SELECTION is shared commons: `rac_plugin_find_for_engine(
+ *      RAC_PRIMITIVE_TRANSCRIBE, engine_name)` returns the engine's vtable
+ *      pointer (0 when no plugin is registered under that engine for the
+ *      primitive). Actually building the service from that vtable means
+ *      dereferencing `vt->stt_ops->create` INSIDE the struct, which the Web
+ *      SDK deliberately never does (it uses proto-byte ABIs + offset helpers,
+ *      never raw vtable deref). So the create→wrap stays in a commons C ABI
+ *      convenience export that does the selection + deref + heap-wrap in one:
  *
  *        // returns an opaque rac_stt_service_t* (as a pointer/number), or 0
  *        RAC_API rac_stt_service_t* rac_stt_hybrid_router_create_service(
@@ -75,11 +74,10 @@
  *        RAC_API void rac_stt_hybrid_router_destroy_service(rac_stt_service_t*);
  *
  *      exported as `_rac_stt_hybrid_router_create_service` /
- *      `_rac_stt_hybrid_router_destroy_service`. This binding is written
- *      against exactly that pair (see `HybridSttRouter.createService`). Adding
- *      these two thin wrappers to commons + the export list is the ONLY
- *      remaining commons-side change; it is out of scope for the Web SDK
- *      package and tracked as the build/commons follow-up.
+ *      `_rac_stt_hybrid_router_destroy_service` (both already land in commons +
+ *      the WASM export list). This binding uses `rac_plugin_find_for_engine`
+ *      as the routability guard before delegating create→wrap to that pair
+ *      (see `HybridSttRouter.createService`).
  *
  * Until A–D land, `HybridSttRouter` constructs cleanly but
  * `supportsHybridRouter()` returns false and `setPair`/`transcribe` raise a
@@ -87,6 +85,13 @@
  */
 
 import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule';
+
+/**
+ * `rac_primitive_t` value for the TRANSCRIBE (STT) primitive. Used to pin the
+ * STT plugin via `rac_plugin_find_for_engine`. Mirrors the C enum
+ * RAC_PRIMITIVE_TRANSCRIBE (rac/plugin/rac_plugin_entry.h).
+ */
+export const RAC_PRIMITIVE_TRANSCRIBE = 2;
 
 /**
  * The hybrid-router proto-byte ABI + supporting vtable/register exports.
@@ -139,9 +144,24 @@ export interface HybridWasmModule extends EmscriptenRunanywhereModule {
   /** `void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes)`. */
   _rac_stt_hybrid_router_proto_buffer_free?(responseBytes: number): void;
 
+  // ── Plugin selection (rac_plugin_entry.h) ─────────────────────────────────
+  /** `const rac_engine_vtable_t* rac_plugin_find_for_engine(
+   *    rac_primitive_t primitive, const char* engine_name)` — returns the
+   *    engine's vtable pointer for `primitive`, or 0 when no plugin is
+   *    registered under that engine name for the primitive. Used to pin the
+   *    offline "sherpa" vs online "cloud" STT engine (priority order cannot
+   *    distinguish two plugins that serve the same primitive). */
+  _rac_plugin_find_for_engine?(
+    primitive: number,
+    engineNamePtr: number,
+  ): number;
+
   // ── Service creation convenience (BUILD DELTA item D) ─────────────────────
   /** `rac_stt_service_t* rac_stt_hybrid_router_create_service(
-   *    engine_hint, model_id_or_path, config_json)` — opaque ptr or 0. */
+   *    engine_hint, model_id_or_path, config_json)` — opaque ptr or 0.
+   *    Internally selects the engine via `rac_plugin_find_for_engine`, then
+   *    dereferences `stt_ops->create` + heap-wraps (commons does the deref so
+   *    JS never touches the vtable). */
   _rac_stt_hybrid_router_create_service?(
     engineHintPtr: number,
     modelIdOrPathPtr: number,

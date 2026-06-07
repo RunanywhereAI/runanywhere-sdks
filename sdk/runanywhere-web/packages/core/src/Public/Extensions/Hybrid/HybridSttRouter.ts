@@ -54,6 +54,7 @@ import {
   hasHybridRouterExports,
   hybridRouterRequirementMessage,
   missingHybridRouterExports,
+  RAC_PRIMITIVE_TRANSCRIBE,
   type HybridWasmModule,
 } from './HybridWasmModule';
 import { CloudSTT } from './CloudSTT';
@@ -70,7 +71,7 @@ interface AttachedService {
   servicePtr: number;
 }
 
-/** Map a backend kind to the engine hint `rac_plugin_route` pins on. */
+/** Map a backend kind to the engine name `rac_plugin_find_for_engine` pins on. */
 function pinnedEngineName(backend: HybridBackendKind): string {
   switch (backend) {
     case HybridBackendKind.HYBRID_BACKEND_SHERPA:
@@ -332,15 +333,36 @@ export class HybridSttRouter {
   // ── Registry-routed service creation ──────────────────────────────────────
 
   /**
-   * Create an STT service for `model` via the registry route (engine hint
+   * Create an STT service for `model` via the registry route (engine name
    * "sherpa"/"cloud"), returning the opaque `rac_stt_service_t*` the router
    * holds. cloud needs provider + api_key + model from the credential
    * registry; sherpa resolves its model from the C model registry, so it gets
    * the model id with no extra config — exactly the Swift/Kotlin split.
+   *
+   * Plugin selection is the shared commons helper
+   * `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engineName)`: it
+   * returns the engine's vtable pointer directly (0 = no plugin registered
+   * under that engine for the primitive). We use it as the routability guard,
+   * then delegate the create→wrap to `rac_stt_hybrid_router_create_service`
+   * (commons dereferences `stt_ops->create` + heap-wraps; JS never touches the
+   * vtable).
    */
   private createService(model: HybridModelSpec): AttachedService {
     const mod = this.module;
     const engineName = pinnedEngineName(model.backend);
+
+    // Select the STT plugin by engine name. The new commons selection helper
+    // returns the vtable pointer directly (0 = not found) — no routing-hints
+    // struct, no out-pointer, no rc. Guard here so a missing backend surfaces
+    // a precise `backendNotAvailable` instead of an opaque create failure.
+    if (!this.findEnginePlugin(engineName)) {
+      throw SDKException.backendNotAvailable(
+        'hybrid.stt',
+        `No '${engineName}' STT plugin registered for RAC_PRIMITIVE_TRANSCRIBE. ` +
+          `Register the backend first ` +
+          `(load the ONNX/sherpa backend for sherpa; CloudSTT.registerBackend() for cloud).`,
+      );
+    }
 
     // cloud config JSON (provider/api_key/model/...); sherpa = no config.
     const configJSON = model.backend === HybridBackendKind.HYBRID_BACKEND_CLOUD
@@ -358,9 +380,9 @@ export class HybridSttRouter {
       if (!servicePtr) {
         throw SDKException.backendNotAvailable(
           'hybrid.stt',
-          `No '${engineName}' STT plugin registered, or create failed for model ` +
-            `'${model.id}'. Register the backend first ` +
-            `(load the ONNX/sherpa backend for sherpa; CloudSTT.registerBackend() for cloud).`,
+          `'${engineName}' STT plugin create failed for model '${model.id}'. ` +
+            `Check the model is registered/downloaded (sherpa) or the cloud ` +
+            `credentials are valid (cloud).`,
         );
       }
       return { servicePtr };
@@ -368,6 +390,40 @@ export class HybridSttRouter {
       mod._free?.(enginePtr);
       mod._free?.(modelPtr);
       if (configPtr) mod._free?.(configPtr);
+    }
+  }
+
+  /**
+   * Look up the STT plugin registered under `engineName` via the commons
+   * `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engineName)` export.
+   * Returns the engine vtable pointer (truthy when found, 0 when no plugin is
+   * registered under that engine for the primitive). Prefers the typed export;
+   * falls back to the string-name `ccall` when only that shape is present
+   * (mirrors `ProtoWasmBridge.inferModelFileRole`). When the export is missing
+   * entirely we optimistically return non-zero so the subsequent
+   * create→wrap stays the single source of truth for failure.
+   */
+  private findEnginePlugin(engineName: string): number {
+    const mod = this.module;
+    const namePtr = allocCString(mod, engineName);
+    try {
+      if (typeof mod._rac_plugin_find_for_engine === 'function') {
+        return mod._rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, namePtr);
+      }
+      if (typeof mod.ccall === 'function') {
+        return Number(
+          mod.ccall(
+            'rac_plugin_find_for_engine',
+            'number',
+            ['number', 'number'],
+            [RAC_PRIMITIVE_TRANSCRIBE, namePtr],
+          ),
+        );
+      }
+      // Selection export unavailable: defer to create→wrap for the real error.
+      return 1;
+    } finally {
+      mod._free?.(namePtr);
     }
   }
 
