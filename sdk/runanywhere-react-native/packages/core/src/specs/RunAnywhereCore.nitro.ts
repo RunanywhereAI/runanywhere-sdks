@@ -201,8 +201,9 @@ export interface RunAnywhereCore extends HybridObject<{
   /**
    * Refresh the model registry — unified cross-SDK surface.
    *
-   * Routes to `rac_model_registry_refresh` in commons. Each flag is
-   * independent and interpreted by the native registry implementation.
+   * Routes to `rac_model_registry_refresh_proto` in commons (the flags are
+   * encoded into a ModelRegistryRefreshRequest proto by the C++ bridge). Each
+   * flag is independent and interpreted by the native registry implementation.
    *
    * @param includeRemoteCatalog Fetch the backend model assignment catalog.
    * @param rescanLocal Request a local filesystem rescan in native commons.

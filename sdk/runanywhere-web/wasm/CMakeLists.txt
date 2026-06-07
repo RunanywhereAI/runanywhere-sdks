@@ -411,7 +411,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_remove"
     "_rac_model_registry_get_downloaded"
     "_rac_model_registry_update_download_status"
-    "_rac_model_registry_refresh"
     "_rac_model_registry_register_proto"
     "_rac_model_registry_update_proto"
     "_rac_model_registry_get_proto"
@@ -928,6 +927,8 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # fall back to CPU. Always rebuild `racommons-llamacpp-webgpu.{js,wasm}`
     # alongside the CPU variant via `./wasm/scripts/build.sh --llamacpp --webgpu`
     # whenever this list or wasm/src/wasm_exports.cpp changes.
+    "_rac_wasm_offsetof_platform_adapter_abi_version"
+    "_rac_wasm_offsetof_platform_adapter_struct_size"
     "_rac_wasm_offsetof_platform_adapter_file_exists"
     "_rac_wasm_offsetof_platform_adapter_file_read"
     "_rac_wasm_offsetof_platform_adapter_file_write"
@@ -936,7 +937,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_offsetof_platform_adapter_secure_set"
     "_rac_wasm_offsetof_platform_adapter_secure_delete"
     "_rac_wasm_offsetof_platform_adapter_log"
-    "_rac_wasm_offsetof_platform_adapter_track_error"
     "_rac_wasm_offsetof_platform_adapter_now_ms"
     "_rac_wasm_offsetof_platform_adapter_get_memory_info"
     "_rac_wasm_offsetof_platform_adapter_http_download"

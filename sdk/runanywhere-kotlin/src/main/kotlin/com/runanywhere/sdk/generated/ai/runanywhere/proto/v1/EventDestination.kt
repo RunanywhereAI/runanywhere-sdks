@@ -25,23 +25,25 @@ import kotlin.Suppress
  *   Kotlin SDKEvent.kt:24-33          — PUBLIC_ONLY / ANALYTICS_ONLY / ALL
  *   Dart   sdk_event.dart:20-29       — all / publicOnly / analyticsOnly
  * ---------------------------------------------------------------------------
+ * Bitmask routing destination. Values are powers of two so they can be OR'd
+ * together; proto3 enums are open ints, so combinations round-trip on the wire
+ * without named constants. The C++ destination router reads this as a bitmask.
+ *   PUBLIC    — app-facing canonical SDKEvent proto stream
+ *   TELEMETRY — telemetry_manager / server analytics
+ *   LOG       — structured local log sink (opt-in)
+ *   ALL       — PUBLIC | TELEMETRY (legacy "all" parity; the publish() default)
  */
 public enum class EventDestination(
   override val `value`: Int,
 ) : WireEnum {
   EVENT_DESTINATION_UNSPECIFIED(0),
+  EVENT_DESTINATION_PUBLIC(1),
+  EVENT_DESTINATION_TELEMETRY(2),
   /**
-   * EventBus + Analytics (default)
+   * PUBLIC | TELEMETRY
    */
-  EVENT_DESTINATION_ALL(1),
-  /**
-   * EventBus only
-   */
-  EVENT_DESTINATION_PUBLIC_ONLY(2),
-  /**
-   * Analytics/telemetry only
-   */
-  EVENT_DESTINATION_ANALYTICS_ONLY(3),
+  EVENT_DESTINATION_ALL(3),
+  EVENT_DESTINATION_LOG(4),
   ;
 
   public companion object {
@@ -57,9 +59,10 @@ public enum class EventDestination(
     @JvmStatic
     public fun fromValue(`value`: Int): EventDestination? = when (`value`) {
       0 -> EVENT_DESTINATION_UNSPECIFIED
-      1 -> EVENT_DESTINATION_ALL
-      2 -> EVENT_DESTINATION_PUBLIC_ONLY
-      3 -> EVENT_DESTINATION_ANALYTICS_ONLY
+      1 -> EVENT_DESTINATION_PUBLIC
+      2 -> EVENT_DESTINATION_TELEMETRY
+      3 -> EVENT_DESTINATION_ALL
+      4 -> EVENT_DESTINATION_LOG
       else -> null
     }
   }

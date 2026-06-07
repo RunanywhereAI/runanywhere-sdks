@@ -762,34 +762,15 @@ typedef RacHttpDownloadExecuteDart = int Function(
 );
 
 // ============================================================================
-// Model registry refresh (rac_model_registry.h)
-// ============================================================================
-
-/// Matches `rac_model_registry_refresh_opts_t`.
-///
-/// `discoveryCallbacks` is left as `Pointer<ffi.Void>` here because the
-/// callbacks struct is defined in `dart_bridge_model_registry.dart` and the
-/// Dart-side refresh caller (the Models capability) passes `nullptr`
-/// today — platform file-IO discovery runs through
-/// `DartBridgeModelRegistry.discoverDownloadedModels()` separately.
-base class RacModelRegistryRefreshOpts extends ffi.Struct {
-  @ffi.Int32()
-  external int includeRemoteCatalog;
-  @ffi.Int32()
-  external int rescanLocal;
-  @ffi.Int32()
-  external int pruneOrphans;
-  external ffi.Pointer<ffi.Void> discoveryCallbacks;
-}
-
-typedef RacModelRegistryRefreshNative = ffi.Int32 Function(
-    ffi.Pointer<ffi.Void>, RacModelRegistryRefreshOpts);
-typedef RacModelRegistryRefreshDart = int Function(
-    ffi.Pointer<ffi.Void>, RacModelRegistryRefreshOpts);
-
-// ============================================================================
 // Model registry proto-byte API (rac_model_registry.h)
 // ============================================================================
+//
+// Refresh is part of the proto-byte API: the only entry point is
+// `rac_model_registry_refresh_proto` (handle, ModelRegistryRefreshRequest
+// bytes, size, out ModelRegistryRefreshResult). It reuses the shared
+// `RacHandleBytesToProto` typedef. The legacy struct-opts
+// `rac_model_registry_refresh` / `rac_model_registry_refresh_opts_t` were
+// removed from commons.
 
 typedef RacModelRegistryRegisterProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Void>,
@@ -1508,9 +1489,11 @@ class RacBindings {
         rac_http_download_execute = lib.lookupFunction<
             RacHttpDownloadExecuteNative,
             RacHttpDownloadExecuteDart>('rac_http_download_execute'),
-        rac_model_registry_refresh = lib.lookupFunction<
-            RacModelRegistryRefreshNative,
-            RacModelRegistryRefreshDart>('rac_model_registry_refresh'),
+        rac_model_registry_refresh_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_model_registry_refresh_proto'),
+        ),
         rac_model_registry_register_proto =
             _lookupOptional<RacModelRegistryRegisterProtoDart>(
           () => lib.lookupFunction<RacModelRegistryRegisterProtoNative,
@@ -2059,11 +2042,12 @@ class RacBindings {
 
   final RacHttpDownloadExecuteDart rac_http_download_execute;
 
-  // Model registry refresh (T4.9) --------------------------------------------
-
-  final RacModelRegistryRefreshDart rac_model_registry_refresh;
-
   // Model registry proto-byte API --------------------------------------------
+
+  /// `rac_model_registry_refresh_proto` — the single refresh entry point.
+  /// Takes a `ModelRegistryRefreshRequest` and returns a
+  /// `ModelRegistryRefreshResult`.
+  final RacHandleBytesToProtoDart? rac_model_registry_refresh_proto;
 
   final RacModelRegistryRegisterProtoDart? rac_model_registry_register_proto;
 

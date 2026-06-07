@@ -1519,6 +1519,11 @@ void InitBridge::registerPlatformAdapter() {
     // Reset adapter
     memset(&adapter_, 0, sizeof(adapter_));
 
+    // ABI guard (MUST be the first two fields). rac_init rejects the adapter
+    // with RAC_ERROR_ABI_VERSION_MISMATCH unless these match the commons build.
+    adapter_.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter_.struct_size = sizeof(adapter_);
+
     // File operations
     adapter_.file_exists = platformFileExistsCallback;
     adapter_.file_read = platformFileReadCallback;

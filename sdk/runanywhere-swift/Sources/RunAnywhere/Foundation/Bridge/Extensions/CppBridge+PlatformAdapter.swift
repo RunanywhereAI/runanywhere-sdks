@@ -58,6 +58,12 @@ extension CppBridge {
 
                 state.adapter = rac_platform_adapter_t()
 
+                // MARK: ABI Guard (MUST be the first two fields)
+                // rac_init rejects the adapter with RAC_ERROR_ABI_VERSION_MISMATCH
+                // unless these match the commons build this SDK is linked against.
+                state.adapter.abi_version = UInt32(RAC_PLATFORM_ADAPTER_ABI_VERSION)
+                state.adapter.struct_size = UInt32(MemoryLayout<rac_platform_adapter_t>.stride)
+
                 // MARK: Logging Callback
                 state.adapter.log = platformLogCallback
 

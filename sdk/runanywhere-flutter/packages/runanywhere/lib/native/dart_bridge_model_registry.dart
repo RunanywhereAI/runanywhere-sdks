@@ -543,41 +543,46 @@ class DartBridgeModelRegistry {
   }
 
   // ============================================================================
-  // Refresh — bridges rac_model_registry_refresh
+  // Refresh — bridges rac_model_registry_refresh_proto
   // ============================================================================
 
-  /// Refresh the model registry via commons C ABI.
+  /// Refresh the model registry via the commons proto entry point
+  /// `rac_model_registry_refresh_proto`.
   ///
-  /// Note: we deliberately pass `discoveryCallbacks = nullptr`. Local rescan
-  /// / orphan pruning from the native layer requires the Dart-side discovery
-  /// callbacks struct (see [discoverDownloadedModels]) which is not safe to
-  /// hand off into an opaque pointer shared across C-ABI boundaries here.
-  /// Callers that want those steps should use [discoverDownloadedModels]
-  /// directly — the Models capability does exactly that.
+  /// Encodes a [model_pb.ModelRegistryRefreshRequest] and decodes the returned
+  /// [model_pb.ModelRegistryRefreshResult]. Local rescan / orphan pruning are
+  /// honoured at the C ABI layer (commons runs the adapter rescan via the
+  /// registered `file_list_directory` slot); callers that need the discovered
+  /// model list should use [discoverDownloadedModels] — the Models capability
+  /// does exactly that.
   Future<bool> refresh({
     required bool includeRemoteCatalog,
     required bool pruneOrphans,
   }) async {
-    if (_registryHandle == null) return false;
-    final optsPtr = calloc<RacModelRegistryRefreshOpts>();
-    try {
-      optsPtr.ref
-        ..includeRemoteCatalog = includeRemoteCatalog ? 1 : 0
-        ..rescanLocal = 0
-        ..pruneOrphans = pruneOrphans ? 1 : 0
-        ..discoveryCallbacks = nullptr;
-      final rc = RacNative.bindings
-          .rac_model_registry_refresh(_registryHandle!, optsPtr.ref);
-      if (rc != 0) {
-        _logger.debug('rac_model_registry_refresh rc=$rc');
-        return false;
-      }
-      return true;
-    } catch (e) {
-      _logger.debug('rac_model_registry_refresh error: $e');
+    final handle = _registryHandle;
+    if (handle == null) return false;
+    final fn = RacNative.bindings.rac_model_registry_refresh_proto;
+    if (fn == null) {
+      _logger.debug('rac_model_registry_refresh_proto unavailable');
       return false;
-    } finally {
-      calloc.free(optsPtr);
+    }
+    try {
+      final result =
+          DartBridgeProtoUtils.callRequestWithHandle<
+              model_pb.ModelRegistryRefreshResult>(
+        handle: handle,
+        request: model_pb.ModelRegistryRefreshRequest(
+          includeRemoteCatalog: includeRemoteCatalog,
+          pruneOrphans: pruneOrphans,
+        ),
+        invoke: fn,
+        decode: model_pb.ModelRegistryRefreshResult.fromBuffer,
+        symbol: 'rac_model_registry_refresh_proto',
+      );
+      return result.success;
+    } catch (e) {
+      _logger.debug('rac_model_registry_refresh_proto error: $e');
+      return false;
     }
   }
 

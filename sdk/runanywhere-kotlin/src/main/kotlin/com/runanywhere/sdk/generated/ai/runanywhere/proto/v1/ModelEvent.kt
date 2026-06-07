@@ -31,6 +31,14 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ===========================================================================
+ * SECTION 10 — MODEL / DOWNLOAD / STORAGE
+ * ===========================================================================
+ * Model lifecycle and registry, the download lifecycle, and storage events
+ * (both the flat RN-style `StorageEvent` and the operation-result-bearing
+ * `StorageLifecycleEvent`). These cover artifact acquisition and on-device
+ * model/storage management across every component.
+ * ---------------------------------------------------------------------------
  * ---------------------------------------------------------------------------
  * Model lifecycle events: load / unload / download / list / catalog / delete /
  * custom-model / built-in-registration. Mirrors RN
@@ -158,6 +166,49 @@ public class ModelEvent(
     schemaIndex = 11,
   )
   public val custom_model_url: String = "",
+  /**
+   * Model-load + download/extraction telemetry metrics so the C++
+   * destination router derives the telemetry payload from the proto
+   * SDKEvent alone. `framework` is the InferenceFramework enum stored as
+   * int32 (matches FrameworkEvent.framework).
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelName",
+    schemaIndex = 12,
+  )
+  public val model_name: String = "",
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelSizeBytes",
+    schemaIndex = 13,
+  )
+  public val model_size_bytes: Long = 0L,
+  /**
+   * load / download / extraction duration
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "durationMs",
+    schemaIndex = 14,
+  )
+  public val duration_ms: Long = 0L,
+  /**
+   * InferenceFramework enum int
+   */
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 15,
+  )
+  public val framework: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -182,6 +233,10 @@ public class ModelEvent(
     if (model_count != other.model_count) return false
     if (custom_model_name != other.custom_model_name) return false
     if (custom_model_url != other.custom_model_url) return false
+    if (model_name != other.model_name) return false
+    if (model_size_bytes != other.model_size_bytes) return false
+    if (duration_ms != other.duration_ms) return false
+    if (framework != other.framework) return false
     return true
   }
 
@@ -201,6 +256,10 @@ public class ModelEvent(
       result = result * 37 + model_count.hashCode()
       result = result * 37 + custom_model_name.hashCode()
       result = result * 37 + custom_model_url.hashCode()
+      result = result * 37 + model_name.hashCode()
+      result = result * 37 + model_size_bytes.hashCode()
+      result = result * 37 + duration_ms.hashCode()
+      result = result * 37 + framework.hashCode()
       super.hashCode = result
     }
     return result
@@ -220,6 +279,10 @@ public class ModelEvent(
     result += """model_count=$model_count"""
     result += """custom_model_name=${sanitize(custom_model_name)}"""
     result += """custom_model_url=${sanitize(custom_model_url)}"""
+    result += """model_name=${sanitize(model_name)}"""
+    result += """model_size_bytes=$model_size_bytes"""
+    result += """duration_ms=$duration_ms"""
+    result += """framework=$framework"""
     return result.joinToString(prefix = "ModelEvent{", separator = ", ", postfix = "}")
   }
 
@@ -236,8 +299,12 @@ public class ModelEvent(
     model_count: Int = this.model_count,
     custom_model_name: String = this.custom_model_name,
     custom_model_url: String = this.custom_model_url,
+    model_name: String = this.model_name,
+    model_size_bytes: Long = this.model_size_bytes,
+    duration_ms: Long = this.duration_ms,
+    framework: Int = this.framework,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelEvent = ModelEvent(kind, model_id, task_id, progress, bytes_downloaded, total_bytes, download_state, local_path, error, model_count, custom_model_name, custom_model_url, unknownFields)
+  ): ModelEvent = ModelEvent(kind, model_id, task_id, progress, bytes_downloaded, total_bytes, download_state, local_path, error, model_count, custom_model_name, custom_model_url, model_name, model_size_bytes, duration_ms, framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -287,6 +354,18 @@ public class ModelEvent(
         if (value.custom_model_url != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.custom_model_url)
         }
+        if (value.model_name != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.model_name)
+        }
+        if (value.model_size_bytes != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(14, value.model_size_bytes)
+        }
+        if (value.duration_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.duration_ms)
+        }
+        if (value.framework != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.framework)
+        }
         return size
       }
 
@@ -327,11 +406,35 @@ public class ModelEvent(
         if (value.custom_model_url != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.custom_model_url)
         }
+        if (value.model_name != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.model_name)
+        }
+        if (value.model_size_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 14, value.model_size_bytes)
+        }
+        if (value.duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.duration_ms)
+        }
+        if (value.framework != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.framework)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.framework != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.framework)
+        }
+        if (value.duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.duration_ms)
+        }
+        if (value.model_size_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 14, value.model_size_bytes)
+        }
+        if (value.model_name != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.model_name)
+        }
         if (value.custom_model_url != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.custom_model_url)
         }
@@ -383,6 +486,10 @@ public class ModelEvent(
         var model_count: Int = 0
         var custom_model_name: String = ""
         var custom_model_url: String = ""
+        var model_name: String = ""
+        var model_size_bytes: Long = 0L
+        var duration_ms: Long = 0L
+        var framework: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -401,6 +508,10 @@ public class ModelEvent(
             10 -> model_count = ProtoAdapter.INT32.decode(reader)
             11 -> custom_model_name = ProtoAdapter.STRING.decode(reader)
             12 -> custom_model_url = ProtoAdapter.STRING.decode(reader)
+            13 -> model_name = ProtoAdapter.STRING.decode(reader)
+            14 -> model_size_bytes = ProtoAdapter.INT64.decode(reader)
+            15 -> duration_ms = ProtoAdapter.INT64.decode(reader)
+            16 -> framework = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -417,6 +528,10 @@ public class ModelEvent(
           model_count = model_count,
           custom_model_name = custom_model_name,
           custom_model_url = custom_model_url,
+          model_name = model_name,
+          model_size_bytes = model_size_bytes,
+          duration_ms = duration_ms,
+          framework = framework,
           unknownFields = unknownFields
         )
       }

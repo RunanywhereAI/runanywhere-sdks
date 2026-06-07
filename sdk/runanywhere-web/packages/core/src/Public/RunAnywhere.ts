@@ -1312,6 +1312,15 @@ export const RunAnywhere = {
    * populated, to restore the "Downloaded" status across tab reloads.
    *
    * Returns the number of registry entries patched.
+   *
+   * TODO(layering): the positive-link branch (mark isDownloaded=true when the
+   * canonical OPFS path exists) is now largely redundant with the C++ adapter
+   * rescan that `rac_model_registry_refresh_proto` runs via the registered
+   * `file_list_directory` slot. The piece C++ does NOT yet cover is the
+   * negative reconciliation below (clear isDownloaded when OPFS bytes were
+   * purged) — the commons `prune_orphans` path is still a documented no-op.
+   * Once a C++ orphan-prune lands, this can be retired entirely. Do not
+   * delete until then.
    */
   async hydrateModelRegistry(): Promise<number> {
     const list = ModelRegistryCapability.listModels();

@@ -22,6 +22,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Double
 import kotlin.Float
 import kotlin.Int
 import kotlin.Long
@@ -31,6 +32,16 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ===========================================================================
+ * SECTION 3 — STT / SECTION 4 — TTS / SECTION 5 — VAD (voice lifecycle)
+ * ===========================================================================
+ * STT, TTS, and VAD higher-level lifecycle events are all consolidated into a
+ * single `VoiceLifecycleEvent` message discriminated by `VoiceEventKind`
+ * (which carries TRANSCRIPTION_* / STT_* for STT, SYNTHESIS_* / AUDIO_GENERATED
+ * / PLAYBACK_* for TTS, VAD_* / SPEECH_* for VAD, plus voice-session
+ * orchestration). The low-level streaming pipeline payloads live in
+ * voice_events.proto's `VoiceEvent` (exposed via SDKEvent.voice_pipeline).
+ * ---------------------------------------------------------------------------
  * ---------------------------------------------------------------------------
  * Voice / audio higher-level events. Mirrors RN
  *   events.ts:136-187 (SDKVoiceEvent: 41 variants).
@@ -163,6 +174,163 @@ public class VoiceLifecycleEvent(
     schemaIndex = 11,
   )
   public val error: String = "",
+  /**
+   * -----------------------------------------------------------------------
+   * Telemetry metrics (STT transcription + TTS synthesis + model load) so
+   * the C++ destination router derives the full telemetry payload from the
+   * proto SDKEvent alone. Populated per-component (component on the SDKEvent
+   * envelope selects which subset applies). `framework` is the
+   * InferenceFramework enum stored as int32.
+   * -----------------------------------------------------------------------
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelId",
+    schemaIndex = 12,
+  )
+  public val model_id: String = "",
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelName",
+    schemaIndex = 13,
+  )
+  public val model_name: String = "",
+  /**
+   * STT input audio length
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "audioLengthMs",
+    schemaIndex = 14,
+  )
+  public val audio_length_ms: Long = 0L,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "audioSizeBytes",
+    schemaIndex = 15,
+  )
+  public val audio_size_bytes: Int = 0,
+  /**
+   * STT
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "wordCount",
+    schemaIndex = 16,
+  )
+  public val word_count: Int = 0,
+  /**
+   * STT
+   */
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "realTimeFactor",
+    schemaIndex = 17,
+  )
+  public val real_time_factor: Double = 0.0,
+  /**
+   * STT
+   */
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 18,
+  )
+  public val language: String = "",
+  /**
+   * STT + TTS
+   */
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sampleRate",
+    schemaIndex = 19,
+  )
+  public val sample_rate: Int = 0,
+  /**
+   * STT
+   */
+  @field:WireField(
+    tag = 21,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isStreaming",
+    schemaIndex = 20,
+  )
+  public val is_streaming: Boolean = false,
+  /**
+   * InferenceFramework enum int
+   */
+  @field:WireField(
+    tag = 22,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 21,
+  )
+  public val framework: Int = 0,
+  /**
+   * TTS synthesis metrics.
+   */
+  @field:WireField(
+    tag = 23,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "characterCount",
+    schemaIndex = 22,
+  )
+  public val character_count: Int = 0,
+  /**
+   * distinct from duration_ms(7); telemetry output_duration_ms
+   */
+  @field:WireField(
+    tag = 24,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "audioDurationMs",
+    schemaIndex = 23,
+  )
+  public val audio_duration_ms: Long = 0L,
+  @field:WireField(
+    tag = 25,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "audioSizeBytesTts",
+    schemaIndex = 24,
+  )
+  public val audio_size_bytes_tts: Int = 0,
+  /**
+   * telemetry processing_time_ms
+   */
+  @field:WireField(
+    tag = 26,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "processingDurationMs",
+    schemaIndex = 25,
+  )
+  public val processing_duration_ms: Long = 0L,
+  @field:WireField(
+    tag = 27,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "charactersPerSecond",
+    schemaIndex = 26,
+  )
+  public val characters_per_second: Double = 0.0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceLifecycleEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -187,6 +355,21 @@ public class VoiceLifecycleEvent(
     if (turn_response != other.turn_response) return false
     if (turn_audio_base64 != other.turn_audio_base64) return false
     if (error != other.error) return false
+    if (model_id != other.model_id) return false
+    if (model_name != other.model_name) return false
+    if (audio_length_ms != other.audio_length_ms) return false
+    if (audio_size_bytes != other.audio_size_bytes) return false
+    if (word_count != other.word_count) return false
+    if (real_time_factor != other.real_time_factor) return false
+    if (language != other.language) return false
+    if (sample_rate != other.sample_rate) return false
+    if (is_streaming != other.is_streaming) return false
+    if (framework != other.framework) return false
+    if (character_count != other.character_count) return false
+    if (audio_duration_ms != other.audio_duration_ms) return false
+    if (audio_size_bytes_tts != other.audio_size_bytes_tts) return false
+    if (processing_duration_ms != other.processing_duration_ms) return false
+    if (characters_per_second != other.characters_per_second) return false
     return true
   }
 
@@ -206,6 +389,21 @@ public class VoiceLifecycleEvent(
       result = result * 37 + turn_response.hashCode()
       result = result * 37 + turn_audio_base64.hashCode()
       result = result * 37 + error.hashCode()
+      result = result * 37 + model_id.hashCode()
+      result = result * 37 + model_name.hashCode()
+      result = result * 37 + audio_length_ms.hashCode()
+      result = result * 37 + audio_size_bytes.hashCode()
+      result = result * 37 + word_count.hashCode()
+      result = result * 37 + real_time_factor.hashCode()
+      result = result * 37 + language.hashCode()
+      result = result * 37 + sample_rate.hashCode()
+      result = result * 37 + is_streaming.hashCode()
+      result = result * 37 + framework.hashCode()
+      result = result * 37 + character_count.hashCode()
+      result = result * 37 + audio_duration_ms.hashCode()
+      result = result * 37 + audio_size_bytes_tts.hashCode()
+      result = result * 37 + processing_duration_ms.hashCode()
+      result = result * 37 + characters_per_second.hashCode()
       super.hashCode = result
     }
     return result
@@ -225,6 +423,21 @@ public class VoiceLifecycleEvent(
     result += """turn_response=${sanitize(turn_response)}"""
     result += """turn_audio_base64=${sanitize(turn_audio_base64)}"""
     result += """error=${sanitize(error)}"""
+    result += """model_id=${sanitize(model_id)}"""
+    result += """model_name=${sanitize(model_name)}"""
+    result += """audio_length_ms=$audio_length_ms"""
+    result += """audio_size_bytes=$audio_size_bytes"""
+    result += """word_count=$word_count"""
+    result += """real_time_factor=$real_time_factor"""
+    result += """language=${sanitize(language)}"""
+    result += """sample_rate=$sample_rate"""
+    result += """is_streaming=$is_streaming"""
+    result += """framework=$framework"""
+    result += """character_count=$character_count"""
+    result += """audio_duration_ms=$audio_duration_ms"""
+    result += """audio_size_bytes_tts=$audio_size_bytes_tts"""
+    result += """processing_duration_ms=$processing_duration_ms"""
+    result += """characters_per_second=$characters_per_second"""
     return result.joinToString(prefix = "VoiceLifecycleEvent{", separator = ", ", postfix = "}")
   }
 
@@ -241,8 +454,23 @@ public class VoiceLifecycleEvent(
     turn_response: String = this.turn_response,
     turn_audio_base64: String = this.turn_audio_base64,
     error: String = this.error,
+    model_id: String = this.model_id,
+    model_name: String = this.model_name,
+    audio_length_ms: Long = this.audio_length_ms,
+    audio_size_bytes: Int = this.audio_size_bytes,
+    word_count: Int = this.word_count,
+    real_time_factor: Double = this.real_time_factor,
+    language: String = this.language,
+    sample_rate: Int = this.sample_rate,
+    is_streaming: Boolean = this.is_streaming,
+    framework: Int = this.framework,
+    character_count: Int = this.character_count,
+    audio_duration_ms: Long = this.audio_duration_ms,
+    audio_size_bytes_tts: Int = this.audio_size_bytes_tts,
+    processing_duration_ms: Long = this.processing_duration_ms,
+    characters_per_second: Double = this.characters_per_second,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceLifecycleEvent = VoiceLifecycleEvent(kind, session_id, text, confidence, response_text, audio_base64, duration_ms, audio_level, transcription, turn_response, turn_audio_base64, error, unknownFields)
+  ): VoiceLifecycleEvent = VoiceLifecycleEvent(kind, session_id, text, confidence, response_text, audio_base64, duration_ms, audio_level, transcription, turn_response, turn_audio_base64, error, model_id, model_name, audio_length_ms, audio_size_bytes, word_count, real_time_factor, language, sample_rate, is_streaming, framework, character_count, audio_duration_ms, audio_size_bytes_tts, processing_duration_ms, characters_per_second, unknownFields)
 
   public companion object {
     @JvmField
@@ -293,6 +521,51 @@ public class VoiceLifecycleEvent(
         if (value.error != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.error)
         }
+        if (value.model_id != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.model_id)
+        }
+        if (value.model_name != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.model_name)
+        }
+        if (value.audio_length_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.audio_length_ms)
+        }
+        if (value.audio_size_bytes != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(16, value.audio_size_bytes)
+        }
+        if (value.word_count != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(17, value.word_count)
+        }
+        if (!value.real_time_factor.equals(0.0)) {
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(18, value.real_time_factor)
+        }
+        if (value.language != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.language)
+        }
+        if (value.sample_rate != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(20, value.sample_rate)
+        }
+        if (value.is_streaming != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(21, value.is_streaming)
+        }
+        if (value.framework != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(22, value.framework)
+        }
+        if (value.character_count != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(23, value.character_count)
+        }
+        if (value.audio_duration_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(24, value.audio_duration_ms)
+        }
+        if (value.audio_size_bytes_tts != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(25, value.audio_size_bytes_tts)
+        }
+        if (value.processing_duration_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(26, value.processing_duration_ms)
+        }
+        if (!value.characters_per_second.equals(0.0)) {
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(27, value.characters_per_second)
+        }
         return size
       }
 
@@ -333,11 +606,101 @@ public class VoiceLifecycleEvent(
         if (value.error != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.error)
         }
+        if (value.model_id != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.model_id)
+        }
+        if (value.model_name != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.model_name)
+        }
+        if (value.audio_length_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.audio_length_ms)
+        }
+        if (value.audio_size_bytes != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.audio_size_bytes)
+        }
+        if (value.word_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.word_count)
+        }
+        if (!value.real_time_factor.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 18, value.real_time_factor)
+        }
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.language)
+        }
+        if (value.sample_rate != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 20, value.sample_rate)
+        }
+        if (value.is_streaming != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 21, value.is_streaming)
+        }
+        if (value.framework != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 22, value.framework)
+        }
+        if (value.character_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 23, value.character_count)
+        }
+        if (value.audio_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 24, value.audio_duration_ms)
+        }
+        if (value.audio_size_bytes_tts != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 25, value.audio_size_bytes_tts)
+        }
+        if (value.processing_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 26, value.processing_duration_ms)
+        }
+        if (!value.characters_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 27, value.characters_per_second)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceLifecycleEvent) {
         writer.writeBytes(value.unknownFields)
+        if (!value.characters_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 27, value.characters_per_second)
+        }
+        if (value.processing_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 26, value.processing_duration_ms)
+        }
+        if (value.audio_size_bytes_tts != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 25, value.audio_size_bytes_tts)
+        }
+        if (value.audio_duration_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 24, value.audio_duration_ms)
+        }
+        if (value.character_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 23, value.character_count)
+        }
+        if (value.framework != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 22, value.framework)
+        }
+        if (value.is_streaming != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 21, value.is_streaming)
+        }
+        if (value.sample_rate != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 20, value.sample_rate)
+        }
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 19, value.language)
+        }
+        if (!value.real_time_factor.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 18, value.real_time_factor)
+        }
+        if (value.word_count != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.word_count)
+        }
+        if (value.audio_size_bytes != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 16, value.audio_size_bytes)
+        }
+        if (value.audio_length_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 15, value.audio_length_ms)
+        }
+        if (value.model_name != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 14, value.model_name)
+        }
+        if (value.model_id != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 13, value.model_id)
+        }
         if (value.error != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.error)
         }
@@ -389,6 +752,21 @@ public class VoiceLifecycleEvent(
         var turn_response: String = ""
         var turn_audio_base64: String = ""
         var error: String = ""
+        var model_id: String = ""
+        var model_name: String = ""
+        var audio_length_ms: Long = 0L
+        var audio_size_bytes: Int = 0
+        var word_count: Int = 0
+        var real_time_factor: Double = 0.0
+        var language: String = ""
+        var sample_rate: Int = 0
+        var is_streaming: Boolean = false
+        var framework: Int = 0
+        var character_count: Int = 0
+        var audio_duration_ms: Long = 0L
+        var audio_size_bytes_tts: Int = 0
+        var processing_duration_ms: Long = 0L
+        var characters_per_second: Double = 0.0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -407,6 +785,21 @@ public class VoiceLifecycleEvent(
             10 -> turn_response = ProtoAdapter.STRING.decode(reader)
             11 -> turn_audio_base64 = ProtoAdapter.STRING.decode(reader)
             12 -> error = ProtoAdapter.STRING.decode(reader)
+            13 -> model_id = ProtoAdapter.STRING.decode(reader)
+            14 -> model_name = ProtoAdapter.STRING.decode(reader)
+            15 -> audio_length_ms = ProtoAdapter.INT64.decode(reader)
+            16 -> audio_size_bytes = ProtoAdapter.INT32.decode(reader)
+            17 -> word_count = ProtoAdapter.INT32.decode(reader)
+            18 -> real_time_factor = ProtoAdapter.DOUBLE.decode(reader)
+            19 -> language = ProtoAdapter.STRING.decode(reader)
+            20 -> sample_rate = ProtoAdapter.INT32.decode(reader)
+            21 -> is_streaming = ProtoAdapter.BOOL.decode(reader)
+            22 -> framework = ProtoAdapter.INT32.decode(reader)
+            23 -> character_count = ProtoAdapter.INT32.decode(reader)
+            24 -> audio_duration_ms = ProtoAdapter.INT64.decode(reader)
+            25 -> audio_size_bytes_tts = ProtoAdapter.INT32.decode(reader)
+            26 -> processing_duration_ms = ProtoAdapter.INT64.decode(reader)
+            27 -> characters_per_second = ProtoAdapter.DOUBLE.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -423,6 +816,21 @@ public class VoiceLifecycleEvent(
           turn_response = turn_response,
           turn_audio_base64 = turn_audio_base64,
           error = error,
+          model_id = model_id,
+          model_name = model_name,
+          audio_length_ms = audio_length_ms,
+          audio_size_bytes = audio_size_bytes,
+          word_count = word_count,
+          real_time_factor = real_time_factor,
+          language = language,
+          sample_rate = sample_rate,
+          is_streaming = is_streaming,
+          framework = framework,
+          character_count = character_count,
+          audio_duration_ms = audio_duration_ms,
+          audio_size_bytes_tts = audio_size_bytes_tts,
+          processing_duration_ms = processing_duration_ms,
+          characters_per_second = characters_per_second,
           unknownFields = unknownFields
         )
       }

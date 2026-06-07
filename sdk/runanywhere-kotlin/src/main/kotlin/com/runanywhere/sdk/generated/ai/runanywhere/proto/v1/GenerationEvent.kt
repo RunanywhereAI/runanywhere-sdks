@@ -23,6 +23,7 @@ import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
 import kotlin.Double
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -31,6 +32,14 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ===========================================================================
+ * SECTION 2 — GENERATION (LLM / VLM)
+ * ===========================================================================
+ * Text/multimodal generation lifecycle. `GenerationEvent` covers LLM (and the
+ * shared LLM-backed path of VLM) token/streaming/cost/routing/tool/structured/
+ * thinking events. VLM image-conditioned generation also surfaces through
+ * `CapabilityOperationEvent` (SECTION 7) for its VLM_* kinds.
+ * ---------------------------------------------------------------------------
  * ---------------------------------------------------------------------------
  * LLM generation events. Mirrors RN
  *   events.ts:72-89 (SDKGenerationEvent: 12 variants).
@@ -263,6 +272,91 @@ public class GenerationEvent(
     schemaIndex = 23,
   )
   public val input_tokens: Int = 0,
+  /**
+   * Telemetry metrics carried on the canonical event stream so the C++
+   * destination router can derive the full telemetry payload from the
+   * proto SDKEvent alone (no parallel struct path). `framework` is the
+   * InferenceFramework enum stored as int32 (matches FrameworkEvent.framework).
+   */
+  @field:WireField(
+    tag = 25,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "tokensPerSecond",
+    schemaIndex = 24,
+  )
+  public val tokens_per_second: Double = 0.0,
+  /**
+   * completion TTFT (FIRST_TOKEN uses first_token_latency_ms)
+   */
+  @field:WireField(
+    tag = 26,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "timeToFirstTokenMs",
+    schemaIndex = 25,
+  )
+  public val time_to_first_token_ms: Long = 0L,
+  @field:WireField(
+    tag = 27,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isStreaming",
+    schemaIndex = 26,
+  )
+  public val is_streaming: Boolean = false,
+  @field:WireField(
+    tag = 28,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 27,
+  )
+  public val temperature: Float = 0f,
+  @field:WireField(
+    tag = 29,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxTokens",
+    schemaIndex = 28,
+  )
+  public val max_tokens: Int = 0,
+  @field:WireField(
+    tag = 30,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "contextLength",
+    schemaIndex = 29,
+  )
+  public val context_length: Int = 0,
+  @field:WireField(
+    tag = 31,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelName",
+    schemaIndex = 30,
+  )
+  public val model_name: String = "",
+  /**
+   * wall-clock generation duration
+   */
+  @field:WireField(
+    tag = 32,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "durationMs",
+    schemaIndex = 31,
+  )
+  public val duration_ms: Double = 0.0,
+  /**
+   * InferenceFramework enum int
+   */
+  @field:WireField(
+    tag = 33,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 32,
+  )
+  public val framework: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<GenerationEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -299,6 +393,15 @@ public class GenerationEvent(
     if (structured_output_json != other.structured_output_json) return false
     if (thinking_text != other.thinking_text) return false
     if (input_tokens != other.input_tokens) return false
+    if (tokens_per_second != other.tokens_per_second) return false
+    if (time_to_first_token_ms != other.time_to_first_token_ms) return false
+    if (is_streaming != other.is_streaming) return false
+    if (temperature != other.temperature) return false
+    if (max_tokens != other.max_tokens) return false
+    if (context_length != other.context_length) return false
+    if (model_name != other.model_name) return false
+    if (duration_ms != other.duration_ms) return false
+    if (framework != other.framework) return false
     return true
   }
 
@@ -330,6 +433,15 @@ public class GenerationEvent(
       result = result * 37 + structured_output_json.hashCode()
       result = result * 37 + thinking_text.hashCode()
       result = result * 37 + input_tokens.hashCode()
+      result = result * 37 + tokens_per_second.hashCode()
+      result = result * 37 + time_to_first_token_ms.hashCode()
+      result = result * 37 + is_streaming.hashCode()
+      result = result * 37 + temperature.hashCode()
+      result = result * 37 + max_tokens.hashCode()
+      result = result * 37 + context_length.hashCode()
+      result = result * 37 + model_name.hashCode()
+      result = result * 37 + duration_ms.hashCode()
+      result = result * 37 + framework.hashCode()
       super.hashCode = result
     }
     return result
@@ -361,6 +473,15 @@ public class GenerationEvent(
     result += """structured_output_json=${sanitize(structured_output_json)}"""
     result += """thinking_text=${sanitize(thinking_text)}"""
     result += """input_tokens=$input_tokens"""
+    result += """tokens_per_second=$tokens_per_second"""
+    result += """time_to_first_token_ms=$time_to_first_token_ms"""
+    result += """is_streaming=$is_streaming"""
+    result += """temperature=$temperature"""
+    result += """max_tokens=$max_tokens"""
+    result += """context_length=$context_length"""
+    result += """model_name=${sanitize(model_name)}"""
+    result += """duration_ms=$duration_ms"""
+    result += """framework=$framework"""
     return result.joinToString(prefix = "GenerationEvent{", separator = ", ", postfix = "}")
   }
 
@@ -389,8 +510,17 @@ public class GenerationEvent(
     structured_output_json: String = this.structured_output_json,
     thinking_text: String = this.thinking_text,
     input_tokens: Int = this.input_tokens,
+    tokens_per_second: Double = this.tokens_per_second,
+    time_to_first_token_ms: Long = this.time_to_first_token_ms,
+    is_streaming: Boolean = this.is_streaming,
+    temperature: Float = this.temperature,
+    max_tokens: Int = this.max_tokens,
+    context_length: Int = this.context_length,
+    model_name: String = this.model_name,
+    duration_ms: Double = this.duration_ms,
+    framework: Int = this.framework,
     unknownFields: ByteString = this.unknownFields,
-  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, unknownFields)
+  ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text, tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id, cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id, tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text, input_tokens, tokens_per_second, time_to_first_token_ms, is_streaming, temperature, max_tokens, context_length, model_name, duration_ms, framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -476,6 +606,33 @@ public class GenerationEvent(
         if (value.input_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(24, value.input_tokens)
         }
+        if (!value.tokens_per_second.equals(0.0)) {
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(25, value.tokens_per_second)
+        }
+        if (value.time_to_first_token_ms != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(26, value.time_to_first_token_ms)
+        }
+        if (value.is_streaming != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(27, value.is_streaming)
+        }
+        if (!value.temperature.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(28, value.temperature)
+        }
+        if (value.max_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(29, value.max_tokens)
+        }
+        if (value.context_length != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(30, value.context_length)
+        }
+        if (value.model_name != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(31, value.model_name)
+        }
+        if (!value.duration_ms.equals(0.0)) {
+          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(32, value.duration_ms)
+        }
+        if (value.framework != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(33, value.framework)
+        }
         return size
       }
 
@@ -552,11 +709,65 @@ public class GenerationEvent(
         if (value.input_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 24, value.input_tokens)
         }
+        if (!value.tokens_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 25, value.tokens_per_second)
+        }
+        if (value.time_to_first_token_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 26, value.time_to_first_token_ms)
+        }
+        if (value.is_streaming != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 27, value.is_streaming)
+        }
+        if (!value.temperature.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 28, value.temperature)
+        }
+        if (value.max_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 29, value.max_tokens)
+        }
+        if (value.context_length != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 30, value.context_length)
+        }
+        if (value.model_name != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 31, value.model_name)
+        }
+        if (!value.duration_ms.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 32, value.duration_ms)
+        }
+        if (value.framework != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 33, value.framework)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: GenerationEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.framework != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 33, value.framework)
+        }
+        if (!value.duration_ms.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 32, value.duration_ms)
+        }
+        if (value.model_name != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 31, value.model_name)
+        }
+        if (value.context_length != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 30, value.context_length)
+        }
+        if (value.max_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 29, value.max_tokens)
+        }
+        if (!value.temperature.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 28, value.temperature)
+        }
+        if (value.is_streaming != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 27, value.is_streaming)
+        }
+        if (value.time_to_first_token_ms != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 26, value.time_to_first_token_ms)
+        }
+        if (!value.tokens_per_second.equals(0.0)) {
+          ProtoAdapter.DOUBLE.encodeWithTag(writer, 25, value.tokens_per_second)
+        }
         if (value.input_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 24, value.input_tokens)
         }
@@ -656,6 +867,15 @@ public class GenerationEvent(
         var structured_output_json: String = ""
         var thinking_text: String = ""
         var input_tokens: Int = 0
+        var tokens_per_second: Double = 0.0
+        var time_to_first_token_ms: Long = 0L
+        var is_streaming: Boolean = false
+        var temperature: Float = 0f
+        var max_tokens: Int = 0
+        var context_length: Int = 0
+        var model_name: String = ""
+        var duration_ms: Double = 0.0
+        var framework: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -686,6 +906,15 @@ public class GenerationEvent(
             22 -> structured_output_json = ProtoAdapter.STRING.decode(reader)
             23 -> thinking_text = ProtoAdapter.STRING.decode(reader)
             24 -> input_tokens = ProtoAdapter.INT32.decode(reader)
+            25 -> tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
+            26 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
+            27 -> is_streaming = ProtoAdapter.BOOL.decode(reader)
+            28 -> temperature = ProtoAdapter.FLOAT.decode(reader)
+            29 -> max_tokens = ProtoAdapter.INT32.decode(reader)
+            30 -> context_length = ProtoAdapter.INT32.decode(reader)
+            31 -> model_name = ProtoAdapter.STRING.decode(reader)
+            32 -> duration_ms = ProtoAdapter.DOUBLE.decode(reader)
+            33 -> framework = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -714,6 +943,15 @@ public class GenerationEvent(
           structured_output_json = structured_output_json,
           thinking_text = thinking_text,
           input_tokens = input_tokens,
+          tokens_per_second = tokens_per_second,
+          time_to_first_token_ms = time_to_first_token_ms,
+          is_streaming = is_streaming,
+          temperature = temperature,
+          max_tokens = max_tokens,
+          context_length = context_length,
+          model_name = model_name,
+          duration_ms = duration_ms,
+          framework = framework,
           unknownFields = unknownFields
         )
       }

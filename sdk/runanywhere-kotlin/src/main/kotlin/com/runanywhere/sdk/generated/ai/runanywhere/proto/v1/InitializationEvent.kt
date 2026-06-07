@@ -30,6 +30,13 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * ===========================================================================
+ * SECTION 1 — LIFECYCLE (ALL COMPONENTS)
+ * ===========================================================================
+ * SDK-wide lifecycle/init, configuration, per-component init lifecycle, the
+ * operation-aware component lifecycle event + its snapshot helpers, and SDK
+ * session lifecycle. These span every component rather than any single one.
+ * ---------------------------------------------------------------------------
  * ---------------------------------------------------------------------------
  * SDK lifecycle / initialization stage events. Mirrors
  *   RN  events.ts:38-43 (SDKInitializationEvent: 5 variants)

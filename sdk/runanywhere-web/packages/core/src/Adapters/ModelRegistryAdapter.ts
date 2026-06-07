@@ -1,6 +1,6 @@
 /**
- * ModelRegistryAdapter.ts — T4.9 Web binding for
- * `rac_model_registry_refresh` plus the proto-byte model registry ABI.
+ * ModelRegistryAdapter.ts — Web binding for
+ * `rac_model_registry_refresh_proto` plus the proto-byte model registry ABI.
  *
  * The Web SDK's `ModelRegistry` (pure-TS) still owns the JS-side catalog
  * (UI state, listeners), but this adapter exposes the unified C-ABI so the
@@ -23,6 +23,8 @@ import {
   ModelInfo as ProtoModelInfoCodec,
   ModelInfoList as ProtoModelInfoListCodec,
   ModelQuery as ProtoModelQueryCodec,
+  ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequestCodec,
+  ModelRegistryRefreshResult as ProtoModelRegistryRefreshResultCodec,
   type ModelInfo as ProtoModelInfo,
   type ModelInfoList as ProtoModelInfoList,
   type ModelQuery as ProtoModelQuery,
@@ -53,21 +55,18 @@ export interface ModelRegistryModule {
 
   _rac_get_model_registry?(): number;
   /**
-   * Emscripten ABI lowering of
-   * `rac_result_t rac_model_registry_refresh(handle, opts_by_value)`.
-   *
-   * Clang with the WASM ABI splits `rac_model_registry_refresh_opts_t`
-   * (three `rac_bool_t` int32s + one pointer) into the individual scalar
-   * arguments shown below. If the ABI version of clang ever changes to
-   * pass the struct through a hidden sret pointer, this binding will need
-   * to allocate and pass a pointer instead.
+   * `rac_result_t rac_model_registry_refresh_proto(handle, req_bytes,
+   * req_size, out_proto_buffer)` — the single refresh entry point. Takes a
+   * serialized `ModelRegistryRefreshRequest` and returns an owned
+   * `ModelRegistryRefreshResult` via the out (bytes, size) pointer pair,
+   * same shape as the other proto-byte registry calls in this file.
    */
-  _rac_model_registry_refresh?(
+  _rac_model_registry_refresh_proto?(
     handle: number,
-    includeRemoteCatalog: number,
-    rescanLocal: number,
-    pruneOrphans: number,
-    discoveryCallbacks: number,
+    reqBytes: number,
+    reqSize: number,
+    outBytesPtr: number,
+    outSizePtr: number,
   ): number;
   _rac_model_registry_register_proto?(
     handle: number,
@@ -233,12 +232,17 @@ export class ModelRegistryAdapter {
     return protoAvailabilityByModule.get(this.module) ?? { status: 'available' };
   }
 
-  /** Refresh the registry via `rac_model_registry_refresh`. */
+  /**
+   * Refresh the registry via `rac_model_registry_refresh_proto`. Encodes a
+   * `ModelRegistryRefreshRequest`, calls the proto entry point, and decodes
+   * the returned `ModelRegistryRefreshResult` to read `success`. Mirrors the
+   * encode → withHeapBytes → readOwnedProtoResult pattern used by `query`.
+   */
   refresh(options: RefreshOptions = {}): boolean {
     const mod = this.module;
-    if (!mod._rac_get_model_registry || !mod._rac_model_registry_refresh) {
+    if (!mod._rac_get_model_registry || !mod._rac_model_registry_refresh_proto) {
       logger.warning(
-        'refresh: module missing rac_get_model_registry / rac_model_registry_refresh exports',
+        'refresh: module missing rac_get_model_registry / rac_model_registry_refresh_proto exports',
       );
       return false;
     }
@@ -249,22 +253,35 @@ export class ModelRegistryAdapter {
       return false;
     }
 
+    const reqBytes = ProtoModelRegistryRefreshRequestCodec.encode({
+      includeRemoteCatalog: options.includeRemoteCatalog ?? false,
+      rescanLocal: options.rescanLocal ?? false,
+      pruneOrphans: options.pruneOrphans ?? false,
+      catalogUri: '',
+      forceRefresh: false,
+      includeDownloadedState: options.rescanLocal ?? false,
+    }).finish();
+
     try {
-      const rc = mod._rac_model_registry_refresh(
-        handle,
-        options.includeRemoteCatalog ? 1 : 0,
-        options.rescanLocal ? 1 : 0,
-        options.pruneOrphans ? 1 : 0,
-        0, // discovery_callbacks = nullptr
-      );
-      if (rc !== 0) {
-        logger.warning(`rac_model_registry_refresh returned rc=${rc}`);
+      const resultBytes = this.withHeapBytes(reqBytes, (reqPtr, reqLen) => (
+        this.readOwnedProtoResult((outBytesPtr, outSizePtr) => (
+          mod._rac_model_registry_refresh_proto!(
+            handle,
+            reqPtr,
+            reqLen,
+            outBytesPtr,
+            outSizePtr,
+          )
+        ), 'rac_model_registry_refresh_proto')
+      ));
+      if (!resultBytes) {
         return false;
       }
-      return true;
+      const result = ProtoModelRegistryRefreshResultCodec.decode(resultBytes);
+      return result.success;
     } catch (error) {
       logger.warning(
-        `rac_model_registry_refresh threw: ${
+        `rac_model_registry_refresh_proto threw: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

@@ -123,6 +123,17 @@ public class StorageEvent(
     schemaIndex = 8,
   )
   public val evicted_bytes: Long = 0L,
+  /**
+   * For CLEAR_CACHE_COMPLETED / CLEAN_TEMP_COMPLETED — bytes reclaimed.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "freedBytes",
+    schemaIndex = 9,
+  )
+  public val freed_bytes: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -144,6 +155,7 @@ public class StorageEvent(
     if (stored_model_count != other.stored_model_count) return false
     if (cache_key != other.cache_key) return false
     if (evicted_bytes != other.evicted_bytes) return false
+    if (freed_bytes != other.freed_bytes) return false
     return true
   }
 
@@ -160,6 +172,7 @@ public class StorageEvent(
       result = result * 37 + stored_model_count.hashCode()
       result = result * 37 + cache_key.hashCode()
       result = result * 37 + evicted_bytes.hashCode()
+      result = result * 37 + freed_bytes.hashCode()
       super.hashCode = result
     }
     return result
@@ -176,6 +189,7 @@ public class StorageEvent(
     result += """stored_model_count=$stored_model_count"""
     result += """cache_key=${sanitize(cache_key)}"""
     result += """evicted_bytes=$evicted_bytes"""
+    result += """freed_bytes=$freed_bytes"""
     return result.joinToString(prefix = "StorageEvent{", separator = ", ", postfix = "}")
   }
 
@@ -189,8 +203,9 @@ public class StorageEvent(
     stored_model_count: Int = this.stored_model_count,
     cache_key: String = this.cache_key,
     evicted_bytes: Long = this.evicted_bytes,
+    freed_bytes: Long = this.freed_bytes,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageEvent = StorageEvent(kind, model_id, error, total_bytes, available_bytes, used_bytes, stored_model_count, cache_key, evicted_bytes, unknownFields)
+  ): StorageEvent = StorageEvent(kind, model_id, error, total_bytes, available_bytes, used_bytes, stored_model_count, cache_key, evicted_bytes, freed_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -231,6 +246,9 @@ public class StorageEvent(
         if (value.evicted_bytes != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.evicted_bytes)
         }
+        if (value.freed_bytes != 0L) {
+          size += ProtoAdapter.INT64.encodedSizeWithTag(10, value.freed_bytes)
+        }
         return size
       }
 
@@ -262,11 +280,17 @@ public class StorageEvent(
         if (value.evicted_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.evicted_bytes)
         }
+        if (value.freed_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.freed_bytes)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.freed_bytes != 0L) {
+          ProtoAdapter.INT64.encodeWithTag(writer, 10, value.freed_bytes)
+        }
         if (value.evicted_bytes != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.evicted_bytes)
         }
@@ -306,6 +330,7 @@ public class StorageEvent(
         var stored_model_count: Int = 0
         var cache_key: String = ""
         var evicted_bytes: Long = 0L
+        var freed_bytes: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -321,6 +346,7 @@ public class StorageEvent(
             7 -> stored_model_count = ProtoAdapter.INT32.decode(reader)
             8 -> cache_key = ProtoAdapter.STRING.decode(reader)
             9 -> evicted_bytes = ProtoAdapter.INT64.decode(reader)
+            10 -> freed_bytes = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -334,6 +360,7 @@ public class StorageEvent(
           stored_model_count = stored_model_count,
           cache_key = cache_key,
           evicted_bytes = evicted_bytes,
+          freed_bytes = freed_bytes,
           unknownFields = unknownFields
         )
       }

@@ -36,7 +36,6 @@ interface CallbackPtrs {
   secureSet: number;
   secureDelete: number;
   log: number;
-  trackError: number;
   nowMs: number;
   getMemoryInfo: number;
   fileListDirectory: number;
@@ -84,7 +83,6 @@ export class PlatformAdapter {
       secureSet: this.registerSecureSet(),
       secureDelete: this.registerSecureDelete(),
       log: this.registerLog(),
-      trackError: this.registerTrackError(),
       nowMs: this.registerNowMs(),
       getMemoryInfo: this.registerGetMemoryInfo(),
       fileListDirectory: this.registerFileListDirectory(),
@@ -108,6 +106,12 @@ export class PlatformAdapter {
       return (fn as () => number)();
     };
 
+    // ABI guard (MUST be the first two fields). rac_init rejects the adapter
+    // with RAC_ERROR_ABI_VERSION_MISMATCH unless these match the commons build.
+    // 1 == RAC_PLATFORM_ADAPTER_ABI_VERSION.
+    m.setValue(this.adapterPtr + getOffset('abi_version'), 1, 'i32');
+    m.setValue(this.adapterPtr + getOffset('struct_size'), adapterSize, 'i32');
+
     m.setValue(this.adapterPtr + getOffset('file_exists'), this.callbacks.fileExists, '*');
     m.setValue(this.adapterPtr + getOffset('file_read'), this.callbacks.fileRead, '*');
     m.setValue(this.adapterPtr + getOffset('file_write'), this.callbacks.fileWrite, '*');
@@ -116,7 +120,6 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + getOffset('secure_set'), this.callbacks.secureSet, '*');
     m.setValue(this.adapterPtr + getOffset('secure_delete'), this.callbacks.secureDelete, '*');
     m.setValue(this.adapterPtr + getOffset('log'), this.callbacks.log, '*');
-    m.setValue(this.adapterPtr + getOffset('track_error'), this.callbacks.trackError, '*');
     m.setValue(this.adapterPtr + getOffset('now_ms'), this.callbacks.nowMs, '*');
     m.setValue(this.adapterPtr + getOffset('get_memory_info'), this.callbacks.getMemoryInfo, '*');
     // http_download (optional) → null. The HTTPAdapter / FetchHttpTransport
@@ -291,19 +294,6 @@ export class PlatformAdapter {
         default: console.log(prefix, message);
       }
     }, 'viiii');
-  }
-
-  /** void (*)(const char* error_json, void* user_data) */
-  private registerTrackError(): number {
-    const m = this.m;
-    return m.addFunction((errorJsonPtr: number, _userData: number) => {
-      try {
-        const errorJson = m.UTF8ToString(errorJsonPtr);
-        logger.error(`Native error tracked: ${errorJson}`);
-      } catch (error) {
-        logger.error(`Native error tracking failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }, 'vii');
   }
 
   /** int64_t (*)(void* user_data) */

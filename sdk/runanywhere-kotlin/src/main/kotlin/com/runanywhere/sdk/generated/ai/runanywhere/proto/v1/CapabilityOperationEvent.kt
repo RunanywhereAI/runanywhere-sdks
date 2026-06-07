@@ -30,6 +30,18 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * ===========================================================================
+ * SECTION 6 — EMBEDDINGS / SECTION 7 — DIFFUSION / SECTION 8 — RAG /
+ * SECTION 9 — LORA / SECTION 2b — VLM (capability operations)
+ * ===========================================================================
+ * Embeddings, Diffusion, RAG, LoRA, and VLM capability-operation lifecycle is
+ * consolidated into a single `CapabilityOperationEvent` message discriminated
+ * by `CapabilityOperationEventKind` (VLM_* / DIFFUSION_* / EMBEDDINGS_* /
+ * RAG_* / LORA_*). One flat struct keeps these analytics-only operation events
+ * uniform across the five capability components.
+ * ---------------------------------------------------------------------------
+ */
 public class CapabilityOperationEvent(
   @field:WireField(
     tag = 1,

@@ -321,6 +321,12 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_log_level(void) {
 // packs function-pointer fields into this struct. Every field offset is
 // exposed here so the TypeScript side never hard-codes `PTR_SIZE = 4` or
 // a sequential accumulator — same rule as the HTTP struct helpers below.
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_abi_version(void) {
+  return (int)offsetof(rac_platform_adapter_t, abi_version);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_struct_size(void) {
+  return (int)offsetof(rac_platform_adapter_t, struct_size);
+}
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_file_exists(void) {
   return (int)offsetof(rac_platform_adapter_t, file_exists);
 }
@@ -345,9 +351,6 @@ rac_wasm_offsetof_platform_adapter_secure_delete(void) {
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_log(void) {
   return (int)offsetof(rac_platform_adapter_t, log);
-}
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_track_error(void) {
-  return (int)offsetof(rac_platform_adapter_t, track_error);
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_now_ms(void) {
   return (int)offsetof(rac_platform_adapter_t, now_ms);

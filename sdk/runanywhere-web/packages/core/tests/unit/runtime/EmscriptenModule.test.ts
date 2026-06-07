@@ -74,7 +74,7 @@ describe('Emscripten module singleton wiring', () => {
   it('clears ModelRegistryAdapter default module', () => {
     ModelRegistryAdapter.setDefaultModule({
       _rac_get_model_registry: () => 1,
-      _rac_model_registry_refresh: () => 0,
+      _rac_model_registry_refresh_proto: () => 0,
     });
     expect(ModelRegistryAdapter.tryDefault()).not.toBeNull();
     ModelRegistryAdapter.clearDefaultModule();

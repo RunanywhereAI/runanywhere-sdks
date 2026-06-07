@@ -97,6 +97,11 @@ public enum class VoiceEventKind(
   VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED(45),
   VOICE_EVENT_KIND_VOICE_SESSION_STOPPED(46),
   VOICE_EVENT_KIND_VOICE_SESSION_ERROR(47),
+  /**
+   * VAD pause/resume (telemetry-only metrics).
+   */
+  VOICE_EVENT_KIND_VAD_PAUSED(48),
+  VOICE_EVENT_KIND_VAD_RESUMED(49),
   ;
 
   public companion object {
@@ -159,6 +164,8 @@ public enum class VoiceEventKind(
       45 -> VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED
       46 -> VOICE_EVENT_KIND_VOICE_SESSION_STOPPED
       47 -> VOICE_EVENT_KIND_VOICE_SESSION_ERROR
+      48 -> VOICE_EVENT_KIND_VAD_PAUSED
+      49 -> VOICE_EVENT_KIND_VAD_RESUMED
       else -> null
     }
   }

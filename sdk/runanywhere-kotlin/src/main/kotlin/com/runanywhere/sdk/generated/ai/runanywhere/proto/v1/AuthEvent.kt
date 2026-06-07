@@ -29,6 +29,17 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * ===========================================================================
+ * SECTION 11 — INFRA
+ * ===========================================================================
+ * Cross-cutting infrastructure events that are not owned by a single SDK
+ * component: auth, device, network, framework registry, hardware routing,
+ * performance, telemetry, cancellation, and generic failure. Ordered roughly
+ * init/config → device/network → framework/hardware → session/auth →
+ * telemetry → cancellation/failure/performance.
+ * ---------------------------------------------------------------------------
+ */
 public class AuthEvent(
   @field:WireField(
     tag = 1,

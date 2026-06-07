@@ -13,13 +13,12 @@
  *     Apple links commons statically.
  *   - importModelProto mirrors Swift's RAModelImportRequest route for
  *     platform-normalized local paths after downloads or file-picker flows.
- *   - Needs migration: refreshModelRegistry(includeRemoteCatalog,
- *     rescanLocal, pruneOrphans) builds `rac_model_registry_refresh_opts_t`
- *     and calls the non-proto `rac_model_registry_refresh` despite the
- *     proto sibling `rac_model_registry_refresh_proto` already existing
- *     in commons. Migration target: change the Nitro spec to take an
- *     ArrayBuffer (serialized ModelRegistryRefreshRequest) and route
- *     through the proto API.
+ *   - refreshModelRegistry(includeRemoteCatalog, rescanLocal, pruneOrphans)
+ *     hand-encodes the three bool fields into a ModelRegistryRefreshRequest
+ *     protobuf message (no protobuf runtime is linked in this bridge) and
+ *     routes through the canonical `rac_model_registry_refresh_proto`. The
+ *     legacy struct-opts `rac_model_registry_refresh` entry point has been
+ *     removed from commons.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
@@ -532,11 +531,48 @@ HybridRunAnywhereCore::importModelProto(
 }
 
 // ============================================================================
-// Refresh — delegates to rac_model_registry_refresh in commons.
-// Discovery callbacks are left NULL here: rescan_local / prune_orphans need
-// platform file-IO stubs that the RN bridge does not wire today; those flags
-// are honoured at the C ABI layer (they just no-op without callbacks).
+// Refresh — delegates to rac_model_registry_refresh_proto in commons.
+//
+// The RN C++ bridge has no protobuf runtime linked, so we hand-encode the
+// minimal ModelRegistryRefreshRequest (three bool fields) into protobuf wire
+// format and pass the bytes through the proto entry point. proto3 omits
+// default-valued (false) fields, so an all-false request serializes to zero
+// bytes, which is a valid empty message. rescan_local / prune_orphans are
+// honoured at the C ABI layer (commons runs the adapter rescan when the
+// file_list_directory slot is populated).
 // ============================================================================
+
+namespace {
+
+// Encode field `fieldNumber` (a proto bool, wire type 0/varint) as `true`.
+// Skipped entirely when the value is false per proto3 default-field omission.
+void appendRefreshBoolField(std::vector<uint8_t>& out, uint32_t fieldNumber,
+                            bool value) {
+    if (!value) {
+        return;
+    }
+    out.push_back(static_cast<uint8_t>((fieldNumber << 3) | 0x00));  // tag
+    out.push_back(0x01);                                             // varint 1
+}
+
+#if !defined(__APPLE__)
+rac_result_t refreshProtoViaSymbol(
+    rac_model_registry_handle_t registryHandle,
+    const uint8_t* bytes,
+    size_t size,
+    rac_proto_buffer_t* outResult) {
+    auto refreshProto =
+        proto_compat::symbol<proto_compat::RegistryRequestProtoFn>(
+            "rac_model_registry_refresh_proto");
+    if (!refreshProto) {
+        LOGE("refreshModelRegistry: rac_model_registry_refresh_proto unavailable");
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    return refreshProto(registryHandle, bytes, size, outResult);
+}
+#endif
+
+} // namespace
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
     bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) {
@@ -548,17 +584,30 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
             return false;
         }
 
-        rac_model_registry_refresh_opts_t opts{};
-        opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE;
-        opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE;
-        opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE;
-        opts.discovery_callbacks = nullptr;
+        // ModelRegistryRefreshRequest: field 1 include_remote_catalog,
+        // field 2 rescan_local, field 3 prune_orphans (all bool).
+        std::vector<uint8_t> requestBytes;
+        appendRefreshBoolField(requestBytes, 1, includeRemoteCatalog);
+        appendRefreshBoolField(requestBytes, 2, rescanLocal);
+        appendRefreshBoolField(requestBytes, 3, pruneOrphans);
 
-        rac_result_t rc = rac_model_registry_refresh(registryHandle, opts);
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+#if defined(__APPLE__)
+        rac_result_t rc = rac_model_registry_refresh_proto(
+            registryHandle, requestBytes.data(), requestBytes.size(), &out);
+#else
+        rac_result_t rc = refreshProtoViaSymbol(
+            registryHandle, requestBytes.data(), requestBytes.size(), &out);
+#endif
         if (rc != RAC_SUCCESS) {
             LOGE("refreshModelRegistry: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
             return false;
         }
+        // The ModelRegistryRefreshResult bytes carry counts/warnings the RN
+        // surface does not consume today; success is signalled by rc.
+        proto_compat::freeBuffer(&out);
         return true;
     });
 }

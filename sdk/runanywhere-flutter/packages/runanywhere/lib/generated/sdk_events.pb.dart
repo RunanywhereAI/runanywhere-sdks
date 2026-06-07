@@ -303,1560 +303,6 @@ class ConfigurationEvent extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
-/// LLM generation events. Mirrors RN
-///   events.ts:72-89 (SDKGenerationEvent: 12 variants).
-/// Plus Kotlin LLMEvent (5 variants), Dart SDKGenerationEvent (4 factories).
-/// ---------------------------------------------------------------------------
-class GenerationEvent extends $pb.GeneratedMessage {
-  factory GenerationEvent({
-    GenerationEventKind? kind,
-    $core.String? sessionId,
-    $core.String? prompt,
-    $core.String? token,
-    $core.String? streamingText,
-    $core.int? tokensCount,
-    $core.String? response,
-    $core.int? tokensUsed,
-    $fixnum.Int64? latencyMs,
-    $fixnum.Int64? firstTokenLatencyMs,
-    $core.String? error,
-    $core.String? modelId,
-    $core.double? costAmount,
-    $core.double? costSavedAmount,
-    $core.String? routingTarget,
-    $core.String? routingReason,
-    $core.String? cancelReason,
-    $core.String? toolCallId,
-    $core.String? toolName,
-    $core.String? toolPayloadJson,
-    $core.String? structuredSchemaJson,
-    $core.String? structuredOutputJson,
-    $core.String? thinkingText,
-    $core.int? inputTokens,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (sessionId != null) result.sessionId = sessionId;
-    if (prompt != null) result.prompt = prompt;
-    if (token != null) result.token = token;
-    if (streamingText != null) result.streamingText = streamingText;
-    if (tokensCount != null) result.tokensCount = tokensCount;
-    if (response != null) result.response = response;
-    if (tokensUsed != null) result.tokensUsed = tokensUsed;
-    if (latencyMs != null) result.latencyMs = latencyMs;
-    if (firstTokenLatencyMs != null)
-      result.firstTokenLatencyMs = firstTokenLatencyMs;
-    if (error != null) result.error = error;
-    if (modelId != null) result.modelId = modelId;
-    if (costAmount != null) result.costAmount = costAmount;
-    if (costSavedAmount != null) result.costSavedAmount = costSavedAmount;
-    if (routingTarget != null) result.routingTarget = routingTarget;
-    if (routingReason != null) result.routingReason = routingReason;
-    if (cancelReason != null) result.cancelReason = cancelReason;
-    if (toolCallId != null) result.toolCallId = toolCallId;
-    if (toolName != null) result.toolName = toolName;
-    if (toolPayloadJson != null) result.toolPayloadJson = toolPayloadJson;
-    if (structuredSchemaJson != null)
-      result.structuredSchemaJson = structuredSchemaJson;
-    if (structuredOutputJson != null)
-      result.structuredOutputJson = structuredOutputJson;
-    if (thinkingText != null) result.thinkingText = thinkingText;
-    if (inputTokens != null) result.inputTokens = inputTokens;
-    return result;
-  }
-
-  GenerationEvent._();
-
-  factory GenerationEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory GenerationEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'GenerationEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<GenerationEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: GenerationEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..aOS(3, _omitFieldNames ? '' : 'prompt')
-    ..aOS(4, _omitFieldNames ? '' : 'token')
-    ..aOS(5, _omitFieldNames ? '' : 'streamingText')
-    ..aI(6, _omitFieldNames ? '' : 'tokensCount')
-    ..aOS(7, _omitFieldNames ? '' : 'response')
-    ..aI(8, _omitFieldNames ? '' : 'tokensUsed')
-    ..aInt64(9, _omitFieldNames ? '' : 'latencyMs')
-    ..aInt64(10, _omitFieldNames ? '' : 'firstTokenLatencyMs')
-    ..aOS(11, _omitFieldNames ? '' : 'error')
-    ..aOS(12, _omitFieldNames ? '' : 'modelId')
-    ..aD(13, _omitFieldNames ? '' : 'costAmount')
-    ..aD(14, _omitFieldNames ? '' : 'costSavedAmount')
-    ..aOS(15, _omitFieldNames ? '' : 'routingTarget')
-    ..aOS(16, _omitFieldNames ? '' : 'routingReason')
-    ..aOS(17, _omitFieldNames ? '' : 'cancelReason')
-    ..aOS(18, _omitFieldNames ? '' : 'toolCallId')
-    ..aOS(19, _omitFieldNames ? '' : 'toolName')
-    ..aOS(20, _omitFieldNames ? '' : 'toolPayloadJson')
-    ..aOS(21, _omitFieldNames ? '' : 'structuredSchemaJson')
-    ..aOS(22, _omitFieldNames ? '' : 'structuredOutputJson')
-    ..aOS(23, _omitFieldNames ? '' : 'thinkingText')
-    ..aI(24, _omitFieldNames ? '' : 'inputTokens')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GenerationEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GenerationEvent copyWith(void Function(GenerationEvent) updates) =>
-      super.copyWith((message) => updates(message as GenerationEvent))
-          as GenerationEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static GenerationEvent create() => GenerationEvent._();
-  @$core.override
-  GenerationEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static GenerationEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<GenerationEvent>(create);
-  static GenerationEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  GenerationEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(GenerationEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  /// Optional session id (RN voiceSession_*, generationStarted.sessionId).
-  @$pb.TagNumber(2)
-  $core.String get sessionId => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set sessionId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasSessionId() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearSessionId() => $_clearField(2);
-
-  /// For STARTED — the prompt text (RN events.ts:75).
-  @$pb.TagNumber(3)
-  $core.String get prompt => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set prompt($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasPrompt() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearPrompt() => $_clearField(3);
-
-  /// For TOKEN_GENERATED / FIRST_TOKEN_GENERATED — single token text.
-  @$pb.TagNumber(4)
-  $core.String get token => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set token($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasToken() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearToken() => $_clearField(4);
-
-  /// For STREAMING_UPDATE — the running response text and token count.
-  @$pb.TagNumber(5)
-  $core.String get streamingText => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set streamingText($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasStreamingText() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearStreamingText() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get tokensCount => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set tokensCount($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTokensCount() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTokensCount() => $_clearField(6);
-
-  /// For COMPLETED — full response, usage stats, latency.
-  @$pb.TagNumber(7)
-  $core.String get response => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set response($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasResponse() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearResponse() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get tokensUsed => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set tokensUsed($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasTokensUsed() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearTokensUsed() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $fixnum.Int64 get latencyMs => $_getI64(8);
-  @$pb.TagNumber(9)
-  set latencyMs($fixnum.Int64 value) => $_setInt64(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasLatencyMs() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearLatencyMs() => $_clearField(9);
-
-  /// For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76).
-  @$pb.TagNumber(10)
-  $fixnum.Int64 get firstTokenLatencyMs => $_getI64(9);
-  @$pb.TagNumber(10)
-  set firstTokenLatencyMs($fixnum.Int64 value) => $_setInt64(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasFirstTokenLatencyMs() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearFirstTokenLatencyMs() => $_clearField(10);
-
-  /// For FAILED.
-  @$pb.TagNumber(11)
-  $core.String get error => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set error($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasError() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearError() => $_clearField(11);
-
-  /// For MODEL_LOADED / MODEL_UNLOADED — bound model.
-  @$pb.TagNumber(12)
-  $core.String get modelId => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set modelId($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasModelId() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearModelId() => $_clearField(12);
-
-  /// For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated.
-  @$pb.TagNumber(13)
-  $core.double get costAmount => $_getN(12);
-  @$pb.TagNumber(13)
-  set costAmount($core.double value) => $_setDouble(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasCostAmount() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearCostAmount() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.double get costSavedAmount => $_getN(13);
-  @$pb.TagNumber(14)
-  set costSavedAmount($core.double value) => $_setDouble(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasCostSavedAmount() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearCostSavedAmount() => $_clearField(14);
-
-  /// For ROUTING_DECISION — RN events.ts:89.
-  @$pb.TagNumber(15)
-  $core.String get routingTarget => $_getSZ(14);
-  @$pb.TagNumber(15)
-  set routingTarget($core.String value) => $_setString(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasRoutingTarget() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearRoutingTarget() => $_clearField(15);
-
-  @$pb.TagNumber(16)
-  $core.String get routingReason => $_getSZ(15);
-  @$pb.TagNumber(16)
-  set routingReason($core.String value) => $_setString(15, value);
-  @$pb.TagNumber(16)
-  $core.bool hasRoutingReason() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearRoutingReason() => $_clearField(16);
-
-  /// For cancellation / tool / structured-output / thinking events.
-  @$pb.TagNumber(17)
-  $core.String get cancelReason => $_getSZ(16);
-  @$pb.TagNumber(17)
-  set cancelReason($core.String value) => $_setString(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasCancelReason() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearCancelReason() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  $core.String get toolCallId => $_getSZ(17);
-  @$pb.TagNumber(18)
-  set toolCallId($core.String value) => $_setString(17, value);
-  @$pb.TagNumber(18)
-  $core.bool hasToolCallId() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearToolCallId() => $_clearField(18);
-
-  @$pb.TagNumber(19)
-  $core.String get toolName => $_getSZ(18);
-  @$pb.TagNumber(19)
-  set toolName($core.String value) => $_setString(18, value);
-  @$pb.TagNumber(19)
-  $core.bool hasToolName() => $_has(18);
-  @$pb.TagNumber(19)
-  void clearToolName() => $_clearField(19);
-
-  @$pb.TagNumber(20)
-  $core.String get toolPayloadJson => $_getSZ(19);
-  @$pb.TagNumber(20)
-  set toolPayloadJson($core.String value) => $_setString(19, value);
-  @$pb.TagNumber(20)
-  $core.bool hasToolPayloadJson() => $_has(19);
-  @$pb.TagNumber(20)
-  void clearToolPayloadJson() => $_clearField(20);
-
-  @$pb.TagNumber(21)
-  $core.String get structuredSchemaJson => $_getSZ(20);
-  @$pb.TagNumber(21)
-  set structuredSchemaJson($core.String value) => $_setString(20, value);
-  @$pb.TagNumber(21)
-  $core.bool hasStructuredSchemaJson() => $_has(20);
-  @$pb.TagNumber(21)
-  void clearStructuredSchemaJson() => $_clearField(21);
-
-  @$pb.TagNumber(22)
-  $core.String get structuredOutputJson => $_getSZ(21);
-  @$pb.TagNumber(22)
-  set structuredOutputJson($core.String value) => $_setString(21, value);
-  @$pb.TagNumber(22)
-  $core.bool hasStructuredOutputJson() => $_has(21);
-  @$pb.TagNumber(22)
-  void clearStructuredOutputJson() => $_clearField(22);
-
-  @$pb.TagNumber(23)
-  $core.String get thinkingText => $_getSZ(22);
-  @$pb.TagNumber(23)
-  set thinkingText($core.String value) => $_setString(22, value);
-  @$pb.TagNumber(23)
-  $core.bool hasThinkingText() => $_has(22);
-  @$pb.TagNumber(23)
-  void clearThinkingText() => $_clearField(23);
-
-  /// For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
-  /// Enables totalTokens = input_tokens + tokens_used analytics
-  /// from the event stream alone.
-  @$pb.TagNumber(24)
-  $core.int get inputTokens => $_getIZ(23);
-  @$pb.TagNumber(24)
-  set inputTokens($core.int value) => $_setSignedInt32(23, value);
-  @$pb.TagNumber(24)
-  $core.bool hasInputTokens() => $_has(23);
-  @$pb.TagNumber(24)
-  void clearInputTokens() => $_clearField(24);
-}
-
-/// ---------------------------------------------------------------------------
-/// Model lifecycle events: load / unload / download / list / catalog / delete /
-/// custom-model / built-in-registration. Mirrors RN
-///   events.ts:95-130 (SDKModelEvent: 24 variants).
-/// Plus Kotlin ModelEvent (7 ModelEventType) and Dart SDKModelEvent (10
-/// concrete classes).
-/// ---------------------------------------------------------------------------
-class ModelEvent extends $pb.GeneratedMessage {
-  factory ModelEvent({
-    ModelEventKind? kind,
-    $core.String? modelId,
-    $core.String? taskId,
-    $core.double? progress,
-    $fixnum.Int64? bytesDownloaded,
-    $fixnum.Int64? totalBytes,
-    $core.String? downloadState,
-    $core.String? localPath,
-    $core.String? error,
-    $core.int? modelCount,
-    $core.String? customModelName,
-    $core.String? customModelUrl,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (modelId != null) result.modelId = modelId;
-    if (taskId != null) result.taskId = taskId;
-    if (progress != null) result.progress = progress;
-    if (bytesDownloaded != null) result.bytesDownloaded = bytesDownloaded;
-    if (totalBytes != null) result.totalBytes = totalBytes;
-    if (downloadState != null) result.downloadState = downloadState;
-    if (localPath != null) result.localPath = localPath;
-    if (error != null) result.error = error;
-    if (modelCount != null) result.modelCount = modelCount;
-    if (customModelName != null) result.customModelName = customModelName;
-    if (customModelUrl != null) result.customModelUrl = customModelUrl;
-    return result;
-  }
-
-  ModelEvent._();
-
-  factory ModelEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ModelEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ModelEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<ModelEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: ModelEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'modelId')
-    ..aOS(3, _omitFieldNames ? '' : 'taskId')
-    ..aD(4, _omitFieldNames ? '' : 'progress', fieldType: $pb.PbFieldType.OF)
-    ..aInt64(5, _omitFieldNames ? '' : 'bytesDownloaded')
-    ..aInt64(6, _omitFieldNames ? '' : 'totalBytes')
-    ..aOS(7, _omitFieldNames ? '' : 'downloadState')
-    ..aOS(8, _omitFieldNames ? '' : 'localPath')
-    ..aOS(9, _omitFieldNames ? '' : 'error')
-    ..aI(10, _omitFieldNames ? '' : 'modelCount')
-    ..aOS(11, _omitFieldNames ? '' : 'customModelName')
-    ..aOS(12, _omitFieldNames ? '' : 'customModelUrl')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ModelEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ModelEvent copyWith(void Function(ModelEvent) updates) =>
-      super.copyWith((message) => updates(message as ModelEvent)) as ModelEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ModelEvent create() => ModelEvent._();
-  @$core.override
-  ModelEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ModelEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ModelEvent>(create);
-  static ModelEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  ModelEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(ModelEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get modelId => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set modelId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasModelId() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearModelId() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get taskId => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set taskId($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasTaskId() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearTaskId() => $_clearField(3);
-
-  /// For LOAD_PROGRESS / DOWNLOAD_PROGRESS — 0.0..1.0.
-  @$pb.TagNumber(4)
-  $core.double get progress => $_getN(3);
-  @$pb.TagNumber(4)
-  set progress($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasProgress() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearProgress() => $_clearField(4);
-
-  /// For DOWNLOAD_PROGRESS — bytes counters.
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get bytesDownloaded => $_getI64(4);
-  @$pb.TagNumber(5)
-  set bytesDownloaded($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasBytesDownloaded() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearBytesDownloaded() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get totalBytes => $_getI64(5);
-  @$pb.TagNumber(6)
-  set totalBytes($fixnum.Int64 value) => $_setInt64(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTotalBytes() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTotalBytes() => $_clearField(6);
-
-  /// For DOWNLOAD_PROGRESS — engine-level state string (RN events.ts:111).
-  @$pb.TagNumber(7)
-  $core.String get downloadState => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set downloadState($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasDownloadState() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearDownloadState() => $_clearField(7);
-
-  /// For DOWNLOAD_COMPLETED — landed local path (RN events.ts:118).
-  @$pb.TagNumber(8)
-  $core.String get localPath => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set localPath($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasLocalPath() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearLocalPath() => $_clearField(8);
-
-  /// For *_FAILED.
-  @$pb.TagNumber(9)
-  $core.String get error => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set error($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasError() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearError() => $_clearField(9);
-
-  /// For LIST_COMPLETED / CATALOG_LOADED — count only; the full
-  /// ModelInfo array travels via response RPCs, not via events.
-  @$pb.TagNumber(10)
-  $core.int get modelCount => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set modelCount($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasModelCount() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearModelCount() => $_clearField(10);
-
-  /// For CUSTOM_MODEL_ADDED — RN events.ts:129.
-  @$pb.TagNumber(11)
-  $core.String get customModelName => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set customModelName($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasCustomModelName() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearCustomModelName() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.String get customModelUrl => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set customModelUrl($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasCustomModelUrl() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearCustomModelUrl() => $_clearField(12);
-}
-
-/// ---------------------------------------------------------------------------
-/// Voice / audio higher-level events. Mirrors RN
-///   events.ts:136-187 (SDKVoiceEvent: 41 variants).
-/// Plus Dart SDKVoiceEvent (~15 concrete classes), Kotlin STTEvent + TTSEvent.
-///
-/// Renamed from `VoiceEvent` to `VoiceLifecycleEvent` to avoid colliding with
-/// `runanywhere.v1.VoiceEvent` from voice_events.proto, which carries the
-/// low-level streaming pipeline payloads (UserSaid / AssistantToken /
-/// AudioFrame / VAD / Interrupted / StateChange / Error / Metrics). The
-/// pipeline events are exposed via SDKEvent.voice_pipeline; this message
-/// is exposed via SDKEvent.voice.
-/// ---------------------------------------------------------------------------
-class VoiceLifecycleEvent extends $pb.GeneratedMessage {
-  factory VoiceLifecycleEvent({
-    VoiceEventKind? kind,
-    $core.String? sessionId,
-    $core.String? text,
-    $core.double? confidence,
-    $core.String? responseText,
-    $core.String? audioBase64,
-    $fixnum.Int64? durationMs,
-    $core.double? audioLevel,
-    $core.String? transcription,
-    $core.String? turnResponse,
-    $core.String? turnAudioBase64,
-    $core.String? error,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (sessionId != null) result.sessionId = sessionId;
-    if (text != null) result.text = text;
-    if (confidence != null) result.confidence = confidence;
-    if (responseText != null) result.responseText = responseText;
-    if (audioBase64 != null) result.audioBase64 = audioBase64;
-    if (durationMs != null) result.durationMs = durationMs;
-    if (audioLevel != null) result.audioLevel = audioLevel;
-    if (transcription != null) result.transcription = transcription;
-    if (turnResponse != null) result.turnResponse = turnResponse;
-    if (turnAudioBase64 != null) result.turnAudioBase64 = turnAudioBase64;
-    if (error != null) result.error = error;
-    return result;
-  }
-
-  VoiceLifecycleEvent._();
-
-  factory VoiceLifecycleEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory VoiceLifecycleEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'VoiceLifecycleEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<VoiceEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: VoiceEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..aOS(3, _omitFieldNames ? '' : 'text')
-    ..aD(4, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
-    ..aOS(5, _omitFieldNames ? '' : 'responseText')
-    ..aOS(6, _omitFieldNames ? '' : 'audioBase64')
-    ..aInt64(7, _omitFieldNames ? '' : 'durationMs')
-    ..aD(8, _omitFieldNames ? '' : 'audioLevel', fieldType: $pb.PbFieldType.OF)
-    ..aOS(9, _omitFieldNames ? '' : 'transcription')
-    ..aOS(10, _omitFieldNames ? '' : 'turnResponse')
-    ..aOS(11, _omitFieldNames ? '' : 'turnAudioBase64')
-    ..aOS(12, _omitFieldNames ? '' : 'error')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  VoiceLifecycleEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  VoiceLifecycleEvent copyWith(void Function(VoiceLifecycleEvent) updates) =>
-      super.copyWith((message) => updates(message as VoiceLifecycleEvent))
-          as VoiceLifecycleEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static VoiceLifecycleEvent create() => VoiceLifecycleEvent._();
-  @$core.override
-  VoiceLifecycleEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static VoiceLifecycleEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<VoiceLifecycleEvent>(create);
-  static VoiceLifecycleEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  VoiceEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(VoiceEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  /// For listeningStarted / voiceSession_* — optional session id.
-  @$pb.TagNumber(2)
-  $core.String get sessionId => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set sessionId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasSessionId() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearSessionId() => $_clearField(2);
-
-  /// For TRANSCRIPTION_PARTIAL / TRANSCRIPTION_FINAL / STT_PARTIAL_RESULT /
-  /// STT_COMPLETED.
-  @$pb.TagNumber(3)
-  $core.String get text => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set text($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasText() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearText() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.double get confidence => $_getN(3);
-  @$pb.TagNumber(4)
-  set confidence($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasConfidence() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearConfidence() => $_clearField(4);
-
-  /// For RESPONSE_GENERATED.
-  @$pb.TagNumber(5)
-  $core.String get responseText => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set responseText($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasResponseText() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearResponseText() => $_clearField(5);
-
-  /// For AUDIO_GENERATED — base64-encoded PCM (RN events.ts:145).
-  @$pb.TagNumber(6)
-  $core.String get audioBase64 => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set audioBase64($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasAudioBase64() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearAudioBase64() => $_clearField(6);
-
-  /// For RECORDING_STOPPED / PLAYBACK_STARTED / PLAYBACK_COMPLETED —
-  /// duration in milliseconds (RN events.ts:158, 160-161).
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get durationMs => $_getI64(6);
-  @$pb.TagNumber(7)
-  set durationMs($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasDurationMs() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearDurationMs() => $_clearField(7);
-
-  /// For VOICE_SESSION_LISTENING — current audio level (RN events.ts:178).
-  @$pb.TagNumber(8)
-  $core.double get audioLevel => $_getN(7);
-  @$pb.TagNumber(8)
-  set audioLevel($core.double value) => $_setFloat(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasAudioLevel() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearAudioLevel() => $_clearField(8);
-
-  /// For VOICE_SESSION_TRANSCRIBED / VOICE_SESSION_RESPONDED /
-  /// VOICE_SESSION_TURN_COMPLETED — RN events.ts:182-185.
-  @$pb.TagNumber(9)
-  $core.String get transcription => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set transcription($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasTranscription() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearTranscription() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.String get turnResponse => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set turnResponse($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasTurnResponse() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearTurnResponse() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.String get turnAudioBase64 => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set turnAudioBase64($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasTurnAudioBase64() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearTurnAudioBase64() => $_clearField(11);
-
-  /// For *_ERROR / *_FAILED.
-  @$pb.TagNumber(12)
-  $core.String get error => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set error($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasError() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearError() => $_clearField(12);
-}
-
-/// ---------------------------------------------------------------------------
-/// Performance metrics events. Mirrors RN
-///   events.ts:193-197 (SDKPerformanceEvent: 4 variants).
-/// ---------------------------------------------------------------------------
-class PerformanceEvent extends $pb.GeneratedMessage {
-  factory PerformanceEvent({
-    PerformanceEventKind? kind,
-    $fixnum.Int64? memoryBytes,
-    $core.String? thermalState,
-    $core.String? operation,
-    $fixnum.Int64? milliseconds,
-    $core.double? tokensPerSecond,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (memoryBytes != null) result.memoryBytes = memoryBytes;
-    if (thermalState != null) result.thermalState = thermalState;
-    if (operation != null) result.operation = operation;
-    if (milliseconds != null) result.milliseconds = milliseconds;
-    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
-    return result;
-  }
-
-  PerformanceEvent._();
-
-  factory PerformanceEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory PerformanceEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'PerformanceEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<PerformanceEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: PerformanceEventKind.values)
-    ..aInt64(2, _omitFieldNames ? '' : 'memoryBytes')
-    ..aOS(3, _omitFieldNames ? '' : 'thermalState')
-    ..aOS(4, _omitFieldNames ? '' : 'operation')
-    ..aInt64(5, _omitFieldNames ? '' : 'milliseconds')
-    ..aD(6, _omitFieldNames ? '' : 'tokensPerSecond')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PerformanceEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PerformanceEvent copyWith(void Function(PerformanceEvent) updates) =>
-      super.copyWith((message) => updates(message as PerformanceEvent))
-          as PerformanceEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static PerformanceEvent create() => PerformanceEvent._();
-  @$core.override
-  PerformanceEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static PerformanceEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<PerformanceEvent>(create);
-  static PerformanceEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  PerformanceEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(PerformanceEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  /// For MEMORY_WARNING — usage in bytes (RN typed as number).
-  @$pb.TagNumber(2)
-  $fixnum.Int64 get memoryBytes => $_getI64(1);
-  @$pb.TagNumber(2)
-  set memoryBytes($fixnum.Int64 value) => $_setInt64(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasMemoryBytes() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearMemoryBytes() => $_clearField(2);
-
-  /// For THERMAL_STATE_CHANGED — engine-defined state string
-  /// (e.g. "nominal", "fair", "serious", "critical"; Apple-specific
-  /// names preserved as strings to avoid platform-coupled enums).
-  @$pb.TagNumber(3)
-  $core.String get thermalState => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set thermalState($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasThermalState() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearThermalState() => $_clearField(3);
-
-  /// For LATENCY_MEASURED.
-  @$pb.TagNumber(4)
-  $core.String get operation => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set operation($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasOperation() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearOperation() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get milliseconds => $_getI64(4);
-  @$pb.TagNumber(5)
-  set milliseconds($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasMilliseconds() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearMilliseconds() => $_clearField(5);
-
-  /// For THROUGHPUT_MEASURED — RN events.ts:197.
-  @$pb.TagNumber(6)
-  $core.double get tokensPerSecond => $_getN(5);
-  @$pb.TagNumber(6)
-  set tokensPerSecond($core.double value) => $_setDouble(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTokensPerSecond() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTokensPerSecond() => $_clearField(6);
-}
-
-/// ---------------------------------------------------------------------------
-/// Network events. Mirrors RN
-///   events.ts:203-207 (SDKNetworkEvent: 4 variants).
-/// ---------------------------------------------------------------------------
-class NetworkEvent extends $pb.GeneratedMessage {
-  factory NetworkEvent({
-    NetworkEventKind? kind,
-    $core.String? url,
-    $core.int? statusCode,
-    $core.bool? isOnline,
-    $core.String? error,
-    $fixnum.Int64? latencyMs,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (url != null) result.url = url;
-    if (statusCode != null) result.statusCode = statusCode;
-    if (isOnline != null) result.isOnline = isOnline;
-    if (error != null) result.error = error;
-    if (latencyMs != null) result.latencyMs = latencyMs;
-    return result;
-  }
-
-  NetworkEvent._();
-
-  factory NetworkEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory NetworkEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'NetworkEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<NetworkEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: NetworkEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'url')
-    ..aI(3, _omitFieldNames ? '' : 'statusCode')
-    ..aOB(4, _omitFieldNames ? '' : 'isOnline')
-    ..aOS(5, _omitFieldNames ? '' : 'error')
-    ..aInt64(6, _omitFieldNames ? '' : 'latencyMs')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  NetworkEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  NetworkEvent copyWith(void Function(NetworkEvent) updates) =>
-      super.copyWith((message) => updates(message as NetworkEvent))
-          as NetworkEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static NetworkEvent create() => NetworkEvent._();
-  @$core.override
-  NetworkEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static NetworkEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<NetworkEvent>(create);
-  static NetworkEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  NetworkEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(NetworkEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get url => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set url($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasUrl() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearUrl() => $_clearField(2);
-
-  /// For REQUEST_COMPLETED — HTTP status (RN events.ts:205).
-  @$pb.TagNumber(3)
-  $core.int get statusCode => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set statusCode($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasStatusCode() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearStatusCode() => $_clearField(3);
-
-  /// For CONNECTIVITY_CHANGED — RN events.ts:207.
-  @$pb.TagNumber(4)
-  $core.bool get isOnline => $_getBF(3);
-  @$pb.TagNumber(4)
-  set isOnline($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasIsOnline() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearIsOnline() => $_clearField(4);
-
-  /// For REQUEST_FAILED / TIMEOUT.
-  @$pb.TagNumber(5)
-  $core.String get error => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set error($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasError() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearError() => $_clearField(5);
-
-  /// For REQUEST_COMPLETED — response time in ms (canonical addition,
-  /// implied by Kotlin/iOS request timing instrumentation).
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get latencyMs => $_getI64(5);
-  @$pb.TagNumber(6)
-  set latencyMs($fixnum.Int64 value) => $_setInt64(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasLatencyMs() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearLatencyMs() => $_clearField(6);
-}
-
-/// ---------------------------------------------------------------------------
-/// Storage events. Mirrors RN
-///   events.ts:213-226 (SDKStorageEvent: 13 variants).
-/// Plus Dart SDKStorageEvent (cacheCleared, tempFilesCleaned).
-/// ---------------------------------------------------------------------------
-class StorageEvent extends $pb.GeneratedMessage {
-  factory StorageEvent({
-    StorageEventKind? kind,
-    $core.String? modelId,
-    $core.String? error,
-    $fixnum.Int64? totalBytes,
-    $fixnum.Int64? availableBytes,
-    $fixnum.Int64? usedBytes,
-    $core.int? storedModelCount,
-    $core.String? cacheKey,
-    $fixnum.Int64? evictedBytes,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (modelId != null) result.modelId = modelId;
-    if (error != null) result.error = error;
-    if (totalBytes != null) result.totalBytes = totalBytes;
-    if (availableBytes != null) result.availableBytes = availableBytes;
-    if (usedBytes != null) result.usedBytes = usedBytes;
-    if (storedModelCount != null) result.storedModelCount = storedModelCount;
-    if (cacheKey != null) result.cacheKey = cacheKey;
-    if (evictedBytes != null) result.evictedBytes = evictedBytes;
-    return result;
-  }
-
-  StorageEvent._();
-
-  factory StorageEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory StorageEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'StorageEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<StorageEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: StorageEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'modelId')
-    ..aOS(3, _omitFieldNames ? '' : 'error')
-    ..aInt64(4, _omitFieldNames ? '' : 'totalBytes')
-    ..aInt64(5, _omitFieldNames ? '' : 'availableBytes')
-    ..aInt64(6, _omitFieldNames ? '' : 'usedBytes')
-    ..aI(7, _omitFieldNames ? '' : 'storedModelCount')
-    ..aOS(8, _omitFieldNames ? '' : 'cacheKey')
-    ..aInt64(9, _omitFieldNames ? '' : 'evictedBytes')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  StorageEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  StorageEvent copyWith(void Function(StorageEvent) updates) =>
-      super.copyWith((message) => updates(message as StorageEvent))
-          as StorageEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static StorageEvent create() => StorageEvent._();
-  @$core.override
-  StorageEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static StorageEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<StorageEvent>(create);
-  static StorageEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  StorageEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(StorageEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  /// For DELETE_MODEL_* events.
-  @$pb.TagNumber(2)
-  $core.String get modelId => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set modelId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasModelId() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearModelId() => $_clearField(2);
-
-  /// For *_FAILED.
-  @$pb.TagNumber(3)
-  $core.String get error => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set error($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasError() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearError() => $_clearField(3);
-
-  /// For INFO_RETRIEVED — total/available bytes (StorageInfo summary).
-  @$pb.TagNumber(4)
-  $fixnum.Int64 get totalBytes => $_getI64(3);
-  @$pb.TagNumber(4)
-  set totalBytes($fixnum.Int64 value) => $_setInt64(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTotalBytes() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearTotalBytes() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get availableBytes => $_getI64(4);
-  @$pb.TagNumber(5)
-  set availableBytes($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasAvailableBytes() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearAvailableBytes() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get usedBytes => $_getI64(5);
-  @$pb.TagNumber(6)
-  set usedBytes($fixnum.Int64 value) => $_setInt64(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasUsedBytes() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearUsedBytes() => $_clearField(6);
-
-  /// For MODELS_RETRIEVED.
-  @$pb.TagNumber(7)
-  $core.int get storedModelCount => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set storedModelCount($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasStoredModelCount() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearStoredModelCount() => $_clearField(7);
-
-  /// For CACHE_HIT / CACHE_MISS / EVICTION (canonical superset additions
-  /// not in RN's events.ts but called out in Step 3 spec).
-  @$pb.TagNumber(8)
-  $core.String get cacheKey => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set cacheKey($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasCacheKey() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearCacheKey() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $fixnum.Int64 get evictedBytes => $_getI64(8);
-  @$pb.TagNumber(9)
-  set evictedBytes($fixnum.Int64 value) => $_setInt64(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasEvictedBytes() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearEvictedBytes() => $_clearField(9);
-}
-
-/// ---------------------------------------------------------------------------
-/// Framework registry events. Mirrors RN
-///   events.ts:232-251 (SDKFrameworkEvent: 11 variants).
-/// ---------------------------------------------------------------------------
-class FrameworkEvent extends $pb.GeneratedMessage {
-  factory FrameworkEvent({
-    FrameworkEventKind? kind,
-    $core.int? framework,
-    $core.String? adapterName,
-    $core.int? adapterCount,
-    $core.int? frameworkCount,
-    $core.int? modelCount,
-    $core.String? modality,
-    $core.String? error,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (framework != null) result.framework = framework;
-    if (adapterName != null) result.adapterName = adapterName;
-    if (adapterCount != null) result.adapterCount = adapterCount;
-    if (frameworkCount != null) result.frameworkCount = frameworkCount;
-    if (modelCount != null) result.modelCount = modelCount;
-    if (modality != null) result.modality = modality;
-    if (error != null) result.error = error;
-    return result;
-  }
-
-  FrameworkEvent._();
-
-  factory FrameworkEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory FrameworkEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'FrameworkEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<FrameworkEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: FrameworkEventKind.values)
-    ..aI(2, _omitFieldNames ? '' : 'framework')
-    ..aOS(3, _omitFieldNames ? '' : 'adapterName')
-    ..aI(4, _omitFieldNames ? '' : 'adapterCount')
-    ..aI(5, _omitFieldNames ? '' : 'frameworkCount')
-    ..aI(6, _omitFieldNames ? '' : 'modelCount')
-    ..aOS(7, _omitFieldNames ? '' : 'modality')
-    ..aOS(8, _omitFieldNames ? '' : 'error')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  FrameworkEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  FrameworkEvent copyWith(void Function(FrameworkEvent) updates) =>
-      super.copyWith((message) => updates(message as FrameworkEvent))
-          as FrameworkEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static FrameworkEvent create() => FrameworkEvent._();
-  @$core.override
-  FrameworkEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static FrameworkEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<FrameworkEvent>(create);
-  static FrameworkEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  FrameworkEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(FrameworkEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  /// For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. Uses
-  /// canonical InferenceFramework from model_types.proto, but stored as
-  /// its enum int32 here to avoid cross-file message dependency just for
-  /// a single field. Frontends decode via the shared codegen.
-  @$pb.TagNumber(2)
-  $core.int get framework => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set framework($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasFramework() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearFramework() => $_clearField(2);
-
-  /// For ADAPTER_REGISTERED — adapter display name.
-  @$pb.TagNumber(3)
-  $core.String get adapterName => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set adapterName($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasAdapterName() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearAdapterName() => $_clearField(3);
-
-  /// For ADAPTERS_RETRIEVED / *_RETRIEVED — counts.
-  @$pb.TagNumber(4)
-  $core.int get adapterCount => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set adapterCount($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasAdapterCount() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearAdapterCount() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get frameworkCount => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set frameworkCount($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasFrameworkCount() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearFrameworkCount() => $_clearField(5);
-
-  /// For MODELS_FOR_FRAMEWORK_RETRIEVED — model count (full ModelInfo[]
-  /// travels via RPCs, not events).
-  @$pb.TagNumber(6)
-  $core.int get modelCount => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set modelCount($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasModelCount() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearModelCount() => $_clearField(6);
-
-  /// For *_FOR_MODALITY_* — modality identifier (string-keyed; canonical
-  /// FrameworkModality enum exists in model_types but we keep this loose
-  /// so plugins can register custom modalities).
-  @$pb.TagNumber(7)
-  $core.String get modality => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set modality($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasModality() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearModality() => $_clearField(7);
-
-  /// For ERROR / UNREGISTERED failures (canonical superset additions).
-  @$pb.TagNumber(8)
-  $core.String get error => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set error($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasError() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearError() => $_clearField(8);
-}
-
-/// ---------------------------------------------------------------------------
-/// Device events: device-info collection / sync, plus battery / thermal /
-/// connectivity changes (canonical superset; Kotlin's analytics layer
-/// already emits these as raw `BaseSDKEvent`s with category=device).
-/// Mirrors RN events.ts:257-264 (SDKDeviceEvent: 7 variants).
-/// ---------------------------------------------------------------------------
-class DeviceEvent extends $pb.GeneratedMessage {
-  factory DeviceEvent({
-    DeviceEventKind? kind,
-    $core.String? deviceId,
-    $core.String? osName,
-    $core.String? osVersion,
-    $core.String? model,
-    $core.String? error,
-    $core.String? property,
-    $core.String? newValue,
-    $core.String? oldValue,
-    $core.double? batteryLevel,
-    $core.bool? isCharging,
-    $core.String? thermalState,
-    $core.bool? isConnected,
-    $core.String? connectionType,
-  }) {
-    final result = create();
-    if (kind != null) result.kind = kind;
-    if (deviceId != null) result.deviceId = deviceId;
-    if (osName != null) result.osName = osName;
-    if (osVersion != null) result.osVersion = osVersion;
-    if (model != null) result.model = model;
-    if (error != null) result.error = error;
-    if (property != null) result.property = property;
-    if (newValue != null) result.newValue = newValue;
-    if (oldValue != null) result.oldValue = oldValue;
-    if (batteryLevel != null) result.batteryLevel = batteryLevel;
-    if (isCharging != null) result.isCharging = isCharging;
-    if (thermalState != null) result.thermalState = thermalState;
-    if (isConnected != null) result.isConnected = isConnected;
-    if (connectionType != null) result.connectionType = connectionType;
-    return result;
-  }
-
-  DeviceEvent._();
-
-  factory DeviceEvent.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory DeviceEvent.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'DeviceEvent',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<DeviceEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: DeviceEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'deviceId')
-    ..aOS(3, _omitFieldNames ? '' : 'osName')
-    ..aOS(4, _omitFieldNames ? '' : 'osVersion')
-    ..aOS(5, _omitFieldNames ? '' : 'model')
-    ..aOS(6, _omitFieldNames ? '' : 'error')
-    ..aOS(7, _omitFieldNames ? '' : 'property')
-    ..aOS(8, _omitFieldNames ? '' : 'newValue')
-    ..aOS(9, _omitFieldNames ? '' : 'oldValue')
-    ..aD(10, _omitFieldNames ? '' : 'batteryLevel',
-        fieldType: $pb.PbFieldType.OF)
-    ..aOB(11, _omitFieldNames ? '' : 'isCharging')
-    ..aOS(12, _omitFieldNames ? '' : 'thermalState')
-    ..aOB(13, _omitFieldNames ? '' : 'isConnected')
-    ..aOS(14, _omitFieldNames ? '' : 'connectionType')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DeviceEvent clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  DeviceEvent copyWith(void Function(DeviceEvent) updates) =>
-      super.copyWith((message) => updates(message as DeviceEvent))
-          as DeviceEvent;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static DeviceEvent create() => DeviceEvent._();
-  @$core.override
-  DeviceEvent createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static DeviceEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<DeviceEvent>(create);
-  static DeviceEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  DeviceEventKind get kind => $_getN(0);
-  @$pb.TagNumber(1)
-  set kind(DeviceEventKind value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasKind() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearKind() => $_clearField(1);
-
-  /// For DEVICE_INFO_COLLECTED / REFRESHED — populated state-key/value
-  /// pairs (avoid embedding full DeviceInfoData; that lives in its own
-  /// proto). The summary fields below are the most-queried subset.
-  @$pb.TagNumber(2)
-  $core.String get deviceId => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set deviceId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasDeviceId() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearDeviceId() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get osName => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set osName($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasOsName() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearOsName() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.String get osVersion => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set osVersion($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasOsVersion() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearOsVersion() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get model => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set model($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasModel() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearModel() => $_clearField(5);
-
-  /// For *_FAILED.
-  @$pb.TagNumber(6)
-  $core.String get error => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set error($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasError() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearError() => $_clearField(6);
-
-  /// For DEVICE_STATE_CHANGED — RN events.ts:264.
-  @$pb.TagNumber(7)
-  $core.String get property => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set property($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasProperty() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearProperty() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get newValue => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set newValue($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasNewValue() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearNewValue() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.String get oldValue => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set oldValue($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasOldValue() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearOldValue() => $_clearField(9);
-
-  /// For BATTERY_CHANGED / THERMAL_CHANGED / CONNECTIVITY_CHANGED.
-  @$pb.TagNumber(10)
-  $core.double get batteryLevel => $_getN(9);
-  @$pb.TagNumber(10)
-  set batteryLevel($core.double value) => $_setFloat(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasBatteryLevel() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearBatteryLevel() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.bool get isCharging => $_getBF(10);
-  @$pb.TagNumber(11)
-  set isCharging($core.bool value) => $_setBool(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasIsCharging() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearIsCharging() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.String get thermalState => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set thermalState($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasThermalState() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearThermalState() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $core.bool get isConnected => $_getBF(12);
-  @$pb.TagNumber(13)
-  set isConnected($core.bool value) => $_setBool(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasIsConnected() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearIsConnected() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.String get connectionType => $_getSZ(13);
-  @$pb.TagNumber(14)
-  set connectionType($core.String value) => $_setString(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasConnectionType() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearConnectionType() => $_clearField(14);
-}
-
-/// ---------------------------------------------------------------------------
 /// Per-component initialization lifecycle. Mirrors RN
 ///   events.ts:270-312 (ComponentInitializationEvent: 16 variants).
 /// Distinct from `InitializationEvent` (overall SDK lifecycle).
@@ -2867,106 +1313,1299 @@ class SessionEvent extends $pb.GeneratedMessage {
   void clearEndedAtMs() => $_clearField(7);
 }
 
-class AuthEvent extends $pb.GeneratedMessage {
-  factory AuthEvent({
-    AuthEventKind? kind,
-    $core.String? provider,
-    $core.String? subjectId,
-    $core.String? scope,
+/// ---------------------------------------------------------------------------
+/// LLM generation events. Mirrors RN
+///   events.ts:72-89 (SDKGenerationEvent: 12 variants).
+/// Plus Kotlin LLMEvent (5 variants), Dart SDKGenerationEvent (4 factories).
+/// ---------------------------------------------------------------------------
+class GenerationEvent extends $pb.GeneratedMessage {
+  factory GenerationEvent({
+    GenerationEventKind? kind,
+    $core.String? sessionId,
+    $core.String? prompt,
+    $core.String? token,
+    $core.String? streamingText,
+    $core.int? tokensCount,
+    $core.String? response,
+    $core.int? tokensUsed,
+    $fixnum.Int64? latencyMs,
+    $fixnum.Int64? firstTokenLatencyMs,
     $core.String? error,
+    $core.String? modelId,
+    $core.double? costAmount,
+    $core.double? costSavedAmount,
+    $core.String? routingTarget,
+    $core.String? routingReason,
+    $core.String? cancelReason,
+    $core.String? toolCallId,
+    $core.String? toolName,
+    $core.String? toolPayloadJson,
+    $core.String? structuredSchemaJson,
+    $core.String? structuredOutputJson,
+    $core.String? thinkingText,
+    $core.int? inputTokens,
+    $core.double? tokensPerSecond,
+    $fixnum.Int64? timeToFirstTokenMs,
+    $core.bool? isStreaming,
+    $core.double? temperature,
+    $core.int? maxTokens,
+    $core.int? contextLength,
+    $core.String? modelName,
+    $core.double? durationMs,
+    $core.int? framework,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
-    if (provider != null) result.provider = provider;
-    if (subjectId != null) result.subjectId = subjectId;
-    if (scope != null) result.scope = scope;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (prompt != null) result.prompt = prompt;
+    if (token != null) result.token = token;
+    if (streamingText != null) result.streamingText = streamingText;
+    if (tokensCount != null) result.tokensCount = tokensCount;
+    if (response != null) result.response = response;
+    if (tokensUsed != null) result.tokensUsed = tokensUsed;
+    if (latencyMs != null) result.latencyMs = latencyMs;
+    if (firstTokenLatencyMs != null)
+      result.firstTokenLatencyMs = firstTokenLatencyMs;
     if (error != null) result.error = error;
+    if (modelId != null) result.modelId = modelId;
+    if (costAmount != null) result.costAmount = costAmount;
+    if (costSavedAmount != null) result.costSavedAmount = costSavedAmount;
+    if (routingTarget != null) result.routingTarget = routingTarget;
+    if (routingReason != null) result.routingReason = routingReason;
+    if (cancelReason != null) result.cancelReason = cancelReason;
+    if (toolCallId != null) result.toolCallId = toolCallId;
+    if (toolName != null) result.toolName = toolName;
+    if (toolPayloadJson != null) result.toolPayloadJson = toolPayloadJson;
+    if (structuredSchemaJson != null)
+      result.structuredSchemaJson = structuredSchemaJson;
+    if (structuredOutputJson != null)
+      result.structuredOutputJson = structuredOutputJson;
+    if (thinkingText != null) result.thinkingText = thinkingText;
+    if (inputTokens != null) result.inputTokens = inputTokens;
+    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
+    if (timeToFirstTokenMs != null)
+      result.timeToFirstTokenMs = timeToFirstTokenMs;
+    if (isStreaming != null) result.isStreaming = isStreaming;
+    if (temperature != null) result.temperature = temperature;
+    if (maxTokens != null) result.maxTokens = maxTokens;
+    if (contextLength != null) result.contextLength = contextLength;
+    if (modelName != null) result.modelName = modelName;
+    if (durationMs != null) result.durationMs = durationMs;
+    if (framework != null) result.framework = framework;
     return result;
   }
 
-  AuthEvent._();
+  GenerationEvent._();
 
-  factory AuthEvent.fromBuffer($core.List<$core.int> data,
+  factory GenerationEvent.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory AuthEvent.fromJson($core.String json,
+  factory GenerationEvent.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'AuthEvent',
+      _omitMessageNames ? '' : 'GenerationEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aE<AuthEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: AuthEventKind.values)
-    ..aOS(2, _omitFieldNames ? '' : 'provider')
-    ..aOS(3, _omitFieldNames ? '' : 'subjectId')
-    ..aOS(4, _omitFieldNames ? '' : 'scope')
-    ..aOS(5, _omitFieldNames ? '' : 'error')
+    ..aE<GenerationEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: GenerationEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(3, _omitFieldNames ? '' : 'prompt')
+    ..aOS(4, _omitFieldNames ? '' : 'token')
+    ..aOS(5, _omitFieldNames ? '' : 'streamingText')
+    ..aI(6, _omitFieldNames ? '' : 'tokensCount')
+    ..aOS(7, _omitFieldNames ? '' : 'response')
+    ..aI(8, _omitFieldNames ? '' : 'tokensUsed')
+    ..aInt64(9, _omitFieldNames ? '' : 'latencyMs')
+    ..aInt64(10, _omitFieldNames ? '' : 'firstTokenLatencyMs')
+    ..aOS(11, _omitFieldNames ? '' : 'error')
+    ..aOS(12, _omitFieldNames ? '' : 'modelId')
+    ..aD(13, _omitFieldNames ? '' : 'costAmount')
+    ..aD(14, _omitFieldNames ? '' : 'costSavedAmount')
+    ..aOS(15, _omitFieldNames ? '' : 'routingTarget')
+    ..aOS(16, _omitFieldNames ? '' : 'routingReason')
+    ..aOS(17, _omitFieldNames ? '' : 'cancelReason')
+    ..aOS(18, _omitFieldNames ? '' : 'toolCallId')
+    ..aOS(19, _omitFieldNames ? '' : 'toolName')
+    ..aOS(20, _omitFieldNames ? '' : 'toolPayloadJson')
+    ..aOS(21, _omitFieldNames ? '' : 'structuredSchemaJson')
+    ..aOS(22, _omitFieldNames ? '' : 'structuredOutputJson')
+    ..aOS(23, _omitFieldNames ? '' : 'thinkingText')
+    ..aI(24, _omitFieldNames ? '' : 'inputTokens')
+    ..aD(25, _omitFieldNames ? '' : 'tokensPerSecond')
+    ..aInt64(26, _omitFieldNames ? '' : 'timeToFirstTokenMs')
+    ..aOB(27, _omitFieldNames ? '' : 'isStreaming')
+    ..aD(28, _omitFieldNames ? '' : 'temperature',
+        fieldType: $pb.PbFieldType.OF)
+    ..aI(29, _omitFieldNames ? '' : 'maxTokens')
+    ..aI(30, _omitFieldNames ? '' : 'contextLength')
+    ..aOS(31, _omitFieldNames ? '' : 'modelName')
+    ..aD(32, _omitFieldNames ? '' : 'durationMs')
+    ..aI(33, _omitFieldNames ? '' : 'framework')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  AuthEvent clone() => deepCopy();
+  GenerationEvent clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  AuthEvent copyWith(void Function(AuthEvent) updates) =>
-      super.copyWith((message) => updates(message as AuthEvent)) as AuthEvent;
+  GenerationEvent copyWith(void Function(GenerationEvent) updates) =>
+      super.copyWith((message) => updates(message as GenerationEvent))
+          as GenerationEvent;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static AuthEvent create() => AuthEvent._();
+  static GenerationEvent create() => GenerationEvent._();
   @$core.override
-  AuthEvent createEmptyInstance() => create();
+  GenerationEvent createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static AuthEvent getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AuthEvent>(create);
-  static AuthEvent? _defaultInstance;
+  static GenerationEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GenerationEvent>(create);
+  static GenerationEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  AuthEventKind get kind => $_getN(0);
+  GenerationEventKind get kind => $_getN(0);
   @$pb.TagNumber(1)
-  set kind(AuthEventKind value) => $_setField(1, value);
+  set kind(GenerationEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// Optional session id (RN voiceSession_*, generationStarted.sessionId).
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  /// For STARTED — the prompt text (RN events.ts:75).
+  @$pb.TagNumber(3)
+  $core.String get prompt => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set prompt($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPrompt() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPrompt() => $_clearField(3);
+
+  /// For TOKEN_GENERATED / FIRST_TOKEN_GENERATED — single token text.
+  @$pb.TagNumber(4)
+  $core.String get token => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set token($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearToken() => $_clearField(4);
+
+  /// For STREAMING_UPDATE — the running response text and token count.
+  @$pb.TagNumber(5)
+  $core.String get streamingText => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set streamingText($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStreamingText() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStreamingText() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get tokensCount => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set tokensCount($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTokensCount() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTokensCount() => $_clearField(6);
+
+  /// For COMPLETED — full response, usage stats, latency.
+  @$pb.TagNumber(7)
+  $core.String get response => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set response($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasResponse() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearResponse() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get tokensUsed => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set tokensUsed($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasTokensUsed() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTokensUsed() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get latencyMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set latencyMs($fixnum.Int64 value) => $_setInt64(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasLatencyMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearLatencyMs() => $_clearField(9);
+
+  /// For FIRST_TOKEN_GENERATED — TTFT in ms (RN events.ts:76).
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get firstTokenLatencyMs => $_getI64(9);
+  @$pb.TagNumber(10)
+  set firstTokenLatencyMs($fixnum.Int64 value) => $_setInt64(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasFirstTokenLatencyMs() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearFirstTokenLatencyMs() => $_clearField(10);
+
+  /// For FAILED.
+  @$pb.TagNumber(11)
+  $core.String get error => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set error($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasError() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearError() => $_clearField(11);
+
+  /// For MODEL_LOADED / MODEL_UNLOADED — bound model.
+  @$pb.TagNumber(12)
+  $core.String get modelId => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set modelId($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasModelId() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearModelId() => $_clearField(12);
+
+  /// For COST_CALCULATED — RN events.ts:88, Dart SDKGenerationCostCalculated.
+  @$pb.TagNumber(13)
+  $core.double get costAmount => $_getN(12);
+  @$pb.TagNumber(13)
+  set costAmount($core.double value) => $_setDouble(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasCostAmount() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearCostAmount() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.double get costSavedAmount => $_getN(13);
+  @$pb.TagNumber(14)
+  set costSavedAmount($core.double value) => $_setDouble(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasCostSavedAmount() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearCostSavedAmount() => $_clearField(14);
+
+  /// For ROUTING_DECISION — RN events.ts:89.
+  @$pb.TagNumber(15)
+  $core.String get routingTarget => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set routingTarget($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasRoutingTarget() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearRoutingTarget() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get routingReason => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set routingReason($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasRoutingReason() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearRoutingReason() => $_clearField(16);
+
+  /// For cancellation / tool / structured-output / thinking events.
+  @$pb.TagNumber(17)
+  $core.String get cancelReason => $_getSZ(16);
+  @$pb.TagNumber(17)
+  set cancelReason($core.String value) => $_setString(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasCancelReason() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearCancelReason() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.String get toolCallId => $_getSZ(17);
+  @$pb.TagNumber(18)
+  set toolCallId($core.String value) => $_setString(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasToolCallId() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearToolCallId() => $_clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.String get toolName => $_getSZ(18);
+  @$pb.TagNumber(19)
+  set toolName($core.String value) => $_setString(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasToolName() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearToolName() => $_clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.String get toolPayloadJson => $_getSZ(19);
+  @$pb.TagNumber(20)
+  set toolPayloadJson($core.String value) => $_setString(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasToolPayloadJson() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearToolPayloadJson() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.String get structuredSchemaJson => $_getSZ(20);
+  @$pb.TagNumber(21)
+  set structuredSchemaJson($core.String value) => $_setString(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasStructuredSchemaJson() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearStructuredSchemaJson() => $_clearField(21);
+
+  @$pb.TagNumber(22)
+  $core.String get structuredOutputJson => $_getSZ(21);
+  @$pb.TagNumber(22)
+  set structuredOutputJson($core.String value) => $_setString(21, value);
+  @$pb.TagNumber(22)
+  $core.bool hasStructuredOutputJson() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearStructuredOutputJson() => $_clearField(22);
+
+  @$pb.TagNumber(23)
+  $core.String get thinkingText => $_getSZ(22);
+  @$pb.TagNumber(23)
+  set thinkingText($core.String value) => $_setString(22, value);
+  @$pb.TagNumber(23)
+  $core.bool hasThinkingText() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearThinkingText() => $_clearField(23);
+
+  /// For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
+  /// Enables totalTokens = input_tokens + tokens_used analytics
+  /// from the event stream alone.
+  @$pb.TagNumber(24)
+  $core.int get inputTokens => $_getIZ(23);
+  @$pb.TagNumber(24)
+  set inputTokens($core.int value) => $_setSignedInt32(23, value);
+  @$pb.TagNumber(24)
+  $core.bool hasInputTokens() => $_has(23);
+  @$pb.TagNumber(24)
+  void clearInputTokens() => $_clearField(24);
+
+  /// Telemetry metrics carried on the canonical event stream so the C++
+  /// destination router can derive the full telemetry payload from the
+  /// proto SDKEvent alone (no parallel struct path). `framework` is the
+  /// InferenceFramework enum stored as int32 (matches FrameworkEvent.framework).
+  @$pb.TagNumber(25)
+  $core.double get tokensPerSecond => $_getN(24);
+  @$pb.TagNumber(25)
+  set tokensPerSecond($core.double value) => $_setDouble(24, value);
+  @$pb.TagNumber(25)
+  $core.bool hasTokensPerSecond() => $_has(24);
+  @$pb.TagNumber(25)
+  void clearTokensPerSecond() => $_clearField(25);
+
+  @$pb.TagNumber(26)
+  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(25);
+  @$pb.TagNumber(26)
+  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(25, value);
+  @$pb.TagNumber(26)
+  $core.bool hasTimeToFirstTokenMs() => $_has(25);
+  @$pb.TagNumber(26)
+  void clearTimeToFirstTokenMs() => $_clearField(26);
+
+  @$pb.TagNumber(27)
+  $core.bool get isStreaming => $_getBF(26);
+  @$pb.TagNumber(27)
+  set isStreaming($core.bool value) => $_setBool(26, value);
+  @$pb.TagNumber(27)
+  $core.bool hasIsStreaming() => $_has(26);
+  @$pb.TagNumber(27)
+  void clearIsStreaming() => $_clearField(27);
+
+  @$pb.TagNumber(28)
+  $core.double get temperature => $_getN(27);
+  @$pb.TagNumber(28)
+  set temperature($core.double value) => $_setFloat(27, value);
+  @$pb.TagNumber(28)
+  $core.bool hasTemperature() => $_has(27);
+  @$pb.TagNumber(28)
+  void clearTemperature() => $_clearField(28);
+
+  @$pb.TagNumber(29)
+  $core.int get maxTokens => $_getIZ(28);
+  @$pb.TagNumber(29)
+  set maxTokens($core.int value) => $_setSignedInt32(28, value);
+  @$pb.TagNumber(29)
+  $core.bool hasMaxTokens() => $_has(28);
+  @$pb.TagNumber(29)
+  void clearMaxTokens() => $_clearField(29);
+
+  @$pb.TagNumber(30)
+  $core.int get contextLength => $_getIZ(29);
+  @$pb.TagNumber(30)
+  set contextLength($core.int value) => $_setSignedInt32(29, value);
+  @$pb.TagNumber(30)
+  $core.bool hasContextLength() => $_has(29);
+  @$pb.TagNumber(30)
+  void clearContextLength() => $_clearField(30);
+
+  @$pb.TagNumber(31)
+  $core.String get modelName => $_getSZ(30);
+  @$pb.TagNumber(31)
+  set modelName($core.String value) => $_setString(30, value);
+  @$pb.TagNumber(31)
+  $core.bool hasModelName() => $_has(30);
+  @$pb.TagNumber(31)
+  void clearModelName() => $_clearField(31);
+
+  @$pb.TagNumber(32)
+  $core.double get durationMs => $_getN(31);
+  @$pb.TagNumber(32)
+  set durationMs($core.double value) => $_setDouble(31, value);
+  @$pb.TagNumber(32)
+  $core.bool hasDurationMs() => $_has(31);
+  @$pb.TagNumber(32)
+  void clearDurationMs() => $_clearField(32);
+
+  @$pb.TagNumber(33)
+  $core.int get framework => $_getIZ(32);
+  @$pb.TagNumber(33)
+  set framework($core.int value) => $_setSignedInt32(32, value);
+  @$pb.TagNumber(33)
+  $core.bool hasFramework() => $_has(32);
+  @$pb.TagNumber(33)
+  void clearFramework() => $_clearField(33);
+}
+
+/// ---------------------------------------------------------------------------
+/// Voice / audio higher-level events. Mirrors RN
+///   events.ts:136-187 (SDKVoiceEvent: 41 variants).
+/// Plus Dart SDKVoiceEvent (~15 concrete classes), Kotlin STTEvent + TTSEvent.
+///
+/// Renamed from `VoiceEvent` to `VoiceLifecycleEvent` to avoid colliding with
+/// `runanywhere.v1.VoiceEvent` from voice_events.proto, which carries the
+/// low-level streaming pipeline payloads (UserSaid / AssistantToken /
+/// AudioFrame / VAD / Interrupted / StateChange / Error / Metrics). The
+/// pipeline events are exposed via SDKEvent.voice_pipeline; this message
+/// is exposed via SDKEvent.voice.
+/// ---------------------------------------------------------------------------
+class VoiceLifecycleEvent extends $pb.GeneratedMessage {
+  factory VoiceLifecycleEvent({
+    VoiceEventKind? kind,
+    $core.String? sessionId,
+    $core.String? text,
+    $core.double? confidence,
+    $core.String? responseText,
+    $core.String? audioBase64,
+    $fixnum.Int64? durationMs,
+    $core.double? audioLevel,
+    $core.String? transcription,
+    $core.String? turnResponse,
+    $core.String? turnAudioBase64,
+    $core.String? error,
+    $core.String? modelId,
+    $core.String? modelName,
+    $fixnum.Int64? audioLengthMs,
+    $core.int? audioSizeBytes,
+    $core.int? wordCount,
+    $core.double? realTimeFactor,
+    $core.String? language,
+    $core.int? sampleRate,
+    $core.bool? isStreaming,
+    $core.int? framework,
+    $core.int? characterCount,
+    $fixnum.Int64? audioDurationMs,
+    $core.int? audioSizeBytesTts,
+    $fixnum.Int64? processingDurationMs,
+    $core.double? charactersPerSecond,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (sessionId != null) result.sessionId = sessionId;
+    if (text != null) result.text = text;
+    if (confidence != null) result.confidence = confidence;
+    if (responseText != null) result.responseText = responseText;
+    if (audioBase64 != null) result.audioBase64 = audioBase64;
+    if (durationMs != null) result.durationMs = durationMs;
+    if (audioLevel != null) result.audioLevel = audioLevel;
+    if (transcription != null) result.transcription = transcription;
+    if (turnResponse != null) result.turnResponse = turnResponse;
+    if (turnAudioBase64 != null) result.turnAudioBase64 = turnAudioBase64;
+    if (error != null) result.error = error;
+    if (modelId != null) result.modelId = modelId;
+    if (modelName != null) result.modelName = modelName;
+    if (audioLengthMs != null) result.audioLengthMs = audioLengthMs;
+    if (audioSizeBytes != null) result.audioSizeBytes = audioSizeBytes;
+    if (wordCount != null) result.wordCount = wordCount;
+    if (realTimeFactor != null) result.realTimeFactor = realTimeFactor;
+    if (language != null) result.language = language;
+    if (sampleRate != null) result.sampleRate = sampleRate;
+    if (isStreaming != null) result.isStreaming = isStreaming;
+    if (framework != null) result.framework = framework;
+    if (characterCount != null) result.characterCount = characterCount;
+    if (audioDurationMs != null) result.audioDurationMs = audioDurationMs;
+    if (audioSizeBytesTts != null) result.audioSizeBytesTts = audioSizeBytesTts;
+    if (processingDurationMs != null)
+      result.processingDurationMs = processingDurationMs;
+    if (charactersPerSecond != null)
+      result.charactersPerSecond = charactersPerSecond;
+    return result;
+  }
+
+  VoiceLifecycleEvent._();
+
+  factory VoiceLifecycleEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VoiceLifecycleEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VoiceLifecycleEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<VoiceEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: VoiceEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(3, _omitFieldNames ? '' : 'text')
+    ..aD(4, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
+    ..aOS(5, _omitFieldNames ? '' : 'responseText')
+    ..aOS(6, _omitFieldNames ? '' : 'audioBase64')
+    ..aInt64(7, _omitFieldNames ? '' : 'durationMs')
+    ..aD(8, _omitFieldNames ? '' : 'audioLevel', fieldType: $pb.PbFieldType.OF)
+    ..aOS(9, _omitFieldNames ? '' : 'transcription')
+    ..aOS(10, _omitFieldNames ? '' : 'turnResponse')
+    ..aOS(11, _omitFieldNames ? '' : 'turnAudioBase64')
+    ..aOS(12, _omitFieldNames ? '' : 'error')
+    ..aOS(13, _omitFieldNames ? '' : 'modelId')
+    ..aOS(14, _omitFieldNames ? '' : 'modelName')
+    ..aInt64(15, _omitFieldNames ? '' : 'audioLengthMs')
+    ..aI(16, _omitFieldNames ? '' : 'audioSizeBytes')
+    ..aI(17, _omitFieldNames ? '' : 'wordCount')
+    ..aD(18, _omitFieldNames ? '' : 'realTimeFactor')
+    ..aOS(19, _omitFieldNames ? '' : 'language')
+    ..aI(20, _omitFieldNames ? '' : 'sampleRate')
+    ..aOB(21, _omitFieldNames ? '' : 'isStreaming')
+    ..aI(22, _omitFieldNames ? '' : 'framework')
+    ..aI(23, _omitFieldNames ? '' : 'characterCount')
+    ..aInt64(24, _omitFieldNames ? '' : 'audioDurationMs')
+    ..aI(25, _omitFieldNames ? '' : 'audioSizeBytesTts')
+    ..aInt64(26, _omitFieldNames ? '' : 'processingDurationMs')
+    ..aD(27, _omitFieldNames ? '' : 'charactersPerSecond')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VoiceLifecycleEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VoiceLifecycleEvent copyWith(void Function(VoiceLifecycleEvent) updates) =>
+      super.copyWith((message) => updates(message as VoiceLifecycleEvent))
+          as VoiceLifecycleEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VoiceLifecycleEvent create() => VoiceLifecycleEvent._();
+  @$core.override
+  VoiceLifecycleEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VoiceLifecycleEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VoiceLifecycleEvent>(create);
+  static VoiceLifecycleEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  VoiceEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(VoiceEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// For listeningStarted / voiceSession_* — optional session id.
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => $_clearField(2);
+
+  /// For TRANSCRIPTION_PARTIAL / TRANSCRIPTION_FINAL / STT_PARTIAL_RESULT /
+  /// STT_COMPLETED.
+  @$pb.TagNumber(3)
+  $core.String get text => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set text($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasText() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearText() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get confidence => $_getN(3);
+  @$pb.TagNumber(4)
+  set confidence($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasConfidence() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearConfidence() => $_clearField(4);
+
+  /// For RESPONSE_GENERATED.
+  @$pb.TagNumber(5)
+  $core.String get responseText => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set responseText($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasResponseText() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearResponseText() => $_clearField(5);
+
+  /// For AUDIO_GENERATED — base64-encoded PCM (RN events.ts:145).
+  @$pb.TagNumber(6)
+  $core.String get audioBase64 => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set audioBase64($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasAudioBase64() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAudioBase64() => $_clearField(6);
+
+  /// For RECORDING_STOPPED / PLAYBACK_STARTED / PLAYBACK_COMPLETED —
+  /// duration in milliseconds (RN events.ts:158, 160-161).
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get durationMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set durationMs($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasDurationMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDurationMs() => $_clearField(7);
+
+  /// For VOICE_SESSION_LISTENING — current audio level (RN events.ts:178).
+  @$pb.TagNumber(8)
+  $core.double get audioLevel => $_getN(7);
+  @$pb.TagNumber(8)
+  set audioLevel($core.double value) => $_setFloat(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasAudioLevel() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearAudioLevel() => $_clearField(8);
+
+  /// For VOICE_SESSION_TRANSCRIBED / VOICE_SESSION_RESPONDED /
+  /// VOICE_SESSION_TURN_COMPLETED — RN events.ts:182-185.
+  @$pb.TagNumber(9)
+  $core.String get transcription => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set transcription($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasTranscription() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearTranscription() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get turnResponse => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set turnResponse($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasTurnResponse() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearTurnResponse() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get turnAudioBase64 => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set turnAudioBase64($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasTurnAudioBase64() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearTurnAudioBase64() => $_clearField(11);
+
+  /// For *_ERROR / *_FAILED.
+  @$pb.TagNumber(12)
+  $core.String get error => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set error($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasError() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearError() => $_clearField(12);
+
+  /// -----------------------------------------------------------------------
+  /// Telemetry metrics (STT transcription + TTS synthesis + model load) so
+  /// the C++ destination router derives the full telemetry payload from the
+  /// proto SDKEvent alone. Populated per-component (component on the SDKEvent
+  /// envelope selects which subset applies). `framework` is the
+  /// InferenceFramework enum stored as int32.
+  /// -----------------------------------------------------------------------
+  @$pb.TagNumber(13)
+  $core.String get modelId => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set modelId($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasModelId() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearModelId() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get modelName => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set modelName($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasModelName() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearModelName() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $fixnum.Int64 get audioLengthMs => $_getI64(14);
+  @$pb.TagNumber(15)
+  set audioLengthMs($fixnum.Int64 value) => $_setInt64(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasAudioLengthMs() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearAudioLengthMs() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.int get audioSizeBytes => $_getIZ(15);
+  @$pb.TagNumber(16)
+  set audioSizeBytes($core.int value) => $_setSignedInt32(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasAudioSizeBytes() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearAudioSizeBytes() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.int get wordCount => $_getIZ(16);
+  @$pb.TagNumber(17)
+  set wordCount($core.int value) => $_setSignedInt32(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasWordCount() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearWordCount() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.double get realTimeFactor => $_getN(17);
+  @$pb.TagNumber(18)
+  set realTimeFactor($core.double value) => $_setDouble(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasRealTimeFactor() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearRealTimeFactor() => $_clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.String get language => $_getSZ(18);
+  @$pb.TagNumber(19)
+  set language($core.String value) => $_setString(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasLanguage() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearLanguage() => $_clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.int get sampleRate => $_getIZ(19);
+  @$pb.TagNumber(20)
+  set sampleRate($core.int value) => $_setSignedInt32(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasSampleRate() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearSampleRate() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.bool get isStreaming => $_getBF(20);
+  @$pb.TagNumber(21)
+  set isStreaming($core.bool value) => $_setBool(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasIsStreaming() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearIsStreaming() => $_clearField(21);
+
+  @$pb.TagNumber(22)
+  $core.int get framework => $_getIZ(21);
+  @$pb.TagNumber(22)
+  set framework($core.int value) => $_setSignedInt32(21, value);
+  @$pb.TagNumber(22)
+  $core.bool hasFramework() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearFramework() => $_clearField(22);
+
+  /// TTS synthesis metrics.
+  @$pb.TagNumber(23)
+  $core.int get characterCount => $_getIZ(22);
+  @$pb.TagNumber(23)
+  set characterCount($core.int value) => $_setSignedInt32(22, value);
+  @$pb.TagNumber(23)
+  $core.bool hasCharacterCount() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearCharacterCount() => $_clearField(23);
+
+  @$pb.TagNumber(24)
+  $fixnum.Int64 get audioDurationMs => $_getI64(23);
+  @$pb.TagNumber(24)
+  set audioDurationMs($fixnum.Int64 value) => $_setInt64(23, value);
+  @$pb.TagNumber(24)
+  $core.bool hasAudioDurationMs() => $_has(23);
+  @$pb.TagNumber(24)
+  void clearAudioDurationMs() => $_clearField(24);
+
+  @$pb.TagNumber(25)
+  $core.int get audioSizeBytesTts => $_getIZ(24);
+  @$pb.TagNumber(25)
+  set audioSizeBytesTts($core.int value) => $_setSignedInt32(24, value);
+  @$pb.TagNumber(25)
+  $core.bool hasAudioSizeBytesTts() => $_has(24);
+  @$pb.TagNumber(25)
+  void clearAudioSizeBytesTts() => $_clearField(25);
+
+  @$pb.TagNumber(26)
+  $fixnum.Int64 get processingDurationMs => $_getI64(25);
+  @$pb.TagNumber(26)
+  set processingDurationMs($fixnum.Int64 value) => $_setInt64(25, value);
+  @$pb.TagNumber(26)
+  $core.bool hasProcessingDurationMs() => $_has(25);
+  @$pb.TagNumber(26)
+  void clearProcessingDurationMs() => $_clearField(26);
+
+  @$pb.TagNumber(27)
+  $core.double get charactersPerSecond => $_getN(26);
+  @$pb.TagNumber(27)
+  set charactersPerSecond($core.double value) => $_setDouble(26, value);
+  @$pb.TagNumber(27)
+  $core.bool hasCharactersPerSecond() => $_has(26);
+  @$pb.TagNumber(27)
+  void clearCharactersPerSecond() => $_clearField(27);
+}
+
+/// ===========================================================================
+/// SECTION 6 — EMBEDDINGS / SECTION 7 — DIFFUSION / SECTION 8 — RAG /
+/// SECTION 9 — LORA / SECTION 2b — VLM (capability operations)
+/// ===========================================================================
+/// Embeddings, Diffusion, RAG, LoRA, and VLM capability-operation lifecycle is
+/// consolidated into a single `CapabilityOperationEvent` message discriminated
+/// by `CapabilityOperationEventKind` (VLM_* / DIFFUSION_* / EMBEDDINGS_* /
+/// RAG_* / LORA_*). One flat struct keeps these analytics-only operation events
+/// uniform across the five capability components.
+/// ---------------------------------------------------------------------------
+class CapabilityOperationEvent extends $pb.GeneratedMessage {
+  factory CapabilityOperationEvent({
+    CapabilityOperationEventKind? kind,
+    SDKComponent? component,
+    $core.String? modelId,
+    $core.String? operationId,
+    $core.String? operation,
+    $core.double? progress,
+    $fixnum.Int64? inputCount,
+    $fixnum.Int64? outputCount,
+    $core.String? resultJson,
+    $core.String? error,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (component != null) result.component = component;
+    if (modelId != null) result.modelId = modelId;
+    if (operationId != null) result.operationId = operationId;
+    if (operation != null) result.operation = operation;
+    if (progress != null) result.progress = progress;
+    if (inputCount != null) result.inputCount = inputCount;
+    if (outputCount != null) result.outputCount = outputCount;
+    if (resultJson != null) result.resultJson = resultJson;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  CapabilityOperationEvent._();
+
+  factory CapabilityOperationEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CapabilityOperationEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CapabilityOperationEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<CapabilityOperationEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: CapabilityOperationEventKind.values)
+    ..aE<SDKComponent>(2, _omitFieldNames ? '' : 'component',
+        enumValues: SDKComponent.values)
+    ..aOS(3, _omitFieldNames ? '' : 'modelId')
+    ..aOS(4, _omitFieldNames ? '' : 'operationId')
+    ..aOS(5, _omitFieldNames ? '' : 'operation')
+    ..aD(6, _omitFieldNames ? '' : 'progress', fieldType: $pb.PbFieldType.OF)
+    ..aInt64(7, _omitFieldNames ? '' : 'inputCount')
+    ..aInt64(8, _omitFieldNames ? '' : 'outputCount')
+    ..aOS(9, _omitFieldNames ? '' : 'resultJson')
+    ..aOS(10, _omitFieldNames ? '' : 'error')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilityOperationEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CapabilityOperationEvent copyWith(
+          void Function(CapabilityOperationEvent) updates) =>
+      super.copyWith((message) => updates(message as CapabilityOperationEvent))
+          as CapabilityOperationEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CapabilityOperationEvent create() => CapabilityOperationEvent._();
+  @$core.override
+  CapabilityOperationEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CapabilityOperationEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CapabilityOperationEvent>(create);
+  static CapabilityOperationEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CapabilityOperationEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(CapabilityOperationEventKind value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasKind() => $_has(0);
   @$pb.TagNumber(1)
   void clearKind() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.String get provider => $_getSZ(1);
+  SDKComponent get component => $_getN(1);
   @$pb.TagNumber(2)
-  set provider($core.String value) => $_setString(1, value);
+  set component(SDKComponent value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasProvider() => $_has(1);
+  $core.bool hasComponent() => $_has(1);
   @$pb.TagNumber(2)
-  void clearProvider() => $_clearField(2);
+  void clearComponent() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get subjectId => $_getSZ(2);
+  $core.String get modelId => $_getSZ(2);
   @$pb.TagNumber(3)
-  set subjectId($core.String value) => $_setString(2, value);
+  set modelId($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasSubjectId() => $_has(2);
+  $core.bool hasModelId() => $_has(2);
   @$pb.TagNumber(3)
-  void clearSubjectId() => $_clearField(3);
+  void clearModelId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.String get scope => $_getSZ(3);
+  $core.String get operationId => $_getSZ(3);
   @$pb.TagNumber(4)
-  set scope($core.String value) => $_setString(3, value);
+  set operationId($core.String value) => $_setString(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasScope() => $_has(3);
+  $core.bool hasOperationId() => $_has(3);
   @$pb.TagNumber(4)
-  void clearScope() => $_clearField(4);
+  void clearOperationId() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get error => $_getSZ(4);
+  $core.String get operation => $_getSZ(4);
   @$pb.TagNumber(5)
-  set error($core.String value) => $_setString(4, value);
+  set operation($core.String value) => $_setString(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasError() => $_has(4);
+  $core.bool hasOperation() => $_has(4);
   @$pb.TagNumber(5)
-  void clearError() => $_clearField(5);
+  void clearOperation() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get progress => $_getN(5);
+  @$pb.TagNumber(6)
+  set progress($core.double value) => $_setFloat(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasProgress() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearProgress() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get inputCount => $_getI64(6);
+  @$pb.TagNumber(7)
+  set inputCount($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasInputCount() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearInputCount() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get outputCount => $_getI64(7);
+  @$pb.TagNumber(8)
+  set outputCount($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasOutputCount() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearOutputCount() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get resultJson => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set resultJson($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasResultJson() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearResultJson() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get error => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set error($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasError() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearError() => $_clearField(10);
+}
+
+/// ---------------------------------------------------------------------------
+/// Model lifecycle events: load / unload / download / list / catalog / delete /
+/// custom-model / built-in-registration. Mirrors RN
+///   events.ts:95-130 (SDKModelEvent: 24 variants).
+/// Plus Kotlin ModelEvent (7 ModelEventType) and Dart SDKModelEvent (10
+/// concrete classes).
+/// ---------------------------------------------------------------------------
+class ModelEvent extends $pb.GeneratedMessage {
+  factory ModelEvent({
+    ModelEventKind? kind,
+    $core.String? modelId,
+    $core.String? taskId,
+    $core.double? progress,
+    $fixnum.Int64? bytesDownloaded,
+    $fixnum.Int64? totalBytes,
+    $core.String? downloadState,
+    $core.String? localPath,
+    $core.String? error,
+    $core.int? modelCount,
+    $core.String? customModelName,
+    $core.String? customModelUrl,
+    $core.String? modelName,
+    $fixnum.Int64? modelSizeBytes,
+    $fixnum.Int64? durationMs,
+    $core.int? framework,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (modelId != null) result.modelId = modelId;
+    if (taskId != null) result.taskId = taskId;
+    if (progress != null) result.progress = progress;
+    if (bytesDownloaded != null) result.bytesDownloaded = bytesDownloaded;
+    if (totalBytes != null) result.totalBytes = totalBytes;
+    if (downloadState != null) result.downloadState = downloadState;
+    if (localPath != null) result.localPath = localPath;
+    if (error != null) result.error = error;
+    if (modelCount != null) result.modelCount = modelCount;
+    if (customModelName != null) result.customModelName = customModelName;
+    if (customModelUrl != null) result.customModelUrl = customModelUrl;
+    if (modelName != null) result.modelName = modelName;
+    if (modelSizeBytes != null) result.modelSizeBytes = modelSizeBytes;
+    if (durationMs != null) result.durationMs = durationMs;
+    if (framework != null) result.framework = framework;
+    return result;
+  }
+
+  ModelEvent._();
+
+  factory ModelEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ModelEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ModelEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<ModelEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: ModelEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'modelId')
+    ..aOS(3, _omitFieldNames ? '' : 'taskId')
+    ..aD(4, _omitFieldNames ? '' : 'progress', fieldType: $pb.PbFieldType.OF)
+    ..aInt64(5, _omitFieldNames ? '' : 'bytesDownloaded')
+    ..aInt64(6, _omitFieldNames ? '' : 'totalBytes')
+    ..aOS(7, _omitFieldNames ? '' : 'downloadState')
+    ..aOS(8, _omitFieldNames ? '' : 'localPath')
+    ..aOS(9, _omitFieldNames ? '' : 'error')
+    ..aI(10, _omitFieldNames ? '' : 'modelCount')
+    ..aOS(11, _omitFieldNames ? '' : 'customModelName')
+    ..aOS(12, _omitFieldNames ? '' : 'customModelUrl')
+    ..aOS(13, _omitFieldNames ? '' : 'modelName')
+    ..aInt64(14, _omitFieldNames ? '' : 'modelSizeBytes')
+    ..aInt64(15, _omitFieldNames ? '' : 'durationMs')
+    ..aI(16, _omitFieldNames ? '' : 'framework')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ModelEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ModelEvent copyWith(void Function(ModelEvent) updates) =>
+      super.copyWith((message) => updates(message as ModelEvent)) as ModelEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelEvent create() => ModelEvent._();
+  @$core.override
+  ModelEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ModelEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ModelEvent>(create);
+  static ModelEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ModelEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(ModelEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get modelId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set modelId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasModelId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModelId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get taskId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set taskId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTaskId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTaskId() => $_clearField(3);
+
+  /// For LOAD_PROGRESS / DOWNLOAD_PROGRESS — 0.0..1.0.
+  @$pb.TagNumber(4)
+  $core.double get progress => $_getN(3);
+  @$pb.TagNumber(4)
+  set progress($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasProgress() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearProgress() => $_clearField(4);
+
+  /// For DOWNLOAD_PROGRESS — bytes counters.
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get bytesDownloaded => $_getI64(4);
+  @$pb.TagNumber(5)
+  set bytesDownloaded($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasBytesDownloaded() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearBytesDownloaded() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get totalBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set totalBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTotalBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTotalBytes() => $_clearField(6);
+
+  /// For DOWNLOAD_PROGRESS — engine-level state string (RN events.ts:111).
+  @$pb.TagNumber(7)
+  $core.String get downloadState => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set downloadState($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasDownloadState() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDownloadState() => $_clearField(7);
+
+  /// For DOWNLOAD_COMPLETED — landed local path (RN events.ts:118).
+  @$pb.TagNumber(8)
+  $core.String get localPath => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set localPath($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasLocalPath() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLocalPath() => $_clearField(8);
+
+  /// For *_FAILED.
+  @$pb.TagNumber(9)
+  $core.String get error => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set error($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+
+  /// For LIST_COMPLETED / CATALOG_LOADED — count only; the full
+  /// ModelInfo array travels via response RPCs, not via events.
+  @$pb.TagNumber(10)
+  $core.int get modelCount => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set modelCount($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasModelCount() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearModelCount() => $_clearField(10);
+
+  /// For CUSTOM_MODEL_ADDED — RN events.ts:129.
+  @$pb.TagNumber(11)
+  $core.String get customModelName => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set customModelName($core.String value) => $_setString(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasCustomModelName() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearCustomModelName() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get customModelUrl => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set customModelUrl($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasCustomModelUrl() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearCustomModelUrl() => $_clearField(12);
+
+  /// Model-load + download/extraction telemetry metrics so the C++
+  /// destination router derives the telemetry payload from the proto
+  /// SDKEvent alone. `framework` is the InferenceFramework enum stored as
+  /// int32 (matches FrameworkEvent.framework).
+  @$pb.TagNumber(13)
+  $core.String get modelName => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set modelName($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasModelName() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearModelName() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $fixnum.Int64 get modelSizeBytes => $_getI64(13);
+  @$pb.TagNumber(14)
+  set modelSizeBytes($fixnum.Int64 value) => $_setInt64(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasModelSizeBytes() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearModelSizeBytes() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $fixnum.Int64 get durationMs => $_getI64(14);
+  @$pb.TagNumber(15)
+  set durationMs($fixnum.Int64 value) => $_setInt64(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasDurationMs() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearDurationMs() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.int get framework => $_getIZ(15);
+  @$pb.TagNumber(16)
+  set framework($core.int value) => $_setSignedInt32(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasFramework() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearFramework() => $_clearField(16);
 }
 
 enum ModelRegistryEvent_Result {
@@ -3450,6 +3089,181 @@ class DownloadEvent extends $pb.GeneratedMessage {
   $1.DownloadResumeResult ensureResumeResult() => $_ensure(8);
 }
 
+/// ---------------------------------------------------------------------------
+/// Storage events. Mirrors RN
+///   events.ts:213-226 (SDKStorageEvent: 13 variants).
+/// Plus Dart SDKStorageEvent (cacheCleared, tempFilesCleaned).
+/// ---------------------------------------------------------------------------
+class StorageEvent extends $pb.GeneratedMessage {
+  factory StorageEvent({
+    StorageEventKind? kind,
+    $core.String? modelId,
+    $core.String? error,
+    $fixnum.Int64? totalBytes,
+    $fixnum.Int64? availableBytes,
+    $fixnum.Int64? usedBytes,
+    $core.int? storedModelCount,
+    $core.String? cacheKey,
+    $fixnum.Int64? evictedBytes,
+    $fixnum.Int64? freedBytes,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (modelId != null) result.modelId = modelId;
+    if (error != null) result.error = error;
+    if (totalBytes != null) result.totalBytes = totalBytes;
+    if (availableBytes != null) result.availableBytes = availableBytes;
+    if (usedBytes != null) result.usedBytes = usedBytes;
+    if (storedModelCount != null) result.storedModelCount = storedModelCount;
+    if (cacheKey != null) result.cacheKey = cacheKey;
+    if (evictedBytes != null) result.evictedBytes = evictedBytes;
+    if (freedBytes != null) result.freedBytes = freedBytes;
+    return result;
+  }
+
+  StorageEvent._();
+
+  factory StorageEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory StorageEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'StorageEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<StorageEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: StorageEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'modelId')
+    ..aOS(3, _omitFieldNames ? '' : 'error')
+    ..aInt64(4, _omitFieldNames ? '' : 'totalBytes')
+    ..aInt64(5, _omitFieldNames ? '' : 'availableBytes')
+    ..aInt64(6, _omitFieldNames ? '' : 'usedBytes')
+    ..aI(7, _omitFieldNames ? '' : 'storedModelCount')
+    ..aOS(8, _omitFieldNames ? '' : 'cacheKey')
+    ..aInt64(9, _omitFieldNames ? '' : 'evictedBytes')
+    ..aInt64(10, _omitFieldNames ? '' : 'freedBytes')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StorageEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  StorageEvent copyWith(void Function(StorageEvent) updates) =>
+      super.copyWith((message) => updates(message as StorageEvent))
+          as StorageEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StorageEvent create() => StorageEvent._();
+  @$core.override
+  StorageEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static StorageEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<StorageEvent>(create);
+  static StorageEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  StorageEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(StorageEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// For DELETE_MODEL_* events.
+  @$pb.TagNumber(2)
+  $core.String get modelId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set modelId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasModelId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModelId() => $_clearField(2);
+
+  /// For *_FAILED.
+  @$pb.TagNumber(3)
+  $core.String get error => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set error($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasError() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearError() => $_clearField(3);
+
+  /// For INFO_RETRIEVED — total/available bytes (StorageInfo summary).
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get totalBytes => $_getI64(3);
+  @$pb.TagNumber(4)
+  set totalBytes($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTotalBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTotalBytes() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get availableBytes => $_getI64(4);
+  @$pb.TagNumber(5)
+  set availableBytes($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasAvailableBytes() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAvailableBytes() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get usedBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set usedBytes($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasUsedBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearUsedBytes() => $_clearField(6);
+
+  /// For MODELS_RETRIEVED.
+  @$pb.TagNumber(7)
+  $core.int get storedModelCount => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set storedModelCount($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStoredModelCount() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStoredModelCount() => $_clearField(7);
+
+  /// For CACHE_HIT / CACHE_MISS / EVICTION (canonical superset additions
+  /// not in RN's events.ts but called out in Step 3 spec).
+  @$pb.TagNumber(8)
+  $core.String get cacheKey => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set cacheKey($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCacheKey() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCacheKey() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get evictedBytes => $_getI64(8);
+  @$pb.TagNumber(9)
+  set evictedBytes($fixnum.Int64 value) => $_setInt64(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasEvictedBytes() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearEvictedBytes() => $_clearField(9);
+
+  /// For CLEAR_CACHE_COMPLETED / CLEAN_TEMP_COMPLETED — bytes reclaimed.
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get freedBytes => $_getI64(9);
+  @$pb.TagNumber(10)
+  set freedBytes($fixnum.Int64 value) => $_setInt64(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasFreedBytes() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearFreedBytes() => $_clearField(10);
+}
+
 enum StorageLifecycleEvent_Result {
   infoResult,
   availabilityResult,
@@ -3646,6 +3460,611 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
   $2.StorageDeleteResult ensureDeleteResult() => $_ensure(8);
 }
 
+class AuthEvent extends $pb.GeneratedMessage {
+  factory AuthEvent({
+    AuthEventKind? kind,
+    $core.String? provider,
+    $core.String? subjectId,
+    $core.String? scope,
+    $core.String? error,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (provider != null) result.provider = provider;
+    if (subjectId != null) result.subjectId = subjectId;
+    if (scope != null) result.scope = scope;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  AuthEvent._();
+
+  factory AuthEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AuthEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AuthEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<AuthEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: AuthEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'provider')
+    ..aOS(3, _omitFieldNames ? '' : 'subjectId')
+    ..aOS(4, _omitFieldNames ? '' : 'scope')
+    ..aOS(5, _omitFieldNames ? '' : 'error')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AuthEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AuthEvent copyWith(void Function(AuthEvent) updates) =>
+      super.copyWith((message) => updates(message as AuthEvent)) as AuthEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AuthEvent create() => AuthEvent._();
+  @$core.override
+  AuthEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static AuthEvent getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AuthEvent>(create);
+  static AuthEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  AuthEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(AuthEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get provider => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set provider($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasProvider() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearProvider() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get subjectId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set subjectId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSubjectId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSubjectId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get scope => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set scope($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasScope() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearScope() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get error => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set error($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => $_clearField(5);
+}
+
+/// ---------------------------------------------------------------------------
+/// Device events: device-info collection / sync, plus battery / thermal /
+/// connectivity changes (canonical superset; Kotlin's analytics layer
+/// already emits these as raw `BaseSDKEvent`s with category=device).
+/// Mirrors RN events.ts:257-264 (SDKDeviceEvent: 7 variants).
+/// ---------------------------------------------------------------------------
+class DeviceEvent extends $pb.GeneratedMessage {
+  factory DeviceEvent({
+    DeviceEventKind? kind,
+    $core.String? deviceId,
+    $core.String? osName,
+    $core.String? osVersion,
+    $core.String? model,
+    $core.String? error,
+    $core.String? property,
+    $core.String? newValue,
+    $core.String? oldValue,
+    $core.double? batteryLevel,
+    $core.bool? isCharging,
+    $core.String? thermalState,
+    $core.bool? isConnected,
+    $core.String? connectionType,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (deviceId != null) result.deviceId = deviceId;
+    if (osName != null) result.osName = osName;
+    if (osVersion != null) result.osVersion = osVersion;
+    if (model != null) result.model = model;
+    if (error != null) result.error = error;
+    if (property != null) result.property = property;
+    if (newValue != null) result.newValue = newValue;
+    if (oldValue != null) result.oldValue = oldValue;
+    if (batteryLevel != null) result.batteryLevel = batteryLevel;
+    if (isCharging != null) result.isCharging = isCharging;
+    if (thermalState != null) result.thermalState = thermalState;
+    if (isConnected != null) result.isConnected = isConnected;
+    if (connectionType != null) result.connectionType = connectionType;
+    return result;
+  }
+
+  DeviceEvent._();
+
+  factory DeviceEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DeviceEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DeviceEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<DeviceEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: DeviceEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'deviceId')
+    ..aOS(3, _omitFieldNames ? '' : 'osName')
+    ..aOS(4, _omitFieldNames ? '' : 'osVersion')
+    ..aOS(5, _omitFieldNames ? '' : 'model')
+    ..aOS(6, _omitFieldNames ? '' : 'error')
+    ..aOS(7, _omitFieldNames ? '' : 'property')
+    ..aOS(8, _omitFieldNames ? '' : 'newValue')
+    ..aOS(9, _omitFieldNames ? '' : 'oldValue')
+    ..aD(10, _omitFieldNames ? '' : 'batteryLevel',
+        fieldType: $pb.PbFieldType.OF)
+    ..aOB(11, _omitFieldNames ? '' : 'isCharging')
+    ..aOS(12, _omitFieldNames ? '' : 'thermalState')
+    ..aOB(13, _omitFieldNames ? '' : 'isConnected')
+    ..aOS(14, _omitFieldNames ? '' : 'connectionType')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeviceEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DeviceEvent copyWith(void Function(DeviceEvent) updates) =>
+      super.copyWith((message) => updates(message as DeviceEvent))
+          as DeviceEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DeviceEvent create() => DeviceEvent._();
+  @$core.override
+  DeviceEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DeviceEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DeviceEvent>(create);
+  static DeviceEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  DeviceEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(DeviceEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// For DEVICE_INFO_COLLECTED / REFRESHED — populated state-key/value
+  /// pairs (avoid embedding full DeviceInfoData; that lives in its own
+  /// proto). The summary fields below are the most-queried subset.
+  @$pb.TagNumber(2)
+  $core.String get deviceId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set deviceId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDeviceId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDeviceId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get osName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set osName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOsName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOsName() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get osVersion => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set osVersion($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasOsVersion() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOsVersion() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get model => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set model($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasModel() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearModel() => $_clearField(5);
+
+  /// For *_FAILED.
+  @$pb.TagNumber(6)
+  $core.String get error => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set error($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+
+  /// For DEVICE_STATE_CHANGED — RN events.ts:264.
+  @$pb.TagNumber(7)
+  $core.String get property => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set property($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasProperty() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearProperty() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get newValue => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set newValue($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasNewValue() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearNewValue() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get oldValue => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set oldValue($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasOldValue() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearOldValue() => $_clearField(9);
+
+  /// For BATTERY_CHANGED / THERMAL_CHANGED / CONNECTIVITY_CHANGED.
+  @$pb.TagNumber(10)
+  $core.double get batteryLevel => $_getN(9);
+  @$pb.TagNumber(10)
+  set batteryLevel($core.double value) => $_setFloat(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasBatteryLevel() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearBatteryLevel() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.bool get isCharging => $_getBF(10);
+  @$pb.TagNumber(11)
+  set isCharging($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasIsCharging() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearIsCharging() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get thermalState => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set thermalState($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasThermalState() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearThermalState() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.bool get isConnected => $_getBF(12);
+  @$pb.TagNumber(13)
+  set isConnected($core.bool value) => $_setBool(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasIsConnected() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearIsConnected() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get connectionType => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set connectionType($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasConnectionType() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearConnectionType() => $_clearField(14);
+}
+
+/// ---------------------------------------------------------------------------
+/// Network events. Mirrors RN
+///   events.ts:203-207 (SDKNetworkEvent: 4 variants).
+/// ---------------------------------------------------------------------------
+class NetworkEvent extends $pb.GeneratedMessage {
+  factory NetworkEvent({
+    NetworkEventKind? kind,
+    $core.String? url,
+    $core.int? statusCode,
+    $core.bool? isOnline,
+    $core.String? error,
+    $fixnum.Int64? latencyMs,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (url != null) result.url = url;
+    if (statusCode != null) result.statusCode = statusCode;
+    if (isOnline != null) result.isOnline = isOnline;
+    if (error != null) result.error = error;
+    if (latencyMs != null) result.latencyMs = latencyMs;
+    return result;
+  }
+
+  NetworkEvent._();
+
+  factory NetworkEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory NetworkEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'NetworkEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<NetworkEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: NetworkEventKind.values)
+    ..aOS(2, _omitFieldNames ? '' : 'url')
+    ..aI(3, _omitFieldNames ? '' : 'statusCode')
+    ..aOB(4, _omitFieldNames ? '' : 'isOnline')
+    ..aOS(5, _omitFieldNames ? '' : 'error')
+    ..aInt64(6, _omitFieldNames ? '' : 'latencyMs')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NetworkEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  NetworkEvent copyWith(void Function(NetworkEvent) updates) =>
+      super.copyWith((message) => updates(message as NetworkEvent))
+          as NetworkEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static NetworkEvent create() => NetworkEvent._();
+  @$core.override
+  NetworkEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static NetworkEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<NetworkEvent>(create);
+  static NetworkEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  NetworkEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(NetworkEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get url => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set url($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasUrl() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUrl() => $_clearField(2);
+
+  /// For REQUEST_COMPLETED — HTTP status (RN events.ts:205).
+  @$pb.TagNumber(3)
+  $core.int get statusCode => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set statusCode($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStatusCode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStatusCode() => $_clearField(3);
+
+  /// For CONNECTIVITY_CHANGED — RN events.ts:207.
+  @$pb.TagNumber(4)
+  $core.bool get isOnline => $_getBF(3);
+  @$pb.TagNumber(4)
+  set isOnline($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasIsOnline() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIsOnline() => $_clearField(4);
+
+  /// For REQUEST_FAILED / TIMEOUT.
+  @$pb.TagNumber(5)
+  $core.String get error => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set error($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => $_clearField(5);
+
+  /// For REQUEST_COMPLETED — response time in ms (canonical addition,
+  /// implied by Kotlin/iOS request timing instrumentation).
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get latencyMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set latencyMs($fixnum.Int64 value) => $_setInt64(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLatencyMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLatencyMs() => $_clearField(6);
+}
+
+/// ---------------------------------------------------------------------------
+/// Framework registry events. Mirrors RN
+///   events.ts:232-251 (SDKFrameworkEvent: 11 variants).
+/// ---------------------------------------------------------------------------
+class FrameworkEvent extends $pb.GeneratedMessage {
+  factory FrameworkEvent({
+    FrameworkEventKind? kind,
+    $core.int? framework,
+    $core.String? adapterName,
+    $core.int? adapterCount,
+    $core.int? frameworkCount,
+    $core.int? modelCount,
+    $core.String? modality,
+    $core.String? error,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (framework != null) result.framework = framework;
+    if (adapterName != null) result.adapterName = adapterName;
+    if (adapterCount != null) result.adapterCount = adapterCount;
+    if (frameworkCount != null) result.frameworkCount = frameworkCount;
+    if (modelCount != null) result.modelCount = modelCount;
+    if (modality != null) result.modality = modality;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  FrameworkEvent._();
+
+  factory FrameworkEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FrameworkEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FrameworkEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<FrameworkEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: FrameworkEventKind.values)
+    ..aI(2, _omitFieldNames ? '' : 'framework')
+    ..aOS(3, _omitFieldNames ? '' : 'adapterName')
+    ..aI(4, _omitFieldNames ? '' : 'adapterCount')
+    ..aI(5, _omitFieldNames ? '' : 'frameworkCount')
+    ..aI(6, _omitFieldNames ? '' : 'modelCount')
+    ..aOS(7, _omitFieldNames ? '' : 'modality')
+    ..aOS(8, _omitFieldNames ? '' : 'error')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FrameworkEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FrameworkEvent copyWith(void Function(FrameworkEvent) updates) =>
+      super.copyWith((message) => updates(message as FrameworkEvent))
+          as FrameworkEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FrameworkEvent create() => FrameworkEvent._();
+  @$core.override
+  FrameworkEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FrameworkEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FrameworkEvent>(create);
+  static FrameworkEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  FrameworkEventKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(FrameworkEventKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  /// For ADAPTER_REGISTERED / *_RETRIEVED — bound framework. Uses
+  /// canonical InferenceFramework from model_types.proto, but stored as
+  /// its enum int32 here to avoid cross-file message dependency just for
+  /// a single field. Frontends decode via the shared codegen.
+  @$pb.TagNumber(2)
+  $core.int get framework => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set framework($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFramework() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFramework() => $_clearField(2);
+
+  /// For ADAPTER_REGISTERED — adapter display name.
+  @$pb.TagNumber(3)
+  $core.String get adapterName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set adapterName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAdapterName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAdapterName() => $_clearField(3);
+
+  /// For ADAPTERS_RETRIEVED / *_RETRIEVED — counts.
+  @$pb.TagNumber(4)
+  $core.int get adapterCount => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set adapterCount($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAdapterCount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAdapterCount() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get frameworkCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set frameworkCount($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFrameworkCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFrameworkCount() => $_clearField(5);
+
+  /// For MODELS_FOR_FRAMEWORK_RETRIEVED — model count (full ModelInfo[]
+  /// travels via RPCs, not events).
+  @$pb.TagNumber(6)
+  $core.int get modelCount => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set modelCount($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasModelCount() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearModelCount() => $_clearField(6);
+
+  /// For *_FOR_MODALITY_* — modality identifier (string-keyed; canonical
+  /// FrameworkModality enum exists in model_types but we keep this loose
+  /// so plugins can register custom modalities).
+  @$pb.TagNumber(7)
+  $core.String get modality => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set modality($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasModality() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearModality() => $_clearField(7);
+
+  /// For ERROR / UNREGISTERED failures (canonical superset additions).
+  @$pb.TagNumber(8)
+  $core.String get error => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set error($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasError() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearError() => $_clearField(8);
+}
+
 class HardwareRoutingEvent extends $pb.GeneratedMessage {
   factory HardwareRoutingEvent({
     HardwareRoutingEventKind? kind,
@@ -3791,169 +4210,129 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
   $3.HardwareProfileResult ensureHardwareProfile() => $_ensure(7);
 }
 
-class CapabilityOperationEvent extends $pb.GeneratedMessage {
-  factory CapabilityOperationEvent({
-    CapabilityOperationEventKind? kind,
-    SDKComponent? component,
-    $core.String? modelId,
-    $core.String? operationId,
+/// ---------------------------------------------------------------------------
+/// Performance metrics events. Mirrors RN
+///   events.ts:193-197 (SDKPerformanceEvent: 4 variants).
+/// ---------------------------------------------------------------------------
+class PerformanceEvent extends $pb.GeneratedMessage {
+  factory PerformanceEvent({
+    PerformanceEventKind? kind,
+    $fixnum.Int64? memoryBytes,
+    $core.String? thermalState,
     $core.String? operation,
-    $core.double? progress,
-    $fixnum.Int64? inputCount,
-    $fixnum.Int64? outputCount,
-    $core.String? resultJson,
-    $core.String? error,
+    $fixnum.Int64? milliseconds,
+    $core.double? tokensPerSecond,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
-    if (component != null) result.component = component;
-    if (modelId != null) result.modelId = modelId;
-    if (operationId != null) result.operationId = operationId;
+    if (memoryBytes != null) result.memoryBytes = memoryBytes;
+    if (thermalState != null) result.thermalState = thermalState;
     if (operation != null) result.operation = operation;
-    if (progress != null) result.progress = progress;
-    if (inputCount != null) result.inputCount = inputCount;
-    if (outputCount != null) result.outputCount = outputCount;
-    if (resultJson != null) result.resultJson = resultJson;
-    if (error != null) result.error = error;
+    if (milliseconds != null) result.milliseconds = milliseconds;
+    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
     return result;
   }
 
-  CapabilityOperationEvent._();
+  PerformanceEvent._();
 
-  factory CapabilityOperationEvent.fromBuffer($core.List<$core.int> data,
+  factory PerformanceEvent.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory CapabilityOperationEvent.fromJson($core.String json,
+  factory PerformanceEvent.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'CapabilityOperationEvent',
+      _omitMessageNames ? '' : 'PerformanceEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aE<CapabilityOperationEventKind>(1, _omitFieldNames ? '' : 'kind',
-        enumValues: CapabilityOperationEventKind.values)
-    ..aE<SDKComponent>(2, _omitFieldNames ? '' : 'component',
-        enumValues: SDKComponent.values)
-    ..aOS(3, _omitFieldNames ? '' : 'modelId')
-    ..aOS(4, _omitFieldNames ? '' : 'operationId')
-    ..aOS(5, _omitFieldNames ? '' : 'operation')
-    ..aD(6, _omitFieldNames ? '' : 'progress', fieldType: $pb.PbFieldType.OF)
-    ..aInt64(7, _omitFieldNames ? '' : 'inputCount')
-    ..aInt64(8, _omitFieldNames ? '' : 'outputCount')
-    ..aOS(9, _omitFieldNames ? '' : 'resultJson')
-    ..aOS(10, _omitFieldNames ? '' : 'error')
+    ..aE<PerformanceEventKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: PerformanceEventKind.values)
+    ..aInt64(2, _omitFieldNames ? '' : 'memoryBytes')
+    ..aOS(3, _omitFieldNames ? '' : 'thermalState')
+    ..aOS(4, _omitFieldNames ? '' : 'operation')
+    ..aInt64(5, _omitFieldNames ? '' : 'milliseconds')
+    ..aD(6, _omitFieldNames ? '' : 'tokensPerSecond')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CapabilityOperationEvent clone() => deepCopy();
+  PerformanceEvent clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CapabilityOperationEvent copyWith(
-          void Function(CapabilityOperationEvent) updates) =>
-      super.copyWith((message) => updates(message as CapabilityOperationEvent))
-          as CapabilityOperationEvent;
+  PerformanceEvent copyWith(void Function(PerformanceEvent) updates) =>
+      super.copyWith((message) => updates(message as PerformanceEvent))
+          as PerformanceEvent;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static CapabilityOperationEvent create() => CapabilityOperationEvent._();
+  static PerformanceEvent create() => PerformanceEvent._();
   @$core.override
-  CapabilityOperationEvent createEmptyInstance() => create();
+  PerformanceEvent createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static CapabilityOperationEvent getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<CapabilityOperationEvent>(create);
-  static CapabilityOperationEvent? _defaultInstance;
+  static PerformanceEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PerformanceEvent>(create);
+  static PerformanceEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  CapabilityOperationEventKind get kind => $_getN(0);
+  PerformanceEventKind get kind => $_getN(0);
   @$pb.TagNumber(1)
-  set kind(CapabilityOperationEventKind value) => $_setField(1, value);
+  set kind(PerformanceEventKind value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasKind() => $_has(0);
   @$pb.TagNumber(1)
   void clearKind() => $_clearField(1);
 
+  /// For MEMORY_WARNING — usage in bytes (RN typed as number).
   @$pb.TagNumber(2)
-  SDKComponent get component => $_getN(1);
+  $fixnum.Int64 get memoryBytes => $_getI64(1);
   @$pb.TagNumber(2)
-  set component(SDKComponent value) => $_setField(2, value);
+  set memoryBytes($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasComponent() => $_has(1);
+  $core.bool hasMemoryBytes() => $_has(1);
   @$pb.TagNumber(2)
-  void clearComponent() => $_clearField(2);
+  void clearMemoryBytes() => $_clearField(2);
 
+  /// For THERMAL_STATE_CHANGED — engine-defined state string
+  /// (e.g. "nominal", "fair", "serious", "critical"; Apple-specific
+  /// names preserved as strings to avoid platform-coupled enums).
   @$pb.TagNumber(3)
-  $core.String get modelId => $_getSZ(2);
+  $core.String get thermalState => $_getSZ(2);
   @$pb.TagNumber(3)
-  set modelId($core.String value) => $_setString(2, value);
+  set thermalState($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasModelId() => $_has(2);
+  $core.bool hasThermalState() => $_has(2);
   @$pb.TagNumber(3)
-  void clearModelId() => $_clearField(3);
+  void clearThermalState() => $_clearField(3);
 
+  /// For LATENCY_MEASURED.
   @$pb.TagNumber(4)
-  $core.String get operationId => $_getSZ(3);
+  $core.String get operation => $_getSZ(3);
   @$pb.TagNumber(4)
-  set operationId($core.String value) => $_setString(3, value);
+  set operation($core.String value) => $_setString(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasOperationId() => $_has(3);
+  $core.bool hasOperation() => $_has(3);
   @$pb.TagNumber(4)
-  void clearOperationId() => $_clearField(4);
+  void clearOperation() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get operation => $_getSZ(4);
+  $fixnum.Int64 get milliseconds => $_getI64(4);
   @$pb.TagNumber(5)
-  set operation($core.String value) => $_setString(4, value);
+  set milliseconds($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasOperation() => $_has(4);
+  $core.bool hasMilliseconds() => $_has(4);
   @$pb.TagNumber(5)
-  void clearOperation() => $_clearField(5);
+  void clearMilliseconds() => $_clearField(5);
 
+  /// For THROUGHPUT_MEASURED — RN events.ts:197.
   @$pb.TagNumber(6)
-  $core.double get progress => $_getN(5);
+  $core.double get tokensPerSecond => $_getN(5);
   @$pb.TagNumber(6)
-  set progress($core.double value) => $_setFloat(5, value);
+  set tokensPerSecond($core.double value) => $_setDouble(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasProgress() => $_has(5);
+  $core.bool hasTokensPerSecond() => $_has(5);
   @$pb.TagNumber(6)
-  void clearProgress() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get inputCount => $_getI64(6);
-  @$pb.TagNumber(7)
-  set inputCount($fixnum.Int64 value) => $_setInt64(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasInputCount() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearInputCount() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $fixnum.Int64 get outputCount => $_getI64(7);
-  @$pb.TagNumber(8)
-  set outputCount($fixnum.Int64 value) => $_setInt64(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasOutputCount() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearOutputCount() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.String get resultJson => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set resultJson($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasResultJson() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearResultJson() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.String get error => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set error($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasError() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearError() => $_clearField(10);
+  void clearTokensPerSecond() => $_clearField(6);
 }
 
 class TelemetryEvent extends $pb.GeneratedMessage {

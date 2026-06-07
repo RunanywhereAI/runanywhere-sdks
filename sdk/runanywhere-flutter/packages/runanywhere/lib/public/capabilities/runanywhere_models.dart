@@ -105,7 +105,7 @@ class RunAnywhereModels {
 
   /// Refresh the model registry — canonical §13 cross-SDK unified
   /// surface (0-arg). Routes through the commons C ABI
-  /// `rac_model_registry_refresh`; rescans local filesystem and
+  /// `rac_model_registry_refresh_proto`; rescans local filesystem and
   /// fetches the backend catalog in one shot.
   Future<void> refreshModelRegistry() async {
     if (!DartBridge.isInitialized) return;
@@ -125,7 +125,7 @@ class RunAnywhereModels {
       pruneOrphans: false,
     );
     if (!ok) {
-      logger.warning('rac_model_registry_refresh reported failure');
+      logger.warning('rac_model_registry_refresh_proto reported failure');
     }
   }
 

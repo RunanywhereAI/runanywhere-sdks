@@ -17,6 +17,17 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
+ * ===========================================================================
+ * SECTION 0 — ENVELOPE / SHARED ENUMS
+ * ===========================================================================
+ * Cross-cutting enums referenced by the `SDKEvent` envelope and by many of the
+ * per-component messages below: the component identifier and the routing
+ * destination. (The `EventCategory` enum carried by the envelope lives in
+ * component_types.proto to break the sdk_events ↔ voice_events import cycle.)
+ * The envelope message `SDKEvent` itself, plus the filter/request/result
+ * messages and the `SDKEvents` service, are defined last (SECTION 14) because
+ * they reference every per-component message above.
+ * ---------------------------------------------------------------------------
  * ---------------------------------------------------------------------------
  * Component identifier — every consumer / framework that the SDK orchestrates.
  * Sources pre-IDL:

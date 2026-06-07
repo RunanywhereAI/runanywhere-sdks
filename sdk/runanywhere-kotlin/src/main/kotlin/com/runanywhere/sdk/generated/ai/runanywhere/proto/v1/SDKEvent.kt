@@ -34,6 +34,15 @@ import kotlin.lazy
 import okio.ByteString
 
 /**
+ * ===========================================================================
+ * SECTION 14 — ENVELOPE + SERVICE
+ * ===========================================================================
+ * The top-level `SDKEvent` envelope (its `oneof event` references every
+ * per-component message defined in the sections above), the subscription
+ * filter, the publish/subscribe request/result messages, and the logical
+ * `SDKEvents` service. Kept last so all referenced payload messages are
+ * already declared.
+ * ---------------------------------------------------------------------------
  * ---------------------------------------------------------------------------
  * Top-level event envelope. Every event published by every SDK is wrapped in
  * exactly one `SDKEvent` — analytics consumers, app developers, and

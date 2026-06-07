@@ -202,6 +202,13 @@ base class RacDirectoryEntryStruct extends Struct {
 /// Note: This is a complex struct - for simplicity we use `Pointer<Void>` in FFI calls
 /// and manage the struct manually in Dart
 base class RacPlatformAdapterStruct extends Struct {
+  // ABI guard (MUST be the first two fields). rac_init rejects the adapter
+  // with RAC_ERROR_ABI_VERSION_MISMATCH unless these match the commons build.
+  @Uint32()
+  external int abiVersion;
+  @Uint32()
+  external int structSize;
+
   external Pointer<NativeFunction<RacFileExistsCallbackNative>> fileExists;
   external Pointer<NativeFunction<RacFileReadCallbackNative>> fileRead;
   external Pointer<NativeFunction<RacFileWriteCallbackNative>> fileWrite;
