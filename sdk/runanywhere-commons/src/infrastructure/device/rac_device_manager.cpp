@@ -12,7 +12,6 @@
 #include <mutex>
 #include <string>
 
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
@@ -41,26 +40,14 @@ DeviceManagerState& get_state() {
 // Logging category
 static const char* LOG_CAT = "DeviceManager";
 
-// Helper to emit device registered event
+// Helper to emit device registered event (canonical proto stream; the
+// destination router forwards it to telemetry).
 void emit_device_registered(const char* device_id) {
-    rac_analytics_event_data_t event = {};
-    event.type = RAC_EVENT_DEVICE_REGISTERED;
-    event.data.device = RAC_ANALYTICS_DEVICE_DEFAULT;
-    event.data.device.device_id = device_id;
-
-    rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTERED, &event);
     rac::events::publish_device_registered(device_id);
 }
 
-// Helper to emit device registration failed event
+// Helper to emit device registration failed event.
 void emit_device_registration_failed(rac_result_t error_code, const char* error_message) {
-    rac_analytics_event_data_t event = {};
-    event.type = RAC_EVENT_DEVICE_REGISTRATION_FAILED;
-    event.data.device = RAC_ANALYTICS_DEVICE_DEFAULT;
-    event.data.device.error_code = error_code;
-    event.data.device.error_message = error_message;
-
-    rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTRATION_FAILED, &event);
     rac::events::publish_device_registration_failed(error_code, error_message);
 }
 

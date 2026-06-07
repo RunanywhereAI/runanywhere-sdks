@@ -95,6 +95,20 @@ RAC_API rac_result_t rac_sdk_event_publish_failure(rac_result_t error_code, cons
  */
 RAC_API void rac_sdk_event_clear_queue(void);
 
+/**
+ * @brief Register the telemetry sink for the canonical event destination router.
+ *
+ * The destination router (invoked from every rac::events::publish) forwards any
+ * event whose envelope `destination` includes the TELEMETRY bit to this
+ * telemetry manager via rac_telemetry_manager_track_proto. Pass the
+ * rac_telemetry_manager_t* handle as an opaque pointer (NULL to detach).
+ *
+ * This replaces the legacy rac_analytics_events_set_callback round-trip: SDKs
+ * register the telemetry manager once and the router feeds it directly from the
+ * proto event stream.
+ */
+RAC_API void rac_events_set_telemetry_sink(void* telemetry_manager);
+
 #ifdef __cplusplus
 }
 // NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)

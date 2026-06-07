@@ -14,15 +14,30 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
 namespace rac::events {
 
 namespace {
+
+// Active telemetry sink for the destination router. Registered by SDKs via
+// rac_events_set_telemetry_sink; fed by route() when an event's destination
+// includes the TELEMETRY bit. Guarded by a mutex (registration is rare).
+std::mutex& telemetry_sink_mutex() {
+    static std::mutex m;
+    return m;
+}
+rac_telemetry_manager_t*& telemetry_sink() {
+    static rac_telemetry_manager_t* sink = nullptr;
+    return sink;
+}
 
 uint64_t current_time_ms() {
     using namespace std::chrono;
@@ -70,7 +85,46 @@ rac_result_t publish(runanywhere::v1::SDKEvent& event, runanywhere::v1::SDKCompo
     if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return RAC_ERROR_EVENT_PUBLISH_FAILED;
     }
-    return rac_sdk_event_publish_proto(bytes.data(), bytes.size());
+
+    const int32_t dest = static_cast<int32_t>(event.destination());
+
+    // PUBLIC sink: the canonical app-facing proto stream. Fed whenever the
+    // PUBLIC bit is set (which ALL also satisfies). UNSPECIFIED was normalized
+    // to ALL above, so this also covers the default.
+    rac_result_t result = RAC_SUCCESS;
+    if (dest & static_cast<int32_t>(runanywhere::v1::EVENT_DESTINATION_PUBLIC)) {
+        result = rac_sdk_event_publish_proto(bytes.data(), bytes.size());
+    }
+
+    // TELEMETRY + LOG sinks.
+    route(event, bytes.data(), bytes.size());
+
+    return result;
+}
+
+void route(const runanywhere::v1::SDKEvent& event, const uint8_t* serialized_bytes,
+           size_t serialized_size) {
+    const int32_t dest = static_cast<int32_t>(event.destination());
+
+    // TELEMETRY sink: feed the registered telemetry manager directly from the
+    // serialized proto. The manager extracts every metric per oneof case.
+    if (dest & static_cast<int32_t>(runanywhere::v1::EVENT_DESTINATION_TELEMETRY)) {
+        rac_telemetry_manager_t* sink = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(telemetry_sink_mutex());
+            sink = telemetry_sink();
+        }
+        if (sink != nullptr && serialized_bytes != nullptr) {
+            rac_telemetry_manager_track_proto(sink, serialized_bytes, serialized_size);
+        }
+    }
+
+    // LOG sink: opt-in structured local log breadcrumb.
+    if (dest & static_cast<int32_t>(runanywhere::v1::EVENT_DESTINATION_LOG)) {
+        RAC_LOG_DEBUG("Events", "[log-sink] component=%d category=%d id=%s",
+                      static_cast<int>(event.component()), static_cast<int>(event.category()),
+                      event.id().c_str());
+    }
 }
 
 // Each typed overload moves its payload into the matching SDKEvent oneof arm,
@@ -110,6 +164,51 @@ RAC_DEFINE_PUBLISH_OVERLOAD(FailureEvent, failure)
 
 #undef RAC_DEFINE_PUBLISH_OVERLOAD
 
+rac_result_t publish_with_session(runanywhere::v1::SDKComponent component,
+                                  runanywhere::v1::EventCategory category,
+                                  runanywhere::v1::GenerationEvent payload, const char* session_id,
+                                  runanywhere::v1::EventDestination destination) {
+    runanywhere::v1::SDKEvent event;
+    *event.mutable_generation() = std::move(payload);
+    if (session_id != nullptr && session_id[0] != '\0') {
+        event.set_session_id(session_id);
+    }
+    if (destination != runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED) {
+        event.set_destination(destination);
+    }
+    return publish(event, component, category);
+}
+
+rac_result_t publish_with_session(runanywhere::v1::SDKComponent component,
+                                  runanywhere::v1::EventCategory category,
+                                  runanywhere::v1::VoiceLifecycleEvent payload,
+                                  const char* session_id,
+                                  runanywhere::v1::EventDestination destination) {
+    runanywhere::v1::SDKEvent event;
+    *event.mutable_voice() = std::move(payload);
+    if (session_id != nullptr && session_id[0] != '\0') {
+        event.set_session_id(session_id);
+    }
+    if (destination != runanywhere::v1::EVENT_DESTINATION_UNSPECIFIED) {
+        event.set_destination(destination);
+    }
+    return publish(event, component, category);
+}
+
 }  // namespace rac::events
+
+// ---------------------------------------------------------------------------
+// C ABI: telemetry sink registration for the destination router.
+// ---------------------------------------------------------------------------
+extern "C" void rac_events_set_telemetry_sink(void* telemetry_manager) {
+    std::lock_guard<std::mutex> lock(rac::events::telemetry_sink_mutex());
+    rac::events::telemetry_sink() = static_cast<rac_telemetry_manager_t*>(telemetry_manager);
+}
+
+#else  // !RAC_HAVE_PROTOBUF
+
+// Without protobuf there is no proto event stream; the telemetry sink registration
+// is a no-op so the C ABI symbol still resolves for SDK builds.
+extern "C" void rac_events_set_telemetry_sink(void* /*telemetry_manager*/) {}
 
 #endif  // RAC_HAVE_PROTOBUF

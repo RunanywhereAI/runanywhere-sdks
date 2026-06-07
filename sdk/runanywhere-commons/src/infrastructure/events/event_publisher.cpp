@@ -275,7 +275,13 @@ rac_result_t publish_message(const runanywhere::v1::SDKEvent& event) {
     if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return RAC_ERROR_EVENT_PUBLISH_FAILED;
     }
-    return rac_sdk_event_publish_proto(bytes.data(), bytes.size());
+    rac_result_t result = rac_sdk_event_publish_proto(bytes.data(), bytes.size());
+    // Feed the non-public sinks (TELEMETRY/LOG) through the canonical destination
+    // router so events emitted via this helper reach telemetry exactly like those
+    // emitted via rac::events::publish (sdk_event_publish.cpp). publish_message
+    // is only used for PUBLIC-bit events, so this never double-publishes PUBLIC.
+    rac::events::route(event, bytes.data(), bytes.size());
+    return result;
 }
 
 #endif

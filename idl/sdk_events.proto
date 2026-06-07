@@ -111,11 +111,19 @@ enum SDKComponent {
 //   Kotlin SDKEvent.kt:24-33          — PUBLIC_ONLY / ANALYTICS_ONLY / ALL
 //   Dart   sdk_event.dart:20-29       — all / publicOnly / analyticsOnly
 // ---------------------------------------------------------------------------
+// Bitmask routing destination. Values are powers of two so they can be OR'd
+// together; proto3 enums are open ints, so combinations round-trip on the wire
+// without named constants. The C++ destination router reads this as a bitmask.
+//   PUBLIC    — app-facing canonical SDKEvent proto stream
+//   TELEMETRY — telemetry_manager / server analytics
+//   LOG       — structured local log sink (opt-in)
+//   ALL       — PUBLIC | TELEMETRY (legacy "all" parity; the publish() default)
 enum EventDestination {
-    EVENT_DESTINATION_UNSPECIFIED      = 0;
-    EVENT_DESTINATION_ALL              = 1;   // EventBus + Analytics (default)
-    EVENT_DESTINATION_PUBLIC_ONLY      = 2;   // EventBus only
-    EVENT_DESTINATION_ANALYTICS_ONLY   = 3;   // Analytics/telemetry only
+    EVENT_DESTINATION_UNSPECIFIED = 0;
+    EVENT_DESTINATION_PUBLIC      = 1;
+    EVENT_DESTINATION_TELEMETRY   = 2;
+    EVENT_DESTINATION_ALL         = 3;   // PUBLIC | TELEMETRY
+    EVENT_DESTINATION_LOG         = 4;
 }
 
 // ===========================================================================
@@ -411,6 +419,20 @@ message GenerationEvent {
     // Enables totalTokens = input_tokens + tokens_used analytics
     // from the event stream alone.
     int32               input_tokens     = 24;
+
+    // Telemetry metrics carried on the canonical event stream so the C++
+    // destination router can derive the full telemetry payload from the
+    // proto SDKEvent alone (no parallel struct path). `framework` is the
+    // InferenceFramework enum stored as int32 (matches FrameworkEvent.framework).
+    double              tokens_per_second        = 25;
+    int64               time_to_first_token_ms   = 26;   // completion TTFT (FIRST_TOKEN uses first_token_latency_ms)
+    bool                is_streaming             = 27;
+    float               temperature              = 28;
+    int32               max_tokens               = 29;
+    int32               context_length           = 30;
+    string              model_name               = 31;
+    double              duration_ms              = 32;   // wall-clock generation duration
+    int32               framework                = 33;   // InferenceFramework enum int
 }
 
 enum GenerationEventKind {
@@ -496,6 +518,31 @@ message VoiceLifecycleEvent {
 
     // For *_ERROR / *_FAILED.
     string         error           = 12;
+
+    // -----------------------------------------------------------------------
+    // Telemetry metrics (STT transcription + TTS synthesis + model load) so
+    // the C++ destination router derives the full telemetry payload from the
+    // proto SDKEvent alone. Populated per-component (component on the SDKEvent
+    // envelope selects which subset applies). `framework` is the
+    // InferenceFramework enum stored as int32.
+    // -----------------------------------------------------------------------
+    string         model_id              = 13;
+    string         model_name            = 14;
+    int64          audio_length_ms       = 15;   // STT input audio length
+    int32          audio_size_bytes      = 16;
+    int32          word_count            = 17;   // STT
+    double         real_time_factor      = 18;   // STT
+    string         language              = 19;   // STT
+    int32          sample_rate           = 20;   // STT + TTS
+    bool           is_streaming          = 21;   // STT
+    int32          framework             = 22;   // InferenceFramework enum int
+
+    // TTS synthesis metrics.
+    int32          character_count       = 23;
+    int64          audio_duration_ms     = 24;   // distinct from duration_ms(7); telemetry output_duration_ms
+    int32          audio_size_bytes_tts  = 25;
+    int64          processing_duration_ms = 26;  // telemetry processing_time_ms
+    double         characters_per_second = 27;
 }
 
 enum VoiceEventKind {
@@ -565,6 +612,10 @@ enum VoiceEventKind {
     VOICE_EVENT_KIND_VOICE_SESSION_TURN_COMPLETED = 45;
     VOICE_EVENT_KIND_VOICE_SESSION_STOPPED       = 46;
     VOICE_EVENT_KIND_VOICE_SESSION_ERROR         = 47;
+
+    // VAD pause/resume (telemetry-only metrics).
+    VOICE_EVENT_KIND_VAD_PAUSED                  = 48;
+    VOICE_EVENT_KIND_VAD_RESUMED                 = 49;
 }
 
 // ===========================================================================
@@ -657,6 +708,15 @@ message ModelEvent {
     // For CUSTOM_MODEL_ADDED — RN events.ts:129.
     string         custom_model_name   = 11;
     string         custom_model_url    = 12;
+
+    // Model-load + download/extraction telemetry metrics so the C++
+    // destination router derives the telemetry payload from the proto
+    // SDKEvent alone. `framework` is the InferenceFramework enum stored as
+    // int32 (matches FrameworkEvent.framework).
+    string         model_name          = 13;
+    int64          model_size_bytes    = 14;
+    int64          duration_ms         = 15;   // load / download / extraction duration
+    int32          framework           = 16;   // InferenceFramework enum int
 }
 
 enum ModelEventKind {
@@ -682,6 +742,10 @@ enum ModelEventKind {
     MODEL_EVENT_KIND_DELETE_FAILED          = 19;
     MODEL_EVENT_KIND_CUSTOM_MODEL_ADDED     = 20;
     MODEL_EVENT_KIND_BUILT_IN_REGISTERED    = 21;
+    MODEL_EVENT_KIND_EXTRACTION_STARTED     = 22;
+    MODEL_EVENT_KIND_EXTRACTION_PROGRESS    = 23;
+    MODEL_EVENT_KIND_EXTRACTION_COMPLETED   = 24;
+    MODEL_EVENT_KIND_EXTRACTION_FAILED      = 25;
 }
 
 message ModelRegistryEvent {
@@ -785,6 +849,9 @@ message StorageEvent {
     // not in RN's events.ts but called out in Step 3 spec).
     string           cache_key         = 8;
     int64            evicted_bytes     = 9;
+
+    // For CLEAR_CACHE_COMPLETED / CLEAN_TEMP_COMPLETED — bytes reclaimed.
+    int64            freed_bytes       = 10;
 }
 
 enum StorageEventKind {

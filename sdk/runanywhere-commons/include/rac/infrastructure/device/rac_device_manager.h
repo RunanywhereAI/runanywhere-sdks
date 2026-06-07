@@ -9,7 +9,7 @@
  * - Registration persistence (UserDefaults/SharedPreferences)
  * - HTTP transport (URLSession/OkHttp)
  *
- * Events are emitted via rac_analytics_event_emit().
+ * Events are emitted as canonical proto SDKEvents via rac::events::publish_*.
  */
 
 #ifndef RAC_DEVICE_MANAGER_H

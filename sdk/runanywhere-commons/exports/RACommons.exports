@@ -60,9 +60,6 @@ _rac_get_current_time_ms
 # exporter, used by SDK telemetry shims still pending the proto-bytes
 # migration). SDK-facing events go through
 # rac_sdk_event_* below.
-_rac_analytics_events_set_callback
-_rac_analytics_event_emit
-_rac_analytics_events_has_callback
 
 # Platform Adapter
 _rac_get_platform_adapter
@@ -686,7 +683,7 @@ _rac_telemetry_manager_http_complete
 _rac_telemetry_manager_set_device_info
 _rac_telemetry_manager_set_http_callback
 _rac_telemetry_manager_track
-_rac_telemetry_manager_track_analytics
+_rac_telemetry_manager_track_proto
 
 # File manager — model folder bookkeeping called from CppBridge+FileManager.swift.
 _rac_file_manager_cache_size
@@ -886,8 +883,6 @@ _rac_analytics_emit_tts_voice_load_completed
 _rac_analytics_emit_tts_voice_load_failed
 _rac_analytics_emit_vad_speech_ended
 _rac_analytics_emit_vad_speech_started
-_rac_analytics_events_has_public_callback
-_rac_analytics_events_set_public_callback
 _rac_archive_type_extension
 _rac_archive_type_from_path
 _rac_artifact_infer_from_url
@@ -1033,10 +1028,10 @@ _rac_error_to_debug_string
 _rac_error_to_json
 _rac_error_to_string
 _rac_event_category_name
-_rac_event_get_destination
 _rac_event_publish
 _rac_event_subscribe_all
 _rac_event_unsubscribe
+_rac_events_set_telemetry_sink
 _rac_expected_model_files_alloc
 _rac_expected_model_files_free
 _rac_extract_model_archive_native

@@ -21,7 +21,6 @@
 #include <vector>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
@@ -31,6 +30,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "stt_options.pb.h"
 #endif
@@ -494,15 +494,19 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
     rac_stt_proto_quiesce();
 
     // Emit model load started event
+#if defined(RAC_HAVE_PROTOBUF)
     {
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_MODEL_LOAD_STARTED;
-        event.data.llm_model.model_id = model_id;
-        event.data.llm_model.model_name = model_name;
-        event.data.llm_model.framework = component->actual_framework;
-        event.data.llm_model.error_code = RAC_SUCCESS;
-        rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_STARTED, &event);
+        runanywhere::v1::ModelEvent m;
+        m.set_kind(runanywhere::v1::MODEL_EVENT_KIND_LOAD_STARTED);
+        if (model_id)
+            m.set_model_id(model_id);
+        if (model_name)
+            m.set_model_name(model_name);
+        m.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_STT,
+                             runanywhere::v1::EVENT_CATEGORY_MODEL, std::move(m));
     }
+#endif
 
     auto load_start = std::chrono::steady_clock::now();
 
@@ -515,26 +519,25 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
                                 std::chrono::steady_clock::now() - load_start)
                                 .count());
 
-    if (result != RAC_SUCCESS) {
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_MODEL_LOAD_FAILED;
-        event.data.llm_model.model_id = model_id;
-        event.data.llm_model.model_name = model_name;
-        event.data.llm_model.framework = component->actual_framework;
-        event.data.llm_model.duration_ms = load_duration_ms;
-        event.data.llm_model.error_code = result;
-        event.data.llm_model.error_message = "Model load failed";
-        rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_FAILED, &event);
-    } else {
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_MODEL_LOAD_COMPLETED;
-        event.data.llm_model.model_id = model_id;
-        event.data.llm_model.model_name = model_name;
-        event.data.llm_model.framework = component->actual_framework;
-        event.data.llm_model.duration_ms = load_duration_ms;
-        event.data.llm_model.error_code = RAC_SUCCESS;
-        rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_COMPLETED, &event);
+#if defined(RAC_HAVE_PROTOBUF)
+    {
+        runanywhere::v1::ModelEvent m;
+        if (model_id)
+            m.set_model_id(model_id);
+        if (model_name)
+            m.set_model_name(model_name);
+        m.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        m.set_duration_ms(static_cast<int64_t>(load_duration_ms));
+        if (result != RAC_SUCCESS) {
+            m.set_kind(runanywhere::v1::MODEL_EVENT_KIND_LOAD_FAILED);
+            m.set_error("Model load failed");
+        } else {
+            m.set_kind(runanywhere::v1::MODEL_EVENT_KIND_LOAD_COMPLETED);
+        }
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_STT,
+                             runanywhere::v1::EVENT_CATEGORY_MODEL, std::move(m));
     }
+#endif
 
     return result;
 }
@@ -601,15 +604,20 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
             RAC_LOG_ERROR("STT.Component", "No model loaded - cannot transcribe");
 
             // Emit transcription failed event
-            rac_analytics_event_data_t event = {};
-            event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
-            event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-            event.data.stt_transcription.transcription_id = transcription_id.c_str();
-            event.data.stt_transcription.model_id = model_id;
-            event.data.stt_transcription.model_name = model_name;
-            event.data.stt_transcription.error_code = result;
-            event.data.stt_transcription.error_message = "No model loaded";
-            rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
+#if defined(RAC_HAVE_PROTOBUF)
+            {
+                runanywhere::v1::VoiceLifecycleEvent voice;
+                voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED);
+                if (model_id)
+                    voice.set_model_id(model_id);
+                if (model_name)
+                    voice.set_model_name(model_name);
+                voice.set_error("No model loaded");
+                rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                                  runanywhere::v1::EVENT_CATEGORY_STT,
+                                                  std::move(voice), transcription_id.c_str());
+            }
+#endif
 
             return result;
         }
@@ -622,21 +630,26 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     RAC_LOG_INFO("STT.Component", "Transcribing audio");
 
     // Emit transcription started event
+#if defined(RAC_HAVE_PROTOBUF)
     {
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_STARTED;
-        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.audio_length_ms = audio_length_ms;
-        event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
-        event.data.stt_transcription.language = local_options.language;
-        event.data.stt_transcription.is_streaming = RAC_FALSE;
-        event.data.stt_transcription.sample_rate = sample_rate;
-        event.data.stt_transcription.framework = framework;
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_STARTED, &event);
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED);
+        if (model_id)
+            voice.set_model_id(model_id);
+        if (model_name)
+            voice.set_model_name(model_name);
+        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        if (local_options.language)
+            voice.set_language(local_options.language);
+        voice.set_is_streaming(false);
+        voice.set_sample_rate(sample_rate);
+        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          transcription_id.c_str());
     }
+#endif
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -648,15 +661,20 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         rac_lifecycle_track_error(component->lifecycle, result, "transcribe");
 
         // Emit transcription failed event
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
-        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.error_code = result;
-        event.data.stt_transcription.error_message = "Transcription failed";
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
+#if defined(RAC_HAVE_PROTOBUF)
+        {
+            runanywhere::v1::VoiceLifecycleEvent voice;
+            voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED);
+            if (model_id)
+                voice.set_model_id(model_id);
+            if (model_name)
+                voice.set_model_name(model_name);
+            voice.set_error("Transcription failed");
+            rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                              runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                              transcription_id.c_str());
+        }
+#endif
 
         return result;
     }
@@ -678,25 +696,31 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     RAC_LOG_INFO("STT.Component", "Transcription completed");
 
     // Emit transcription completed event
+#if defined(RAC_HAVE_PROTOBUF)
     {
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_COMPLETED;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.text = out_result->text;
-        event.data.stt_transcription.confidence = out_result->confidence;
-        event.data.stt_transcription.duration_ms = duration_ms;
-        event.data.stt_transcription.audio_length_ms = audio_length_ms;
-        event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
-        event.data.stt_transcription.word_count = word_count;
-        event.data.stt_transcription.real_time_factor = real_time_factor;
-        event.data.stt_transcription.language = local_options.language;
-        event.data.stt_transcription.sample_rate = sample_rate;
-        event.data.stt_transcription.framework = framework;
-        event.data.stt_transcription.error_code = RAC_SUCCESS;
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
+        if (model_id)
+            voice.set_model_id(model_id);
+        if (model_name)
+            voice.set_model_name(model_name);
+        if (out_result->text)
+            voice.set_text(out_result->text);
+        voice.set_confidence(out_result->confidence);
+        voice.set_duration_ms(static_cast<int64_t>(duration_ms));
+        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        voice.set_word_count(word_count);
+        voice.set_real_time_factor(real_time_factor);
+        if (local_options.language)
+            voice.set_language(local_options.language);
+        voice.set_sample_rate(sample_rate);
+        voice.set_framework(rac::events::framework_to_proto_int(framework));
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          transcription_id.c_str());
     }
+#endif
 
     return RAC_SUCCESS;
 }
@@ -773,21 +797,26 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     std::string transcription_id = generate_unique_id();
 
     // Emit STT_TRANSCRIPTION_STARTED event with is_streaming = RAC_TRUE
+#if defined(RAC_HAVE_PROTOBUF)
     {
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_STARTED;
-        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.audio_length_ms = audio_length_ms;
-        event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
-        event.data.stt_transcription.language = effective_options->language;
-        event.data.stt_transcription.is_streaming = RAC_TRUE;  // Streaming mode!
-        event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework = component->actual_framework;
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_STARTED, &event);
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED);
+        if (model_id)
+            voice.set_model_id(model_id);
+        if (model_name)
+            voice.set_model_name(model_name);
+        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        if (effective_options->language)
+            voice.set_language(effective_options->language);
+        voice.set_is_streaming(true);  // Streaming mode!
+        voice.set_sample_rate(component->config.sample_rate);
+        voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          transcription_id.c_str());
     }
+#endif
 
     auto start_time = std::chrono::steady_clock::now();
 
@@ -803,16 +832,22 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         rac_lifecycle_track_error(component->lifecycle, result, "transcribeStream");
 
         // Emit STT_TRANSCRIPTION_FAILED event
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
-        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.is_streaming = RAC_TRUE;
-        event.data.stt_transcription.duration_ms = duration_ms;
-        event.data.stt_transcription.error_code = result;
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
+#if defined(RAC_HAVE_PROTOBUF)
+        {
+            runanywhere::v1::VoiceLifecycleEvent voice;
+            voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED);
+            if (model_id)
+                voice.set_model_id(model_id);
+            if (model_name)
+                voice.set_model_name(model_name);
+            voice.set_is_streaming(true);
+            voice.set_duration_ms(static_cast<int64_t>(duration_ms));
+            voice.set_error(rac_error_message(result));
+            rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                              runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                              transcription_id.c_str());
+        }
+#endif
     } else {
         // Emit STT_TRANSCRIPTION_COMPLETED event with is_streaming = RAC_TRUE
         // Note: For streaming, we don't have final consolidated text, so word_count is not
@@ -820,23 +855,27 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         double real_time_factor =
             (audio_length_ms > 0 && duration_ms > 0) ? (audio_length_ms / duration_ms) : 0.0;
 
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_COMPLETED;
-        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.audio_length_ms = audio_length_ms;
-        event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
-        event.data.stt_transcription.language = effective_options->language;
-        event.data.stt_transcription.is_streaming = RAC_TRUE;  // Streaming mode!
-        event.data.stt_transcription.duration_ms = duration_ms;
-        event.data.stt_transcription.real_time_factor = real_time_factor;
+#if defined(RAC_HAVE_PROTOBUF)
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
+        if (model_id)
+            voice.set_model_id(model_id);
+        if (model_name)
+            voice.set_model_name(model_name);
+        voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
+        voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
+        if (effective_options->language)
+            voice.set_language(effective_options->language);
+        voice.set_is_streaming(true);  // Streaming mode!
+        voice.set_duration_ms(static_cast<int64_t>(duration_ms));
+        voice.set_real_time_factor(real_time_factor);
         // word_count not available for streaming - text is delivered via callbacks
-        event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework = component->actual_framework;
-        event.data.stt_transcription.error_code = RAC_SUCCESS;
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
+        voice.set_sample_rate(component->config.sample_rate);
+        voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          transcription_id.c_str());
+#endif
     }
 
     return result;

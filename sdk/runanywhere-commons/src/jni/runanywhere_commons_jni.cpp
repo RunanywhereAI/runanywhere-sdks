@@ -57,7 +57,6 @@
 
 // Include runanywhere-commons C API headers
 #include "../infrastructure/http/rac_http_internal.h"
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -102,6 +101,7 @@
 #include "rac/features/llm/rac_llm_schema_to_json.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
+#include "rac/infrastructure/events/rac_sdk_emit.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/lifecycle/rac_sdk_init.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
@@ -2400,59 +2400,77 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTelemetryManagerFlus
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Analytics Events (rac_analytics_events.h)
+// JNI FUNCTIONS - Telemetry sink + SDK event emission (canonical proto stream)
 // =============================================================================
+//
+// The legacy struct-based analytics callback was removed. Telemetry is now fed
+// by the C++ destination router: the SDK registers the telemetry manager once
+// via rac_events_set_telemetry_sink and every event whose destination includes
+// the TELEMETRY bit is forwarded automatically. The racAnalyticsEventEmit*
+// bridges below build the canonical runanywhere.v1 proto payloads (mirrored
+// from the legacy event-type ints supplied by Kotlin) and publish them through
+// the same rac::events::emit_* helpers used by the C++ component layer.
 
-// Global telemetry manager pointer for analytics callback routing
-// The C callback routes events directly to the telemetry manager (same as Swift)
-static rac_telemetry_manager_t* g_analytics_telemetry_manager = nullptr;
-static std::mutex g_analytics_telemetry_mutex;
+// Legacy event-type int constants (the values Kotlin still passes as eventType).
+// Kept here as the JNI<->Kotlin wire contract; the C++ side no longer carries a
+// rac_event_type_t enum.
+namespace {
+constexpr jint kEvtLlmModelLoadStarted = 100;
+constexpr jint kEvtLlmModelLoadCompleted = 101;
+constexpr jint kEvtLlmModelLoadFailed = 102;
+constexpr jint kEvtLlmModelUnloaded = 103;
+constexpr jint kEvtLlmGenerationStarted = 110;
+constexpr jint kEvtLlmGenerationCompleted = 111;
+constexpr jint kEvtLlmGenerationFailed = 112;
+constexpr jint kEvtLlmFirstToken = 113;
+constexpr jint kEvtLlmStreamingUpdate = 114;
 
-// C callback that routes analytics events to telemetry manager
-// This mirrors Swift's analyticsEventCallback -> Telemetry.trackAnalyticsEvent()
-static void jni_analytics_event_callback(rac_event_type_t type,
-                                         const rac_analytics_event_data_t* data, void* user_data) {
-    LOGi("jni_analytics_event_callback called: event_type=%d", type);
+constexpr jint kEvtSttModelLoadCompleted = 201;
+constexpr jint kEvtSttModelLoadFailed = 202;
+constexpr jint kEvtSttTranscriptionStarted = 210;
+constexpr jint kEvtSttTranscriptionCompleted = 211;
+constexpr jint kEvtSttTranscriptionFailed = 212;
 
-    std::lock_guard<std::mutex> lock(g_analytics_telemetry_mutex);
-    if (g_analytics_telemetry_manager && data) {
-        LOGi("jni_analytics_event_callback: routing to telemetry manager");
-        rac_telemetry_manager_track_analytics(g_analytics_telemetry_manager, type, data);
-    } else {
-        LOGw("jni_analytics_event_callback: manager=%p, data=%p",
-             (void*)g_analytics_telemetry_manager, (void*)data);
-    }
-}
+constexpr jint kEvtTtsVoiceLoadCompleted = 301;
+constexpr jint kEvtTtsVoiceLoadFailed = 302;
+constexpr jint kEvtTtsSynthesisStarted = 310;
+constexpr jint kEvtTtsSynthesisCompleted = 311;
+constexpr jint kEvtTtsSynthesisFailed = 312;
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventsSetCallback(
+constexpr jint kEvtVadSpeechStarted = 402;
+constexpr jint kEvtVadSpeechEnded = 403;
+
+constexpr jint kEvtModelDownloadStarted = 700;
+constexpr jint kEvtModelDownloadProgress = 701;
+constexpr jint kEvtModelDownloadCompleted = 702;
+constexpr jint kEvtModelDownloadFailed = 703;
+constexpr jint kEvtModelDownloadCancelled = 704;
+constexpr jint kEvtModelExtractionStarted = 710;
+constexpr jint kEvtModelExtractionProgress = 711;
+constexpr jint kEvtModelExtractionCompleted = 712;
+constexpr jint kEvtModelExtractionFailed = 713;
+constexpr jint kEvtModelDeleted = 720;
+
+constexpr jint kEvtSdkInitStarted = 600;
+constexpr jint kEvtSdkInitCompleted = 601;
+constexpr jint kEvtSdkInitFailed = 602;
+constexpr jint kEvtSdkModelsLoaded = 603;
+}  // namespace
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEventsSetTelemetrySink(
     JNIEnv* env, jclass clazz, jlong telemetryHandle) {
-    LOGi("racAnalyticsEventsSetCallback called (telemetryHandle=%lld)", (long long)telemetryHandle);
-
-    std::lock_guard<std::mutex> lock(g_analytics_telemetry_mutex);
-
-    if (telemetryHandle != 0) {
-        // Store telemetry manager and register C callback
-        g_analytics_telemetry_manager = reinterpret_cast<rac_telemetry_manager_t*>(telemetryHandle);
-        rac_result_t result =
-            rac_analytics_events_set_callback(jni_analytics_event_callback, nullptr);
-        LOGi("Analytics callback registered, result=%d", result);
-        return static_cast<jint>(result);
-    } else {
-        // Unregister callback
-        g_analytics_telemetry_manager = nullptr;
-        rac_result_t result = rac_analytics_events_set_callback(nullptr, nullptr);
-        LOGi("Analytics callback unregistered, result=%d", result);
-        return static_cast<jint>(result);
-    }
+    LOGi("racEventsSetTelemetrySink called (telemetryHandle=%lld)", (long long)telemetryHandle);
+    rac_events_set_telemetry_sink(reinterpret_cast<void*>(telemetryHandle));
 }
 
 // =============================================================================
-// JNI FUNCTIONS - Analytics Event Emission
+// JNI FUNCTIONS - SDK Event Emission (Kotlin-originated)
 // =============================================================================
-// These functions allow Kotlin to emit analytics events (e.g., SDK lifecycle events
-// that originate from Kotlin code). They call rac_analytics_event_emit() which
-// routes events through the registered callback to the telemetry manager.
+// These functions let Kotlin emit SDK events (e.g. lifecycle/model/download
+// events originating from Kotlin). They build the canonical proto payload and
+// publish it via rac::events::emit_*, so they reach telemetry through the same
+// destination router as C++ component events.
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitDownload(
@@ -2464,20 +2482,46 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitDo
     std::string errorMsgStorage;
     const char* archiveTypePtr = getNullableCString(env, archiveType, archiveTypeStorage);
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
+    const char* modelIdPtr = modelIdStr.c_str();
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.model_download.model_id = modelIdStr.c_str();
-    event_data.data.model_download.progress = progress;
-    event_data.data.model_download.bytes_downloaded = bytesDownloaded;
-    event_data.data.model_download.total_bytes = totalBytes;
-    event_data.data.model_download.duration_ms = durationMs;
-    event_data.data.model_download.size_bytes = sizeBytes;
-    event_data.data.model_download.archive_type = archiveTypePtr;
-    event_data.data.model_download.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.model_download.error_message = errorMsgPtr;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    switch (eventType) {
+        case kEvtModelDownloadStarted:
+            rac::events::emit_model_download_started(modelIdPtr, totalBytes, archiveTypePtr);
+            break;
+        case kEvtModelDownloadProgress:
+            rac::events::emit_model_download_progress(modelIdPtr, progress, bytesDownloaded,
+                                                      totalBytes);
+            break;
+        case kEvtModelDownloadCompleted:
+            rac::events::emit_model_download_completed(modelIdPtr, sizeBytes, durationMs,
+                                                       archiveTypePtr);
+            break;
+        case kEvtModelDownloadFailed:
+            rac::events::emit_model_download_failed(modelIdPtr, static_cast<rac_result_t>(errorCode),
+                                                    errorMsgPtr);
+            break;
+        case kEvtModelDownloadCancelled:
+            rac::events::emit_model_download_cancelled(modelIdPtr);
+            break;
+        case kEvtModelExtractionStarted:
+            rac::events::emit_model_extraction_started(modelIdPtr, archiveTypePtr);
+            break;
+        case kEvtModelExtractionProgress:
+            rac::events::emit_model_extraction_progress(modelIdPtr, progress);
+            break;
+        case kEvtModelExtractionCompleted:
+            rac::events::emit_model_extraction_completed(modelIdPtr, sizeBytes, durationMs);
+            break;
+        case kEvtModelExtractionFailed:
+            rac::events::emit_model_extraction_failed(
+                modelIdPtr, static_cast<rac_result_t>(errorCode), errorMsgPtr);
+            break;
+        case kEvtModelDeleted:
+            rac::events::emit_model_deleted(modelIdPtr, sizeBytes);
+            break;
+        default:
+            break;
+    }
     return RAC_SUCCESS;
 }
 
@@ -2488,14 +2532,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSd
     std::string errorMsgStorage;
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.sdk_lifecycle.duration_ms = durationMs;
-    event_data.data.sdk_lifecycle.count = count;
-    event_data.data.sdk_lifecycle.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.sdk_lifecycle.error_message = errorMsgPtr;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    switch (eventType) {
+        case kEvtSdkInitStarted:
+            rac::events::emit_sdk_init_started();
+            break;
+        case kEvtSdkInitCompleted:
+            rac::events::emit_sdk_init_completed(durationMs);
+            break;
+        case kEvtSdkInitFailed:
+            rac::events::emit_sdk_init_failed(static_cast<rac_result_t>(errorCode), errorMsgPtr);
+            break;
+        case kEvtSdkModelsLoaded:
+            rac::events::emit_sdk_models_loaded(count, durationMs);
+            break;
+        default:
+            break;
+    }
     return RAC_SUCCESS;
 }
 
@@ -2506,13 +2558,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSt
     std::string errorMsgStorage;
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.storage.freed_bytes = freedBytes;
-    event_data.data.storage.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.storage.error_message = errorMsgPtr;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    // 800 = cache cleared, 801 = cache clear failed, 802 = temp cleaned.
+    switch (eventType) {
+        case 800:
+            rac::events::emit_storage_cache_cleared(freedBytes);
+            break;
+        case 801:
+            rac::events::emit_storage_cache_clear_failed(static_cast<rac_result_t>(errorCode),
+                                                         errorMsgPtr);
+            break;
+        case 802:
+            rac::events::emit_storage_temp_cleaned(freedBytes);
+            break;
+        default:
+            break;
+    }
     return RAC_SUCCESS;
 }
 
@@ -2524,13 +2584,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitDe
     std::string errorMsgStorage;
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.device.device_id = deviceIdStr.c_str();
-    event_data.data.device.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.device.error_message = errorMsgPtr;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    // 900 = device registered, 901 = device registration failed.
+    if (eventType == 901) {
+        rac::events::emit_device_registration_failed(static_cast<rac_result_t>(errorCode),
+                                                     errorMsgPtr);
+    } else {
+        rac::events::emit_device_registered(deviceIdStr.c_str());
+    }
     return RAC_SUCCESS;
 }
 
@@ -2538,30 +2598,23 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSdkError(
     JNIEnv* env, jclass clazz, jint eventType, jint errorCode, jstring errorMessage,
     jstring operation, jstring context) {
+    (void)eventType;
     std::string errorMsgStorage, opStorage, ctxStorage;
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
     const char* opPtr = getNullableCString(env, operation, opStorage);
     const char* ctxPtr = getNullableCString(env, context, ctxStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.sdk_error.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.sdk_error.error_message = errorMsgPtr;
-    event_data.data.sdk_error.operation = opPtr;
-    event_data.data.sdk_error.context = ctxPtr;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    rac::events::emit_sdk_error(static_cast<rac_result_t>(errorCode), errorMsgPtr, opPtr, ctxPtr);
     return RAC_SUCCESS;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitNetwork(
     JNIEnv* env, jclass clazz, jint eventType, jboolean isOnline) {
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.network.is_online = isOnline ? RAC_TRUE : RAC_FALSE;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    (void)env;
+    (void)clazz;
+    (void)eventType;
+    rac::events::emit_network_connectivity_changed(isOnline == JNI_TRUE);
     return RAC_SUCCESS;
 }
 
@@ -2578,25 +2631,37 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitLl
     const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.llm_generation.generation_id = genIdStr.c_str();
-    event_data.data.llm_generation.model_id = modelIdStr.c_str();
-    event_data.data.llm_generation.model_name = modelNamePtr;
-    event_data.data.llm_generation.input_tokens = inputTokens;
-    event_data.data.llm_generation.output_tokens = outputTokens;
-    event_data.data.llm_generation.duration_ms = durationMs;
-    event_data.data.llm_generation.tokens_per_second = tokensPerSecond;
-    event_data.data.llm_generation.is_streaming = isStreaming ? RAC_TRUE : RAC_FALSE;
-    event_data.data.llm_generation.time_to_first_token_ms = timeToFirstTokenMs;
-    event_data.data.llm_generation.framework = static_cast<rac_inference_framework_t>(framework);
-    event_data.data.llm_generation.temperature = temperature;
-    event_data.data.llm_generation.max_tokens = maxTokens;
-    event_data.data.llm_generation.context_length = contextLength;
-    event_data.data.llm_generation.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.llm_generation.error_message = errorMsgPtr;
+    const char* genIdPtr = genIdStr.c_str();
+    const char* modelIdPtr = modelIdStr.c_str();
+    const auto fw = static_cast<rac_inference_framework_t>(framework);
 
-    rac_analytics_event_emit(event_data.type, &event_data);
+    switch (eventType) {
+        case kEvtLlmGenerationStarted:
+            rac::events::emit_llm_generation_started(genIdPtr, modelIdPtr,
+                                                     isStreaming == JNI_TRUE, fw, temperature,
+                                                     maxTokens, contextLength);
+            break;
+        case kEvtLlmGenerationCompleted:
+            rac::events::emit_llm_generation_completed(
+                genIdPtr, modelIdPtr, inputTokens, outputTokens, durationMs, tokensPerSecond,
+                isStreaming == JNI_TRUE, timeToFirstTokenMs, fw, temperature, maxTokens,
+                contextLength);
+            break;
+        case kEvtLlmGenerationFailed:
+            rac::events::emit_llm_generation_failed(genIdPtr, modelIdPtr,
+                                                    static_cast<rac_result_t>(errorCode),
+                                                    errorMsgPtr);
+            break;
+        case kEvtLlmFirstToken:
+            rac::events::emit_llm_first_token(genIdPtr, modelIdPtr, timeToFirstTokenMs, fw);
+            break;
+        case kEvtLlmStreamingUpdate:
+            rac::events::emit_llm_streaming_update(genIdPtr, outputTokens);
+            break;
+        default:
+            break;
+    }
+    (void)modelNamePtr;
     return RAC_SUCCESS;
 }
 
@@ -2611,17 +2676,28 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitLl
     const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.llm_model.model_id = modelIdStr.c_str();
-    event_data.data.llm_model.model_name = modelNamePtr;
-    event_data.data.llm_model.model_size_bytes = modelSizeBytes;
-    event_data.data.llm_model.duration_ms = durationMs;
-    event_data.data.llm_model.framework = static_cast<rac_inference_framework_t>(framework);
-    event_data.data.llm_model.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.llm_model.error_message = errorMsgPtr;
+    (void)modelSizeBytes;  // load events carry duration/framework; size is download-only
+    const char* modelIdPtr = modelIdStr.c_str();
+    const auto fw = static_cast<rac_inference_framework_t>(framework);
 
-    rac_analytics_event_emit(event_data.type, &event_data);
+    switch (eventType) {
+        case kEvtLlmModelLoadCompleted:
+            rac::events::emit_llm_model_load_completed(modelIdPtr, modelNamePtr, durationMs, fw);
+            break;
+        case kEvtLlmModelLoadFailed:
+            rac::events::emit_llm_model_load_failed(modelIdPtr, modelNamePtr, durationMs, fw,
+                                                    static_cast<rac_result_t>(errorCode),
+                                                    errorMsgPtr);
+            break;
+        case kEvtLlmModelUnloaded:
+            rac::events::emit_llm_model_unloaded(modelIdPtr);
+            break;
+        case kEvtLlmModelLoadStarted:
+        default:
+            // LOAD_STARTED has no telemetry payload of interest; skip to match the
+            // component-side behavior (started carries no metrics).
+            break;
+    }
     return RAC_SUCCESS;
 }
 
@@ -2639,26 +2715,30 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitSt
     const char* langPtr = getNullableCString(env, language, langStorage);
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.stt_transcription.transcription_id = transIdStr.c_str();
-    event_data.data.stt_transcription.model_id = modelIdStr.c_str();
-    event_data.data.stt_transcription.model_name = modelNamePtr;
-    event_data.data.stt_transcription.text = textPtr;
-    event_data.data.stt_transcription.confidence = confidence;
-    event_data.data.stt_transcription.duration_ms = durationMs;
-    event_data.data.stt_transcription.audio_length_ms = audioLengthMs;
-    event_data.data.stt_transcription.audio_size_bytes = audioSizeBytes;
-    event_data.data.stt_transcription.word_count = wordCount;
-    event_data.data.stt_transcription.real_time_factor = realTimeFactor;
-    event_data.data.stt_transcription.language = langPtr;
-    event_data.data.stt_transcription.sample_rate = sampleRate;
-    event_data.data.stt_transcription.is_streaming = isStreaming ? RAC_TRUE : RAC_FALSE;
-    event_data.data.stt_transcription.framework = static_cast<rac_inference_framework_t>(framework);
-    event_data.data.stt_transcription.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.stt_transcription.error_message = errorMsgPtr;
+    const char* transIdPtr = transIdStr.c_str();
+    const char* modelIdPtr = modelIdStr.c_str();
+    (void)modelNamePtr;
+    const auto fw = static_cast<rac_inference_framework_t>(framework);
 
-    rac_analytics_event_emit(event_data.type, &event_data);
+    switch (eventType) {
+        case kEvtSttTranscriptionStarted:
+            rac::events::emit_stt_transcription_started(transIdPtr, modelIdPtr, audioLengthMs,
+                                                        audioSizeBytes, langPtr,
+                                                        isStreaming == JNI_TRUE, sampleRate, fw);
+            break;
+        case kEvtSttTranscriptionCompleted:
+            rac::events::emit_stt_transcription_completed(
+                transIdPtr, modelIdPtr, textPtr, confidence, durationMs, audioLengthMs,
+                audioSizeBytes, wordCount, realTimeFactor, langPtr, sampleRate, fw);
+            break;
+        case kEvtSttTranscriptionFailed:
+            rac::events::emit_stt_transcription_failed(transIdPtr, modelIdPtr,
+                                                       static_cast<rac_result_t>(errorCode),
+                                                       errorMsgPtr);
+            break;
+        default:
+            break;
+    }
     return RAC_SUCCESS;
 }
 
@@ -2674,34 +2754,42 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitTt
     const char* modelNamePtr = getNullableCString(env, modelName, modelNameStorage);
     const char* errorMsgPtr = getNullableCString(env, errorMessage, errorMsgStorage);
 
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.tts_synthesis.synthesis_id = synthIdStr.c_str();
-    event_data.data.tts_synthesis.model_id = modelIdStr.c_str();
-    event_data.data.tts_synthesis.model_name = modelNamePtr;
-    event_data.data.tts_synthesis.character_count = characterCount;
-    event_data.data.tts_synthesis.audio_duration_ms = audioDurationMs;
-    event_data.data.tts_synthesis.audio_size_bytes = audioSizeBytes;
-    event_data.data.tts_synthesis.processing_duration_ms = processingDurationMs;
-    event_data.data.tts_synthesis.characters_per_second = charactersPerSecond;
-    event_data.data.tts_synthesis.sample_rate = sampleRate;
-    event_data.data.tts_synthesis.framework = static_cast<rac_inference_framework_t>(framework);
-    event_data.data.tts_synthesis.error_code = static_cast<rac_result_t>(errorCode);
-    event_data.data.tts_synthesis.error_message = errorMsgPtr;
+    const char* synthIdPtr = synthIdStr.c_str();
+    const char* modelIdPtr = modelIdStr.c_str();
+    (void)modelNamePtr;
+    const auto fw = static_cast<rac_inference_framework_t>(framework);
 
-    rac_analytics_event_emit(event_data.type, &event_data);
+    switch (eventType) {
+        case kEvtTtsSynthesisStarted:
+            rac::events::emit_tts_synthesis_started(synthIdPtr, modelIdPtr, characterCount,
+                                                    sampleRate, fw);
+            break;
+        case kEvtTtsSynthesisCompleted:
+            rac::events::emit_tts_synthesis_completed(
+                synthIdPtr, modelIdPtr, characterCount, audioDurationMs, audioSizeBytes,
+                processingDurationMs, charactersPerSecond, sampleRate, fw);
+            break;
+        case kEvtTtsSynthesisFailed:
+            rac::events::emit_tts_synthesis_failed(synthIdPtr, modelIdPtr,
+                                                   static_cast<rac_result_t>(errorCode),
+                                                   errorMsgPtr);
+            break;
+        default:
+            break;
+    }
     return RAC_SUCCESS;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAnalyticsEventEmitVad(
     JNIEnv* env, jclass clazz, jint eventType, jdouble speechDurationMs, jfloat energyLevel) {
-    rac_analytics_event_data_t event_data = {};
-    event_data.type = static_cast<rac_event_type_t>(eventType);
-    event_data.data.vad.speech_duration_ms = speechDurationMs;
-    event_data.data.vad.energy_level = energyLevel;
-
-    rac_analytics_event_emit(event_data.type, &event_data);
+    (void)env;
+    (void)clazz;
+    if (eventType == kEvtVadSpeechStarted) {
+        rac::events::emit_vad_speech_started(energyLevel);
+    } else if (eventType == kEvtVadSpeechEnded) {
+        rac::events::emit_vad_speech_ended(speechDurationMs, energyLevel);
+    }
     return RAC_SUCCESS;
 }
 

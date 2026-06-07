@@ -6,7 +6,7 @@
  * Business logic (caching, JSON parsing, registry saving) is in C++.
  * Platform SDKs provide HTTP GET callback for network transport.
  *
- * Events are emitted via rac_analytics_event_emit().
+ * Events are emitted as canonical proto SDKEvents via rac::events::publish_*.
  */
 
 #ifndef RAC_MODEL_ASSIGNMENT_H

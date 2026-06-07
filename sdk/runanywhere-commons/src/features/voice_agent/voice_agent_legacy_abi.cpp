@@ -47,7 +47,6 @@
 #include <new>
 #include <thread>
 
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -63,6 +62,7 @@
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/events/rac_voice_agent_state.h"
 #include "voice_agent_pipeline.hpp"
 
 namespace {
@@ -99,16 +99,9 @@ void publish_initialize_with_loaded_models_failure(rac_voice_agent_handle_t hand
 
 }  // namespace
 
-// Forward declare event helpers from events.cpp
-namespace rac::events {
-void emit_voice_agent_stt_state_changed(rac_voice_agent_component_state_t state,
-                                        const char* model_id, const char* error_message);
-void emit_voice_agent_llm_state_changed(rac_voice_agent_component_state_t state,
-                                        const char* model_id, const char* error_message);
-void emit_voice_agent_tts_state_changed(rac_voice_agent_component_state_t state,
-                                        const char* model_id, const char* error_message);
-void emit_voice_agent_all_ready();
-}  // namespace rac::events
+// rac::events::emit_voice_agent_* are declared in
+// rac/infrastructure/events/rac_voice_agent_state.h and implemented in
+// core/events.cpp (canonical proto SDKEvent emission).
 
 // =============================================================================
 // MODEL LOADING API

@@ -889,17 +889,17 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_telemetry_manager_set_device_info"
     "_rac_telemetry_manager_set_http_callback"
     "_rac_telemetry_manager_track"
-    "_rac_telemetry_manager_track_analytics"
+    "_rac_telemetry_manager_track_proto"
     "_rac_telemetry_manager_http_complete"
     "_rac_telemetry_manager_flush"
     "_rac_telemetry_payload_default"
     "_rac_telemetry_payload_free"
 
-    # Analytics Events
-    "_rac_analytics_events_set_callback"
-    "_rac_analytics_events_has_callback"
+    # Event destination router — telemetry sink registration
+    "_rac_events_set_telemetry_sink"
 
-    # Platform Emit Helpers (called from TypeScript via ccall for STT/TTS/VAD/download events)
+    # Platform Emit Helpers (called from TypeScript via ccall for STT/TTS/VAD/download events).
+    # These now build canonical proto SDKEvents and publish through the destination router.
     "_rac_analytics_emit_stt_model_load_completed"
     "_rac_analytics_emit_stt_model_load_failed"
     "_rac_analytics_emit_stt_transcription_completed"

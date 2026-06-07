@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -42,6 +41,7 @@
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "vad_options.pb.h"
 #include "voice_events.pb.h"
@@ -302,17 +302,21 @@ static void vad_speech_activity_callback(rac_speech_activity_event_t event, void
     if (!component)
         return;
 
-    // Emit analytics event for speech activity
-    rac_analytics_event_data_t event_data;
-    event_data.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
-
-    if (event == RAC_SPEECH_ACTIVITY_STARTED) {
-        // Emit VAD_SPEECH_STARTED event
-        rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_STARTED, &event_data);
-    } else {
-        // Emit VAD_SPEECH_ENDED event
-        rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_ENDED, &event_data);
+    // Emit telemetry-only voice-lifecycle event for speech activity.
+#if defined(RAC_HAVE_PROTOBUF)
+    {
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(event == RAC_SPEECH_ACTIVITY_STARTED
+                           ? runanywhere::v1::VOICE_EVENT_KIND_SPEECH_STARTED
+                           : runanywhere::v1::VOICE_EVENT_KIND_SPEECH_ENDED);
+        // SPEECH_ENDED telemetry reads speech_duration_ms (= duration_ms); the
+        // legacy call site passed the default (0) here, preserved exactly.
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_VAD,
+                                          runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice),
+                                          /*session_id=*/nullptr,
+                                          rac::events::legacy_destination_telemetry());
     }
+#endif
 
     // Route to user callback
     if (component->activity_callback) {
@@ -584,10 +588,12 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     rac_result_t result = rac_energy_vad_start(component->vad_service);
 
     if (result == RAC_SUCCESS) {
-        // Emit VAD_STARTED event
-        rac_analytics_event_data_t event_data;
-        event_data.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
-        rac_analytics_event_emit(RAC_EVENT_VAD_STARTED, &event_data);
+#if defined(RAC_HAVE_PROTOBUF)
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+#endif
     }
 
     return result;
@@ -607,10 +613,12 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
     rac_result_t result = rac_energy_vad_stop(component->vad_service);
 
     if (result == RAC_SUCCESS) {
-        // Emit VAD_STOPPED event
-        rac_analytics_event_data_t event_data;
-        event_data.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
-        rac_analytics_event_emit(RAC_EVENT_VAD_STOPPED, &event_data);
+#if defined(RAC_HAVE_PROTOBUF)
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+#endif
     }
 
     return result;
