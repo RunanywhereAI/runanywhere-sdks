@@ -383,15 +383,9 @@ abstract final class RunAnywhere {
     // Step 4: Model registry.
     await DartBridgeModelRegistry.instance.initialize();
 
-    // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
-    // INITIALIZATION_STAGE_COMPLETED SDKEvent from the C++ init path
-    // (`event_publisher.cpp:544`), so Dart does not re-emit duplicates.
-    unawaited(
-      DartBridgeTelemetry.instance.emitSDKInitialized(
-        durationMs: 0,
-        environment: params.environment.name,
-      ),
-    );
+    // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent from the
+    // C++ init path (`event_publisher.cpp:544`) and the destination router
+    // forwards it to the registered telemetry sink, so Dart does not emit it.
 
     // Step 5: Background services — device registration + auth. Failures
     // here are non-critical (offline inference still works), so they are

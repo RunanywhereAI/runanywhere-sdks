@@ -134,15 +134,17 @@ object CppBridgeTelemetry {
                 }
             RunAnywhereBridge.racTelemetryManagerSetHttpCallback(telemetryManagerHandle, httpCallback)
 
-            // Register the analytics-events callback so C++ routes TELEMETRY_ONLY
-            // and ALL events into this manager for batching + HTTP transport.
-            // Mirrors Swift's `rac_analytics_events_set_callback(...)` wired in
-            // `CppBridge.Events.register()`. Pass `0` to unregister.
-            val analyticsRc = RunAnywhereBridge.racAnalyticsEventsSetCallback(telemetryManagerHandle)
-            if (analyticsRc != 0) {
+            // Attach this manager as the C++ event router's telemetry sink so
+            // the router (`rac::events::route`) feeds every TELEMETRY-bit event
+            // into it for batching + HTTP transport. The router does the
+            // per-event translation internally — no analytics callback needed.
+            // Mirrors Swift's `rac_events_set_telemetry_sink(...)` wired in
+            // `CppBridge.Events.register()`. Pass `0` to detach.
+            val sinkRc = RunAnywhereBridge.racEventsSetTelemetrySink(telemetryManagerHandle)
+            if (sinkRc != 0) {
                 log(
                     CppBridgePlatformAdapter.LogLevel.WARN,
-                    "Failed to register analytics events callback (rc=$analyticsRc)",
+                    "Failed to register telemetry sink (rc=$sinkRc)",
                 )
             }
 
@@ -173,10 +175,10 @@ object CppBridgeTelemetry {
         synchronized(lock) {
             if (!isRegistered) return
             if (telemetryManagerHandle != 0L) {
-                // Detach the analytics-events callback first so no further C++
-                // events get routed into a manager we are about to destroy.
+                // Detach the telemetry sink first so the C++ router stops
+                // feeding events into a manager we are about to destroy.
                 try {
-                    RunAnywhereBridge.racAnalyticsEventsSetCallback(0L)
+                    RunAnywhereBridge.racEventsSetTelemetrySink(0L)
                 } catch (_: Throwable) {
                     // Best-effort; native lib may already be unloaded.
                 }

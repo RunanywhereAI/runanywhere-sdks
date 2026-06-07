@@ -30,45 +30,42 @@ extension CppBridge {
 
         private static var isRegistered = false
 
-        /// Register C++ event callbacks
-        /// Only analytics callback is needed - for telemetry HTTP transport
+        /// Register the C++ telemetry sink.
+        ///
+        /// The C++ destination-bitmask router (`rac::events::route`) now drives
+        /// telemetry internally: it calls `rac_telemetry_manager_track_proto`
+        /// for every event whose destination carries the TELEMETRY bit. Swift
+        /// only has to attach the telemetry manager once as the sink — there is
+        /// no per-event analytics callback to translate anymore.
         static func register() {
             guard !isRegistered else { return }
 
-            // Register analytics callback (receives TELEMETRY_ONLY and ALL events)
-            // This forwards to C++ telemetry manager which builds JSON and calls HTTP callback
-            let result = rac_analytics_events_set_callback(analyticsEventCallback, nil)
-            if result != RAC_SUCCESS {
-                SDKLogger(category: "CppBridge.Events").warning("Failed to register analytics callback")
+            guard let mgr = CppBridge.Telemetry.handle else {
+                SDKLogger(category: "CppBridge.Events").warning(
+                    "Telemetry manager not initialized; skipping telemetry sink registration"
+                )
+                return
             }
+
+            // Attach the telemetry manager as the router's telemetry sink.
+            // `rac_events_set_telemetry_sink` takes the manager as an opaque
+            // `void*` (NULL to detach) and returns void.
+            rac_events_set_telemetry_sink(UnsafeMutableRawPointer(mgr.ptr))
 
             // Note: Public events are handled directly by app developers via C++ callbacks
             // No Swift EventPublisher layer needed
 
             isRegistered = true
-            SDKLogger(category: "CppBridge.Events").debug("Registered C++ event callbacks")
+            SDKLogger(category: "CppBridge.Events").debug("Registered C++ telemetry sink")
         }
 
-        /// Unregister C++ event callbacks
+        /// Detach the C++ telemetry sink.
         static func unregister() {
             guard isRegistered else { return }
-            _ = rac_analytics_events_set_callback(nil, nil)
+            rac_events_set_telemetry_sink(nil)
             isRegistered = false
         }
     }
-}
-
-/// Analytics callback - handles telemetry (C++ routes TELEMETRY_ONLY and ALL here)
-private func analyticsEventCallback(
-    type: rac_event_type_t,
-    data: UnsafePointer<rac_analytics_event_data_t>?,
-    userData _: UnsafeMutableRawPointer?
-) {
-    guard let data = data else {
-        return
-    }
-    // Forward to telemetry manager (C++ builds JSON, calls HTTP callback)
-    CppBridge.Telemetry.trackAnalyticsEvent(type: type, data: data)
 }
 
 // MARK: - Telemetry Bridge
@@ -137,13 +134,12 @@ extension CppBridge {
             }
         }
 
-        /// Track analytics event from C++
-        static func trackAnalyticsEvent(
-            type: rac_event_type_t,
-            data: UnsafePointer<rac_analytics_event_data_t>
-        ) {
-            guard let mgr = manager.withLock({ $0 }) else { return }
-            rac_telemetry_manager_track_analytics(mgr.ptr, type, data)
+        /// The live telemetry-manager handle, if initialized.
+        ///
+        /// Exposed so `CppBridge.Events.register()` can attach it to the C++
+        /// router as the telemetry sink (`rac_events_set_telemetry_sink`).
+        static var handle: ManagerHandle? {
+            manager.withLock { $0 }
         }
 
         /// Flush pending events

@@ -110,11 +110,14 @@ public enum CppBridge {
         // In development: C++ stderr ON for debugging
         rac_configure_logging(environment.cEnvironment)
 
-        // Step 2: Events callback (for analytics routing)
-        Events.register()
-
-        // Step 3: Telemetry manager (builds JSON, calls HTTP callback)
+        // Step 2: Telemetry manager (builds JSON, calls HTTP callback).
+        // Must come before Events.register(): the events bridge attaches this
+        // manager to the C++ router as the telemetry sink, so the manager has
+        // to exist first.
         Telemetry.initialize(environment: environment)
+
+        // Step 3: Attach the telemetry manager as the C++ router's telemetry sink.
+        Events.register()
 
         // Step 4: Device registration callbacks
         Device.register()
@@ -188,8 +191,10 @@ public enum CppBridge {
         // Shutdown in reverse order
         // Note: ModelAssignment and Platform callbacks remain valid (static)
 
-        Telemetry.shutdown()
+        // Detach the router's telemetry sink BEFORE destroying the manager so
+        // the C++ router never holds a dangling manager pointer.
         Events.unregister()
+        Telemetry.shutdown()
         // PlatformAdapter callbacks remain valid (static)
         // Device callbacks remain valid (static)
 

@@ -574,19 +574,23 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTelemetryManagerFlush(handle: Long): Int
 
-    // ANALYTICS EVENTS (rac_analytics_events.h)
+    // EVENT TELEMETRY SINK (rac_events_set_telemetry_sink)
 
     /**
-     * Register analytics events callback with telemetry manager.
-     * Events from C++ will be routed to the telemetry manager for batching and HTTP transport.
+     * Attach the telemetry manager as the C++ event router's telemetry sink.
      *
-     * @param telemetryHandle Handle to the telemetry manager (from racTelemetryManagerCreate)
-     *                        Pass 0 to unregister the callback
+     * The C++ destination-bitmask router (`rac::events::route`) drives telemetry
+     * internally — it calls `rac_telemetry_manager_track_proto` for every event
+     * whose destination carries the TELEMETRY bit. The SDK only registers the
+     * manager once as the sink; there is no per-event analytics callback to
+     * translate anymore.
+     *
+     * @param telemetryHandle Handle to the telemetry manager (from racTelemetryManagerCreate).
+     *                        Pass 0 to detach the sink.
      * @return RAC_SUCCESS or error code
      */
-    // CALLBACK_TARGET — invoked from C++ via JNI (analytics → telemetry callback registration)
     @JvmStatic
-    external fun racAnalyticsEventsSetCallback(telemetryHandle: Long): Int
+    external fun racEventsSetTelemetrySink(telemetryHandle: Long): Int
 
     /**
      * Emit a download/extraction event.
