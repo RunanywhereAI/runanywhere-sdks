@@ -4,16 +4,17 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:runanywhere/runanywhere.dart';
 
 import 'package:runanywhere_ai/core/models/app_types.dart';
 
 /// DeviceInfoService (mirroring iOS DeviceInfoService.swift)
 ///
-/// Retrieves device information (model, OS version) and delegates chip,
-/// neural-engine, and memory facts to `RunAnywhere.hardware.getProfile()`.
-/// The SDK's hardware ABI is the single source of truth; example code must
-/// not reimplement chip/NPU heuristics (AGENTS.md Business Logic Layering).
+/// Retrieves device model / OS / app version from platform plugins. Chip, NPU
+/// and total-memory facts used to come from the SDK's hardware ABI, but that
+/// ABI was removed when the routing scorer was retired (the engine router no
+/// longer needs a hardware profile). Device-info display is a UI concern, so
+/// the example reads what the platform exposes and leaves the rest empty; the
+/// UI hides rows with empty values.
 class DeviceInfoService extends ChangeNotifier {
   static final DeviceInfoService shared = DeviceInfoService._();
 
@@ -37,6 +38,7 @@ class DeviceInfoService extends ChangeNotifier {
 
       String modelName = '';
       String osVersion = '';
+      String chipName = '';
 
       if (Platform.isIOS) {
         final iosInfo = await deviceInfoPlugin.iosInfo;
@@ -46,24 +48,20 @@ class DeviceInfoService extends ChangeNotifier {
         final androidInfo = await deviceInfoPlugin.androidInfo;
         modelName = '${androidInfo.manufacturer} ${androidInfo.model}';
         osVersion = 'Android ${androidInfo.version.release}';
+        // Best-effort chip name from the platform (no SDK hardware probe).
+        chipName = androidInfo.hardware;
       } else if (Platform.isMacOS) {
         final macOSInfo = await deviceInfoPlugin.macOsInfo;
         modelName = macOSInfo.model;
         osVersion = 'macOS ${macOSInfo.osRelease}';
       }
 
-      // Hardware facts come from the commons hardware ABI via the SDK so new
-      // chips/NPUs are picked up without an example release. When the native
-      // probe is unavailable (debug builds without commons, simulator drift),
-      // fall back to empty values so the UI can hide the rows gracefully.
-      final profile = await _tryGetHardwareProfile();
-
       _deviceInfo = SystemDeviceInfo(
         modelName: modelName,
-        chipName: profile?.chip ?? '',
-        totalMemory: profile?.totalMemoryBytes.toInt() ?? 0,
+        chipName: chipName,
+        totalMemory: 0,
         availableMemory: 0,
-        neuralEngineAvailable: profile?.hasNeuralEngine ?? false,
+        neuralEngineAvailable: false,
         osVersion: osVersion,
         appVersion: packageInfo.version,
       );
@@ -79,15 +77,5 @@ class DeviceInfoService extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-  }
-
-  Future<HardwareProfile?> _tryGetHardwareProfile() async {
-    try {
-      final result = await RunAnywhere.hardware.getProfile();
-      return result.hasProfile() ? result.profile : null;
-    } catch (e) {
-      debugPrint('Hardware profile unavailable: $e');
-      return null;
-    }
   }
 }

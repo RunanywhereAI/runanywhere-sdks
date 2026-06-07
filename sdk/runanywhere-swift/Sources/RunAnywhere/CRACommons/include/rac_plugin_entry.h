@@ -23,8 +23,11 @@
 #define RAC_PLUGIN_ENTRY_H
 
 #include "rac_error.h"
+#include "rac_logger.h"
+#include "rac_types.h"
 #include "rac_engine_vtable.h"
 
+// NOLINTBEGIN(modernize-redundant-void-arg,modernize-use-nullptr)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -64,8 +67,23 @@ extern "C" {
  *                 Plugins built against v2 will be rejected at register
  *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
  *                 new `create` slot is unreachable otherwise.
+ *                 NOTE: `rac_service_register_provider` /
+ *                 `rac_service_unregister_provider` remain as no-op
+ *                 deprecation shims (log a WARN, return RAC_SUCCESS) in
+ *                 `src/plugin/rac_plugin_registry.cpp` to keep older Genie
+ *                 .so / Flutter pre-v3 plugin binaries dlopenable.
+ *                 The associated *types* / *fn typedefs /
+ *                 `rac_service_create` / `rac_service_list_providers` are
+ *                 gone for good; new code MUST use `rac_plugin_register` /
+ *                 `rac_plugin_unregister`. The shims can be deleted once
+ *                 every shipped Genie / RN / Flutter binary has been
+ *                 rebuilt against v3.
+ *   4u — removed the never-implemented rerank_ops vtable slot and the
+ *                 RAC_PRIMITIVE_RERANK primitive (wire value 6 retired). All
+ *                 engines rebuild against v4; v3 plugins are rejected at
+ *                 register time with RAC_ERROR_ABI_VERSION_MISMATCH.
  */
-#define RAC_PLUGIN_API_VERSION 3u
+#define RAC_PLUGIN_API_VERSION 4u
 
 /* ===========================================================================
  * Plugin entry-point signature
@@ -81,6 +99,17 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
 /**
  * @brief Declare a plugin entry point in a public header.
  *
+ * The entry symbol is annotated with `RAC_API` (= default ELF/Mach-O
+ * visibility, dllexport on Windows). dlsym/static-lookup MUST be able to
+ * find this symbol regardless of how the host engine library was linked —
+ * notably, even when a SHARED carrier sets visibility=hidden globally and
+ * the real definition lives in a sibling static archive (e.g. the
+ * runanywhere_llamacpp_vlm shared carrier whose only effective contents come
+ * from rac_backend_llamacpp). Without an explicit annotation at declaration
+ * time, loadability depended on transitive default visibility of the host
+ * plugin target — a brittle invariant that a future visibility tightening
+ * would silently break.
+ *
  * Example:
  * @code
  *   // sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry_llamacpp.h
@@ -88,8 +117,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *   RAC_PLUGIN_ENTRY_DECL(llamacpp);
  * @endcode
  */
-#define RAC_PLUGIN_ENTRY_DECL(name) \
-    const rac_engine_vtable_t* rac_plugin_entry_##name(void)
+#define RAC_PLUGIN_ENTRY_DECL(name) RAC_API const rac_engine_vtable_t* rac_plugin_entry_##name(void)
 
 /**
  * @brief Define a plugin entry point in the .cpp file.
@@ -102,8 +130,7 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *   }
  * @endcode
  */
-#define RAC_PLUGIN_ENTRY_DEF(name) \
-    RAC_PLUGIN_ENTRY_DECL(name)
+#define RAC_PLUGIN_ENTRY_DEF(name) RAC_PLUGIN_ENTRY_DECL(name)
 
 /* ===========================================================================
  * Static registration (iOS / Android / no-dlopen builds)
@@ -152,38 +179,165 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  */
 #ifdef __cplusplus
 
-#  if defined(__GNUC__) || defined(__clang__)
-#    define RAC_STATIC_REGISTRAR_USED_ATTR __attribute__((used))
-#  else
-#    define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
-#  endif
+#if defined(__GNUC__) || defined(__clang__)
+#define RAC_STATIC_REGISTRAR_USED_ATTR __attribute__((used))
+#else
+#define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
+#endif
 
-#define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
-    namespace rac_plugin_autoreg_##name {                                      \
-        struct Registrar {                                                     \
-            Registrar() noexcept {                                             \
-                (void)::rac_plugin_register(::rac_plugin_entry_##name());      \
-            }                                                                  \
-        };                                                                     \
-        /* `used` keeps the symbol after compiler dead-code analysis; the host \
-         * still has to ask the linker not to drop the .o file (see header     \
-         * docs above for the per-platform link flag). */                      \
-        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;           \
-    }                                                                          \
-    /* Force at least one externally-visible symbol per plugin so the linker  \
-     * can be asked to keep the TU by name without `-force_load`. */          \
-    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR                                  \
-    const char* const rac_plugin_static_marker_##name = #name
+/* The `Registrar()` ctor below is marked `noexcept` because it runs during
+ * pre-main() static initialization — an escaping exception would call
+ * std::terminate before any logger / crash reporter is wired up. This is safe
+ * by construction: `rac_plugin_register` itself is declared noexcept (see
+ * RAC_PLUGIN_REGISTRY_NOEXCEPT below) and internally coerces std::bad_alloc /
+ * throwing capability_check callbacks into structured rac_result_t codes. */
+#define RAC_STATIC_PLUGIN_REGISTER(name)                                                          \
+    namespace rac_plugin_autoreg_##name {                                                         \
+        struct Registrar {                                                                        \
+            Registrar() noexcept {                                                                \
+                (void)::rac_plugin_register(::rac_plugin_entry_##name());                         \
+            }                                                                                     \
+        };                                                                                        \
+        /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
+         * still has to ask the linker not to drop the .o file (see header                        \
+         * docs above for the per-platform link flag). */                                         \
+        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;                              \
+    }                                                                                             \
+    /* Force at least one externally-visible symbol per plugin so the linker                      \
+     * can be asked to keep the TU by name without `-force_load`. */                              \
+    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR const char* const rac_plugin_static_marker_##name = \
+        #name
+
+/**
+ * @brief Variant of RAC_STATIC_PLUGIN_REGISTER that routes through a backend's
+ *        explicit `rac_backend_<name>_register()` entry point.
+ *
+ * Some backends need more than the bare
+ * `rac_plugin_register(rac_plugin_entry_<name>())` that RAC_STATIC_PLUGIN_REGISTER
+ * performs — e.g. llamacpp also hooks up its CPU-runtime provider, and metalrt
+ * emits a stub-mode diagnostic when the closed-source engine binary is absent.
+ * Those backends expose a hand-written `rac_backend_<name>_register()` that does
+ * the unified plugin registration *plus* the engine-specific bring-up, and is
+ * idempotent on repeat calls (so the dynamic-link path — where the SDK bridge
+ * calls it directly — and this static-init path agree).
+ *
+ * This macro emits the SAME static-init scaffold and the SAME externally-visible
+ * marker symbol (`rac_plugin_static_marker_<name>`) as RAC_STATIC_PLUGIN_REGISTER,
+ * so the `-force_load` / `--whole-archive` / MSVC `/INCLUDE:` keep-alive in
+ * `cmake/plugins.cmake` is unchanged. The only difference is that the Registrar
+ * ctor calls `::rac_backend_##name##_register()` instead of
+ * `rac_plugin_register(rac_plugin_entry_##name())`. See RAC_STATIC_PLUGIN_REGISTER
+ * above for the full rationale on `used`, init ordering, and noexcept.
+ *
+ * Usage (one line in a dedicated C++ shim TU named explicitly in CMake so it is
+ * retained by `-force_load`):
+ * @code
+ *   RAC_STATIC_REGISTER_BACKEND(llamacpp);
+ * @endcode
+ */
+#define RAC_STATIC_REGISTER_BACKEND(name)                                                         \
+    extern "C" rac_result_t rac_backend_##name##_register(void);                                  \
+    namespace rac_plugin_autoreg_##name {                                                         \
+        struct Registrar {                                                                        \
+            Registrar() noexcept {                                                                \
+                (void)::rac_backend_##name##_register();                                          \
+            }                                                                                     \
+        };                                                                                        \
+        /* `used` keeps the symbol after compiler dead-code analysis; the host                    \
+         * still has to ask the linker not to drop the .o file (see header                        \
+         * docs above for the per-platform link flag). */                                         \
+        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;                              \
+    }                                                                                             \
+    /* Force at least one externally-visible symbol per plugin so the linker                      \
+     * can be asked to keep the TU by name without `-force_load`. */                              \
+    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR const char* const rac_plugin_static_marker_##name = \
+        #name
 
 #else
-#define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
-    /* Static registration requires C++ linkage — put a one-line C++ shim TU \
-     * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
+#define RAC_STATIC_PLUGIN_REGISTER(name)
+/* Static registration requires C++ linkage — put a one-line C++ shim TU \
+ * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
+#define RAC_STATIC_REGISTER_BACKEND(name)
+#endif
+
+/* ===========================================================================
+ * Boilerplate "create" adapter helper
+ *
+ * Most backends' per-primitive `create` op is a 7-line forward onto the
+ * engine's native `rac_<primitive>_<name>_create(model_id, nullptr, &handle)`
+ * entry point. This macro generates that scaffold so each backend doesn't
+ * hand-copy it.
+ *
+ * Scope: sherpa STT / TTS / VAD today. Backends with richer create flows
+ * (llamacpp LLM — CPU-runtime session wrapping; onnx embeddings — try/catch
+ * + unique_ptr; llamacpp VLM — mmproj path plumbing) hand-write their
+ * adapter and are NOT expected to use this macro.
+ *
+ * Requirements at expansion site:
+ *   - a file-scope `const char* LOG_CAT` (or similar) visible to RAC_LOG_INFO;
+ *   - `rac_<primitive>_<name>_create(const char*, const <cfg>*, rac_handle_t*)`
+ *     declared (i.e. the backend header is already included).
+ *
+ * The generated function has the ABI-v3 `create` signature:
+ *   rac_result_t <name>_<primitive>_create_impl(const char* model_id,
+ *                                               const char* config_json,
+ *                                               void** out_impl);
+ * `config_json` is currently ignored (passed as nullptr to the engine create);
+ * bring-your-own-adapter if you need to thread config through.
+ * =========================================================================== */
+
+#ifdef __cplusplus
+#define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                                                 \
+    static ::rac_result_t name##_##primitive##_create_impl(                                        \
+        const char* model_id, const char* /*config_json*/, void** out_impl) {                      \
+        if (!out_impl)                                                                             \
+            return RAC_ERROR_NULL_POINTER;                                                         \
+        *out_impl = nullptr;                                                                       \
+        RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",                       \
+                     model_id ? model_id : "(default)");                                           \
+        ::rac_handle_t backend_handle = nullptr;                                                   \
+        ::rac_result_t rc = rac_##primitive##_##name##_create(model_id, nullptr, &backend_handle); \
+        if (rc != RAC_SUCCESS)                                                                     \
+            return rc;                                                                             \
+        *out_impl = backend_handle;                                                                \
+        return RAC_SUCCESS;                                                                        \
+    }
+#else
+#define RAC_DEFINE_CREATE_ADAPTER(primitive, name)                                            \
+    static rac_result_t name##_##primitive##_create_impl(                                     \
+        const char* model_id, const char* /*config_json*/, void** out_impl) {                 \
+        if (!out_impl)                                                                        \
+            return RAC_ERROR_NULL_POINTER;                                                    \
+        *out_impl = NULL;                                                                     \
+        RAC_LOG_INFO(LOG_CAT, #name "_" #primitive "_create_impl: model=%s",                  \
+                     model_id ? model_id : "(default)");                                      \
+        rac_handle_t backend_handle = NULL;                                                   \
+        rac_result_t rc = rac_##primitive##_##name##_create(model_id, NULL, &backend_handle); \
+        if (rc != RAC_SUCCESS)                                                                \
+            return rc;                                                                        \
+        *out_impl = backend_handle;                                                           \
+        return RAC_SUCCESS;                                                                   \
+    }
 #endif
 
 /* ===========================================================================
  * Registry operations (implemented in src/plugin/rac_plugin_registry.cpp)
  * =========================================================================== */
+
+/* All registry functions below are noexcept under C++ linkage: they cross
+ * the C ABI into Swift / Kotlin (JNI) / Dart (FFI) / Hermes (NitroModules)
+ * / WASM. Propagating a C++ exception out of an extern "C" function is
+ * undefined behavior per ISO C++ [except.handle]/9. Internally each
+ * implementation wraps allocator-throwing operations + third-party
+ * callbacks in try/catch and coerces failures to RAC_ERROR_OUT_OF_MEMORY /
+ * RAC_ERROR_PLUGIN_LOAD_FAILED / RAC_ERROR_INTERNAL. The noexcept
+ * specifier is conditionally compiled so plain C consumers see the C
+ * signatures unchanged. */
+#ifdef __cplusplus
+#define RAC_PLUGIN_REGISTRY_NOEXCEPT noexcept
+#else
+#define RAC_PLUGIN_REGISTRY_NOEXCEPT
+#endif
 
 /**
  * @brief Register a plugin vtable. Performs ABI validation + capability check
@@ -195,12 +349,12 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Thread-safe.
  */
-rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable);
+rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Unregister a plugin by name. No-op if the name is not registered.
  */
-rac_result_t rac_plugin_unregister(const char* name);
+rac_result_t rac_plugin_unregister(const char* name) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Look up the highest-priority plugin that serves `primitive`, or NULL
@@ -209,7 +363,19 @@ rac_result_t rac_plugin_unregister(const char* name);
  * Thread-safe. The returned pointer is valid for the remaining lifetime of
  * the registry (i.e. until `rac_plugin_unregister` is called for this name).
  */
-const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
+const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive) RAC_PLUGIN_REGISTRY_NOEXCEPT;
+
+/**
+ * @brief Look up the plugin registered under `engine_name` IFF it serves
+ *        `primitive`, else NULL. Used to pin a specific engine (e.g. the hybrid
+ *        STT router's offline "sherpa" vs online "cloud") where simple priority
+ *        order cannot distinguish two plugins that serve the same primitive.
+ *
+ * Thread-safe.
+ */
+const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
+                                                      const char* engine_name)
+    RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Iterate all plugins registered for `primitive`, in descending
@@ -219,18 +385,18 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
  * registry fills it in-place. Values >= `max` are truncated.
  */
 RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
-                                     const rac_engine_vtable_t** out_plugins,
-                                     size_t max,
-                                     size_t* out_count);
+                                     const rac_engine_vtable_t** out_plugins, size_t max,
+                                     size_t* out_count) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 /**
  * @brief Total number of registered plugins (across all primitives,
  *        counting each plugin once).
  */
-size_t rac_plugin_count(void);
+size_t rac_plugin_count(void) RAC_PLUGIN_REGISTRY_NOEXCEPT;
 
 #ifdef __cplusplus
 }
 #endif
+// NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)
 
 #endif /* RAC_PLUGIN_ENTRY_H */

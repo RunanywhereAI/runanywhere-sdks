@@ -29,8 +29,10 @@
 
 #include "rac_error.h"
 #include "rac_types.h"
+#include "rac_model_format_ids.h"
 #include "rac_primitive.h"
 
+// NOLINTBEGIN(modernize-redundant-void-arg,modernize-use-nullptr)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,17 +46,21 @@ extern "C" {
  * the specific per-domain header for the primitive they implement.
  * =========================================================================== */
 
-struct rac_llm_service_ops;              /* rac/features/llm/rac_llm_service.h */
-struct rac_stt_service_ops;              /* rac/features/stt/rac_stt_service.h */
-struct rac_tts_service_ops;              /* rac/features/tts/rac_tts_service.h */
-struct rac_vad_service_ops;              /* rac/features/vad/rac_vad_service.h */
-struct rac_embeddings_service_ops;       /* rac/features/embeddings/rac_embeddings_service.h */
-struct rac_rerank_service_ops;           /* rac/features/rerank/rac_rerank_service.h (future) */
-struct rac_vlm_service_ops;              /* rac/features/vlm/rac_vlm_service.h */
-struct rac_diffusion_service_ops;        /* rac/features/diffusion/rac_diffusion_service.h */
+struct rac_llm_service_ops;        /* rac/features/llm/rac_llm_service.h */
+struct rac_stt_service_ops;        /* rac/features/stt/rac_stt_service.h */
+struct rac_tts_service_ops;        /* rac/features/tts/rac_tts_service.h */
+struct rac_vad_service_ops;        /* rac/features/vad/rac_vad_service.h */
+struct rac_embeddings_service_ops; /* rac/features/embeddings/rac_embeddings_service.h */
+struct rac_vlm_service_ops;        /* rac/features/vlm/rac_vlm_service.h */
+struct rac_diffusion_service_ops;  /* rac/features/diffusion/rac_diffusion_service.h */
 
 /**
  * @brief Plugin metadata carried in every vtable.
+ *
+ * This is the ABI/routing projection of the canonical declarative manifest
+ * (`rac_engine_manifest_t`). New engine entries should define a manifest and
+ * populate this struct with `RAC_ENGINE_METADATA_FROM_MANIFEST(...)` instead
+ * of maintaining a second hand-written metadata block.
  *
  * Layout note: bumped to ABI v2 — the previous
  * `reserved_0/_1` (8 bytes) were promoted into the routing-extension fields
@@ -104,13 +110,13 @@ typedef struct rac_engine_metadata {
      *  runtime registry (e.g. llama.cpp today, which bundles its own Metal
      *  shaders) simply continue to score off priority + hardware profile. */
     const rac_runtime_id_t* runtimes;
-    size_t                  runtimes_count;
+    size_t runtimes_count;
 
-    /** Model file formats this engine accepts (proto-encoded
-     *  `runanywhere.v1.ModelFormat` values cast to uint32_t). MAY be NULL.
-     *  Frontends pass the proto enum value directly via `RouteRequest.format`. */
-    const uint32_t*         formats;
-    size_t                  formats_count;
+    /** Model file formats this engine accepts (`RAC_MODEL_FORMAT_ID_*` values
+     *  mirroring `runanywhere.v1.ModelFormat`). MAY be NULL. Frontends pass
+     *  the proto enum value directly via `RouteRequest.format`. */
+    const uint32_t* formats;
+    size_t formats_count;
 } rac_engine_metadata_t;
 
 /**
@@ -138,28 +144,25 @@ typedef struct rac_engine_vtable {
      */
     void (*on_unload)(void);
 
-    /* ─────────── Primitive slot groups (8 active) ─────────── */
+    /* ─────────── Primitive slot groups (7 active) ─────────── */
 
     /** LLM text generation (`RAC_PRIMITIVE_GENERATE_TEXT`). */
-    const struct rac_llm_service_ops*       llm_ops;
+    const struct rac_llm_service_ops* llm_ops;
 
     /** Speech-to-Text (`RAC_PRIMITIVE_TRANSCRIBE`). */
-    const struct rac_stt_service_ops*       stt_ops;
+    const struct rac_stt_service_ops* stt_ops;
 
     /** Text-to-Speech (`RAC_PRIMITIVE_SYNTHESIZE`). */
-    const struct rac_tts_service_ops*       tts_ops;
+    const struct rac_tts_service_ops* tts_ops;
 
     /** Voice Activity Detection (`RAC_PRIMITIVE_DETECT_VOICE`). */
-    const struct rac_vad_service_ops*       vad_ops;
+    const struct rac_vad_service_ops* vad_ops;
 
     /** Text / multimodal embeddings (`RAC_PRIMITIVE_EMBED`). */
     const struct rac_embeddings_service_ops* embedding_ops;
 
-    /** Cross-encoder reranking (`RAC_PRIMITIVE_RERANK`). */
-    const struct rac_rerank_service_ops*    rerank_ops;
-
     /** Vision-Language Model (`RAC_PRIMITIVE_VLM`). */
-    const struct rac_vlm_service_ops*       vlm_ops;
+    const struct rac_vlm_service_ops* vlm_ops;
 
     /** Diffusion / image generation (`RAC_PRIMITIVE_DIFFUSION`). */
     const struct rac_diffusion_service_ops* diffusion_ops;
@@ -187,17 +190,51 @@ typedef struct rac_engine_vtable {
     const void* reserved_slot_9;
 } rac_engine_vtable_t;
 
+/* ===========================================================================
+ * RAC_PRIMITIVE_TABLE — single source of truth for the primitive↔vtable-slot
+ * mapping.
+ *
+ * One X(enum, vtable_field, name_string) row per LIVE routable primitive. The
+ * four registry functions that MUST agree on this mapping —
+ * `each_served_primitive`, `rac_engine_vtable_slot`, `rac_primitive_name`, and
+ * `rac_engine_manifest_validate_vtable` (in rac_plugin_registry.cpp) — are all
+ * GENERATED by expanding this table with a local `X` macro, so they cannot
+ * drift out of sync.
+ *
+ * This is plain-C / ABI-safe: the table is only ever expanded inside ordinary
+ * C switch/if bodies (no template metaprogramming) and expands to nothing in
+ * the struct itself.
+ *
+ * Wire value 6 (formerly RERANK) is retired — no backend implemented it and it
+ * was never routable. It has no vtable slot and no table row.
+ *
+ * Adding a modality is now THREE edits (down from ~8 scattered sites):
+ *   1. Add one X(...) row here (and the matching `const struct ..._ops*` slot
+ *      promoted from a reserved slot in the struct above).
+ *   2. Promote the corresponding `RAC_PRIMITIVE_RESERVED_*` enumerator in
+ *      rac_primitive.h to the named primitive.
+ *   3. Bump `RAC_PLUGIN_API_VERSION` in rac_plugin_entry.h (ABI change).
+ * =========================================================================== */
+#define RAC_PRIMITIVE_TABLE(X)                                       \
+    X(RAC_PRIMITIVE_GENERATE_TEXT, llm_ops,       "generate_text")   \
+    X(RAC_PRIMITIVE_TRANSCRIBE,    stt_ops,       "transcribe")      \
+    X(RAC_PRIMITIVE_SYNTHESIZE,    tts_ops,       "synthesize")      \
+    X(RAC_PRIMITIVE_DETECT_VOICE,  vad_ops,       "detect_voice")    \
+    X(RAC_PRIMITIVE_EMBED,         embedding_ops, "embed")           \
+    X(RAC_PRIMITIVE_VLM,           vlm_ops,       "vlm")             \
+    X(RAC_PRIMITIVE_DIFFUSION,     diffusion_ops, "diffusion")
+
 /**
  * Lookup the per-primitive ops pointer inside a vtable at runtime, keyed by
  * `rac_primitive_t`. Returns NULL for primitives the engine does not serve,
  * or for primitives outside the 1..8 range. The returned pointer must be
  * cast to the primitive's per-domain ops struct type.
  */
-const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt,
-                                   rac_primitive_t primitive);
+const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt, rac_primitive_t primitive);
 
 #ifdef __cplusplus
 }
 #endif
+// NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)
 
 #endif /* RAC_PLUGIN_ENGINE_VTABLE_H */

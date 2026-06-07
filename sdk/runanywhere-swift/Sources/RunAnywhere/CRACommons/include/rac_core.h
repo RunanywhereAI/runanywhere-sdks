@@ -123,8 +123,9 @@ RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
 // was REMOVED in v3.0.0 (RAC_PLUGIN_API_VERSION 3u).
 //
 // New code uses the unified plugin registry from rac/plugin/rac_plugin_entry.h
-// (rac_plugin_register / rac_plugin_list) and the hardware-aware router
-// from rac/router/rac_route.h (rac_plugin_route).
+// (rac_plugin_register / rac_plugin_list / rac_plugin_find). Backend selection
+// is simple priority order — the highest-priority registered plugin that serves
+// the requested primitive wins; there is no hardware/format/accelerator scoring.
 // =============================================================================
 
 // =============================================================================

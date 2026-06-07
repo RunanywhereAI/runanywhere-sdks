@@ -17,8 +17,8 @@
 #include <stdint.h>
 
 #include "rac_error.h"
-#include "rac_proto_buffer.h"
 #include "rac_types.h"
+#include "rac_proto_buffer.h"
 #include "rac_model_types.h"
 
 #ifdef __cplusplus
@@ -198,6 +198,15 @@ RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registr
  * The registry converts the proto to its internal C++/C representation and
  * applies the same semantics as rac_model_registry_save().
  *
+ * Merge-not-replace on existing entries: when the model_id is already in the
+ * registry, runtime fields the caller did not set (local_path, is_downloaded,
+ * checksum_sha256, expected_files, multi_file per-file local_path) are
+ * preserved from the existing snapshot. Callers reseeding a curated catalog
+ * on app launch therefore retain previous download progress without needing
+ * an example-app skip-if-present workaround. To force a clean reset, callers
+ * must explicitly populate the desired field on the incoming ModelInfo (the
+ * "absent" check is field-presence-based via the proto `has_*` accessors).
+ *
  * @param handle Registry handle
  * @param proto_bytes Serialized runanywhere.v1.ModelInfo bytes
  * @param proto_size Byte count
@@ -219,8 +228,7 @@ RAC_API rac_result_t rac_model_registry_register_proto(rac_model_registry_handle
  * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
  */
 RAC_API rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
-                                                     const uint8_t* proto_bytes,
-                                                     size_t proto_size);
+                                                     const uint8_t* proto_bytes, size_t proto_size);
 
 /**
  * @brief Get model metadata as serialized runanywhere.v1.ModelInfo bytes.
@@ -235,8 +243,7 @@ RAC_API rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t
  * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
  */
 RAC_API rac_result_t rac_model_registry_get_proto(rac_model_registry_handle_t handle,
-                                                  const char* model_id,
-                                                  uint8_t** proto_bytes_out,
+                                                  const char* model_id, uint8_t** proto_bytes_out,
                                                   size_t* proto_size_out);
 
 /**
@@ -257,7 +264,19 @@ RAC_API rac_result_t rac_model_registry_list_proto(rac_model_registry_handle_t h
 /**
  * @brief Query model metadata using serialized runanywhere.v1.ModelQuery bytes.
  *
- * Returns serialized runanywhere.v1.ModelInfoList bytes.
+ * Returns serialized runanywhere.v1.ModelInfoList bytes. The caller owns the
+ * returned buffer and must free it with rac_model_registry_proto_free().
+ *
+ * The current generated ModelQuery schema supports framework/category/format/
+ * source, downloaded_only, available_only, max_size_bytes, and search_query
+ * filters, plus schema-defined sort_field/sort_order ordering.
+ *
+ * @param handle Registry handle
+ * @param query_proto_bytes Serialized runanywhere.v1.ModelQuery bytes
+ * @param query_proto_size Byte count
+ * @param proto_bytes_out Output: allocated ModelInfoList proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_model_registry_query_proto(rac_model_registry_handle_t handle,
                                                     const uint8_t* query_proto_bytes,
@@ -267,6 +286,14 @@ RAC_API rac_result_t rac_model_registry_query_proto(rac_model_registry_handle_t 
 
 /**
  * @brief List downloaded model metadata as serialized runanywhere.v1.ModelInfoList bytes.
+ *
+ * This is equivalent to a ModelQuery with downloaded_only=true. The caller owns
+ * the returned buffer and must free it with rac_model_registry_proto_free().
+ *
+ * @param handle Registry handle
+ * @param proto_bytes_out Output: allocated ModelInfoList proto bytes
+ * @param proto_size_out Output: byte count
+ * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_model_registry_list_downloaded_proto(rac_model_registry_handle_t handle,
                                                               uint8_t** proto_bytes_out,
@@ -293,6 +320,120 @@ RAC_API rac_result_t rac_model_registry_remove_proto(rac_model_registry_handle_t
 RAC_API void rac_model_registry_proto_free(uint8_t* proto_bytes);
 
 // =============================================================================
+// CANONICAL PROTO-BUFFER MODEL REGISTRY API
+// =============================================================================
+
+/**
+ * @brief Save serialized runanywhere.v1.ModelInfo and return the saved ModelInfo.
+ *
+ * Output uses the canonical rac_proto_buffer_t ownership/error convention.
+ */
+RAC_API rac_result_t rac_model_registry_register_proto_buffer(rac_model_registry_handle_t handle,
+                                                              const uint8_t* proto_bytes,
+                                                              size_t proto_size,
+                                                              rac_proto_buffer_t* out_model);
+
+/**
+ * @brief Update an existing runanywhere.v1.ModelInfo and return the saved ModelInfo.
+ *
+ * Missing model ids return RAC_ERROR_NOT_FOUND in out_model->status.
+ */
+RAC_API rac_result_t rac_model_registry_update_proto_buffer(rac_model_registry_handle_t handle,
+                                                            const uint8_t* proto_bytes,
+                                                            size_t proto_size,
+                                                            rac_proto_buffer_t* out_model);
+
+/**
+ * @brief Get a model as serialized runanywhere.v1.ModelInfo bytes.
+ */
+RAC_API rac_result_t rac_model_registry_get_proto_buffer(rac_model_registry_handle_t handle,
+                                                         const char* model_id,
+                                                         rac_proto_buffer_t* out_model);
+
+/**
+ * @brief List models as serialized runanywhere.v1.ModelInfoList bytes.
+ */
+RAC_API rac_result_t rac_model_registry_list_proto_buffer(rac_model_registry_handle_t handle,
+                                                          rac_proto_buffer_t* out_models);
+
+/**
+ * @brief Query models using serialized runanywhere.v1.ModelQuery bytes.
+ */
+RAC_API rac_result_t rac_model_registry_query_proto_buffer(rac_model_registry_handle_t handle,
+                                                           const uint8_t* query_proto_bytes,
+                                                           size_t query_proto_size,
+                                                           rac_proto_buffer_t* out_models);
+
+/**
+ * @brief List downloaded models as serialized runanywhere.v1.ModelInfoList bytes.
+ */
+RAC_API rac_result_t rac_model_registry_list_downloaded_proto_buffer(
+    rac_model_registry_handle_t handle, rac_proto_buffer_t* out_models);
+
+/**
+ * @brief Remove model metadata and return serialized runanywhere.v1.ModelDeleteResult bytes.
+ *
+ * File deletion remains platform-owned; this function only unregisters the
+ * portable registry row.
+ */
+RAC_API rac_result_t rac_model_registry_remove_proto_buffer(rac_model_registry_handle_t handle,
+                                                            const char* model_id,
+                                                            rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelGetRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelGetResult bytes in out_result.
+ */
+RAC_API rac_result_t rac_model_registry_get_model_proto(rac_model_registry_handle_t handle,
+                                                        const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
+                                                        rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelListRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelListResult bytes in out_result.
+ */
+RAC_API rac_result_t rac_model_registry_list_models_proto(rac_model_registry_handle_t handle,
+                                                          const uint8_t* request_proto_bytes,
+                                                          size_t request_proto_size,
+                                                          rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelImportRequest bytes.
+ *
+ * The input source_path must already be a stable platform-normalized path.
+ * Commons records registry metadata only; it does not copy files or acquire OS
+ * handles.
+ */
+RAC_API rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
+                                                     const uint8_t* request_proto_bytes,
+                                                     size_t request_proto_size,
+                                                     rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelDiscoveryRequest bytes.
+ *
+ * Platform adapters own filesystem traversal. This portable entry point shapes
+ * discovery results from registry state and normalized local_path values.
+ */
+RAC_API rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handle,
+                                                       const uint8_t* request_proto_bytes,
+                                                       size_t request_proto_size,
+                                                       rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelRegistryRefreshRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelRegistryRefreshResult bytes.
+ */
+RAC_API rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle,
+                                                      const uint8_t* request_proto_bytes,
+                                                      size_t request_proto_size,
+                                                      rac_proto_buffer_t* out_result);
+
+// =============================================================================
 // QUERY HELPERS
 // =============================================================================
 
@@ -306,21 +447,10 @@ RAC_API void rac_model_registry_proto_free(uint8_t* proto_bytes);
  */
 RAC_API rac_bool_t rac_model_info_is_downloaded(const rac_model_info_t* model);
 
-/**
- * @brief Check if model category requires context length.
- *
- * @param category Model category
- * @return RAC_TRUE if requires context length
- */
-RAC_API rac_bool_t rac_model_category_requires_context_length(rac_model_category_t category);
-
-/**
- * @brief Check if model category supports thinking.
- *
- * @param category Model category
- * @return RAC_TRUE if supports thinking
- */
-RAC_API rac_bool_t rac_model_category_supports_thinking(rac_model_category_t category);
+// NOTE: rac_model_category_requires_context_length() and
+// rac_model_category_supports_thinking() are declared in rac_model_types.h
+// (the canonical home for rac_model_category_t helpers) and intentionally
+// not re-declared here to avoid double-declaration drift.
 
 /**
  * @brief Infer artifact type from URL and format.
@@ -369,183 +499,182 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
 
 // =============================================================================
-// MODEL DISCOVERY - Scan file system for downloaded models
+// REFRESH — proto entry point only
+// =============================================================================
+//
+// The struct-opts `rac_model_registry_refresh` entry point and its
+// `rac_model_registry_refresh_opts_t` / `rac_discovery_callbacks_t` types were
+// removed. Refresh is now driven exclusively through the proto API
+// (`rac_model_registry_refresh_proto`, declared further below in the PROTO
+// section): callers serialize a `ModelRegistryRefreshRequest`
+// (include_remote_catalog / rescan_local / prune_orphans / optional query) and
+// read back a `ModelRegistryRefreshResult`. Filesystem reconciliation runs via
+// the platform adapter's `file_list_directory` slot, not a discovery-callback
+// struct.
+
+// =============================================================================
+// FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)
 // =============================================================================
 
 /**
- * @brief Callback to list directory contents
- * @param path Directory path
- * @param out_entries Output: Array of entry names (allocated by callback)
- * @param out_count Output: Number of entries
- * @param user_data User context
- * @return RAC_SUCCESS or error code
- */
-typedef rac_result_t (*rac_list_directory_fn)(const char* path, char*** out_entries,
-                                              size_t* out_count, void* user_data);
-
-/**
- * @brief Callback to free directory entries
- * @param entries Array of entry names
- * @param count Number of entries
- * @param user_data User context
- */
-typedef void (*rac_free_directory_entries_fn)(char** entries, size_t count, void* user_data);
-
-/**
- * @brief Callback to check if path is a directory
- * @param path Path to check
- * @param user_data User context
- * @return RAC_TRUE if directory, RAC_FALSE otherwise
- */
-typedef rac_bool_t (*rac_is_directory_fn)(const char* path, void* user_data);
-
-/**
- * @brief Callback to check if path exists
- * @param path Path to check
- * @param user_data User context
- * @return RAC_TRUE if exists
- */
-typedef rac_bool_t (*rac_path_exists_discovery_fn)(const char* path, void* user_data);
-
-/**
- * @brief Callbacks for model discovery file operations.
+ * @brief Fetch model assignments from the server and populate the registry.
  *
- * NOTE: The `is_model_file` callback that previously sat between
- * `path_exists` and `user_data` was removed when the canonical commons
- * helper `rac_model_format_for_framework()` (declared in
- * rac_model_types.h) became the single source of truth for "is this file
- * a model file for this framework?". SDK bridges no longer wire that
- * callback — commons consults `rac_model_format_for_framework()` directly
- * using the file extension parsed from the path.
- */
-typedef struct {
-    rac_list_directory_fn list_directory;
-    rac_free_directory_entries_fn free_entries;
-    rac_is_directory_fn is_directory;
-    rac_path_exists_discovery_fn path_exists;
-    void* user_data;
-} rac_discovery_callbacks_t;
-
-/**
- * @brief Discovery result for a single model
- */
-typedef struct {
-    /** Model ID that was discovered */
-    const char* model_id;
-    /** Path where model was found */
-    const char* local_path;
-    /** Framework of the model */
-    rac_inference_framework_t framework;
-} rac_discovered_model_t;
-
-/**
- * @brief Result of model discovery scan
- */
-typedef struct {
-    /** Number of models discovered as downloaded */
-    size_t discovered_count;
-    /** Array of discovered models */
-    rac_discovered_model_t* discovered_models;
-    /** Number of unregistered model folders found */
-    size_t unregistered_count;
-} rac_discovery_result_t;
-
-/**
- * @brief Discover downloaded models on the file system.
+ * Thin wrapper over rac_model_assignment_fetch() that keeps the results in
+ * the global model registry.  Intended for the Web/WASM binding
+ * (fetchModelAssignments) and any other SDK frontend that needs a single
+ * C ABI call instead of the two-step fetch+register pattern.
  *
- * Scans the models directory for each framework, checks if folders
- * contain valid model files, and updates the registry for registered models.
+ * If rac_model_assignment_set_callbacks() has not been called yet the
+ * function returns RAC_SUCCESS with zero models so that WASM callers that
+ * operate offline don't see an error.
  *
- * @param handle Registry handle
- * @param callbacks Platform file operation callbacks
- * @param out_result Output: Discovery result (caller must call rac_discovery_result_free)
- * @return RAC_SUCCESS or error code
+ * @param force_refresh     Pass RAC_TRUE to bypass the cache.
+ * @param out_models        Output: caller-owned array (free with
+ *                          rac_model_info_array_free).  May be NULL if the
+ *                          caller only wants the side-effect of populating the
+ *                          registry.
+ * @param out_count         Output: number of models.  May be NULL.
+ * @return RAC_SUCCESS or error code.
  */
-RAC_API rac_result_t rac_model_registry_discover_downloaded(
-    rac_model_registry_handle_t handle, const rac_discovery_callbacks_t* callbacks,
-    rac_discovery_result_t* out_result);
+RAC_API rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refresh,
+                                                          rac_model_info_t*** out_models,
+                                                          size_t* out_count);
 
 /**
- * @brief Free discovery result
- * @param result Discovery result to free
+ * @brief Fetch model assignments via the proto-byte ABI.
+ *
+ * Wraps rac_model_registry_fetch_assignments() so SDK bridges (RN, Web,
+ * Kotlin JNI) can replace the per-SDK JSON shims with one canonical
+ * proto-byte call. The implementation calls
+ * rac_model_assignment_fetch() under the hood (so the platform adapter
+ * still owns HTTP transport), then serializes the result into a
+ * runanywhere.v1.ModelRegistryFetchAssignmentsResult message containing
+ * the populated ModelInfoList plus error/timing metadata.
+ *
+ * Offline / pre-init behavior matches
+ * rac_model_registry_fetch_assignments(): if the assignment callbacks
+ * have not been registered yet, success is returned with zero models
+ * and an empty ModelInfoList — equivalent to the WASM offline path.
+ *
+ * @param request_bytes Serialized
+ *                      runanywhere.v1.ModelRegistryFetchAssignmentsRequest
+ *                      bytes. May be empty (size==0); commons treats it
+ *                      as a default request (force_refresh=false,
+ *                      device_id="").
+ * @param request_size  Byte count.
+ * @param out_result    Receives serialized
+ *                      runanywhere.v1.ModelRegistryFetchAssignmentsResult
+ *                      bytes on success or an error envelope on failure.
+ * @return RAC_SUCCESS or a negative rac_result_t.
  */
-RAC_API void rac_discovery_result_free(rac_discovery_result_t* result);
+RAC_API rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t* request_bytes,
+                                                                size_t request_size,
+                                                                rac_proto_buffer_t* out_result);
 
 // =============================================================================
-// REFRESH - Unified cross-SDK registry refresh
+// URL → ModelFormat / ArtifactType INFERENCE (proto-byte ABI)
+//
+// Canonical commons-owned heuristic shared by every SDK. Replaces the
+// per-SDK Dart `protoModelFormatFromPath` / `withInferredArtifact` and
+// Kotlin `detectFormatFromUrl` / `inferArtifactFields` helpers.
 // =============================================================================
 
 /**
- * @brief Options for rac_model_registry_refresh().
+ * @brief Infer a ModelFormat from a portable URL/file-path string.
  *
- * Semantic fields (per task spec):
- *   - include_remote_catalog: RAC_TRUE to fetch the remote model assignment
- *       catalog via rac_model_assignment_fetch(force_refresh=TRUE). Requires
- *       that rac_model_assignment_set_callbacks() has previously been called
- *       (usually at SDK init); otherwise this step no-ops and returns success.
- *   - rescan_local: RAC_TRUE to rescan on-disk model folders and link any
- *       newly-discovered downloads back to registered model entries.
- *       Requires discovery_callbacks to be non-NULL; otherwise this step is
- *       skipped silently.
- *   - prune_orphans: RAC_TRUE to clear local_path on models whose recorded
- *       path no longer exists on disk (detected via
- *       discovery_callbacks->path_exists). Requires discovery_callbacks to
- *       be non-NULL; otherwise this step is skipped silently.
+ * Consumes serialized runanywhere.v1.ModelFormatFromUrlRequest bytes and
+ * returns serialized runanywhere.v1.ModelFormatFromUrlResult bytes. Only
+ * the trailing file-suffix is inspected; no network or filesystem access.
  *
- * discovery_callbacks mirrors rac_model_registry_discover_downloaded's
- * callback struct. It stays optional in the ABI so consumers that only want
- * `include_remote_catalog` don't have to wire platform file-IO stubs.
+ * @param request_bytes Serialized ModelFormatFromUrlRequest (may be empty).
+ * @param request_size  Byte count.
+ * @param out_result    Receives serialized ModelFormatFromUrlResult bytes.
+ * @return RAC_SUCCESS on success (including unknown-format), or a
+ *         negative rac_result_t on encode/decode failure.
  */
-typedef struct {
-    rac_bool_t include_remote_catalog;
-    rac_bool_t rescan_local;
-    rac_bool_t prune_orphans;
-    /** Optional — required only when rescan_local or prune_orphans is set. */
-    const rac_discovery_callbacks_t* discovery_callbacks;
-} rac_model_registry_refresh_opts_t;
+RAC_API rac_result_t rac_model_format_from_url_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_proto_buffer_t* out_result);
 
 /**
- * @brief Refresh the model registry.
+ * @brief Infer a ModelArtifactType from a portable URL/file-path string.
  *
- * Unifies what used to be three separate SDK-specific calls (Kotlin's
- * fetchModelAssignments, Flutter's discoverDownloadedModels, Swift's
- * discoverDownloadedModels) behind a single C ABI. Each step is independent;
- * a failure in one does not abort the others — the first non-success code
- * encountered is returned so callers can still observe errors.
+ * Consumes serialized runanywhere.v1.ArtifactInferFromUrlRequest bytes and
+ * returns serialized runanywhere.v1.ArtifactInferFromUrlResult bytes.
+ * Recognizes the ".tar.gz" / ".tgz" / ".tar.bz2" / ".tbz2" / ".tar.xz" /
+ * ".txz" / ".zip" archive suffixes and defaults to SINGLE_FILE otherwise.
  *
- * @param handle Registry handle (usually rac_get_model_registry()).
- * @param opts   Refresh options (passed by value).
- * @return       RAC_SUCCESS if all requested steps succeeded.
- *               RAC_ERROR_INVALID_ARGUMENT if handle is NULL.
- *               Propagated error code from the first failing step otherwise.
+ * @param request_bytes Serialized ArtifactInferFromUrlRequest (may be empty).
+ * @param request_size  Byte count.
+ * @param out_result    Receives serialized ArtifactInferFromUrlResult bytes.
+ * @return RAC_SUCCESS on success, or a negative rac_result_t on
+ *         encode/decode failure.
  */
-RAC_API rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
-                                                rac_model_registry_refresh_opts_t opts);
+RAC_API rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request_bytes,
+                                                       size_t request_size,
+                                                       rac_proto_buffer_t* out_result);
 
 // =============================================================================
 // REGISTER MODEL FROM URL — single-call URL+name+framework → save
+//
+// Composes the canonical RAModelInfo factory (rac_model_info_make_proto)
+// with the existing registry persistence path so SDKs replace the ~60 LOC
+// build-and-save body of Swift's RunAnywhere.registerModel(...) (and the
+// equivalent Kotlin/Flutter/RN/Web glue) with a single ABI call. Output is
+// the saved ModelInfo bytes — same shape as
+// rac_model_registry_register_proto_buffer.
 // =============================================================================
 
 /**
  * @brief Build a fully-populated ModelInfo from a URL+name+framework tuple and
  *        persist it to the global model registry.
  *
- * Consumes serialized `runanywhere.v1.RegisterModelFromUrlRequest` bytes and
- * returns serialized `runanywhere.v1.ModelInfo` bytes (the saved entry) in
- * out_proto. Internally composes `rac_model_info_make_proto` (field defaults,
- * id/name/framework/category/source/format/artifact inference) with the
- * registry persistence path used by every other SDK adapter.
+ * Consumes serialized runanywhere.v1.RegisterModelFromUrlRequest bytes and
+ * returns serialized runanywhere.v1.ModelInfo bytes (the saved entry) in
+ * out_proto. Internally:
+ *
+ *   1. Translates RegisterModelFromUrlRequest → ModelInfoMakeRequest.
+ *   2. Calls rac_model_info_make_proto() to default the 18 ModelInfo fields
+ *      (id from URL, name fallback, format/framework/category detection,
+ *      artifact inference, source mark, timestamps, …).
+ *   3. Saves the resulting ModelInfo through
+ *      rac_model_registry_register_proto_buffer() on the global registry
+ *      (rac_get_model_registry()), which round-trips through the same
+ *      conversion + save path used by every other SDK adapter.
+ *
+ * On encode/decode failure the error envelope is set on out_proto via the
+ * canonical rac_proto_buffer_set_error() convention.
  *
  * @param in_request_bytes Serialized RegisterModelFromUrlRequest bytes (may be
- *                         empty — treated as a default-zeroed request).
+ *                         empty — treated as a default-zeroed request, which
+ *                         results in a model with empty url/id/name and the
+ *                         standard make() defaults).
  * @param in_size          Byte count.
- * @param out_proto        Receives serialized ModelInfo bytes on success or an
- *                         error status on failure.
+ * @param out_proto        Receives serialized runanywhere.v1.ModelInfo bytes
+ *                         on success or an error status on failure.
  * @return RAC_SUCCESS on success, or a negative rac_result_t on failure.
  */
 RAC_API rac_result_t rac_register_model_from_url_proto(const uint8_t* in_request_bytes,
                                                        size_t in_size,
                                                        rac_proto_buffer_t* out_proto);
+
+/**
+ * Register a multi-file model from a RegisterMultiFileModelRequest.
+ *
+ * Builds a ModelInfo carrying a MultiFileArtifact (one ModelFileDescriptor per
+ * file) plus the caller-supplied capability fields, and persists it through the
+ * same registry save path. Replaces the hand-built MultiFileArtifact ModelInfo
+ * every SDK assembles today.
+ *
+ * @param in_request_bytes Serialized RegisterMultiFileModelRequest bytes.
+ * @param in_size          Byte count.
+ * @param out_proto        Receives serialized runanywhere.v1.ModelInfo bytes on
+ *                         success or an error status on failure.
+ * @return RAC_SUCCESS on success, or a negative rac_result_t on failure.
+ */
+RAC_API rac_result_t rac_register_multi_file_model_proto(const uint8_t* in_request_bytes,
+                                                         size_t in_size,
+                                                         rac_proto_buffer_t* out_proto);
 
 #ifdef __cplusplus
 }

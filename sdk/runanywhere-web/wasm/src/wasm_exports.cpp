@@ -14,7 +14,6 @@
 
 // Core
 #include "rac/core/capabilities/rac_lifecycle.h"
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_error_proto.h"

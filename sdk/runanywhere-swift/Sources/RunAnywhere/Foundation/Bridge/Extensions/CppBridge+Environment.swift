@@ -120,12 +120,6 @@ extension CppBridge {
             buildToken != nil
         }
 
-        /// Get Sentry DSN for crash reporting (optional)
-        public static var sentryDSN: String? {
-            guard let ptr = rac_dev_config_get_sentry_dsn() else { return nil }
-            return String(cString: ptr)
-        }
-
         /// Configure CppBridge.HTTP for development mode using C++ config
         /// - Returns: true if configured successfully, false if config not available
         @discardableResult

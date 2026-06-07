@@ -109,7 +109,6 @@
 // Event system
 #include "rac_events.h"
 #include "rac_sdk_event_stream.h"
-#include "rac_analytics_events.h"
 
 // Download management
 #include "rac_download.h"
@@ -171,8 +170,6 @@
 #include "rac_plugin_entry.h"
 #include "rac_plugin_loader.h"  // runtime dlopen path
 #include "rac_plugin_entry_platform.h"  // platform plugin (Apple FM / System TTS / CoreML Diffusion)
-#include "rac_routing_hints.h"
-#include "rac_route.h"
 #include "rac_runtime_registry.h"  // explicit-module mode requirement
 #include "rac_runtime_vtable.h"
 

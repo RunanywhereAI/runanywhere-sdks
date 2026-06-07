@@ -138,7 +138,9 @@ extension CppBridge {
         ///
         /// Exposed so `CppBridge.Events.register()` can attach it to the C++
         /// router as the telemetry sink (`rac_events_set_telemetry_sink`).
-        static var handle: ManagerHandle? {
+        /// `fileprivate` because `ManagerHandle` is a private file-scoped type;
+        /// `register()` lives in this same file.
+        fileprivate static var handle: ManagerHandle? {
             manager.withLock { $0 }
         }
 
