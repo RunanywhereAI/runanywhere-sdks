@@ -724,6 +724,10 @@ set(RAC_CORE_SOURCES
 # Infrastructure sources - registry, model management, network, telemetry
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
+    # Single canonical SDKEvent publish helper (rac::events::publish). One
+    # place that stamps the envelope and routes serialized bytes through
+    # rac_sdk_event_publish_proto; typed per-component payload overloads.
+    src/infrastructure/events/sdk_event_publish.cpp
     # Legacy service_registry.cpp DELETED. Plugin registration
     # now flows exclusively through rac_plugin_registry.cpp below.
     src/plugin/rac_plugin_registry.cpp

@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "rac/core/rac_error.h"
@@ -27,6 +28,7 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "hardware_profile.pb.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #endif
 
@@ -668,14 +670,15 @@ rac_result_t publish_shutdown() {
 
 rac_result_t publish_device_registered(const char* device_id) {
 #if defined(RAC_HAVE_PROTOBUF)
-    runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_DEVICE,
-                      runanywhere::v1::ERROR_SEVERITY_INFO);
-    auto* device = event.mutable_device();
-    device->set_kind(runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED);
+    // Routed through the single canonical SDKEvent publish helper
+    // (sdk_event_publish.h): build the typed payload, then let the helper stamp
+    // the envelope (id/timestamp/source/destination) and emit it.
+    runanywhere::v1::DeviceEvent device;
+    device.set_kind(runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED);
     if (device_id)
-        device->set_device_id(device_id);
-    return publish_message(event);
+        device.set_device_id(device_id);
+    return publish(runanywhere::v1::SDK_COMPONENT_UNSPECIFIED,
+                   runanywhere::v1::EVENT_CATEGORY_DEVICE, std::move(device));
 #else
     (void)device_id;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
