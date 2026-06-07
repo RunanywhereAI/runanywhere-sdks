@@ -1,12 +1,14 @@
 /**
- * @file stt_component.cpp
- * @brief STT Capability Component Implementation
+ * @file stt_module.cpp
+ * @brief Unified STT feature module.
  *
- * C++ port of Swift's STTCapability.swift
- * Swift Source: Sources/RunAnywhere/Features/STT/STTCapability.swift
+ * W4 component unification: merges the former stt_component.cpp (handle-based
+ * component path + the *_component_*_proto verbs) with STT's slice of
+ * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
+ * rac_stt_transcribe_lifecycle_proto / _stream verbs) into one TU.
  *
- * IMPORTANT: This is a direct translation of the Swift implementation.
- * Do NOT add features not present in the Swift code.
+ * The component section is a direct translation of Swift's STTCapability.swift;
+ * do NOT add features not present in the Swift code.
  */
 
 #include <chrono>
@@ -20,13 +22,19 @@
 #include <string>
 #include <vector>
 
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
+#include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_proto_adapters.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_stream.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -1269,3 +1277,363 @@ extern "C" rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
     delete wrapper;
     return rc;
 }
+
+// =============================================================================
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly STT slice of
+// rac_nonllm_lifecycle_proto_abi.cpp)
+//
+// Handle-less verbs that resolve the loaded model via the global registry
+// (rac::lifecycle::acquire_lifecycle_stt) rather than a component handle.
+// =============================================================================
+
+namespace {
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+// Shared anon-ns helpers carried verbatim from rac_nonllm_lifecycle_proto_abi.cpp.
+// Internal linkage keeps these distinct from the component-section helpers above
+// (proto_bytes_valid / proto_parse_data / copy_proto_message) — no ODR clash.
+bool valid_bytes(const uint8_t* bytes, size_t size) {
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+}
+
+const void* parse_data(const uint8_t* bytes, size_t size) {
+    static const char kEmpty[] = "";
+    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+}
+
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    if (!out) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    const size_t size = message.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize proto result");
+    }
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+}
+
+rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
+}
+
+rac_audio_format_enum_t c_audio_format(runanywhere::v1::AudioFormat format) {
+    switch (format) {
+        case runanywhere::v1::AUDIO_FORMAT_WAV:
+            return RAC_AUDIO_FORMAT_WAV;
+        case runanywhere::v1::AUDIO_FORMAT_MP3:
+            return RAC_AUDIO_FORMAT_MP3;
+        case runanywhere::v1::AUDIO_FORMAT_OPUS:
+            return RAC_AUDIO_FORMAT_OPUS;
+        case runanywhere::v1::AUDIO_FORMAT_AAC:
+            return RAC_AUDIO_FORMAT_AAC;
+        case runanywhere::v1::AUDIO_FORMAT_FLAC:
+            return RAC_AUDIO_FORMAT_FLAC;
+        case runanywhere::v1::AUDIO_FORMAT_PCM:
+        case runanywhere::v1::AUDIO_FORMAT_PCM_S16LE:
+        default:
+            return RAC_AUDIO_FORMAT_PCM;
+    }
+}
+
+// 3-arg variant carried from the nonllm slice. Coexists as an overload with the
+// 2-arg estimate_audio_length_ms in the component section above.
+int64_t estimate_audio_length_ms(size_t byte_count, int32_t sample_rate, size_t bytes_per_sample) {
+    const int32_t rate = sample_rate > 0 ? sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
+    const size_t width = bytes_per_sample > 0 ? bytes_per_sample : RAC_STT_BYTES_PER_SAMPLE;
+    return static_cast<int64_t>(
+        (static_cast<double>(byte_count) / static_cast<double>(width) / static_cast<double>(rate)) *
+        1000.0);
+}
+
+rac_result_t parse_stt_request(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                               runanywhere::v1::STTTranscriptionRequest* out_request,
+                               rac_proto_buffer_t* out_error) {
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_error, "STTTranscriptionRequest bytes are invalid");
+    }
+    if (!out_request->ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                     static_cast<int>(request_proto_size))) {
+        return parse_error(out_error, "failed to parse STTTranscriptionRequest");
+    }
+    if (out_request->has_audio() && (!out_request->audio().file_uri().empty() ||
+                                     !out_request->audio().adapter_handle().empty())) {
+        return rac_proto_buffer_set_error(
+            out_error, RAC_ERROR_NOT_SUPPORTED,
+            "STTTranscriptionRequest audio file_uri/adapter_handle requires a platform adapter");
+    }
+    if (!out_request->has_audio() || out_request->audio().audio_data().empty()) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "STTTranscriptionRequest.audio.audio_data is required");
+    }
+    return RAC_SUCCESS;
+}
+
+#endif  // RAC_HAVE_PROTOBUF
+
+[[maybe_unused]] rac_result_t feature_unavailable(rac_proto_buffer_t* out) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+}
+
+}  // namespace
+
+extern "C" {
+
+rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                size_t request_proto_size,
+                                                rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_result);
+#else
+    runanywhere::v1::STTTranscriptionRequest request;
+    rac_result_t rc =
+        parse_stt_request(request_proto_bytes, request_proto_size, &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
+
+    rac::lifecycle::LifecycleSttRef ref;
+    rc = rac::lifecycle::acquire_lifecycle_stt(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "STT lifecycle model is not loaded");
+    }
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+    if (request.has_options() &&
+        !rac::foundation::rac_stt_options_from_proto(request.options(), &options)) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to convert STTOptions");
+    }
+    if (request.has_options() && request.options().has_language_code() &&
+        !request.options().language_code().empty()) {
+        options.language = request.options().language_code().c_str();
+        options.detect_language = RAC_FALSE;
+    }
+    if (request.audio().sample_rate() > 0) {
+        options.sample_rate = request.audio().sample_rate();
+    }
+    if (request.audio().audio_format() != runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED) {
+        options.audio_format = c_audio_format(request.audio().audio_format());
+    }
+
+    const std::string& audio = request.audio().audio_data();
+    rac_stt_service_t service{ref.ops, ref.impl, ref.model_id};
+    rac_stt_result_t raw = {};
+    rc = rac_stt_transcribe(&service, audio.data(), audio.size(), &options, &raw);
+    if (rc != RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    runanywhere::v1::STTOutput output;
+    if (!rac::foundation::rac_stt_result_to_proto(&raw, &output)) {
+        rac_stt_result_free(&raw);
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to encode STTOutput");
+    }
+    output.set_timestamp_ms(rac_get_current_time_ms());
+    const size_t sample_width =
+        request.audio().encoding() == runanywhere::v1::STT_AUDIO_ENCODING_PCM_F32_LE
+            ? sizeof(float)
+            : RAC_STT_BYTES_PER_SAMPLE;
+    const int64_t duration_ms =
+        request.audio().duration_ms() > 0
+            ? request.audio().duration_ms()
+            : estimate_audio_length_ms(audio.size(), options.sample_rate, sample_width);
+    output.set_duration_ms(duration_ms);
+    auto* metadata = output.mutable_metadata();
+    metadata->set_model_id(ref.model_id ? ref.model_id : "");
+    metadata->set_audio_length_ms(duration_ms);
+    if (duration_ms > 0 && metadata->processing_time_ms() > 0) {
+        metadata->set_real_time_factor(
+            static_cast<float>(static_cast<double>(metadata->processing_time_ms()) /
+                               static_cast<double>(duration_ms)));
+    }
+
+    rc = copy_proto(output, out_result);
+    rac_stt_result_free(&raw);
+    rac::lifecycle::release_lifecycle_stt(&ref);
+    return rc;
+#endif
+}
+
+rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data) {
+    if (!callback) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    runanywhere::v1::STTTranscriptionRequest request;
+    if (!request.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.has_audio() &&
+        (!request.audio().file_uri().empty() || !request.audio().adapter_handle().empty())) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (!request.has_audio() || request.audio().audio_data().empty()) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    rac::lifecycle::LifecycleSttRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_stt(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    if (!ref.ops || !ref.ops->transcribe_stream) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+    if (request.has_options() &&
+        !rac::foundation::rac_stt_options_from_proto(request.options(), &options)) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.has_options() && request.options().has_language_code() &&
+        !request.options().language_code().empty()) {
+        options.language = request.options().language_code().c_str();
+        options.detect_language = RAC_FALSE;
+    }
+    if (request.audio().sample_rate() > 0) {
+        options.sample_rate = request.audio().sample_rate();
+    }
+    if (request.audio().audio_format() != runanywhere::v1::AUDIO_FORMAT_UNSPECIFIED) {
+        options.audio_format = c_audio_format(request.audio().audio_format());
+    }
+
+    // Bridge context: forwards backend partial/final callbacks into
+    // serialized STTStreamEvent envelopes via the caller's proto callback.
+    struct StreamCtx {
+        rac_stt_lifecycle_stream_event_callback_fn fn;
+        void* user_data;
+        std::string request_id;
+        uint64_t next_seq;
+        runanywhere::v1::STTLanguage language;
+        size_t audio_size;
+        int32_t sample_rate;
+        size_t sample_width;
+    };
+
+    const std::string request_id =
+        request.request_id().empty()
+            ? std::string("stt-lifecycle-") + std::to_string(rac_get_current_time_ms())
+            : request.request_id();
+
+    const size_t sample_width =
+        request.audio().encoding() == runanywhere::v1::STT_AUDIO_ENCODING_PCM_F32_LE
+            ? sizeof(float)
+            : RAC_STT_BYTES_PER_SAMPLE;
+
+    const int32_t effective_sample_rate =
+        options.sample_rate > 0 ? options.sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
+
+    runanywhere::v1::STTLanguage language_enum = runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
+    if (request.has_options()) {
+        language_enum = request.options().language();
+    }
+
+    StreamCtx ctx{.fn = callback,
+                  .user_data = user_data,
+                  .request_id = request_id,
+                  .next_seq = 1,
+                  .language = language_enum,
+                  .audio_size = request.audio().audio_data().size(),
+                  .sample_rate = effective_sample_rate,
+                  .sample_width = sample_width};
+
+    auto emit_event = [](const runanywhere::v1::STTStreamEvent& event,
+                         rac_stt_lifecycle_stream_event_callback_fn fn, void* user_ctx) {
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_ctx);
+    };
+
+    // Emit STARTED envelope before the backend call so SDK consumers can wire
+    // their state machine (kind = STARTED, seq = 1).
+    {
+        runanywhere::v1::STTStreamEvent started;
+        started.set_seq(ctx.next_seq++);
+        started.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        started.set_request_id(ctx.request_id);
+        started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
+        emit_event(started, ctx.fn, ctx.user_data);
+    }
+
+    auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
+        auto* c = static_cast<StreamCtx*>(opaque);
+        runanywhere::v1::STTStreamEvent event;
+        event.set_seq(c->next_seq++);
+        event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        event.set_request_id(c->request_id);
+        event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
+                                            : runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL);
+        auto* partial = event.mutable_partial();
+        if (partial_text) {
+            partial->set_text(partial_text);
+        }
+        partial->set_is_final(is_final == RAC_TRUE);
+        partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
+        partial->set_request_id(c->request_id);
+        partial->set_language(c->language);
+        if (is_final == RAC_TRUE) {
+            auto* final_output = event.mutable_final_output();
+            if (partial_text) {
+                final_output->set_text(partial_text);
+            }
+            final_output->set_language(c->language);
+            const int64_t audio_length_ms =
+                estimate_audio_length_ms(c->audio_size, c->sample_rate, c->sample_width);
+            final_output->set_duration_ms(audio_length_ms);
+            final_output->mutable_metadata()->set_audio_length_ms(audio_length_ms);
+        }
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        c->fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), c->user_data);
+    };
+
+    const std::string& audio = request.audio().audio_data();
+    rc = ref.ops->transcribe_stream(ref.impl, audio.data(), audio.size(), &options, bridge, &ctx);
+    if (rc != RAC_SUCCESS) {
+        runanywhere::v1::STTStreamEvent error_event;
+        error_event.set_seq(ctx.next_seq++);
+        error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        error_event.set_request_id(ctx.request_id);
+        error_event.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
+        error_event.set_error_code(rc);
+        error_event.set_error_message(rac_error_message(rc));
+        emit_event(error_event, ctx.fn, ctx.user_data);
+    }
+    rac::lifecycle::release_lifecycle_stt(&ref);
+    return rc;
+#endif
+}
+
+}  // extern "C"

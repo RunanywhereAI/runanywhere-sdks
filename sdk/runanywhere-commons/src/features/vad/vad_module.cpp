@@ -1,12 +1,16 @@
 /**
- * @file vad_component.cpp
- * @brief VAD Capability Component Implementation
+ * @file vad_module.cpp
+ * @brief Unified VAD feature module.
  *
- * C++ port of Swift's VADCapability.swift
- * Swift Source: Sources/RunAnywhere/Features/VAD/VADCapability.swift
+ * W4 component unification: merges the former vad_component.cpp (handle-based
+ * dual-backend component path — always-on energy VAD + optional model VAD —
+ * plus the *_component_*_proto verbs) with VAD's slice of
+ * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
+ * rac_vad_process_lifecycle_proto + configure/start/stop/reset verbs) into one
+ * TU. The dual-backend dispatch (model-first, energy-fallback) is preserved.
  *
- * IMPORTANT: This is a direct translation of the Swift implementation.
- * Do NOT add features not present in the Swift code.
+ * The component section is a direct translation of Swift's VADCapability.swift;
+ * do NOT add features not present in the Swift code.
  */
 
 #include "vad_threshold_registry.h"
@@ -23,17 +27,24 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
+#include "rac/core/rac_types.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
+#include "rac/features/vad/rac_vad_proto_adapters.h"
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/features/vad/rac_vad_stream.h"
+#include "rac/foundation/rac_proto_adapters.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -1169,3 +1180,344 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
     return rac_vad_component_set_activity_callback(handle, proto_activity_trampoline, handle);
 #endif
 }
+
+// =============================================================================
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly VAD slice of
+// rac_nonllm_lifecycle_proto_abi.cpp)
+//
+// Handle-less verbs that resolve the loaded model via the global registry
+// (rac::lifecycle::acquire_lifecycle_vad). Verb map: process=generate,
+// configure=load.
+// =============================================================================
+
+namespace {
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+// Shared anon-ns helpers carried from rac_nonllm_lifecycle_proto_abi.cpp.
+// Internal linkage; distinct from the component-section helpers above
+// (proto_bytes_valid / proto_parse_data / copy_proto_message). compute_rms_energy
+// is NOT re-declared here — the component section above already defines it in
+// this same TU's anonymous namespace and it is reused below.
+bool valid_bytes(const uint8_t* bytes, size_t size) {
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+}
+
+const void* parse_data(const uint8_t* bytes, size_t size) {
+    static const char kEmpty[] = "";
+    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+}
+
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    if (!out) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    const size_t size = message.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize proto result");
+    }
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+}
+
+rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
+}
+
+rac_result_t parse_vad_request(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                               runanywhere::v1::VADProcessRequest* out_request,
+                               rac_proto_buffer_t* out_error) {
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_error, "VADProcessRequest bytes are invalid");
+    }
+    if (!out_request->ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                     static_cast<int>(request_proto_size))) {
+        return parse_error(out_error, "failed to parse VADProcessRequest");
+    }
+    if (out_request->has_audio() && !out_request->audio().adapter_handle().empty()) {
+        return rac_proto_buffer_set_error(
+            out_error, RAC_ERROR_NOT_SUPPORTED,
+            "VADProcessRequest audio adapter_handle requires a platform adapter");
+    }
+    if (!out_request->has_audio() || out_request->audio().audio_data().empty()) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VADProcessRequest.audio.audio_data is required");
+    }
+    if (out_request->audio().channels() > 1) {
+        return rac_proto_buffer_set_error(
+            out_error, RAC_ERROR_NOT_SUPPORTED,
+            "VADProcessRequest multi-channel audio is not supported by the portable lifecycle ABI");
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
+                                std::vector<float>* out, rac_proto_buffer_t* out_error) {
+    const std::string& bytes = audio.audio_data();
+    out->clear();
+    switch (audio.encoding()) {
+        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_S16_LE: {
+            if (bytes.size() % sizeof(int16_t) != 0) {
+                return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                                  "VAD PCM_S16_LE audio byte length is invalid");
+            }
+            const size_t count = bytes.size() / sizeof(int16_t);
+            out->resize(count);
+            const auto* raw = reinterpret_cast<const uint8_t*>(bytes.data());
+            for (size_t i = 0; i < count; ++i) {
+                const int16_t sample =
+                    static_cast<int16_t>(static_cast<uint16_t>(raw[i * 2]) |
+                                         (static_cast<uint16_t>(raw[i * 2 + 1]) << 8));
+                (*out)[i] = static_cast<float>(sample) / 32768.0f;
+            }
+            return RAC_SUCCESS;
+        }
+        case runanywhere::v1::VAD_AUDIO_ENCODING_UNSPECIFIED:
+        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE: {
+            if (bytes.size() % sizeof(float) != 0) {
+                return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                                  "VAD PCM_F32_LE audio byte length is invalid");
+            }
+            const size_t count = bytes.size() / sizeof(float);
+            out->resize(count);
+            if (count > 0) {
+                std::memcpy(out->data(), bytes.data(), bytes.size());
+            }
+            return RAC_SUCCESS;
+        }
+        default:
+            return rac_proto_buffer_set_error(out_error, RAC_ERROR_NOT_SUPPORTED,
+                                              "VAD audio encoding is not supported");
+    }
+}
+
+rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref, rac_result_t op_rc,
+                                    float threshold, int32_t sample_rate, int32_t frame_length_ms,
+                                    rac_proto_buffer_t* out_result) {
+    runanywhere::v1::VADServiceState state;
+    state.set_is_ready(op_rc == RAC_SUCCESS);
+    const bool active = (ref.ops != nullptr && ref.ops->is_speech_active != nullptr &&
+                         ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
+    state.set_is_speech_active(active);
+    state.set_energy_threshold(threshold);
+    state.set_sample_rate(sample_rate);
+    state.set_frame_length_ms(frame_length_ms);
+    if (ref.model_id) {
+        state.set_current_model(ref.model_id);
+    }
+    if (op_rc != RAC_SUCCESS) {
+        state.set_error_code(op_rc);
+        state.set_error_message(rac_error_message(op_rc));
+    }
+    return copy_proto(state, out_result);
+}
+
+#endif  // RAC_HAVE_PROTOBUF
+
+[[maybe_unused]] rac_result_t feature_unavailable_lifecycle(rac_proto_buffer_t* out) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+}
+
+}  // namespace
+
+extern "C" {
+
+rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                             size_t request_proto_size,
+                                             rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable_lifecycle(out_result);
+#else
+    runanywhere::v1::VADProcessRequest request;
+    rac_result_t rc =
+        parse_vad_request(request_proto_bytes, request_proto_size, &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
+
+    std::vector<float> samples;
+    rc = decode_vad_samples(request.audio(), &samples, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
+    if (samples.empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VADProcessRequest decoded no samples");
+    }
+
+    rac::lifecycle::LifecycleVadRef ref;
+    rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+    if (request.has_options() && request.options().threshold() > 0.0f) {
+        threshold = request.options().threshold();
+        if (ref.ops->set_threshold) {
+            (void)ref.ops->set_threshold(ref.impl, threshold);
+        }
+    }
+
+    rac_bool_t is_speech = RAC_FALSE;
+    if (!ref.ops->process) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                                          "VAD backend does not implement process");
+    }
+    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
+    if (rc != RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    const int32_t sample_rate = request.audio().sample_rate() > 0 ? request.audio().sample_rate()
+                                                                  : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    const float energy = compute_rms_energy(samples.data(), samples.size());
+    runanywhere::v1::VADResult result;
+    result.set_is_speech(is_speech == RAC_TRUE);
+    result.set_energy(energy);
+    result.set_confidence(threshold > 0.0f ? std::min(1.0f, energy / threshold)
+                                           : (is_speech == RAC_TRUE ? 1.0f : 0.0f));
+    int32_t duration_ms = static_cast<int32_t>(
+        (static_cast<double>(samples.size()) / static_cast<double>(sample_rate)) * 1000.0);
+    if (!samples.empty() && duration_ms == 0) {
+        duration_ms = 1;
+    }
+    result.set_duration_ms(duration_ms);
+    result.set_timestamp_ms(rac_get_current_time_ms());
+    rc = copy_proto(result, out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// VAD lifecycle configure / start / stop / reset ABIs (FLT-12)
+// ---------------------------------------------------------------------------
+
+rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                               size_t request_proto_size,
+                                               rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable_lifecycle(out_result);
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_result, "VADConfiguration bytes are invalid");
+    }
+    runanywhere::v1::VADConfiguration proto;
+    if (!proto.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                              static_cast<int>(request_proto_size))) {
+        return parse_error(out_result, "failed to parse VADConfiguration");
+    }
+
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    const int32_t sample_rate =
+        proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    const int32_t frame_length_ms =
+        proto.frame_length_ms() > 0 ? proto.frame_length_ms()
+                                    : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
+    const float threshold =
+        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->set_threshold) {
+        op_rc = ref.ops->set_threshold(ref.impl, threshold);
+    }
+
+    rc = emit_vad_service_state(ref, op_rc, threshold, sample_rate, frame_length_ms, out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable_lifecycle(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->start) {
+        op_rc = ref.ops->start(ref.impl);
+    }
+
+    rc = emit_vad_service_state(
+        ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
+        static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable_lifecycle(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->stop) {
+        op_rc = ref.ops->stop(ref.impl);
+    }
+
+    rc = emit_vad_service_state(
+        ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
+        static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_reset_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable_lifecycle(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->reset) {
+        op_rc = ref.ops->reset(ref.impl);
+    }
+
+    rc = emit_vad_service_state(
+        ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
+        static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+}  // extern "C"

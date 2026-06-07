@@ -1,12 +1,15 @@
 /**
- * @file tts_component.cpp
- * @brief TTS Capability Component Implementation
+ * @file tts_module.cpp
+ * @brief Unified TTS feature module.
  *
- * C++ port of Swift's TTSCapability.swift
- * Swift Source: Sources/RunAnywhere/Features/TTS/TTSCapability.swift
+ * W4 component unification: merges the former tts_component.cpp (handle-based
+ * component path + the *_component_*_proto verbs) with TTS's slice of
+ * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
+ * rac_tts_synthesize_lifecycle_proto / _stream / stop / list_voices verbs)
+ * into one TU.
  *
- * IMPORTANT: This is a direct translation of the Swift implementation.
- * Do NOT add features not present in the Swift code.
+ * The component section is a direct translation of Swift's TTSCapability.swift;
+ * do NOT add features not present in the Swift code.
  */
 
 #include <chrono>
@@ -19,13 +22,19 @@
 #include <string>
 #include <vector>
 
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
+#include "rac/core/rac_types.h"
 #include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_proto_adapters.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/tts/rac_tts_stream.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -1024,3 +1033,408 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream_proto(
     return rc;
 #endif
 }
+
+// =============================================================================
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly TTS slice of
+// rac_nonllm_lifecycle_proto_abi.cpp)
+//
+// Handle-less verbs that resolve the loaded voice via the global registry
+// (rac::lifecycle::acquire_lifecycle_tts) rather than a component handle.
+// =============================================================================
+
+namespace {
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+// Shared anon-ns helpers carried verbatim from rac_nonllm_lifecycle_proto_abi.cpp.
+// Internal linkage keeps these distinct from the component-section helpers above
+// (proto_bytes_valid / proto_parse_data / copy_proto_message) — no ODR clash.
+bool valid_bytes(const uint8_t* bytes, size_t size) {
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+}
+
+const void* parse_data(const uint8_t* bytes, size_t size) {
+    static const char kEmpty[] = "";
+    return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
+}
+
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    if (!out) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    const size_t size = message.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize proto result");
+    }
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+}
+
+rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
+}
+
+void free_tts_options(rac_tts_options_t* options) {
+    if (!options)
+        return;
+    rac_free(const_cast<char*>(options->voice));
+    if (options->language != RAC_TTS_OPTIONS_DEFAULT.language) {
+        rac_free(const_cast<char*>(options->language));
+    }
+    *options = RAC_TTS_OPTIONS_DEFAULT;
+}
+
+rac_result_t parse_tts_request(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                               runanywhere::v1::TTSSynthesisRequest* out_request,
+                               rac_proto_buffer_t* out_error) {
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_error, "TTSSynthesisRequest bytes are invalid");
+    }
+    if (!out_request->ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                     static_cast<int>(request_proto_size))) {
+        return parse_error(out_error, "failed to parse TTSSynthesisRequest");
+    }
+    if (out_request->text().empty() && !out_request->has_ssml()) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "TTSSynthesisRequest.text or ssml is required");
+    }
+    return RAC_SUCCESS;
+}
+
+#endif  // RAC_HAVE_PROTOBUF
+
+[[maybe_unused]] rac_result_t feature_unavailable(rac_proto_buffer_t* out) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+}
+
+}  // namespace
+
+extern "C" {
+
+rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                size_t request_proto_size,
+                                                rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_result);
+#else
+    runanywhere::v1::TTSSynthesisRequest request;
+    rac_result_t rc =
+        parse_tts_request(request_proto_bytes, request_proto_size, &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
+
+    rac::lifecycle::LifecycleTtsRef ref;
+    rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "TTS lifecycle voice/model is not loaded");
+    }
+
+    rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
+    if (request.has_options() &&
+        !rac::foundation::rac_tts_options_from_proto(request.options(), &options)) {
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to convert TTSOptions");
+    }
+    if (request.has_options() && request.options().sample_rate() > 0) {
+        options.sample_rate = request.options().sample_rate();
+    }
+
+    const bool use_ssml = request.has_ssml() && !request.ssml().empty();
+    if (use_ssml) {
+        options.use_ssml = RAC_TRUE;
+    }
+    const std::string& text = use_ssml ? request.ssml() : request.text();
+    rac_tts_service_t service{ref.ops, ref.impl, ref.model_id};
+    rac_tts_result_t raw = {};
+    rc = rac_tts_synthesize(&service, text.c_str(), &options, &raw);
+    if (rc != RAC_SUCCESS) {
+        free_tts_options(&options);
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    runanywhere::v1::TTSOutput output;
+    if (!rac::foundation::rac_tts_result_to_proto(&raw, &output)) {
+        rac_tts_result_free(&raw);
+        free_tts_options(&options);
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          "failed to encode TTSOutput");
+    }
+    output.set_timestamp_ms(rac_get_current_time_ms());
+    output.set_is_final(true);
+    output.set_error_code(RAC_SUCCESS);
+    output.set_audio_size_bytes(static_cast<int64_t>(raw.audio_size));
+    auto* metadata = output.mutable_metadata();
+    metadata->set_voice_id(options.voice ? options.voice : (ref.model_id ? ref.model_id : ""));
+    if (options.language) {
+        metadata->set_language_code(options.language);
+    }
+    metadata->set_character_count(static_cast<int32_t>(text.size()));
+
+    rc = copy_proto(output, out_result);
+    rac_tts_result_free(&raw);
+    free_tts_options(&options);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return rc;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// TTS lifecycle stream / stop ABIs (FLT-12)
+// ---------------------------------------------------------------------------
+
+rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_tts_lifecycle_stream_event_callback_fn callback, void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    (void)callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!callback)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    rac_proto_buffer_t error_buf;
+    rac_proto_buffer_init(&error_buf);
+
+    runanywhere::v1::TTSSynthesisRequest request;
+    rac_result_t rc =
+        parse_tts_request(request_proto_bytes, request_proto_size, &request, &error_buf);
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&error_buf);
+        return rc;
+    }
+
+    rac::lifecycle::LifecycleTtsRef ref;
+    rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&error_buf);
+        return rc;
+    }
+
+    if (!ref.ops || !ref.ops->synthesize_stream) {
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        rac_proto_buffer_free(&error_buf);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
+    if (request.has_options() &&
+        !rac::foundation::rac_tts_options_from_proto(request.options(), &options)) {
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        rac_proto_buffer_free(&error_buf);
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.has_options() && request.options().sample_rate() > 0) {
+        options.sample_rate = request.options().sample_rate();
+    }
+
+    const bool use_ssml = request.has_ssml() && !request.ssml().empty();
+    if (use_ssml) {
+        options.use_ssml = RAC_TRUE;
+    }
+    const std::string& text = use_ssml ? request.ssml() : request.text();
+
+    const std::string request_id =
+        request.request_id().empty()
+            ? std::string("tts-lifecycle-") + std::to_string(rac_get_current_time_ms())
+            : request.request_id();
+
+    struct StreamCtx {
+        rac_tts_lifecycle_stream_event_callback_fn fn;
+        void* user_data;
+        std::string request_id;
+        uint64_t next_seq;
+        std::string voice_id;
+        std::string language_code;
+        int32_t sample_rate;
+        rac_audio_format_enum_t audio_format;
+        int32_t character_count;
+    };
+    StreamCtx ctx{.fn = callback,
+                  .user_data = user_data,
+                  .request_id = request_id,
+                  .next_seq = 1,
+                  .voice_id = options.voice ? options.voice : (ref.model_id ? ref.model_id : ""),
+                  .language_code = options.language ? options.language : "",
+                  .sample_rate =
+                      options.sample_rate > 0 ? options.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                  .audio_format = options.audio_format,
+                  .character_count = static_cast<int32_t>(text.size())};
+
+    auto emit_event = [](const runanywhere::v1::TTSStreamEvent& event,
+                         rac_tts_lifecycle_stream_event_callback_fn fn, void* user_ctx) {
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_ctx);
+    };
+
+    // STARTED envelope.
+    {
+        runanywhere::v1::TTSStreamEvent started;
+        started.set_seq(ctx.next_seq++);
+        started.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        started.set_request_id(ctx.request_id);
+        started.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED);
+        emit_event(started, ctx.fn, ctx.user_data);
+    }
+
+    auto chunk_bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
+        auto* c = static_cast<StreamCtx*>(opaque);
+        runanywhere::v1::TTSStreamEvent event;
+        event.set_seq(c->next_seq++);
+        event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        event.set_request_id(c->request_id);
+        event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK);
+        auto* output = event.mutable_output();
+        if (audio_data && audio_size > 0) {
+            output->set_audio_data(audio_data, audio_size);
+        }
+        const auto audio_format_proto = [c]() {
+            switch (c->audio_format) {
+                case RAC_AUDIO_FORMAT_WAV:
+                    return runanywhere::v1::AUDIO_FORMAT_WAV;
+                case RAC_AUDIO_FORMAT_MP3:
+                    return runanywhere::v1::AUDIO_FORMAT_MP3;
+                case RAC_AUDIO_FORMAT_OPUS:
+                    return runanywhere::v1::AUDIO_FORMAT_OPUS;
+                case RAC_AUDIO_FORMAT_AAC:
+                    return runanywhere::v1::AUDIO_FORMAT_AAC;
+                case RAC_AUDIO_FORMAT_FLAC:
+                    return runanywhere::v1::AUDIO_FORMAT_FLAC;
+                case RAC_AUDIO_FORMAT_PCM:
+                default:
+                    return runanywhere::v1::AUDIO_FORMAT_PCM;
+            }
+        }();
+        output->set_audio_format(audio_format_proto);
+        output->set_sample_rate(c->sample_rate);
+        output->set_timestamp_ms(rac_get_current_time_ms());
+        output->set_audio_size_bytes(static_cast<int64_t>(audio_size));
+        auto* metadata = output->mutable_metadata();
+        metadata->set_voice_id(c->voice_id);
+        metadata->set_language_code(c->language_code);
+        metadata->set_character_count(c->character_count);
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        c->fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), c->user_data);
+    };
+
+    rc = ref.ops->synthesize_stream(ref.impl, text.c_str(), &options, chunk_bridge, &ctx);
+
+    if (rc != RAC_SUCCESS) {
+        runanywhere::v1::TTSStreamEvent error_event;
+        error_event.set_seq(ctx.next_seq++);
+        error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        error_event.set_request_id(ctx.request_id);
+        error_event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR);
+        error_event.set_error_code(rc);
+        error_event.set_error_message(rac_error_message(rc));
+        emit_event(error_event, ctx.fn, ctx.user_data);
+    } else {
+        runanywhere::v1::TTSStreamEvent completed;
+        completed.set_seq(ctx.next_seq++);
+        completed.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        completed.set_request_id(ctx.request_id);
+        completed.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED);
+        emit_event(completed, ctx.fn, ctx.user_data);
+    }
+
+    free_tts_options(&options);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    rac_proto_buffer_free(&error_buf);
+    return rc;
+#endif
+}
+
+rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    rac::lifecycle::LifecycleTtsRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "TTS lifecycle voice/model is not loaded");
+    }
+
+    rac_result_t stop_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->stop) {
+        stop_rc = ref.ops->stop(ref.impl);
+    }
+
+    runanywhere::v1::TTSServiceState state;
+    state.set_is_ready(stop_rc == RAC_SUCCESS);
+    if (ref.model_id) {
+        state.set_current_voice(ref.model_id);
+    }
+    if (stop_rc != RAC_SUCCESS) {
+        state.set_error_code(stop_rc);
+        state.set_error_message(rac_error_message(stop_rc));
+    }
+    rc = copy_proto(state, out_result);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return rc == RAC_SUCCESS ? stop_rc : rc;
+#endif
+}
+
+rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out) {
+    if (!out)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out);
+#else
+    rac::lifecycle::LifecycleTtsRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out, rc, "TTS lifecycle voice/model is not loaded");
+    }
+
+    runanywhere::v1::TTSVoiceList list;
+    if (ref.ops && ref.ops->get_info) {
+        rac_tts_info_t info = {};
+        rac_result_t info_rc = ref.ops->get_info(ref.impl, &info);
+        if (info_rc == RAC_SUCCESS) {
+            for (size_t i = 0; i < info.num_voices; ++i) {
+                const char* id = info.available_voices ? info.available_voices[i] : nullptr;
+                if (!id)
+                    continue;
+                runanywhere::v1::TTSVoiceInfo* voice = list.add_voices();
+                voice->set_id(id);
+                voice->set_display_name(id);
+            }
+        }
+    }
+
+    if (list.voices_size() == 0 && ref.model_id) {
+        runanywhere::v1::TTSVoiceInfo* voice = list.add_voices();
+        voice->set_id(ref.model_id);
+        voice->set_display_name(ref.model_id);
+    }
+
+    rc = copy_proto(list, out);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return rc;
+#endif
+}
+
+}  // extern "C"

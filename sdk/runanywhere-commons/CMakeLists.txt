@@ -832,9 +832,11 @@ endif()
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
     # LLM
-    src/features/llm/llm_component.cpp
+    # W4: unified module — merges the former llm_component.cpp (legacy
+    # handle-based component path) + rac_llm_proto_service.cpp (handle-less
+    # generated-proto C ABI) into one TU.
+    src/features/llm/llm_module.cpp
     src/features/llm/rac_llm_service.cpp
-    src/features/llm/rac_llm_proto_service.cpp
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
@@ -864,7 +866,9 @@ set(RAC_FEATURES_SOURCES
     # AsyncThrowingStream / callbackFlow / tokenQueue shims).
     src/features/llm/rac_llm_stream.cpp
     # STT
-    src/features/stt/stt_component.cpp
+    # W4: unified module — merges stt_component.cpp + STT slice of
+    # rac_nonllm_lifecycle_proto_abi.cpp.
+    src/features/stt/stt_module.cpp
     src/features/stt/rac_stt_service.cpp
     src/features/stt/stt_analytics.cpp
     # Lifecycle-owned proto-byte STTStreamEvent ABI
@@ -872,7 +876,9 @@ set(RAC_FEATURES_SOURCES
     # Canonical STTConfiguration defaults helper
     src/features/stt/rac_stt_config_defaults.cpp
     # TTS
-    src/features/tts/tts_component.cpp
+    # W4: unified module — merges tts_component.cpp + TTS slice of
+    # rac_nonllm_lifecycle_proto_abi.cpp.
+    src/features/tts/tts_module.cpp
     src/features/tts/rac_tts_service.cpp
     src/features/tts/tts_analytics.cpp
     # Lifecycle-owned proto-byte TTSStreamEvent ABI
@@ -880,7 +886,9 @@ set(RAC_FEATURES_SOURCES
     # Canonical TTSConfiguration defaults helper
     src/features/tts/rac_tts_config_defaults.cpp
     # VAD
-    src/features/vad/vad_component.cpp
+    # W4: unified module — merges vad_component.cpp + VAD slice of
+    # rac_nonllm_lifecycle_proto_abi.cpp (dual-backend energy+model preserved).
+    src/features/vad/vad_module.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
     # Lifecycle-owned proto-byte VADStreamEvent ABI
@@ -892,23 +900,28 @@ set(RAC_FEATURES_SOURCES
     # API directly. The shared types in
     # include/rac/features/wakeword/rac_wakeword_types.h remain.
     # VLM (Vision Language Model)
-    src/features/vlm/vlm_component.cpp
+    # W4: unified module — merges vlm_component.cpp + rac_vlm_proto_abi.cpp.
+    src/features/vlm/vlm_module.cpp
     src/features/vlm/rac_vlm_service.cpp
-    src/features/vlm/rac_vlm_proto_abi.cpp
     # Diffusion
-    src/features/diffusion/diffusion_component.cpp
+    # W4: unified module — merges diffusion_component.cpp +
+    # rac_diffusion_proto_abi.cpp + Diffusion slice of
+    # rac_nonllm_lifecycle_proto_abi.cpp.
+    src/features/diffusion/diffusion_module.cpp
     src/features/diffusion/rac_diffusion_service.cpp
-    src/features/diffusion/rac_diffusion_proto_abi.cpp
     src/features/diffusion/diffusion_model_registry.cpp
     src/features/diffusion/rac_diffusion_tokenizer.cpp
     # Lifecycle-owned proto-byte DiffusionStreamEvent ABI
     src/features/diffusion/rac_diffusion_stream.cpp
     # Embeddings
+    # W4: unified module — merges embeddings_component.cpp +
+    # rac_embeddings_proto_abi.cpp + Embeddings slice of
+    # rac_nonllm_lifecycle_proto_abi.cpp.
     src/features/embeddings/rac_embeddings_service.cpp
-    src/features/embeddings/rac_embeddings_proto_abi.cpp
-    src/features/embeddings/embeddings_component.cpp
-    # Lifecycle-owned generated-proto ABI for non-LLM one-shot operations
-    src/features/rac_nonllm_lifecycle_proto_abi.cpp
+    src/features/embeddings/embeddings_module.cpp
+    # W4: rac_nonllm_lifecycle_proto_abi.cpp removed — every lifecycle verb it
+    # owned was folded into the per-feature X_module.cpp TUs. The shared bridge
+    # header (rac_nonllm_lifecycle_bridge.h) is retained.
     # Platform service availability callback registry (always built; platform
     # implementations remain Apple-gated below).
     src/features/platform/rac_platform_services.cpp
