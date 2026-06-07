@@ -499,107 +499,18 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
 
 // =============================================================================
-// MODEL DISCOVERY - Scan file system for downloaded models
+// REFRESH — proto entry point only
 // =============================================================================
-
-/**
- * @brief Callback to list directory contents
- * @param path Directory path
- * @param out_entries Output: Array of entry names (allocated by callback)
- * @param out_count Output: Number of entries
- * @param user_data User context
- * @return RAC_SUCCESS or error code
- */
-typedef rac_result_t (*rac_list_directory_fn)(const char* path, char*** out_entries,
-                                              size_t* out_count, void* user_data);
-
-/**
- * @brief Callback to free directory entries
- * @param entries Array of entry names
- * @param count Number of entries
- * @param user_data User context
- */
-typedef void (*rac_free_directory_entries_fn)(char** entries, size_t count, void* user_data);
-
-/**
- * @brief Callback to check if path is a directory
- * @param path Path to check
- * @param user_data User context
- * @return RAC_TRUE if directory, RAC_FALSE otherwise
- */
-typedef rac_bool_t (*rac_is_directory_fn)(const char* path, void* user_data);
-
-/**
- * @brief Callback to check if path exists
- * @param path Path to check
- * @param user_data User context
- * @return RAC_TRUE if exists
- */
-typedef rac_bool_t (*rac_path_exists_discovery_fn)(const char* path, void* user_data);
-
-/**
- * @brief Callbacks for model discovery file operations.
- *
- * NOTE: The `is_model_file` callback that previously sat between
- * `path_exists` and `user_data` was removed when the canonical commons
- * helper `rac_model_format_for_framework()` (declared in
- * include/rac/infrastructure/model_management/rac_model_types.h) became the
- * single source of truth for "is this file a model file for this
- * framework?". SDK bridges no longer need to wire that callback — the
- * commons discovery path consults `rac_model_format_for_framework()`
- * directly using the file extension parsed from the path.
- */
-typedef struct {
-    rac_list_directory_fn list_directory;
-    rac_free_directory_entries_fn free_entries;
-    rac_is_directory_fn is_directory;
-    rac_path_exists_discovery_fn path_exists;
-    void* user_data;
-} rac_discovery_callbacks_t;
-
-// =============================================================================
-// REFRESH - Unified cross-SDK registry refresh
-// =============================================================================
-
-/**
- * @brief Options for rac_model_registry_refresh().
- *
- * Semantic fields:
- *   - include_remote_catalog: RAC_TRUE to fetch the remote model assignment
- *       catalog via rac_model_assignment_fetch(force_refresh=TRUE). Requires
- *       that rac_model_assignment_set_callbacks() has previously been called
- *       (usually at SDK init); otherwise this step no-ops and returns success.
- *   - rescan_local / prune_orphans: deprecated no-ops in this struct-based
- *       entry point. Cold-launch filesystem reconciliation now runs through
- *       the platform adapter via rac_model_registry_refresh_proto (which calls
- *       rescan_local_via_platform_adapter). These fields are retained only for
- *       ABI stability and are ignored here.
- */
-typedef struct {
-    rac_bool_t include_remote_catalog;
-    rac_bool_t rescan_local;  /* deprecated: ignored; rescan runs via the proto/adapter path */
-    rac_bool_t prune_orphans; /* deprecated: ignored; rescan runs via the proto/adapter path */
-    /* deprecated: unused; always NULL */
-    const rac_discovery_callbacks_t* discovery_callbacks;
-} rac_model_registry_refresh_opts_t;
-
-/**
- * @brief Refresh the model registry.
- *
- * Unifies what used to be three separate SDK-specific calls (Kotlin's
- * fetchModelAssignments, Flutter's discoverDownloadedModels, Swift's
- * discoverDownloadedModels) behind a single C ABI. Each step is independent;
- * a failure in one does not abort the others — the first non-success code
- * encountered is returned so callers can still observe errors.
- *
- * @param handle Registry handle (usually rac_get_model_registry()).
- * @param opts   Refresh options (passed by value).
- * @return       RAC_SUCCESS if all requested steps succeeded.
- *               RAC_ERROR_INVALID_ARGUMENT if handle is NULL.
- *               Propagated error code from the first failing step otherwise.
- */
-RAC_API rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
-                                                rac_model_registry_refresh_opts_t opts);
+//
+// The struct-opts `rac_model_registry_refresh` entry point and its
+// `rac_model_registry_refresh_opts_t` / `rac_discovery_callbacks_t` types were
+// removed. Refresh is now driven exclusively through the proto API
+// (`rac_model_registry_refresh_proto`, declared further below in the PROTO
+// section): callers serialize a `ModelRegistryRefreshRequest`
+// (include_remote_catalog / rescan_local / prune_orphans / optional query) and
+// read back a `ModelRegistryRefreshResult`. Filesystem reconciliation runs via
+// the platform adapter's `file_list_directory` slot, not a discovery-callback
+// struct.
 
 // =============================================================================
 // FETCH ASSIGNMENTS — Unified cross-SDK entry point (Task 5 / Web WASM)

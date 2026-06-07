@@ -19,6 +19,22 @@
  *      post-finalize size guard → update progress / model registry.
  *   4. Cancel/resume/progress flow through the proto-byte entry points and
  *      observe per-task atomics on proto_download_task.
+ *
+ * Edge cases handled:
+ *   - Zip-slip / path traversal: is_safe_relative_descriptor_path +
+ *     safe_descriptor_path_under reject ../absolute/backslash/empty components,
+ *     canonicalize, and enforce containment under the model folder.
+ *   - Resume: is_resume_candidate / resume_token / make_resume_token — a
+ *     re-issued download with a matching token resumes the partial transfer.
+ *   - Cancel: per-task cancel_requested atomic + delete_partial_on_cancel decides
+ *     whether the .part file is removed.
+ *   - Task lookup collision: dedupe by task_id → resume_token → model_id,
+ *     preferring active over stale terminal tasks.
+ *   - Insufficient storage: pre-flight gate returns "insufficient storage".
+ *   - Post-finalize size guard: verifies the downloaded file size against the
+ *     expected descriptor size; a mismatch fails the file.
+ *   - Archive members: optional extraction step after stream finalize.
+ *   - Terminal-task cleanup: rac_download_cleanup_terminal_tasks_proto.
  */
 
 #include <algorithm>

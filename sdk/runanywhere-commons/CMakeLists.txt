@@ -741,7 +741,15 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
+    # model_registry.cpp was split per SRP into five TUs (slim core + struct
+    # CRUD, proto<->C conversion, proto-byte ABI, filesystem discovery, and
+    # refresh/fetch). All five share the internal layout declared in
+    # `model_registry_internal.h`.
     src/infrastructure/model_management/model_registry.cpp
+    src/infrastructure/model_management/model_registry_convert.cpp
+    src/infrastructure/model_management/model_registry_proto.cpp
+    src/infrastructure/model_management/model_registry_discovery.cpp
+    src/infrastructure/model_management/model_registry_refresh.cpp
     src/infrastructure/model_management/lora_registry.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_types_mappers.cpp

@@ -4,6 +4,23 @@
  *
  * Streaming extraction with constant memory usage regardless of archive size.
  * Supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ with auto-detection via magic bytes.
+ *
+ * Edge cases handled:
+ *   - Magic-byte auto-detect with size guards (zip/gzip/bzip2/xz/ustar),
+ *     detect_archive_kind_from_bytes; a detected-vs-hint mismatch →
+ *     RAC_ERROR_UNSUPPORTED_ARCHIVE.
+ *   - Zip-slip: is_path_safe rejects absolute / .. / UNC / drive-letter entry
+ *     paths.
+ *   - macOS resource forks: should_skip_entry skips __MACOSX/ and ._* entries.
+ *   - Symlinks: skipped when skip_symlinks, else rejected if the target is
+ *     absolute or contains ".."; hardlinks rewritten under the destination with
+ *     the same safety check.
+ *   - No-subprocess filters: only built-in zlib/bzip2/xz are registered (NOT
+ *     support_filter_all) so iOS/WASM sandboxes never fork+exec /usr/bin/gzip.
+ *   - Streaming, constant memory regardless of archive size; per-entry
+ *     header/data errors are logged and skipped or aborted.
+ *   - Missing archive / null args → RAC_ERROR_FILE_NOT_FOUND /
+ *     RAC_ERROR_NULL_POINTER.
  */
 
 #include "rac/infrastructure/extraction/rac_extraction.h"
@@ -134,6 +151,21 @@ static archive_kind detect_archive_kind_from_bytes(const unsigned char* bytes, s
     return archive_kind::unknown;
 }
 
+// Probe the first <=512 bytes for an archive magic signature.
+//
+// Intentionally uses stdio FILE here rather than the platform adapter's
+// file_read slot: rac_platform_adapter_t::file_read (and the file_manager
+// rac_file_callbacks_t) are WHOLE-FILE only — they have no bounded/offset
+// read. Routing a 512-byte magic probe through file_read would allocate and
+// copy the entire archive (multi-GB GGUF/ONNX bundles) into memory just to
+// read the header, an OOM risk and a clear pessimization. Adding a bounded
+// read slot would be an ABI change across all 5 SDK populators + pinned
+// headers + the WASM offset table, which is not justified for a header probe.
+// This is native/host-side extraction code anyway: libarchive itself opens
+// the archive with raw FILE I/O immediately below (archive_read_open_filename),
+// so the fopen here matches the surrounding code. fread is hard-bounded to
+// sizeof(bytes) and detect_archive_kind_from_bytes re-validates size before
+// every offset access, so this path is memory-safe.
 static archive_kind detect_archive_kind_from_file(const char* file_path) {
     if (!file_path) {
         return archive_kind::unknown;

@@ -31,22 +31,48 @@ static int64_t test_now_ms(void* /*ctx*/) {
         .count();
 }
 
-static const rac_platform_adapter_t test_adapter = {
-    /* file_exists       */ nullptr,
-    /* file_read         */ nullptr,
-    /* file_write        */ nullptr,
-    /* file_delete       */ nullptr,
-    /* secure_get        */ nullptr,
-    /* secure_set        */ nullptr,
-    /* secure_delete     */ nullptr,
-    /* log               */ test_log_callback,
-    /* now_ms            */ test_now_ms,
-    /* get_memory_info   */ nullptr,
-    /* http_download     */ nullptr,
-    /* http_download_cancel */ nullptr,
-    /* extract_archive   */ nullptr,
-    /* user_data         */ nullptr,
-};
+// No-op mandatory-slot stubs. rac_init fail-fasts on any NULL mandatory slot.
+static rac_bool_t test_file_exists(const char* /*path*/, void* /*ctx*/) {
+    return RAC_FALSE;
+}
+static rac_result_t test_file_read(const char* /*path*/, void** /*out_data*/, size_t* /*out_size*/,
+                                   void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_file_write(const char* /*path*/, const void* /*data*/, size_t /*size*/,
+                                    void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_file_delete(const char* /*path*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_get(const char* /*key*/, char** /*out_value*/, void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_secure_set(const char* /*key*/, const char* /*value*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_delete(const char* /*key*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+
+static rac_platform_adapter_t make_test_adapter() {
+    rac_platform_adapter_t adapter = {};
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t));
+    adapter.file_exists = test_file_exists;
+    adapter.file_read = test_file_read;
+    adapter.file_write = test_file_write;
+    adapter.file_delete = test_file_delete;
+    adapter.secure_get = test_secure_get;
+    adapter.secure_set = test_secure_set;
+    adapter.secure_delete = test_secure_delete;
+    adapter.log = test_log_callback;
+    adapter.now_ms = test_now_ms;
+    return adapter;
+}
+
+static const rac_platform_adapter_t test_adapter = make_test_adapter();
 
 static rac_config_t make_test_config() {
     rac_config_t config = {};

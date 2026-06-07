@@ -638,8 +638,8 @@ RAC_API const char* rac_model_format_extension(rac_model_format_t format);
  *        given inference framework.
  *
  * Canonical commons-owned replacement for the per-SDK `is_model_file`
- * callbacks (e.g. Swift's `racIsModelFile` previously wired through
- * `rac_discovery_callbacks_t.is_model_file`). The mapping mirrors the
+ * callbacks (e.g. Swift's `racIsModelFile`, previously wired through a
+ * platform discovery-callback struct). The mapping mirrors the
  * Swift reference table:
  *   - LLAMACPP             : .gguf, .bin
  *   - ONNX, SHERPA         : .onnx, .ort

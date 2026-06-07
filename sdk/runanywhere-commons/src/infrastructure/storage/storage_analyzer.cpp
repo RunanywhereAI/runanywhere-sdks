@@ -6,6 +6,18 @@
  * - Uses rac_model_registry for model listing
  * - Uses rac_model_paths for path calculations
  * - Calls platform callbacks for file operations
+ *
+ * Edge cases handled:
+ *   - Dedup warnings: add_warning_once + seen_warnings set so the same warning
+ *     is not emitted twice.
+ *   - Model with no model_id / no local_path / missing-on-disk path → per-model
+ *     warning, skipped from the delete plan.
+ *   - Loaded-model state unavailable → kLoadedStateUnavailableWarning so the
+ *     lifecycle layer is told to verify before deleting a loaded model.
+ *   - Optional cache inclusion (include_cache).
+ *   - Model-not-found by id → warning.
+ *   - Empty/malformed request → parse_request_or_empty returns an empty set,
+ *     treated as a no-op.
  */
 
 #include <algorithm>

@@ -28,6 +28,15 @@
 extern "C" {
 #endif
 
+/**
+ * ABI version of rac_platform_adapter_t. Bump on ANY layout change (add /
+ * remove / reorder a slot). rac_init() rejects an adapter whose abi_version or
+ * struct_size does not match the commons build it is linked against. This is
+ * the platform-adapter analogue of RAC_PLUGIN_API_VERSION for the engine
+ * vtable. Independent numbering — starts at 1.
+ */
+#define RAC_PLATFORM_ADAPTER_ABI_VERSION 1u
+
 // =============================================================================
 // CALLBACK TYPES (defined outside struct for C compatibility)
 // =============================================================================
@@ -135,24 +144,35 @@ typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
  *
  * ABI-evolution contract (NORMATIVE):
  *   This struct is a positional ABI contract shared between commons and every
- *   SDK's pinned header copy (XCFramework / .so / WASM offset table). Unlike the
- *   plugin vtable (`rac_engine_vtable_t`, which carries an `abi_version` that
- *   commons rejects on mismatch), this struct has NO version/size field today,
- *   so commons CANNOT detect a consumer that pins an older SDK while linking a
- *   newer commons. The slot-by-slot NULL-check pattern (every call site guards
- *   its slot before invoking it) is the only safety net: a divergent layout
- *   typically surfaces as a NULL/garbage slot that fails its own guard rather
- *   than silent state corruption. Therefore, when EXTENDING this struct, new
- *   callback slots MUST be appended immediately before `user_data` (never
- *   inserted earlier) and MUST be Optional / NULL-safe at their call site, so an
- *   older SDK that zero-inits or omits the new tail slot still initialises
- *   safely. A future hardening pass may prepend `uint32_t abi_version` +
- *   `uint32_t struct_size`, but that is an ABI break requiring a synchronized
- *   rollout across all five SDK populators (Swift/Kotlin-JNI/RN/Flutter/Web)
- *   plus every pinned binary header and the WASM offset table, and is therefore
- *   intentionally NOT done here.
+ *   SDK's pinned header copy (XCFramework / .so / WASM offset table). The FIRST
+ *   two fields are now `uint32_t abi_version` + `uint32_t struct_size` (mirroring
+ *   the plugin vtable's `abi_version`): every SDK populator MUST set them to
+ *   RAC_PLATFORM_ADAPTER_ABI_VERSION and sizeof(rac_platform_adapter_t), and
+ *   rac_init() rejects a mismatch with RAC_ERROR_ABI_VERSION_MISMATCH. This lets
+ *   commons detect a consumer that pins an older SDK while linking a newer
+ *   commons instead of silently mis-reading slots. The slot-by-slot NULL-check
+ *   pattern (every call site guards its slot before invoking it) remains the
+ *   secondary safety net. When EXTENDING this struct, new callback slots MUST be
+ *   appended immediately before `user_data` (never inserted earlier — the two
+ *   ABI-guard fields must stay first), MUST be Optional / NULL-safe at their call
+ *   site, AND the change MUST bump RAC_PLATFORM_ADAPTER_ABI_VERSION with a
+ *   synchronized rollout across all five SDK populators
+ *   (Swift/Kotlin-JNI/RN/Flutter/Web) plus every pinned binary header and the
+ *   WASM offset table.
  */
 typedef struct rac_platform_adapter {
+    // -------------------------------------------------------------------------
+    // ABI guard (MUST be first two fields — see RAC_PLATFORM_ADAPTER_ABI_VERSION)
+    // -------------------------------------------------------------------------
+
+    /** Set to RAC_PLATFORM_ADAPTER_ABI_VERSION by the SDK populator.
+     *  rac_init rejects a mismatch with RAC_ERROR_ABI_VERSION_MISMATCH. */
+    uint32_t abi_version;
+
+    /** Set to sizeof(rac_platform_adapter_t) by the SDK populator.
+     *  rac_init rejects a mismatch with RAC_ERROR_ABI_VERSION_MISMATCH. */
+    uint32_t struct_size;
+
     // -------------------------------------------------------------------------
     // File System Operations
     // -------------------------------------------------------------------------
@@ -336,9 +356,9 @@ typedef struct rac_platform_adapter {
      * Enumerate the entries in a directory.
      *
      * Optional. When non-NULL, the C++ model registry refresh path can rescan
-     * on-disk model folders without the SDK having to wire up the legacy
-     * `rac_discovery_callbacks_t` struct. When NULL the rescan path falls
-     * back to a no-op + a structured warning string in
+     * on-disk model folders directly through this slot (the legacy
+     * discovery-callback struct it replaced has been removed). When NULL the
+     * rescan path falls back to a no-op + a structured warning string in
      * `ModelRegistryRefreshResult.warnings` ("rescan_local requires platform
      * filesystem callbacks in the C ABI refresh path"), preserving prior
      * behaviour.
@@ -347,20 +367,22 @@ typedef struct rac_platform_adapter {
      * allocate and call again. See `rac_file_list_directory_fn` docs.
      *
      * Cross-SDK status (each SDK is responsible for populating this slot on
-     * every platform whose runtime exposes a directory enumeration API):
+     * every platform whose runtime exposes a directory enumeration API). All
+     * five SDK populators now wire this slot; rac_init emits a RAC_LOG_WARNING
+     * if it is ever left NULL:
      *   - Web:           POPULATED (registerFileListDirectory in
      *                    PlatformAdapter.ts via OPFS).
-     *   - Swift (iOS):   SHOULD be populated via FileManager.contentsOfDirectory
-     *                    (currently NULL — refresh emits the warning above).
-     *   - Kotlin / RN Android: SHOULD be populated via java.io.File.listFiles().
-     *   - Flutter:       SHOULD be populated via Dart FFI trampoline over
+     *   - Swift (iOS):   POPULATED via FileManager.contentsOfDirectory.
+     *   - Kotlin / RN Android: POPULATED via java.io.File.listFiles().
+     *   - Flutter:       POPULATED via Dart FFI trampoline over
      *                    dart:io Directory.listSync().
-     *   - RN iOS:        SHOULD be populated via FileManager.contentsOfDirectory.
+     *   - RN iOS:        POPULATED via FileManager.contentsOfDirectory.
      *
-     * User-visible impact when this slot is NULL: model registry refresh with
+     * User-visible impact if this slot is NULL: model registry refresh with
      * `rescan_local = true` cannot link on-disk model folders to registered
-     * entries — the warning in `ModelRegistryRefreshResult.warnings` is the
-     * only signal to consuming code that the local rescan was skipped.
+     * entries — the warning in `ModelRegistryRefreshResult.warnings` (plus the
+     * rac_init RAC_LOG_WARNING) is the only signal to consuming code that the
+     * local rescan was skipped.
      */
     rac_file_list_directory_fn file_list_directory;
 
@@ -381,11 +403,12 @@ typedef struct rac_platform_adapter {
      *
      * Cross-SDK status (populate on every platform whose runtime exposes a
      * cheap directory probe — falling back to file_list_directory is
-     * acceptable but pays the enumeration cost):
+     * acceptable but pays the enumeration cost). All five SDK populators now
+     * wire this slot:
      *   - Web:           POPULATED (registerIsNonEmptyDirectory).
-     *   - Swift / RN iOS / Kotlin / RN Android / Flutter: SHOULD be populated
-     *     directly when the platform exposes a non-enumerating probe, otherwise
-     *     rely on the file_list_directory fallback above.
+     *   - Swift / RN iOS / Kotlin / RN Android / Flutter: POPULATED (directly
+     *     when the platform exposes a non-enumerating probe, otherwise relying
+     *     on the file_list_directory fallback above).
      *
      * User-visible impact when BOTH slots are NULL: multi-file model artifacts
      * (e.g. mmproj + GGUF pairs, tokenizer + ONNX bundles) always report

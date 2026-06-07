@@ -718,7 +718,6 @@ _rac_model_registry_create
 _rac_model_registry_get
 _rac_model_registry_get_all
 _rac_model_registry_get_downloaded
-_rac_model_registry_refresh
 _rac_model_registry_remove
 _rac_model_registry_save
 _rac_model_registry_update_download_status

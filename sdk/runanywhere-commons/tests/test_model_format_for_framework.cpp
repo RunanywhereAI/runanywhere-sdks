@@ -4,7 +4,7 @@
  *
  * The new commons-owned helper centralizes the per-framework "is this
  * extension a model file?" check that each platform SDK previously
- * supplied via rac_discovery_callbacks_t.is_model_file (Swift's
+ * supplied via a platform discovery-callback struct (Swift's
  * racIsModelFile). Mirrors the Swift reference table 1:1.
  *
  * Cases covered:

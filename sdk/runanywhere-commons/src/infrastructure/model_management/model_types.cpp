@@ -769,10 +769,10 @@ const char* rac_model_format_extension(rac_model_format_t format) {
 // =============================================================================
 //
 // Canonical commons-owned replacement for the per-SDK "is_model_file"
-// callbacks (Swift's racIsModelFile previously wired through
-// rac_discovery_callbacks_t.is_model_file). Mirrors the Swift reference
-// table 1:1 so removing the callback from the SDKs does not change the
-// discovery semantics.
+// callbacks (e.g. Swift's racIsModelFile, previously wired through a platform
+// discovery-callback struct). Mirrors the Swift reference table 1:1 so
+// removing the callback from the SDKs does not change the discovery
+// semantics.
 
 rac_result_t rac_model_format_for_framework(rac_inference_framework_t framework,
                                             const char* extension, rac_bool_t* out) {

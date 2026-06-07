@@ -139,11 +139,59 @@ rac_result_t rac_init(const rac_config_t* config) {
         return RAC_ERROR_NULL_POINTER;
     }
 
-    if (config->platform_adapter == nullptr) {
+    const rac_platform_adapter_t* adapter = config->platform_adapter;
+    if (adapter == nullptr) {
         rac_error_set_details("Platform adapter is required for initialization");
         rac::events::publish_initialization_failed(RAC_ERROR_ADAPTER_NOT_SET,
                                                    "Platform adapter is required");
         return RAC_ERROR_ADAPTER_NOT_SET;
+    }
+
+    // ABI guard: reject a populator built against a different struct layout.
+    if (adapter->abi_version != RAC_PLATFORM_ADAPTER_ABI_VERSION) {
+        char msg[160];
+        std::snprintf(msg, sizeof(msg),
+                      "Platform adapter ABI version mismatch: got %u, expected %u",
+                      adapter->abi_version, RAC_PLATFORM_ADAPTER_ABI_VERSION);
+        rac_error_set_details(msg);
+        rac::events::publish_initialization_failed(RAC_ERROR_ABI_VERSION_MISMATCH, msg);
+        return RAC_ERROR_ABI_VERSION_MISMATCH;
+    }
+    if (adapter->struct_size != sizeof(rac_platform_adapter_t)) {
+        char msg[160];
+        std::snprintf(msg, sizeof(msg),
+                      "Platform adapter struct_size mismatch: got %u, expected %zu",
+                      adapter->struct_size, sizeof(rac_platform_adapter_t));
+        rac_error_set_details(msg);
+        rac::events::publish_initialization_failed(RAC_ERROR_ABI_VERSION_MISMATCH, msg);
+        return RAC_ERROR_ABI_VERSION_MISMATCH;
+    }
+
+    // Mandatory slots — fail-fast so a misconfigured adapter is caught here
+    // rather than silently degrading deep in a worker thread.
+    struct {
+        const char* name;
+        const void* fn;
+    } mandatory[] = {
+        {"file_exists", reinterpret_cast<const void*>(adapter->file_exists)},
+        {"file_read", reinterpret_cast<const void*>(adapter->file_read)},
+        {"file_write", reinterpret_cast<const void*>(adapter->file_write)},
+        {"file_delete", reinterpret_cast<const void*>(adapter->file_delete)},
+        {"secure_get", reinterpret_cast<const void*>(adapter->secure_get)},
+        {"secure_set", reinterpret_cast<const void*>(adapter->secure_set)},
+        {"secure_delete", reinterpret_cast<const void*>(adapter->secure_delete)},
+        {"log", reinterpret_cast<const void*>(adapter->log)},
+        {"now_ms", reinterpret_cast<const void*>(adapter->now_ms)},
+    };
+    for (const auto& slot : mandatory) {
+        if (slot.fn == nullptr) {
+            char msg[160];
+            std::snprintf(msg, sizeof(msg), "Platform adapter missing mandatory slot: %s",
+                          slot.name);
+            rac_error_set_details(msg);
+            rac::events::publish_initialization_failed(RAC_ERROR_ADAPTER_NOT_SET, msg);
+            return RAC_ERROR_ADAPTER_NOT_SET;
+        }
     }
 
     // Store configuration. Release-stores so concurrent acquire-loads from
@@ -159,6 +207,32 @@ rac_result_t rac_init(const rac_config_t* config) {
     s_platform_adapter.store(config->platform_adapter, std::memory_order_release);
 
     s_initialized.store(true);
+
+    // Optional discovery / capability slots — warn but proceed (graceful
+    // degradation: registry rescan / is_downloaded / vendor-id / memory / HTTP
+    // simply no-op or fall back when NULL). Run AFTER the adapter store above so
+    // RAC_LOG_WARNING has a live `log` slot to route through.
+    if (adapter->file_list_directory == nullptr) {
+        RAC_LOG_WARNING("RAC.Core",
+                        "Platform adapter slot file_list_directory is NULL; model registry "
+                        "local rescan will be skipped");
+    }
+    if (adapter->is_non_empty_directory == nullptr) {
+        RAC_LOG_WARNING("RAC.Core",
+                        "Platform adapter slot is_non_empty_directory is NULL; directory "
+                        "artifact is_downloaded falls back to file_list_directory");
+    }
+    if (adapter->get_vendor_id == nullptr) {
+        RAC_LOG_WARNING("RAC.Core",
+                        "Platform adapter slot get_vendor_id is NULL; device id will be "
+                        "synthesized + persisted via secure_set");
+    }
+    if (adapter->get_memory_info == nullptr) {
+        RAC_LOG_WARNING("RAC.Core", "Platform adapter slot get_memory_info is NULL");
+    }
+    if (adapter->http_download == nullptr) {
+        RAC_LOG_WARNING("RAC.Core", "Platform adapter slot http_download is NULL");
+    }
 
 #if !defined(RAC_PLATFORM_ANDROID)
     // Initialize diffusion model registry (iOS/Apple only; extensible model definitions)

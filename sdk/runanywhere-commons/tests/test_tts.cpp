@@ -98,6 +98,8 @@ static rac_result_t test_get_memory_info(rac_memory_info_t* out_info, void* /*us
 
 static rac_platform_adapter_t make_test_adapter() {
     rac_platform_adapter_t adapter = {};
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t));
     adapter.file_exists = test_file_exists;
     adapter.file_read = test_file_read;
     adapter.file_write = test_file_write;

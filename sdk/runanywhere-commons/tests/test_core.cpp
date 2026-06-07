@@ -38,22 +38,55 @@ static int64_t test_now_ms(void* /*ctx*/) {
         .count();
 }
 
-static const rac_platform_adapter_t test_adapter = {
-    /* file_exists       */ nullptr,
-    /* file_read         */ nullptr,
-    /* file_write        */ nullptr,
-    /* file_delete       */ nullptr,
-    /* secure_get        */ nullptr,
-    /* secure_set        */ nullptr,
-    /* secure_delete     */ nullptr,
-    /* log               */ test_log_callback,
-    /* now_ms            */ test_now_ms,
-    /* get_memory_info   */ nullptr,
-    /* http_download     */ nullptr,
-    /* http_download_cancel */ nullptr,
-    /* extract_archive   */ nullptr,
-    /* user_data         */ nullptr,
-};
+// Minimal no-op mandatory-slot stubs. rac_init now fail-fasts when any
+// mandatory slot is NULL, so every mandatory slot must be a real (non-NULL)
+// function pointer even for the lifecycle-only tests.
+static rac_bool_t test_file_exists(const char* /*path*/, void* /*ctx*/) {
+    return RAC_FALSE;
+}
+static rac_result_t test_file_read(const char* /*path*/, void** /*out_data*/, size_t* /*out_size*/,
+                                   void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_file_write(const char* /*path*/, const void* /*data*/, size_t /*size*/,
+                                    void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_file_delete(const char* /*path*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_get(const char* /*key*/, char** /*out_value*/, void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_secure_set(const char* /*key*/, const char* /*value*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_delete(const char* /*key*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+
+// Build a fully-valid happy-path adapter (correct abi_version + struct_size and
+// every mandatory slot populated). Returned by value so individual tests can
+// tweak a field to exercise the new rac_init validation.
+static rac_platform_adapter_t make_valid_test_adapter() {
+    rac_platform_adapter_t adapter = {};
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t));
+    adapter.file_exists = test_file_exists;
+    adapter.file_read = test_file_read;
+    adapter.file_write = test_file_write;
+    adapter.file_delete = test_file_delete;
+    adapter.secure_get = test_secure_get;
+    adapter.secure_set = test_secure_set;
+    adapter.secure_delete = test_secure_delete;
+    adapter.log = test_log_callback;
+    adapter.now_ms = test_now_ms;
+    return adapter;
+}
+
+// Stable storage for the happy-path adapter referenced by make_test_config().
+// The adapter pointer must outlive rac_init/rac_shutdown by contract.
+static const rac_platform_adapter_t test_adapter = make_valid_test_adapter();
 
 static rac_config_t make_test_config() {
     rac_config_t config = {};
@@ -116,6 +149,76 @@ static TestResult test_get_version() {
     ASSERT_TRUE(ver.patch < 1000, "patch version should be reasonable (< 1000)");
 
     rac_shutdown();
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: platform adapter ABI / mandatory-slot validation in rac_init
+// =============================================================================
+
+static TestResult test_init_wrong_abi_version() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION + 1;  // mismatch
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_ABI_VERSION_MISMATCH,
+              "rac_init should reject a wrong abi_version with RAC_ERROR_ABI_VERSION_MISMATCH");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_init must not initialize on ABI mismatch");
+    return TEST_PASS();
+}
+
+static TestResult test_init_wrong_struct_size() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t)) - 4;  // mismatch
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_ABI_VERSION_MISMATCH,
+              "rac_init should reject a wrong struct_size with RAC_ERROR_ABI_VERSION_MISMATCH");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_init must not initialize on struct_size mismatch");
+    return TEST_PASS();
+}
+
+static TestResult test_init_missing_mandatory_slot() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+    adapter.now_ms = nullptr;  // drop a mandatory slot
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_ADAPTER_NOT_SET,
+              "rac_init should reject a NULL mandatory slot with RAC_ERROR_ADAPTER_NOT_SET");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE,
+              "rac_init must not initialize when a mandatory slot is NULL");
+    return TEST_PASS();
+}
+
+static TestResult test_init_valid_adapter_succeeds() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_init should succeed with a fully-valid adapter");
+    ASSERT_EQ(rac_is_initialized(), RAC_TRUE, "rac_is_initialized should be TRUE after init");
+
+    rac_shutdown();
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_is_initialized should be FALSE after shutdown");
     return TEST_PASS();
 }
 
@@ -317,6 +420,10 @@ int main(int argc, char** argv) {
         suite.add("init_shutdown", test_init_shutdown);
         suite.add("double_init", test_double_init);
         suite.add("get_version", test_get_version);
+        suite.add("init_wrong_abi_version", test_init_wrong_abi_version);
+        suite.add("init_wrong_struct_size", test_init_wrong_struct_size);
+        suite.add("init_missing_mandatory_slot", test_init_missing_mandatory_slot);
+        suite.add("init_valid_adapter_succeeds", test_init_valid_adapter_succeeds);
         suite.add("error_message_known", test_error_message_known);
         suite.add("error_message_unknown", test_error_message_unknown);
         suite.add("error_classification", test_error_classification);

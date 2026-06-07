@@ -1065,6 +1065,103 @@ std::unordered_map<uint64_t, ProtoListenerUserData*>& toolCallingCtxMap() {
     static std::unordered_map<uint64_t, ProtoListenerUserData*> m;
     return m;
 }
+
+// Per-handle proto listener registry. Collapses the three identical
+// uintptr_t(handle) -> global jobject + mutex triplets (VAD activity, VAD
+// stream, LLM stream) into one type. At most one listener per handle (the C
+// ABI enforces this), so a flat map is sufficient.
+//
+// Threading: every public method takes the internal mutex. The trampoline
+// helper (acquireLocal) hands back a *local* ref created under the lock so the
+// caller can invoke it after releasing the lock — identical to the prior
+// hand-written callbacks. All GlobalRef lifetime is owned here.
+class HandleListenerRegistry {
+public:
+    // Replace (or clear when listener==nullptr) the listener for `key`.
+    // `env` must be valid.
+    void set(JNIEnv* env, uintptr_t key, jobject listener) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = map_.find(key);
+        if (it != map_.end()) {
+            if (it->second != nullptr) {
+                env->DeleteGlobalRef(it->second);
+            }
+            map_.erase(it);
+        }
+        if (listener != nullptr) {
+            map_[key] = env->NewGlobalRef(listener);
+        }
+    }
+
+    // Erase + release the listener for `key` (no-op if absent).
+    void erase(JNIEnv* env, uintptr_t key) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = map_.find(key);
+        if (it != map_.end()) {
+            if (it->second != nullptr) {
+                env->DeleteGlobalRef(it->second);
+            }
+            map_.erase(it);
+        }
+    }
+
+    // Return a fresh LOCAL ref to the listener for `key` (created under the
+    // lock), or nullptr. Caller invokes then DeleteLocalRef.
+    jobject acquireLocal(JNIEnv* env, uintptr_t key) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto it = map_.find(key);
+        if (it != map_.end() && it->second != nullptr) {
+            return env->NewLocalRef(it->second);
+        }
+        return nullptr;
+    }
+
+    // Release every GlobalRef and clear (JNI_OnUnload path).
+    void clearAll(JNIEnv* env) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& kv : map_) {
+            if (kv.second != nullptr) {
+                env->DeleteGlobalRef(kv.second);
+            }
+        }
+        map_.clear();
+    }
+
+private:
+    std::mutex mutex_;
+    std::unordered_map<uintptr_t, jobject> map_;
+};
+
+// Function-local singletons (avoid static-init-order issues), mirroring
+// toolCallingCtxMap().
+HandleListenerRegistry& vadActivityListeners() {
+    static HandleListenerRegistry r;
+    return r;
+}
+HandleListenerRegistry& vadStreamListeners() {
+    static HandleListenerRegistry r;
+    return r;
+}
+HandleListenerRegistry& llmStreamListeners() {
+    static HandleListenerRegistry r;
+    return r;
+}
+
+// Shared trampoline body. The three per-handle proto callbacks differ only by
+// op-name and which registry they read, so route them all through here.
+void dispatchHandleListener(HandleListenerRegistry& reg, const uint8_t* proto_bytes,
+                            size_t proto_size, void* user_data, const char* op) {
+    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr) {
+        return;
+    }
+    jobject listener = reg.acquireLocal(env, key);
+    if (listener != nullptr) {
+        invokeProtoListener(env, listener, proto_bytes, proto_size, op);
+        env->DeleteLocalRef(listener);
+    }
+}
 }  // namespace
 
 // =============================================================================
@@ -4228,28 +4325,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetStati
     return makeProtoCallResult(env, rc, &result, "racVadComponentGetStatisticsProto");
 }
 
-static std::mutex g_vad_proto_listener_mutex;
-static std::unordered_map<uintptr_t, jobject> g_vad_proto_listeners;
-
 static void vad_activity_proto_callback(const uint8_t* proto_bytes, size_t proto_size,
                                         void* user_data) {
-    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
-    JNIEnv* env = getJNIEnv();
-    if (env == nullptr)
-        return;
-
-    jobject listener = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
-        auto it = g_vad_proto_listeners.find(key);
-        if (it != g_vad_proto_listeners.end() && it->second != nullptr) {
-            listener = env->NewLocalRef(it->second);
-        }
-    }
-    if (listener != nullptr) {
-        invokeProtoListener(env, listener, proto_bytes, proto_size, "vadActivityProtoCallback");
-        env->DeleteLocalRef(listener);
-    }
+    dispatchHandleListener(vadActivityListeners(), proto_bytes, proto_size, user_data,
+                           "vadActivityProtoCallback");
 }
 
 JNIEXPORT jint JNICALL
@@ -4260,17 +4339,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActiv
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
     RAC_JNI_TRY {
-        {
-            std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
-            auto it = g_vad_proto_listeners.find(key);
-            if (it != g_vad_proto_listeners.end()) {
-                env->DeleteGlobalRef(it->second);
-                g_vad_proto_listeners.erase(it);
-            }
-            if (listener != nullptr) {
-                g_vad_proto_listeners[key] = env->NewGlobalRef(listener);
-            }
-        }
+        vadActivityListeners().set(env, key, listener);
         return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
             handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
             listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
@@ -4282,27 +4351,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActiv
 // VAD STREAM PROTO ABI (rac_vad_stream.h)
 // =============================================================================
 
-static std::mutex g_vad_stream_listener_mutex;
-static std::unordered_map<uintptr_t, jobject> g_vad_stream_listeners;
-
 static void vad_stream_proto_callback(const uint8_t* proto_bytes, size_t proto_size,
                                       void* user_data) {
-    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
-    JNIEnv* env = getJNIEnv();
-    if (env == nullptr)
-        return;
-    jobject listener = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
-        auto it = g_vad_stream_listeners.find(key);
-        if (it != g_vad_stream_listeners.end() && it->second != nullptr) {
-            listener = env->NewLocalRef(it->second);
-        }
-    }
-    if (listener != nullptr) {
-        invokeProtoListener(env, listener, proto_bytes, proto_size, "vadStreamProtoCallback");
-        env->DeleteLocalRef(listener);
-    }
+    dispatchHandleListener(vadStreamListeners(), proto_bytes, proto_size, user_data,
+                           "vadStreamProtoCallback");
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -4313,17 +4365,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetStreamProtoCal
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
     RAC_JNI_TRY {
-        {
-            std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
-            auto it = g_vad_stream_listeners.find(key);
-            if (it != g_vad_stream_listeners.end()) {
-                env->DeleteGlobalRef(it->second);
-                g_vad_stream_listeners.erase(it);
-            }
-            if (listener != nullptr) {
-                g_vad_stream_listeners[key] = env->NewGlobalRef(listener);
-            }
-        }
+        vadStreamListeners().set(env, key, listener);
         return static_cast<jint>(rac_vad_set_stream_proto_callback(
             handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
             listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
@@ -6118,31 +6160,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
                              "racStructuredOutputGenerateProto");
 }
 
-// Per-handle LLM stream-event proto callback registry. We can have at most
-// one callback per LLM handle (the C ABI enforces this), so a uintptr_t →
-// global jobject map is sufficient. The trampoline forwards proto bytes to
-// the Kotlin NativeProtoProgressListener.
-static std::mutex g_llm_stream_proto_listener_mutex;
-static std::unordered_map<uintptr_t, jobject> g_llm_stream_proto_listeners;
-
+// Per-handle LLM stream-event proto callback. The trampoline forwards proto
+// bytes to the Kotlin NativeProtoProgressListener via the shared
+// llmStreamListeners() registry (see HandleListenerRegistry above).
 static void llm_stream_proto_trampoline(const uint8_t* proto_bytes, size_t proto_size,
                                         void* user_data) {
-    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
-    JNIEnv* env = getJNIEnv();
-    if (env == nullptr)
-        return;
-    jobject listener = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-        auto it = g_llm_stream_proto_listeners.find(key);
-        if (it != g_llm_stream_proto_listeners.end() && it->second != nullptr) {
-            listener = env->NewLocalRef(it->second);
-        }
-    }
-    if (listener != nullptr) {
-        invokeProtoListener(env, listener, proto_bytes, proto_size, "llmStreamProtoCallback");
-        env->DeleteLocalRef(listener);
-    }
+    dispatchHandleListener(llmStreamListeners(), proto_bytes, proto_size, user_data,
+                           "llmStreamProtoCallback");
 }
 
 JNIEXPORT jint JNICALL
@@ -6153,17 +6177,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetStreamProtoCal
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
     RAC_JNI_TRY {
-        {
-            std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-            auto it = g_llm_stream_proto_listeners.find(key);
-            if (it != g_llm_stream_proto_listeners.end()) {
-                env->DeleteGlobalRef(it->second);
-                g_llm_stream_proto_listeners.erase(it);
-            }
-            if (listener != nullptr) {
-                g_llm_stream_proto_listeners[key] = env->NewGlobalRef(listener);
-            }
-        }
+        llmStreamListeners().set(env, key, listener);
         return static_cast<jint>(rac_llm_set_stream_proto_callback(
             handleFromJLong(handle), listener != nullptr ? llm_stream_proto_trampoline : nullptr,
             listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
@@ -6178,14 +6192,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmUnsetStreamProtoC
     if (handle == 0L)
         return RAC_ERROR_NULL_POINTER;
     uintptr_t key = static_cast<uintptr_t>(handle);
-    {
-        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-        auto it = g_llm_stream_proto_listeners.find(key);
-        if (it != g_llm_stream_proto_listeners.end()) {
-            env->DeleteGlobalRef(it->second);
-            g_llm_stream_proto_listeners.erase(it);
-        }
-    }
+    llmStreamListeners().erase(env, key);
     return static_cast<jint>(rac_llm_unset_stream_proto_callback(handleFromJLong(handle)));
 }
 
@@ -6913,35 +6920,9 @@ void rac_jni_release_all_listener_global_refs(JNIEnv* env) {
         }
     }
 
-    {
-        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
-        for (auto& kv : g_vad_proto_listeners) {
-            if (kv.second != nullptr) {
-                env->DeleteGlobalRef(kv.second);
-            }
-        }
-        g_vad_proto_listeners.clear();
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
-        for (auto& kv : g_vad_stream_listeners) {
-            if (kv.second != nullptr) {
-                env->DeleteGlobalRef(kv.second);
-            }
-        }
-        g_vad_stream_listeners.clear();
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-        for (auto& kv : g_llm_stream_proto_listeners) {
-            if (kv.second != nullptr) {
-                env->DeleteGlobalRef(kv.second);
-            }
-        }
-        g_llm_stream_proto_listeners.clear();
-    }
+    vadActivityListeners().clearAll(env);
+    vadStreamListeners().clearAll(env);
+    llmStreamListeners().clearAll(env);
 
     {
         std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
@@ -6967,40 +6948,15 @@ void rac_jni_erase_llm_stream_listener(JNIEnv* env, uintptr_t handle_key) {
     if (env == nullptr) {
         return;
     }
-    std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
-    auto it = g_llm_stream_proto_listeners.find(handle_key);
-    if (it != g_llm_stream_proto_listeners.end()) {
-        if (it->second != nullptr) {
-            env->DeleteGlobalRef(it->second);
-        }
-        g_llm_stream_proto_listeners.erase(it);
-    }
+    llmStreamListeners().erase(env, handle_key);
 }
 
 void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
     if (env == nullptr) {
         return;
     }
-    {
-        std::lock_guard<std::mutex> lock(g_vad_proto_listener_mutex);
-        auto it = g_vad_proto_listeners.find(handle_key);
-        if (it != g_vad_proto_listeners.end()) {
-            if (it->second != nullptr) {
-                env->DeleteGlobalRef(it->second);
-            }
-            g_vad_proto_listeners.erase(it);
-        }
-    }
-    {
-        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
-        auto it = g_vad_stream_listeners.find(handle_key);
-        if (it != g_vad_stream_listeners.end()) {
-            if (it->second != nullptr) {
-                env->DeleteGlobalRef(it->second);
-            }
-            g_vad_stream_listeners.erase(it);
-        }
-    }
+    vadActivityListeners().erase(env, handle_key);
+    vadStreamListeners().erase(env, handle_key);
 }
 }  // namespace
 
