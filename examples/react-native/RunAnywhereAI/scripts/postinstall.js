@@ -31,6 +31,32 @@ try {
   process.exit(err.status ?? 1);
 }
 
+// Apply the RN 0.83.1 <-> react-native-screens codegen UnionTypeAnnotation fix
+// (scripts/patch-rn-codegen.js). Idempotent; runs in all contexts (incl. CI) so
+// native builds get a codegen that doesn't throw on union-typed event props.
+try {
+  execSync('node scripts/patch-rn-codegen.js', { stdio: 'inherit', cwd });
+} catch (err) {
+  process.stderr.write(`[postinstall] patch-rn-codegen warning: ${err.message}\n`);
+}
+
+// Generate the gitignored debug keystore (standard, non-secret android /
+// androiddebugkey credentials) if absent, so `gradlew assembleDebug` works on a
+// fresh checkout / CI without a manual keytool step.
+const debugKeystore = path.join(cwd, 'android', 'app', 'debug.keystore');
+if (existsSync(path.join(cwd, 'android')) && !existsSync(debugKeystore)) {
+  try {
+    execSync(
+      `keytool -genkeypair -v -keystore "${debugKeystore}" -storepass android ` +
+        `-keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 ` +
+        `-validity 10000 -dname "CN=Android Debug,O=Android,C=US"`,
+      { stdio: 'inherit', cwd }
+    );
+  } catch (err) {
+    process.stderr.write(`[postinstall] debug keystore generation warning: ${err.message}\n`);
+  }
+}
+
 const isCI = process.env.CI === 'true' || process.env.CI === '1';
 if (isCI) {
   process.stdout.write('[postinstall] CI=true detected; skipping patch-package + pod-install.\n');
