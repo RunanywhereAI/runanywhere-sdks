@@ -1072,17 +1072,18 @@ endif()
 # archive and every symbol is visible to downstream consumers. The override
 # is target-scoped so engine backends keep their hidden-visibility hardening.
 # TODO(v0.21): annotate all remaining legacy C ABI functions with RAC_API
-# and drop this Android-specific override. Also flip the same override on
-# Linux: the test executables (test_voice_agent_pipeline,
+# and drop this Android-specific override. Linux and macOS shared dev builds
+# need the same override: the test executables (test_voice_agent_pipeline,
 # test_graph_scheduler, test_pipeline_executor) link directly against
 # internal C++ classes (`rac::voice_agent::VoiceAgentPipeline`,
 # `rac::graph::GraphScheduler`, etc.) that don't yet carry RAC_API. With
-# the default hidden visibility on Linux SHARED builds the test linker
-# fails with `undefined reference to <class>::<class>()`. Apple builds
-# already use a curated exports list so they're unaffected by this; macOS
-# CMake builds use RAC_BUILD_SHARED=OFF so the symbols live inside the
-# static archive.
-if(ANDROID OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND RAC_BUILD_SHARED))
+# the default hidden visibility on SHARED builds the test linker fails with
+# `undefined reference to <class>::<class>()`. The official macOS CMake presets
+# still use RAC_BUILD_SHARED=OFF, so this only affects explicit shared dev
+# builds such as the native plugin gate.
+if(ANDROID
+   OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND RAC_BUILD_SHARED)
+   OR (RAC_PLATFORM_MACOS AND RAC_BUILD_SHARED))
     set_target_properties(rac_commons PROPERTIES
         C_VISIBILITY_PRESET   default
         CXX_VISIBILITY_PRESET default
@@ -1102,20 +1103,14 @@ endif()
 # link time. Use scripts/validation/commons/check_rac_api_exports.sh to verify the
 # list stays in sync; update the count here when it changes materially.
 #
-# This block is additionally gated on
-# RAC_BUILD_SHARED. `-exported_symbols_list` is a no-op for STATIC
-# archives (which is the default for every Apple preset in
-# CMakePresets.json — macos-{debug,release}, ios-{device,simulator}),
-# so materializing the merged file + setting target_link_options is
-# pure overhead in the common case. Skipping the entire block also
-# sidesteps the latent macOS-SHARED-with-engine-symbols hazard: when
-# RAC_BUILD_SHARED=OFF the merged list is never consulted, so the
-# current sibling-files-only-defined-in-commons invariant cannot fail
-# even if RAC_STATIC_PLUGINS=OFF. The only sibling concatenated below
-# (RACommons.rag.exports) lists `rac_backend_rag_{register,unregister}`
-# whose definitions live in src/features/rag/ — i.e. inside commons —
-# so a future SHARED Apple build with any plugin-link mode is safe.
-if(APPLE AND RAC_BUILD_SHARED)
+# This block is additionally gated on RAC_BUILD_SHARED and excluded for macOS
+# shared dev builds. `-exported_symbols_list` is a no-op for STATIC archives
+# (the default for every Apple preset in CMakePresets.json), so materializing
+# the merged file + setting target_link_options is pure overhead in the common
+# case. The current curated list is an SDK distribution contract, not a macOS
+# plugin-gate contract: it includes some optional ABI entries that are not
+# linked into `rac_commons` when server/runtime/engine targets are standalone.
+if(APPLE AND RAC_BUILD_SHARED AND NOT RAC_PLATFORM_MACOS)
     # Backend-conditional exports live in sibling files and
     # are concatenated into a single per-build merged list under
     # ${CMAKE_CURRENT_BINARY_DIR}. The Apple linker takes exactly one

@@ -698,6 +698,8 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
     result.set_success(true);
     if (auth_rc != RAC_SUCCESS) {
         append_warning(&result, warning_from_code("auth retry deferred", auth_rc));
+    } else if (!result.http_configured() && result.warning().empty()) {
+        append_warning(&result, "no usable external config");
     }
     result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
     return serialize_result(result, out_RASdkInitResult);

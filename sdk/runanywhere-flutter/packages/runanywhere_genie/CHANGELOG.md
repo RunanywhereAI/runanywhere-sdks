@@ -1,3 +1,11 @@
+## 0.19.13
+
+### Changed
+- Kept the experimental Qualcomm Genie backend shell aligned with the
+  RunAnywhere Flutter SDK 0.19.13 release.
+- Clarified that functional routing still requires Qualcomm Genie SDK-backed
+  native binaries on supported Android/Snapdragon devices.
+
 ## 0.16.0
 
 ### Added
