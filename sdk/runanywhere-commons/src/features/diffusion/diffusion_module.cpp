@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "features/rac_nonllm_lifecycle_bridge.h"
+#include "features/common/rac_component_lifecycle_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -209,34 +210,10 @@ static void diffusion_destroy_service(rac_handle_t service, void* user_data) {
 // =============================================================================
 
 extern "C" rac_result_t rac_diffusion_component_create(rac_handle_t* out_handle) {
-    if (!out_handle) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    auto* component = new (std::nothrow) rac_diffusion_component();
-    if (!component) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    // Create lifecycle manager
-    rac_lifecycle_config_t lifecycle_config = {};
-    lifecycle_config.resource_type = RAC_RESOURCE_TYPE_DIFFUSION_MODEL;
-    lifecycle_config.logger_category = "Diffusion.Lifecycle";
-    lifecycle_config.user_data = component;
-
-    rac_result_t result = rac_lifecycle_create(&lifecycle_config, diffusion_create_service,
-                                               diffusion_destroy_service, &component->lifecycle);
-
-    if (result != RAC_SUCCESS) {
-        delete component;
-        return result;
-    }
-
-    *out_handle = reinterpret_cast<rac_handle_t>(component);
-
-    RAC_LOG_INFO("Diffusion.Component", "Diffusion component created");
-
-    return RAC_SUCCESS;
+    return rac::features::create_lifecycle_component<rac_diffusion_component>(
+        out_handle, RAC_RESOURCE_TYPE_DIFFUSION_MODEL, "Diffusion.Lifecycle",
+        diffusion_create_service, diffusion_destroy_service, "Diffusion.Component",
+        "Diffusion component created");
 }
 
 extern "C" rac_result_t rac_diffusion_component_configure(rac_handle_t handle,

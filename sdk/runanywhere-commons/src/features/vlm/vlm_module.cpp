@@ -23,6 +23,7 @@
 
 #include "core/internal/platform_compat.h"
 #include "features/vlm/rac_vlm_lifecycle_bridge.h"
+#include "features/common/rac_component_lifecycle_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -278,34 +279,9 @@ static void vlm_destroy_service(rac_handle_t service, void* user_data) {
 // =============================================================================
 
 extern "C" rac_result_t rac_vlm_component_create(rac_handle_t* out_handle) {
-    if (!out_handle) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    auto* component = new (std::nothrow) rac_vlm_component();
-    if (!component) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    // Create lifecycle manager
-    rac_lifecycle_config_t lifecycle_config = {};
-    lifecycle_config.resource_type = RAC_RESOURCE_TYPE_VLM_MODEL;
-    lifecycle_config.logger_category = "VLM.Lifecycle";
-    lifecycle_config.user_data = component;
-
-    rac_result_t result = rac_lifecycle_create(&lifecycle_config, vlm_create_service,
-                                               vlm_destroy_service, &component->lifecycle);
-
-    if (result != RAC_SUCCESS) {
-        delete component;
-        return result;
-    }
-
-    *out_handle = reinterpret_cast<rac_handle_t>(component);
-
-    RAC_LOG_INFO(LOG_CAT, "VLM component created");
-
-    return RAC_SUCCESS;
+    return rac::features::create_lifecycle_component<rac_vlm_component>(
+        out_handle, RAC_RESOURCE_TYPE_VLM_MODEL, "VLM.Lifecycle", vlm_create_service,
+        vlm_destroy_service, LOG_CAT, "VLM component created");
 }
 
 extern "C" rac_result_t rac_vlm_component_configure(rac_handle_t handle,

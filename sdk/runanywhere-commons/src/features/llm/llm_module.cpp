@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "features/common/rac_component_lifecycle_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 // BUG-STREAMING-001: the canonical 13-field LLM stream emitter shared with the
 // registry-backed path (rac_llm_stream.cpp). The component section invokes
@@ -397,34 +398,9 @@ static void llm_destroy_service(rac_handle_t service, void* user_data) {
 // =============================================================================
 
 extern "C" rac_result_t rac_llm_component_create(rac_handle_t* out_handle) {
-    if (!out_handle) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    auto* component = new (std::nothrow) rac_llm_component();
-    if (!component) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    // Create lifecycle manager
-    rac_lifecycle_config_t lifecycle_config = {};
-    lifecycle_config.resource_type = RAC_RESOURCE_TYPE_LLM_MODEL;
-    lifecycle_config.logger_category = "LLM.Lifecycle";
-    lifecycle_config.user_data = component;
-
-    rac_result_t result = rac_lifecycle_create(&lifecycle_config, llm_create_service,
-                                               llm_destroy_service, &component->lifecycle);
-
-    if (result != RAC_SUCCESS) {
-        delete component;
-        return result;
-    }
-
-    *out_handle = reinterpret_cast<rac_handle_t>(component);
-
-    RAC_LOG_INFO("LLM.Component", "LLM component created");
-
-    return RAC_SUCCESS;
+    return rac::features::create_lifecycle_component<rac_llm_component>(
+        out_handle, RAC_RESOURCE_TYPE_LLM_MODEL, "LLM.Lifecycle", llm_create_service,
+        llm_destroy_service, "LLM.Component", "LLM component created");
 }
 
 extern "C" rac_result_t rac_llm_component_configure(rac_handle_t handle,
