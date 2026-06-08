@@ -52,7 +52,6 @@ let package = Package(
 
         // Individual backend products (used by the example apps that only
         // want to link a subset of the runtimes).
-        .library(name: "RunAnywhereCore", targets: ["RunAnywhere"]),
         .library(name: "RunAnywhereLlamaCPP", targets: ["LlamaCPPRuntime"]),
         .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
     ],

@@ -33,7 +33,6 @@
  * - CppBridge+State.swift - SDK state management
  * - CppBridge+HTTP.swift - HTTP transport
  * - CppBridge+Auth.swift - Authentication flow
- * - CppBridge+Services.swift - Service registry
  * - CppBridge+ModelPaths.swift - Model path utilities
  * - CppBridge+ModelRegistry.swift - Model registry
  * - CppBridge+ModelAssignment.swift - Model assignment

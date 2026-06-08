@@ -140,7 +140,10 @@ let package = Package(
         // =================================================================
         .target(
             name: "LlamaCPPBackend",
-            dependencies: ["RABackendLlamaCPPBinary"],
+            dependencies: [
+                "CRACommons",
+                "RABackendLlamaCPPBinary",
+            ],
             path: "sdk/runanywhere-swift/Sources/LlamaCPPRuntime/include",
             publicHeadersPath: "."
         ),
@@ -163,6 +166,7 @@ let package = Package(
         .target(
             name: "ONNXBackend",
             dependencies: [
+                "CRACommons",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
             ],
@@ -187,6 +191,8 @@ let package = Package(
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: [
                 "CRACommons",
+                "Generated/router.pb.swift",
+                "Generated/diffusion_options.pb.swift",
                 // The previously-excluded
                 // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
                 // files are no longer emitted by `idl/codegen/generate_swift.sh` and

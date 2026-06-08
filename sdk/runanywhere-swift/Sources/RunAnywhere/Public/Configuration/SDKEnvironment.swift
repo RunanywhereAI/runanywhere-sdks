@@ -121,9 +121,6 @@ public extension RASDKEnvironment {
     /// Should send telemetry data (production only) — uses C++.
     var shouldSendTelemetry: Bool { rac_env_should_send_telemetry(cEnvironment) }
 
-    /// Should use mock data sources (development only).
-    var useMockData: Bool { self == .development }
-
     /// Should sync with backend (non-development) — uses C++.
     var shouldSyncWithBackend: Bool { rac_env_should_sync_with_backend(cEnvironment) }
 

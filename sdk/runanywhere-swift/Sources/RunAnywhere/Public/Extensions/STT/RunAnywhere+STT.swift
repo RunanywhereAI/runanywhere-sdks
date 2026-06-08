@@ -26,10 +26,7 @@ public extension RunAnywhere {
         // Query ModelLifecycle instead of the CppBridge.STT actor's own
         // handle — those handles are separate, and the one loaded by
         // RunAnywhere.loadModel() is the lifecycle's, not the actor's.
-        var currentRequest = RACurrentModelRequest()
-        currentRequest.category = .speechRecognition
-        let current = RunAnywhere.currentModel(currentRequest)
-        guard current.found else {
+        guard loadedModelSnapshot(category: .speechRecognition).found else {
             throw SDKException(code: .notInitialized, message: "STT model not loaded", category: .component)
         }
 
@@ -48,12 +45,8 @@ public extension RunAnywhere {
     /// incremental transcript and an `isFinal` flag; the stream closes after
     /// the final event or on error.
     ///
-    /// Chunks are accumulated into a single buffer and forwarded to the
-    /// underlying `CppBridge.STT.transcribeStream` exactly once after the
-    /// input source closes. Bridge errors are surfaced as a terminal partial
-    /// with `isFinal = true` and `text` carrying a non-empty `"STT stream
-    /// failed: …"` payload, matching the shape `ProtoStreamContext` emits
-    /// when the native producer fails.
+    /// Chunks are fed into a lifecycle-derived native session as they arrive.
+    /// Bridge errors are surfaced as a terminal partial with `isFinal = true`.
     static func transcribeStream(
         audio: AsyncStream<Data>,
         options: RASTTOptions = .defaults()
@@ -64,36 +57,36 @@ public extension RunAnywhere {
                     continuation.finish()
                     return
                 }
-                var currentRequest = RACurrentModelRequest()
-                currentRequest.category = .speechRecognition
-                let current = RunAnywhere.currentModel(currentRequest)
-                guard current.found else {
+                do {
+                    try await ensureServicesReady()
+                } catch {
                     continuation.finish()
                     return
                 }
-
-                var accumulated = Data()
-                for await chunk in audio {
-                    if Task.isCancelled { break }
-                    accumulated.append(chunk)
-                }
-
-                if Task.isCancelled {
+                let snapshot = loadedModelSnapshot(category: .speechRecognition)
+                guard snapshot.found else {
                     continuation.finish()
                     return
                 }
-
-                var request = RASTTTranscriptionRequest()
-                var audioSource = RASTTAudioSource()
-                audioSource.audioData = accumulated
-                request.audio = audioSource
-                request.options = options
 
                 do {
-                    let partials = try await CppBridge.STT.shared.transcribeStream(request)
+                    let partials = try await CppBridge.STT.shared.transcribeSessionStream(
+                        audio: audio,
+                        options: options,
+                        loadedModel: snapshot
+                    )
+                    var sawFinal = false
                     for await partial in partials {
                         if Task.isCancelled { break }
+                        if partial.isFinal {
+                            sawFinal = true
+                        }
                         continuation.yield(partial)
+                    }
+                    if !Task.isCancelled, !sawFinal {
+                        var finalPartial = RASTTPartialResult()
+                        finalPartial.isFinal = true
+                        continuation.yield(finalPartial)
                     }
                 } catch {
                     var failure = RASTTPartialResult()
@@ -104,9 +97,6 @@ public extension RunAnywhere {
                     return
                 }
 
-                var finalPartial = RASTTPartialResult()
-                finalPartial.isFinal = true
-                continuation.yield(finalPartial)
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in task.cancel() }

@@ -8,6 +8,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - Platform Bridge
 
@@ -136,16 +137,29 @@ extension CppBridge {
         private static func syncWait(
             _ work: @escaping @Sendable () async throws -> rac_handle_t?,
             onTimeout: @Sendable () -> Void,
-            onError: @escaping @Sendable (Error) -> Void
+            onError: @escaping @Sendable (Error) -> Void,
+            releaseAfterTimeout: @escaping @Sendable (rac_handle_t) -> Void
         ) -> rac_handle_t? {
             let semaphore = DispatchSemaphore(value: 0)
-            let box = UnsafeResultBox<rac_handle_t?>(nil)
+            let box = TimedPlatformHandleBox()
             Task.detached(priority: .userInitiated) {
-                do { box.value = try await work() } catch { onError(error) }
+                let handle: rac_handle_t?
+                do {
+                    handle = try await work()
+                } catch {
+                    onError(error)
+                    handle = nil
+                }
+                if let lateHandle = box.complete(handle) {
+                    releaseAfterTimeout(lateHandle)
+                }
                 semaphore.signal()
             }
             guard semaphore.wait(timeout: callbackTimeout) == .success else {
                 onTimeout()
+                if let handle = box.markTimedOut() {
+                    releaseAfterTimeout(handle)
+                }
                 return nil
             }
             return box.value
@@ -168,6 +182,33 @@ extension CppBridge {
                 return RAC_ERROR_TIMEOUT
             }
             return box.value
+        }
+
+        /// Run `work` to completion off the caller's actor and return a
+        /// Swift-owned value. The C callback must write borrowed/out C pointers
+        /// only after this wait succeeds, so late timeout completions cannot
+        /// mutate C stack memory owned by the caller.
+        private static func syncWaitValue<T: Sendable>(
+            _ work: @escaping @Sendable () async throws -> T,
+            onError: @escaping @Sendable (Error) -> Void
+        ) -> (result: rac_result_t, value: T?) {
+            let semaphore = DispatchSemaphore(value: 0)
+            let valueBox = UnsafeResultBox<T?>(nil)
+            let resultBox = UnsafeResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
+            Task.detached(priority: .userInitiated) {
+                do {
+                    valueBox.value = try await work()
+                    resultBox.value = RAC_SUCCESS
+                } catch {
+                    onError(error)
+                    resultBox.value = RAC_ERROR_INTERNAL
+                }
+                semaphore.signal()
+            }
+            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+                return (RAC_ERROR_TIMEOUT, nil)
+            }
+            return (resultBox.value, valueBox.value)
         }
 
         // MARK: - LLM Callbacks (Foundation Models)
@@ -223,6 +264,9 @@ extension CppBridge {
                     Platform.logger.error("Foundation Models service creation timed out")
                 } onError: { error in
                     Platform.logger.error("Failed to create Foundation Models service: \(error)")
+                } releaseAfterTimeout: { handle in
+                    guard #available(iOS 26.0, macOS 26.0, *) else { return }
+                    Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
                 }
             }
 
@@ -242,16 +286,25 @@ extension CppBridge {
 
                 let prompt = String(cString: promptPtr)
 
-                return Platform.syncWaitResult {
-                    let response = try await service.generate(
+                let waitResult = Platform.syncWaitValue {
+                    try await service.generate(
                         prompt: prompt,
                         options: RALLMGenerationOptions.defaults()
                     )
-                    outResponsePtr.pointee = strdup(response)
-                    return RAC_SUCCESS
                 } onError: { error in
                     Platform.logger.error("Foundation Models generate failed: \(error)")
                 }
+                guard waitResult.result == RAC_SUCCESS else {
+                    return waitResult.result
+                }
+                guard let response = waitResult.value else {
+                    return RAC_ERROR_INTERNAL
+                }
+                guard let responsePtr = strdup(response) else {
+                    return RAC_ERROR_OUT_OF_MEMORY
+                }
+                outResponsePtr.pointee = responsePtr
+                return RAC_SUCCESS
             }
 
             callbacks.destroy = { handle, _ in
@@ -311,6 +364,8 @@ extension CppBridge {
                     Platform.logger.error("System TTS service creation timed out")
                 } onError: { error in
                     Platform.logger.error("Failed to create System TTS service: \(error)")
+                } releaseAfterTimeout: { handle in
+                    Unmanaged<SystemTTSService>.fromOpaque(handle).release()
                 }
             }
 
@@ -389,4 +444,37 @@ extension CppBridge {
 private final class UnsafeResultBox<T>: @unchecked Sendable {
     var value: T
     init(_ value: T) { self.value = value }
+}
+
+/// Thread-safe handoff for platform create callbacks. If the C callback times
+/// out, a later async success must release its retained service handle instead
+/// of storing a value nobody will destroy.
+private final class TimedPlatformHandleBox: @unchecked Sendable {
+    private struct State: @unchecked Sendable {
+        var timedOut = false
+        var handle: rac_handle_t?
+    }
+
+    private let state = OSAllocatedUnfairLock<State>(initialState: State())
+
+    var value: rac_handle_t? {
+        state.withLock { $0.handle }
+    }
+
+    func complete(_ handle: rac_handle_t?) -> rac_handle_t? {
+        state.withLock { current in
+            guard !current.timedOut else { return handle }
+            current.handle = handle
+            return nil
+        }
+    }
+
+    func markTimedOut() -> rac_handle_t? {
+        state.withLock { current in
+            current.timedOut = true
+            let handle = current.handle
+            current.handle = nil
+            return handle
+        }
+    }
 }

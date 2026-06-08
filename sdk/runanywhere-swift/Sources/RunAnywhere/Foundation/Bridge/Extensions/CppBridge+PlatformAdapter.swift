@@ -287,11 +287,20 @@ private func platformFileReadCallback(
     do {
         let data = try Data(contentsOf: URL(fileURLWithPath: pathString))
 
-        // Allocate buffer and copy data
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
-        data.copyBytes(to: buffer, count: data.count)
+        outData.pointee = nil
+        outSize.pointee = 0
 
-        outData.pointee = UnsafeMutableRawPointer(buffer)
+        guard !data.isEmpty else {
+            return RAC_SUCCESS
+        }
+
+        guard let buffer = rac_alloc(data.count) else {
+            return RAC_ERROR_OUT_OF_MEMORY
+        }
+        let typedBuffer = buffer.assumingMemoryBound(to: UInt8.self)
+        data.copyBytes(to: typedBuffer, count: data.count)
+
+        outData.pointee = buffer
         outSize.pointee = data.count
 
         return RAC_SUCCESS
@@ -463,6 +472,7 @@ private func platformSecureGetCallback(
     }
 
     let keyString = String(cString: key)
+    outValue.pointee = nil
 
     // Keychain API requires dictionary with heterogeneous values
     // swiftlint:disable:next avoid_any_type prefer_concrete_types
@@ -488,7 +498,9 @@ private func platformSecureGetCallback(
     }
 
     if let stringValue = String(data: data, encoding: .utf8) {
-        let cString = strdup(stringValue)
+        guard let cString = stringValue.withCString({ rac_strdup($0) }) else {
+            return RAC_ERROR_OUT_OF_MEMORY
+        }
         outValue.pointee = cString
         return RAC_SUCCESS
     }

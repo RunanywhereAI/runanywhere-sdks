@@ -32,10 +32,7 @@ public extension RunAnywhere {
         // the lifecycle — CppBridge.TTS.shared.isLoaded queries the Swift
         // actor's own handle which is separate from the lifecycle's handle,
         // and would return false even after a successful RunAnywhere.loadModel().
-        var currentRequest = RACurrentModelRequest()
-        currentRequest.category = .speechSynthesis
-        let current = RunAnywhere.currentModel(currentRequest)
-        guard current.found else {
+        guard loadedModelSnapshot(category: .speechSynthesis).found else {
             throw SDKException(code: .notInitialized, message: "TTS voice not loaded", category: .component)
         }
 
@@ -45,39 +42,57 @@ public extension RunAnywhere {
         return try await CppBridge.TTS.shared.synthesize(request)
     }
 
-    /// Stream synthesis through the generated-proto C++ TTS ABI.
+    /// Stream synthesis through a lifecycle-derived native TTS session.
     static func synthesizeStream(
         _ text: String,
         options: RATTSOptions = .defaults()
     ) -> AsyncStream<RATTSOutput> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+                do {
+                    try await ensureServicesReady()
+                } catch {
                     continuation.finish()
                     return
                 }
                 // Mirror synthesize(): query ModelLifecycle (the canonical
                 // source of truth) instead of the CppBridge.TTS actor's own
                 // handle, which is separate from the lifecycle's handle.
-                var currentRequest = RACurrentModelRequest()
-                currentRequest.category = .speechSynthesis
-                let current = RunAnywhere.currentModel(currentRequest)
-                guard current.found else {
+                let snapshot = loadedModelSnapshot(category: .speechSynthesis)
+                guard snapshot.found else {
                     continuation.finish()
                     return
                 }
                 var request = RATTSSynthesisRequest()
                 request.text = text
                 request.options = options
-                guard let stream = try? await CppBridge.TTS.shared.synthesizeStream(request) else {
+                let stream: AsyncStream<RATTSOutput>
+                do {
+                    stream = try await CppBridge.TTS.shared.synthesizeSessionStream(
+                        request,
+                        loadedModel: snapshot
+                    )
+                } catch {
+                    var failure = RATTSOutput()
+                    failure.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
+                    failure.isFinal = true
+                    failure.errorMessage = "TTS stream failed: \(error)"
+                    failure.errorCode = Int32(RAC_ERROR_PROCESSING_FAILED)
+                    continuation.yield(failure)
                     continuation.finish()
                     return
                 }
                 for await output in stream {
+                    if Task.isCancelled { break }
                     continuation.yield(output)
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 

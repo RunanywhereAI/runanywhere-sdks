@@ -57,6 +57,7 @@
 #include "rac_stt_service.h"
 #include "rac_stt_component.h"
 #include "rac_stt_analytics.h"
+#include "rac_stt_stream.h"
 
 // TTS (Text-to-Speech)
 #include "rac_tts.h"
@@ -64,6 +65,7 @@
 #include "rac_tts_service.h"
 #include "rac_tts_component.h"
 #include "rac_tts_analytics.h"
+#include "rac_tts_stream.h"
 
 // VAD (Voice Activity Detection)
 #include "rac_vad.h"

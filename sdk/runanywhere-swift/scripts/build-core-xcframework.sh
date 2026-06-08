@@ -437,12 +437,12 @@ fi
 if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     ios_build_targets+=(rac_backend_sherpa)
 fi
-run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}"
+run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}" --parallel 2
 
 echo "▶ Configure ios-simulator"
 run cmake --preset ios-simulator "${cmake_extra[@]}" "${ios_cmake_extra[@]}"
 echo "▶ Build ios-simulator (Release)"
-run cmake --build --preset ios-simulator --config Release --target "${ios_build_targets[@]}"
+run cmake --build --preset ios-simulator --config Release --target "${ios_build_targets[@]}" --parallel 2
 
 echo "▶ Configure macos-release"
 macos_cmake_args=(
@@ -464,7 +464,7 @@ macos_cmake_args=(
 )
 run cmake --preset macos-release "${macos_cmake_args[@]}"
 echo "▶ Build macos-release"
-run cmake --build --preset macos-release --target rac_commons
+run cmake --build --preset macos-release --target rac_commons --parallel 2
 
 # ────────────────────────────────────────────────────────────────────────────
 # 3. Locate archives and package each target as an xcframework with both

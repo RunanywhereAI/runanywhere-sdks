@@ -9,35 +9,44 @@
 //      registration, model assignments, telemetry flush, model discovery)
 //    * HTTP retry → rac_sdk_retry_http_proto
 //  Swift retains only the parts that cannot move into C++:
-//    * Task.detached spawning + _servicesInitLock concurrency primitive
+//    * Task.detached spawning + Swift-side initialization state
 //    * Keychain SDK params persistence (Apple-specific)
 //    * MainActor platform-plugin/callback registration
 //    * URLSession HTTP transport implementation and adapter configuration
 //
 
 import Foundation
+import os
 
 /// The RunAnywhere SDK - Single entry point for on-device AI
 public enum RunAnywhere {
 
     // MARK: - Internal State Management
 
-    /// Internal init params storage
-    internal static var initParams: SDKInitParams?
-    internal static var currentEnvironment: SDKEnvironment?
-    internal static var isInitializedFlag = false
+    private struct SDKState: @unchecked Sendable {
+        var initParams: SDKInitParams?
+        var currentEnvironment: SDKEnvironment?
+        var isInitialized = false
+        var hasCompletedServicesInit = false
+        var hasCompletedHTTPSetup = false
+        var servicesInitTask: Task<Void, Error>?
+    }
 
-    /// Track if services initialization is complete (makes API calls O(1) after first use)
-    internal static var hasCompletedServicesInit = false
-    /// Track if HTTP/auth setup succeeded (separate from core services so auth can be retried on reconnect)
-    internal static var hasCompletedHTTPSetup = false
-    /// Serialized Phase 2 task — ensures only one init runs at a time.
-    /// Concurrent callers of completeServicesInitialization() await this shared task
-    /// instead of racing through the init logic with an unprotected boolean guard.
-    private static var _servicesInitTask: Task<Void, Error>?
-    /// Serializes the check-and-set on `_servicesInitTask` so two concurrent callers
-    /// can't both observe `nil` and spawn duplicate init tasks.
-    private static let _servicesInitLock = DispatchQueue(label: "com.runanywhere.sdk.servicesInit")
+    private static let state = OSAllocatedUnfairLock<SDKState>(initialState: SDKState())
+
+    /// Serializes Phase 1 core initialization so concurrent `initialize()`
+    /// callers cannot both enter the C++ bridge setup path.
+    private static let coreInitQueue = DispatchQueue(label: "com.runanywhere.sdk.coreInit")
+
+    /// Internal init params storage.
+    internal static var initParams: SDKInitParams? { state.withLock { $0.initParams } }
+    internal static var currentEnvironment: SDKEnvironment? { state.withLock { $0.currentEnvironment } }
+    internal static var isInitializedFlag: Bool { state.withLock { $0.isInitialized } }
+
+    /// Track if services initialization is complete (makes API calls O(1) after first use).
+    internal static var hasCompletedServicesInit: Bool { state.withLock { $0.hasCompletedServicesInit } }
+    /// Track if HTTP/auth setup succeeded (separate from core services so auth can be retried on reconnect).
+    internal static var hasCompletedHTTPSetup: Bool { state.withLock { $0.hasCompletedHTTPSetup } }
 
     // MARK: - SDK State
 
@@ -48,7 +57,9 @@ public enum RunAnywhere {
     public static var areServicesReady: Bool { hasCompletedServicesInit }
 
     /// Check if SDK is active and ready for use
-    public static var isActive: Bool { isInitializedFlag && initParams != nil }
+    public static var isActive: Bool {
+        state.withLock { $0.isInitialized && $0.initParams != nil }
+    }
 
     /// Current SDK version
     public static var version: String { SDKConstants.version }
@@ -87,11 +98,12 @@ public enum RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
 
-        isInitializedFlag = false
-        hasCompletedServicesInit = false
-        hasCompletedHTTPSetup = false
-        initParams = nil
-        currentEnvironment = nil
+        let taskToCancel = state.withLock { lockedState -> Task<Void, Error>? in
+            let task = lockedState.servicesInitTask
+            lockedState = SDKState()
+            return task
+        }
+        taskToCancel?.cancel()
 
         await CppBridge.shutdown()
         CppBridge.State.shutdown()
@@ -134,13 +146,24 @@ public enum RunAnywhere {
     // MARK: - Phase 1: Core Initialization (delegated to C++)
 
     private static func performCoreInit(with params: SDKInitParams, startBackgroundServices: Bool) throws {
+        try coreInitQueue.sync {
+            try performCoreInitSerial(with: params, startBackgroundServices: startBackgroundServices)
+        }
+    }
+
+    private static func performCoreInitSerial(with params: SDKInitParams, startBackgroundServices: Bool) throws {
         guard !isInitializedFlag else { return }
 
         let initStartTime = CFAbsoluteTimeGetCurrent()
 
         // Set environment first so logging boots with correct config.
-        currentEnvironment = params.environment
-        initParams = params
+        state.withLock {
+            $0.currentEnvironment = params.environment
+            $0.initParams = params
+            $0.hasCompletedServicesInit = false
+            $0.hasCompletedHTTPSetup = false
+            $0.servicesInitTask = nil
+        }
         Logging.shared.applyEnvironmentConfiguration(params.environment)
 
         // Bring up the core C++ bridges (platform adapter, events,
@@ -187,7 +210,7 @@ public enum RunAnywhere {
                 deviceId: CppBridge.Device.persistentId
             )
 
-            isInitializedFlag = true
+            state.withLock { $0.isInitialized = true }
 
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
@@ -208,8 +231,14 @@ public enum RunAnywhere {
 
         } catch {
             logger.error("Initialization failed: \(error.localizedDescription)")
-            initParams = nil
-            isInitializedFlag = false
+            state.withLock {
+                $0.initParams = nil
+                $0.currentEnvironment = nil
+                $0.isInitialized = false
+                $0.hasCompletedServicesInit = false
+                $0.hasCompletedHTTPSetup = false
+                $0.servicesInitTask = nil
+            }
             CppBridge.Events.emitSDKInitFailed(error: SDKException.from(error))
             throw error
         }
@@ -223,20 +252,20 @@ public enum RunAnywhere {
     public static func completeServicesInitialization() async throws {
         if hasCompletedServicesInit { return }
 
-        let task: Task<Void, Error> = _servicesInitLock.sync {
-            if let existingTask = _servicesInitTask {
+        let task: Task<Void, Error> = state.withLock {
+            if let existingTask = $0.servicesInitTask {
                 return existingTask
             }
             let newTask = Task<Void, Error> { try await _performServicesInitialization() }
-            _servicesInitTask = newTask
+            $0.servicesInitTask = newTask
             return newTask
         }
 
         do {
             try await task.value
-            _servicesInitLock.sync { _servicesInitTask = nil }
+            state.withLock { $0.servicesInitTask = nil }
         } catch {
-            _servicesInitLock.sync { _servicesInitTask = nil }
+            state.withLock { $0.servicesInitTask = nil }
             throw error
         }
     }
@@ -246,7 +275,8 @@ public enum RunAnywhere {
     /// assignment fetch, telemetry flush, and downloaded-model discovery).
     /// Swift retains only platform-service callback registration.
     private static func _performServicesInitialization() async throws {
-        guard let params = initParams, let environment = currentEnvironment else {
+        let snapshot = state.withLock { ($0.initParams, $0.currentEnvironment) }
+        guard let params = snapshot.0, let environment = snapshot.1 else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
@@ -282,7 +312,7 @@ public enum RunAnywhere {
             discoverDownloadedModels: true,
             rescanLocalModels: true
         )
-        hasCompletedHTTPSetup = phase2Result.hasCompletedHTTPSetup_p || phase2Result.httpConfigured
+        let completedHTTPSetup = phase2Result.hasCompletedHTTPSetup_p || phase2Result.httpConfigured
         if !phase2Result.warning.isEmpty {
             logger.info("Phase 2 warning: \(phase2Result.warning)")
         }
@@ -290,17 +320,24 @@ public enum RunAnywhere {
             logger.info("Phase 2 linked \(phase2Result.linkedModelsCount) assigned models")
         }
 
-        hasCompletedServicesInit = true
+        state.withLock {
+            $0.hasCompletedHTTPSetup = completedHTTPSetup
+            $0.hasCompletedServicesInit = true
+        }
     }
 
     /// Ensure services are ready before API calls (internal guard).
     /// O(1) after first successful initialization with HTTP configured.
     /// If core services are done but HTTP/auth failed (offline init), retries auth only.
     internal static func ensureServicesReady() async throws {
-        if hasCompletedServicesInit && hasCompletedHTTPSetup {
+        let readiness = state.withLock { (
+            services: $0.hasCompletedServicesInit,
+            http: $0.hasCompletedHTTPSetup
+        ) }
+        if readiness.services && readiness.http {
             return
         }
-        if hasCompletedServicesInit && !hasCompletedHTTPSetup {
+        if readiness.services && !readiness.http {
             await retryHTTPSetup()
             return
         }
@@ -321,13 +358,14 @@ public enum RunAnywhere {
             return
         }
 
-        hasCompletedHTTPSetup = proto.hasCompletedHTTPSetup_p || proto.httpConfigured
+        let completedHTTPSetup = proto.hasCompletedHTTPSetup_p || proto.httpConfigured
+        state.withLock { $0.hasCompletedHTTPSetup = completedHTTPSetup }
 
         if !proto.warning.isEmpty {
             logger.debug("HTTP retry warning: \(proto.warning)")
         }
 
-        if hasCompletedHTTPSetup {
+        if completedHTTPSetup {
             logger.info("HTTP/Auth setup succeeded on retry")
         }
     }

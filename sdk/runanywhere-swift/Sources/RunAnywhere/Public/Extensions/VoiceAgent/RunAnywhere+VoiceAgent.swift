@@ -57,9 +57,7 @@ public extension RunAnywhere {
     static func ensureDefaultVAD(modelID: String? = nil) async -> Bool {
         guard isInitialized else { return false }
 
-        var currentRequest = RACurrentModelRequest()
-        currentRequest.category = .voiceActivityDetection
-        let snapshot = RunAnywhere.currentModel(currentRequest)
+        let snapshot = loadedModelSnapshot(category: .voiceActivityDetection)
         if snapshot.found && !snapshot.modelID.isEmpty {
             return true
         }
@@ -132,17 +130,9 @@ public extension RunAnywhere {
         // mirrors are not updated by RunAnywhere.loadModel(_:). Query the
         // lifecycle directly, matching the iOS example app and the rest of
         // the public Swift surface (STT/TTS/VLM readiness checks).
-        var sttRequest = RACurrentModelRequest()
-        sttRequest.category = .speechRecognition
-        let sttSnap = RunAnywhere.currentModel(sttRequest)
-
-        var llmRequest = RACurrentModelRequest()
-        llmRequest.category = .language
-        let llmSnap = RunAnywhere.currentModel(llmRequest)
-
-        var ttsRequest = RACurrentModelRequest()
-        ttsRequest.category = .speechSynthesis
-        let ttsSnap = RunAnywhere.currentModel(ttsRequest)
+        let sttSnap = loadedModelSnapshot(category: .speechRecognition)
+        let llmSnap = loadedModelSnapshot(category: .language)
+        let ttsSnap = loadedModelSnapshot(category: .speechSynthesis)
 
         var missing: [String] = []
         if !sttSnap.found || sttSnap.modelID.isEmpty { missing.append("STT") }

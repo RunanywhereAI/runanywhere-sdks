@@ -111,9 +111,7 @@ public extension RunAnywhere {
             if let cached = currentModelID {
                 modelID = cached
             } else {
-                var request = RACurrentModelRequest()
-                request.category = .embedding
-                let current = RunAnywhere.currentModel(request)
+                let current = RunAnywhere.loadedModelSnapshot(category: .embedding)
                 modelID = current.modelID
             }
             guard !modelID.isEmpty else { return }
@@ -139,9 +137,7 @@ public extension RunAnywhere {
         private func ensureLoaded(modelID: String) async throws {
             if currentModelID == modelID { return }
 
-            var currentRequest = RACurrentModelRequest()
-            currentRequest.category = .embedding
-            let current = RunAnywhere.currentModel(currentRequest)
+            let current = RunAnywhere.loadedModelSnapshot(category: .embedding)
             if current.found, current.modelID == modelID { return }
 
             var loadRequest = RAModelLoadRequest()

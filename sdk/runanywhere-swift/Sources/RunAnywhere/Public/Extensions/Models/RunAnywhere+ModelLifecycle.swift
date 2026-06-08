@@ -52,6 +52,29 @@ public extension RunAnywhere {
         CppBridge.ModelLifecycle.currentModel(request)
     }
 
+    internal static func loadedModelSnapshot(
+        category: RAModelCategory,
+        includeModelMetadata: Bool = false
+    ) -> RACurrentModelResult {
+        var request = RACurrentModelRequest()
+        request.category = category
+        request.includeModelMetadata = includeModelMetadata
+        return currentModel(request)
+    }
+
+    internal static func firstLoadedModelSnapshot(
+        categories: [RAModelCategory],
+        includeModelMetadata: Bool = false
+    ) -> RACurrentModelResult? {
+        for category in categories {
+            let result = loadedModelSnapshot(category: category, includeModelMetadata: includeModelMetadata)
+            if result.found {
+                return result
+            }
+        }
+        return nil
+    }
+
     /// Full `RAModelInfo` for the model currently loaded under `category`,
     /// or `nil` when nothing is loaded for it.
     ///
@@ -59,10 +82,7 @@ public extension RunAnywhere {
     /// (e.g. view models surfacing the loaded model's display name / framework)
     /// get the populated proto instead of reconstructing a stand-in.
     static func modelInfoForCategory(_ category: RAModelCategory) -> RAModelInfo? {
-        var request = RACurrentModelRequest()
-        request.category = category
-        request.includeModelMetadata = true
-        let result = currentModel(request)
+        let result = loadedModelSnapshot(category: category, includeModelMetadata: true)
         guard result.found, result.hasModel else { return nil }
         return result.model
     }

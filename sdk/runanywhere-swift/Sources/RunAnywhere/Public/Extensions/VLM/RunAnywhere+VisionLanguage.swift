@@ -69,14 +69,7 @@ public extension RunAnywhere {
     /// the `.multimodal` or `.vision` category. Both categories collapse to
     /// `SDK_COMPONENT_VLM` in C++ commons.
     private static func isVLMModelLoaded() -> Bool {
-        for category in [RAModelCategory.multimodal, RAModelCategory.vision] {
-            var request = RACurrentModelRequest()
-            request.category = category
-            if RunAnywhere.currentModel(request).found {
-                return true
-            }
-        }
-        return false
+        firstLoadedModelSnapshot(categories: [.multimodal, .vision]) != nil
     }
 
     /// Cancel the current VLM generation.

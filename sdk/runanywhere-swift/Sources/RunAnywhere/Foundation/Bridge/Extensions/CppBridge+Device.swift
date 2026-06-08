@@ -25,6 +25,8 @@ extension CppBridge {
         /// Per AGENTS.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
         private static let deviceInfoStrings =
             OSAllocatedUnfairLock<DeviceCStringStore>(initialState: DeviceCStringStore())
+        private static let deviceIdString =
+            OSAllocatedUnfairLock<DeviceCStringStore>(initialState: DeviceCStringStore())
         private static let httpResponseStrings =
             OSAllocatedUnfairLock<DeviceCStringStore>(initialState: DeviceCStringStore())
 
@@ -137,7 +139,10 @@ extension CppBridge {
             // Get device ID callback
             callbacks.get_device_id = { _ in
                 let deviceId = CppBridge.Device.persistentId
-                return (deviceId as NSString).utf8String
+                return CppBridge.Device.deviceIdString.withLock { store in
+                    store.reset()
+                    return store.dup(deviceId)
+                }
             }
 
             // Check if registered callback
@@ -173,24 +178,28 @@ extension CppBridge {
                 // executor, deadlocking against `semaphore.wait()`. The bounded
                 // wait is a backstop against any residual hang.
                 let semaphore = DispatchSemaphore(value: 0)
-                let resultBox = OSAllocatedUnfairLock<rac_result_t>(initialState: RAC_ERROR_NETWORK_ERROR)
+                let resultBox = OSAllocatedUnfairLock<DeviceHTTPResult>(
+                    initialState: .failure(
+                        result: RAC_ERROR_NETWORK_ERROR,
+                        message: "Device registration HTTP request failed"
+                    )
+                )
 
                 Task.detached {
-                    var status: rac_result_t = RAC_ERROR_NETWORK_ERROR
+                    var payload = DeviceHTTPResult.failure(
+                        result: RAC_ERROR_NETWORK_ERROR,
+                        message: "Device registration HTTP request failed"
+                    )
                     defer {
-                        resultBox.withLock { $0 = status }
+                        resultBox.withLock { $0 = payload }
                         semaphore.signal()
                     }
                     do {
                         guard let jsonData = jsonStr.data(using: .utf8) else {
-                            CppBridge.Device.writeHTTPResponse(
-                                outResponse,
+                            payload = .failure(
                                 result: RAC_ERROR_INVALID_ARGUMENT,
-                                statusCode: 0,
-                                body: nil,
-                                error: "Invalid JSON data"
+                                message: "Invalid JSON data"
                             )
-                            status = RAC_ERROR_INVALID_ARGUMENT
                             return
                         }
 
@@ -200,37 +209,30 @@ extension CppBridge {
                             requiresAuth: needsAuth
                         )
 
-                        CppBridge.Device.writeHTTPResponse(
-                            outResponse,
-                            result: RAC_SUCCESS,
+                        payload = .success(
                             statusCode: 200,
-                            body: String(data: responseData, encoding: .utf8),
-                            error: nil
+                            body: String(data: responseData, encoding: .utf8)
                         )
-                        status = RAC_SUCCESS
                     } catch {
-                        CppBridge.Device.writeHTTPResponse(
-                            outResponse,
+                        payload = .failure(
                             result: RAC_ERROR_NETWORK_ERROR,
-                            statusCode: 0,
-                            body: nil,
-                            error: error.localizedDescription
+                            message: error.localizedDescription
                         )
-                        status = RAC_ERROR_NETWORK_ERROR
                     }
                 }
 
-                guard semaphore.wait(timeout: .now() + 30) == .success else {
-                    CppBridge.Device.writeHTTPResponse(
-                        outResponse,
+                let payload: DeviceHTTPResult
+                if semaphore.wait(timeout: .now() + 30) == .success {
+                    payload = resultBox.withLock { $0 }
+                } else {
+                    payload = .failure(
                         result: RAC_ERROR_TIMEOUT,
-                        statusCode: 0,
-                        body: nil,
-                        error: "Device registration HTTP request timed out"
+                        message: "Device registration HTTP request timed out"
                     )
-                    return RAC_ERROR_TIMEOUT
                 }
-                return resultBox.withLock { $0 }
+
+                CppBridge.Device.writeHTTPResponse(outResponse, payload: payload)
+                return payload.result
             }
 
             callbacks.user_data = nil
@@ -262,6 +264,30 @@ extension CppBridge {
                 outResponse.pointee.status_code = statusCode
                 outResponse.pointee.response_body = body.flatMap { store.dup($0) }
                 outResponse.pointee.error_message = error.flatMap { store.dup($0) }
+            }
+        }
+
+        private static func writeHTTPResponse(
+            _ outResponse: UnsafeMutablePointer<rac_device_http_response_t>,
+            payload: DeviceHTTPResult
+        ) {
+            switch payload {
+            case let .success(statusCode, body):
+                writeHTTPResponse(
+                    outResponse,
+                    result: RAC_SUCCESS,
+                    statusCode: statusCode,
+                    body: body,
+                    error: nil
+                )
+            case let .failure(result, message):
+                writeHTTPResponse(
+                    outResponse,
+                    result: result,
+                    statusCode: 0,
+                    body: nil,
+                    error: message
+                )
             }
         }
 
@@ -297,5 +323,19 @@ private final class DeviceCStringStore {
     func reset() {
         buffers.forEach { free($0) }
         buffers.removeAll(keepingCapacity: true)
+    }
+}
+
+private enum DeviceHTTPResult: Sendable {
+    case success(statusCode: Int32, body: String?)
+    case failure(result: rac_result_t, message: String)
+
+    var result: rac_result_t {
+        switch self {
+        case .success:
+            return RAC_SUCCESS
+        case let .failure(result, _):
+            return result
+        }
     }
 }

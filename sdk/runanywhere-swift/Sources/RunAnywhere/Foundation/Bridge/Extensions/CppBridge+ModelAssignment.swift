@@ -9,6 +9,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - CppBridge Model Assignment Extension
 
@@ -46,41 +47,53 @@ public extension CppBridge {
                 storage.reset()
 
                 let endpointStr = String(cString: endpoint)
+                let needsAuth = requiresAuth == RAC_TRUE
 
-                // Use semaphore to make async call synchronous for C callback
+                // Use semaphore to make async call synchronous for C callback.
+                // The detached task writes only Swift-owned payloads; the C
+                // out-response is populated below on the callback thread so a
+                // late timeout completion cannot touch stack memory owned by
+                // commons.
                 let semaphore = DispatchSemaphore(value: 0)
-                var result: rac_result_t = RAC_ERROR_HTTP_REQUEST_FAILED
+                let resultBox = OSAllocatedUnfairLock<AssignmentHTTPResult>(
+                    initialState: .failure(
+                        result: RAC_ERROR_HTTP_REQUEST_FAILED,
+                        message: "Model assignment HTTP request failed"
+                    )
+                )
 
-                Task {
+                Task.detached(priority: .userInitiated) {
+                    let payload: AssignmentHTTPResult
                     do {
                         let data: Data = try await CppBridge.HTTP.shared.getRaw(
                             endpointStr,
-                            requiresAuth: requiresAuth == RAC_TRUE
+                            requiresAuth: needsAuth
                         )
 
                         let responseStr = String(data: data, encoding: .utf8) ?? ""
-                        storage.responseBody = responseStr.withCString { strdup($0) }
-                        outResponse.pointee.response_body = UnsafePointer(storage.responseBody)
-                        outResponse.pointee.response_length = data.count
-                        outResponse.pointee.status_code = 200
-                        outResponse.pointee.result = RAC_SUCCESS
-                        outResponse.pointee.error_message = nil
-                        result = RAC_SUCCESS
+                        payload = .success(body: responseStr, length: data.count)
                     } catch {
-                        let errorMsg = error.localizedDescription
-                        storage.errorMessage = errorMsg.withCString { strdup($0) }
-                        outResponse.pointee.error_message = UnsafePointer(storage.errorMessage)
-                        outResponse.pointee.result = RAC_ERROR_HTTP_REQUEST_FAILED
-                        outResponse.pointee.status_code = 0
-                        outResponse.pointee.response_body = nil
-                        outResponse.pointee.response_length = 0
-                        result = RAC_ERROR_HTTP_REQUEST_FAILED
+                        payload = .failure(
+                            result: RAC_ERROR_HTTP_REQUEST_FAILED,
+                            message: error.localizedDescription
+                        )
                     }
+                    resultBox.withLock { $0 = payload }
                     semaphore.signal()
                 }
 
-                _ = semaphore.wait(timeout: .now() + 30)
-                return result
+                let payload: AssignmentHTTPResult
+                if semaphore.wait(timeout: .now() + 30) == .success {
+                    payload = resultBox.withLock { $0 }
+                } else {
+                    payload = .failure(
+                        result: RAC_ERROR_TIMEOUT,
+                        message: "Model assignment HTTP request timed out"
+                    )
+                }
+
+                storage.write(payload, into: outResponse)
+                return payload.result
             }
 
             callbacks.user_data = Unmanaged.passUnretained(responseStorage).toOpaque()
@@ -223,10 +236,47 @@ private final class AssignmentResponseStorage {
     var responseBody: UnsafeMutablePointer<CChar>?
     var errorMessage: UnsafeMutablePointer<CChar>?
 
+    func write(
+        _ payload: AssignmentHTTPResult,
+        into outResponse: UnsafeMutablePointer<rac_assignment_http_response_t>
+    ) {
+        reset()
+        switch payload {
+        case let .success(body, length):
+            responseBody = body.withCString { strdup($0) }
+            outResponse.pointee.response_body = UnsafePointer(responseBody)
+            outResponse.pointee.response_length = length
+            outResponse.pointee.status_code = 200
+            outResponse.pointee.result = RAC_SUCCESS
+            outResponse.pointee.error_message = nil
+        case let .failure(result, message):
+            errorMessage = message.withCString { strdup($0) }
+            outResponse.pointee.error_message = UnsafePointer(errorMessage)
+            outResponse.pointee.result = result
+            outResponse.pointee.status_code = 0
+            outResponse.pointee.response_body = nil
+            outResponse.pointee.response_length = 0
+        }
+    }
+
     func reset() {
         free(responseBody)
         free(errorMessage)
         responseBody = nil
         errorMessage = nil
+    }
+}
+
+private enum AssignmentHTTPResult: Sendable {
+    case success(body: String, length: Int)
+    case failure(result: rac_result_t, message: String)
+
+    var result: rac_result_t {
+        switch self {
+        case .success:
+            return RAC_SUCCESS
+        case let .failure(result, _):
+            return result
+        }
     }
 }
