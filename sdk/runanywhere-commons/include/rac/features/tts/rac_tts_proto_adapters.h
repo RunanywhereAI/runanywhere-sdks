@@ -30,11 +30,6 @@ class TTSSpeakResult;
 
 namespace rac::foundation {
 
-bool rac_tts_config_to_proto(const rac_tts_config_t* in, ::runanywhere::v1::TTSConfiguration* out);
-bool rac_tts_config_from_proto(const ::runanywhere::v1::TTSConfiguration& in,
-                               rac_tts_config_t* out);
-
-bool rac_tts_options_to_proto(const rac_tts_options_t* in, ::runanywhere::v1::TTSOptions* out);
 bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts_options_t* out);
 
 bool rac_tts_phoneme_timestamp_to_proto(const rac_tts_phoneme_timestamp_t* in,
@@ -47,17 +42,7 @@ bool rac_tts_synthesis_metadata_to_proto(const rac_tts_synthesis_metadata_t* in,
 bool rac_tts_synthesis_metadata_from_proto(const ::runanywhere::v1::TTSSynthesisMetadata& in,
                                            rac_tts_synthesis_metadata_t* out);
 
-bool rac_tts_output_to_proto(const rac_tts_output_t* in, ::runanywhere::v1::TTSOutput* out);
-bool rac_tts_output_from_proto(const ::runanywhere::v1::TTSOutput& in, rac_tts_output_t* out);
-
 bool rac_tts_result_to_proto(const rac_tts_result_t* in, ::runanywhere::v1::TTSOutput* out);
-bool rac_tts_result_from_proto(const ::runanywhere::v1::TTSOutput& in, rac_tts_result_t* out);
-
-bool rac_tts_speak_result_to_proto(const rac_tts_speak_result_t* in,
-                                   ::runanywhere::v1::TTSSpeakResult* out);
-bool rac_tts_speak_result_from_proto(const ::runanywhere::v1::TTSSpeakResult& in,
-                                     rac_tts_speak_result_t* out);
-
 }  // namespace rac::foundation
 
 #endif  // __cplusplus

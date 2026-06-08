@@ -128,7 +128,7 @@ Every AI capability follows the same two-layer design:
 
 1. **Service layer** (`src/features/*/rac_*_service.cpp`): Thin dispatch. Looks up model in registry, resolves `rac_inference_framework_t` → optional engine-name pin, calls `rac_plugin_find()` (or `rac_plugin_find_for_engine()` when pinned) to get the highest-priority `rac_engine_vtable_t*`, calls `vt->*_ops->create()` to instantiate backend, wraps in a `rac_*_service_t{ops, impl, model_id}` struct.
 
-2. **Component layer** (`src/features/*/llm_component.cpp` etc.): Owns model lifecycle via `rac_lifecycle_t`, emits analytics events (`RAC_EVENT_*`), handles cancel, streams tokens/audio, exposes the public `rac_*_component_*()` API that platform SDKs call.
+2. **Component layer** (merged into `src/features/*/*_module.cpp`): Owns model lifecycle via `rac_lifecycle_t`, emits analytics events (`RAC_EVENT_*`), handles cancel, streams tokens/audio, exposes the public `rac_*_component_*()` API that platform SDKs call.
 
 **Feature-family classification** — not every capability fits one mold:
 

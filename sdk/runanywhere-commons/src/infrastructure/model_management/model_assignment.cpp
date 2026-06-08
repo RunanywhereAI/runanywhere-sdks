@@ -1430,9 +1430,6 @@ static void add_json_string_array_to_metadata(const std::string& object, const c
     if (!assignment_json_value(object, key, &array_value)) {
         return;
     }
-    for (const std::string& item : json_top_level_objects(array_value)) {
-        (void)item;
-    }
 
     const std::string array = trim_copy(array_value);
     if (array.empty() || array.front() != '[') {

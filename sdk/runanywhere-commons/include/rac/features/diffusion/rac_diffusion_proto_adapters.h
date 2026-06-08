@@ -28,26 +28,13 @@ class DiffusionResult;
 
 namespace rac::foundation {
 
-bool rac_diffusion_config_to_proto(const rac_diffusion_config_t* in,
-                                   ::runanywhere::v1::DiffusionConfiguration* out);
-bool rac_diffusion_config_from_proto(const ::runanywhere::v1::DiffusionConfiguration& in,
-                                     rac_diffusion_config_t* out);
-
-bool rac_diffusion_options_to_proto(const rac_diffusion_options_t* in,
-                                    ::runanywhere::v1::DiffusionGenerationOptions* out);
 bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerationOptions& in,
                                       rac_diffusion_options_t* out);
 
 bool rac_diffusion_progress_to_proto(const rac_diffusion_progress_t* in,
                                      ::runanywhere::v1::DiffusionProgress* out);
-bool rac_diffusion_progress_from_proto(const ::runanywhere::v1::DiffusionProgress& in,
-                                       rac_diffusion_progress_t* out);
-
 bool rac_diffusion_result_to_proto(const rac_diffusion_result_t* in,
                                    ::runanywhere::v1::DiffusionResult* out);
-bool rac_diffusion_result_from_proto(const ::runanywhere::v1::DiffusionResult& in,
-                                     rac_diffusion_result_t* out);
-
 }  // namespace rac::foundation
 
 #endif  // __cplusplus

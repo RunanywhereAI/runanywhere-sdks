@@ -2,6 +2,14 @@
 
 This file provides guidance to AI coding assistants (Claude Code, Cursor, etc.) when working with code in this repository.
 - Focus on SIMPLICITY, and following Clean SOLID principles when writing code. Reusability, Clean architecture(not strictly) style, clear separation of concerns.
+
+### ⚠️ Resource discipline — bounded parallelism (do NOT crash the machine)
+Unbounded parallel builds and process/agent storms have crashed dev laptops. ALWAYS cap parallelism:
+- **Builds: never use bare `-j`.** Cap native builds at **`-j 2`** (`cmake --build <dir> -j 2`, `make -j2`, `ninja -j 2`). Bare `-j` spawns one heavy compiler per core (protobuf/libarchive use ~1–2 GB each) → OOM/swap → crash. Gradle: `--max-workers=2`; Xcode: `-jobs 2`.
+- **One heavy build at a time.** Never run two native/SDK builds at once. Build the 5 SDKs and sample apps **sequentially**, not in parallel.
+- **No process/agent storms.** Don't launch many parallel agents or repo-wide `grep`/`find` loops at once; prefer a single bounded pass and fan out at most 2–3 agents.
+- **Check `uptime` before a heavy step**; if the 1-min load is already high, wait.
+
 ### Before starting work.
 - Do NOT write ANY MOCK IMPLEMENTATION unless specified otherwise.
 - DO NOT PLAN or WRITE any unit tests unless specified otherwise.

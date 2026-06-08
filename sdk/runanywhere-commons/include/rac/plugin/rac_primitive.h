@@ -106,11 +106,6 @@ typedef enum rac_runtime_id {
     RAC_RUNTIME_LAST = 31 /**< Sentinel; never assigned. */
 } rac_runtime_id_t;
 
-/**
- * Human-readable short name for a runtime. Never returns NULL.
- */
-const char* rac_runtime_name(rac_runtime_id_t r);
-
 #ifdef __cplusplus
 }
 #endif

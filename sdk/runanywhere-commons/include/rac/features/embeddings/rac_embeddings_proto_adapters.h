@@ -28,13 +28,6 @@ class EmbeddingVector;
 
 namespace rac::foundation {
 
-bool rac_embeddings_config_to_proto(const rac_embeddings_config_t* in,
-                                    ::runanywhere::v1::EmbeddingsConfiguration* out);
-bool rac_embeddings_config_from_proto(const ::runanywhere::v1::EmbeddingsConfiguration& in,
-                                      rac_embeddings_config_t* out);
-
-bool rac_embeddings_options_to_proto(const rac_embeddings_options_t* in,
-                                     ::runanywhere::v1::EmbeddingsOptions* out);
 bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOptions& in,
                                        rac_embeddings_options_t* out);
 
@@ -45,9 +38,6 @@ bool rac_embedding_vector_from_proto(const ::runanywhere::v1::EmbeddingVector& i
 
 bool rac_embeddings_result_to_proto(const rac_embeddings_result_t* in,
                                     ::runanywhere::v1::EmbeddingsResult* out);
-bool rac_embeddings_result_from_proto(const ::runanywhere::v1::EmbeddingsResult& in,
-                                      rac_embeddings_result_t* out);
-
 }  // namespace rac::foundation
 
 #endif  // __cplusplus

@@ -28,21 +28,12 @@ class VLMImage;
 
 namespace rac::foundation {
 
-bool rac_vlm_config_to_proto(const rac_vlm_config_t* in, ::runanywhere::v1::VLMConfiguration* out);
-bool rac_vlm_config_from_proto(const ::runanywhere::v1::VLMConfiguration& in,
-                               rac_vlm_config_t* out);
-
-bool rac_vlm_options_to_proto(const rac_vlm_options_t* in, const char* prompt,
-                              ::runanywhere::v1::VLMGenerationOptions* out);
 bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& in,
                                 rac_vlm_options_t* out, const char** out_prompt);
 
 void rac_vlm_options_free_owned(rac_vlm_options_t* options);
 
 bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMResult* out);
-bool rac_vlm_result_from_proto(const ::runanywhere::v1::VLMResult& in, rac_vlm_result_t* out);
-
-bool rac_vlm_image_to_proto(const rac_vlm_image_t* in, ::runanywhere::v1::VLMImage* out);
 bool rac_vlm_image_from_proto(const ::runanywhere::v1::VLMImage& in, rac_vlm_image_t* out);
 
 }  // namespace rac::foundation

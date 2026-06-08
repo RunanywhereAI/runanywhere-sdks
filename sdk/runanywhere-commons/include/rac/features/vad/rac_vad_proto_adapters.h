@@ -29,29 +29,6 @@ class SpeechActivityEvent;
 
 namespace rac::foundation {
 
-bool rac_vad_config_to_proto(const rac_vad_config_t* in, ::runanywhere::v1::VADConfiguration* out);
-bool rac_vad_config_from_proto(const ::runanywhere::v1::VADConfiguration& in,
-                               rac_vad_config_t* out);
-
-bool rac_vad_input_to_proto_options(const rac_vad_input_t* in, ::runanywhere::v1::VADOptions* out);
-bool rac_vad_input_from_proto_options(const ::runanywhere::v1::VADOptions& in,
-                                      rac_vad_input_t* out);
-
-bool rac_vad_output_to_proto(const rac_vad_output_t* in, ::runanywhere::v1::VADResult* out);
-bool rac_vad_output_from_proto(const ::runanywhere::v1::VADResult& in, rac_vad_output_t* out);
-
-bool rac_vad_statistics_to_proto(const rac_vad_statistics_t* in,
-                                 ::runanywhere::v1::VADStatistics* out);
-bool rac_vad_statistics_from_proto(const ::runanywhere::v1::VADStatistics& in,
-                                   rac_vad_statistics_t* out);
-
-bool rac_speech_activity_to_proto(rac_speech_activity_t in_kind, int64_t in_timestamp_ms,
-                                  int32_t in_duration_ms,
-                                  ::runanywhere::v1::SpeechActivityEvent* out);
-bool rac_speech_activity_from_proto(const ::runanywhere::v1::SpeechActivityEvent& in,
-                                    rac_speech_activity_t* out_kind, int64_t* out_timestamp_ms,
-                                    int32_t* out_duration_ms);
-
 }  // namespace rac::foundation
 
 #endif  // __cplusplus

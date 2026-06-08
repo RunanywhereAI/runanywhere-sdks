@@ -17,49 +17,6 @@
  *     return false. Callers SHOULD guard usage with `#ifdef RAC_HAVE_PROTOBUF`
  *     when they need a real conversion.
  *
- * Coverage:
- *   - STT  : config <-> proto STTConfiguration
- *            options <-> proto STTOptions (with STTLanguage enum mapping)
- *            output  <-> proto STTOutput  (rac_stt_output_t / rac_stt_result_t)
- *            word    <-> proto WordTimestamp
- *            metadata<-> proto TranscriptionMetadata
- *            alternative <-> proto TranscriptionAlternative
- *   - TTS  : config <-> proto TTSConfiguration
- *            options <-> proto TTSOptions
- *            output  <-> proto TTSOutput  (rac_tts_output_t / rac_tts_result_t)
- *            speak_result <-> proto TTSSpeakResult
- *            phoneme <-> proto TTSPhonemeTimestamp
- *            metadata<-> proto TTSSynthesisMetadata
- *   - VAD  : config <-> proto VADConfiguration
- *            options <-> proto VADOptions    (synthesized from input override)
- *            output  <-> proto VADResult
- *            statistics <-> proto VADStatistics
- *            speech_activity <-> proto SpeechActivityEvent
- *   - VLM  : config  <-> proto VLMConfiguration
- *            options <-> proto VLMGenerationOptions (subset)
- *            result  <-> proto VLMResult
- *            image   <-> proto VLMImage (oneof source)
- *   - Diffusion: config <-> proto DiffusionConfiguration
- *                options <-> proto DiffusionGenerationOptions
- *                result  <-> proto DiffusionResult
- *                progress<-> proto DiffusionProgress
- *   - LoRA : adapter entry <-> proto LoraAdapterCatalogEntry
- *            adapter info  <-> proto LoRAAdapterInfo (limited; C side has no info struct)
- *   - RAG  : config <-> proto RAGConfiguration
- *            query  <-> proto RAGQueryOptions
- *            result <-> proto RAGResult (with retrieved_chunks)
- *            search_result <-> proto RAGSearchResult
- *   - Embeddings: config <-> proto EmbeddingsConfiguration
- *                 options <-> proto EmbeddingsOptions
- *                 vector  <-> proto EmbeddingVector
- *                 result  <-> proto EmbeddingsResult
- *   - Storage: device <-> proto DeviceStorageInfo
- *              app    <-> proto AppStorageInfo
- *              metrics<-> proto ModelStorageMetrics
- *              info   <-> proto StorageInfo
- *              avail  <-> proto StorageAvailability
- *   - Errors: structured error <-> proto SDKError (+ context map)
- *
  * Conventions:
  *   - All adapters return `bool` — true on success, false on failure (NULL
  *     pointer or otherwise unmappable input). Callers MUST check.
@@ -199,17 +156,6 @@ bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
 bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry& in,
                                rac_lora_entry_t* out);
 
-// proto LoRAAdapterInfo has no exact C ABI counterpart. We expose helpers that
-// build / parse it from the loose set of fields a C consumer typically holds.
-// Use these when round-tripping the "adapter is currently applied" snapshot.
-bool rac_lora_info_to_proto(const char* adapter_id, const char* adapter_path, float scale,
-                            bool applied, const char* error_message /*can be NULL*/,
-                            ::runanywhere::v1::LoRAAdapterInfo* out);
-bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in,
-                              char** out_adapter_id /*owned*/, char** out_adapter_path /*owned*/,
-                              float* out_scale, bool* out_applied,
-                              char** out_error_message /*owned, may be NULL*/);
-
 // ===========================================================================
 // STORAGE
 // ===========================================================================
@@ -228,20 +174,9 @@ bool rac_model_storage_metrics_to_proto(const rac_model_storage_metrics_t* in,
 bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageMetrics& in,
                                           rac_model_storage_metrics_t* out);
 
-bool rac_storage_info_to_proto(const rac_storage_info_t* in, ::runanywhere::v1::StorageInfo* out);
-bool rac_storage_info_from_proto(const ::runanywhere::v1::StorageInfo& in, rac_storage_info_t* out);
-
-bool rac_storage_availability_to_proto(const rac_storage_availability_t* in,
-                                       ::runanywhere::v1::StorageAvailability* out);
-bool rac_storage_availability_from_proto(const ::runanywhere::v1::StorageAvailability& in,
-                                         rac_storage_availability_t* out);
-
 // ===========================================================================
 // ERRORS
 // ===========================================================================
-
-bool rac_error_to_proto(const rac_error_t* in, ::runanywhere::v1::SDKError* out);
-bool rac_error_from_proto(const ::runanywhere::v1::SDKError& in, rac_error_t* out);
 
 // Convert a single rac_result_t error code to the proto ErrorCode enum.
 // Returns ERROR_CODE_UNSPECIFIED for unknown / unmapped codes.
