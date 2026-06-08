@@ -56,6 +56,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "foundation/rac_proto_marshal_internal.h"
 #include "infrastructure/events/sdk_event_publish.h"
 #include "llm_options.pb.h"
 #include "llm_service.pb.h"
@@ -1545,16 +1546,7 @@ const void* parse_data(const uint8_t* bytes, size_t size) {
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize proto result");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
 rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {

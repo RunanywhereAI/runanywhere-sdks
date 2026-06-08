@@ -20,7 +20,7 @@
  * pointer once with acquire and scan that immutable copy.
  */
 
-#include "rac/routing/rac_hybrid_custom_filter.h"
+#include "rac/router/hybrid/rac_hybrid_custom_filter.h"
 
 #include <atomic>
 #include <cstring>

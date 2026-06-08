@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // hybrid_device_state.dart — public contract + installer for the cross-SDK host
-// device-state vtable (rac/routing/rac_hybrid_device_state.h). The hybrid
+// device-state vtable (rac/router/hybrid/rac_hybrid_device_state.h). The hybrid
 // router consults this vtable on every transcribe() to evaluate the NETWORK /
 // Battery hard filters; it is NOT passed in the per-request routing context.
 //

@@ -11,6 +11,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
@@ -32,17 +33,6 @@ static bool g_storage_available = false;
 // =============================================================================
 // Helpers
 // =============================================================================
-
-static char* str_dup(const char* src) {
-    if (!src)
-        return nullptr;
-    size_t len = strlen(src);
-    char* dst = (char*)malloc(len + 1);
-    if (dst) {
-        memcpy(dst, src, len + 1);
-    }
-    return dst;
-}
 
 // Caller must hold g_auth_mutex.
 static void free_auth_state_strings_locked() {
@@ -308,8 +298,8 @@ static int update_auth_state_from_response_locked(const rac_auth_response_t* res
     }
 
     // Pre-allocate required strings before modifying state
-    char* new_access = str_dup(response->access_token);
-    char* new_refresh = str_dup(response->refresh_token);
+    char* new_access = rac_strdup(response->access_token);
+    char* new_refresh = rac_strdup(response->refresh_token);
     if (!new_access || !new_refresh) {
         free(new_access);
         free(new_refresh);
@@ -324,9 +314,9 @@ static int update_auth_state_from_response_locked(const rac_auth_response_t* res
     g_auth_state.refresh_token = new_refresh;
 
     // Copy optional values (NULL is acceptable)
-    g_auth_state.device_id = str_dup(response->device_id);
-    g_auth_state.user_id = str_dup(response->user_id);
-    g_auth_state.organization_id = str_dup(response->organization_id);
+    g_auth_state.device_id = rac_strdup(response->device_id);
+    g_auth_state.user_id = rac_strdup(response->user_id);
+    g_auth_state.organization_id = rac_strdup(response->organization_id);
 
     // Calculate expiry timestamp
     g_auth_state.token_expires_at = current_time_seconds() + response->expires_in;
@@ -446,7 +436,7 @@ int rac_auth_load_stored_tokens(void) {
     // Load access token
     if (g_storage.retrieve(RAC_KEY_ACCESS_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
         free(g_auth_state.access_token);
-        g_auth_state.access_token = str_dup(buffer);
+        g_auth_state.access_token = rac_strdup(buffer);
     } else {
         return -1;  // No stored token
     }
@@ -454,26 +444,26 @@ int rac_auth_load_stored_tokens(void) {
     // Load refresh token
     if (g_storage.retrieve(RAC_KEY_REFRESH_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
         free(g_auth_state.refresh_token);
-        g_auth_state.refresh_token = str_dup(buffer);
+        g_auth_state.refresh_token = rac_strdup(buffer);
     }
 
     // Load device ID
     if (g_storage.retrieve(RAC_KEY_DEVICE_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
         free(g_auth_state.device_id);
-        g_auth_state.device_id = str_dup(buffer);
+        g_auth_state.device_id = rac_strdup(buffer);
     }
 
     // Load user ID (optional)
     if (g_storage.retrieve(RAC_KEY_USER_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
         free(g_auth_state.user_id);
-        g_auth_state.user_id = str_dup(buffer);
+        g_auth_state.user_id = rac_strdup(buffer);
     }
 
     // Load organization ID
     if (g_storage.retrieve(RAC_KEY_ORGANIZATION_ID, buffer, sizeof(buffer), g_storage.context) >
         0) {
         free(g_auth_state.organization_id);
-        g_auth_state.organization_id = str_dup(buffer);
+        g_auth_state.organization_id = rac_strdup(buffer);
     }
 
     // Mark as authenticated if we have tokens

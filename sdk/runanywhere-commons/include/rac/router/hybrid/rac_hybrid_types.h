@@ -31,11 +31,11 @@ extern "C" {
  */
 typedef enum rac_hybrid_capability {
     RAC_HYBRID_CAPABILITY_UNSPECIFIED = 0,
-    RAC_HYBRID_CAPABILITY_LLM         = 1,
-    RAC_HYBRID_CAPABILITY_VLM         = 2,
-    RAC_HYBRID_CAPABILITY_STT         = 3,
-    RAC_HYBRID_CAPABILITY_TTS         = 4,
-    RAC_HYBRID_CAPABILITY_VAD         = 5
+    RAC_HYBRID_CAPABILITY_LLM = 1,
+    RAC_HYBRID_CAPABILITY_VLM = 2,
+    RAC_HYBRID_CAPABILITY_STT = 3,
+    RAC_HYBRID_CAPABILITY_TTS = 4,
+    RAC_HYBRID_CAPABILITY_VAD = 5
 } rac_hybrid_capability_t;
 
 /**
@@ -45,10 +45,10 @@ typedef enum rac_hybrid_capability {
  */
 typedef enum rac_hybrid_backend_kind {
     RAC_HYBRID_BACKEND_UNSPECIFIED = 0,
-    RAC_HYBRID_BACKEND_LLAMACPP    = 1,
-    RAC_HYBRID_BACKEND_OPENROUTER  = 2,
-    RAC_HYBRID_BACKEND_SHERPA      = 3,
-    RAC_HYBRID_BACKEND_CLOUD       = 4  /* generic cloud STT backend (provider chosen via config) */
+    RAC_HYBRID_BACKEND_LLAMACPP = 1,
+    RAC_HYBRID_BACKEND_OPENROUTER = 2,
+    RAC_HYBRID_BACKEND_SHERPA = 3,
+    RAC_HYBRID_BACKEND_CLOUD = 4 /* generic cloud STT backend (provider chosen via config) */
 } rac_hybrid_backend_kind_t;
 
 /**
@@ -56,8 +56,8 @@ typedef enum rac_hybrid_backend_kind {
  */
 typedef enum rac_hybrid_model_type {
     RAC_HYBRID_MODEL_TYPE_UNSPECIFIED = 0,
-    RAC_HYBRID_MODEL_TYPE_OFFLINE     = 1,
-    RAC_HYBRID_MODEL_TYPE_ONLINE      = 2
+    RAC_HYBRID_MODEL_TYPE_OFFLINE = 1,
+    RAC_HYBRID_MODEL_TYPE_ONLINE = 2
 } rac_hybrid_model_type_t;
 
 /**
@@ -65,13 +65,13 @@ typedef enum rac_hybrid_model_type {
  *        Routing Conditions list in thoughts/file.txt verbatim.
  */
 typedef enum rac_hybrid_filter_kind {
-    RAC_HYBRID_FILTER_NONE    = 0,
+    RAC_HYBRID_FILTER_NONE = 0,
     RAC_HYBRID_FILTER_NETWORK = 1,
     /* Value 2 (PRIVACY) was removed. Do not reuse — it is reserved on the
        wire side too (see idl/hybrid_router.proto HybridFilter). */
     RAC_HYBRID_FILTER_QUALITY = 3,
     RAC_HYBRID_FILTER_BATTERY = 4,
-    RAC_HYBRID_FILTER_CUSTOM  = 5
+    RAC_HYBRID_FILTER_CUSTOM = 5
 } rac_hybrid_filter_kind_t;
 
 /**
@@ -92,10 +92,10 @@ typedef struct rac_hybrid_battery_filter {
  *        metadata for logging.
  */
 typedef struct rac_hybrid_custom_filter {
-    char                         name[64];
-    char                         description[128];
-    rac_hybrid_custom_filter_fn  check;
-    void*                        user_data;
+    char name[64];
+    char description[128];
+    rac_hybrid_custom_filter_fn check;
+    void* user_data;
 } rac_hybrid_custom_filter_t;
 
 /**
@@ -105,10 +105,10 @@ typedef struct rac_hybrid_custom_filter {
 typedef struct rac_hybrid_filter {
     rac_hybrid_filter_kind_t kind;
     union {
-        bool                        network_required;
-        int32_t                     quality_tier;
+        bool network_required;
+        int32_t quality_tier;
         rac_hybrid_battery_filter_t battery;
-        rac_hybrid_custom_filter_t  custom;
+        rac_hybrid_custom_filter_t custom;
     } data;
 } rac_hybrid_filter_t;
 
@@ -116,7 +116,7 @@ typedef struct rac_hybrid_filter {
  * @brief Cascade kind tag. Only Confidence is in the file.txt spec.
  */
 typedef enum rac_hybrid_cascade_kind {
-    RAC_HYBRID_CASCADE_NONE       = 0,
+    RAC_HYBRID_CASCADE_NONE = 0,
     RAC_HYBRID_CASCADE_CONFIDENCE = 1
 } rac_hybrid_cascade_kind_t;
 
@@ -138,8 +138,8 @@ typedef struct rac_hybrid_cascade {
  * @brief Rank — sole comparator used to sort eligible candidates.
  */
 typedef enum rac_hybrid_rank {
-    RAC_HYBRID_RANK_UNSPECIFIED         = 0,
-    RAC_HYBRID_RANK_PREFER_LOCAL_FIRST  = 1,
+    RAC_HYBRID_RANK_UNSPECIFIED = 0,
+    RAC_HYBRID_RANK_PREFER_LOCAL_FIRST = 1,
     RAC_HYBRID_RANK_PREFER_ONLINE_FIRST = 2
 } rac_hybrid_rank_t;
 
@@ -150,17 +150,17 @@ typedef enum rac_hybrid_rank {
  */
 typedef struct rac_hybrid_routing_policy {
     const rac_hybrid_filter_t* hard_filters;
-    int32_t                    hard_filter_count;
-    rac_hybrid_cascade_t       cascade;
-    rac_hybrid_rank_t          rank;
+    int32_t hard_filter_count;
+    rac_hybrid_cascade_t cascade;
+    rac_hybrid_rank_t rank;
 } rac_hybrid_routing_policy_t;
 
 /**
  * @brief Descriptor for one model registered with the router.
  */
 typedef struct rac_hybrid_model_descriptor {
-    char                      model_id[128];
-    rac_hybrid_model_type_t   model_type;
+    char model_id[128];
+    rac_hybrid_model_type_t model_type;
     rac_hybrid_backend_kind_t backend;
 } rac_hybrid_model_descriptor_t;
 
@@ -176,29 +176,29 @@ typedef struct rac_hybrid_model_descriptor {
  * outside that per-candidate evaluation.
  */
 typedef struct rac_hybrid_routing_context {
-    bool    is_online;
+    bool is_online;
     int32_t battery_percent;
-    char    candidate_model_id[128];
+    char candidate_model_id[128];
 } rac_hybrid_routing_context_t;
 
 /**
  * @brief Metadata returned alongside the capability result. Always populated.
  */
 typedef struct rac_hybrid_routed_metadata {
-    char    chosen_model_id[128];
-    bool    was_fallback;
+    char chosen_model_id[128];
+    bool was_fallback;
     int32_t attempt_count;
     /* RAC_SUCCESS (0) unless the router fell back; in that case the primary
        candidate's failing rac_result_t is captured here so the caller can
        surface "why we fell back" in UI/logs. */
     int32_t primary_error_code;
-    char    primary_error_message[256];
+    char primary_error_message[256];
     /* Final confidence of the result that was actually returned. NaN when the
        engine does not surface a quality signal. */
-    float   confidence;
+    float confidence;
     /* Primary's confidence captured before cascading to the secondary on a
        confidence-based fallback. NaN when no confidence cascade occurred. */
-    float   primary_confidence;
+    float primary_confidence;
 } rac_hybrid_routed_metadata_t;
 
 /* Suggested default confidence threshold for an STT confidence cascade. The

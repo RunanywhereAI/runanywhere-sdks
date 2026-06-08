@@ -17,7 +17,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/routing/rac_hybrid_device_state.h"
+#include "rac/router/hybrid/rac_hybrid_device_state.h"
 
 namespace {
 

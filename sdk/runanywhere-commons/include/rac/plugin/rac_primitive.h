@@ -39,8 +39,8 @@ typedef enum rac_primitive {
     /* Wire value 6 retired (was RAC_PRIMITIVE_RERANK — never routable, no
      * backend ever implemented it). Left as a gap so the values below stay
      * wire-stable; do not reuse 6 without bumping RAC_PLUGIN_API_VERSION. */
-    RAC_PRIMITIVE_VLM = 7,           /**< Vision-Language Models. */
-    RAC_PRIMITIVE_DIFFUSION = 8,     /**< Text-to-Image / Image-to-Image diffusion. */
+    RAC_PRIMITIVE_VLM = 7,       /**< Vision-Language Models. */
+    RAC_PRIMITIVE_DIFFUSION = 8, /**< Text-to-Image / Image-to-Image diffusion. */
 
     /* Reserved primitive slots — added to prevent struct re-layout when new
      * primitives land. Bump RAC_PLUGIN_API_VERSION when promoting any of
@@ -71,8 +71,9 @@ const char* rac_primitive_name(rac_primitive_t p);
  * Distinct from rac_primitive_t (which models WHAT the engine does) and from
  * idl/model_types.proto::ModelFormat (which models the file format). Plugins
  * declare which runtimes they can serve via the `runtimes[]` metadata field.
- * The router scores plugins higher when the
- * caller's `preferred_runtime` matches one of the plugin's declared runtimes.
+ * This is descriptive metadata only — the router does NOT score on it;
+ * plugin selection is plain priority order (highest-priority plugin per
+ * primitive wins).
  *
  * Order is wire-stable. Add new runtimes in the reserved range only and bump
  * RAC_PLUGIN_API_VERSION when promoting a reserved value.

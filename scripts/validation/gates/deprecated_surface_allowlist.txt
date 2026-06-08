@@ -98,4 +98,4 @@ sdk/runanywhere-swift/Sources/RunAnywhere/Hybrid/Cloud.swift
 sdk/runanywhere-react-native/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/CloudSTT.ts
 sdk/runanywhere-web/packages/core/src/Public/Extensions/Hybrid/HybridTypes.ts
-sdk/runanywhere-commons/include/rac/routing/rac_stt_hybrid_router.h
+sdk/runanywhere-commons/include/rac/router/hybrid/rac_stt_hybrid_router.h

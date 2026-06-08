@@ -96,6 +96,10 @@ target_include_directories(rac_backend_rag PUBLIC
 if(Protobuf_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../src/generated/proto/rag.pb.h")
     target_compile_definitions(rac_backend_rag PRIVATE RAC_HAVE_PROTOBUF=1)
     target_include_directories(rac_backend_rag PRIVATE
+        # commons src/ root — rac_backend_rag is folded into rac_commons via
+        # $<TARGET_OBJECTS>, so it shares commons-internal headers (e.g.
+        # foundation/rac_proto_marshal_internal.h). Mirrors rac_commons' own src/ path.
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../src
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/generated/proto
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/generated
         ${Protobuf_INCLUDE_DIRS}

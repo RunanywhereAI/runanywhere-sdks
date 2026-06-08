@@ -71,9 +71,9 @@ typedef struct rac_hybrid_device_state_ops {
  * snapshot is decoupled from the vtable's lifetime.
  */
 typedef struct rac_hybrid_device_state_snapshot {
-    bool    is_online;
+    bool is_online;
     int32_t battery_percent;
-    bool    thermal_throttled;
+    bool thermal_throttled;
 } rac_hybrid_device_state_snapshot_t;
 
 /**
@@ -114,8 +114,7 @@ RAC_API rac_result_t rac_hybrid_set_device_state(const rac_hybrid_device_state_o
  * @return RAC_SUCCESS on success;
  *         RAC_ERROR_INVALID_PARAMETER if @p out is NULL.
  */
-RAC_API rac_result_t rac_hybrid_get_device_state_snapshot(
-    rac_hybrid_device_state_snapshot_t* out);
+RAC_API rac_result_t rac_hybrid_get_device_state_snapshot(rac_hybrid_device_state_snapshot_t* out);
 
 #ifdef __cplusplus
 }

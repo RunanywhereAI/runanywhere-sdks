@@ -13,6 +13,7 @@
  * do NOT add features not present in the Swift code.
  */
 
+#include "rac_vad_service_internal.h"
 #include "vad_threshold_registry.h"
 
 #include <algorithm>
@@ -45,18 +46,15 @@
 #include "rac/features/vad/rac_vad_stream.h"
 #include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
-#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_primitive.h"
-#include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "foundation/rac_proto_marshal_internal.h"
-#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #include "vad_options.pb.h"
 #include "voice_events.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 // =============================================================================
@@ -680,37 +678,17 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
 
-    // Pick the highest-priority plugin that serves DETECT_VOICE (priority
-    // assigned at backend registration; no hardware/format scoring). onnx_vad
-    // wins for model-based VAD; energy VAD is not plugin-registered since it's
-    // not a full ops-based engine.
-    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_DETECT_VOICE);
-    if (!vt || !vt->vad_ops || !vt->vad_ops->create) {
-        RAC_LOG_ERROR("VAD.Component", "no registered plugin serves DETECT_VOICE");
-        return RAC_ERROR_BACKEND_NOT_FOUND;
-    }
-    rac_result_t result = RAC_SUCCESS;
-
-    void* impl = nullptr;
-    result = vt->vad_ops->create(model_path, /*config_json=*/nullptr, &impl);
-    if (result != RAC_SUCCESS || !impl) {
-        RAC_LOG_ERROR("VAD.Component", "Plugin create failed for VAD");
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
+    // Create the model-backed VAD service via the service layer (registry
+    // lookup → backend create → "vad.backend.created" telemetry). The component
+    // owns lifecycle/selection; the service file owns creation. Mirrors how
+    // stt_module.cpp delegates to rac_stt_create.
+    rac_vad_service_t* service = nullptr;
+    rac_result_t result = rac::vad::create_model_vad_service(model_path, &service);
+    if (result != RAC_SUCCESS) {
+        return result;
     }
 
-    auto* service = static_cast<rac_vad_service_t*>(malloc(sizeof(rac_vad_service_t)));
-    if (!service) {
-        if (vt->vad_ops->destroy)
-            vt->vad_ops->destroy(impl);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    service->ops = vt->vad_ops;
-    service->impl = impl;
-    service->model_id = model_path ? strdup(model_path) : nullptr;
-    rac_handle_t service_handle = service;
-
-    // The service registry returns a rac_vad_service_t* (vtable-wrapped)
-    component->model_service = reinterpret_cast<rac_vad_service_t*>(service_handle);
+    component->model_service = service;
     component->is_model_loaded = true;
     component->loaded_model_id = model_id ? strdup(model_id) : nullptr;
 
@@ -735,18 +713,6 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     }
 
     RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
-
-    // Single source of truth for the "*.backend.created" telemetry
-    // event. Previously each backend fired this from its own *_create path;
-    // now it fires once from the commons service layer so future backends
-    // inherit the emit for free (and can't silently drop it).
-    {
-        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
-        char props[128];
-        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("vad.backend.created", RAC_EVENT_CATEGORY_VOICE, RAC_EVENT_DESTINATION_ALL,
-                        props);
-    }
 
     return RAC_SUCCESS;
 }

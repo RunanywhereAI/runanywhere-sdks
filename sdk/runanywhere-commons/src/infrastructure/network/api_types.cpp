@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
 #include "rac/infrastructure/network/rac_api_types.h"
 
 // Simple JSON building helpers (no external dependencies)
@@ -16,17 +17,6 @@
 // =============================================================================
 // Memory Management
 // =============================================================================
-
-static char* str_dup(const char* src) {
-    if (!src)
-        return nullptr;
-    size_t len = strlen(src);
-    char* dst = (char*)malloc(len + 1);
-    if (dst) {
-        memcpy(dst, src, len + 1);
-    }
-    return dst;
-}
 
 void rac_auth_response_free(rac_auth_response_t* response) {
     if (!response)
@@ -303,7 +293,7 @@ char* rac_auth_request_to_json(const rac_auth_request_t* request) {
     buf[pos++] = '}';
     buf[pos] = '\0';
 
-    return str_dup(buf);
+    return rac_strdup(buf);
 }
 
 int rac_auth_response_from_json(const char* json, rac_auth_response_t* out_response) {
@@ -346,7 +336,7 @@ char* rac_refresh_request_to_json(const rac_refresh_request_t* request) {
     buf[pos++] = '}';
     buf[pos] = '\0';
 
-    return str_dup(buf);
+    return rac_strdup(buf);
 }
 
 // =============================================================================
@@ -412,7 +402,7 @@ char* rac_device_reg_request_to_json(const rac_device_reg_request_t* request) {
     buf[pos++] = '}';
     buf[pos] = '\0';
 
-    return str_dup(buf);
+    return rac_strdup(buf);
 }
 
 int rac_device_reg_response_from_json(const char* json, rac_device_reg_response_t* out_response) {
@@ -523,7 +513,7 @@ char* rac_telemetry_event_to_json(const rac_telemetry_event_t* event) {
     buf[pos++] = '}';
     buf[pos] = '\0';
 
-    return str_dup(buf);
+    return rac_strdup(buf);
 }
 
 char* rac_telemetry_batch_to_json(const rac_telemetry_batch_t* batch) {
@@ -624,8 +614,8 @@ int rac_api_error_from_response(int status_code, const char* body, const char* u
     memset(out_error, 0, sizeof(*out_error));
 
     out_error->status_code = status_code;
-    out_error->raw_body = str_dup(body);
-    out_error->request_url = str_dup(url);
+    out_error->raw_body = rac_strdup(body);
+    out_error->request_url = rac_strdup(url);
 
     if (body) {
         // Try to extract error message from various formats

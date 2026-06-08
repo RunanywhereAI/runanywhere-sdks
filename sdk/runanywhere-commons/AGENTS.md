@@ -130,6 +130,12 @@ Every AI capability follows the same two-layer design:
 
 2. **Component layer** (`src/features/*/llm_component.cpp` etc.): Owns model lifecycle via `rac_lifecycle_t`, emits analytics events (`RAC_EVENT_*`), handles cancel, streams tokens/audio, exposes the public `rac_*_component_*()` API that platform SDKs call.
 
+**Feature-family classification** — not every capability fits one mold:
+
+- **Single-backend capabilities** (`llm`, `stt`, `tts`, `vad`, `vlm`, `diffusion`, `embeddings`) follow the Service+Component split above: each resolves a single `rac_engine_vtable_t*` and wraps it in a `rac_*_service_t`.
+- **Composed pipelines** (`rag`, `voice_agent`) are intentionally different: they orchestrate other services and have no single backend vtable of their own, so they deliberately skip the service wrapper.
+- **VAD is a dual-backend special case**: a plugin-provided model VAD service (e.g. sherpa Silero) plus a component-owned energy-VAD fallback. The component selects between them rather than always dispatching to one backend.
+
 ### Unified Plugin ABI (v4)
 
 All backends publish a `rac_engine_vtable_t` (`include/rac/plugin/rac_engine_vtable.h`) with slots for 7 primitives (the single source of truth is the `RAC_PRIMITIVE_TABLE` X-macro in that header):
@@ -198,7 +204,7 @@ Ports Swift's `ManagedLifecycle.swift`. States: `IDLE → LOADING → LOADED →
 - `rac_lora_registry_t` — LoRA adapter entries with compatible model ID matching
 - `rac_model_assignment_t` — Fetches device-assigned models from backend API with cache
 
-### Download Manager (`include/rac/infrastructure/download/rac_download.h`)
+### Download Manager (`include/rac/infrastructure/download/rac_download_orchestrator.h`)
 
 Orchestration (not HTTP transport). Stages: `DOWNLOADING` (0-80%) → `EXTRACTING` (80-95%) → `VALIDATING` (95-99%) → `COMPLETED` (100%). HTTP delegated to `rac_http_download` (platform adapter).
 

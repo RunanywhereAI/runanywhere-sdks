@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/common/rac_stream_registry_internal.h"
 #include "rac/core/rac_logger.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -60,39 +61,6 @@ std::atomic<bool>& diffusion_proto_shutting_down() {
     return flag;
 }
 
-struct DiffusionInFlightGuard {
-    DiffusionInFlightGuard() {
-        if (diffusion_proto_shutting_down().load(std::memory_order_acquire)) {
-            return;
-        }
-        diffusion_in_flight().fetch_add(1, std::memory_order_acq_rel);
-        // Re-check after incrementing to avoid TOCTOU with
-        // rac_diffusion_proto_quiesce().
-        if (diffusion_proto_shutting_down().load(std::memory_order_acquire)) {
-            diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel);
-            return;
-        }
-        admitted_ = true;
-    }
-    ~DiffusionInFlightGuard() {
-        if (admitted_) {
-            diffusion_in_flight().fetch_sub(1, std::memory_order_acq_rel);
-        }
-    }
-    bool admitted() const { return admitted_; }
-    DiffusionInFlightGuard(const DiffusionInFlightGuard&) = delete;
-    DiffusionInFlightGuard& operator=(const DiffusionInFlightGuard&) = delete;
-
-   private:
-    bool admitted_{false};
-};
-
-struct CallbackSlot {
-    rac_diffusion_stream_proto_callback_fn fn = nullptr;
-    void* user_data = nullptr;
-    uint64_t seq = 0;
-};
-
 struct StreamSession {
     rac_handle_t handle = nullptr;
     std::string request_id;
@@ -104,8 +72,11 @@ std::mutex& g_mu() {
     return m;
 }
 
-std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
-    static std::unordered_map<rac_handle_t, CallbackSlot> m;
+std::unordered_map<rac_handle_t, rac::stream::CallbackSlot<rac_diffusion_stream_proto_callback_fn>>&
+g_slots() {
+    static std::unordered_map<rac_handle_t,
+                              rac::stream::CallbackSlot<rac_diffusion_stream_proto_callback_fn>>
+        m;
     return m;
 }
 
@@ -142,7 +113,8 @@ rac_result_t rac_diffusion_set_stream_proto_callback(
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{.fn = callback, .user_data = user_data, .seq = 0};
+        g_slots()[handle] = rac::stream::CallbackSlot<rac_diffusion_stream_proto_callback_fn>{
+            .fn = callback, .user_data = user_data, .seq = 0};
     }
     return RAC_SUCCESS;
 }
@@ -274,11 +246,12 @@ void dispatch_diffusion_stream_event(rac_handle_t handle,
     // If the proto dispatcher is shutting down,
     // the guard refuses admission and we must skip the slot lookup + callback
     // invocation entirely — slot.fn / user_data may already be freed.
-    DiffusionInFlightGuard in_flight_guard;
+    rac::stream::ShutdownAwareInFlightGuard in_flight_guard(diffusion_in_flight(),
+                                                            diffusion_proto_shutting_down());
     if (!in_flight_guard.admitted()) {
         return;
     }
-    CallbackSlot slot;
+    rac::stream::CallbackSlot<rac_diffusion_stream_proto_callback_fn> slot;
     uint64_t seq = 0;
     {
         std::lock_guard<std::mutex> lock(g_mu());

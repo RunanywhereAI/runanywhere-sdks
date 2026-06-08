@@ -49,8 +49,8 @@
 #include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-#include "rac/routing/rac_stt_hybrid_router.h"
-#include "rac/routing/rac_stt_hybrid_router_proto.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
 namespace {
 

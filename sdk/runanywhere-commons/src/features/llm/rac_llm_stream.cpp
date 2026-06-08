@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/common/rac_stream_registry_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "rac/core/rac_logger.h"
 
@@ -49,30 +50,14 @@ namespace {
 // touches the atomic). rac_llm_proto_quiesce() spin-waits for the counter to
 // drain to zero, exactly mirroring voice_agent.cpp:594 and
 // rac_vlm_proto_abi.cpp:412.
-std::atomic<int>& llm_in_flight() {
-    static std::atomic<int> counter{0};
-    return counter;
-}
+static std::atomic<int> g_in_flight{0};
 
-struct LlmInFlightGuard {
-    LlmInFlightGuard() { llm_in_flight().fetch_add(1, std::memory_order_acq_rel); }
-    ~LlmInFlightGuard() { llm_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
-    LlmInFlightGuard(const LlmInFlightGuard&) = delete;
-    LlmInFlightGuard& operator=(const LlmInFlightGuard&) = delete;
-};
-
-struct CallbackSlot {
-    rac_llm_stream_proto_callback_fn fn = nullptr;
-    void* user_data = nullptr;
-    // B-FL-7-001 fix: per-handle, per-session sequence counter. Previously a
-    // single process-wide `g_seq_counter` was used, which kept growing across
-    // generateStream calls; the Wire / protobuf-java decoder threw "end-group
-    // tag did not match" the second time on the same handle, presumably because
-    // some collector treated drift in `seq` values as a corrupted stream. Reset
-    // seq on every fresh `set_stream_proto_callback` so each session starts at
-    // 1 again.
-    uint64_t seq = 0;
-};
+// Per-handle callback record. `seq` is the per-handle, per-session sequence
+// counter (B-FL-7-001 fix): a single process-wide counter kept growing across
+// generateStream calls and the Wire / protobuf-java decoder threw "end-group
+// tag did not match" the second time on the same handle. seq resets to 0 on
+// every fresh `set_stream_proto_callback` so each session starts at 1 again.
+using CallbackSlot = rac::stream::CallbackSlot<rac_llm_stream_proto_callback_fn>;
 
 std::mutex& g_mu() {
     static std::mutex m;
@@ -126,7 +111,7 @@ rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle) {
 // user_data that may have been captured by a concurrent
 // dispatch_llm_stream_event invocation. Mirrors rac_vlm_proto_quiesce().
 void rac_llm_proto_quiesce(void) {
-    while (llm_in_flight().load(std::memory_order_acquire) > 0) {
+    while (g_in_flight.load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
     }
 }
@@ -508,13 +493,13 @@ void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& 
     // the lock) or finds an empty slot (it won — nothing to wait on).
     CallbackSlot slot;
     uint64_t seq;
-    std::optional<LlmInFlightGuard> in_flight_guard;
+    std::optional<rac::stream::InFlightGuard> in_flight_guard;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
         if (it == g_slots().end() || it->second.fn == nullptr)
             return;
-        in_flight_guard.emplace();
+        in_flight_guard.emplace(g_in_flight);
         slot = it->second;
         // Bump the per-handle counter under the lock so concurrent
         // dispatches on the same handle still produce monotonic seq values.

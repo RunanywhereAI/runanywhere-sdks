@@ -32,10 +32,10 @@
  * To make this binding actually run, the WASM build must:
  *
  *   A. In sdk/runanywhere-web/wasm/src/wasm_exports.cpp, add:
- *        #include "rac/routing/rac_stt_hybrid_router_proto.h"
- *        #include "rac/routing/rac_stt_hybrid_router.h"
- *        #include "rac/routing/rac_hybrid_device_state.h"
- *        #include "rac/routing/rac_hybrid_custom_filter.h"
+ *        #include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
+ *        #include "rac/router/hybrid/rac_stt_hybrid_router.h"
+ *        #include "rac/router/hybrid/rac_hybrid_device_state.h"
+ *        #include "rac/router/hybrid/rac_hybrid_custom_filter.h"
  *      so the linker keeps the symbols (KEEPALIVE / referenced TUs).
  *
  *   B. In sdk/runanywhere-web/wasm/CMakeLists.txt RAC_EXPORTED_FUNCTIONS_BASE,

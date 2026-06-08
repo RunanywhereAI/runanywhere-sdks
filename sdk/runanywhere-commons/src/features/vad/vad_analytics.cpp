@@ -6,27 +6,13 @@
  * Swift Source: Sources/RunAnywhere/Features/VAD/Analytics/VADAnalyticsService.swift
  */
 
-#include <chrono>
 #include <cstdlib>
 #include <mutex>
 #include <new>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
 #include "rac/features/vad/rac_vad_analytics.h"
-
-// =============================================================================
-// INTERNAL UTILITIES
-// =============================================================================
-
-namespace {
-
-int64_t get_current_time_ms() {
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}
-
-}  // namespace
 
 // =============================================================================
 // VAD ANALYTICS SERVICE IMPLEMENTATION
@@ -55,7 +41,7 @@ struct rac_vad_analytics_s {
           has_speech_start(false),
           total_speech_segments(0),
           total_speech_duration_ms(0),
-          start_time_ms(get_current_time_ms()),
+          start_time_ms(rac_get_current_time_ms()),
           last_event_time_ms(0),
           has_last_event_time(false) {}
 };
@@ -99,7 +85,7 @@ rac_result_t rac_vad_analytics_track_initialized(rac_vad_analytics_handle_t hand
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     handle->current_framework = framework;
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "VAD initialized with framework: %d", framework);
@@ -117,7 +103,7 @@ rac_result_t rac_vad_analytics_track_initialization_failed(rac_vad_analytics_han
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     handle->current_framework = framework;
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("VAD.Analytics", "VAD initialization failed: %d - %s", error_code,
@@ -132,7 +118,7 @@ rac_result_t rac_vad_analytics_track_cleaned_up(rac_vad_analytics_handle_t handl
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "VAD cleaned up");
@@ -146,7 +132,7 @@ rac_result_t rac_vad_analytics_track_started(rac_vad_analytics_handle_t handle) 
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "VAD started");
@@ -160,7 +146,7 @@ rac_result_t rac_vad_analytics_track_stopped(rac_vad_analytics_handle_t handle) 
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "VAD stopped");
@@ -174,7 +160,7 @@ rac_result_t rac_vad_analytics_track_speech_start(rac_vad_analytics_handle_t han
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    int64_t now = get_current_time_ms();
+    int64_t now = rac_get_current_time_ms();
     handle->speech_start_time_ms = now;
     handle->has_speech_start = true;
     handle->last_event_time_ms = now;
@@ -195,7 +181,7 @@ rac_result_t rac_vad_analytics_track_speech_end(rac_vad_analytics_handle_t handl
         return RAC_SUCCESS;  // No speech start to end
     }
 
-    int64_t end_time_ms = get_current_time_ms();
+    int64_t end_time_ms = rac_get_current_time_ms();
     double duration_ms = static_cast<double>(end_time_ms - handle->speech_start_time_ms);
 
     handle->has_speech_start = false;
@@ -215,7 +201,7 @@ rac_result_t rac_vad_analytics_track_paused(rac_vad_analytics_handle_t handle) {
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "VAD paused");
@@ -229,7 +215,7 @@ rac_result_t rac_vad_analytics_track_resumed(rac_vad_analytics_handle_t handle) 
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "VAD resumed");
@@ -247,7 +233,7 @@ rac_result_t rac_vad_analytics_track_model_load_started(rac_vad_analytics_handle
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     handle->current_framework = framework;
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "Model load started: %s, size: %lld", model_id,
@@ -264,7 +250,7 @@ rac_result_t rac_vad_analytics_track_model_load_completed(rac_vad_analytics_hand
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "Model load completed: %s, duration: %.1fms, size: %lld",
@@ -282,7 +268,7 @@ rac_result_t rac_vad_analytics_track_model_load_failed(rac_vad_analytics_handle_
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("VAD.Analytics", "Model load failed: %s, error: %d - %s", model_id, error_code,
@@ -298,7 +284,7 @@ rac_result_t rac_vad_analytics_track_model_unloaded(rac_vad_analytics_handle_t h
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_DEBUG("VAD.Analytics", "Model unloaded: %s", model_id);

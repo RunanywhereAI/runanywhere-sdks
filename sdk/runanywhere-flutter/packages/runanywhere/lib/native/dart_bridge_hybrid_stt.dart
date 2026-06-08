@@ -183,7 +183,7 @@ final class _RacSttService extends Struct {
 }
 
 // ============================================================================
-// Device-state vtable (rac/routing/rac_hybrid_device_state.h)
+// Device-state vtable (rac/router/hybrid/rac_hybrid_device_state.h)
 // ============================================================================
 
 /// `bool (*is_online)(void* user_data)` — bool is one byte in the C ABI; FFI
@@ -206,7 +206,7 @@ final class _RacHybridDeviceStateOps extends Struct {
 }
 
 // ============================================================================
-// Custom-filter predicate (rac/routing/rac_hybrid_custom_filter.h)
+// Custom-filter predicate (rac/router/hybrid/rac_hybrid_custom_filter.h)
 // ============================================================================
 
 /// Mirrors `rac_hybrid_routing_context_t` — {is_online, battery_percent,
@@ -229,7 +229,7 @@ typedef _HybridCustomFilterPredicateNative = Int32 Function(
     Pointer<_RacHybridRoutingContext>, Pointer<Void>);
 
 // ============================================================================
-// Proto-byte router ABI (rac/routing/rac_stt_hybrid_router_proto.h)
+// Proto-byte router ABI (rac/router/hybrid/rac_stt_hybrid_router_proto.h)
 // ============================================================================
 
 typedef _RouterCreateNative = Int32 Function(Pointer<RacHandle>);

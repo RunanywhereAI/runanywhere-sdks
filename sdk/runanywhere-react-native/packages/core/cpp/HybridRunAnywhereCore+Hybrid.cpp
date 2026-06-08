@@ -57,11 +57,11 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
-#include "rac/routing/rac_hybrid_custom_filter.h"
-#include "rac/routing/rac_hybrid_device_state.h"
-#include "rac/routing/rac_hybrid_types.h"
-#include "rac/routing/rac_stt_hybrid_router.h"
-#include "rac/routing/rac_stt_hybrid_router_proto.h"
+#include "rac/router/hybrid/rac_hybrid_custom_filter.h"
+#include "rac/router/hybrid/rac_hybrid_device_state.h"
+#include "rac/router/hybrid/rac_hybrid_types.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
 namespace margelo::nitro::runanywhere {
 

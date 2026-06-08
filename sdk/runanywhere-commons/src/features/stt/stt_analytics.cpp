@@ -6,17 +6,16 @@
  * Swift Source: Sources/RunAnywhere/Features/STT/Analytics/STTAnalyticsService.swift
  */
 
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
 #include <new>
-#include <random>
-#include <sstream>
 #include <string>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_uuid.h"
 #include "rac/features/stt/rac_stt_analytics.h"
 
 // =============================================================================
@@ -36,36 +35,10 @@ struct TranscriptionTracker {
     rac_inference_framework_t framework;
 };
 
-int64_t get_current_time_ms() {
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}
-
 std::string generate_uuid() {
-    static thread_local std::mt19937 gen(std::random_device{}());
-    static thread_local std::uniform_int_distribution<> dis(0, 15);
-
-    std::stringstream ss;
-    ss << std::hex;
-
-    for (int i = 0; i < 8; i++)
-        ss << dis(gen);
-    ss << "-";
-    for (int i = 0; i < 4; i++)
-        ss << dis(gen);
-    ss << "-4";
-    for (int i = 0; i < 3; i++)
-        ss << dis(gen);
-    ss << "-";
-    ss << (8 + dis(gen) % 4);
-    for (int i = 0; i < 3; i++)
-        ss << dis(gen);
-    ss << "-";
-    for (int i = 0; i < 12; i++)
-        ss << dis(gen);
-
-    return ss.str();
+    char uuid_buf[37];
+    rac_uuid_v4(uuid_buf, sizeof(uuid_buf));
+    return std::string(uuid_buf);
 }
 
 }  // namespace
@@ -94,7 +67,7 @@ struct rac_stt_analytics_s {
           total_latency_ms(0),
           total_audio_processed_ms(0),
           total_real_time_factor(0),
-          start_time_ms(get_current_time_ms()),
+          start_time_ms(rac_get_current_time_ms()),
           last_event_time_ms(0),
           has_last_event_time(false) {}
 };
@@ -140,7 +113,7 @@ rac_result_t rac_stt_analytics_start_transcription(rac_stt_analytics_handle_t ha
     std::string id = generate_uuid();
 
     TranscriptionTracker tracker;
-    tracker.start_time_ms = get_current_time_ms();
+    tracker.start_time_ms = rac_get_current_time_ms();
     tracker.model_id = model_id;
     tracker.audio_length_ms = audio_length_ms;
     tracker.audio_size_bytes = audio_size_bytes;
@@ -202,7 +175,7 @@ rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_handle_t
     TranscriptionTracker tracker = it->second;
     handle->active_transcriptions.erase(it);
 
-    int64_t end_time_ms = get_current_time_ms();
+    int64_t end_time_ms = rac_get_current_time_ms();
     double processing_time_ms = static_cast<double>(end_time_ms - tracker.start_time_ms);
 
     // Calculate real-time factor (RTF): processing time / audio length
@@ -235,7 +208,7 @@ rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analytics_hand
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     handle->active_transcriptions.erase(transcription_id);
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("STT.Analytics", "Transcription failed %s: %d - %s", transcription_id, error_code,
@@ -264,7 +237,7 @@ rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t handle,
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("STT.Analytics", "STT error in %s: %d - %s (model: %s, trans: %s)",

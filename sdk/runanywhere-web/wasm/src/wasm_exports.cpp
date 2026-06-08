@@ -85,10 +85,10 @@
 // instead of dead-stripping them (mirrors the per-feature includes above). The
 // matching _rac_stt_hybrid_router_* / _rac_hybrid_* symbols are listed in
 // RAC_EXPORTED_FUNCTIONS_BASE in wasm/CMakeLists.txt.
-#include "rac/routing/rac_hybrid_custom_filter.h"
-#include "rac/routing/rac_hybrid_device_state.h"
-#include "rac/routing/rac_stt_hybrid_router.h"
-#include "rac/routing/rac_stt_hybrid_router_proto.h"
+#include "rac/router/hybrid/rac_hybrid_custom_filter.h"
+#include "rac/router/hybrid/rac_hybrid_device_state.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
 /**
  * WASM module initialization.

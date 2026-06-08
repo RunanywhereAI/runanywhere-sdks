@@ -6,17 +6,16 @@
  * Swift Source: Sources/RunAnywhere/Features/LLM/Analytics/GenerationAnalyticsService.swift
  */
 
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
 #include <new>
-#include <random>
-#include <sstream>
 #include <string>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_uuid.h"
 #include "rac/features/llm/rac_llm_analytics.h"
 
 // =============================================================================
@@ -39,38 +38,6 @@ struct GenerationTracker {
     int64_t first_token_time_ms;
     bool has_first_token_time;
 };
-
-int64_t get_current_time_ms() {
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}
-
-std::string generate_uuid() {
-    static thread_local std::mt19937 gen(std::random_device{}());
-    static thread_local std::uniform_int_distribution<> dis(0, 15);
-
-    std::stringstream ss;
-    ss << std::hex;
-
-    for (int i = 0; i < 8; i++)
-        ss << dis(gen);
-    ss << "-";
-    for (int i = 0; i < 4; i++)
-        ss << dis(gen);
-    ss << "-4";  // Version 4 UUID
-    for (int i = 0; i < 3; i++)
-        ss << dis(gen);
-    ss << "-";
-    ss << (8 + dis(gen) % 4);  // Variant
-    for (int i = 0; i < 3; i++)
-        ss << dis(gen);
-    ss << "-";
-    for (int i = 0; i < 12; i++)
-        ss << dis(gen);
-
-    return ss.str();
-}
 
 }  // namespace
 
@@ -104,7 +71,7 @@ struct rac_llm_analytics_s {
           total_tokens_per_second(0),
           total_input_tokens(0),
           total_output_tokens(0),
-          start_time_ms(get_current_time_ms()),
+          start_time_ms(rac_get_current_time_ms()),
           last_event_time_ms(0),
           has_last_event_time(false) {}
 };
@@ -147,10 +114,12 @@ rac_result_t rac_llm_analytics_start_generation(rac_llm_analytics_handle_t handl
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    std::string id = generate_uuid();
+    char uuid_buf[37];
+    rac_uuid_v4(uuid_buf, sizeof(uuid_buf));
+    std::string id(uuid_buf);
 
     GenerationTracker tracker;
-    tracker.start_time_ms = get_current_time_ms();
+    tracker.start_time_ms = rac_get_current_time_ms();
     tracker.is_streaming = false;
     tracker.framework = framework;
     tracker.model_id = model_id;
@@ -186,10 +155,12 @@ rac_result_t rac_llm_analytics_start_streaming_generation(
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    std::string id = generate_uuid();
+    char uuid_buf[37];
+    rac_uuid_v4(uuid_buf, sizeof(uuid_buf));
+    std::string id(uuid_buf);
 
     GenerationTracker tracker;
-    tracker.start_time_ms = get_current_time_ms();
+    tracker.start_time_ms = rac_get_current_time_ms();
     tracker.is_streaming = true;
     tracker.framework = framework;
     tracker.model_id = model_id;
@@ -240,7 +211,7 @@ rac_result_t rac_llm_analytics_track_first_token(rac_llm_analytics_handle_t hand
         return RAC_SUCCESS;
     }
 
-    tracker.first_token_time_ms = get_current_time_ms();
+    tracker.first_token_time_ms = rac_get_current_time_ms();
     tracker.has_first_token_time = true;
 
     double time_to_first_token_ms =
@@ -294,7 +265,7 @@ rac_result_t rac_llm_analytics_complete_generation(rac_llm_analytics_handle_t ha
     GenerationTracker tracker = it->second;
     handle->active_generations.erase(it);
 
-    int64_t end_time_ms = get_current_time_ms();
+    int64_t end_time_ms = rac_get_current_time_ms();
     double total_time_sec = static_cast<double>(end_time_ms - tracker.start_time_ms) / 1000.0;
     double tokens_per_second =
         total_time_sec > 0 ? static_cast<double>(output_tokens) / total_time_sec : 0;
@@ -336,7 +307,7 @@ rac_result_t rac_llm_analytics_track_generation_failed(rac_llm_analytics_handle_
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     handle->active_generations.erase(generation_id);
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("LLM.Analytics", "Generation failed %s: %d - %s", generation_id, error_code,
@@ -355,7 +326,7 @@ rac_result_t rac_llm_analytics_track_error(rac_llm_analytics_handle_t handle,
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("LLM.Analytics", "LLM error in %s: %d - %s (model: %s, gen: %s)",

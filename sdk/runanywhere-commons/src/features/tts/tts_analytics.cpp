@@ -6,17 +6,16 @@
  * Swift Source: Sources/RunAnywhere/Features/TTS/Analytics/TTSAnalyticsService.swift
  */
 
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <map>
 #include <mutex>
 #include <new>
-#include <random>
-#include <sstream>
 #include <string>
 
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_uuid.h"
 #include "rac/features/tts/rac_tts_analytics.h"
 
 // =============================================================================
@@ -32,38 +31,6 @@ struct SynthesisTracker {
     int32_t sample_rate;
     rac_inference_framework_t framework;
 };
-
-int64_t get_current_time_ms() {
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}
-
-std::string generate_uuid() {
-    static thread_local std::mt19937 gen(std::random_device{}());
-    static thread_local std::uniform_int_distribution<> dis(0, 15);
-
-    std::stringstream ss;
-    ss << std::hex;
-
-    for (int i = 0; i < 8; i++)
-        ss << dis(gen);
-    ss << "-";
-    for (int i = 0; i < 4; i++)
-        ss << dis(gen);
-    ss << "-4";
-    for (int i = 0; i < 3; i++)
-        ss << dis(gen);
-    ss << "-";
-    ss << (8 + dis(gen) % 4);
-    for (int i = 0; i < 3; i++)
-        ss << dis(gen);
-    ss << "-";
-    for (int i = 0; i < 12; i++)
-        ss << dis(gen);
-
-    return ss.str();
-}
 
 }  // namespace
 
@@ -93,7 +60,7 @@ struct rac_tts_analytics_s {
           total_audio_duration_ms(0),
           total_audio_size_bytes(0),
           total_characters_per_second(0),
-          start_time_ms(get_current_time_ms()),
+          start_time_ms(rac_get_current_time_ms()),
           last_event_time_ms(0),
           has_last_event_time(false) {}
 };
@@ -134,11 +101,13 @@ rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_t handle
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    std::string id = generate_uuid();
+    char uuid_buf[37];
+    rac_uuid_v4(uuid_buf, sizeof(uuid_buf));
+    std::string id(uuid_buf);
     int32_t character_count = static_cast<int32_t>(strlen(text));
 
     SynthesisTracker tracker;
-    tracker.start_time_ms = get_current_time_ms();
+    tracker.start_time_ms = rac_get_current_time_ms();
     tracker.model_id = voice;
     tracker.character_count = character_count;
     tracker.sample_rate = sample_rate;
@@ -187,7 +156,7 @@ rac_result_t rac_tts_analytics_complete_synthesis(rac_tts_analytics_handle_t han
     SynthesisTracker tracker = it->second;
     handle->active_syntheses.erase(it);
 
-    int64_t end_time_ms = get_current_time_ms();
+    int64_t end_time_ms = rac_get_current_time_ms();
     double processing_time_ms = static_cast<double>(end_time_ms - tracker.start_time_ms);
     int32_t character_count = tracker.character_count;
 
@@ -223,7 +192,7 @@ rac_result_t rac_tts_analytics_track_synthesis_failed(rac_tts_analytics_handle_t
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     handle->active_syntheses.erase(synthesis_id);
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("TTS.Analytics", "Synthesis failed %s: %d - %s", synthesis_id, error_code,
@@ -242,7 +211,7 @@ rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t handle,
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    handle->last_event_time_ms = get_current_time_ms();
+    handle->last_event_time_ms = rac_get_current_time_ms();
     handle->has_last_event_time = true;
 
     RAC_LOG_ERROR("TTS.Analytics", "TTS error in %s: %d - %s (model: %s, syn: %s)",

@@ -37,6 +37,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/common/rac_stream_registry_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
@@ -52,23 +53,7 @@ namespace {
 // rac_vlm_proto_abi.cpp for the canonical reference; this guards
 // dispatch_stt_stream_event so destroy/teardown can spin-wait until any
 // in-flight slot.fn() returns before freeing user_data.
-std::atomic<int>& stt_in_flight() {
-    static std::atomic<int> counter{0};
-    return counter;
-}
-
-struct SttInFlightGuard {
-    SttInFlightGuard() { stt_in_flight().fetch_add(1, std::memory_order_acq_rel); }
-    ~SttInFlightGuard() { stt_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
-    SttInFlightGuard(const SttInFlightGuard&) = delete;
-    SttInFlightGuard& operator=(const SttInFlightGuard&) = delete;
-};
-
-struct CallbackSlot {
-    rac_stt_stream_proto_callback_fn fn = nullptr;
-    void* user_data = nullptr;
-    uint64_t seq = 0;
-};
+std::atomic<int> g_in_flight{0};
 
 struct StreamSession {
     rac_handle_t handle = nullptr;
@@ -99,8 +84,11 @@ std::mutex& g_mu() {
     return m;
 }
 
-std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
-    static std::unordered_map<rac_handle_t, CallbackSlot> m;
+std::unordered_map<rac_handle_t, rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn>>&
+g_slots() {
+    static std::unordered_map<rac_handle_t,
+                              rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn>>
+        m;
     return m;
 }
 
@@ -109,11 +97,9 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
-uint64_t next_session_id() {
-    static std::atomic<uint64_t> g_counter{0};
-    // Skip 0 — reserved as "invalid session" sentinel for SDK callers.
-    return g_counter.fetch_add(1, std::memory_order_relaxed) + 1;
-}
+// One allocator instance per TU keeps an independent id sequence; next() skips
+// 0, reserved as the "invalid session" sentinel for SDK callers.
+rac::stream::SessionIdAllocator g_session_ids;
 
 #if defined(RAC_HAVE_PROTOBUF)
 int64_t now_us() {
@@ -214,7 +200,8 @@ rac_result_t rac_stt_set_stream_proto_callback(rac_handle_t handle,
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{.fn = callback, .user_data = user_data, .seq = 0};
+        g_slots()[handle] = rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn>{
+            .fn = callback, .user_data = user_data, .seq = 0};
     }
     return RAC_SUCCESS;
 }
@@ -235,7 +222,7 @@ rac_result_t rac_stt_unset_stream_proto_callback(rac_handle_t handle) {
 // tearing down the STT component, MUST call this after the unset to avoid
 // a use-after-free in the dispatch thread.
 void rac_stt_proto_quiesce(void) {
-    while (stt_in_flight().load(std::memory_order_acquire) > 0) {
+    while (g_in_flight.load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
     }
 }
@@ -261,7 +248,7 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         return RAC_ERROR_DECODING_ERROR;
     }
 
-    const uint64_t id = next_session_id();
+    const uint64_t id = g_session_ids.next();
     {
         std::lock_guard<std::mutex> lock(g_mu());
         StreamSession& s = g_sessions()[id];
@@ -629,8 +616,8 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     // Hold the InFlightGuard across the whole
     // dispatch so rac_stt_proto_quiesce() can spin-wait on the counter
     // before destroy threads free user_data.
-    SttInFlightGuard in_flight_guard;
-    CallbackSlot slot;
+    rac::stream::InFlightGuard in_flight_guard(g_in_flight);
+    rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn> slot;
     uint64_t seq = 0;
     std::string request_id;
     {

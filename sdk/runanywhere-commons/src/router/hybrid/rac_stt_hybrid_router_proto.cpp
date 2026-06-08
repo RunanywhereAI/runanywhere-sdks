@@ -15,7 +15,7 @@
  *      rac_stt_hybrid_router_proto_buffer_free.
  */
 
-#include "rac/routing/rac_stt_hybrid_router_proto.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -26,9 +26,9 @@
 
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
-#include "rac/routing/rac_hybrid_device_state.h"
-#include "rac/routing/rac_hybrid_types.h"
-#include "rac/routing/rac_stt_hybrid_router.h"
+#include "rac/router/hybrid/rac_hybrid_device_state.h"
+#include "rac/router/hybrid/rac_hybrid_types.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router.h"
 
 namespace v1 = ::runanywhere::v1;
 

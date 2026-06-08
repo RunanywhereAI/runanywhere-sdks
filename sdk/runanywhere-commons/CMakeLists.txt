@@ -696,6 +696,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_benchmark_log.cpp
     src/core/rac_benchmark_stats.cpp
     src/core/rac_memory.cpp
+    src/core/rac_uuid.cpp
     src/core/rac_logger.cpp
     src/infrastructure/logging/log_redact.cpp
     src/core/rac_audio_utils.cpp
@@ -898,6 +899,7 @@ set(RAC_FEATURES_SOURCES
     # W4: unified module — merges vad_component.cpp + VAD slice of
     # rac_nonllm_lifecycle_proto_abi.cpp (dual-backend energy+model preserved).
     src/features/vad/vad_module.cpp
+    src/features/vad/rac_vad_service.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
     # Lifecycle-owned proto-byte VADStreamEvent ABI

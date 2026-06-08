@@ -40,17 +40,14 @@ extern "C" {
  * @return RAC_SUCCESS or error code.
  */
 RAC_API rac_result_t rac_stt_hybrid_router_set_offline_service_proto(
-    rac_handle_t       handle,
-    rac_stt_service_t* service,
-    const uint8_t*     descriptor_bytes,
-    size_t             descriptor_size);
+    rac_handle_t handle, rac_stt_service_t* service, const uint8_t* descriptor_bytes,
+    size_t descriptor_size);
 
 /** Symmetric to rac_stt_hybrid_router_set_offline_service_proto. */
-RAC_API rac_result_t rac_stt_hybrid_router_set_online_service_proto(
-    rac_handle_t       handle,
-    rac_stt_service_t* service,
-    const uint8_t*     descriptor_bytes,
-    size_t             descriptor_size);
+RAC_API rac_result_t rac_stt_hybrid_router_set_online_service_proto(rac_handle_t handle,
+                                                                    rac_stt_service_t* service,
+                                                                    const uint8_t* descriptor_bytes,
+                                                                    size_t descriptor_size);
 
 /**
  * Install / replace the routing policy.
@@ -59,10 +56,9 @@ RAC_API rac_result_t rac_stt_hybrid_router_set_online_service_proto(
  * @param policy_bytes  Serialized runanywhere.v1.HybridRoutingPolicy.
  * @param policy_size   Length of @p policy_bytes.
  */
-RAC_API rac_result_t rac_stt_hybrid_router_set_policy_proto(
-    rac_handle_t   handle,
-    const uint8_t* policy_bytes,
-    size_t         policy_size);
+RAC_API rac_result_t rac_stt_hybrid_router_set_policy_proto(rac_handle_t handle,
+                                                            const uint8_t* policy_bytes,
+                                                            size_t policy_size);
 
 /**
  * Dispatch one transcribe request through the router.
@@ -84,12 +80,11 @@ RAC_API rac_result_t rac_stt_hybrid_router_set_policy_proto(
  * @param out_response_bytes  Receives heap-allocated response bytes.
  * @param out_response_size   Receives length of @p *out_response_bytes.
  */
-RAC_API rac_result_t rac_stt_hybrid_router_transcribe_proto(
-    rac_handle_t   handle,
-    const uint8_t* request_bytes,
-    size_t         request_size,
-    uint8_t**      out_response_bytes,
-    size_t*        out_response_size);
+RAC_API rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t handle,
+                                                            const uint8_t* request_bytes,
+                                                            size_t request_size,
+                                                            uint8_t** out_response_bytes,
+                                                            size_t* out_response_size);
 
 /**
  * Release a buffer returned by rac_stt_hybrid_router_transcribe_proto.

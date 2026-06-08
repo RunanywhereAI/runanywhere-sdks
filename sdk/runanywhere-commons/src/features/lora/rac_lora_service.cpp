@@ -29,6 +29,8 @@
 #if defined(RAC_HAVE_PROTOBUF)
 #include "lora_options.pb.h"
 #include "sdk_events.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
 #endif
 
 extern "C" rac_result_t rac_lora_registry_register_catalog_entry_proto(
@@ -197,15 +199,7 @@ void add_unique_path(std::vector<std::string>* paths, const std::string& path) {
 }
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    if (!out)
-        return RAC_ERROR_NULL_POINTER;
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize proto result");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize proto result");
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {

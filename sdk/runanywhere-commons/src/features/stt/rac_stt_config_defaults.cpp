@@ -17,9 +17,6 @@
  * stay merge-safe while concurrent agents edit feature subtrees.
  */
 
-#include <cstdint>
-#include <vector>
-
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -27,6 +24,8 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "stt_options.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
 #endif
 
 namespace {
@@ -34,13 +33,7 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
-    const size_t size = message.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
-                                          "failed to serialize STTConfiguration defaults");
-    }
-    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out);
+    return rac::proto::copy_message(message, out, "failed to serialize STTConfiguration defaults");
 }
 
 #endif  // RAC_HAVE_PROTOBUF

@@ -38,7 +38,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/routing/rac_hybrid_types.h"
+#include "rac/router/hybrid/rac_hybrid_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,8 +64,8 @@ extern "C" {
  *                  Never NULL when invoked by the router.
  * @param user_data Opaque binding-owned pointer supplied at registration.
  */
-typedef rac_bool_t (*rac_hybrid_custom_filter_predicate_t)(
-    const rac_hybrid_routing_context_t* ctx, void* user_data);
+typedef rac_bool_t (*rac_hybrid_custom_filter_predicate_t)(const rac_hybrid_routing_context_t* ctx,
+                                                           void* user_data);
 
 /**
  * @brief Register (or replace) a named custom-filter predicate.
@@ -84,9 +84,7 @@ typedef rac_bool_t (*rac_hybrid_custom_filter_predicate_t)(
  *         RAC_ERROR_OUT_OF_MEMORY if the new snapshot cannot be allocated.
  */
 RAC_API rac_result_t rac_hybrid_register_custom_filter(
-    const char*                          name,
-    rac_hybrid_custom_filter_predicate_t predicate,
-    void*                                user_data);
+    const char* name, rac_hybrid_custom_filter_predicate_t predicate, void* user_data);
 
 /**
  * @brief Remove a named custom-filter predicate.
@@ -116,10 +114,9 @@ RAC_API rac_result_t rac_hybrid_unregister_custom_filter(const char* name);
  *         (out_pass is left untouched — the router decides the fail-open /
  *         fail-closed policy for an unknown name).
  */
-RAC_API rac_result_t rac_hybrid_invoke_custom_filter(
-    const char*                         name,
-    const rac_hybrid_routing_context_t* ctx,
-    rac_bool_t*                         out_pass);
+RAC_API rac_result_t rac_hybrid_invoke_custom_filter(const char* name,
+                                                     const rac_hybrid_routing_context_t* ctx,
+                                                     rac_bool_t* out_pass);
 
 #ifdef __cplusplus
 }

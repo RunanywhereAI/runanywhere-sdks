@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/common/rac_stream_registry_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/tts/rac_tts_proto_adapters.h"
@@ -31,23 +32,9 @@
 
 namespace {
 
-std::atomic<int>& tts_in_flight() {
-    static std::atomic<int> counter{0};
-    return counter;
-}
+std::atomic<int> g_in_flight{0};
 
-struct TtsInFlightGuard {
-    TtsInFlightGuard() { tts_in_flight().fetch_add(1, std::memory_order_acq_rel); }
-    ~TtsInFlightGuard() { tts_in_flight().fetch_sub(1, std::memory_order_acq_rel); }
-    TtsInFlightGuard(const TtsInFlightGuard&) = delete;
-    TtsInFlightGuard& operator=(const TtsInFlightGuard&) = delete;
-};
-
-struct CallbackSlot {
-    rac_tts_stream_proto_callback_fn fn = nullptr;
-    void* user_data = nullptr;
-    uint64_t seq = 0;
-};
+using CallbackSlot = rac::stream::CallbackSlot<rac_tts_stream_proto_callback_fn>;
 
 struct StreamSession {
     rac_handle_t handle = nullptr;
@@ -70,10 +57,7 @@ std::unordered_map<uint64_t, StreamSession>& g_sessions() {
     return m;
 }
 
-uint64_t next_session_id() {
-    static std::atomic<uint64_t> g_counter{0};
-    return g_counter.fetch_add(1, std::memory_order_relaxed) + 1;
-}
+rac::stream::SessionIdAllocator g_session_ids;
 
 #if defined(RAC_HAVE_PROTOBUF)
 int64_t now_us() {
@@ -141,8 +125,7 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
                                const runanywhere::v1::TTSOutput* output,
                                const runanywhere::v1::TTSPhonemeTimestamp* phoneme,
                                const runanywhere::v1::TTSSpeakResult* speak_result,
-                               const char* error_message, int error_code,
-                               uint64_t session_id = 0);
+                               const char* error_message, int error_code, uint64_t session_id = 0);
 }  // namespace rac::tts
 #endif
 
@@ -171,7 +154,7 @@ rac_result_t rac_tts_unset_stream_proto_callback(rac_handle_t handle) {
 }
 
 void rac_tts_proto_quiesce(void) {
-    while (tts_in_flight().load(std::memory_order_acquire) > 0) {
+    while (g_in_flight.load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
     }
 }
@@ -218,7 +201,7 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
         options.use_ssml = RAC_TRUE;
     }
 
-    const uint64_t session_id = next_session_id();
+    const uint64_t session_id = g_session_ids.next();
     const std::string request_id = parsed.request_id().empty()
                                        ? std::string("tts-") + std::to_string(session_id)
                                        : parsed.request_id();
@@ -252,9 +235,8 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
               .character_count = static_cast<int32_t>(text.size()),
               .chunk_index = 0};
 
-    rac::tts::dispatch_tts_stream_event(
-        handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED, nullptr, nullptr, nullptr, nullptr,
-        0, session_id);
+    rac::tts::dispatch_tts_stream_event(handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED,
+                                        nullptr, nullptr, nullptr, nullptr, 0, session_id);
 
     auto bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);
@@ -274,9 +256,9 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
         metadata->set_voice_id(ctx->voice_id);
         metadata->set_language_code(ctx->language_code);
         metadata->set_character_count(ctx->character_count);
-        rac::tts::dispatch_tts_stream_event(
-            ctx->handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK, &output, nullptr,
-            nullptr, nullptr, 0, ctx->session_id);
+        rac::tts::dispatch_tts_stream_event(ctx->handle,
+                                            runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
+                                            &output, nullptr, nullptr, nullptr, 0, ctx->session_id);
     };
 
     rac_result_t rc =
@@ -284,9 +266,9 @@ rac_result_t rac_tts_stream_start_proto(rac_handle_t handle, const uint8_t* requ
     const bool active = session_is_active(session_id);
     if (active) {
         if (rc == RAC_SUCCESS) {
-            rac::tts::dispatch_tts_stream_event(
-                handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED, nullptr, nullptr, nullptr,
-                nullptr, 0, session_id);
+            rac::tts::dispatch_tts_stream_event(handle,
+                                                runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED,
+                                                nullptr, nullptr, nullptr, nullptr, 0, session_id);
         } else {
             rac::tts::dispatch_tts_stream_event(
                 handle, runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR, nullptr, nullptr, nullptr,
@@ -332,7 +314,7 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
                                const runanywhere::v1::TTSPhonemeTimestamp* phoneme,
                                const runanywhere::v1::TTSSpeakResult* speak_result,
                                const char* error_message, int error_code, uint64_t session_id) {
-    TtsInFlightGuard in_flight_guard;
+    rac::stream::InFlightGuard guard(g_in_flight);
     CallbackSlot slot;
     uint64_t seq = 0;
     std::string request_id;

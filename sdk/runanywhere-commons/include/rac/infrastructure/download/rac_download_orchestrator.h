@@ -15,7 +15,6 @@
  *      _cleanup_terminal_tasks_proto for lifecycle management
  *
  * Depends on:
- *  - rac_download.h (download manager state machine, progress tracking)
  *  - rac_http_transport.h (SDK-registered HTTP transport)
  *  - rac_extraction.h (rac_extract_archive_native for archive extraction)
  *  - rac_model_paths.h (destination path resolution)

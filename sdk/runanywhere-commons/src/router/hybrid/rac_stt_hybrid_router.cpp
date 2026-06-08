@@ -22,7 +22,7 @@
  * so its confidence is NaN and never triggers a cascade.
  */
 
-#include "rac/routing/rac_stt_hybrid_router.h"
+#include "rac/router/hybrid/rac_stt_hybrid_router.h"
 
 #include <algorithm>
 #include <atomic>
@@ -41,8 +41,8 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_plugin_entry.h"
-#include "rac/routing/rac_hybrid_custom_filter.h"
-#include "rac/routing/rac_hybrid_types.h"
+#include "rac/router/hybrid/rac_hybrid_custom_filter.h"
+#include "rac/router/hybrid/rac_hybrid_types.h"
 
 namespace {
 
