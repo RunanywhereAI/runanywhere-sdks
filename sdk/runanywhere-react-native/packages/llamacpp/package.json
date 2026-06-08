@@ -51,8 +51,8 @@
   },
   "peerDependencies": {
     "@runanywhere/core": ">=0.19.13",
-    "react": "19.0.0",
-    "react-native": "0.83.1",
+    "react": ">=19.0.0",
+    "react-native": ">=0.83.1",
     "react-native-nitro-modules": "^0.33.9"
   },
   "devDependencies": {

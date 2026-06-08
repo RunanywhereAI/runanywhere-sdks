@@ -31,15 +31,6 @@ try {
   process.exit(err.status ?? 1);
 }
 
-// Apply the RN 0.83.1 <-> react-native-screens codegen UnionTypeAnnotation fix
-// (scripts/patch-rn-codegen.js). Idempotent; runs in all contexts (incl. CI) so
-// native builds get a codegen that doesn't throw on union-typed event props.
-try {
-  execSync('node scripts/patch-rn-codegen.js', { stdio: 'inherit', cwd });
-} catch (err) {
-  process.stderr.write(`[postinstall] patch-rn-codegen warning: ${err.message}\n`);
-}
-
 // Generate the gitignored debug keystore (standard, non-secret android /
 // androiddebugkey credentials) if absent, so `gradlew assembleDebug` works on a
 // fresh checkout / CI without a manual keytool step.

@@ -29,6 +29,8 @@ export interface SDKInitOptions {
   apiKey?: string;
   baseURL?: string;
   environment?: SDKEnvironment;
+  /** Optional development-mode device registration build token. */
+  buildToken?: string;
   debug?: boolean;
   /** Hardware acceleration preference for LLM/VLM inference. */
   acceleration?: AccelerationPreference;

@@ -869,6 +869,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_sdk_init"
     "_rac_sdk_init_phase1_proto"
     "_rac_sdk_init_phase2_proto"
+    "_rac_sdk_retry_http_proto"
     "_rac_sdk_get_config"
     "_rac_sdk_get_environment"
     "_rac_sdk_is_initialized"

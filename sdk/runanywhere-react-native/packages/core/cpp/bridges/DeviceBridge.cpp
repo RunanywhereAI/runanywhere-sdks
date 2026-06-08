@@ -211,33 +211,8 @@ rac_result_t DeviceBridge::registerCallbacks() {
     return result;
 }
 
-rac_result_t DeviceBridge::registerIfNeeded(rac_environment_t environment, const std::string& buildToken) {
-    if (!callbacksRegistered_) {
-        LOGE("Device callbacks not registered - call registerCallbacks() first");
-        return RAC_ERROR_NOT_INITIALIZED;
-    }
-
-    LOGI("Registering device if needed (env=%d)...", static_cast<int>(environment));
-
-    const char* tokenPtr = buildToken.empty() ? nullptr : buildToken.c_str();
-    rac_result_t result = rac_device_manager_register_if_needed(environment, tokenPtr);
-
-    if (result == RAC_SUCCESS) {
-        LOGI("Device registration completed successfully");
-    } else {
-        LOGE("Device registration failed: %d", result);
-    }
-
-    return result;
-}
-
 bool DeviceBridge::isRegistered() const {
     return rac_device_manager_is_registered() == RAC_TRUE;
-}
-
-void DeviceBridge::clearRegistration() {
-    rac_device_manager_clear_registration();
-    LOGI("Device registration cleared");
 }
 
 std::string DeviceBridge::getDeviceId() const {

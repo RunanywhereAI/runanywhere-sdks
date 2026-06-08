@@ -49,6 +49,9 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Complete deferred native service initialization.
+   * Resolves to the commons `has_completed_http_setup || http_configured`
+   * flag. A `false` result means Phase 2 finished in offline/deferred mode,
+   * not that native services failed.
    * Matches Swift: RunAnywhere.completeServicesInitialization().
    */
   completeServicesInitialization(): Promise<boolean>;
@@ -56,8 +59,7 @@ export interface RunAnywhereCore extends HybridObject<{
   /**
    * Retry HTTP/auth setup after an offline initialization via the commons
    * `rac_sdk_retry_http_proto` idempotency guard. Returns the resulting
-   * `http_configured` flag so the TS recovery path knows whether the
-   * platform-side auth round-trip is still required.
+   * `has_completed_http_setup || http_configured` flag.
    * Matches Swift: CppBridge.SdkInit.retryHTTP().
    */
   retryHTTPSetupProto(): Promise<boolean>;
@@ -112,22 +114,9 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Register device with backend
-   * @param environmentJson Environment configuration JSON
-   * @returns true if registered successfully
-   */
-  registerDevice(environmentJson: string): Promise<boolean>;
-
-  /**
    * Check if device is registered
    */
   isDeviceRegistered(): Promise<boolean>;
-
-  /**
-   * Clear device registration flag (for testing)
-   * Forces re-registration on next SDK init
-   */
-  clearDeviceRegistration(): Promise<boolean>;
 
   /**
    * Get the device ID
@@ -394,34 +383,6 @@ export interface RunAnywhereCore extends HybridObject<{
     bodyJson: string,
     timeoutMs: number
   ): Promise<string>;
-
-  /**
-   * Authenticate with the RunAnywhere backend and store the resulting JWT
-   * access/refresh tokens in the C++ AuthBridge. The native implementation
-   * builds the request JSON, executes the POST via rac_http_client_*, and
-   * calls AuthBridge::setAuth on success so subsequent native HTTP calls
-   * (device registration, telemetry) pick up the access token automatically.
-   *
-   * @returns The full auth response body (`{access_token, refresh_token,
-   *   expires_in, device_id, organization_id, user_id, token_type}`) as a
-   *   JSON string. Rejects when the backend returns a non-2xx response.
-   */
-  authAuthenticate(
-    apiKey: string,
-    baseURL: string,
-    deviceId: string,
-    platform: string,
-    sdkVersion: string
-  ): Promise<string>;
-
-  /**
-   * Refresh the stored JWT access token using the refresh token currently
-   * held by AuthBridge. Rejects when no refresh token is present or the
-   * backend rejects the refresh.
-   *
-   * @returns The new auth response body as a JSON string.
-   */
-  authRefreshToken(baseURL: string): Promise<string>;
 
   // ============================================================================
   // LLM Capability (Backend-Agnostic)

@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include <vector>
 
 // RACommons headers
 #include "rac_core.h"
@@ -85,7 +86,14 @@ public:
     rac_result_t initialize(rac_environment_t environment,
                            const std::string& apiKey,
                            const std::string& baseURL,
-                           const std::string& deviceId);
+                           const std::string& deviceId,
+                           const std::string& platform,
+                           const std::string& sdkVersion,
+                           const std::string& buildToken,
+                           bool forceRefreshAssignments,
+                           bool flushTelemetry,
+                           bool discoverDownloadedModels,
+                           bool rescanLocalModels);
 
     /**
      * @brief Complete deferred services initialization
@@ -93,19 +101,19 @@ public:
      * Registers native device callbacks and then drives commons Phase 2 through
      * rac_sdk_init_phase2_proto when bundled commons exposes it.
      *
+     * @param outHttpConfigured Set to has_completed_http_setup || http_configured.
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t completeServicesInitialization();
+    rac_result_t completeServicesInitialization(bool& outHttpConfigured);
 
     /**
      * @brief Retry HTTP/auth setup after an offline initialization.
      *
      * Drives the commons idempotency guard `rac_sdk_retry_http_proto`, which
      * re-checks usable external config and reports whether HTTP is configured.
-     * Mirrors Swift CppBridge.SdkInit.retryHTTP(). The platform-side auth
-     * round-trip that this ABI defers stays in the TypeScript layer.
+     * Mirrors Swift CppBridge.SdkInit.retryHTTP().
      *
-     * @param outHttpConfigured Set to the proto `http_configured` flag.
+     * @param outHttpConfigured Set to has_completed_http_setup || http_configured.
      * @return RAC_SUCCESS (incl. the feature-unavailable downgrade) or error.
      */
     rac_result_t retryHTTPSetup(bool& outHttpConfigured);
@@ -275,12 +283,12 @@ public:
     /**
      * @brief Get SDK version
      *
-     * Single source of truth is `sdk/runanywhere-commons/VERSION`, exposed via
-     * `rac_sdk_get_version()` (never NULL, process-lifetime static). Matches the
-     * Swift `SDKConstants.version` so the value reported to telemetry / device
-     * registration can never drift or fall back to a stale literal.
+     * Defaults to commons' canonical version and is overridden during init by
+     * the generated TypeScript Phase 1 request envelope.
      */
-    std::string getSdkVersion() const { return rac_sdk_get_version(); }
+    std::string getSdkVersion() const {
+        return sdkVersion_.empty() ? std::string(rac_sdk_get_version()) : sdkVersion_;
+    }
 
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
@@ -324,7 +332,9 @@ private:
     std::string apiKey_;
     std::string baseURL_;
     std::string deviceId_;
+    std::string platform_;
     std::string sdkVersion_;  // SDK version from TypeScript SDKConstants
+    std::vector<uint8_t> phase2RequestBytes_;
 
     // Platform adapter - must persist for C++ to call
     rac_platform_adapter_t adapter_{};

@@ -10,4 +10,9 @@ export const SDKConstants = {
    * Native commons receives this through the Phase 1 init payload.
    */
   version: '0.19.13',
+
+  /**
+   * SDK platform identifier used by backend auth/device metadata.
+   */
+  platform: 'react_native',
 } as const;

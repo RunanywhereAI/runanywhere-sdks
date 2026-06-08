@@ -10,6 +10,7 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
+import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -54,9 +55,11 @@ class DartBridgeHTTP {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final configureFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<Utf8>),
-          int Function(Pointer<Utf8>, Pointer<Utf8>)>('rac_http_configure');
+      final configureFn = lib
+          .lookupFunction<
+            Int32 Function(Pointer<Utf8>, Pointer<Utf8>),
+            int Function(Pointer<Utf8>, Pointer<Utf8>)
+          >('rac_http_configure');
 
       final basePtr = (_baseURL ?? '').toNativeUtf8();
       final keyPtr = (_apiKey ?? '').toNativeUtf8();
@@ -105,14 +108,13 @@ class DartBridgeHTTP {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) =>
-      _request(
-        method: 'GET',
-        endpoint: endpoint,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeout: timeout,
-      );
+  }) => _request(
+    method: 'GET',
+    endpoint: endpoint,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeout: timeout,
+  );
 
   Future<HTTPResult> post(
     String endpoint, {
@@ -120,15 +122,14 @@ class DartBridgeHTTP {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) =>
-      _request(
-        method: 'POST',
-        endpoint: endpoint,
-        body: body,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeout: timeout,
-      );
+  }) => _request(
+    method: 'POST',
+    endpoint: endpoint,
+    body: body,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeout: timeout,
+  );
 
   Future<HTTPResult> put(
     String endpoint, {
@@ -136,29 +137,27 @@ class DartBridgeHTTP {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) =>
-      _request(
-        method: 'PUT',
-        endpoint: endpoint,
-        body: body,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeout: timeout,
-      );
+  }) => _request(
+    method: 'PUT',
+    endpoint: endpoint,
+    body: body,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeout: timeout,
+  );
 
   Future<HTTPResult> delete(
     String endpoint, {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) =>
-      _request(
-        method: 'DELETE',
-        endpoint: endpoint,
-        headers: headers,
-        requiresAuth: requiresAuth,
-        timeout: timeout,
-      );
+  }) => _request(
+    method: 'DELETE',
+    endpoint: endpoint,
+    headers: headers,
+    requiresAuth: requiresAuth,
+    timeout: timeout,
+  );
 
   Future<HTTPResult> _request({
     required String method,
@@ -210,10 +209,8 @@ class DartBridgeHTTP {
         timeoutMs: (timeout ?? const Duration(seconds: 30)).inMilliseconds,
       );
 
-      // 401-retry is owned by the C++ `auth_manager` — no Dart-side
-      // refresh loop. Let the bearer token go stale and surface 401
-      // to the caller; callers that care about refresh invoke
-      // `DartBridgeAuth.refreshToken` directly.
+      // Auth refresh is owned by commons through `rac_sdk_retry_http_proto`.
+      // Dart does not build refresh requests or parse auth responses locally.
 
       if (response.isSuccess) {
         return HTTPResult.success(
@@ -230,11 +227,14 @@ class DartBridgeHTTP {
         error: _parseError(response.body, response.statusCode),
       );
     } catch (e) {
-      _logger.error('HTTP request failed', metadata: {
-        'method': method,
-        'endpoint': endpoint,
-        'error': e.toString(),
-      });
+      _logger.error(
+        'HTTP request failed',
+        metadata: {
+          'method': method,
+          'endpoint': endpoint,
+          'error': e.toString(),
+        },
+      );
       return HTTPResult.failure(e.toString());
     }
   }
@@ -252,17 +252,20 @@ class DartBridgeHTTP {
     }
 
     if (authBridge.isAuthenticated()) {
-      _logger.debug('Token needs refresh, attempting refresh...');
-      final result = await authBridge.refreshToken();
-      if (result.isSuccess) {
+      _logger.debug('Token needs refresh, attempting commons retryHTTP...');
+      try {
+        final result = DartBridgeSdkInit.retryHTTP();
+        if (!result.success) {
+          _logger.warning('commons retryHTTP returned unsuccessful result');
+        }
         final newToken = authBridge.getAccessToken();
         if (newToken != null) {
           _accessToken = newToken;
           _logger.info('Token refreshed successfully');
           return newToken;
         }
-      } else {
-        _logger.warning('Token refresh failed: ${result.error}');
+      } catch (e) {
+        _logger.warning('commons retryHTTP failed: $e');
       }
     }
 
@@ -372,13 +375,12 @@ class HTTPResult {
     required int statusCode,
     String? body,
     Map<String, String>? headers,
-  }) =>
-      HTTPResult(
-        isSuccess: true,
-        statusCode: statusCode,
-        body: body,
-        headers: headers,
-      );
+  }) => HTTPResult(
+    isSuccess: true,
+    statusCode: statusCode,
+    body: body,
+    headers: headers,
+  );
 
   factory HTTPResult.failure(String error) =>
       HTTPResult(isSuccess: false, error: error);

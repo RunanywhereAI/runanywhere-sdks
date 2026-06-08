@@ -14,8 +14,8 @@
 #include <random>
 #include <sstream>
 
-#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
 namespace rac {
@@ -104,9 +104,11 @@ void OpenAIHandler::handleHealth(const httplib::Request& /*req*/, httplib::Respo
     response["status"] = "ok";
     response["model"] = modelId_;
 
-    // Check if LLM is ready
+    // Check if the generic LLM service is alive. Backends that need a deeper
+    // readiness check expose it through rac_llm_get_info.
     if (llmHandle_) {
-        response["model_loaded"] = rac_llm_llamacpp_is_model_loaded(llmHandle_) != 0;
+        rac_llm_info_t info = {};
+        response["model_loaded"] = RAC_SUCCEEDED(rac_llm_get_info(llmHandle_, &info));
     } else {
         response["model_loaded"] = false;
     }
@@ -142,12 +144,13 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/, httplib
     RAC_LOG_INFO("Server", "processNonStreaming: options parsed, max_tokens=%d, temp=%.2f",
                  options.max_tokens, options.temperature);
 
-    // Generate response using LlamaCPP backend directly
-    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_llamacpp_generate with handle=%p",
+    // Generate response using the generic LLM service. Backend selection
+    // happened at rac_llm_create time through the plugin registry.
+    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_generate with handle=%p",
                  (void*)llmHandle_);
     rac_llm_result_t result = {};
-    rac_result_t rc = rac_llm_llamacpp_generate(llmHandle_, prompt.c_str(), &options, &result);
-    RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_llamacpp_generate returned rc=%d", rc);
+    rac_result_t rc = rac_llm_generate(llmHandle_, prompt.c_str(), &options, &result);
+    RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_generate returned rc=%d", rc);
 
     if (RAC_FAILED(rc)) {
         rac_llm_result_free(&result);
@@ -280,7 +283,7 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/, httplib::R
                 sink.write(sseData.c_str(), sseData.size());
             }
 
-            // Stream tokens incrementally via rac_llm_llamacpp_generate_stream
+            // Stream tokens incrementally via the generic LLM service.
             struct StreamCtx {
                 httplib::DataSink* sink;
                 const std::string* requestId;
@@ -291,33 +294,10 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/, httplib::R
 
             StreamCtx ctx = {&sink, &requestId, &modelId_, created, 0};
 
-            auto streamCallback = [](const char* token, rac_bool_t is_final,
-                                     void* user_data) -> rac_bool_t {
+            auto streamCallback = [](const char* token, void* user_data) -> rac_bool_t {
                 auto* ctx = static_cast<StreamCtx*>(user_data);
 
-                if (is_final) {
-                    // Send finish chunk
-                    rac_openai_stream_chunk_t chunk = {};
-                    chunk.id = ctx->requestId->c_str();
-                    chunk.object = "chat.completion.chunk";
-                    chunk.created = ctx->created;
-                    chunk.model = ctx->modelId->c_str();
-
-                    rac_openai_delta_t delta = {};
-                    delta.role = nullptr;
-                    delta.content = nullptr;
-
-                    rac_openai_stream_choice_t choice = {};
-                    choice.index = 0;
-                    choice.delta = delta;
-                    choice.finish_reason = RAC_OPENAI_FINISH_STOP;
-
-                    chunk.choices = &choice;
-                    chunk.num_choices = 1;
-
-                    std::string sseData = json::formatSSE(json::serializeStreamChunk(chunk));
-                    ctx->sink->write(sseData.c_str(), sseData.size());
-                } else if (token && token[0] != '\0') {
+                if (token && token[0] != '\0') {
                     // Send content chunk with this token
                     rac_openai_stream_chunk_t chunk = {};
                     chunk.id = ctx->requestId->c_str();
@@ -345,14 +325,37 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/, httplib::R
                 return RAC_TRUE;  // Continue generating
             };
 
-            rac_result_t rc = rac_llm_llamacpp_generate_stream(llmHandle_, prompt.c_str(), &options,
-                                                               streamCallback, &ctx);
+            rac_result_t rc =
+                rac_llm_generate_stream(llmHandle_, prompt.c_str(), &options, streamCallback, &ctx);
 
             if (RAC_FAILED(rc)) {
                 RAC_LOG_ERROR("Server", "Streaming generation failed: %d", rc);
             }
 
             totalTokensGenerated_ += ctx.tokenCount;
+
+            {
+                rac_openai_stream_chunk_t chunk = {};
+                chunk.id = requestId.c_str();
+                chunk.object = "chat.completion.chunk";
+                chunk.created = created;
+                chunk.model = modelId_.c_str();
+
+                rac_openai_delta_t delta = {};
+                delta.role = nullptr;
+                delta.content = nullptr;
+
+                rac_openai_stream_choice_t choice = {};
+                choice.index = 0;
+                choice.delta = delta;
+                choice.finish_reason = RAC_OPENAI_FINISH_STOP;
+
+                chunk.choices = &choice;
+                chunk.num_choices = 1;
+
+                std::string sseData = json::formatSSE(json::serializeStreamChunk(chunk));
+                sink.write(sseData.c_str(), sseData.size());
+            }
 
             // Send [DONE]
             std::string doneData = json::formatSSEDone();

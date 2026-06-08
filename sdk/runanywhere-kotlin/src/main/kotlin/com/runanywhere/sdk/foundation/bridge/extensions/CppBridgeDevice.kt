@@ -35,7 +35,6 @@ import ai.runanywhere.proto.v1.DeviceInfo
 import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
-import com.runanywhere.sdk.public.configuration.cEnvironment
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import java.util.UUID
@@ -195,37 +194,6 @@ object CppBridgeDevice {
 
     /** Current device id without re-initialising. */
     fun getDeviceId(): String? = deviceId
-
-    /**
-     * Trigger device registration with the backend. Thin wrapper over
-     * `rac_device_manager_register_if_needed` — commons handles every
-     * policy decision (skip-if-registered, dev UPSERT, full payload
-     * assembly, retry). Mirrors Swift's
-     * `CppBridge.Device.registerIfNeeded(environment:)`.
-     *
-     * @return `true` when commons reported success (or already-done).
-     */
-    fun triggerRegistration(environment: SDKEnvironment, buildToken: String? = null): Boolean {
-        if (!callbacksRegistered) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
-                TAG,
-                "Cannot trigger registration: device callbacks not registered",
-            )
-            return false
-        }
-        if (!CppBridgeTelemetry.hasUsableNetworkConfig(environment)) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Skipping device registration: no usable external config (env=$environment)",
-            )
-            return false
-        }
-
-        val result = RunAnywhereBridge.racDeviceManagerRegisterIfNeeded(environment.cEnvironment, buildToken)
-        return result == 0
-    }
 
     // JNI callbacks (invoked by commons through `rac_device_callbacks_t`)
 

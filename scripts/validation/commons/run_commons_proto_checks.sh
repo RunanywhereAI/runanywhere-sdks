@@ -14,6 +14,9 @@ if [[ "$(uname -s)" == "Linux" ]]; then
   export CXX="${CXX:-g++}"
 fi
 
+validation_run_step "commons_export_check" "${VALIDATION_REPO_ROOT}" \
+  "${SCRIPT_DIR}/check_rac_api_exports.sh" --strict
+
 validation_run_step "commons_configure" "${VALIDATION_REPO_ROOT}" \
   cmake -S "${COMMONS_DIR}" -B "${COMMONS_BUILD_DIR}" \
     -DCMAKE_BUILD_TYPE=Debug \

@@ -6,24 +6,23 @@
  * Two-phase initialization delegates to CppBridge:
  *   * Phase 1 → CppBridge.initialize() → CppBridgeSdkInit.phase1
  *     (rac_sdk_init_phase1_proto) for validation + config/state init.
- *   * Phase 2 → CppBridge.initializeServices() — device registration, HTTP
- *     auth round-trip, telemetry flush (Kotlin-side OkHttp orchestration).
- *   * HTTP retry → retryHTTPSetup() tries the idempotent
- *     CppBridgeSdkInit.retryHTTP() (rac_sdk_retry_http_proto) fast-path before
- *     falling back to re-running the Kotlin Phase 2 services init.
+ *   * Phase 2 → CppBridge.initializeServices() registers platform adapters,
+ *     then CppBridgeSdkInit.phase2 runs auth/refresh, device registration,
+ *     model assignments, telemetry flush, and model discovery in commons.
+ *   * HTTP retry → retryHTTPSetup() calls CppBridgeSdkInit.retryHTTP()
+ *     (rac_sdk_retry_http_proto).
  * Kotlin retains only the parts that cannot move into C++:
  *   * Coroutine Mutex + servicesMutex concurrency primitive
  *   * EncryptedSharedPreferences / file-backed SDK params persistence
- *   * JNI platform-plugin registration on JVM/Android main thread
- *   * HTTP authentication round-trip via OkHttp (deferred per
- *     sdk_init.cpp file header)
- *   * Telemetry flush + model discovery (deferred — handles owned by SDK)
+ *   * JNI platform-plugin/callback registration
+ *   * OkHttp HTTP transport implementation and adapter configuration
  */
 
 package com.runanywhere.sdk.public
 
 import android.content.Context
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -381,21 +380,14 @@ object RunAnywhere {
      * once. Mirrors Swift's `completeServicesInitialization()` (the
      * `_servicesInitTask` + `_servicesInitLock.sync { ... }` fan-in).
      *
-     * The platform bridge runs the Kotlin-side OkHttp orchestration:
-     *   1. HTTP transport + auth round-trip (OkHttp/CppBridgeAuth).
-     *      Tolerates offline mode — local/cached models stay accessible.
-     *   2. Telemetry flush (CppBridgeTelemetry.flush).
-     *   3. Device registration (CppBridgeDevice.triggerRegistration).
+     * Kotlin first wires the OkHttp transport and platform callbacks via
+     * [initializePlatformBridgeServices]. Then `CppBridgeSdkInit.phase2`
+     * drives the commons-owned step list: auth/refresh, device registration,
+     * assignment fetch, telemetry flush, and downloaded-model discovery.
      *
-     * (The commons `rac_sdk_init_phase2_proto` ABI is now bound via
-     * `CppBridgeSdkInit.phase2`; Kotlin keeps the OkHttp-backed orchestration
-     * here because auth/device/telemetry transport are platform-side, and
-     * routes the idempotent HTTP fast-path through `CppBridgeSdkInit.retryHTTP`
-     * in [retryHTTPSetup].)
-     *
-     * HTTPClientAdapter.isConfigured drives [_hasCompletedHTTPSetup] so a
-     * later [ensureServicesReady] call can retry HTTP without re-running the
-     * rest of the bootstrap.
+     * The generated `SdkInitResult` drives [_hasCompletedHTTPSetup] so a later
+     * [ensureServicesReady] call can retry HTTP/auth through
+     * `CppBridgeSdkInit.retryHTTP` without re-running the rest of the bootstrap.
      */
     suspend fun completeServicesInitialization() {
         // Fast path: already completed.
@@ -419,9 +411,24 @@ object RunAnywhere {
             logger.debug("Initializing services for ${params.environment.wireString} mode")
 
             try {
-                // Delegate to the platform bridge — runs the Kotlin-side
-                // OkHttp HTTP auth, telemetry flush, and device registration.
-                val httpConfigured = initializePlatformBridgeServices()
+                // Configure/register platform adapters first; commons uses
+                // those callbacks and the registered OkHttp transport during
+                // Phase 2.
+                initializePlatformBridgeServices()
+
+                val phase2Result =
+                    CppBridgeSdkInit.phase2(
+                        buildToken =
+                            if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+                                CppBridgeDevConfig.buildToken
+                            } else {
+                                null
+                            },
+                        forceRefreshAssignments = false,
+                        flushTelemetry = true,
+                        discoverDownloadedModels = true,
+                        rescanLocalModels = true,
+                    )
 
                 // Decouple "services ready" from "HTTP/auth complete" so
                 // offline/local-only Phase 2 still leaves
@@ -439,10 +446,18 @@ object RunAnywhere {
                 // on every API call. A transient offline failure (config present,
                 // network down) stays applicable and is still retried.
                 _httpSetupApplicable = CppBridgeTelemetry.hasUsableNetworkConfig(params.environment)
-                _hasCompletedHTTPSetup = httpConfigured
+                _hasCompletedHTTPSetup =
+                    phase2Result.has_completed_http_setup || phase2Result.http_configured
                 _areServicesReady = true
 
-                if (httpConfigured) {
+                if (phase2Result.warning.isNotEmpty()) {
+                    logger.info("Phase 2 warning: ${phase2Result.warning}")
+                }
+                if (phase2Result.linked_models_count > 0) {
+                    logger.info("Phase 2 linked ${phase2Result.linked_models_count} assigned models")
+                }
+
+                if (_hasCompletedHTTPSetup) {
                     logger.info("Services initialized for ${params.environment.wireString} mode")
                 } else {
                     logger.info(
@@ -500,33 +515,27 @@ object RunAnywhere {
      *
      * Tries the idempotent commons fast-path
      * `CppBridgeSdkInit.retryHTTP()` (`rac_sdk_retry_http_proto`) first: when
-     * commons reports `http_configured` (already authenticated), the full
-     * Kotlin Phase 2 re-run is skipped. Otherwise it falls back to
-     * [initializePlatformBridgeServices] (OkHttp/CppBridgeAuth) so an offline
-     * init can complete once connectivity returns.
+     * commons reports `http_configured` / `has_completed_http_setup`, the
+     * retry has converged. Otherwise the SDK remains in offline-friendly mode
+     * and will try again on the next guarded call.
      */
     private suspend fun retryHTTPSetup() {
         val params = _initParams ?: return
         logger.debug("Retrying HTTP/auth setup for ${params.environment.wireString}...")
 
         try {
-            // Idempotent fast-path: commons returns http_configured=true with
-            // no side effects when auth is already established, so we avoid
-            // re-running the full Kotlin Phase 2 bootstrap on every call.
-            val fastPath = runCatching { CppBridgeSdkInit.retryHTTP() }.getOrNull()
-            if (fastPath?.http_configured == true) {
-                _hasCompletedHTTPSetup = true
+            val retryResult = CppBridgeSdkInit.retryHTTP()
+            _hasCompletedHTTPSetup =
+                retryResult.has_completed_http_setup || retryResult.http_configured
+            if (retryResult.warning.isNotEmpty()) {
+                logger.debug("HTTP retry warning: ${retryResult.warning}")
+            }
+            if (_hasCompletedHTTPSetup) {
                 logger.info("HTTP/Auth already configured (idempotent fast-path)")
                 return
             }
 
-            val httpConfigured = initializePlatformBridgeServices()
-            _hasCompletedHTTPSetup = httpConfigured
-            if (httpConfigured) {
-                logger.info("HTTP/Auth setup succeeded on retry")
-            } else {
-                logger.debug("HTTP/Auth retry still missing usable config; will retry on next call")
-            }
+            logger.debug("HTTP/Auth retry still incomplete; will retry on next call")
         } catch (e: Throwable) {
             logger.debug("HTTP/Auth retry failed (still offline?): ${e.message}")
         }

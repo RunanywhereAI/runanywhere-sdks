@@ -94,6 +94,12 @@ for root, _, files in os.walk(include_root):
         if not (fname.endswith('.h') or fname.endswith('.hpp')):
             continue
         path = os.path.join(root, fname)
+        norm_path = path.replace(os.sep, "/")
+        if "/include/rac/backends/" in norm_path:
+            # Engine-owned headers live under the commons include prefix for
+            # consumers, but their RAC_API symbols are exported by engine
+            # targets, not RACommons.
+            continue
         with open(path, errors='replace') as fh:
             content = fh.read()
         # Strip comments (block and line)

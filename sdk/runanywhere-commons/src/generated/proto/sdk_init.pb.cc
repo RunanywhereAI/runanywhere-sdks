@@ -42,19 +42,21 @@ namespace runanywhere {
 namespace v1 {
 class SdkInitPhase2Request::_Internal {
  public:
+  using HasBits = decltype(::std::declval<SdkInitPhase2Request>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_._has_bits_);
 };
 
 constexpr SdkInitPhase2Request::ParseTableT_ SdkInitPhase2Request::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
-      PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request,
-                            _impl_._cached_size_),  // no hasbits
+      PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_._has_bits_),
       0, // no _extensions_
-      0, 0,  // max_field_number, fast_idx_mask
+      5, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967295,  // skipmap
-      offsetof(ParseTableT_, field_names),  // no field_entries
-      0,  // num_field_entries
+      4294967264,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      5,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -65,22 +67,73 @@ constexpr SdkInitPhase2Request::ParseTableT_ SdkInitPhase2Request::InternalGener
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
+      // string build_token = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.build_token_)}},
+      // bool force_refresh_assignments = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.force_refresh_assignments_), 1>(),
+       {16, 1, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.force_refresh_assignments_)}},
+      // bool flush_telemetry = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.flush_telemetry_), 2>(),
+       {24, 2, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.flush_telemetry_)}},
+      // bool discover_downloaded_models = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.discover_downloaded_models_), 3>(),
+       {32, 3, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.discover_downloaded_models_)}},
+      // bool rescan_local_models = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SdkInitPhase2Request, _impl_.rescan_local_models_), 4>(),
+       {40, 4, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.rescan_local_models_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
-    }}, // no field_entries, or aux_entries
+    }}, {{
+      // string build_token = 1;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.build_token_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // bool force_refresh_assignments = 2;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.force_refresh_assignments_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool flush_telemetry = 3;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.flush_telemetry_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool discover_downloaded_models = 4;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.discover_downloaded_models_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool rescan_local_models = 5;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.rescan_local_models_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    }},
+    // no aux_entries
     {{
+      "\43\13\0\0\0\0\0\0"
+      "runanywhere.v1.SdkInitPhase2Request"
+      "build_token"
     }},
   };
 }
 
+
+inline constexpr SdkInitPhase2Request::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        build_token_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        force_refresh_assignments_{false},
+        flush_telemetry_{false},
+        discover_downloaded_models_{false},
+        rescan_local_models_{false} {}
+
 template <typename>
 constexpr SdkInitPhase2Request::SdkInitPhase2Request(::_pbi::ConstantInitialized,
                        const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::internal::ZeroFieldsBase(
+    : ::google::protobuf::Message(
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           class_data
 #endif  // PROTOBUF_CUSTOM_VTABLE
-      ) {
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
 }
 inline void* PROTOBUF_NONNULL SdkInitPhase2Request::PlacementNew_(
     const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
@@ -88,7 +141,7 @@ inline void* PROTOBUF_NONNULL SdkInitPhase2Request::PlacementNew_(
   return ::new (mem) SdkInitPhase2Request(arena);
 }
 constexpr auto SdkInitPhase2Request::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(SdkInitPhase2Request), alignof(SdkInitPhase2Request));
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SdkInitPhase2Request), alignof(SdkInitPhase2Request));
 }
 constexpr auto SdkInitPhase2Request::InternalGenerateClassData_(
     const MessageLite& prototype,
@@ -103,10 +156,10 @@ constexpr auto SdkInitPhase2Request::InternalGenerateClassData_(
 #endif
           nullptr,  // IsInitialized
           &SdkInitPhase2Request::MergeImpl,
-          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<SdkInitPhase2Request>(),
+          ::google::protobuf::Message::GetNewImpl<SdkInitPhase2Request>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           &SdkInitPhase2Request::SharedDtor,
-          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<SdkInitPhase2Request>(), &SdkInitPhase2Request::ByteSizeLong,
+          ::google::protobuf::Message::GetClearImpl<SdkInitPhase2Request>(), &SdkInitPhase2Request::ByteSizeLong,
               &SdkInitPhase2Request::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
           PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_._cached_size_),
@@ -176,11 +229,11 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_._has_bits_),
       0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
+      6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
+      6,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -190,13 +243,10 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
       ::_pbi::TcParser::GetTable<::runanywhere::v1::SdkInitPhase1Request>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      // string device_id = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 2, 0,
-        PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.device_id_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // .runanywhere.v1.SdkInitEnvironment environment = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitPhase1Request, _impl_.environment_), 3>(),
-       {8, 3, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SdkInitPhase1Request, _impl_.environment_), 5>(),
+       {8, 5, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.environment_)}},
       // string api_key = 2;
       {::_pbi::TcParser::FastUS1,
@@ -206,25 +256,44 @@ constexpr SdkInitPhase1Request::ParseTableT_ SdkInitPhase1Request::InternalGener
       {::_pbi::TcParser::FastUS1,
        {26, 1, 0,
         PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.base_url_)}},
+      // string device_id = 4;
+      {::_pbi::TcParser::FastUS1,
+       {34, 2, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.device_id_)}},
+      // string platform = 5;
+      {::_pbi::TcParser::FastUS1,
+       {42, 3, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.platform_)}},
+      // string sdk_version = 6;
+      {::_pbi::TcParser::FastUS1,
+       {50, 4, 0,
+        PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.sdk_version_)}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
       // .runanywhere.v1.SdkInitEnvironment environment = 1;
-      {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.environment_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.environment_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // string api_key = 2;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.api_key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string base_url = 3;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.base_url_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string device_id = 4;
       {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.device_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string platform = 5;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.platform_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string sdk_version = 6;
+      {PROTOBUF_FIELD_OFFSET(SdkInitPhase1Request, _impl_.sdk_version_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\43\0\7\10\11\0\0\0"
+      "\43\0\7\10\11\10\13\0"
       "runanywhere.v1.SdkInitPhase1Request"
       "api_key"
       "base_url"
       "device_id"
+      "platform"
+      "sdk_version"
     }},
   };
 }
@@ -241,6 +310,12 @@ inline constexpr SdkInitPhase1Request::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         device_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        platform_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        sdk_version_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         environment_{static_cast< ::runanywhere::v1::SdkInitEnvironment >(0)} {}
@@ -569,16 +644,32 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_._has_bits_),
-        7, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.environment_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.api_key_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.base_url_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.device_id_),
-        3,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.platform_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase1Request, _impl_.sdk_version_),
+        5,
         0,
         1,
         2,
-        0x000, // bitmap
+        3,
+        4,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.build_token_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.force_refresh_assignments_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.flush_telemetry_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.discover_downloaded_models_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitPhase2Request, _impl_.rescan_local_models_),
+        0,
+        1,
+        2,
+        3,
+        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SdkInitResult, _impl_._has_bits_),
         13, // hasbit index offset
@@ -607,8 +698,8 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::SdkInitPhase1Request)},
-        {11, sizeof(::runanywhere::v1::SdkInitPhase2Request)},
-        {12, sizeof(::runanywhere::v1::SdkInitResult)},
+        {15, sizeof(::runanywhere::v1::SdkInitPhase2Request)},
+        {28, sizeof(::runanywhere::v1::SdkInitResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -619,28 +710,33 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_sdk_5finit_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\016sdk_init.proto\022\016runanywhere.v1\032\014errors"
-    ".proto\"\205\001\n\024SdkInitPhase1Request\0227\n\013envir"
+    ".proto\"\254\001\n\024SdkInitPhase1Request\0227\n\013envir"
     "onment\030\001 \001(\0162\".runanywhere.v1.SdkInitEnv"
     "ironment\022\017\n\007api_key\030\002 \001(\t\022\020\n\010base_url\030\003 "
-    "\001(\t\022\021\n\tdevice_id\030\004 \001(\t\"\026\n\024SdkInitPhase2R"
-    "equest\"\253\002\n\rSdkInitResult\022+\n\005phase\030\001 \001(\0162"
-    "\034.runanywhere.v1.SdkInitPhase\022\017\n\007success"
-    "\030\002 \001(\010\022\'\n\005error\030\003 \001(\0132\030.runanywhere.v1.S"
-    "DKError\022\027\n\017http_configured\030\004 \001(\010\022\031\n\021devi"
-    "ce_registered\030\005 \001(\010\022\033\n\023linked_models_cou"
-    "nt\030\006 \001(\r\022\032\n\022discovered_orphans\030\007 \001(\r\022\017\n\007"
-    "warning\030\010 \001(\t\022\023\n\013duration_ms\030\t \001(\003\022 \n\030ha"
-    "s_completed_http_setup\030\n \001(\010*}\n\014SdkInitP"
-    "hase\022\036\n\032SDK_INIT_PHASE_UNSPECIFIED\020\000\022\026\n\022"
-    "SDK_INIT_PHASE_ONE\020\001\022\026\n\022SDK_INIT_PHASE_T"
-    "WO\020\002\022\035\n\031SDK_INIT_PHASE_RETRY_HTTP\020\003*\201\001\n\022"
-    "SdkInitEnvironment\022$\n SDK_INIT_ENVIRONME"
-    "NT_DEVELOPMENT\020\000\022 \n\034SDK_INIT_ENVIRONMENT"
-    "_STAGING\020\001\022#\n\037SDK_INIT_ENVIRONMENT_PRODU"
-    "CTION\020\002B\207\001\n\027ai.runanywhere.proto.v1B\014Sdk"
-    "InitProtoP\001Z<github.com/runanywhere/runa"
-    "nywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004R"
-    "AV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\001(\t\022\021\n\tdevice_id\030\004 \001(\t\022\020\n\010platform\030\005 \001(\t"
+    "\022\023\n\013sdk_version\030\006 \001(\t\"\250\001\n\024SdkInitPhase2R"
+    "equest\022\023\n\013build_token\030\001 \001(\t\022!\n\031force_ref"
+    "resh_assignments\030\002 \001(\010\022\027\n\017flush_telemetr"
+    "y\030\003 \001(\010\022\"\n\032discover_downloaded_models\030\004 "
+    "\001(\010\022\033\n\023rescan_local_models\030\005 \001(\010\"\253\002\n\rSdk"
+    "InitResult\022+\n\005phase\030\001 \001(\0162\034.runanywhere."
+    "v1.SdkInitPhase\022\017\n\007success\030\002 \001(\010\022\'\n\005erro"
+    "r\030\003 \001(\0132\030.runanywhere.v1.SDKError\022\027\n\017htt"
+    "p_configured\030\004 \001(\010\022\031\n\021device_registered\030"
+    "\005 \001(\010\022\033\n\023linked_models_count\030\006 \001(\r\022\032\n\022di"
+    "scovered_orphans\030\007 \001(\r\022\017\n\007warning\030\010 \001(\t\022"
+    "\023\n\013duration_ms\030\t \001(\003\022 \n\030has_completed_ht"
+    "tp_setup\030\n \001(\010*}\n\014SdkInitPhase\022\036\n\032SDK_IN"
+    "IT_PHASE_UNSPECIFIED\020\000\022\026\n\022SDK_INIT_PHASE"
+    "_ONE\020\001\022\026\n\022SDK_INIT_PHASE_TWO\020\002\022\035\n\031SDK_IN"
+    "IT_PHASE_RETRY_HTTP\020\003*\201\001\n\022SdkInitEnviron"
+    "ment\022$\n SDK_INIT_ENVIRONMENT_DEVELOPMENT"
+    "\020\000\022 \n\034SDK_INIT_ENVIRONMENT_STAGING\020\001\022#\n\037"
+    "SDK_INIT_ENVIRONMENT_PRODUCTION\020\002B\207\001\n\027ai"
+    ".runanywhere.proto.v1B\014SdkInitProtoP\001Z<g"
+    "ithub.com/runanywhere/runanywhere-sdks/i"
+    "dl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywh"
+    "ere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_sdk_5finit_2eproto_deps[1] = {
@@ -650,7 +746,7 @@ static ::absl::once_flag descriptor_table_sdk_5finit_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5finit_2eproto = {
     false,
     false,
-    913,
+    1099,
     descriptor_table_protodef_sdk_5finit_2eproto,
     "sdk_init.proto",
     &descriptor_table_sdk_5finit_2eproto_once,
@@ -698,7 +794,9 @@ PROTOBUF_NDEBUG_INLINE SdkInitPhase1Request::Impl_::Impl_(
         _cached_size_{0},
         api_key_(arena, from.api_key_),
         base_url_(arena, from.base_url_),
-        device_id_(arena, from.device_id_) {}
+        device_id_(arena, from.device_id_),
+        platform_(arena, from.platform_),
+        sdk_version_(arena, from.sdk_version_) {}
 
 SdkInitPhase1Request::SdkInitPhase1Request(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -724,7 +822,9 @@ PROTOBUF_NDEBUG_INLINE SdkInitPhase1Request::Impl_::Impl_(
       : _cached_size_{0},
         api_key_(arena),
         base_url_(arena),
-        device_id_(arena) {}
+        device_id_(arena),
+        platform_(arena),
+        sdk_version_(arena) {}
 
 inline void SdkInitPhase1Request::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -744,6 +844,8 @@ inline void SdkInitPhase1Request::SharedDtor(MessageLite& self) {
   this_._impl_.api_key_.Destroy();
   this_._impl_.base_url_.Destroy();
   this_._impl_.device_id_.Destroy();
+  this_._impl_.platform_.Destroy();
+  this_._impl_.sdk_version_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -781,7 +883,7 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.api_key_.ClearNonDefaultToEmpty();
     }
@@ -790,6 +892,12 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.device_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.platform_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _impl_.sdk_version_.ClearNonDefaultToEmpty();
     }
   }
   _impl_.environment_ = 0;
@@ -817,7 +925,7 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.SdkInitEnvironment environment = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_environment() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -855,6 +963,26 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
     }
   }
 
+  // string platform = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (!this_._internal_platform().empty()) {
+      const ::std::string& _s = this_._internal_platform();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SdkInitPhase1Request.platform");
+      target = stream->WriteStringMaybeAliased(5, _s, target);
+    }
+  }
+
+  // string sdk_version = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (!this_._internal_sdk_version().empty()) {
+      const ::std::string& _s = this_._internal_sdk_version();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SdkInitPhase1Request.sdk_version");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -880,7 +1008,7 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string api_key = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_api_key().empty()) {
@@ -902,8 +1030,22 @@ PROTOBUF_NOINLINE void SdkInitPhase1Request::Clear() {
                                         this_._internal_device_id());
       }
     }
-    // .runanywhere.v1.SdkInitEnvironment environment = 1;
+    // string platform = 5;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!this_._internal_platform().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_platform());
+      }
+    }
+    // string sdk_version = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (!this_._internal_sdk_version().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_sdk_version());
+      }
+    }
+    // .runanywhere.v1.SdkInitEnvironment environment = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_environment() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_environment());
@@ -927,7 +1069,7 @@ void SdkInitPhase1Request::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_api_key().empty()) {
         _this->_internal_set_api_key(from._internal_api_key());
@@ -956,6 +1098,24 @@ void SdkInitPhase1Request::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!from._internal_platform().empty()) {
+        _this->_internal_set_platform(from._internal_platform());
+      } else {
+        if (_this->_impl_.platform_.IsDefault()) {
+          _this->_internal_set_platform("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (!from._internal_sdk_version().empty()) {
+        _this->_internal_set_sdk_version(from._internal_sdk_version());
+      } else {
+        if (_this->_impl_.sdk_version_.IsDefault()) {
+          _this->_internal_set_sdk_version("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_environment() != 0) {
         _this->_impl_.environment_ = from._impl_.environment_;
       }
@@ -983,6 +1143,8 @@ void SdkInitPhase1Request::InternalSwap(SdkInitPhase1Request* PROTOBUF_RESTRICT 
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.api_key_, &other->_impl_.api_key_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.base_url_, &other->_impl_.base_url_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.device_id_, &other->_impl_.device_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.platform_, &other->_impl_.platform_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.sdk_version_, &other->_impl_.sdk_version_, arena);
   swap(_impl_.environment_, other->_impl_.environment_);
 }
 
@@ -993,27 +1155,73 @@ void SdkInitPhase1Request::InternalSwap(SdkInitPhase1Request* PROTOBUF_RESTRICT 
 
 SdkInitPhase2Request::SdkInitPhase2Request(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, SdkInitPhase2Request_get_class_data()) {
+    : ::google::protobuf::Message(arena, SdkInitPhase2Request_get_class_data()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SdkInitPhase2Request)
 }
+PROTOBUF_NDEBUG_INLINE SdkInitPhase2Request::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::SdkInitPhase2Request& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        build_token_(arena, from.build_token_) {}
+
 SdkInitPhase2Request::SdkInitPhase2Request(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
     const SdkInitPhase2Request& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, SdkInitPhase2Request_get_class_data()) {
+    : ::google::protobuf::Message(arena, SdkInitPhase2Request_get_class_data()) {
 
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SdkInitPhase2Request* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, force_refresh_assignments_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, force_refresh_assignments_),
+           offsetof(Impl_, rescan_local_models_) -
+               offsetof(Impl_, force_refresh_assignments_) +
+               sizeof(Impl_::rescan_local_models_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SdkInitPhase2Request)
+}
+PROTOBUF_NDEBUG_INLINE SdkInitPhase2Request::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        build_token_(arena) {}
+
+inline void SdkInitPhase2Request::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, force_refresh_assignments_),
+           0,
+           offsetof(Impl_, rescan_local_models_) -
+               offsetof(Impl_, force_refresh_assignments_) +
+               sizeof(Impl_::rescan_local_models_));
+}
+SdkInitPhase2Request::~SdkInitPhase2Request() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.SdkInitPhase2Request)
+  SharedDtor(*this);
+}
+inline void SdkInitPhase2Request::SharedDtor(MessageLite& self) {
+  SdkInitPhase2Request& this_ = static_cast<SdkInitPhase2Request&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.build_token_.Destroy();
+  this_._impl_.~Impl_();
 }
 
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1042,15 +1250,225 @@ PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const SdkInitPhase2Request::ParseTableT_
     SdkInitPhase2Request::_table_ =
         SdkInitPhase2Request::InternalGenerateParseTable_(SdkInitPhase2Request_class_data_.base());
 #endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void SdkInitPhase2Request::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SdkInitPhase2Request)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.build_token_.ClearNonDefaultToEmpty();
+  }
+  ::memset(&_impl_.force_refresh_assignments_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.rescan_local_models_) -
+      reinterpret_cast<char*>(&_impl_.force_refresh_assignments_)) + sizeof(_impl_.rescan_local_models_));
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL SdkInitPhase2Request::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const SdkInitPhase2Request& this_ = static_cast<const SdkInitPhase2Request&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL SdkInitPhase2Request::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const SdkInitPhase2Request& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SdkInitPhase2Request)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string build_token = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_build_token().empty()) {
+      const ::std::string& _s = this_._internal_build_token();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SdkInitPhase2Request.build_token");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // bool force_refresh_assignments = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_force_refresh_assignments() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_force_refresh_assignments(), target);
+    }
+  }
+
+  // bool flush_telemetry = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_flush_telemetry() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          3, this_._internal_flush_telemetry(), target);
+    }
+  }
+
+  // bool discover_downloaded_models = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_discover_downloaded_models() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_discover_downloaded_models(), target);
+    }
+  }
+
+  // bool rescan_local_models = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_rescan_local_models() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          5, this_._internal_rescan_local_models(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SdkInitPhase2Request)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t SdkInitPhase2Request::ByteSizeLong(const MessageLite& base) {
+  const SdkInitPhase2Request& this_ = static_cast<const SdkInitPhase2Request&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t SdkInitPhase2Request::ByteSizeLong() const {
+  const SdkInitPhase2Request& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SdkInitPhase2Request)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // string build_token = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_build_token().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_build_token());
+      }
+    }
+    // bool force_refresh_assignments = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_force_refresh_assignments() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool flush_telemetry = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_flush_telemetry() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool discover_downloaded_models = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_discover_downloaded_models() != 0) {
+        total_size += 2;
+      }
+    }
+    // bool rescan_local_models = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_rescan_local_models() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void SdkInitPhase2Request::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<SdkInitPhase2Request*>(&to_msg);
+  auto& from = static_cast<const SdkInitPhase2Request&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SdkInitPhase2Request)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_build_token().empty()) {
+        _this->_internal_set_build_token(from._internal_build_token());
+      } else {
+        if (_this->_impl_.build_token_.IsDefault()) {
+          _this->_internal_set_build_token("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_force_refresh_assignments() != 0) {
+        _this->_impl_.force_refresh_assignments_ = from._impl_.force_refresh_assignments_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_flush_telemetry() != 0) {
+        _this->_impl_.flush_telemetry_ = from._impl_.flush_telemetry_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_discover_downloaded_models() != 0) {
+        _this->_impl_.discover_downloaded_models_ = from._impl_.discover_downloaded_models_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_rescan_local_models() != 0) {
+        _this->_impl_.rescan_local_models_ = from._impl_.rescan_local_models_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void SdkInitPhase2Request::CopyFrom(const SdkInitPhase2Request& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SdkInitPhase2Request)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
 
 
-
-
-
-
+void SdkInitPhase2Request::InternalSwap(SdkInitPhase2Request* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.build_token_, &other->_impl_.build_token_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.rescan_local_models_)
+      + sizeof(SdkInitPhase2Request::_impl_.rescan_local_models_)
+      - PROTOBUF_FIELD_OFFSET(SdkInitPhase2Request, _impl_.force_refresh_assignments_)>(
+          reinterpret_cast<char*>(&_impl_.force_refresh_assignments_),
+          reinterpret_cast<char*>(&other->_impl_.force_refresh_assignments_));
+}
 
 ::google::protobuf::Metadata SdkInitPhase2Request::GetMetadata() const {
-  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 

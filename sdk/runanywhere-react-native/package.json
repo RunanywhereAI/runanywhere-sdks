@@ -55,8 +55,8 @@
     "eslint-plugin-prettier": "^5.5.5",
     "lerna": "^8.2.4",
     "prettier": "^3.8.3",
-    "react": "19.0.0",
-    "react-native": "0.83.1",
+    "react": "19.2.7",
+    "react-native": "0.85.3",
     "typescript": "^5.9.3"
   },
   "packageManager": "yarn@3.6.1",

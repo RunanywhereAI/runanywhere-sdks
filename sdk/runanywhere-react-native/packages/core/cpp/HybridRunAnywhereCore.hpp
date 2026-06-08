@@ -86,25 +86,11 @@ public:
   std::shared_ptr<Promise<std::string>> getUserId() override;
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;
 
-  // Native auth round-trip (request build + rac_http_client_* transport +
-  // AuthBridge state update). Mirrors HTTPClientAdapter on Swift / CppBridgeAuth
-  // on Kotlin — replaces the JS-side fetch + manual token plumbing.
-  std::shared_ptr<Promise<std::string>> authAuthenticate(
-    const std::string& apiKey,
-    const std::string& baseURL,
-    const std::string& deviceId,
-    const std::string& platform,
-    const std::string& sdkVersion) override;
-  std::shared_ptr<Promise<std::string>> authRefreshToken(
-    const std::string& baseURL) override;
-
   // ============================================================================
   // Device Registration - Delegates to DeviceBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> registerDevice(const std::string& environmentJson) override;
   std::shared_ptr<Promise<bool>> isDeviceRegistered() override;
-  std::shared_ptr<Promise<bool>> clearDeviceRegistration() override;
   std::shared_ptr<Promise<std::string>> getDeviceId() override;
 
   // ============================================================================

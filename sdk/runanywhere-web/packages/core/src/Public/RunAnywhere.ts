@@ -156,6 +156,7 @@ interface SdkInitModule extends EmscriptenRunanywhereModule {
     requestSize: number,
     outResult: number,
   ): number;
+  _rac_sdk_retry_http_proto?(outResult: number): number;
   _rac_auth_is_authenticated?(): number;
   _rac_auth_get_user_id?(): number;
   _rac_auth_get_organization_id?(): number;
@@ -253,6 +254,18 @@ function invokeSdkInitProto(
   ));
 }
 
+function invokeSdkResultProto(
+  module: SdkInitModule,
+  fn: (outResult: number) => number,
+  functionName: string,
+): ProtoSdkInitResult | null {
+  return new ProtoWasmBridge(module, logger).callResultProto(
+    SdkInitResult,
+    (outResult) => fn(outResult),
+    functionName,
+  );
+}
+
 function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string): void {
   if (!result) {
     throw SDKException.fromCode(
@@ -297,6 +310,8 @@ export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModul
     apiKey: _initOptions?.apiKey ?? '',
     baseUrl: _initOptions?.baseURL ?? '',
     deviceId: ensureDeviceId(),
+    platform: 'web',
+    sdkVersion: SDK_VERSION,
   }).finish();
 
   const result = invokeSdkInitProto(
@@ -592,17 +607,34 @@ async function planDownloadWithSelfHeal(
 // ---------------------------------------------------------------------------
 
 /**
- * Retry HTTP/auth after an offline initialization. The Web SDK does not yet
- * have a browser-side authenticate flow, so the retry probes the commons
- * auth state via `_rac_auth_is_authenticated` — if the C++ layer has since
- * acquired a token (e.g. another call path authenticated), flip the flag.
- * Once a full browser auth flow lands, the authenticate call goes here.
+ * Retry HTTP/auth after an offline initialization. Commons owns the retry
+ * orchestration (auth, device registration, telemetry flush); Web only
+ * ensures the fetch-backed transport was registered with the active WASM.
  */
 async function retryHTTPSetup(): Promise<void> {
   if (_hasCompletedHTTPSetup) return;
   const module = tryRunanywhereModule() as SdkInitModule | null;
   if (!module) return;
 
+  if (typeof module._rac_sdk_retry_http_proto === 'function') {
+    const result = invokeSdkResultProto(
+      module,
+      module._rac_sdk_retry_http_proto.bind(module),
+      'rac_sdk_retry_http_proto',
+    );
+    throwIfSdkInitFailed(result, 'SDK HTTP retry');
+    _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+    if (result?.warning) {
+      logger.debug(`HTTP/Auth retry warning: ${result.warning}`);
+    }
+    if (_hasCompletedHTTPSetup) {
+      logger.info('HTTP/Auth setup succeeded on retry');
+    }
+    return;
+  }
+
+  // Backward compatibility for stale WASM artifacts that predate
+  // rac_sdk_retry_http_proto. New builds export the commons-owned retry path.
   const authFn = module._rac_auth_is_authenticated;
   if (typeof authFn !== 'function') return;
 
@@ -667,15 +699,11 @@ export const RunAnywhere = {
    * Returns true if the SDK currently holds a non-expired access token.
    *
    * Delegates to commons `rac_auth_is_authenticated()` via the WASM module
-   * once a backend has installed it. Before any backend registers, no WASM
-   * module exists and the SDK cannot be authenticated — this returns false.
+   * once a commons/backend module has installed it. Before any module loads,
+   * no WASM module exists and the SDK cannot be authenticated — this returns false.
    *
-   * NOTE: the Web SDK does not yet call `rac_auth_init` + the
-   * authenticate/refresh flow from the browser (no UI surface registers
-   * credentials), so this will typically return false until a future auth
-   * flow lands. The implementation here is the canonical bridge, so once
-   * auth wiring arrives, this call will reflect the real state without
-   * further changes.
+   * Phase 2 owns auth/refresh in commons via the registered browser fetch
+   * transport; this getter only reflects the current native auth state.
    */
   get isAuthenticated(): boolean {
     const mod = tryRunanywhereModule() as SdkInitModule | null;
@@ -725,18 +753,15 @@ export const RunAnywhere = {
   },
 
   // =========================================================================
-  // Initialization (pure TypeScript — no WASM)
+  // Initialization
   // =========================================================================
 
   /**
    * Initialize the RunAnywhere SDK.
    *
-   * This only initializes the TypeScript infrastructure:
-   *   1. Configure logging
-   *   2. Restore local file storage (if previously configured)
-   *
-   * WASM and proto-byte adapters are installed by backend packages once
-   * their module loads.
+   * Web owns browser setup (logging, persisted storage, WASM/package loading,
+   * OPFS/MEMFS hydration, fetch transport registration). Commons owns the
+   * deterministic init phases once a WASM module is available.
    */
   async initialize(options: SDKInitOptions = {}): Promise<void> {
     if (_isInitialized) {
@@ -872,7 +897,16 @@ export const RunAnywhere = {
 
         let httpConfigured = false;
         if (typeof module._rac_sdk_init_phase2_proto === 'function') {
-          const bytes = SdkInitPhase2Request.encode({}).finish();
+          const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+          const bytes = SdkInitPhase2Request.encode({
+            buildToken: environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+              ? (_initOptions?.buildToken ?? '')
+              : '',
+            forceRefreshAssignments: false,
+            flushTelemetry: true,
+            discoverDownloadedModels: true,
+            rescanLocalModels: true,
+          }).finish();
           const result = invokeSdkInitProto(
             module,
             bytes,
@@ -880,23 +914,14 @@ export const RunAnywhere = {
             'rac_sdk_init_phase2_proto',
           );
           throwIfSdkInitFailed(result, 'SDK Phase 2');
-          httpConfigured = result?.httpConfigured ?? false;
+          httpConfigured = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+          const linkedModelsCount = result?.linkedModelsCount ?? 0;
+          if (linkedModelsCount > 0) {
+            logger.info(`Phase 2 linked ${linkedModelsCount} downloaded models`);
+          }
         } else {
           logger.warning(
             'WASM module missing _rac_sdk_init_phase2_proto; services init remains browser-only until rebuild.',
-          );
-        }
-
-        // Step 5 (deferred from C++): post-Phase-2 model discovery.
-        // Phase 2 fetches model assignments from the backend; models linked by
-        // those assignments won't appear in downloadedModels() until the OPFS
-        // scan runs again with the updated registry. Mirrors Swift Step 5:
-        // CppBridge.ModelRegistry.shared.discoverDownloadedModels().
-        try {
-          await RunAnywhere.hydrateModelRegistry();
-        } catch (err) {
-          logger.debug(
-            `Post-Phase-2 model discovery failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
           );
         }
 

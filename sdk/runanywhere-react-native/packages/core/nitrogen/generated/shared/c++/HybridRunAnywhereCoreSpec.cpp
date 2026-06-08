@@ -28,9 +28,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("isAuthenticated", &HybridRunAnywhereCoreSpec::isAuthenticated);
       prototype.registerHybridMethod("getUserId", &HybridRunAnywhereCoreSpec::getUserId);
       prototype.registerHybridMethod("getOrganizationId", &HybridRunAnywhereCoreSpec::getOrganizationId);
-      prototype.registerHybridMethod("registerDevice", &HybridRunAnywhereCoreSpec::registerDevice);
       prototype.registerHybridMethod("isDeviceRegistered", &HybridRunAnywhereCoreSpec::isDeviceRegistered);
-      prototype.registerHybridMethod("clearDeviceRegistration", &HybridRunAnywhereCoreSpec::clearDeviceRegistration);
       prototype.registerHybridMethod("getDeviceId", &HybridRunAnywhereCoreSpec::getDeviceId);
       prototype.registerHybridMethod("getAvailableModelsProto", &HybridRunAnywhereCoreSpec::getAvailableModelsProto);
       prototype.registerHybridMethod("getModelInfoProto", &HybridRunAnywhereCoreSpec::getModelInfoProto);
@@ -64,8 +62,6 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("currentModelProto", &HybridRunAnywhereCoreSpec::currentModelProto);
       prototype.registerHybridMethod("componentLifecycleSnapshotProto", &HybridRunAnywhereCoreSpec::componentLifecycleSnapshotProto);
       prototype.registerHybridMethod("httpRequest", &HybridRunAnywhereCoreSpec::httpRequest);
-      prototype.registerHybridMethod("authAuthenticate", &HybridRunAnywhereCoreSpec::authAuthenticate);
-      prototype.registerHybridMethod("authRefreshToken", &HybridRunAnywhereCoreSpec::authRefreshToken);
       prototype.registerHybridMethod("isTextModelLoaded", &HybridRunAnywhereCoreSpec::isTextModelLoaded);
       prototype.registerHybridMethod("unloadTextModel", &HybridRunAnywhereCoreSpec::unloadTextModel);
       prototype.registerHybridMethod("getLLMHandle", &HybridRunAnywhereCoreSpec::getLLMHandle);

@@ -6,6 +6,7 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "bridges/ExternalConfigGuard.hpp"
 
+#include <stdexcept>
 #include <utility>
 
 // =============================================================================
@@ -80,21 +81,37 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         std::string deviceId = extractStringValue(configJson, "deviceId");
         std::string envStr = extractStringValue(configJson, "environment", "production");
         std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
+        std::string platformFromConfig = extractStringValue(configJson, "platform", "react_native");
+        std::string buildToken = extractStringValue(configJson, "buildToken", "");
+        bool forceRefreshAssignments = extractBoolValue(configJson, "forceRefreshAssignments", false);
+        bool flushTelemetry = extractBoolValue(configJson, "flushTelemetry", true);
+        bool discoverDownloadedModels = extractBoolValue(configJson, "discoverDownloadedModels", true);
+        bool rescanLocalModels = extractBoolValue(configJson, "rescanLocalModels", true);
 
         // Determine environment (canonical commons rac_environment_t).
         rac_environment_t env = RAC_ENV_PRODUCTION;
         if (envStr == "development") env = RAC_ENV_DEVELOPMENT;
         else if (envStr == "staging") env = RAC_ENV_STAGING;
 
+        InitBridge::shared().setSdkVersion(sdkVersionFromConfig);
+
         // 1. Initialize core (platform adapter + state)
-        rac_result_t result = InitBridge::shared().initialize(env, apiKey, baseURL, deviceId);
+        rac_result_t result = InitBridge::shared().initialize(
+            env,
+            apiKey,
+            baseURL,
+            deviceId,
+            platformFromConfig,
+            sdkVersionFromConfig,
+            buildToken,
+            forceRefreshAssignments,
+            flushTelemetry,
+            discoverDownloadedModels,
+            rescanLocalModels);
         if (result != RAC_SUCCESS) {
             setLastError("Failed to initialize SDK core: " + std::to_string(result));
             return false;
         }
-
-        // Set SDK version from TypeScript SDKConstants (centralized version)
-        InitBridge::shared().setSdkVersion(sdkVersionFromConfig);
 
         // 2. Set base directory for model paths before model registry/download
         // setup. Match Swift SDK: native Documents on iOS, app filesDir on
@@ -199,8 +216,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             }
         }
 
-        // 9. Initialize model assignments with auto-fetch
-        // Set up HTTP GET callback for fetching models from backend
+        // 9. Register model-assignment HTTP callback. Commons Phase 2 owns
+        // when assignment fetch runs; RN only supplies transport glue.
         {
             rac_assignment_callbacks_t callbacks = {};
 
@@ -259,13 +276,11 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             };
 
             callbacks.user_data = nullptr;
-            // Only auto-fetch in staging/production, not development
-            bool shouldAutoFetch = (env != RAC_ENV_DEVELOPMENT);
-            callbacks.auto_fetch = shouldAutoFetch ? RAC_TRUE : RAC_FALSE;
+            callbacks.auto_fetch = RAC_FALSE;
 
             result = rac_model_assignment_set_callbacks(&callbacks);
             if (result == RAC_SUCCESS) {
-                LOGI("Model assignment callbacks registered (autoFetch: %s)", shouldAutoFetch ? "true" : "false");
+                LOGI("Model assignment callbacks registered");
             } else {
                 LOGE("Failed to register model assignment callbacks: %d", result);
                 // Continue - not fatal, models can be fetched later
@@ -282,13 +297,14 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::completeServicesInitializa
         std::lock_guard<std::mutex> lock(initMutex_);
 
         LOGI("Completing native services initialization...");
-        rac_result_t result = InitBridge::shared().completeServicesInitialization();
+        bool httpConfigured = false;
+        rac_result_t result = InitBridge::shared().completeServicesInitialization(httpConfigured);
         if (result != RAC_SUCCESS) {
             setLastError("Failed to complete services initialization: " + std::to_string(result));
-            return false;
+            throw std::runtime_error("Failed to complete services initialization: " + std::to_string(result));
         }
 
-        return true;
+        return httpConfigured;
     });
 }
 
@@ -300,8 +316,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::retryHTTPSetupProto() {
             setLastError("HTTP retry failed: " + std::to_string(result));
             return false;
         }
-        // Resolves to the proto http_configured flag. The TS recovery path
-        // falls through to the platform-side auth round-trip when this is false.
+        // Resolves to has_completed_http_setup || http_configured.
         return httpConfigured;
     });
 }

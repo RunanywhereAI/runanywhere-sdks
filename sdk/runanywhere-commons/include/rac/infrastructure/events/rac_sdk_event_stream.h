@@ -109,6 +109,15 @@ RAC_API void rac_sdk_event_clear_queue(void);
  */
 RAC_API void rac_events_set_telemetry_sink(void* telemetry_manager);
 
+/**
+ * @brief Flush the currently registered telemetry sink.
+ *
+ * Phase-2 SDK initialization uses this to drain telemetry through the same
+ * manager that the destination router already feeds. Returns
+ * RAC_ERROR_FEATURE_NOT_AVAILABLE when no telemetry sink is registered.
+ */
+RAC_API rac_result_t rac_events_flush_telemetry_sink(void);
+
 #ifdef __cplusplus
 }
 // NOLINTEND(modernize-redundant-void-arg,modernize-use-nullptr)

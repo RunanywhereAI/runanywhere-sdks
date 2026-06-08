@@ -42,6 +42,7 @@ import 'package:runanywhere/generated/rag.pb.dart'
         RAGStatistics;
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
+import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show
         JSONSchema,
@@ -63,6 +64,7 @@ import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
+import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
@@ -142,9 +144,9 @@ abstract final class RunAnywhere {
 
   /// Awaitable Phase-2 completion. Mirrors Swift's
   /// `completeServicesInitialization()`. [initialize] detaches Phase 2
-  /// (auth, device registration, model-assignment, telemetry/HTTP wiring)
-  /// and stores the resulting Future in [_servicesInitFuture]; concurrent
-  /// callers share that single Future so the work runs at most once.
+  /// (platform service wiring plus commons-owned init orchestration) and stores
+  /// the resulting Future in [_servicesInitFuture]; concurrent callers share
+  /// that single Future so the work runs at most once.
   /// Returns immediately once Phase 2 has resolved. Throws
   /// [SDKException.notInitialized] if Phase 1 never ran.
   static Future<void> completeServicesInitialization() {
@@ -154,11 +156,9 @@ abstract final class RunAnywhere {
     return _servicesInitFuture ?? Future<void>.value();
   }
 
-  /// One-call "wait until everything is ready" entry point. Mirrors Swift's
-  /// `RunAnywhere.ensureServicesReady()` (RunAnywhere.swift:321) and Kotlin's
-  /// `ensureServicesReady` (RunAnywhere.kt:494): three paths so an
-  /// offline-first Phase 2 (services ready, HTTP/auth deferred) can still
-  /// retry the HTTP/auth round-trip without re-running the full step list.
+  /// One-call "wait until everything is ready" entry point. Three paths let an
+  /// offline-first Phase 2 (services ready, HTTP/auth deferred in commons)
+  /// retry HTTP setup without re-running the full step list.
   ///
   ///  - Fast path: services ready + HTTP configured → return (O(1)).
   ///  - Recovery path: services ready but HTTP failed (offline init) →
@@ -201,10 +201,9 @@ abstract final class RunAnywhere {
   // Dart accessor for callers that want the original Uri / apiKey shape.
   static SDKInitParams? _cachedInitParams;
 
-  // One-shot Dart-only flag: has the lazy filesystem discovery pass run?
-  // Anything cross-platform (initialized / environment / params) lives in
-  // commons and is read through DartBridge. Only Dart scheduling state
-  // belongs here.
+  // One-shot Dart-only compatibility flag: startup downloaded-model discovery
+  // is owned by commons Phase 2; legacy callers still use runDiscoveryIfNeeded()
+  // as a readiness guard before listing registry contents.
   static bool _hasRunDiscovery = false;
 
   // Latched HTTP/auth completion flag — see [hasCompletedHTTPSetup]. Phase 2
@@ -299,10 +298,17 @@ abstract final class RunAnywhere {
     try {
       _cachedInitParams = params;
 
-      // --- Phase 1: Core init (sync, ~1–5 ms) ---
+      final phase1DeviceId = await DartBridgeDevice.instance.getDeviceId();
+
+      // --- Phase 1: Core init (sync after Flutter async device-id lookup) ---
       // Phase-1 failures (invalid env, library load) propagate to the
       // caller via the surrounding try / rethrow.
-      DartBridge.initialize(params.environment);
+      DartBridge.initialize(
+        params.environment,
+        apiKey: params.apiKey,
+        baseURL: params.baseURL.toString(),
+        deviceId: phase1DeviceId,
+      );
       DartBridge.registerEnsureServicesReadyHook(ensureServicesReady);
 
       logger.info(
@@ -336,23 +342,12 @@ abstract final class RunAnywhere {
     }
   }
 
-  /// Phase 2 step-list. Runs detached from [initializeWithParams] so the
-  /// caller's `await initialize()` returns after Phase 1 (~1–5 ms).
-  /// Mirrors Swift `_performServicesInitialization()`.
+  /// Platform-owned Phase 2 setup plus the commons deterministic init step-list.
+  /// Runs detached from [initializeWithParams] so the caller's
+  /// `await initialize()` returns after Phase 1 and the platform device-id
+  /// lookup needed to populate the commons init contract.
   static Future<void> _runPhase2(SDKInitParams params, SDKLogger logger) async {
-    // Step 1: Local service bridges (HTTP, state, model-assignment,
-    // platform services). Drives `rac_sdk_init_phase2_proto` inside
-    // commons.
-    await DartBridge.initializeServices(
-      apiKey: params.apiKey,
-      baseURL: params.baseURL.toString(),
-      deviceId: DartBridgeDevice.cachedDeviceId,
-    );
-
-    // Step 2: Model-paths base directory.
-    await DartBridge.modelPaths.setBaseDirectory();
-
-    // Step 3: Configure the shared HTTP client. Mirrors Swift's inlined
+    // Step 1: Configure the shared HTTP client. Mirrors Swift's inlined
     // HTTP setup inside `RunAnywhere.performCoreInit()` (no DI container).
     HTTPClientAdapter.shared.configure(
       baseURL: params.baseURL.toString(),
@@ -369,7 +364,12 @@ abstract final class RunAnywhere {
       }
     }
 
-    // Step 3: Telemetry sync + async device-info wiring.
+    // Step 2: Model-paths base directory. Commons Phase 2 performs downloaded
+    // model discovery, so the path root must exist before the proto call.
+    await DartBridge.modelPaths.setBaseDirectory();
+
+    // Step 3: Telemetry sink setup. The flush itself is now owned by commons
+    // Phase 2 via rac_events_flush_telemetry_sink.
     DartBridgeTelemetry.initializeSync(environment: params.environment);
     final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
     await DartBridgeTelemetry.initialize(
@@ -380,214 +380,80 @@ abstract final class RunAnywhere {
           : null,
     );
 
-    // Step 4: Model registry.
+    // Step 4: Global model registry handle.
     await DartBridgeModelRegistry.instance.initialize();
 
     // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent from the
     // C++ init path (`event_publisher.cpp:544`) and the destination router
     // forwards it to the registered telemetry sink, so Dart does not emit it.
 
-    // Step 5: Background services — device registration + auth. Failures
-    // here are non-critical (offline inference still works), so they are
-    // logged and swallowed individually inside the helpers.
-    await _registerDeviceIfNeeded(params, logger);
-    await _authenticateWithBackend(params, logger);
+    // Step 5: Commons-owned deterministic Phase 2 orchestration: auth via the
+    // registered HTTP transport, device registration with build token, model
+    // assignment fetch, telemetry flush, and downloaded-model discovery.
+    final phase2Result = await DartBridge.initializeServices(
+      apiKey: params.apiKey,
+      baseURL: params.baseURL.toString(),
+      deviceId: telemetryDeviceId,
+      buildToken:
+          params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+          ? DartBridgeDevConfig.buildToken
+          : null,
+      forceRefreshAssignments: false,
+      flushTelemetry: true,
+      discoverDownloadedModels: true,
+      rescanLocalModels: true,
+    );
 
-    // Latch the HTTP/auth completion flag. Decoupled from
-    // `areServicesReady` so an offline Phase 2 (no connectivity) still
-    // leaves `_hasCompletedHTTPSetup=false` and the next
-    // [ensureServicesReady] call hits the retry path. Mirrors Swift's
-    // `hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured`
-    // (RunAnywhere.swift:270 / :366) and Kotlin's `_hasCompletedHTTPSetup =
-    // httpConfigured` (RunAnywhere.kt:460).
-    _hasCompletedHTTPSetup = _resolveHasCompletedHTTPSetup(params);
-
-    // Flush buffered telemetry events now that HTTP is configured. Events
-    // that were queued before the auth round-trip (cold-start metrics) would
-    // otherwise sit in C++ and only flush on the next emit. Mirrors Swift
-    // `CppBridge.Telemetry.flush()` after HTTP becomes configured
-    // (RunAnywhere.swift:277).
-    if (_hasCompletedHTTPSetup) {
-      DartBridgeTelemetry.flush();
-    }
-
-    // Discover downloaded models using the registry handle the SDK already
-    // owns. Models linked via Phase-2 model assignments won't appear in
-    // `RunAnywhere.models.available()` without this pass. Mirrors Swift
-    // Step 5: `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
-    // (RunAnywhere.swift:310).
-    if (!_hasRunDiscovery) {
-      final discoveryResult =
-          await DartBridgeModelRegistry.instance.discoverDownloadedModels();
-      if (discoveryResult.discoveredModels.isNotEmpty) {
-        logger.info(
-          'Discovered ${discoveryResult.discoveredModels.length} downloaded '
-          'models on startup',
-        );
-      }
+    _hasCompletedHTTPSetup = _isHTTPSetupComplete(phase2Result);
+    if (phase2Result?.success == true) {
       _hasRunDiscovery = true;
     }
 
     logger.info('Phase 2 complete (${params.environment.description})');
   }
 
-  /// Whether HTTP/auth setup actually succeeded for the given environment.
-  /// Development mode is considered "complete" once `HTTPClientAdapter` is
-  /// configured (Supabase URL wired up — no auth round-trip required);
-  /// staging / production require both the configured HTTP transport AND a
-  /// successful auth round-trip. Mirrors Swift's distinction between
-  /// `CppBridge.Environment.requiresAuth` + `CppBridge.HTTP.shared.isConfigured`
-  /// (RunAnywhere.swift:386-405).
-  static bool _resolveHasCompletedHTTPSetup(SDKInitParams params) {
-    final httpConfigured = HTTPClientAdapter.shared.isConfigured;
-    if (!httpConfigured) return false;
-    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      // Dev mode: HTTP wired (typically Supabase) is sufficient — no
-      // auth round-trip required to consider HTTP setup complete.
-      return true;
+  /// Latched HTTP setup status from the generated commons init result.
+  static bool _isHTTPSetupComplete(SdkInitResult? result) {
+    if (result == null) return false;
+    if (result.hasHasCompletedHttpSetup()) {
+      return result.hasCompletedHttpSetup;
     }
-    // Staging / production require a successful auth round-trip too.
-    return DartBridgeAuth.instance.isAuthenticated();
+    return result.httpConfigured;
   }
 
-  /// Retry HTTP/auth after an offline initialization. Mirrors Swift's
-  /// `retryHTTPSetup()` (RunAnywhere.swift:335-374) and Kotlin's
-  /// `retryHTTPSetup()` (RunAnywhere.kt:520-535): combines the C ABI
-  /// idempotency guard (`rac_sdk_retry_http_proto`) with the Dart-side auth
-  /// round-trip the proto explicitly defers. Failures are logged and
-  /// swallowed so the next call can retry again.
+  /// Retry HTTP/auth after an offline initialization. The retry orchestration
+  /// lives in commons behind `rac_sdk_retry_http_proto`; Dart only latches the
+  /// generated result. Failures are logged and swallowed so the next call can
+  /// retry again.
   static Future<void> _retryHTTPSetup() async {
-    final params = _cachedInitParams;
-    if (params == null) return;
     final logger = SDKLogger('RunAnywhere.HTTPRetry');
 
-    // Idempotent fast path + config sanity check, owned by C++.
     try {
       final proto = DartBridgeSdkInit.retryHTTP();
-      if (proto.httpConfigured) {
-        _hasCompletedHTTPSetup = true;
-        return;
-      }
+      _hasCompletedHTTPSetup = _isHTTPSetupComplete(proto);
       if (proto.hasWarning()) {
         logger.debug('HTTP retry warning: ${proto.warning}');
       }
+      if (_hasCompletedHTTPSetup) {
+        logger.info('HTTP/Auth setup succeeded on retry');
+      } else {
+        logger.debug('HTTP/Auth retry still missing usable config');
+      }
     } catch (e) {
       logger.debug('HTTP retry proto failed: $e');
-      return;
-    }
-
-    // Already-configured fast path on the Dart side (e.g. a concurrent
-    // caller raced ahead through [_runPhase2]).
-    if (HTTPClientAdapter.shared.isConfigured &&
-        _resolveHasCompletedHTTPSetup(params)) {
-      _hasCompletedHTTPSetup = true;
-      return;
-    }
-
-    // Re-run the Dart-side HTTP/auth setup. Failures are non-critical —
-    // the next [ensureServicesReady] call will retry.
-    HTTPClientAdapter.shared.configure(
-      baseURL: params.baseURL.toString(),
-      apiKey: params.apiKey,
-      environment: params.environment,
-    );
-    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      final supabaseConfig = SupabaseConfig.configuration(params.environment);
-      if (supabaseConfig != null) {
-        HTTPClientAdapter.shared.configureDev(
-          supabaseURL: supabaseConfig.projectURL.toString(),
-          supabaseKey: supabaseConfig.anonKey,
-        );
-      }
-    }
-    await _authenticateWithBackend(params, logger);
-
-    _hasCompletedHTTPSetup = _resolveHasCompletedHTTPSetup(params);
-    if (_hasCompletedHTTPSetup) {
-      logger.info('HTTP/Auth setup succeeded on retry');
-      DartBridgeTelemetry.flush();
-    } else {
-      logger.debug('HTTP/Auth retry still missing usable config');
     }
   }
 
-  /// Register device with backend. Mirrors Swift
-  /// `CppBridge.Device.registerIfNeeded(environment:)`. The C++ device
-  /// manager owns gating (skip-on-development, already-registered
-  /// short-circuit). Dart's only job is to install the HTTP/secure
-  /// callbacks and invoke the C ABI; failures are logged and swallowed
-  /// so offline inference still works.
-  static Future<void> _registerDeviceIfNeeded(
-    SDKInitParams params,
-    SDKLogger logger,
-  ) async {
-    try {
-      await DartBridgeDevice.register(
-        environment: params.environment,
-        baseURL: params.baseURL.toString(),
-      );
-      await DartBridgeDevice.instance.registerIfNeeded();
-      logger.debug('Device registration check completed');
-    } catch (e) {
-      logger.warning('Device registration failed (non-critical): $e');
-    }
-  }
-
-  /// Authenticate with backend. Mirrors Swift
-  /// `CppBridge.Auth.authenticate(apiKey:)`. The commons auth manager
-  /// owns environment / placeholder / URL gating; if commons rejects
-  /// the config it returns a non-success result and we just log it.
-  /// On success we forward the access token to `HTTPClientAdapter` so
-  /// subsequent requests carry it.
-  static Future<void> _authenticateWithBackend(
-    SDKInitParams params,
-    SDKLogger logger,
-  ) async {
-    try {
-      await DartBridgeAuth.initialize(
-        environment: params.environment,
-        baseURL: params.baseURL.toString(),
-      );
-
-      final deviceId = await DartBridgeDevice.instance.getDeviceId();
-      final result = await DartBridgeAuth.instance.authenticate(
-        apiKey: params.apiKey,
-        deviceId: deviceId,
-      );
-
-      if (result.isSuccess) {
-        logger.info('Authenticated for ${params.environment.description}');
-        final token = result.data?.accessToken;
-        if (token != null) {
-          HTTPClientAdapter.shared.setToken(token);
-        }
-      } else {
-        logger.debug(
-          'Authentication skipped or failed: ${result.error}',
-          metadata: {'environment': params.environment.name},
-        );
-      }
-    } catch (e) {
-      logger.warning(
-        'Authentication error (non-critical): $e',
-        metadata: {'environment': params.environment.name},
-      );
-    }
-  }
-
-  /// One-shot filesystem discovery of downloaded models. Called lazily
-  /// on first `models.available()` so apps can register their catalog
-  /// first. Safe to call repeatedly — the [_hasRunDiscovery] flag
-  /// short-circuits after the first successful pass.
+  /// Compatibility hook for callers that previously triggered one-shot
+  /// downloaded-model discovery before listing. Startup discovery now runs in
+  /// commons Phase 2, so this only waits for Phase 2 once.
   static Future<void> runDiscoveryIfNeeded() async {
     if (_hasRunDiscovery) return;
     final logger = SDKLogger('RunAnywhere.Discovery');
-    final result = await DartBridgeModelRegistry.instance
-        .discoverDownloadedModels();
-    if (result.discoveredModels.isNotEmpty) {
-      logger.info(
-        'Discovered ${result.discoveredModels.length} downloaded models',
-      );
+    try {
+      await completeServicesInitialization();
+    } catch (e) {
+      logger.debug('Phase 2 discovery readiness wait failed: $e');
     }
     _hasRunDiscovery = true;
   }

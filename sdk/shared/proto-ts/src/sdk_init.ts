@@ -144,18 +144,31 @@ export interface SdkInitPhase1Request {
   baseUrl: string;
   /** Resolved by platform (Keychain UUID, etc.). */
   deviceId: string;
+  /** SDK/platform identity used in auth/device metadata. */
+  platform: string;
+  /** SDK version reported to backend services. */
+  sdkVersion: string;
 }
 
 /**
  * ---------------------------------------------------------------------------
  * Phase 2 input — async services initialization. Most state is already
- * resident in commons after Phase 1; this envelope exists so SDKs can pass
- * per-call hints without changing the signature. Currently empty — reserved
- * for future flags such as `force_refresh_assignments` or
- * `skip_device_registration` once Kotlin/RN/Flutter parity demands them.
+ * resident in commons after Phase 1; this envelope carries the few per-call
+ * hints that remain SDK-owned while the deterministic orchestration lives in
+ * commons.
  * ---------------------------------------------------------------------------
  */
 export interface SdkInitPhase2Request {
+  /** Optional dev-mode device registration token. */
+  buildToken: string;
+  /** Bypass cached model assignments. */
+  forceRefreshAssignments: boolean;
+  /** Flush the registered telemetry sink. */
+  flushTelemetry: boolean;
+  /** Reconcile registry rows with local files. */
+  discoverDownloadedModels: boolean;
+  /** Ask discovery/refresh to rescan model dirs. */
+  rescanLocalModels: boolean;
 }
 
 /**
@@ -210,7 +223,7 @@ export interface SdkInitResult {
 }
 
 function createBaseSdkInitPhase1Request(): SdkInitPhase1Request {
-  return { environment: 0, apiKey: "", baseUrl: "", deviceId: "" };
+  return { environment: 0, apiKey: "", baseUrl: "", deviceId: "", platform: "", sdkVersion: "" };
 }
 
 export const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request> = {
@@ -226,6 +239,12 @@ export const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request> = {
     }
     if (message.deviceId !== "") {
       writer.uint32(34).string(message.deviceId);
+    }
+    if (message.platform !== "") {
+      writer.uint32(42).string(message.platform);
+    }
+    if (message.sdkVersion !== "") {
+      writer.uint32(50).string(message.sdkVersion);
     }
     return writer;
   },
@@ -269,6 +288,22 @@ export const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request> = {
           message.deviceId = reader.string();
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.platform = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.sdkVersion = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -296,6 +331,12 @@ export const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request> = {
         : isSet(object.device_id)
         ? globalThis.String(object.device_id)
         : "",
+      platform: isSet(object.platform) ? globalThis.String(object.platform) : "",
+      sdkVersion: isSet(object.sdkVersion)
+        ? globalThis.String(object.sdkVersion)
+        : isSet(object.sdk_version)
+        ? globalThis.String(object.sdk_version)
+        : "",
     };
   },
 
@@ -313,6 +354,12 @@ export const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request> = {
     if (message.deviceId !== "") {
       obj.deviceId = message.deviceId;
     }
+    if (message.platform !== "") {
+      obj.platform = message.platform;
+    }
+    if (message.sdkVersion !== "") {
+      obj.sdkVersion = message.sdkVersion;
+    }
     return obj;
   },
 
@@ -325,16 +372,39 @@ export const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request> = {
     message.apiKey = object.apiKey ?? "";
     message.baseUrl = object.baseUrl ?? "";
     message.deviceId = object.deviceId ?? "";
+    message.platform = object.platform ?? "";
+    message.sdkVersion = object.sdkVersion ?? "";
     return message;
   },
 };
 
 function createBaseSdkInitPhase2Request(): SdkInitPhase2Request {
-  return {};
+  return {
+    buildToken: "",
+    forceRefreshAssignments: false,
+    flushTelemetry: false,
+    discoverDownloadedModels: false,
+    rescanLocalModels: false,
+  };
 }
 
 export const SdkInitPhase2Request: MessageFns<SdkInitPhase2Request> = {
-  encode(_: SdkInitPhase2Request, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: SdkInitPhase2Request, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.buildToken !== "") {
+      writer.uint32(10).string(message.buildToken);
+    }
+    if (message.forceRefreshAssignments !== false) {
+      writer.uint32(16).bool(message.forceRefreshAssignments);
+    }
+    if (message.flushTelemetry !== false) {
+      writer.uint32(24).bool(message.flushTelemetry);
+    }
+    if (message.discoverDownloadedModels !== false) {
+      writer.uint32(32).bool(message.discoverDownloadedModels);
+    }
+    if (message.rescanLocalModels !== false) {
+      writer.uint32(40).bool(message.rescanLocalModels);
+    }
     return writer;
   },
 
@@ -345,6 +415,46 @@ export const SdkInitPhase2Request: MessageFns<SdkInitPhase2Request> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.buildToken = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.forceRefreshAssignments = reader.bool();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.flushTelemetry = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.discoverDownloadedModels = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.rescanLocalModels = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -354,20 +464,66 @@ export const SdkInitPhase2Request: MessageFns<SdkInitPhase2Request> = {
     return message;
   },
 
-  fromJSON(_: any): SdkInitPhase2Request {
-    return {};
+  fromJSON(object: any): SdkInitPhase2Request {
+    return {
+      buildToken: isSet(object.buildToken)
+        ? globalThis.String(object.buildToken)
+        : isSet(object.build_token)
+        ? globalThis.String(object.build_token)
+        : "",
+      forceRefreshAssignments: isSet(object.forceRefreshAssignments)
+        ? globalThis.Boolean(object.forceRefreshAssignments)
+        : isSet(object.force_refresh_assignments)
+        ? globalThis.Boolean(object.force_refresh_assignments)
+        : false,
+      flushTelemetry: isSet(object.flushTelemetry)
+        ? globalThis.Boolean(object.flushTelemetry)
+        : isSet(object.flush_telemetry)
+        ? globalThis.Boolean(object.flush_telemetry)
+        : false,
+      discoverDownloadedModels: isSet(object.discoverDownloadedModels)
+        ? globalThis.Boolean(object.discoverDownloadedModels)
+        : isSet(object.discover_downloaded_models)
+        ? globalThis.Boolean(object.discover_downloaded_models)
+        : false,
+      rescanLocalModels: isSet(object.rescanLocalModels)
+        ? globalThis.Boolean(object.rescanLocalModels)
+        : isSet(object.rescan_local_models)
+        ? globalThis.Boolean(object.rescan_local_models)
+        : false,
+    };
   },
 
-  toJSON(_: SdkInitPhase2Request): unknown {
+  toJSON(message: SdkInitPhase2Request): unknown {
     const obj: any = {};
+    if (message.buildToken !== "") {
+      obj.buildToken = message.buildToken;
+    }
+    if (message.forceRefreshAssignments !== false) {
+      obj.forceRefreshAssignments = message.forceRefreshAssignments;
+    }
+    if (message.flushTelemetry !== false) {
+      obj.flushTelemetry = message.flushTelemetry;
+    }
+    if (message.discoverDownloadedModels !== false) {
+      obj.discoverDownloadedModels = message.discoverDownloadedModels;
+    }
+    if (message.rescanLocalModels !== false) {
+      obj.rescanLocalModels = message.rescanLocalModels;
+    }
     return obj;
   },
 
   create<I extends Exact<DeepPartial<SdkInitPhase2Request>, I>>(base?: I): SdkInitPhase2Request {
     return SdkInitPhase2Request.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<SdkInitPhase2Request>, I>>(_: I): SdkInitPhase2Request {
+  fromPartial<I extends Exact<DeepPartial<SdkInitPhase2Request>, I>>(object: I): SdkInitPhase2Request {
     const message = createBaseSdkInitPhase2Request();
+    message.buildToken = object.buildToken ?? "";
+    message.forceRefreshAssignments = object.forceRefreshAssignments ?? false;
+    message.flushTelemetry = object.flushTelemetry ?? false;
+    message.discoverDownloadedModels = object.discoverDownloadedModels ?? false;
+    message.rescanLocalModels = object.rescanLocalModels ?? false;
     return message;
   },
 };

@@ -15,13 +15,17 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/events/rac_events.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_primitive.h"
+#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "STT.Service";
+
+namespace {
+
+const rac_stt_service_ops_t* stt_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->stt_ops : nullptr;
+}
+
+}  // namespace
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -38,86 +42,34 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
 
     RAC_LOG_INFO(LOG_CAT, "Creating STT service for: %s", model_path ? model_path : "NULL");
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t reg_result = RAC_ERROR_NOT_FOUND;
-    if (model_path) {
-        reg_result = rac_get_model(model_path, &model_info);
-
-        if (reg_result != RAC_SUCCESS) {
-            RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_path);
-            reg_result = rac_get_model_by_path(model_path, &model_info);
-        }
-
-        if (reg_result != RAC_SUCCESS) {
-            const char* last_slash = strrchr(model_path, '/');
-            if (last_slash && last_slash[1] != '\0') {
-                const char* extracted_id = last_slash + 1;
-                RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
-                reg_result = rac_get_model(extracted_id, &model_info);
-            }
-        }
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        model_path,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_UNKNOWN,
+         .allow_null_model_id = true,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = nullptr},
+        &model_ref);
+    if (result != RAC_SUCCESS) {
+        return result;
     }
 
-    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    // Own the resolved path as a std::string because `rac_model_info_free`
-    // below frees `model_info->local_path` — leaving a raw const char* from
-    // it dangling (classic use-after-free). Mirrors rac_llm_service.cpp:95
-    // pattern; same UAF fixed in rac_embeddings_service.cpp (commit 52e4ffc20).
-    std::string resolved_path_owned = model_path ? model_path : "";
-
-    if (reg_result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        if (model_info->local_path) {
-            resolved_path_owned = model_info->local_path;
-        }
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d",
-                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework));
+    rac_stt_service_t* service = nullptr;
+    result = rac::features::create_plugin_service<rac_stt_service_t, rac_stt_service_ops_t>(
+        {.log_cat = LOG_CAT,
+         .primitive = RAC_PRIMITIVE_TRANSCRIBE,
+         .select_ops = stt_ops,
+         .model_create_id = model_ref.path.c_str(),
+         .model_id_for_service = model_path,
+         .config_json = nullptr,
+         .created_event_name = "stt.backend.created",
+         .created_event_category = RAC_EVENT_CATEGORY_STT},
+        &service);
+    if (result != RAC_SUCCESS) {
+        return result;
     }
-
-    // Pick the highest-priority registered plugin that serves this primitive
-    // (priority assigned at backend registration; no hardware/format scoring).
-    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_TRANSCRIBE);
-    if (model_info) {
-        rac_model_info_free(model_info);
-        model_info = nullptr;
-    }
-    if (!vt || !vt->stt_ops || !vt->stt_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves TRANSCRIBE");
-        return RAC_ERROR_BACKEND_NOT_FOUND;
-    }
-    rac_result_t result = RAC_SUCCESS;
-    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
-
-    void* impl = nullptr;
-    result = vt->stt_ops->create(resolved_path_owned.c_str(), /*config_json=*/nullptr, &impl);
-    if (result != RAC_SUCCESS || !impl) {
-        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
-    }
-
-    auto* service = static_cast<rac_stt_service_t*>(malloc(sizeof(rac_stt_service_t)));
-    if (!service) {
-        if (vt->stt_ops->destroy)
-            vt->stt_ops->destroy(impl);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    service->ops = vt->stt_ops;
-    service->impl = impl;
-    service->model_id = model_path ? strdup(model_path) : nullptr;
     *out_handle = service;
-
-    // Single source of truth for the "*.backend.created" telemetry
-    // event. Previously each backend fired this from its own *_create path;
-    // now it fires once from the commons service layer so future backends
-    // inherit the emit for free (and can't silently drop it).
-    {
-        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
-        char props[128];
-        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("stt.backend.created", RAC_EVENT_CATEGORY_STT, RAC_EVENT_DESTINATION_ALL,
-                        props);
-    }
 
     RAC_LOG_INFO(LOG_CAT, "STT service created");
     return RAC_SUCCESS;

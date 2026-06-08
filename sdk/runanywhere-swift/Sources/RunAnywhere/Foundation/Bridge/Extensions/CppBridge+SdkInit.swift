@@ -51,6 +51,8 @@ extension CppBridge {
             request.apiKey = apiKey
             request.baseURL = baseURL
             request.deviceID = deviceId
+            request.platform = SDKConstants.platform
+            request.sdkVersion = SDKConstants.version
 
             let result = try NativeProtoABI.invoke(
                 request,
@@ -70,9 +72,22 @@ extension CppBridge {
         /// enable. Failures in individual sub-steps are non-fatal — the C ABI
         /// reports `success=true` with flags off.
         @discardableResult
-        public static func phase2() throws -> RASdkInitResult {
+        public static func phase2(
+            buildToken: String? = nil,
+            forceRefreshAssignments: Bool = false,
+            flushTelemetry: Bool = true,
+            discoverDownloadedModels: Bool = true,
+            rescanLocalModels: Bool = true
+        ) throws -> RASdkInitResult {
+            var request = RASdkInitPhase2Request()
+            request.buildToken = buildToken ?? ""
+            request.forceRefreshAssignments = forceRefreshAssignments
+            request.flushTelemetry = flushTelemetry
+            request.discoverDownloadedModels = discoverDownloadedModels
+            request.rescanLocalModels = rescanLocalModels
+
             let result = try NativeProtoABI.invoke(
-                RASdkInitPhase2Request(),
+                request,
                 symbol: phase2Symbol,
                 symbolName: "rac_sdk_init_phase2_proto",
                 responseType: RASdkInitResult.self

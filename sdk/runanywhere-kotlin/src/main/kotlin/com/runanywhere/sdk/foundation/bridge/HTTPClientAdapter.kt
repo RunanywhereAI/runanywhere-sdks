@@ -25,7 +25,7 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -399,19 +399,11 @@ public object HTTPClientAdapter {
     }
 
     /**
-     * `SDKConstants.platform` equivalent — Swift sets this to "ios" /
-     * "macos" at compile time. Kotlin uses a single "android" value
-     * because the JVM target is the desktop development surface only.
-     * Mirrors the existing `CppBridgeAuth.authenticate` default
-     * (`platform: String = "android"`) and `CppBridgeState`/`CppBridge.kt`
-     * fingerprint payloads.
-     *
-     * TODO: lift this onto `SDKConstants` (e.g. `SDKConstants.PLATFORM`)
-     *       so all three sites (`HTTPClientAdapter`, `CppBridgeAuth`,
-     *       `CppBridgeState`) share one source of truth. Cannot do that
-     *       here without touching `SDKConstants.kt`.
+     * Platform header value. Shared with the Phase 1 init request via
+     * [SDKConstants.SDK_PLATFORM] so auth/device/telemetry HTTP headers and
+     * the commons SDK config report the same platform string.
      */
-    private const val SDK_PLATFORM: String = "android"
+    private const val SDK_PLATFORM: String = SDKConstants.SDK_PLATFORM
 
     /** Minimum credential length matching commons'
      *  `RAC_MIN_CREDENTIAL_LEN` policy (8 bytes for an API key prefix). */
@@ -506,11 +498,16 @@ internal fun platformParseAPIError(
 
 internal suspend fun platformResolveAuthToken(): String? =
     withContext(Dispatchers.IO) {
-        // `CppBridgeAuth.getValidToken` wraps `racAuthGetValidToken` and
-        // re-issues the refresh round-trip when the in-memory token is
-        // expired — mirrors Swift's `rac_auth_get_valid_token` +
-        // `CppBridge.Auth.refreshToken` handshake.
-        CppBridgeAuth.getValidToken()
+        val first = RunAnywhereBridge.racAuthGetValidToken() ?: return@withContext null
+        val token = first.getOrNull(0)
+        val needsRefresh = first.getOrNull(1)?.toBooleanStrictOrNull() == true
+        if (!needsRefresh && !token.isNullOrEmpty()) {
+            return@withContext token
+        }
+
+        runCatching { CppBridgeSdkInit.retryHTTP() }
+        val refreshed = RunAnywhereBridge.racAuthGetValidToken() ?: return@withContext token
+        refreshed.getOrNull(0) ?: token
     }
 
 // Private helpers

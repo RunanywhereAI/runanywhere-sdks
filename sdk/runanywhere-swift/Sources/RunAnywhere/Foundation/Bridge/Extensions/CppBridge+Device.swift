@@ -265,52 +265,9 @@ extension CppBridge {
             }
         }
 
-        /// Register device with backend if not already registered
-        /// All business logic is in C++ - this is just a thin wrapper
-        public static func registerIfNeeded(environment: SDKEnvironment) async throws {
-            guard callbacksRegistered else {
-                throw SDKException(code: .notInitialized, message: "Device manager callbacks not registered", category: .internal)
-            }
-
-            if environment == .development && !CppBridge.DevConfig.hasUsableDevelopmentRegistrationConfig {
-                SDKLogger(category: "CppBridge.Device")
-                    .debug("Skipping telemetry/device registration: no usable config")
-                return
-            }
-
-            let hasUsableHTTPConfiguration = await CppBridge.HTTP.hasUsableConfiguration
-            if environment != .development && !hasUsableHTTPConfiguration {
-                SDKLogger(category: "CppBridge.Device")
-                    .debug("Skipping telemetry/device registration: no usable config")
-                return
-            }
-
-            // Get build token for development mode
-            let buildTokenString = environment == .development ? CppBridge.DevConfig.buildToken : nil
-
-            let result: rac_result_t
-            if let token = buildTokenString {
-                result = token.withCString { tokenPtr in
-                    rac_device_manager_register_if_needed(Environment.toC(environment), tokenPtr)
-                }
-            } else {
-                result = rac_device_manager_register_if_needed(Environment.toC(environment), nil)
-            }
-
-            // RAC_SUCCESS means registered successfully or already registered
-            if result != RAC_SUCCESS {
-                throw SDKException(code: .serviceNotAvailable, message: "Device registration failed: \(result)", category: .network)
-            }
-        }
-
         /// Check if device is registered
         public static var isRegistered: Bool {
             return rac_device_manager_is_registered() == RAC_TRUE
-        }
-
-        /// Clear registration status
-        public static func clearRegistration() {
-            rac_device_manager_clear_registration()
         }
 
         /// Get the device ID
@@ -318,10 +275,6 @@ extension CppBridge {
             guard let ptr = rac_device_manager_get_device_id() else { return nil }
             return String(cString: ptr)
         }
-
-        // `buildRegistrationJSON` DELETED. Use registerIfNeeded()
-        // — all registration logic now lives in C++ via the rac_device_manager
-        // API; Swift no longer needs to hand-build the JSON request.
     }
 }
 

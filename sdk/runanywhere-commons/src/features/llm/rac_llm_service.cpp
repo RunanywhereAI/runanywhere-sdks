@@ -23,13 +23,17 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/events/rac_events.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_primitive.h"
+#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "LLM.Service";
+
+namespace {
+
+const rac_llm_service_ops_t* llm_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->llm_ops : nullptr;
+}
+
+}  // namespace
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -47,112 +51,34 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     ALOGD("rac_llm_create: model_id=%s", model_id);
     RAC_LOG_INFO(LOG_CAT, "Creating LLM service for: %s", model_id);
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t result = rac_get_model(model_id, &model_info);
-    ALOGD("rac_get_model result=%d", result);
-
-    // If not found by model_id, try looking up by path (model_id might be a path)
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        model_id,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_LLAMACPP,
+         .allow_null_model_id = false,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = ".gguf"},
+        &model_ref);
     if (result != RAC_SUCCESS) {
-        ALOGD("Trying path lookup: %s", model_id);
-        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_id);
-        result = rac_get_model_by_path(model_id, &model_info);
-        ALOGD("rac_get_model_by_path result=%d", result);
+        return result;
     }
 
-    // If still not found, extract last path component and try as model ID
-    // (lifecycle passes filesystem path, but registry stores by model ID)
+    rac_llm_service_t* service = nullptr;
+    result = rac::features::create_plugin_service<rac_llm_service_t, rac_llm_service_ops_t>(
+        {.log_cat = LOG_CAT,
+         .primitive = RAC_PRIMITIVE_GENERATE_TEXT,
+         .select_ops = llm_ops,
+         .model_create_id = model_ref.path.c_str(),
+         .model_id_for_service = model_id,
+         .config_json = nullptr,
+         .created_event_name = "llm.backend.created",
+         .created_event_category = RAC_EVENT_CATEGORY_LLM},
+        &service);
     if (result != RAC_SUCCESS) {
-        const char* last_slash = strrchr(model_id, '/');
-        if (last_slash && last_slash[1] != '\0') {
-            const char* extracted_id = last_slash + 1;
-            RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
-            result = rac_get_model(extracted_id, &model_info);
-        }
-    }
-
-    rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
-    std::string model_path_owned;
-
-    if (result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        const char* reg_path = model_info->local_path ? model_info->local_path : model_id;
-        if (strstr(model_id, ".gguf") != nullptr) {
-            model_path_owned = model_id;
-        } else {
-            model_path_owned = reg_path;
-        }
-        ALOGD("Found in registry: id=%s, framework=%d, local_path=%s",
-              model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-              model_path_owned.c_str());
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path_owned.c_str());
-    } else {
-        model_path_owned = model_id;
-        ALOGD("NOT found in registry (result=%d), default framework=%d", result,
-              static_cast<int>(framework));
-        RAC_LOG_WARNING(LOG_CAT,
-                        "Model NOT found in registry (result=%d), using default framework=%d",
-                        result, static_cast<int>(framework));
-    }
-
-    // Pick the highest-priority registered plugin that serves this primitive.
-    // Backend priority is assigned at registration (SDK init); there is no
-    // hardware/format/accelerator scoring.
-    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT);
-    if (model_info) {
-        rac_model_info_free(model_info);
-        model_info = nullptr;
-    }
-    if (!vt || !vt->llm_ops || !vt->llm_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves GENERATE_TEXT (vt=%p)", (const void*)vt);
-        return RAC_ERROR_BACKEND_NOT_FOUND;
-    }
-    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
-
-    // Allocate backend impl via the plugin's create adapter.
-    void* impl = nullptr;
-    result = vt->llm_ops->create(model_path_owned.c_str(), /*config_json=*/nullptr, &impl);
-    if (result != RAC_SUCCESS || !impl) {
-        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
-    }
-
-    // Wrap impl in rac_llm_service_t (the generic vtable + impl handle).
-    auto* service = static_cast<rac_llm_service_t*>(malloc(sizeof(rac_llm_service_t)));
-    if (!service) {
-        if (vt->llm_ops->destroy)
-            vt->llm_ops->destroy(impl);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    service->ops = vt->llm_ops;
-    service->impl = impl;
-    // strdup can return NULL on allocation
-    // failure. Previously the result was assigned without checking, so a
-    // failing strdup left service->model_id NULL and the service shipped
-    // with a half-initialized record. Honor RAC_ERROR_OUT_OF_MEMORY and
-    // unwind the partially constructed service + backend impl.
-    service->model_id = strdup(model_id);
-    if (!service->model_id) {
-        if (vt->llm_ops->destroy)
-            vt->llm_ops->destroy(impl);
-        free(service);
-        return RAC_ERROR_OUT_OF_MEMORY;
+        return result;
     }
     *out_handle = service;
-
-    // Single source of truth for the "*.backend.created" telemetry
-    // event. Previously each backend fired this from its own *_create path;
-    // now it fires once from the commons service layer so future backends
-    // inherit the emit for free (and can't silently drop it).
-    {
-        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
-        char props[128];
-        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("llm.backend.created", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
-                        props);
-    }
 
     ALOGD("LLM service created successfully");
     RAC_LOG_INFO(LOG_CAT, "LLM service created");

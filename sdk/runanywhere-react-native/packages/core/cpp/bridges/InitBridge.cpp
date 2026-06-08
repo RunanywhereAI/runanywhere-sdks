@@ -16,6 +16,11 @@
 #include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/device/rac_device_identity.h"  // rac_device_get_or_create_persistent_id
+#if __has_include("rac/infrastructure/network/rac_auth_manager.h")
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#elif __has_include("rac_auth_manager.h")
+#include "rac_auth_manager.h"
+#endif
 
 #include <cstddef>
 
@@ -754,6 +759,7 @@ struct SdkInitResultSummary {
     bool hasSuccess = false;
     bool success = false;
     bool httpConfigured = false;
+    bool hasCompletedHttpSetup = false;
     bool deviceRegistered = false;
     uint32_t linkedModelsCount = 0;
     std::string warning;
@@ -823,16 +829,44 @@ static void appendStringField(std::vector<uint8_t>& out,
     out.insert(out.end(), value.begin(), value.end());
 }
 
+static void appendBoolField(std::vector<uint8_t>& out,
+                            uint32_t fieldNumber,
+                            bool value) {
+    if (!value) {
+        return;
+    }
+    appendVarint(out, (static_cast<uint64_t>(fieldNumber) << 3) | 0U);
+    appendVarint(out, 1U);
+}
+
 static std::vector<uint8_t> makePhase1RequestBytes(rac_environment_t environment,
                                                    const std::string& apiKey,
                                                    const std::string& baseURL,
-                                                   const std::string& deviceId) {
+                                                   const std::string& deviceId,
+                                                   const std::string& platform,
+                                                   const std::string& sdkVersion) {
     std::vector<uint8_t> bytes;
     appendVarint(bytes, 0x08);  // field 1: environment
     appendVarint(bytes, static_cast<uint64_t>(environment));
     appendStringField(bytes, 2, apiKey);
     appendStringField(bytes, 3, baseURL);
     appendStringField(bytes, 4, deviceId);
+    appendStringField(bytes, 5, platform);
+    appendStringField(bytes, 6, sdkVersion);
+    return bytes;
+}
+
+static std::vector<uint8_t> makePhase2RequestBytes(const std::string& buildToken,
+                                                   bool forceRefreshAssignments,
+                                                   bool flushTelemetry,
+                                                   bool discoverDownloadedModels,
+                                                   bool rescanLocalModels) {
+    std::vector<uint8_t> bytes;
+    appendStringField(bytes, 1, buildToken);
+    appendBoolField(bytes, 2, forceRefreshAssignments);
+    appendBoolField(bytes, 3, flushTelemetry);
+    appendBoolField(bytes, 4, discoverDownloadedModels);
+    appendBoolField(bytes, 5, rescanLocalModels);
     return bytes;
 }
 
@@ -911,6 +945,9 @@ static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer)
                     break;
                 case 6:
                     summary.linkedModelsCount = static_cast<uint32_t>(value);
+                    break;
+                case 10:
+                    summary.hasCompletedHttpSetup = value != 0;
                     break;
                 default:
                     break;
@@ -1198,6 +1235,45 @@ static rac_result_t platformSecureDeleteCallback(const char* key, void* userData
     } catch (...) {
         return RAC_ERROR_SECURE_STORAGE_FAILED;
     }
+}
+
+static int authSecureStoreCallback(const char* key, const char* value, void* userData) {
+    (void)userData;
+    return platformSecureSetCallback(key, value, nullptr) == RAC_SUCCESS ? 0 : -1;
+}
+
+static int authSecureRetrieveCallback(
+    const char* key,
+    char* outValue,
+    size_t bufferSize,
+    void* userData
+) {
+    (void)userData;
+    if (!outValue || bufferSize == 0) {
+        return -1;
+    }
+
+    char* stored = nullptr;
+    rac_result_t result = platformSecureGetCallback(key, &stored, nullptr);
+    if (result != RAC_SUCCESS || !stored) {
+        return -1;
+    }
+
+    const size_t len = std::strlen(stored);
+    if (len + 1 > bufferSize) {
+        std::free(stored);
+        return -1;
+    }
+
+    std::memcpy(outValue, stored, len);
+    outValue[len] = '\0';
+    std::free(stored);
+    return static_cast<int>(len);
+}
+
+static int authSecureDeleteCallback(const char* key, void* userData) {
+    (void)userData;
+    return platformSecureDeleteCallback(key, nullptr) == RAC_SUCCESS ? 0 : -1;
 }
 
 static void platformLogCallback(
@@ -1574,6 +1650,19 @@ void InitBridge::registerPlatformAdapter() {
     if (result == RAC_SUCCESS) {
         adapterRegistered_ = true;
         LOGI("Platform adapter registered with RACommons");
+
+        static rac_secure_storage_t authStorage = {};
+        authStorage.store = authSecureStoreCallback;
+        authStorage.retrieve = authSecureRetrieveCallback;
+        authStorage.delete_key = authSecureDeleteCallback;
+        authStorage.context = nullptr;
+        rac_auth_init(&authStorage);
+        const int loadResult = rac_auth_load_stored_tokens();
+        if (loadResult == 0) {
+            LOGI("Auth secure storage registered with RACommons");
+        } else {
+            LOGD("Auth secure storage registered; no stored tokens loaded");
+        }
     } else {
         LOGE("Failed to register platform adapter: %d", result);
     }
@@ -1583,7 +1672,14 @@ rac_result_t InitBridge::initialize(
     rac_environment_t environment,
     const std::string& apiKey,
     const std::string& baseURL,
-    const std::string& deviceId
+    const std::string& deviceId,
+    const std::string& platform,
+    const std::string& sdkVersion,
+    const std::string& buildToken,
+    bool forceRefreshAssignments,
+    bool flushTelemetry,
+    bool discoverDownloadedModels,
+    bool rescanLocalModels
 ) {
     if (initialized_) {
         LOGI("SDK already initialized");
@@ -1594,6 +1690,8 @@ rac_result_t InitBridge::initialize(
     apiKey_ = apiKey;
     baseURL_ = baseURL;
     deviceId_ = deviceId;
+    platform_ = platform.empty() ? "react_native" : platform;
+    sdkVersion_ = sdkVersion.empty() ? std::string(rac_sdk_get_version()) : sdkVersion;
 
     // Step 1: Register platform adapter FIRST
     registerPlatformAdapter();
@@ -1606,8 +1704,9 @@ rac_result_t InitBridge::initialize(
     }
 
     // Step 3: Initialize RACommons using rac_init
-    // NOTE: rac_init takes a config struct, not individual parameters
-    // The actual auth/state management is done at the platform level
+    // NOTE: rac_init takes a config struct, not individual parameters.
+    // Auth orchestration and token state live in commons; RN only supplies
+    // secure storage and HTTP callbacks.
     rac_config_t config = {};
     config.platform_adapter = &adapter_;
     config.log_level = RAC_LOG_INFO;
@@ -1633,7 +1732,7 @@ rac_result_t InitBridge::initialize(
 #else
     sdkConfig.platform = "ios"; // Default to ios for unknown platforms
 #endif
-    // Use centralized SDK version (set from TypeScript SDKConstants via setSdkVersion)
+    // Use the version supplied by the generated TypeScript Phase 1 envelope.
     static std::string s_sdkVersion;
     s_sdkVersion = getSdkVersion();
     sdkConfig.sdk_version = s_sdkVersion.c_str();
@@ -1658,7 +1757,9 @@ rac_result_t InitBridge::initialize(
             environment,
             apiKey_,
             baseURL_,
-            s_deviceId);
+            s_deviceId,
+            platform_,
+            s_sdkVersion);
         rac_result_t phase1Result = callSdkInitProto(
             "rac_sdk_init_phase1_proto",
             phase1Bytes,
@@ -1673,6 +1774,20 @@ rac_result_t InitBridge::initialize(
             LOGI("SDK Phase 1 proto initialized");
         }
     }
+
+    std::string effectiveBuildToken = buildToken;
+    if (effectiveBuildToken.empty() && environment == RAC_ENV_DEVELOPMENT) {
+        const char* devBuildToken = rac_dev_config_get_build_token();
+        if (devBuildToken && config::isUsableSecret(devBuildToken)) {
+            effectiveBuildToken = devBuildToken;
+        }
+    }
+    phase2RequestBytes_ = makePhase2RequestBytes(
+        effectiveBuildToken,
+        forceRefreshAssignments,
+        flushTelemetry,
+        discoverDownloadedModels,
+        rescanLocalModels);
 
     initialized_ = true;
     LOGI("SDK initialized successfully for environment %d", static_cast<int>(environment));
@@ -1780,7 +1895,8 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     return DeviceBridge::shared().registerCallbacks();
 }
 
-rac_result_t InitBridge::completeServicesInitialization() {
+rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured) {
+    outHttpConfigured = false;
     if (!initialized_) {
         LOGE("completeServicesInitialization called before initialize");
         return RAC_ERROR_NOT_INITIALIZED;
@@ -1793,10 +1909,9 @@ rac_result_t InitBridge::completeServicesInitialization() {
     }
 
     SdkInitResultSummary phase2Summary;
-    std::vector<uint8_t> emptyPhase2Request;
     rac_result_t phase2Result = callSdkInitProto(
         "rac_sdk_init_phase2_proto",
-        emptyPhase2Request,
+        phase2RequestBytes_,
         &phase2Summary);
     if (phase2Result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
         return RAC_SUCCESS;
@@ -1808,8 +1923,9 @@ rac_result_t InitBridge::completeServicesInitialization() {
     if (!phase2Summary.warning.empty()) {
         LOGI("SDK Phase 2 warning: %s", phase2Summary.warning.c_str());
     }
+    outHttpConfigured = phase2Summary.hasCompletedHttpSetup || phase2Summary.httpConfigured;
     LOGI("SDK Phase 2 complete (http=%d, device=%d, linked=%u)",
-         phase2Summary.httpConfigured ? 1 : 0,
+         outHttpConfigured ? 1 : 0,
          phase2Summary.deviceRegistered ? 1 : 0,
          phase2Summary.linkedModelsCount);
     return RAC_SUCCESS;
@@ -1824,8 +1940,8 @@ rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
 
     SdkInitResultSummary summary;
     rac_result_t result = callSdkRetryHttpProto(&summary);
-    // Feature-unavailable on older packaged natives is non-fatal — the JS
-    // layer still drives the platform-side auth round-trip.
+    // Feature-unavailable on older packaged natives is non-fatal; callers will
+    // leave HTTP setup marked incomplete.
     if (result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
         return RAC_SUCCESS;
     }
@@ -1833,7 +1949,7 @@ rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
         return result;
     }
 
-    outHttpConfigured = summary.httpConfigured;
+    outHttpConfigured = summary.hasCompletedHttpSetup || summary.httpConfigured;
     if (!summary.warning.empty()) {
         LOGI("HTTP retry warning: %s", summary.warning.c_str());
     }

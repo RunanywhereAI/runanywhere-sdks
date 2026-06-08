@@ -18,7 +18,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
@@ -47,7 +46,7 @@ import kotlinx.coroutines.runBlocking
  *
  * Initialization follows a two-phase pattern:
  * - Phase 1 (synchronous): Core initialization including platform adapter registration
- * - Phase 2 (asynchronous): Service initialization for model assignment and platform services
+ * - Phase 2 (asynchronous): Platform service wiring, then commons-owned init orchestration
  *
  * CRITICAL: Platform adapter must be registered FIRST before any C++ calls.
  *
@@ -113,8 +112,10 @@ object CppBridge {
      * 4. Events registration
      * 5. Telemetry configuration (stores credentials, no network)
      *
-     * **Important:** Authentication and device registration happen in Phase 2 ([initializeServices]),
-     * which MUST be called from a background thread (e.g., `Dispatchers.IO`).
+     * **Important:** Authentication, device registration, assignment fetch,
+     * telemetry flush, and downloaded-model discovery happen in commons Phase
+     * 2 (`rac_sdk_init_phase2_proto`), after [initializeServices] has wired
+     * the platform callbacks/transport on a background thread.
      *
      * NOTE: Backend registration (LlamaCPP, ONNX) is NOT done here.
      * Backends are registered by the app calling LlamaCPP.register() and ONNX.register()
@@ -176,10 +177,10 @@ object CppBridge {
             // can determine correct behavior for production/staging modes
             CppBridgeTelemetry.setEnvironment(environment)
 
-            // Configure telemetry base URL and API key ONLY for production/staging mode
-            // In development mode, we use Supabase URL from C++ dev config
-            // NOTE: Authentication is deferred to Phase 2 (initializeServices) to avoid blocking
-            // This matches Swift SDK where authentication is done in completeServicesInitialization()
+            // Configure telemetry base URL and API key ONLY for production/staging mode.
+            // In development mode, commons reads Supabase URL/key from dev config.
+            // Networked auth is deferred to commons Phase 2 to avoid blocking
+            // Phase 1 on the UI thread.
             if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                 if (!baseURL.isNullOrEmpty()) {
                     CppBridgeTelemetry.setBaseUrl(baseURL)
@@ -416,13 +417,10 @@ object CppBridge {
     /**
      * Phase 2: Services Initialization (Asynchronous)
      *
-     * Initializes the service components:
-     * 1. Authentication with backend (production/staging only, makes HTTP calls)
-     * 2. Platform services registration
-     * 3. Device registration (triggers backend call)
+     * Initializes platform service adapters needed by commons Phase 2.
      *
      * Must be called after [initialize] completes.
-     * Must be called from a background thread (e.g., Dispatchers.IO) as it makes network calls.
+     * Must be called from a background thread (e.g., Dispatchers.IO).
      * Mirrors Swift SDK's completeServicesInitialization()
      */
     suspend fun initializeServices() {
@@ -438,125 +436,25 @@ object CppBridge {
         }
 
         try {
-            // Step 0: Configure HTTPClientAdapter for SDK-level HTTP (auth,
-            // device registration, telemetry). Mirrors Swift's
-            // `await CppBridge.HTTP.shared.configure(baseURL:apiKey:)` call
-            // in `completeServicesInitialization`. In development mode the
-            // Supabase URL + anon key come from the C++ dev config.
-            run {
-                val baseUrl: String?
-                val apiKey: String?
-                if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                    baseUrl = CppBridgeDevConfig.supabaseURL
-                    apiKey = CppBridgeDevConfig.supabaseKey
-                } else {
-                    baseUrl = CppBridgeTelemetry.getBaseUrl()
-                    apiKey = CppBridgeTelemetry.getApiKey()
-                }
-                if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
-                    HTTPClientAdapter.configure(baseUrl, apiKey)
-                }
-            }
-
-            // Step 1: Authenticate with backend for production/staging mode
-            // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
-            // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
-            if (_environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                val baseUrl = CppBridgeTelemetry.getBaseUrl()
-                val apiKey = CppBridgeTelemetry.getApiKey()
-
-                if (!apiKey.isNullOrEmpty() && !baseUrl.isNullOrEmpty()) {
-                    try {
-                        logger.debug("Authenticating with backend")
-                        val deviceId = CppBridgeDevice.getDeviceId() ?: CppBridgeDevice.getDeviceIdCallback()
-                        CppBridgeAuth.authenticate(
-                            apiKey = apiKey,
-                            baseUrl = baseUrl,
-                            deviceId = deviceId,
-                            platform = SDKConstants.SDK_PLATFORM,
-                            sdkVersion = SDKConstants.SDK_VERSION,
-                        )
-                        logger.debug("Authentication successful")
-                    } catch (e: Exception) {
-                        logger.error("Authentication failed: ${e.message}")
-                        // Non-fatal: continue with services initialization
-                    }
-                } else {
-                    logger.warn("Missing API key or base URL for authentication")
-                }
-            }
-
-            // Step 2: Model assignment registration removed.
-
-            // Flush any queued telemetry events now that HTTP should be configured.
-            // In demo/default development mode, no usable external config is expected.
-            if (CppBridgeTelemetry.hasUsableNetworkConfig()) {
-                CppBridgeTelemetry.flush()
-            } else {
-                logger.debug("Skipping telemetry flush: no usable external config")
-            }
-
-            // Trigger device registration with backend (non-blocking, best-effort)
-            // Mirrors Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-            try {
-                if (!CppBridgeTelemetry.hasUsableNetworkConfig()) {
-                    logger.debug("Skipping device registration: no usable external config")
-                    synchronized(lock) {
-                        CppBridgeState.servicesInitialized = true
-                        CppBridgeState.servicesInitializing = false
-                    }
-                    logger.debug("Phase 2 services initialization complete")
-                    return
-                }
-
-                val deviceId = CppBridgeDevice.getDeviceIdCallback()
-
-                // Get build token for development mode (mirrors Swift SDK)
-                // Swift: let buildTokenString = environment == .development ? CppBridge.DevConfig.buildToken : nil
-                val buildToken = if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                    try {
-                        val token = RunAnywhereBridge.racDevConfigGetBuildToken()
-                        if (!token.isNullOrEmpty()) {
-                            logger.debug("Using build token from dev config for device registration")
-                            token
+            // Configure the Kotlin HTTP adapter used by callback-based
+            // platform services. Auth and control-plane orchestration are
+            // driven by rac_sdk_init_phase2_proto through the registered
+            // OkHttp transport.
+            if (!HTTPClientAdapter.isConfigured) {
+                val configured =
+                    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+                        CppBridgeDevConfig.configureHTTP()
+                    } else {
+                        val baseUrl = CppBridgeTelemetry.getBaseUrl()
+                        val apiKey = CppBridgeTelemetry.getApiKey()
+                        if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
+                            HTTPClientAdapter.configure(baseUrl, apiKey)
+                            true
                         } else {
-                            logger.debug("No build token available in dev config")
-                            null
+                            false
                         }
-                    } catch (e: Exception) {
-                        logger.warn("Failed to get build token: ${e.message}")
-                        null
                     }
-                } else {
-                    null // Build token only used in development mode
-                }
-
-                val success = CppBridgeDevice.triggerRegistration(
-                    environment = _environment,
-                    buildToken = buildToken,
-                )
-                if (success) {
-                    logger.debug("Device registration triggered")
-                    CppBridgeSDKEvents.emitDeviceRegistered(deviceId)
-                } else {
-                    logger.warn("Device registration not triggered (may already be registered)")
-                }
-            } catch (e: Exception) {
-                // Non-critical failure - device registration is best-effort
-                logger.warn("Device registration failed (non-critical): ${e.message}")
-                // Emit device registration failed event
-                CppBridgeSDKEvents.emitDeviceRegistrationFailed(e.message ?: "Unknown error")
-            }
-
-            // Step 5 (deferred from C++): filesystem-backed model discovery.
-            // Mirrors Swift `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
-            // in `_performServicesInitialization` (sdk_init.cpp file header: deferred
-            // to platform SDKs). Phase-2 model assignments may have linked new models;
-            // without this call they won't surface in modelRegistry.list() until the
-            // next manual hydrate triggered by a UI action.
-            val discoveryResult = CppBridgeModelRegistry.discoverDownloadedModels()
-            if (discoveryResult.linked_count > 0) {
-                logger.info("Discovered ${discoveryResult.linked_count} downloaded models on startup")
+                logger.debug("HTTP adapter configuration for callbacks: configured=$configured")
             }
 
             synchronized(lock) {

@@ -81,6 +81,27 @@ public class SdkInitPhase1Request(
     schemaIndex = 3,
   )
   public val device_id: String = "",
+  /**
+   * SDK/platform identity used in auth/device metadata.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val platform: String = "",
+  /**
+   * SDK version reported to backend services.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sdkVersion",
+    schemaIndex = 5,
+  )
+  public val sdk_version: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SdkInitPhase1Request, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -97,6 +118,8 @@ public class SdkInitPhase1Request(
     if (api_key != other.api_key) return false
     if (base_url != other.base_url) return false
     if (device_id != other.device_id) return false
+    if (platform != other.platform) return false
+    if (sdk_version != other.sdk_version) return false
     return true
   }
 
@@ -108,6 +131,8 @@ public class SdkInitPhase1Request(
       result = result * 37 + api_key.hashCode()
       result = result * 37 + base_url.hashCode()
       result = result * 37 + device_id.hashCode()
+      result = result * 37 + platform.hashCode()
+      result = result * 37 + sdk_version.hashCode()
       super.hashCode = result
     }
     return result
@@ -119,6 +144,8 @@ public class SdkInitPhase1Request(
     result += """api_key=${sanitize(api_key)}"""
     result += """base_url=${sanitize(base_url)}"""
     result += """device_id=${sanitize(device_id)}"""
+    result += """platform=${sanitize(platform)}"""
+    result += """sdk_version=${sanitize(sdk_version)}"""
     return result.joinToString(prefix = "SdkInitPhase1Request{", separator = ", ", postfix = "}")
   }
 
@@ -127,8 +154,10 @@ public class SdkInitPhase1Request(
     api_key: String = this.api_key,
     base_url: String = this.base_url,
     device_id: String = this.device_id,
+    platform: String = this.platform,
+    sdk_version: String = this.sdk_version,
     unknownFields: ByteString = this.unknownFields,
-  ): SdkInitPhase1Request = SdkInitPhase1Request(environment, api_key, base_url, device_id, unknownFields)
+  ): SdkInitPhase1Request = SdkInitPhase1Request(environment, api_key, base_url, device_id, platform, sdk_version, unknownFields)
 
   public companion object {
     @JvmField
@@ -155,6 +184,12 @@ public class SdkInitPhase1Request(
         if (value.device_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.device_id)
         }
+        if (value.platform != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.platform)
+        }
+        if (value.sdk_version != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.sdk_version)
+        }
         return size
       }
 
@@ -171,11 +206,23 @@ public class SdkInitPhase1Request(
         if (value.device_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 4, value.device_id)
         }
+        if (value.platform != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.platform)
+        }
+        if (value.sdk_version != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.sdk_version)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SdkInitPhase1Request) {
         writer.writeBytes(value.unknownFields)
+        if (value.sdk_version != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.sdk_version)
+        }
+        if (value.platform != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.platform)
+        }
         if (value.device_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 4, value.device_id)
         }
@@ -195,6 +242,8 @@ public class SdkInitPhase1Request(
         var api_key: String = ""
         var base_url: String = ""
         var device_id: String = ""
+        var platform: String = ""
+        var sdk_version: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -205,6 +254,8 @@ public class SdkInitPhase1Request(
             2 -> api_key = ProtoAdapter.STRING.decode(reader)
             3 -> base_url = ProtoAdapter.STRING.decode(reader)
             4 -> device_id = ProtoAdapter.STRING.decode(reader)
+            5 -> platform = ProtoAdapter.STRING.decode(reader)
+            6 -> sdk_version = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -213,6 +264,8 @@ public class SdkInitPhase1Request(
           api_key = api_key,
           base_url = base_url,
           device_id = device_id,
+          platform = platform,
+          sdk_version = sdk_version,
           unknownFields = unknownFields
         )
       }

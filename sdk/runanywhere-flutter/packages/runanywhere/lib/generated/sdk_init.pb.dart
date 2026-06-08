@@ -37,12 +37,16 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
     $core.String? apiKey,
     $core.String? baseUrl,
     $core.String? deviceId,
+    $core.String? platform,
+    $core.String? sdkVersion,
   }) {
     final result = create();
     if (environment != null) result.environment = environment;
     if (apiKey != null) result.apiKey = apiKey;
     if (baseUrl != null) result.baseUrl = baseUrl;
     if (deviceId != null) result.deviceId = deviceId;
+    if (platform != null) result.platform = platform;
+    if (sdkVersion != null) result.sdkVersion = sdkVersion;
     return result;
   }
 
@@ -64,6 +68,8 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'apiKey')
     ..aOS(3, _omitFieldNames ? '' : 'baseUrl')
     ..aOS(4, _omitFieldNames ? '' : 'deviceId')
+    ..aOS(5, _omitFieldNames ? '' : 'platform')
+    ..aOS(6, _omitFieldNames ? '' : 'sdkVersion')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -120,17 +126,50 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
   $core.bool hasDeviceId() => $_has(3);
   @$pb.TagNumber(4)
   void clearDeviceId() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get platform => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set platform($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPlatform() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPlatform() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get sdkVersion => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set sdkVersion($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSdkVersion() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSdkVersion() => $_clearField(6);
 }
 
 /// ---------------------------------------------------------------------------
 /// Phase 2 input — async services initialization. Most state is already
-/// resident in commons after Phase 1; this envelope exists so SDKs can pass
-/// per-call hints without changing the signature. Currently empty — reserved
-/// for future flags such as `force_refresh_assignments` or
-/// `skip_device_registration` once Kotlin/RN/Flutter parity demands them.
+/// resident in commons after Phase 1; this envelope carries the few per-call
+/// hints that remain SDK-owned while the deterministic orchestration lives in
+/// commons.
 /// ---------------------------------------------------------------------------
 class SdkInitPhase2Request extends $pb.GeneratedMessage {
-  factory SdkInitPhase2Request() => create();
+  factory SdkInitPhase2Request({
+    $core.String? buildToken,
+    $core.bool? forceRefreshAssignments,
+    $core.bool? flushTelemetry,
+    $core.bool? discoverDownloadedModels,
+    $core.bool? rescanLocalModels,
+  }) {
+    final result = create();
+    if (buildToken != null) result.buildToken = buildToken;
+    if (forceRefreshAssignments != null)
+      result.forceRefreshAssignments = forceRefreshAssignments;
+    if (flushTelemetry != null) result.flushTelemetry = flushTelemetry;
+    if (discoverDownloadedModels != null)
+      result.discoverDownloadedModels = discoverDownloadedModels;
+    if (rescanLocalModels != null) result.rescanLocalModels = rescanLocalModels;
+    return result;
+  }
 
   SdkInitPhase2Request._();
 
@@ -145,6 +184,11 @@ class SdkInitPhase2Request extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'SdkInitPhase2Request',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'buildToken')
+    ..aOB(2, _omitFieldNames ? '' : 'forceRefreshAssignments')
+    ..aOB(3, _omitFieldNames ? '' : 'flushTelemetry')
+    ..aOB(4, _omitFieldNames ? '' : 'discoverDownloadedModels')
+    ..aOB(5, _omitFieldNames ? '' : 'rescanLocalModels')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -165,6 +209,51 @@ class SdkInitPhase2Request extends $pb.GeneratedMessage {
   static SdkInitPhase2Request getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<SdkInitPhase2Request>(create);
   static SdkInitPhase2Request? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get buildToken => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set buildToken($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBuildToken() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBuildToken() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get forceRefreshAssignments => $_getBF(1);
+  @$pb.TagNumber(2)
+  set forceRefreshAssignments($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasForceRefreshAssignments() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearForceRefreshAssignments() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get flushTelemetry => $_getBF(2);
+  @$pb.TagNumber(3)
+  set flushTelemetry($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFlushTelemetry() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFlushTelemetry() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get discoverDownloadedModels => $_getBF(3);
+  @$pb.TagNumber(4)
+  set discoverDownloadedModels($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDiscoverDownloadedModels() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDiscoverDownloadedModels() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get rescanLocalModels => $_getBF(4);
+  @$pb.TagNumber(5)
+  set rescanLocalModels($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasRescanLocalModels() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRescanLocalModels() => $_clearField(5);
 }
 
 /// ---------------------------------------------------------------------------

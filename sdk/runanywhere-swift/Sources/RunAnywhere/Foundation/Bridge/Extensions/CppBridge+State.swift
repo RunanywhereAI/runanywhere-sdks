@@ -27,15 +27,13 @@ extension CppBridge {
 
         // MARK: - Initialization
 
-        /// Populate the SDK config and wire Keychain auth-storage.
+        /// Wire Keychain auth-storage.
         ///
         /// `rac_state_initialize` (environment + cached api_key/base_url/
         /// device_id) is already driven by `CppBridge.SdkInit.phase1` in
-        /// commons, so it is intentionally NOT repeated here — re-initializing
-        /// the same state would be redundant work. This bridge owns the two
-        /// concerns phase1 does not touch: `rac_sdk_init` (version/platform
-        /// metadata used by device registration) and the Keychain secure-storage
-        /// install that backs token persistence.
+        /// commons, and Phase 1 now also populates `rac_sdk_init` metadata.
+        /// This bridge owns only the Keychain secure-storage install that backs
+        /// token persistence.
         /// - Parameters:
         ///   - environment: SDK environment
         ///   - apiKey: API key
@@ -47,36 +45,16 @@ extension CppBridge {
             baseURL: URL,
             deviceId: String
         ) {
-            // Initialize SDK config with version (required for device registration)
-            // This populates rac_sdk_get_config() which device registration uses
-            let sdkVersion = SDKConstants.version
-            let platform = SDKConstants.platform
-
-            // Use withCString to ensure strings remain valid during the call
-            sdkVersion.withCString { sdkVer in
-                platform.withCString { plat in
-                    apiKey.withCString { key in
-                        baseURL.absoluteString.withCString { url in
-                            deviceId.withCString { did in
-                                var sdkConfig = rac_sdk_config_t()
-                                sdkConfig.environment = Environment.toC(environment)
-                                sdkConfig.api_key = apiKey.isEmpty ? nil : key
-                                sdkConfig.base_url = baseURL.absoluteString.isEmpty ? nil : url
-                                sdkConfig.device_id = deviceId.isEmpty ? nil : did
-                                sdkConfig.platform = plat
-                                sdkConfig.sdk_version = sdkVer
-                                _ = rac_sdk_init(&sdkConfig)
-                            }
-                        }
-                    }
-                }
-            }
+            _ = environment
+            _ = apiKey
+            _ = baseURL
+            _ = deviceId
 
             // Install Keychain-backed secure storage into the auth manager and
             // restore any previously persisted tokens.
             installAuthSecureStorage()
 
-            SDKLogger(category: "CppBridge.State").debug("SDK config + auth secure storage initialized")
+            SDKLogger(category: "CppBridge.State").debug("Auth secure storage initialized")
         }
 
         /// Check if state is initialized

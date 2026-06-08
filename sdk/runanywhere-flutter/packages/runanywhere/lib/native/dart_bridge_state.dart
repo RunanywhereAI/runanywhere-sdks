@@ -1,15 +1,11 @@
-import 'dart:async';
-
 // ignore_for_file: avoid_classes_with_only_static_members
 
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// State bridge for C++ SDK state operations.
@@ -30,64 +26,30 @@ class DartBridgeState {
   // Initialization
   // ============================================================================
 
-  /// Initialize C++ state manager with the resolved credentials.
+  /// Install auth secure storage after the platform async cache is ready.
   ///
-  /// This deliberately re-runs `rac_state_initialize`: `DartBridge.initialize`
-  /// (Phase 1) drives `rac_sdk_init_phase1_proto` with the environment only —
-  /// the api key / base URL / device ID are not known until they are resolved
-  /// (Keychain lookup + caller params) in Phase 2. This Phase-2 call backfills
-  /// `rac_sdk_state` with those resolved credentials, so it is NOT a redundant
-  /// duplicate of the Phase-1 call. `rac_state_initialize` is idempotent on the
-  /// environment and simply overwrites the cached api_key/base_url/device_id.
+  /// Phase 1 now drives `rac_sdk_init_phase1_proto` with environment, API key,
+  /// base URL, device ID, platform, and SDK version. That commons call owns
+  /// `rac_state_initialize`, so Flutter does not re-run state initialization in
+  /// Phase 2. This method only wires the Keychain/KeyStore-backed auth vtable
+  /// and restores any persisted auth tokens.
   ///
-  /// Auth persistence (Keychain/KeyStore vtable + stored-token load) is handled
-  /// by `DartBridgeAuth.initialize` which owns the `rac_auth_manager` lifecycle.
-  /// This bridge only manages non-auth runtime state.
   Future<void> initialize({
     required SDKEnvironment environment,
-    String? apiKey,
     String? baseURL,
-    String? deviceId,
   }) async {
     try {
-      final lib = PlatformLoader.loadCommons();
-
-      // Initialize state
-      final initState = lib.lookupFunction<
-          Int32 Function(Int32, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(int, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_state_initialize');
-
-      final envValue = _environmentToInt(environment);
-      final apiKeyPtr = (apiKey ?? '').toNativeUtf8();
-      final baseURLPtr = (baseURL ?? '').toNativeUtf8();
-      final deviceIdPtr = (deviceId ?? '').toNativeUtf8();
-
-      try {
-        final result = initState(envValue, apiKeyPtr, baseURLPtr, deviceIdPtr);
-        if (result != RacResultCode.success) {
-          _logger.warning('State init failed', metadata: {'code': result});
-        }
-      } finally {
-        calloc.free(apiKeyPtr);
-        calloc.free(baseURLPtr);
-        calloc.free(deviceIdPtr);
-      }
-
-      // Install the Keychain/KeyStore-backed secure-storage vtable into
-      // `rac_auth_manager` and restore any previously persisted tokens.
-      // Mirrors Swift `CppBridge.State.installAuthSecureStorage()` — keeps
-      // token persistence wired up before any auth API is exercised.
       await DartBridgeAuth.initialize(
         environment: environment,
         baseURL: baseURL,
       );
 
-      _logger.debug('C++ state initialized');
+      _logger.debug('Auth secure storage initialized');
     } catch (e, stack) {
-      _logger.debug('rac_state_initialize error: $e', metadata: {
-        'stack': stack.toString(),
-      });
+      _logger.debug(
+        'Auth secure storage init error: $e',
+        metadata: {'stack': stack.toString()},
+      );
     }
   }
 
@@ -96,7 +58,8 @@ class DartBridgeState {
     try {
       final lib = PlatformLoader.loadCommons();
       final isInit = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_state_is_initialized');
+        'rac_state_is_initialized',
+      );
       return isInit() != 0;
     } catch (e) {
       return false;
@@ -107,13 +70,15 @@ class DartBridgeState {
   void reset() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final resetState = lib
-          .lookupFunction<Void Function(), void Function()>('rac_state_reset');
+      final resetState = lib.lookupFunction<Void Function(), void Function()>(
+        'rac_state_reset',
+      );
       resetState();
       // Also reset the auth manager so state/auth stay in sync.
       try {
-        final resetAuth = lib
-            .lookupFunction<Void Function(), void Function()>('rac_auth_reset');
+        final resetAuth = lib.lookupFunction<Void Function(), void Function()>(
+          'rac_auth_reset',
+        );
         resetAuth();
       } catch (_) {
         // rac_auth_reset may not be linked yet; ignore.
@@ -127,13 +92,15 @@ class DartBridgeState {
   void shutdown() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final shutdownState =
-          lib.lookupFunction<Void Function(), void Function()>(
-              'rac_state_shutdown');
+      final shutdownState = lib
+          .lookupFunction<Void Function(), void Function()>(
+            'rac_state_shutdown',
+          );
       shutdownState();
       try {
-        final resetAuth = lib
-            .lookupFunction<Void Function(), void Function()>('rac_auth_reset');
+        final resetAuth = lib.lookupFunction<Void Function(), void Function()>(
+          'rac_auth_reset',
+        );
         resetAuth();
       } catch (_) {
         // rac_auth_reset may not be linked yet; ignore.
@@ -152,7 +119,8 @@ class DartBridgeState {
     try {
       final lib = PlatformLoader.loadCommons();
       final getEnv = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_state_get_environment');
+        'rac_state_get_environment',
+      );
       return _intToEnvironment(getEnv());
     } catch (e) {
       return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
@@ -163,8 +131,10 @@ class DartBridgeState {
   String? get baseURL {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getBaseUrl = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_state_get_base_url');
+      final getBaseUrl = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'rac_state_get_base_url',
+          );
 
       final result = getBaseUrl();
       if (result == nullptr) return null;
@@ -179,8 +149,10 @@ class DartBridgeState {
   String? get apiKey {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getApiKey = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_state_get_api_key');
+      final getApiKey = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'rac_state_get_api_key',
+          );
 
       final result = getApiKey();
       if (result == nullptr) return null;
@@ -195,8 +167,10 @@ class DartBridgeState {
   String? get deviceId {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getDeviceId = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_state_get_device_id');
+      final getDeviceId = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'rac_state_get_device_id',
+          );
 
       final result = getDeviceId();
       if (result == nullptr) return null;
@@ -218,8 +192,10 @@ class DartBridgeState {
   String? get accessToken {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getToken = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_auth_get_access_token');
+      final getToken = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'rac_auth_get_access_token',
+          );
 
       final result = getToken();
       if (result == nullptr) return null;
@@ -234,7 +210,8 @@ class DartBridgeState {
     try {
       final lib = PlatformLoader.loadCommons();
       final isAuth = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_auth_is_authenticated');
+        'rac_auth_is_authenticated',
+      );
       return isAuth() != 0;
     } catch (e) {
       return false;
@@ -246,7 +223,8 @@ class DartBridgeState {
     try {
       final lib = PlatformLoader.loadCommons();
       final needsRefresh = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_auth_needs_refresh');
+        'rac_auth_needs_refresh',
+      );
       return needsRefresh() != 0;
     } catch (e) {
       return false;
@@ -257,8 +235,10 @@ class DartBridgeState {
   String? get userId {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getUserId = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_auth_get_user_id');
+      final getUserId = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'rac_auth_get_user_id',
+          );
 
       final result = getUserId();
       if (result == nullptr) return null;
@@ -272,8 +252,10 @@ class DartBridgeState {
   String? get organizationId {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getOrgId = lib.lookupFunction<Pointer<Utf8> Function(),
-          Pointer<Utf8> Function()>('rac_auth_get_organization_id');
+      final getOrgId = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+            'rac_auth_get_organization_id',
+          );
 
       final result = getOrgId();
       if (result == nullptr) return null;
@@ -290,8 +272,9 @@ class DartBridgeState {
   Future<void> clearAuth() async {
     try {
       final lib = PlatformLoader.loadCommons();
-      final clearAuthFn = lib
-          .lookupFunction<Void Function(), void Function()>('rac_auth_clear');
+      final clearAuthFn = lib.lookupFunction<Void Function(), void Function()>(
+        'rac_auth_clear',
+      );
       clearAuthFn();
 
       _logger.debug('Auth state cleared');
@@ -308,9 +291,10 @@ class DartBridgeState {
   void setDeviceRegistered(bool registered) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final setReg =
-          lib.lookupFunction<Void Function(Int32), void Function(int)>(
-              'rac_state_set_device_registered');
+      final setReg = lib
+          .lookupFunction<Void Function(Int32), void Function(int)>(
+            'rac_state_set_device_registered',
+          );
       setReg(registered ? 1 : 0);
     } catch (e) {
       _logger.debug('rac_state_set_device_registered not available: $e');
@@ -322,7 +306,8 @@ class DartBridgeState {
     try {
       final lib = PlatformLoader.loadCommons();
       final isReg = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_state_is_device_registered');
+        'rac_state_is_device_registered',
+      );
       return isReg() != 0;
     } catch (e) {
       return false;
@@ -332,19 +317,6 @@ class DartBridgeState {
   // ============================================================================
   // Helper Methods
   // ============================================================================
-
-  int _environmentToInt(SDKEnvironment env) {
-    switch (env) {
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-        return 0;
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 1;
-      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-        return 2;
-      default:
-        return 0;
-    }
-  }
 
   SDKEnvironment _intToEnvironment(int value) {
     switch (value) {

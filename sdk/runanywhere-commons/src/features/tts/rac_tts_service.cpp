@@ -15,13 +15,17 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/events/rac_events.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_primitive.h"
+#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "TTS.Service";
+
+namespace {
+
+const rac_tts_service_ops_t* tts_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->tts_ops : nullptr;
+}
+
+}  // namespace
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -38,84 +42,34 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
 
     RAC_LOG_INFO(LOG_CAT, "Creating TTS service for: %s", voice_id);
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t result = rac_get_model(voice_id, &model_info);
-
-    // If not found by voice_id, try looking up by path (voice_id might be a path)
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        voice_id,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_ONNX,
+         .allow_null_model_id = false,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = nullptr},
+        &model_ref);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", voice_id);
-        result = rac_get_model_by_path(voice_id, &model_info);
+        return result;
     }
 
-    // If still not found, extract last path component and try as model ID
+    rac_tts_service_t* service = nullptr;
+    result = rac::features::create_plugin_service<rac_tts_service_t, rac_tts_service_ops_t>(
+        {.log_cat = LOG_CAT,
+         .primitive = RAC_PRIMITIVE_SYNTHESIZE,
+         .select_ops = tts_ops,
+         .model_create_id = model_ref.path.c_str(),
+         .model_id_for_service = voice_id,
+         .config_json = nullptr,
+         .created_event_name = "tts.backend.created",
+         .created_event_category = RAC_EVENT_CATEGORY_TTS},
+        &service);
     if (result != RAC_SUCCESS) {
-        const char* last_slash = strrchr(voice_id, '/');
-        if (last_slash && last_slash[1] != '\0') {
-            const char* extracted_id = last_slash + 1;
-            RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
-            result = rac_get_model(extracted_id, &model_info);
-        }
+        return result;
     }
-
-    rac_inference_framework_t framework = RAC_FRAMEWORK_ONNX;
-    // Own the resolved path as a std::string because `rac_model_info_free`
-    // below frees `model_info->local_path` — a raw pointer into it would
-    // dangle. Mirrors the fix in rac_embeddings_service.cpp (commit
-    // 52e4ffc20) and rac_llm_service.cpp:95.
-    std::string model_path_owned = voice_id ? voice_id : "";
-
-    if (result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        if (model_info->local_path && model_info->local_path[0] != '\0') {
-            model_path_owned = model_info->local_path;
-        }
-        RAC_LOG_DEBUG(LOG_CAT, "Found model in registry: id=%s, framework=%d",
-                      model_info->id ? model_info->id : "NULL", framework);
-    }
-
-    // Pick the highest-priority registered plugin that serves this primitive
-    // (priority assigned at backend registration; no hardware/format scoring).
-    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_SYNTHESIZE);
-    if (model_info) {
-        rac_model_info_free(model_info);
-        model_info = nullptr;
-    }
-    if (!vt || !vt->tts_ops || !vt->tts_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves SYNTHESIZE");
-        return RAC_ERROR_BACKEND_NOT_FOUND;
-    }
-    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
-
-    void* impl = nullptr;
-    result = vt->tts_ops->create(model_path_owned.c_str(), /*config_json=*/nullptr, &impl);
-    if (result != RAC_SUCCESS || !impl) {
-        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
-    }
-
-    auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
-    if (!service) {
-        if (vt->tts_ops->destroy)
-            vt->tts_ops->destroy(impl);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    service->ops = vt->tts_ops;
-    service->impl = impl;
-    service->model_id = strdup(voice_id);
     *out_handle = service;
-
-    // Single source of truth for the "*.backend.created" telemetry
-    // event. Previously each backend fired this from its own *_create path;
-    // now it fires once from the commons service layer so future backends
-    // inherit the emit for free (and can't silently drop it).
-    {
-        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
-        char props[128];
-        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track("tts.backend.created", RAC_EVENT_CATEGORY_TTS, RAC_EVENT_DESTINATION_ALL,
-                        props);
-    }
 
     RAC_LOG_INFO(LOG_CAT, "TTS service created");
     return RAC_SUCCESS;

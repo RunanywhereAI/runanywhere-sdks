@@ -179,6 +179,12 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
   /// Resolved by platform (Keychain UUID, etc.).
   public var deviceID: String = String()
 
+  /// SDK/platform identity used in auth/device metadata.
+  public var platform: String = String()
+
+  /// SDK version reported to backend services.
+  public var sdkVersion: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -186,15 +192,29 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
 
 /// ---------------------------------------------------------------------------
 /// Phase 2 input — async services initialization. Most state is already
-/// resident in commons after Phase 1; this envelope exists so SDKs can pass
-/// per-call hints without changing the signature. Currently empty — reserved
-/// for future flags such as `force_refresh_assignments` or
-/// `skip_device_registration` once Kotlin/RN/Flutter parity demands them.
+/// resident in commons after Phase 1; this envelope carries the few per-call
+/// hints that remain SDK-owned while the deterministic orchestration lives in
+/// commons.
 /// ---------------------------------------------------------------------------
 public nonisolated struct RASdkInitPhase2Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  /// Optional dev-mode device registration token.
+  public var buildToken: String = String()
+
+  /// Bypass cached model assignments.
+  public var forceRefreshAssignments: Bool = false
+
+  /// Flush the registered telemetry sink.
+  public var flushTelemetry: Bool = false
+
+  /// Reconcile registry rows with local files.
+  public var discoverDownloadedModels: Bool = false
+
+  /// Ask discovery/refresh to rescan model dirs.
+  public var rescanLocalModels: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -313,7 +333,7 @@ nonisolated extension RASdkInitEnvironment: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase1Request"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}environment\0\u{3}api_key\0\u{3}base_url\0\u{3}device_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}environment\0\u{3}api_key\0\u{3}base_url\0\u{3}device_id\0\u{1}platform\0\u{3}sdk_version\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -325,6 +345,8 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
       case 2: try { try decoder.decodeSingularStringField(value: &self.apiKey) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.baseURL) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.platform) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.sdkVersion) }()
       default: break
       }
     }
@@ -343,6 +365,12 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
     if !self.deviceID.isEmpty {
       try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 4)
     }
+    if !self.platform.isEmpty {
+      try visitor.visitSingularStringField(value: self.platform, fieldNumber: 5)
+    }
+    if !self.sdkVersion.isEmpty {
+      try visitor.visitSingularStringField(value: self.sdkVersion, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -351,6 +379,8 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
     if lhs.apiKey != rhs.apiKey {return false}
     if lhs.baseURL != rhs.baseURL {return false}
     if lhs.deviceID != rhs.deviceID {return false}
+    if lhs.platform != rhs.platform {return false}
+    if lhs.sdkVersion != rhs.sdkVersion {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -358,18 +388,49 @@ nonisolated extension RASdkInitPhase1Request: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitPhase2Request"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}build_token\0\u{3}force_refresh_assignments\0\u{3}flush_telemetry\0\u{3}discover_downloaded_models\0\u{3}rescan_local_models\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.buildToken) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.forceRefreshAssignments) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.flushTelemetry) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.discoverDownloadedModels) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.rescanLocalModels) }()
+      default: break
+      }
+    }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.buildToken.isEmpty {
+      try visitor.visitSingularStringField(value: self.buildToken, fieldNumber: 1)
+    }
+    if self.forceRefreshAssignments != false {
+      try visitor.visitSingularBoolField(value: self.forceRefreshAssignments, fieldNumber: 2)
+    }
+    if self.flushTelemetry != false {
+      try visitor.visitSingularBoolField(value: self.flushTelemetry, fieldNumber: 3)
+    }
+    if self.discoverDownloadedModels != false {
+      try visitor.visitSingularBoolField(value: self.discoverDownloadedModels, fieldNumber: 4)
+    }
+    if self.rescanLocalModels != false {
+      try visitor.visitSingularBoolField(value: self.rescanLocalModels, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASdkInitPhase2Request, rhs: RASdkInitPhase2Request) -> Bool {
+    if lhs.buildToken != rhs.buildToken {return false}
+    if lhs.forceRefreshAssignments != rhs.forceRefreshAssignments {return false}
+    if lhs.flushTelemetry != rhs.flushTelemetry {return false}
+    if lhs.discoverDownloadedModels != rhs.discoverDownloadedModels {return false}
+    if lhs.rescanLocalModels != rhs.rescanLocalModels {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -66,9 +66,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isAuthenticated() = 0;
       virtual std::shared_ptr<Promise<std::string>> getUserId() = 0;
       virtual std::shared_ptr<Promise<std::string>> getOrganizationId() = 0;
-      virtual std::shared_ptr<Promise<bool>> registerDevice(const std::string& environmentJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
-      virtual std::shared_ptr<Promise<bool>> clearDeviceRegistration() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(const std::string& modelId) = 0;
@@ -102,8 +100,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> currentModelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> componentLifecycleSnapshotProto(double component) = 0;
       virtual std::shared_ptr<Promise<std::string>> httpRequest(const std::string& method, const std::string& url, const std::string& headersJson, const std::string& bodyJson, double timeoutMs) = 0;
-      virtual std::shared_ptr<Promise<std::string>> authAuthenticate(const std::string& apiKey, const std::string& baseURL, const std::string& deviceId, const std::string& platform, const std::string& sdkVersion) = 0;
-      virtual std::shared_ptr<Promise<std::string>> authRefreshToken(const std::string& baseURL) = 0;
       virtual std::shared_ptr<Promise<bool>> isTextModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTextModel() = 0;
       virtual std::shared_ptr<Promise<double>> getLLMHandle() = 0;

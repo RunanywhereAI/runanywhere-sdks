@@ -205,10 +205,26 @@ extern "C" void rac_events_set_telemetry_sink(void* telemetry_manager) {
     rac::events::telemetry_sink() = static_cast<rac_telemetry_manager_t*>(telemetry_manager);
 }
 
+extern "C" rac_result_t rac_events_flush_telemetry_sink(void) {
+    rac_telemetry_manager_t* sink = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(rac::events::telemetry_sink_mutex());
+        sink = rac::events::telemetry_sink();
+    }
+    if (sink == nullptr) {
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    return rac_telemetry_manager_flush(sink);
+}
+
 #else  // !RAC_HAVE_PROTOBUF
 
 // Without protobuf there is no proto event stream; the telemetry sink registration
 // is a no-op so the C ABI symbol still resolves for SDK builds.
 extern "C" void rac_events_set_telemetry_sink(void* /*telemetry_manager*/) {}
+
+extern "C" rac_result_t rac_events_flush_telemetry_sink(void) {
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
 
 #endif  // RAC_HAVE_PROTOBUF

@@ -59,13 +59,13 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
 
 /**
  * Initialize CppBridge services (Phase 2).
- * This includes model assignment, platform services, and device registration.
+ * This wires platform services/HTTP callbacks before the public facade calls
+ * `CppBridgeSdkInit.phase2`, where commons owns auth/refresh, device
+ * registration, assignment fetch, telemetry flush, and model discovery.
  *
  * Returns `true` when the HTTP client adapter was configured with a usable
- * external URL + credential, so commonMain can mark `_hasCompletedHTTPSetup`
- * accordingly. Returns `false` for the offline/local-only path where Phase 2
- * still completes but auth/device-registration/telemetry are deferred until
- * the next [RunAnywhere.ensureServicesReady] call retries HTTP setup.
+ * external URL + credential. The generated commons `SdkInitResult` remains
+ * the canonical HTTP/auth completion signal.
  */
 internal suspend fun initializePlatformBridgeServices(): Boolean {
     logger.debug("Initializing CppBridge services...")

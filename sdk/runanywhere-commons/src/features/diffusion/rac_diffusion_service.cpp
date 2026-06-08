@@ -16,14 +16,19 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_model_format_ids.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_primitive.h"
+#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "Diffusion.Service";
 namespace fs = std::filesystem;
+
+namespace {
+
+const rac_diffusion_service_ops_t* diffusion_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->diffusion_ops : nullptr;
+}
+
+}  // namespace
 
 // =============================================================================
 // INTERNAL HELPERS
@@ -73,36 +78,25 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
 
     RAC_LOG_INFO(LOG_CAT, "Creating diffusion service for: %s", model_id);
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t result = rac_get_model(model_id, &model_info);
-
-    // If not found by model_id, try looking up by path (model_id might be a path)
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        model_id,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_UNKNOWN,
+         .allow_null_model_id = false,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = nullptr},
+        &model_ref);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_id);
-        result = rac_get_model_by_path(model_id, &model_info);
+        return result;
     }
 
-    // Start with UNKNOWN framework - will be determined by file detection or registry
-    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    // Own the resolved path as a std::string so it survives rac_model_info_free()
-    // below. Previously we captured a raw pointer into model_info->local_path
-    // and then freed model_info before vt->diffusion_ops->create() — a
-    // use-after-free that handed freed heap bytes to the CoreML diffusion
-    // backend (mirrors the embeddings/VLM lifetime fix in the same wave).
-    std::string model_path_owned = model_id ? model_id : "";
+    rac_inference_framework_t framework = model_ref.framework;
+    std::string model_path_owned = model_ref.path;
 
-    if (result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        if (model_info->local_path && model_info->local_path[0] != '\0') {
-            model_path_owned = model_info->local_path;
-        }
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path_owned.c_str());
-    } else {
+    if (!model_ref.found) {
         RAC_LOG_WARNING(LOG_CAT, "Model NOT found in registry (result=%d), will detect from path",
-                        result);
+                        model_ref.registry_result);
 
         // Try to detect framework from the model path/id
         framework = detect_model_format_from_path(model_id);
@@ -127,35 +121,21 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
                      static_cast<int>(framework));
     }
 
-    // Pick the highest-priority plugin that serves DIFFUSION (priority assigned
-    // at backend registration; no hardware/format scoring).
-    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_DIFFUSION);
-    if (model_info) {
-        rac_model_info_free(model_info);
-        model_info = nullptr;
+    rac_diffusion_service_t* service = nullptr;
+    result =
+        rac::features::create_plugin_service<rac_diffusion_service_t, rac_diffusion_service_ops_t>(
+            {.log_cat = LOG_CAT,
+             .primitive = RAC_PRIMITIVE_DIFFUSION,
+             .select_ops = diffusion_ops,
+             .model_create_id = model_path_owned.c_str(),
+             .model_id_for_service = model_id,
+             .config_json = nullptr,
+             .created_event_name = "diffusion.backend.created",
+             .created_event_category = RAC_EVENT_CATEGORY_MODEL},
+            &service);
+    if (result != RAC_SUCCESS) {
+        return result;
     }
-    if (!vt || !vt->diffusion_ops || !vt->diffusion_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves DIFFUSION");
-        return RAC_ERROR_BACKEND_NOT_FOUND;
-    }
-    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
-
-    void* impl = nullptr;
-    result = vt->diffusion_ops->create(model_path_owned.c_str(), /*config_json=*/nullptr, &impl);
-    if (result != RAC_SUCCESS || !impl) {
-        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
-    }
-
-    auto* service = static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
-    if (!service) {
-        if (vt->diffusion_ops->destroy)
-            vt->diffusion_ops->destroy(impl);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    service->ops = vt->diffusion_ops;
-    service->impl = impl;
-    service->model_id = strdup(model_id);
     *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "Diffusion service created");

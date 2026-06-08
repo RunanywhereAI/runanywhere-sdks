@@ -137,7 +137,7 @@ public actor HTTPClientAdapter {
         var needsRefresh = false
         var status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         if status == 1 || needsRefresh {
-            try await CppBridge.Auth.refreshToken()
+            _ = try CppBridge.SdkInit.retryHTTP()
             status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
         if status == 0, let ptr = tokenPtr { return String(cString: ptr) }

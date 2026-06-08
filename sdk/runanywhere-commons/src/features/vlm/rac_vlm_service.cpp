@@ -16,12 +16,17 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
-#include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_plugin_entry.h"
-#include "rac/plugin/rac_primitive.h"
+#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "VLM.Service";
+
+namespace {
+
+const rac_vlm_service_ops_t* vlm_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->vlm_ops : nullptr;
+}
+
+}  // namespace
 
 static std::string json_escape(const char* value) {
     std::string out;
@@ -67,41 +72,27 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
 
     RAC_LOG_INFO(LOG_CAT, "Creating VLM service for: %s", model_id);
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t result = rac_get_model(model_id, &model_info);
-
-    // If not found by model_id, try looking up by path (model_id might be a path)
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        model_id,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_LLAMACPP,
+         .allow_null_model_id = false,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = nullptr},
+        &model_ref);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_id);
-        result = rac_get_model_by_path(model_id, &model_info);
+        return result;
     }
 
-    // If still not found, extract last path component and try as model ID
-    if (result != RAC_SUCCESS) {
-        const char* last_slash = strrchr(model_id, '/');
-        if (last_slash && last_slash[1] != '\0') {
-            const char* extracted_id = last_slash + 1;
-            RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
-            result = rac_get_model(extracted_id, &model_info);
-        }
-    }
-
-    // Default to llama.cpp for VLM (has broad VLM support via mtmd)
-    rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
-    std::string model_path_owned = model_id;
+    std::string model_path_owned = model_ref.path;
     std::string config_json_owned;
 
-    if (result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        model_path_owned = model_info->local_path ? model_info->local_path : model_id;
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path_owned.c_str());
-
+    if (model_ref.found && model_ref.model_info) {
         rac_model_path_resolution_t resolution = {};
         rac_result_t path_rc = rac_model_paths_resolve_artifact(
-            model_info, model_path_owned.c_str(), /*expected_primary_sha256=*/nullptr, &resolution);
+            model_ref.model_info.get(), model_path_owned.c_str(),
+            /*expected_primary_sha256=*/nullptr, &resolution);
         if (path_rc == RAC_SUCCESS) {
             if (resolution.primary_model_path) {
                 model_path_owned = resolution.primary_model_path;
@@ -112,50 +103,23 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
             }
         }
         rac_model_path_resolution_free(&resolution);
-    } else {
-        RAC_LOG_WARNING(LOG_CAT,
-                        "Model NOT found in registry (result=%d), using default framework=%d",
-                        result, static_cast<int>(framework));
     }
 
-    // v3 Phase B8: route through the plugin registry. For local VLM
-    // directories, resolve companion files in C++ and pass mmproj_path to the
-    // backend instead of requiring SDK-local filename inference.
-    const rac_engine_vtable_t* vt = rac_plugin_find(RAC_PRIMITIVE_VLM);
-    if (model_info) {
-        rac_model_info_free(model_info);
-        model_info = nullptr;
-    }
-    if (!vt || !vt->vlm_ops || !vt->vlm_ops->create) {
-        RAC_LOG_ERROR(LOG_CAT, "no registered plugin serves VLM");
-        return RAC_ERROR_BACKEND_NOT_FOUND;
-    }
-    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
-
-    void* impl = nullptr;
-    result =
-        vt->vlm_ops->create(model_path_owned.c_str(),
-                            config_json_owned.empty() ? nullptr : config_json_owned.c_str(), &impl);
-    if (result != RAC_SUCCESS || !impl) {
-        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
-        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
-    }
-
-    auto* service = static_cast<rac_vlm_service_t*>(malloc(sizeof(rac_vlm_service_t)));
-    if (!service) {
-        if (vt->vlm_ops->destroy)
-            vt->vlm_ops->destroy(impl);
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-    service->ops = vt->vlm_ops;
-    service->impl = impl;
-    service->model_id = strdup(model_id);
-    *out_handle = service;
-
+    rac_vlm_service_t* service = nullptr;
+    result = rac::features::create_plugin_service<rac_vlm_service_t, rac_vlm_service_ops_t>(
+        {.log_cat = LOG_CAT,
+         .primitive = RAC_PRIMITIVE_VLM,
+         .select_ops = vlm_ops,
+         .model_create_id = model_path_owned.c_str(),
+         .model_id_for_service = model_id,
+         .config_json = config_json_owned.empty() ? nullptr : config_json_owned.c_str(),
+         .created_event_name = "vlm.backend.created",
+         .created_event_category = RAC_EVENT_CATEGORY_LLM},
+        &service);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);
         return result;
     }
+    *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "VLM service created");
     return RAC_SUCCESS;

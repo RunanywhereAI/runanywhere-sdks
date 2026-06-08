@@ -23,6 +23,7 @@ import ai.runanywhere.proto.v1.SdkInitEnvironment
 import ai.runanywhere.proto.v1.SdkInitPhase1Request
 import ai.runanywhere.proto.v1.SdkInitPhase2Request
 import ai.runanywhere.proto.v1.SdkInitResult
+import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
@@ -47,6 +48,8 @@ object CppBridgeSdkInit {
                 api_key = apiKey,
                 base_url = baseURL,
                 device_id = deviceId,
+                platform = SDKConstants.SDK_PLATFORM,
+                sdk_version = SDKConstants.SDK_VERSION,
             )
         val result =
             decode(
@@ -63,11 +66,25 @@ object CppBridgeSdkInit {
      * and warning flags. Failures in individual sub-steps are non-fatal — the
      * C ABI reports `success=true` with flags off.
      */
-    fun phase2(): SdkInitResult {
+    fun phase2(
+        buildToken: String? = null,
+        forceRefreshAssignments: Boolean = false,
+        flushTelemetry: Boolean = true,
+        discoverDownloadedModels: Boolean = true,
+        rescanLocalModels: Boolean = true,
+    ): SdkInitResult {
+        val request =
+            SdkInitPhase2Request(
+                build_token = buildToken.orEmpty(),
+                force_refresh_assignments = forceRefreshAssignments,
+                flush_telemetry = flushTelemetry,
+                discover_downloaded_models = discoverDownloadedModels,
+                rescan_local_models = rescanLocalModels,
+            )
         val result =
             decode(
                 RunAnywhereBridge.racSdkInitPhase2Proto(
-                    SdkInitPhase2Request.ADAPTER.encode(SdkInitPhase2Request()),
+                    SdkInitPhase2Request.ADAPTER.encode(request),
                 ),
                 phase = "2",
             )

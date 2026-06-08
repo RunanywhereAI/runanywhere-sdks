@@ -229,6 +229,8 @@ _rac_sdk_event_publish_proto
 _rac_sdk_event_poll
 _rac_sdk_event_publish_failure
 _rac_sdk_event_clear_queue
+_rac_events_set_telemetry_sink
+_rac_events_flush_telemetry_sink
 
 # Model registry and lifecycle proto ABI
 _rac_model_registry_register_proto

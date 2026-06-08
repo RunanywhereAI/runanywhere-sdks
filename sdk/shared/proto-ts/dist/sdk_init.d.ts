@@ -68,17 +68,30 @@ export interface SdkInitPhase1Request {
     baseUrl: string;
     /** Resolved by platform (Keychain UUID, etc.). */
     deviceId: string;
+    /** SDK/platform identity used in auth/device metadata. */
+    platform: string;
+    /** SDK version reported to backend services. */
+    sdkVersion: string;
 }
 /**
  * ---------------------------------------------------------------------------
  * Phase 2 input — async services initialization. Most state is already
- * resident in commons after Phase 1; this envelope exists so SDKs can pass
- * per-call hints without changing the signature. Currently empty — reserved
- * for future flags such as `force_refresh_assignments` or
- * `skip_device_registration` once Kotlin/RN/Flutter parity demands them.
+ * resident in commons after Phase 1; this envelope carries the few per-call
+ * hints that remain SDK-owned while the deterministic orchestration lives in
+ * commons.
  * ---------------------------------------------------------------------------
  */
 export interface SdkInitPhase2Request {
+    /** Optional dev-mode device registration token. */
+    buildToken: string;
+    /** Bypass cached model assignments. */
+    forceRefreshAssignments: boolean;
+    /** Flush the registered telemetry sink. */
+    flushTelemetry: boolean;
+    /** Reconcile registry rows with local files. */
+    discoverDownloadedModels: boolean;
+    /** Ask discovery/refresh to rescan model dirs. */
+    rescanLocalModels: boolean;
 }
 /**
  * ---------------------------------------------------------------------------

@@ -17,6 +17,15 @@ import {
   DEFAULT_BASE_URL,
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
+import {
+  SdkInitEnvironment,
+  SdkInitPhase1Request,
+  SdkInitPhase2Request,
+} from '@runanywhere/proto-ts/sdk_init';
+import type {
+  SdkInitPhase1Request as SdkInitPhase1RequestMessage,
+  SdkInitPhase2Request as SdkInitPhase2RequestMessage,
+} from '@runanywhere/proto-ts/sdk_init';
 
 import type { InitializationState } from '../Foundation/Initialization';
 import {
@@ -76,6 +85,32 @@ let initializingPromise: Promise<void> | null = null;
 type NativePhase2Module = {
   completeServicesInitialization?: () => Promise<unknown>;
 };
+
+function mapSdkInitEnvironment(environment: SDKEnvironment): SdkInitEnvironment {
+  switch (environment) {
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+    case SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED:
+    default:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+  }
+}
+
+function environmentToConfigString(environment: SDKEnvironment): string {
+  switch (environment) {
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+      return 'staging';
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return 'production';
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+    case SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED:
+    default:
+      return 'development';
+  }
+}
 
 function publishInitializationEvent(
   stage: InitializationStage,
@@ -155,11 +190,30 @@ export const RunAnywhere = {
         const effectiveApiKey = isUsableCredential(options.apiKey)
           ? options.apiKey!.trim()
           : '';
+        const phase1Request: SdkInitPhase1RequestMessage = SdkInitPhase1Request.create();
+        phase1Request.environment = mapSdkInitEnvironment(environment);
+        phase1Request.apiKey = effectiveApiKey;
+        phase1Request.baseUrl = effectiveBaseURL;
+        phase1Request.deviceId = '';
+        phase1Request.platform = SDKConstants.platform;
+        phase1Request.sdkVersion = SDKConstants.version;
+
+        const phase2Request: SdkInitPhase2RequestMessage = SdkInitPhase2Request.create();
+        phase2Request.buildToken = options.buildToken?.trim() ?? '';
+        phase2Request.forceRefreshAssignments = options.forceRefreshAssignments ?? false;
+        phase2Request.flushTelemetry = options.flushTelemetry ?? true;
+        phase2Request.discoverDownloadedModels = options.discoverDownloadedModels ?? true;
+        phase2Request.rescanLocalModels = options.rescanLocalModels ?? true;
 
         const initParams: SDKInitOptions = {
-          apiKey: effectiveApiKey,
-          baseURL: effectiveBaseURL,
+          apiKey: phase1Request.apiKey,
+          baseURL: phase1Request.baseUrl,
           environment,
+          buildToken: phase2Request.buildToken,
+          forceRefreshAssignments: phase2Request.forceRefreshAssignments,
+          flushTelemetry: phase2Request.flushTelemetry,
+          discoverDownloadedModels: phase2Request.discoverDownloadedModels,
+          rescanLocalModels: phase2Request.rescanLocalModels,
         };
 
         publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
@@ -182,17 +236,20 @@ export const RunAnywhere = {
         const native = requireNativeModule();
 
         try {
-          const envString = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ? 'development'
-            : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
-              : 'production';
-
-          // RN still crosses an async native bridge for Phase 1. The work belongs
-          // to native commons; TypeScript only builds the call-site config.
+          // RN still crosses an async native bridge for Phase 1. The generated
+          // proto request objects are the call-site envelope; native fills the
+          // platform-owned device id before invoking the commons proto ABI.
           const configJson = JSON.stringify({
-            apiKey: effectiveApiKey,
-            baseURL: effectiveBaseURL,
-            environment: envString,
-            sdkVersion: SDKConstants.version,
+            apiKey: phase1Request.apiKey,
+            baseURL: phase1Request.baseUrl,
+            environment: environmentToConfigString(environment),
+            platform: phase1Request.platform,
+            sdkVersion: phase1Request.sdkVersion,
+            buildToken: phase2Request.buildToken,
+            forceRefreshAssignments: phase2Request.forceRefreshAssignments,
+            flushTelemetry: phase2Request.flushTelemetry,
+            discoverDownloadedModels: phase2Request.discoverDownloadedModels,
+            rescanLocalModels: phase2Request.rescanLocalModels,
           });
 
           const initialized = await native.initialize(configJson);
@@ -298,22 +355,7 @@ export const RunAnywhere = {
         }
         logger.debug('Native phase 2 bridge not available; core native init is already complete.');
       }
-      if (phase2Result === false) {
-        throw SDKException.notInitialized('Native services initialization failed');
-      }
-
-      // Probe authentication state to derive httpConfigured, mirroring
-      // Swift's `hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured`
-      // and Kotlin's `_hasCompletedHTTPSetup = httpConfigured`. An offline Phase 2
-      // completes with httpConfigured=false; ensureServicesReady() retries on the
-      // next online API call via retryHTTPSetupInternal().
-      let httpConfigured = false;
-      try {
-        httpConfigured = await native.isAuthenticated();
-      } catch {
-        // Probe failure is non-fatal; httpConfigured stays false so the retry
-        // branch in ensureServicesReadyInternal() fires on the next API call.
-      }
+      const httpConfigured = phase2Result === true;
 
       initState = markServicesInitialized(initState, httpConfigured);
       if (httpConfigured) {
@@ -638,45 +680,13 @@ async function retryHTTPSetupInternal(): Promise<void> {
   const native = requireNativeModule();
   logger.debug('Retrying HTTP/auth setup...');
   try {
-    // Idempotent fast path + config sanity check, owned by commons
-    // (rac_sdk_retry_http_proto). Mirrors Swift's CppBridge.SdkInit.retryHTTP().
-    // When commons reports HTTP configured, no platform-side round-trip is
-    // needed; otherwise fall through to the auth call below.
-    try {
-      const httpConfigured = await native.retryHTTPSetupProto();
-      if (httpConfigured) {
-        initState = markHTTPSetupCompleted(initState);
-        logger.info('HTTP/Auth setup succeeded on retry (commons reconfigured HTTP).');
-        return;
-      }
-    } catch (protoError) {
-      logger.debug(
-        `HTTP retry proto failed (non-fatal): ${
-          protoError instanceof Error ? protoError.message : String(protoError)
-        }`
-      );
-    }
-
-    const authenticated = await native.isAuthenticated();
-    if (authenticated) {
+    const httpConfigured = await native.retryHTTPSetupProto();
+    if (httpConfigured) {
       initState = markHTTPSetupCompleted(initState);
-      logger.info('HTTP/Auth setup succeeded on retry (already authenticated).');
+      logger.info('HTTP/Auth setup succeeded on retry.');
       return;
     }
-    const params = initState.initParams;
-    if (!params) {
-      return;
-    }
-    const deviceId = await native.getDeviceId().catch(() => '');
-    await native.authAuthenticate(
-      params.apiKey ?? '',
-      params.baseURL ?? '',
-      deviceId,
-      'react_native',
-      SDKConstants.version
-    );
-    initState = markHTTPSetupCompleted(initState);
-    logger.info('HTTP/Auth setup succeeded on retry.');
+    logger.debug('HTTP/Auth retry did not complete; commons reported deferred setup.');
   } catch (error) {
     logger.debug(
       `HTTP/Auth retry failed (still offline?): ${

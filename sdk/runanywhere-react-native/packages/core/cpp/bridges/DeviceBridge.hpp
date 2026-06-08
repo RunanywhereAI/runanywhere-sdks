@@ -111,24 +111,9 @@ public:
     rac_result_t registerCallbacks();
 
     /**
-     * Register device with backend if not already registered
-     * Delegates to rac_device_manager_register_if_needed()
-     *
-     * @param environment SDK environment
-     * @param buildToken Optional build token for development mode
-     * @return RAC_SUCCESS if registered or already registered
-     */
-    rac_result_t registerIfNeeded(rac_environment_t environment, const std::string& buildToken = "");
-
-    /**
      * Check if device is registered
      */
     bool isRegistered() const;
-
-    /**
-     * Clear device registration status
-     */
-    void clearRegistration();
 
     /**
      * Get the device ID
