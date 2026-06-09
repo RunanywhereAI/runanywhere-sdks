@@ -9,7 +9,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.RASTTPartialResult
 import com.runanywhere.sdk.public.extensions.transcribe
+import com.runanywhere.sdk.public.extensions.transcribeStream
 import com.runanywhere.sdk.public.hybrid.BACKEND
 import com.runanywhere.sdk.public.hybrid.RACModel
 import com.runanywhere.sdk.public.hybrid.RACRouter
@@ -18,7 +20,8 @@ import com.runanywhere.sdk.public.hybrid.RoutedMetadata
 import com.runanywhere.sdk.public.types.RASTTOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -75,18 +78,18 @@ class SttViewModel : ViewModel() {
 
     private val recorder = AudioRecorder()
     private val buffer = ByteArrayOutputStream()
+
+    // Live mode: mic chunks are fed straight into the SDK's streaming
+    // transcription (RunAnywhere.transcribeStream), which owns endpointing/
+    // segmentation natively. No app-side silence detection. Mirrors iOS
+    // STTViewModel.
+    private var liveAudio: Channel<ByteArray>? = null
     private var liveJob: Job? = null
     private var committed = ""
     private var offlineModelId: String? = null
 
     private var router: RACRouter? = null
     private var routerOfflineId: String? = null
-
-    @Volatile
-    private var lastVoiceMs = 0L
-
-    @Volatile
-    private var voiceSeen = false
 
     fun selectMode(value: SttMode) {
         if (!isRecording && !isTranscribing) mode = value
@@ -129,48 +132,65 @@ class SttViewModel : ViewModel() {
         metrics = null
         routing = null
         error = null
-        voiceSeen = false
         offlineModelId = modelId
         synchronized(buffer) { buffer.reset() }
         audioLevel = 0f
         isRecording = true
-        recorder.start { chunk, level ->
-            synchronized(buffer) { buffer.write(chunk) }
-            audioLevel = level
-            if (level > SPEECH_THRESHOLD) {
-                voiceSeen = true
-                lastVoiceMs = System.currentTimeMillis()
-            }
-        }
         if (mode == SttMode.LIVE) startLive()
+        recorder.start { chunk, level ->
+            // Batch/hybrid buffer locally; live feeds the SDK streaming session.
+            if (mode == SttMode.LIVE) {
+                liveAudio?.trySend(chunk)
+            } else {
+                synchronized(buffer) { buffer.write(chunk) }
+            }
+            audioLevel = level
+        }
     }
 
     private fun startLive() {
+        val channel = Channel<ByteArray>(Channel.UNLIMITED)
+        liveAudio = channel
         liveJob = viewModelScope.launch {
-            while (true) {
-                delay(LIVE_INTERVAL_MS)
-                val snapshot = synchronized(buffer) { buffer.toByteArray() }
-                if (snapshot.size < MIN_BYTES || !voiceSeen) continue
-                val text = runTranscription(snapshot) ?: continue
-                transcript = join(committed, text)
-                if (System.currentTimeMillis() - lastVoiceMs > SILENCE_MS && text.isNotBlank()) {
-                    committed = transcript
-                    synchronized(buffer) { buffer.reset() }
-                    voiceSeen = false
-                }
+            RunAnywhere.transcribeStream(
+                channel.receiveAsFlow(),
+                RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
+            ).collect { partial -> onLivePartial(partial) }
+        }
+    }
+
+    // Fold one streaming partial into the displayed transcript: non-final
+    // partials preview the current utterance, finals commit it as a line.
+    private fun onLivePartial(partial: RASTTPartialResult) {
+        val text = partial.text.trim()
+        if (partial.is_final) {
+            // Stream errors surface as a terminal partial carrying the
+            // failure text (see RunAnywhere.transcribeStream).
+            if (text.startsWith("STT stream failed")) {
+                error = text
+                return
             }
+            if (text.isNotEmpty()) committed = join(committed, text)
+            transcript = committed
+        } else if (text.isNotEmpty()) {
+            transcript = join(committed, text)
         }
     }
 
     private fun stop() {
         isRecording = false
-        liveJob?.cancel()
-        liveJob = null
         recorder.stop()
         audioLevel = 0f
+        if (mode == SttMode.LIVE) {
+            // Closing the audio stream lets the native session flush and emit
+            // its final result; the collect job ends with the stream.
+            liveAudio?.close()
+            liveAudio = null
+            return
+        }
         val audio = synchronized(buffer) { val bytes = buffer.toByteArray(); buffer.reset(); bytes }
         when {
-            audio.size < MIN_BYTES && mode != SttMode.LIVE ->
+            audio.size < MIN_BYTES ->
                 error = "Recording too short — hold a little longer."
             mode == SttMode.HYBRID -> {
                 isTranscribing = true
@@ -179,17 +199,10 @@ class SttViewModel : ViewModel() {
                     isTranscribing = false
                 }
             }
-            mode == SttMode.BATCH -> {
+            else -> {
                 isTranscribing = true
                 viewModelScope.launch {
                     runTranscription(audio)?.let { transcript = it }
-                    isTranscribing = false
-                }
-            }
-            voiceSeen && audio.size >= MIN_BYTES -> {
-                isTranscribing = true
-                viewModelScope.launch {
-                    runTranscription(audio)?.let { transcript = join(committed, it) }
                     isTranscribing = false
                 }
             }
@@ -285,10 +298,13 @@ class SttViewModel : ViewModel() {
         null
     }
 
+    // Committed utterances stack as lines, mirroring iOS STTViewModel.
     private fun join(a: String, b: String): String =
-        listOf(a.trim(), b.trim()).filter { it.isNotEmpty() }.joinToString(" ")
+        listOf(a.trim(), b.trim()).filter { it.isNotEmpty() }.joinToString("\n")
 
     override fun onCleared() {
+        liveAudio?.close()
+        liveAudio = null
         liveJob?.cancel()
         recorder.stop()
         router?.close()
@@ -297,9 +313,6 @@ class SttViewModel : ViewModel() {
 
     private companion object {
         const val MIN_BYTES = 16000
-        const val LIVE_INTERVAL_MS = 900L
-        const val SILENCE_MS = 1000L
-        const val SPEECH_THRESHOLD = 0.35f
         const val WAV_FORMAT = 1
         const val ONLINE_MODEL_ID = "saaras"
     }

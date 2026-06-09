@@ -18,9 +18,8 @@ const _errors_1 = require("./_errors");
 const rAGConfigurationDefaults = () => ({
     embeddingModelId: '',
     llmModelId: '',
-    embeddingDimension: 384,
     topK: 5,
-    similarityThreshold: 0.7,
+    similarityThreshold: 0.3,
     chunkSize: 512,
     chunkOverlap: 64,
     persistIndex: false,
@@ -45,5 +44,6 @@ const rAGQueryOptionsDefaults = () => ({
     retrievalTopK: 0,
     similarityThreshold: 0,
     stream: false,
+    disableThinking: false,
 });
 exports.rAGQueryOptionsDefaults = rAGQueryOptionsDefaults;

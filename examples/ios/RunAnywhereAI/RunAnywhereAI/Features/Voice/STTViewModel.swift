@@ -52,14 +52,15 @@ class STTViewModel: VoiceComponentViewModelBase {
 
     // MARK: - Private Properties
 
+    /// Batch mode: accumulated audio transcribed once on stop.
     private var audioBuffer = Data()
 
-    /// For live mode: VAD-based transcription
-    private var lastSpeechTime: Date?
-    private var isSpeechActive = false
-    private var silenceCheckTask: Task<Void, Never>?
-    private let speechThreshold: Float = 0.02  // Audio level threshold for speech detection
-    private let silenceDuration: TimeInterval = 1.5  // Seconds of silence before transcribing
+    /// Live mode: mic chunks are fed straight into the SDK's streaming
+    /// transcription session (`RunAnywhere.transcribeStream`), which owns
+    /// endpointing/segmentation natively. No app-side silence detection.
+    private var liveAudioContinuation: AsyncStream<Data>.Continuation?
+    private var liveStreamTask: Task<Void, Never>?
+    private var committedTranscription = ""
 
     // MARK: - Initialization State (for idempotency)
 
@@ -101,30 +102,8 @@ class STTViewModel: VoiceComponentViewModelBase {
 
     /// Load model from ModelSelectionSheet selection
     func loadModelFromSelection(_ model: RAModelInfo) async {
-        logger.info("Loading STT model from selection: \(model.name)")
         isProcessing = true
-        errorMessage = nil
-
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        request.category = .speechRecognition
-        let result = await RunAnywhere.loadModel(request)
-        if result.success {
-            selectedFramework = model.framework
-            selectedModelName = model.name.modelNameFromID()
-            selectedModelId = model.id
-            logger.info("STT model loaded successfully: \(model.name)")
-            Logger(subsystem: "com.runanywhere", category: "Models").info(
-                "Model load succeeded for \(model.id, privacy: .public)"
-            )
-            Logger(subsystem: "com.runanywhere", category: "STT").info(
-                "STT model loaded successfully: \(model.name, privacy: .public)"
-            )
-        } else {
-            logger.error("Failed to load STT model: \(result.errorMessage)")
-            errorMessage = "Failed to load model: \(result.errorMessage)"
-        }
-
+        await loadModel(from: model)
         isProcessing = false
     }
 
@@ -176,21 +155,6 @@ class STTViewModel: VoiceComponentViewModelBase {
         }
     }
 
-    override func handleSDKEvent(_ event: RASDKEvent) {
-        let modelId = event.model.modelID
-
-        switch event.model.kind {
-        case .loadCompleted:
-            applyCurrentModelSnapshot(reason: "loaded")
-            logger.info("STT model loaded: \(modelId)")
-        case .unloadCompleted:
-            clearLoadedModel()
-            logger.info("STT model unloaded")
-        default:
-            break
-        }
-    }
-
     // MARK: - Private Methods - Recording
 
     private func startRecording() async {
@@ -198,55 +162,57 @@ class STTViewModel: VoiceComponentViewModelBase {
         errorMessage = nil
         audioBuffer = Data()
         transcription = ""
-        lastSpeechTime = nil
-        isSpeechActive = false
+        committedTranscription = ""
 
         guard selectedModelId != nil else {
             errorMessage = "No STT model loaded"
             return
         }
 
+        if selectedMode == .live {
+            startLiveTranscription()
+        }
+
         do {
-            // Both modes use audio capture - live mode adds VAD-based auto-transcription
+            // Batch buffers locally; live feeds the SDK streaming session.
             try await audioCapture.startRecording { [weak self] audioData in
                 Task { @MainActor in
-                    self?.audioBuffer.append(audioData)
+                    guard let self else { return }
+                    if self.selectedMode == .live {
+                        self.liveAudioContinuation?.yield(audioData)
+                    } else {
+                        self.audioBuffer.append(audioData)
+                    }
                 }
             }
 
             isRecording = true
-
-            if selectedMode == .live {
-                // Live mode: Start VAD monitoring for auto-transcription
-                startVADMonitoring()
-            }
-
             logger.info("Recording started in \(self.selectedMode.rawValue) mode")
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
             errorMessage = "Failed to start recording: \(error.localizedDescription)"
+            await stopLiveTranscription()
         }
     }
 
     private func stopRecording() async {
         logger.info("Stopping recording")
 
-        // Stop VAD monitoring if active
-        silenceCheckTask?.cancel()
-        silenceCheckTask = nil
-
         // Stop audio capture
         audioCapture.stopRecording()
 
-        // Perform final transcription if we have audio
-        if !audioBuffer.isEmpty {
+        if selectedMode == .live {
+            // Closing the audio stream lets the native session flush and emit
+            // its final result; the consume task ends with the stream.
+            liveAudioContinuation?.finish()
+            liveAudioContinuation = nil
+        } else if !audioBuffer.isEmpty {
+            // Batch: transcribe everything we recorded.
             await performBatchTranscription()
         }
 
         isRecording = false
         audioLevel = 0.0
-        isSpeechActive = false
-        lastSpeechTime = nil
     }
 
     // MARK: - Private Methods - Transcription
@@ -274,84 +240,58 @@ class STTViewModel: VoiceComponentViewModelBase {
         isTranscribing = false
     }
 
-    /// Start VAD monitoring for live mode
-    /// Automatically transcribes when silence is detected after speech
-    private func startVADMonitoring() {
-        logger.info("Starting VAD monitoring for live transcription")
+    /// Start the SDK streaming transcription session for live mode.
+    ///
+    /// Mic chunks are yielded into an `AsyncStream<Data>` consumed by
+    /// `RunAnywhere.transcribeStream`; the native session owns segmentation
+    /// and emits partial + final results.
+    private func startLiveTranscription() {
+        logger.info("Starting live streaming transcription")
 
-        silenceCheckTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self = self, self.isRecording else { break }
+        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        liveAudioContinuation = continuation
 
-                let level = self.audioLevel
-                await self.checkSpeechState(level: level)
-
-                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        liveStreamTask = Task { [weak self] in
+            for await partial in RunAnywhere.transcribeStream(audio: stream) {
+                guard let self, !Task.isCancelled else { break }
+                self.handleLivePartial(partial)
             }
+            self?.logger.info("Live transcription stream ended")
         }
     }
 
-    /// Check speech state and auto-transcribe on silence
-    private func checkSpeechState(level: Float) async {
-        guard isRecording, selectedMode == .live else { return }
+    /// Fold one streaming partial into the displayed transcription:
+    /// non-final partials preview the current utterance, finals commit it.
+    private func handleLivePartial(_ partial: RASTTPartialResult) {
+        let text = partial.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if level > speechThreshold {
-            // Speech detected
-            if !isSpeechActive {
-                logger.debug("Speech started")
-                isSpeechActive = true
+        if partial.isFinal {
+            // Stream errors surface as a terminal partial carrying the
+            // failure text (see RunAnywhere.transcribeStream).
+            if text.hasPrefix("STT stream failed") {
+                errorMessage = text
+                return
             }
-            lastSpeechTime = Date()
-        } else if isSpeechActive {
-            // Check for silence duration
-            if let lastSpeech = lastSpeechTime,
-               Date().timeIntervalSince(lastSpeech) > silenceDuration {
-                logger.debug("Silence detected - auto-transcribing")
-                isSpeechActive = false
-
-                // Only transcribe if we have enough audio (~0.5s at 16kHz)
-                if audioBuffer.count > 16000 {
-                    await performLiveTranscription()
-                } else {
-                    audioBuffer = Data()
-                }
+            if !text.isEmpty {
+                committedTranscription = committedTranscription.isEmpty
+                    ? text
+                    : committedTranscription + "\n" + text
             }
+            transcription = committedTranscription
+        } else if !text.isEmpty {
+            transcription = committedTranscription.isEmpty
+                ? text
+                : committedTranscription + "\n" + text
         }
-    }
-
-    /// Perform transcription for live mode (keeps recording going)
-    private func performLiveTranscription() async {
-        let audio = audioBuffer
-        audioBuffer = Data()  // Clear buffer for next utterance
-
-        guard !audio.isEmpty else { return }
-
-        logger.info("Live transcription of \(audio.count) bytes")
-        isTranscribing = true
-
-        do {
-            let output = try await RunAnywhere.transcribe(audio: audio)
-            // Append to existing transcription with newline
-            if !transcription.isEmpty {
-                transcription += "\n"
-            }
-            transcription += output.text
-            logger.info("Live transcription result: \(output.text)")
-        } catch {
-            logger.error("Live transcription failed: \(error.localizedDescription)")
-            errorMessage = "Transcription failed: \(error.localizedDescription)"
-        }
-
-        isTranscribing = false
     }
 
     /// Stop live transcription (called when mode changes)
     private func stopLiveTranscription() async {
         logger.info("Stopping live transcription")
-        silenceCheckTask?.cancel()
-        silenceCheckTask = nil
-        isSpeechActive = false
-        lastSpeechTime = nil
+        liveAudioContinuation?.finish()
+        liveAudioContinuation = nil
+        liveStreamTask?.cancel()
+        liveStreamTask = nil
     }
 
     // MARK: - Cleanup
@@ -361,9 +301,10 @@ class STTViewModel: VoiceComponentViewModelBase {
     func cleanup() {
         audioCapture.stopRecording()
 
-        // Clean up VAD monitoring
-        silenceCheckTask?.cancel()
-        silenceCheckTask = nil
+        liveAudioContinuation?.finish()
+        liveAudioContinuation = nil
+        liveStreamTask?.cancel()
+        liveStreamTask = nil
 
         hasSubscribedToAudioLevel = false
         cleanupBase()
@@ -387,7 +328,7 @@ enum STTMode: String {
     var description: String {
         switch self {
         case .batch: return "Record first, then transcribe"
-        case .live: return "Auto-transcribe on silence"
+        case .live: return "Stream with live partial results"
         }
     }
 }

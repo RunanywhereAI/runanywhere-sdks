@@ -32,38 +32,33 @@ class ModelListViewModel: ObservableObject {
         }
     }
 
-    /// Subscribe to SDK events for real-time model state updates
+    /// Subscribe to the SDK's typed lifecycle stream for real-time model state
     private func subscribeToModelEvents() {
-        // Subscribe to LLM events via EventBus
-        RunAnywhere.events.events
+        RunAnywhere.events.modelLifecycle
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
+            .sink { [weak self] change in
                 guard let self = self else { return }
-                self.handleSDKEvent(event)
+                self.handleModelLifecycle(change)
             }
             .store(in: &cancellables)
     }
 
-    /// Handle SDK events to update model state
-    private func handleSDKEvent(_ event: RASDKEvent) {
-        guard event.category == .llm || event.component == .llm else { return }
+    /// Apply a typed load/unload change to the current-model state
+    private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        guard change.component == .llm || change.event.category == .llm else { return }
 
-        let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
-
-        switch (event.model.kind, event.generation.kind) {
-        case (.loadCompleted, _), (_, .modelLoaded):
+        switch change.kind {
+        case .loaded:
             // Find the matching model and set as current
-            if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
+            if let matchingModel = availableModels.first(where: { $0.id == change.modelID }) {
                 currentModel = matchingModel
                 print("ModelListViewModel: Model loaded: \(matchingModel.name)")
             }
-        case (.unloadCompleted, _), (_, .modelUnloaded):
-            if currentModel?.id == modelId {
+        case .unloaded:
+            if currentModel?.id == change.modelID {
                 currentModel = nil
-                print("ModelListViewModel: Model unloaded: \(modelId)")
+                print("ModelListViewModel: Model unloaded: \(change.modelID)")
             }
-        default:
-            break
         }
     }
 

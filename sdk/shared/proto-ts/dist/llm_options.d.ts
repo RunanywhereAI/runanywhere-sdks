@@ -116,6 +116,14 @@ export interface LLMGenerationOptions {
      * functions; proto carries only definitions and parser options.
      */
     toolCalling?: ToolCallingOptions | undefined;
+    /**
+     * When true, suppress the model's thinking/reasoning phase for this
+     * generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
+     * model's no-think directive at the prompt level, so no app prepends
+     * "/no_think" by hand. Default false = the model's normal thinking
+     * behavior.
+     */
+    disableThinking: boolean;
 }
 /**
  * ---------------------------------------------------------------------------

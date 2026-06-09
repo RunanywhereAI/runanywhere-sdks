@@ -16,12 +16,25 @@ extension LLMViewModel {
     /// signals. The bus is the single source of truth — there is no parallel
     /// NotificationCenter channel.
     func subscribeToModelLifecycle() {
-        lifecycleCancellable = RunAnywhere.events.events
+        // Typed lifecycle stream: the SDK folds all native load/unload
+        // channels into one publisher.
+        lifecycleCancellable = RunAnywhere.events.modelLifecycle
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    self.handleModelLifecycle(change)
+                }
+            }
+
+        // Generation analytics (TTFT, completion metrics) are chat-screen
+        // analytics, not lifecycle — they stay on the raw event bus.
+        generationCancellable = RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self else { return }
                 Task { @MainActor in
-                    self.handleSDKEvent(event)
+                    self.handleGenerationEvent(event)
                 }
             }
     }
@@ -46,35 +59,32 @@ extension LLMViewModel {
 
     // MARK: - SDK Event Handling
 
-    func handleSDKEvent(_ event: RASDKEvent) {
-        // Model load/unload completion arrives as a component-lifecycle event
-        // (EVENT_CATEGORY_COMPONENT) — the canonical channel the
-        // `RunAnywhere.loadModel` path publishes for SDK_COMPONENT_LLM.
-        if event.category == .component {
-            handleComponentLifecycleEvent(event)
-            return
-        }
+    /// Apply a typed model load/unload change.
+    private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        guard change.component == .llm || change.event.category == .llm else { return }
 
+        switch change.kind {
+        case .loaded:
+            handleModelLoadCompleted(modelId: change.modelID)
+        case .unloaded:
+            handleModelUnloaded(modelId: change.modelID)
+        }
+    }
+
+    /// Decode generation-analytics signals (TTFT, completion metrics) from
+    /// the raw event bus.
+    private func handleGenerationEvent(_ event: RASDKEvent) {
         guard event.category == .llm || event.component == .llm else { return }
 
         let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
         let generationId = event.generation.sessionID.isEmpty ? event.operationID : event.generation.sessionID
 
-        switch (event.model.kind, event.generation.kind) {
-        case (.loadCompleted, _), (_, .modelLoaded):
-            handleModelLoadCompleted(modelId: modelId)
-
-        case (.unloadCompleted, _), (_, .modelUnloaded):
-            handleModelUnloaded(modelId: modelId)
-
-        case (.loadStarted, _):
-            break
-
-        case (_, .firstTokenGenerated):
+        switch event.generation.kind {
+        case .firstTokenGenerated:
             let ttft = Double(event.generation.firstTokenLatencyMs)
             handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case (_, .completed), (_, .streamCompleted):
+        case .completed, .streamCompleted:
             let outputTokens = Int(event.generation.tokensUsed)
             let durationMs = Double(event.generation.latencyMs)
             let tps = durationMs > 0 && outputTokens > 0
@@ -89,23 +99,6 @@ extension LLMViewModel {
                 tokensPerSecond: tps
             )
 
-        default:
-            break
-        }
-    }
-
-    /// React to the canonical component-lifecycle proto event for the LLM slot.
-    /// This is how `RunAnywhere.loadModel(category: .language)` signals a
-    /// completed load/unload, replacing the former "ModelLoaded" NotificationCenter post.
-    private func handleComponentLifecycleEvent(_ event: RASDKEvent) {
-        let lifecycle = event.componentLifecycle
-        guard lifecycle.component == .llm else { return }
-
-        switch lifecycle.currentState {
-        case .ready:
-            handleModelLoadCompleted(modelId: lifecycle.modelID)
-        case .notLoaded, .unloading, .shutdown, .deleting:
-            handleModelUnloaded(modelId: lifecycle.modelID)
         default:
             break
         }

@@ -175,20 +175,19 @@ export async function ragAddDocumentsBatch(
 /**
  * Query the RAG pipeline with a question.
  *
- * Matches Swift: `RunAnywhere.ragQuery(_:options:)`.
+ * Matches Swift: `RunAnywhere.ragQuery(_:options:)` — the options message is
+ * forwarded verbatim (including `retrievalTopK`, `similarityThreshold`,
+ * `stream`, and `disableThinking`). Unset numeric fields encode as proto3
+ * zeros, which commons maps to the canonical `rac_default` values.
  */
 export async function ragQuery(
   question: string,
-  options?: Omit<RAGQueryOptions, 'question'>
+  options?: Partial<Omit<RAGQueryOptions, 'question'>>
 ): Promise<RAGResult> {
   const native = ensureNative();
   const queryOptions: RAGQueryOptions = RAGQueryOptionsMessage.fromPartial({
+    ...options,
     question,
-    systemPrompt: options?.systemPrompt,
-    maxTokens: options?.maxTokens ?? 0,
-    temperature: options?.temperature ?? 0,
-    topP: options?.topP ?? 1.0,
-    topK: options?.topK ?? 0,
   });
   const resultBytes = await native.ragQueryProto(
     encodeProtoMessage(queryOptions, RAGQueryOptionsMessage)

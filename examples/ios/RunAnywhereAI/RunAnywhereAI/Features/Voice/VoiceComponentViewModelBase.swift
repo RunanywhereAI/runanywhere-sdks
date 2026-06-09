@@ -23,10 +23,10 @@ import os
 /// load/unload lifecycle (STT, TTS, VAD).
 ///
 /// Subclasses must override `component`, `eventCategory`, and `modelCategory`
-/// to identify their modality, and override `handleSDKEvent(_:)` to map an
-/// incoming `RASDKEvent` onto their published state. The base provides the
-/// idempotent `subscribeToSDKEvents()`, `checkInitialModelState()`, and
-/// `cleanupBase()` helpers shared by all three.
+/// to identify their modality. The base provides the shared
+/// `loadModel(from:)` entry point, the idempotent `subscribeToSDKEvents()`
+/// (built on the SDK's typed `modelLifecycle` stream), and
+/// `checkInitialModelState()` / `cleanupBase()` helpers shared by all three.
 @MainActor
 class VoiceComponentViewModelBase: ObservableObject {
     // MARK: - Published Model State
@@ -76,6 +76,30 @@ class VoiceComponentViewModelBase: ObservableObject {
         return true
     }
 
+    // MARK: - Model Loading
+
+    /// Load a model for this component via the canonical SDK entry point.
+    /// Shared by every voice-component screen; subclasses wrap it only to
+    /// toggle their busy flag.
+    @discardableResult
+    func loadModel(from model: RAModelInfo) async -> Bool {
+        logger.info("Loading \(String(describing: self.component)) model: \(model.name)")
+        errorMessage = nil
+
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = modelCategory
+        let result = await RunAnywhere.loadModel(request)
+        guard result.success else {
+            logger.error("Model load failed: \(result.errorMessage)")
+            errorMessage = "Failed to load model: \(result.errorMessage)"
+            return false
+        }
+        applyLoadedModel(model)
+        logger.info("Model loaded: \(model.id)")
+        return true
+    }
+
     // MARK: - SDK Event Subscription
 
     func subscribeToSDKEvents() {
@@ -85,23 +109,29 @@ class VoiceComponentViewModelBase: ObservableObject {
         }
         hasSubscribedToSDKEvents = true
 
-        RunAnywhere.events.events
+        // The SDK's typed lifecycle stream folds the three native load/unload
+        // channels into one publisher; the base just applies it to this
+        // component's published state.
+        RunAnywhere.events.modelLifecycle
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
+            .sink { [weak self] change in
                 // Defer state modifications to avoid "Publishing changes
                 // within view updates" warnings.
                 Task { @MainActor in
                     guard let self else { return }
-                    guard event.category == self.eventCategory || event.component == self.component else { return }
-                    self.handleSDKEvent(event)
+                    guard change.component == self.component
+                        || change.event.category == self.eventCategory else { return }
+                    switch change.kind {
+                    case .loaded:
+                        self.applyCurrentModelSnapshot(reason: "loaded")
+                    case .unloaded:
+                        self.clearLoadedModel()
+                        self.logger.info("Voice component model unloaded")
+                    }
                 }
             }
             .store(in: &cancellables)
     }
-
-    /// Map an SDK event onto published state. Called only for events already
-    /// filtered to this ViewModel's component/category. Override in subclasses.
-    func handleSDKEvent(_ event: RASDKEvent) {}
 
     // MARK: - Initial Model State
 
@@ -111,10 +141,9 @@ class VoiceComponentViewModelBase: ObservableObject {
 
     /// Resolve the current model for this modality via the SDK snapshot and
     /// apply it to published state. Shared by `checkInitialModelState()` (cold
-    /// start) and `handleSDKEvent` load-completed handling — `RAModelEvent`
-    /// (the event payload) only carries `modelID`/`kind`, so the full
-    /// `RAModelInfo` must be re-resolved through `RunAnywhere.currentModel`
-    /// rather than passed from the event.
+    /// start) and the lifecycle-loaded sink — the lifecycle change only
+    /// carries `modelID`/`kind`, so the full `RAModelInfo` is re-resolved
+    /// through `RunAnywhere.currentModel` rather than passed from the event.
     func applyCurrentModelSnapshot(reason: String) {
         var request = RACurrentModelRequest()
         request.category = modelCategory

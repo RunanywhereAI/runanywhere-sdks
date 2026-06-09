@@ -1,5 +1,5 @@
 //
-//  RunAnywhere+ModelLifecycle.swift
+//  EventBus+ModelLifecycle.swift
 //  RunAnywhere SDK
 //
 //  Typed model-lifecycle stream over the raw SDK event bus.

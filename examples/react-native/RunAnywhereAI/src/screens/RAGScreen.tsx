@@ -39,7 +39,8 @@ import {
 
 import { RunAnywhere } from '@runanywhere/core';
 import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
-import { RAGConfiguration, RAGQueryOptions } from '@runanywhere/proto-ts/rag';
+import { RAGConfiguration } from '@runanywhere/proto-ts/rag';
+import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 // MARK: - Types
 
@@ -155,14 +156,12 @@ export const RAGScreen: React.FC = () => {
 
       // Build RAG configuration using model IDs. commons (via D-6) owns
       // id → path resolution inside rac_rag_session_create_proto.
+      // Canonical defaults do the right thing (matches iOS DocumentRAG):
+      // commons derives the embedding dimension from the loaded embedding
+      // model, and the retrieval/chunking values come from idl/rag.proto
+      // rac_default annotations.
       const config = RAGConfiguration.fromPartial({
-        embeddingDimension: 384,
-        topK: 5,
-        similarityThreshold: 0.7,
-        chunkSize: 512,
-        chunkOverlap: 64,
-        maxContextTokens: 2048,
-        persistIndex: false,
+        ...rAGConfigurationDefaults(),
         embeddingModelId,
         llmModelId,
       });
@@ -216,18 +215,10 @@ export const RAGScreen: React.FC = () => {
     setError(null);
 
     try {
-      const result = await RunAnywhere.ragQuery(
-        question,
-        RAGQueryOptions.fromPartial({
-          maxTokens: 256,
-          temperature: 0.7,
-          topP: 0.9,
-          topK: 40,
-          retrievalTopK: 3,
-          similarityThreshold: 0.12,
-          stream: false,
-        })
-      );
+      // Canonical query defaults (matches iOS, which queries with
+      // RARAGQueryOptions.defaults(question:)) — commons stamps
+      // maxTokens/temperature/topP and retrieval values when unset.
+      const result = await RunAnywhere.ragQuery(question);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },

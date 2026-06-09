@@ -871,6 +871,7 @@ function createBaseRAGQueryOptions() {
         retrievalTopK: 0,
         similarityThreshold: 0,
         stream: false,
+        disableThinking: false,
     };
 }
 exports.RAGQueryOptions = {
@@ -901,6 +902,9 @@ exports.RAGQueryOptions = {
         }
         if (message.stream !== false) {
             writer.uint32(72).bool(message.stream);
+        }
+        if (message.disableThinking !== false) {
+            writer.uint32(80).bool(message.disableThinking);
         }
         return writer;
     },
@@ -974,6 +978,13 @@ exports.RAGQueryOptions = {
                     message.stream = reader.bool();
                     continue;
                 }
+                case 10: {
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.disableThinking = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1017,6 +1028,11 @@ exports.RAGQueryOptions = {
                     ? globalThis.Number(object.similarity_threshold)
                     : 0,
             stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
+            disableThinking: isSet(object.disableThinking)
+                ? globalThis.Boolean(object.disableThinking)
+                : isSet(object.disable_thinking)
+                    ? globalThis.Boolean(object.disable_thinking)
+                    : false,
         };
     },
     toJSON(message) {
@@ -1048,6 +1064,9 @@ exports.RAGQueryOptions = {
         if (message.stream !== false) {
             obj.stream = message.stream;
         }
+        if (message.disableThinking !== false) {
+            obj.disableThinking = message.disableThinking;
+        }
         return obj;
     },
     create(base) {
@@ -1064,6 +1083,7 @@ exports.RAGQueryOptions = {
         message.retrievalTopK = object.retrievalTopK ?? 0;
         message.similarityThreshold = object.similarityThreshold ?? 0;
         message.stream = object.stream ?? false;
+        message.disableThinking = object.disableThinking ?? false;
         return message;
     },
 };

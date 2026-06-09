@@ -662,12 +662,13 @@ private func platformGetMemoryInfoCallback(
 //
 // The C++ platform adapter still exposes an HTTP-download callback
 // slot for historical reasons (see `rac_http_download` in
-// `rac_platform_adapter.h`). On Swift we route every request through
-// the canonical libcurl-backed `rac_http_download_execute` runner so
-// the transport matches what the other SDKs use and there is no
-// URLSession code left in the SDK. Cancellation is bridged via a
-// shared flag map keyed on the task id the platform callback hands
-// to the C++ caller.
+// `rac_platform_adapter.h`). Swift routes it through commons'
+// `rac_http_download_execute` runner, which in turn issues requests
+// via the registered `rac_http_transport` — i.e. the URLSession
+// transport this SDK installs at init (`URLSessionHttpTransport`),
+// so every request shares one transport path. Cancellation is
+// bridged via a shared flag map keyed on the task id the platform
+// callback hands to the C++ caller.
 
 private final class PlatformDownloadCancelFlag {
     // Per AGENTS.md: NSLock is forbidden — use OSAllocatedUnfairLock.

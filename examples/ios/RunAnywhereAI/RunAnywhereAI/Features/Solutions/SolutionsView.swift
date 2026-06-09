@@ -5,18 +5,11 @@
 //  Demo screen for `RunAnywhere.solutions.run(yaml:)`.
 //
 //  Two buttons run the canonical voice_agent.yaml and rag.yaml solutions
-//  via the SDK's solutions capability namespace. The YAML payloads are
-//  embedded inline as string constants and currently match
-//  `sdk/runanywhere-commons/examples/solutions/*.yaml` byte-for-byte.
-//
-//  SYNC AUTHORITY: `sdk/runanywhere-commons/examples/solutions/` is the
-//  canonical source for these YAML payloads. Any change to system_prompt,
-//  max_context_tokens, sample_rate_hz, or model IDs MUST be made there first
-//  and then mirrored here. The React Native example already automates this via
-//  `examples/react-native/RunAnywhereAI/scripts/sync-solutions-yamls.js`;
-//  full resource-dedup for iOS (Xcode build-phase copy + Bundle.main.url) is
-//  a tracked follow-up that requires adding the YAML files to the Xcode
-//  project's resource build phase.
+//  via the SDK's solutions capability namespace. The YAML payloads come from
+//  `Generated/SolutionsYaml.swift`, emitted by
+//  `scripts/sync-solutions-yamls.sh` from the canonical
+//  `sdk/runanywhere-commons/examples/solutions/*.yaml` — no inline copies,
+//  no drift (mirrors the React Native example's sync script).
 //
 //  The screen renders the solution lifecycle as a simple log: every state
 //  transition (creating, started, error) is appended to a scrollable text
@@ -25,54 +18,6 @@
 
 import RunAnywhere
 import SwiftUI
-
-// Use model IDs that are actually registered by registerModulesAndModels()
-// in RunAnywhereAIApp.swift; the placeholder IDs from
-// sdk/runanywhere-commons/examples/solutions/*.yaml (whisper-base, kokoro,
-// silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3, qwen3-4b-q4_k_m) are
-// NOT registered in this example app, so handing them to
-// RunAnywhere.solutions.run produces a "model not found in registry"
-// failure as soon as the operators load. rerank_model_id is omitted because
-// the example app does not seed a reranker.
-private let voiceAgentYAML = """
-voice_agent:
-  llm_model_id: "smollm2-360m-q8_0"
-  stt_model_id: "sherpa-onnx-whisper-tiny.en"
-  tts_model_id: "vits-piper-en_US-lessac-medium"
-  vad_model_id: "silero-vad"
-
-  sample_rate_hz: 16000
-  chunk_ms: 20
-  audio_source: "microphone"
-
-  enable_barge_in: true
-  barge_in_threshold_ms: 200
-
-  system_prompt: "You are a helpful voice assistant. Keep answers concise."
-  max_context_tokens: 4096
-  temperature: 0.7
-
-  emit_partials: true
-  emit_thoughts: false
-"""
-
-private let ragYAML = """
-rag:
-  embed_model_id: "all-minilm-l6-v2"
-  llm_model_id: "smollm2-360m-q8_0"
-
-  vector_store: "usearch"
-  vector_store_path: "/tmp/ra-rag.usearch"
-
-  retrieve_k: 24
-  rerank_top: 6
-
-  bm25_k1: 1.2
-  bm25_b: 0.75
-  rrf_k: 60
-
-  prompt_template: "Use the context below to answer.\\n\\nContext:\\n{{context}}\\n\\nQuestion: {{query}}"
-"""
 
 struct SolutionsView: View {
     @State private var log: [String] = []
@@ -92,7 +37,7 @@ struct SolutionsView: View {
 
                 HStack(spacing: 12) {
                     Button {
-                        runSolution(name: "Voice Agent", yaml: voiceAgentYAML)
+                        runSolution(name: "Voice Agent", yaml: SolutionsYaml.voiceAgent)
                     } label: {
                         Label("Voice Agent", systemImage: "mic.circle")
                             .frame(maxWidth: .infinity)
@@ -101,7 +46,7 @@ struct SolutionsView: View {
                     .disabled(isRunning)
 
                     Button {
-                        runSolution(name: "RAG", yaml: ragYAML)
+                        runSolution(name: "RAG", yaml: SolutionsYaml.rag)
                     } label: {
                         Label("RAG", systemImage: "doc.text.magnifyingglass")
                             .frame(maxWidth: .infinity)

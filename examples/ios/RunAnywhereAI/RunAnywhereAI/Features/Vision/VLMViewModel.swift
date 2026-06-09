@@ -117,9 +117,8 @@ final class VLMViewModel: NSObject {
         if session.canAddInput(input) { session.addInput(input) }
 
         let output = AVCaptureVideoDataOutput()
-        // CRITICAL: Request BGRA format explicitly!
-        // Default iOS camera output is YUV, which our pixel conversion code doesn't handle.
-        // The SDK's VLMTypes.swift assumes BGRA (offset+2=R, offset+1=G, offset+0=B)
+        // Request BGRA explicitly: the default camera output is YUV, and the
+        // SDK's `RAVLMImage.fromPixelBuffer` accepts BGRA buffers.
         output.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
         ]
@@ -205,21 +204,9 @@ final class VLMViewModel: NSObject {
         currentDescription = ""
 
         do {
-            guard let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                let conversionError = NSError(
-                    domain: "com.runanywhere.RunAnywhereAI",
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert NSImage to CGImage"]
-                )
-                self.error = conversionError
-                logger.error("VLM error: failed to convert NSImage to CGImage")
-                isProcessing = false
-                return
+            guard let image = RAVLMImage.fromNSImage(nsImage) else {
+                throw Self.imageConversionError("Failed to convert image to VLM input")
             }
-            let width = cgImage.width
-            let height = cgImage.height
-            let rgbData = Self.rgbData(from: cgImage, width: width, height: height)
-            let image = RAVLMImage.fromRawRGB(rgbData, width: width, height: height)
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
             options.maxTokens = 300
@@ -234,36 +221,6 @@ final class VLMViewModel: NSObject {
         }
 
         isProcessing = false
-    }
-
-    /// Convert a `CGImage` to raw RGB (3 bytes/pixel) data — strips the padding byte
-    /// from the RGBX layout produced by `CGContext` using `noneSkipLast`.
-    private static func rgbData(from cgImage: CGImage, width: Int, height: Int) -> Data {
-        let rgbaBytesPerRow = 4 * width
-        let rgbaTotalBytes = rgbaBytesPerRow * height
-        var rgbaData = Data(count: rgbaTotalBytes)
-        rgbaData.withUnsafeMutableBytes { ptr in
-            guard let context = CGContext(
-                data: ptr.baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: rgbaBytesPerRow,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-            ) else { return }
-            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        }
-        var rgbData = Data(capacity: width * height * 3)
-        rgbaData.withUnsafeBytes { buffer in
-            let pixels = buffer.bindMemory(to: UInt8.self)
-            for i in stride(from: 0, to: rgbaTotalBytes, by: 4) {
-                rgbData.append(pixels[i])     // R
-                rgbData.append(pixels[i + 1]) // G
-                rgbData.append(pixels[i + 2]) // B
-            }
-        }
-        return rgbData
     }
     #endif
 

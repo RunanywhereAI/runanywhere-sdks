@@ -323,8 +323,9 @@ export function createDefaultRAGConfiguration(
   overrides: Partial<RAGConfiguration> = {},
 ): RAGConfiguration {
   // Seed with the proto-generated canonical defaults so Web matches Swift /
-  // Kotlin / Flutter / RN parity (embeddingDimension=384, topK=5,
-  // similarityThreshold=0.7, chunkSize=512, chunkOverlap=64). Caller-supplied
+  // Kotlin / Flutter / RN parity (topK / similarityThreshold / chunkSize /
+  // chunkOverlap from idl/rag.proto rac_default; embeddingDimension is left
+  // unset so commons derives it from the loaded embedding model). Caller-supplied
   // overrides (including explicit 0 for chunkOverlap / similarityThreshold)
   // are honored end-to-end because RAGConfiguration numeric fields are proto3
   // `optional` — commons distinguishes "unset" from "explicit zero" via
@@ -354,6 +355,8 @@ function makeRAGQuery(
     retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
     similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
     stream: options.stream ?? false,
+    // Structured flag — commons prepends the model's no-think directive.
+    disableThinking: options.disableThinking ?? false,
   };
 }
 

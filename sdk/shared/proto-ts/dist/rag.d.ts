@@ -37,8 +37,10 @@ export interface RAGConfiguration {
     /**
      * Embedding vector dimension — must match the embedding model.
      * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-     * Optional so callers can distinguish "unset" (commons stamps the
-     * canonical default) from explicit zero / explicit override.
+     * Leave UNSET: commons derives the dimension from the loaded embedding
+     * model at session create (rac_embeddings_get_info). Set only to
+     * override. No rac_default on purpose — a generated defaults() that
+     * stamped 384 would mark the field present and defeat the derivation.
      */
     embeddingDimension?: number | undefined;
     /**
@@ -51,6 +53,10 @@ export interface RAGConfiguration {
      * score are discarded before being passed to the LLM as context.
      * Optional so callers can distinguish "unset" from explicit 0.0
      * (accept-everything) without losing the canonical default.
+     * Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
+     * cosine similarities that rarely exceed ~0.5 even for relevant chunks,
+     * so a 0.7 floor filters out every match and retrieval returns nothing
+     * (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
      */
     similarityThreshold?: number | undefined;
     /**
@@ -143,6 +149,12 @@ export interface RAGQueryOptions {
     retrievalTopK: number;
     similarityThreshold: number;
     stream: boolean;
+    /**
+     * When true, suppress the answer model's thinking phase (maps to
+     * LLMGenerationOptions.disable_thinking so commons prepends the no-think
+     * directive instead of the app injecting "/no_think"). Default false.
+     */
+    disableThinking: boolean;
 }
 export interface RAGQueryRequest {
     requestId: string;

@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhere
 
 struct StorageView: View {
-    @StateObject private var viewModel = StorageViewModel()
+    @ObservedObject private var viewModel = StorageViewModel.shared
 
     var body: some View {
         #if os(macOS)

@@ -62,6 +62,7 @@ final class LLMViewModel {
 
     private var generationTask: Task<Void, Never>?
     var lifecycleCancellable: AnyCancellable?
+    var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
     private var isViewModelInitialized = false
@@ -427,8 +428,8 @@ final class LLMViewModel {
         return FileManager.default.fileExists(atPath: adapter.localPath) ? adapter.localPath : nil
     }
 
-    /// Downloads a catalog adapter with URLSession, reports completion through
-    /// commons, then applies the stable local path.
+    /// Downloads a catalog adapter through the SDK's canonical download
+    /// pipeline, then applies the stable local path.
     func downloadAndLoadAdapter(_ adapter: RALoraAdapterCatalogEntry, scale: Float) async {
         isLoadingLoRA = true
         error = nil
@@ -508,44 +509,15 @@ final class LLMViewModel {
         guard !adapter.id.isEmpty else {
             throw LLMError.custom("LoRA catalog adapter id is required")
         }
-        guard let sourceURL = URL(string: adapter.url), sourceURL.scheme != nil else {
-            throw LLMError.custom("LoRA catalog adapter has an invalid download URL")
-        }
 
-        let directory = Self.loraDownloadDirectory()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent(Self.loraFilename(for: adapter), isDirectory: false)
+        // One SDK call owns everything: artifact registration, transfer with
+        // resume/checksum/progress, on-disk placement, and catalog completion.
+        let localPath = try await RunAnywhere.lora.download(adapter)
 
-        let (temporaryURL, response) = try await URLSession.shared.download(from: sourceURL)
-        if let httpResponse = response as? HTTPURLResponse,
-           !(200...299).contains(httpResponse.statusCode) {
-            throw LLMError.custom("LoRA adapter download failed with HTTP \(httpResponse.statusCode)")
-        }
-
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        try FileManager.default.moveItem(at: temporaryURL, to: destination)
-
-        var request = RALoraAdapterDownloadCompletedRequest()
-        request.adapterID = adapter.id
-        request.localPath = destination.path
-        request.completedAtUnixMs = currentUnixMilliseconds()
-        request.imported = false
-        request.statusMessage = "download completed"
-        if let fileSize = try fileSize(at: destination) {
-            request.sizeBytes = fileSize
-        }
-
-        let result = try await RunAnywhere.lora.markDownloadCompleted(request)
-        guard result.success else {
-            throw LLMError.custom(
-                result.errorMessage.isEmpty
-                    ? "LoRA adapter download completion was not persisted"
-                    : result.errorMessage
-            )
-        }
-        return result.entry
+        var entry = adapter
+        entry.localPath = localPath
+        entry.isDownloaded = true
+        return entry
     }
 
     private func copyImportedAdapterToSandbox(from url: URL) throws -> URL {
@@ -582,19 +554,11 @@ final class LLMViewModel {
         Int64((Date().timeIntervalSince1970 * 1_000).rounded())
     }
 
+    /// Sandbox folder for user-imported adapter files (file-picker flow only;
+    /// catalog downloads are placed by the SDK).
     static func loraDownloadDirectory() -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent("LoRA", isDirectory: true)
-    }
-
-    private static func loraFilename(for adapter: RALoraAdapterCatalogEntry) -> String {
-        if !adapter.filename.isEmpty {
-            return adapter.filename
-        }
-        if let filename = URL(string: adapter.url)?.lastPathComponent, !filename.isEmpty {
-            return filename
-        }
-        return "\(adapter.id).gguf"
     }
 
     // MARK: - Private Methods - Message Generation

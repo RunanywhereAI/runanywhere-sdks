@@ -1,5 +1,5 @@
 //
-//  SystemFoundationModelsModule.swift
+//  SystemFoundationModels.swift
 //  RunAnywhere SDK
 //
 //  Built-in Apple Foundation Models (Apple Intelligence) module.

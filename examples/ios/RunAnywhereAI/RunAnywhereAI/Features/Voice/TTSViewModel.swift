@@ -48,24 +48,8 @@ class TTSViewModel: VoiceComponentViewModelBase {
 
     /// Load a model from the unified model selection sheet
     func loadModelFromSelection(_ model: RAModelInfo) async {
-        logger.info("Loading TTS model from selection: \(model.name)")
         isSpeaking = true
-        errorMessage = nil
-
-        var request = RAModelLoadRequest()
-        request.modelID = model.id
-        request.category = .speechSynthesis
-        let result = await RunAnywhere.loadModel(request)
-        if result.success {
-            selectedFramework = model.framework
-            selectedModelName = model.name.modelNameFromID()
-            selectedModelId = model.id
-            logger.info("TTS model loaded successfully: \(model.name)")
-        } else {
-            logger.error("Failed to load TTS model: \(result.errorMessage)")
-            errorMessage = "Failed to load model: \(result.errorMessage)"
-        }
-
+        await loadModel(from: model)
         isSpeaking = false
     }
 
@@ -121,22 +105,6 @@ class TTSViewModel: VoiceComponentViewModelBase {
     override func applyLoadedModel(_ model: RAModelInfo) {
         selectedModelId = model.id
         selectedModelName = model.id
-    }
-
-    override func handleSDKEvent(_ event: RASDKEvent) {
-        let voiceId = event.model.modelID
-
-        switch event.model.kind {
-        case .loadCompleted:
-            selectedModelId = voiceId
-            selectedModelName = voiceId
-            logger.info("TTS voice loaded: \(voiceId)")
-        case .unloadCompleted:
-            clearLoadedModel()
-            logger.info("TTS voice unloaded")
-        default:
-            break
-        }
     }
 
     // MARK: - Formatting Helpers

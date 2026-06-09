@@ -160,6 +160,7 @@ function createBaseLLMGenerationOptions() {
         echoPrompt: false,
         nThreads: 0,
         toolCalling: undefined,
+        disableThinking: false,
     };
 }
 exports.LLMGenerationOptions = {
@@ -235,6 +236,9 @@ exports.LLMGenerationOptions = {
         }
         if (message.toolCalling !== undefined) {
             tool_calling_1.ToolCallingOptions.encode(message.toolCalling, writer.uint32(194).fork()).join();
+        }
+        if (message.disableThinking !== false) {
+            writer.uint32(200).bool(message.disableThinking);
         }
         return writer;
     },
@@ -413,6 +417,13 @@ exports.LLMGenerationOptions = {
                     message.toolCalling = tool_calling_1.ToolCallingOptions.decode(reader, reader.uint32());
                     continue;
                 }
+                case 25: {
+                    if (tag !== 200) {
+                        break;
+                    }
+                    message.disableThinking = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -531,6 +542,11 @@ exports.LLMGenerationOptions = {
                 : isSet(object.tool_calling)
                     ? tool_calling_1.ToolCallingOptions.fromJSON(object.tool_calling)
                     : undefined,
+            disableThinking: isSet(object.disableThinking)
+                ? globalThis.Boolean(object.disableThinking)
+                : isSet(object.disable_thinking)
+                    ? globalThis.Boolean(object.disable_thinking)
+                    : false,
         };
     },
     toJSON(message) {
@@ -607,6 +623,9 @@ exports.LLMGenerationOptions = {
         if (message.toolCalling !== undefined) {
             obj.toolCalling = tool_calling_1.ToolCallingOptions.toJSON(message.toolCalling);
         }
+        if (message.disableThinking !== false) {
+            obj.disableThinking = message.disableThinking;
+        }
         return obj;
     },
     create(base) {
@@ -644,6 +663,7 @@ exports.LLMGenerationOptions = {
         message.toolCalling = (object.toolCalling !== undefined && object.toolCalling !== null)
             ? tool_calling_1.ToolCallingOptions.fromPartial(object.toolCalling)
             : undefined;
+        message.disableThinking = object.disableThinking ?? false;
         return message;
     },
 };

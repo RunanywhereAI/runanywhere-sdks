@@ -12,6 +12,10 @@ import Combine
 
 @MainActor
 class StorageViewModel: ObservableObject {
+    /// Single owner of storage state + SDK storage calls. The Storage screen
+    /// and the Settings storage section both consume this instance.
+    static let shared = StorageViewModel()
+
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0

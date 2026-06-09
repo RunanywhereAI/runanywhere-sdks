@@ -110,17 +110,12 @@ final class RAGViewModel {
             let extractedText = try DocumentService.extractText(from: url)
 
             logger.info("Creating RAG pipeline")
-            var baseConfig = RARAGConfiguration.defaults()
-            baseConfig.embeddingDimension = 384
-            baseConfig.topK = 3
-            baseConfig.similarityThreshold = 0.12
-            baseConfig.maxContextTokens = 2048
-            baseConfig.chunkSize = 180
-            baseConfig.chunkOverlap = 30
+            // Canonical defaults do the right thing: commons derives the
+            // embedding dimension from the loaded embedding model, and the
+            // retrieval/chunking values come from idl/rag.proto rac_defaults.
             try await RunAnywhere.ragCreatePipeline(
                 embeddingModel: embeddingModel,
-                llmModel: llmModel,
-                baseConfiguration: baseConfig
+                llmModel: llmModel
             )
 
             logger.info("Ingesting document text (\(extractedText.count) chars)")
@@ -155,15 +150,14 @@ final class RAGViewModel {
 
         do {
             let settings = SettingsViewModel.shared
-            let effectiveQuestion: String
-            if settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled {
-                effectiveQuestion = "/no_think\n\(question)"
-            } else {
-                effectiveQuestion = question
-            }
+            var options = RARAGQueryOptions.defaults(question: question)
+            // Structured flag — commons applies the model's no-think
+            // directive; the app never injects control tokens into prompts.
+            options.disableThinking =
+                settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled
 
             logger.info("Querying RAG pipeline: \(question)")
-            let result = try await RunAnywhere.ragQuery(question: effectiveQuestion)
+            let result = try await RunAnywhere.ragQuery(options)
             let thinkingContent = RAGMessage.extractThinkingContent(from: result.answer)
             let displayText = RAGMessage.stripThinkTags(from: result.answer)
             messages.append(RAGMessage(role: .assistant, text: displayText, thinkingContent: thinkingContent))
