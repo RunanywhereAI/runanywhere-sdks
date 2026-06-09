@@ -546,15 +546,17 @@ unsupported_structured_options_message(const runanywhere::v1::StructuredOutputOp
 
 // commons-031: StructuredOutputRequest currently has no LLMGenerationOptions
 // field, so the per-call sampling knobs (max_tokens, temperature, top_p,
-// stop_sequences, system_prompt overrides) reach the engine only as the
-// rac_llm_options_t defaults below. Callers that need sampling control must
-// route through rac_llm_generate_proto / rac_llm_generate_stream_proto with
-// LLMGenerationOptions.structured_output set instead (Swift's
-// generateStructured wrapper takes that path — see
+// stop_sequences, system_prompt overrides) — and likewise
+// LLMGenerationOptions.disable_thinking — reach the engine only as the
+// rac_llm_options_t defaults below. Callers that need sampling control or
+// thinking suppression must route through rac_llm_generate_proto /
+// rac_llm_generate_stream_proto with LLMGenerationOptions.structured_output
+// set instead (Swift's generateStructured wrapper takes that path — see
 // sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/
-// RunAnywhere+StructuredOutput.swift). Embedding LLMGenerationOptions into
-// StructuredOutputRequest would close this gap but requires an IDL change +
-// proto regeneration across all SDKs and is tracked outside this cluster.
+// RunAnywhere+StructuredOutput.swift — so disable_thinking already works
+// there). Embedding LLMGenerationOptions into StructuredOutputRequest would
+// close this gap but requires an IDL change + proto regeneration across all
+// SDKs and is tracked outside this cluster.
 
 static void add_structured_validation_errors_from_json(
     const char* validation_errors_json, runanywhere::v1::StructuredOutputValidation* validation) {

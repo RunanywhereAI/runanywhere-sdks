@@ -142,6 +142,19 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 11,
   )
   public val forced_tool_name: String? = null,
+  /**
+   * When true, suppress the model's thinking phase for every generate in
+   * the loop/session (maps from ToolCallingOptions.disable_thinking; same
+   * contract as LLMGenerationOptions.disable_thinking). Default false.
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "disableThinking",
+    schemaIndex = 12,
+  )
+  public val disable_thinking: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -174,6 +187,7 @@ public class ToolCallingSessionCreateRequest(
     if (validate_calls != other.validate_calls) return false
     if (tool_choice != other.tool_choice) return false
     if (forced_tool_name != other.forced_tool_name) return false
+    if (disable_thinking != other.disable_thinking) return false
     return true
   }
 
@@ -193,6 +207,7 @@ public class ToolCallingSessionCreateRequest(
       result = result * 37 + (validate_calls?.hashCode() ?: 0)
       result = result * 37 + (tool_choice?.hashCode() ?: 0)
       result = result * 37 + (forced_tool_name?.hashCode() ?: 0)
+      result = result * 37 + disable_thinking.hashCode()
       super.hashCode = result
     }
     return result
@@ -212,6 +227,7 @@ public class ToolCallingSessionCreateRequest(
     if (validate_calls != null) result += """validate_calls=$validate_calls"""
     if (tool_choice != null) result += """tool_choice=$tool_choice"""
     if (forced_tool_name != null) result += """forced_tool_name=${sanitize(forced_tool_name)}"""
+    result += """disable_thinking=$disable_thinking"""
     return result.joinToString(prefix = "ToolCallingSessionCreateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -228,8 +244,9 @@ public class ToolCallingSessionCreateRequest(
     validate_calls: Boolean? = this.validate_calls,
     tool_choice: ToolChoiceMode? = this.tool_choice,
     forced_tool_name: String? = this.forced_tool_name,
+    disable_thinking: Boolean = this.disable_thinking,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format_hint, max_iterations, keep_tools_available, validate_calls, tool_choice, forced_tool_name, unknownFields)
+  ): ToolCallingSessionCreateRequest = ToolCallingSessionCreateRequest(prompt, max_tokens, temperature, top_p, system_prompt, tools, format_hint, max_iterations, keep_tools_available, validate_calls, tool_choice, forced_tool_name, disable_thinking, unknownFields)
 
   public companion object {
     @JvmField
@@ -272,6 +289,9 @@ public class ToolCallingSessionCreateRequest(
         size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.validate_calls)
         size += ToolChoiceMode.ADAPTER.encodedSizeWithTag(7, value.tool_choice)
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.forced_tool_name)
+        if (value.disable_thinking != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(15, value.disable_thinking)
+        }
         return size
       }
 
@@ -304,11 +324,17 @@ public class ToolCallingSessionCreateRequest(
         ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
         ToolChoiceMode.ADAPTER.encodeWithTag(writer, 7, value.tool_choice)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
+        if (value.disable_thinking != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.disable_thinking)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingSessionCreateRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.disable_thinking != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 15, value.disable_thinking)
+        }
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.forced_tool_name)
         ToolChoiceMode.ADAPTER.encodeWithTag(writer, 7, value.tool_choice)
         ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.validate_calls)
@@ -352,6 +378,7 @@ public class ToolCallingSessionCreateRequest(
         var validate_calls: Boolean? = null
         var tool_choice: ToolChoiceMode? = null
         var forced_tool_name: String? = null
+        var disable_thinking: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -370,6 +397,7 @@ public class ToolCallingSessionCreateRequest(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             8 -> forced_tool_name = ProtoAdapter.STRING.decode(reader)
+            15 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -386,6 +414,7 @@ public class ToolCallingSessionCreateRequest(
           validate_calls = validate_calls,
           tool_choice = tool_choice,
           forced_tool_name = forced_tool_name,
+          disable_thinking = disable_thinking,
           unknownFields = unknownFields
         )
       }

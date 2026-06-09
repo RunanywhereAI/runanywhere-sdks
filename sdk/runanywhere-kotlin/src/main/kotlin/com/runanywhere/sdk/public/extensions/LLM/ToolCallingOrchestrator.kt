@@ -224,6 +224,8 @@ internal object ToolCallingOrchestrator {
                     format_hint = effectiveOpts.effectiveToolFormatHint(),
                     max_iterations = effectiveOpts.effectiveMaxIterations(),
                     keep_tools_available = effectiveOpts.keep_tools_available ?: false,
+                    // Suppress thinking when requested (commons prepends the no-think directive).
+                    disable_thinking = effectiveOpts.disable_thinking ?: false,
                     // Swift parity (`makeRunLoopRequest`):
                     // `validate_calls` is `optional bool` on the proto. When the
                     // caller did not supply a value leave it unset (null) so

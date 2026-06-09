@@ -310,6 +310,8 @@ export async function generateWithTools(
     // synthesized ToolCallingOptions before format/validate proto calls.
     toolChoice: options?.toolChoice,
     forcedToolName: options?.forcedToolName,
+    // Suppress thinking when requested (commons prepends the no-think directive).
+    disableThinking: options?.disableThinking ?? false,
   });
 
   logger.debug(

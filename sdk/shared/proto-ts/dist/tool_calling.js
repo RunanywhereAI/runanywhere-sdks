@@ -1425,6 +1425,7 @@ function createBaseToolCallingOptions() {
         forcedToolName: undefined,
         parallelToolCalls: false,
         requireJsonArguments: false,
+        disableThinking: undefined,
     };
 }
 exports.ToolCallingOptions = {
@@ -1476,6 +1477,9 @@ exports.ToolCallingOptions = {
         }
         if (message.requireJsonArguments !== false) {
             writer.uint32(128).bool(message.requireJsonArguments);
+        }
+        if (message.disableThinking !== undefined) {
+            writer.uint32(136).bool(message.disableThinking);
         }
         return writer;
     },
@@ -1598,6 +1602,13 @@ exports.ToolCallingOptions = {
                     message.requireJsonArguments = reader.bool();
                     continue;
                 }
+                case 17: {
+                    if (tag !== 136) {
+                        break;
+                    }
+                    message.disableThinking = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1676,6 +1687,11 @@ exports.ToolCallingOptions = {
                 : isSet(object.require_json_arguments)
                     ? globalThis.Boolean(object.require_json_arguments)
                     : false,
+            disableThinking: isSet(object.disableThinking)
+                ? globalThis.Boolean(object.disableThinking)
+                : isSet(object.disable_thinking)
+                    ? globalThis.Boolean(object.disable_thinking)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -1728,6 +1744,9 @@ exports.ToolCallingOptions = {
         if (message.requireJsonArguments !== false) {
             obj.requireJsonArguments = message.requireJsonArguments;
         }
+        if (message.disableThinking !== undefined) {
+            obj.disableThinking = message.disableThinking;
+        }
         return obj;
     },
     create(base) {
@@ -1751,6 +1770,7 @@ exports.ToolCallingOptions = {
         message.forcedToolName = object.forcedToolName ?? undefined;
         message.parallelToolCalls = object.parallelToolCalls ?? false;
         message.requireJsonArguments = object.requireJsonArguments ?? false;
+        message.disableThinking = object.disableThinking ?? undefined;
         return message;
     },
 };
@@ -2965,6 +2985,7 @@ function createBaseToolCallingSessionCreateRequest() {
         validateCalls: undefined,
         toolChoice: undefined,
         forcedToolName: undefined,
+        disableThinking: false,
     };
 }
 exports.ToolCallingSessionCreateRequest = {
@@ -3004,6 +3025,9 @@ exports.ToolCallingSessionCreateRequest = {
         }
         if (message.forcedToolName !== undefined) {
             writer.uint32(66).string(message.forcedToolName);
+        }
+        if (message.disableThinking !== false) {
+            writer.uint32(120).bool(message.disableThinking);
         }
         return writer;
     },
@@ -3098,6 +3122,13 @@ exports.ToolCallingSessionCreateRequest = {
                     message.forcedToolName = reader.string();
                     continue;
                 }
+                case 15: {
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.disableThinking = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3158,6 +3189,11 @@ exports.ToolCallingSessionCreateRequest = {
                 : isSet(object.forced_tool_name)
                     ? globalThis.String(object.forced_tool_name)
                     : undefined,
+            disableThinking: isSet(object.disableThinking)
+                ? globalThis.Boolean(object.disableThinking)
+                : isSet(object.disable_thinking)
+                    ? globalThis.Boolean(object.disable_thinking)
+                    : false,
         };
     },
     toJSON(message) {
@@ -3198,6 +3234,9 @@ exports.ToolCallingSessionCreateRequest = {
         if (message.forcedToolName !== undefined) {
             obj.forcedToolName = message.forcedToolName;
         }
+        if (message.disableThinking !== false) {
+            obj.disableThinking = message.disableThinking;
+        }
         return obj;
     },
     create(base) {
@@ -3217,6 +3256,7 @@ exports.ToolCallingSessionCreateRequest = {
         message.validateCalls = object.validateCalls ?? undefined;
         message.toolChoice = object.toolChoice ?? undefined;
         message.forcedToolName = object.forcedToolName ?? undefined;
+        message.disableThinking = object.disableThinking ?? false;
         return message;
     },
 };

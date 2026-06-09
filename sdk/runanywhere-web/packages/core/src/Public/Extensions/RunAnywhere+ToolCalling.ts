@@ -306,6 +306,8 @@ function buildSessionCreateRequest(
       effectiveOptions.forcedToolName && effectiveOptions.forcedToolName.length > 0
         ? effectiveOptions.forcedToolName
         : undefined,
+    // Suppress thinking when requested (commons prepends the no-think directive).
+    disableThinking: effectiveOptions.disableThinking ?? false,
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }

@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -99,6 +100,9 @@ struct ToolCallingSession {
     float temperature = 0.0f;
     float top_p = 0.0f;
     std::string system_prompt;
+    // Suppress the model thinking phase on every generate in the session
+    // (ToolCallingSessionCreateRequest.disable_thinking).
+    bool disable_thinking = false;
 
     // Request-level tool_choice / forced_tool_name overrides.
     bool has_tool_choice = false;
@@ -460,6 +464,7 @@ bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
     }
     options.streaming_enabled = RAC_FALSE;
     options.system_prompt = session.system_prompt.empty() ? nullptr : session.system_prompt.c_str();
+    options.disable_thinking = session.disable_thinking ? RAC_TRUE : RAC_FALSE;
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
 
@@ -482,7 +487,11 @@ bool run_generate_once(ToolCallingSession& session, const std::string& prompt,
         }
     }
 
-    rc = ref.ops->generate(ref.impl, prompt.c_str(), &options, &raw);
+    // Apply the no-think directive at the prompt level when requested (same
+    // contract as the rac_llm_generate / proto generate sites).
+    const std::string effective_prompt =
+        rac::llm::apply_no_think_directive(prompt, options.disable_thinking);
+    rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
 
     // Unpublish before the ref goes out of scope.
     {
@@ -630,6 +639,7 @@ rac_tool_calling_session_create_proto(const uint8_t* request_proto_bytes, size_t
     session->temperature = request.temperature();
     session->top_p = request.top_p();
     session->system_prompt = request.system_prompt();
+    session->disable_thinking = request.disable_thinking();
 
     session->format_hint =
         request.format_hint().empty() ? std::string("default") : request.format_hint();

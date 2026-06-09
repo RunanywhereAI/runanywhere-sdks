@@ -265,6 +265,13 @@ export interface ToolCallingOptions {
     forcedToolName?: string | undefined;
     parallelToolCalls: boolean;
     requireJsonArguments: boolean;
+    /**
+     * When true, suppress the model's thinking/reasoning phase during
+     * tool-enabled generation (commons prepends the model no-think directive
+     * at the prompt level — same contract as
+     * LLMGenerationOptions.disable_thinking). Default false.
+     */
+    disableThinking?: boolean | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -384,6 +391,12 @@ export interface ToolCallingSessionCreateRequest {
      */
     toolChoice?: ToolChoiceMode | undefined;
     forcedToolName?: string | undefined;
+    /**
+     * When true, suppress the model's thinking phase for every generate in
+     * the loop/session (maps from ToolCallingOptions.disable_thinking; same
+     * contract as LLMGenerationOptions.disable_thinking). Default false.
+     */
+    disableThinking: boolean;
 }
 export interface ToolCallingSessionCreateResult {
     sessionHandle: number;

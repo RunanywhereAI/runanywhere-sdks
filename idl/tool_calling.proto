@@ -263,6 +263,12 @@ message ToolCallingOptions {
     optional string forced_tool_name = 14;
     bool parallel_tool_calls = 15;
     bool require_json_arguments = 16;
+
+    // When true, suppress the model's thinking/reasoning phase during
+    // tool-enabled generation (commons prepends the model no-think directive
+    // at the prompt level — same contract as
+    // LLMGenerationOptions.disable_thinking). Default false.
+    optional bool disable_thinking = 17;
 }
 
 // ---------------------------------------------------------------------------
@@ -418,6 +424,11 @@ message ToolCallingSessionCreateRequest {
     // conflicting semantics — a wire-compat hazard that would silently
     // mis-decode data once both patches land.
     reserved 9 to 10;
+
+    // When true, suppress the model's thinking phase for every generate in
+    // the loop/session (maps from ToolCallingOptions.disable_thinking; same
+    // contract as LLMGenerationOptions.disable_thinking). Default false.
+    bool disable_thinking = 15;
 }
 
 message ToolCallingSessionCreateResult {

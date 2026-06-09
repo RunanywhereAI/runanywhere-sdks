@@ -194,6 +194,19 @@ public class ToolCallingOptions(
     schemaIndex = 15,
   )
   public val require_json_arguments: Boolean = false,
+  /**
+   * When true, suppress the model's thinking/reasoning phase during
+   * tool-enabled generation (commons prepends the model no-think directive
+   * at the prompt level — same contract as
+   * LLMGenerationOptions.disable_thinking). Default false.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    jsonName = "disableThinking",
+    schemaIndex = 16,
+  )
+  public val disable_thinking: Boolean? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -234,6 +247,7 @@ public class ToolCallingOptions(
     if (forced_tool_name != other.forced_tool_name) return false
     if (parallel_tool_calls != other.parallel_tool_calls) return false
     if (require_json_arguments != other.require_json_arguments) return false
+    if (disable_thinking != other.disable_thinking) return false
     return true
   }
 
@@ -257,6 +271,7 @@ public class ToolCallingOptions(
       result = result * 37 + (forced_tool_name?.hashCode() ?: 0)
       result = result * 37 + parallel_tool_calls.hashCode()
       result = result * 37 + require_json_arguments.hashCode()
+      result = result * 37 + (disable_thinking?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -280,6 +295,7 @@ public class ToolCallingOptions(
     if (forced_tool_name != null) result += """forced_tool_name=${sanitize(forced_tool_name)}"""
     result += """parallel_tool_calls=$parallel_tool_calls"""
     result += """require_json_arguments=$require_json_arguments"""
+    if (disable_thinking != null) result += """disable_thinking=$disable_thinking"""
     return result.joinToString(prefix = "ToolCallingOptions{", separator = ", ", postfix = "}")
   }
 
@@ -300,8 +316,9 @@ public class ToolCallingOptions(
     forced_tool_name: String? = this.forced_tool_name,
     parallel_tool_calls: Boolean = this.parallel_tool_calls,
     require_json_arguments: Boolean = this.require_json_arguments,
+    disable_thinking: Boolean? = this.disable_thinking,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingOptions = ToolCallingOptions(tools, max_iterations, auto_execute, temperature, max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format_hint, format, custom_system_prompt, max_tool_calls, tool_choice, forced_tool_name, parallel_tool_calls, require_json_arguments, unknownFields)
+  ): ToolCallingOptions = ToolCallingOptions(tools, max_iterations, auto_execute, temperature, max_tokens, system_prompt, replace_system_prompt, keep_tools_available, format_hint, format, custom_system_prompt, max_tool_calls, tool_choice, forced_tool_name, parallel_tool_calls, require_json_arguments, disable_thinking, unknownFields)
 
   public companion object {
     @JvmField
@@ -348,6 +365,7 @@ public class ToolCallingOptions(
         if (value.require_json_arguments != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(16, value.require_json_arguments)
         }
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(17, value.disable_thinking)
         return size
       }
 
@@ -384,11 +402,13 @@ public class ToolCallingOptions(
         if (value.require_json_arguments != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.require_json_arguments)
         }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.disable_thinking)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 17, value.disable_thinking)
         if (value.require_json_arguments != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 16, value.require_json_arguments)
         }
@@ -440,6 +460,7 @@ public class ToolCallingOptions(
         var forced_tool_name: String? = null
         var parallel_tool_calls: Boolean = false
         var require_json_arguments: Boolean = false
+        var disable_thinking: Boolean? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tools.add(ToolDefinition.ADAPTER.decode(reader))
@@ -466,6 +487,7 @@ public class ToolCallingOptions(
             14 -> forced_tool_name = ProtoAdapter.STRING.decode(reader)
             15 -> parallel_tool_calls = ProtoAdapter.BOOL.decode(reader)
             16 -> require_json_arguments = ProtoAdapter.BOOL.decode(reader)
+            17 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -486,6 +508,7 @@ public class ToolCallingOptions(
           forced_tool_name = forced_tool_name,
           parallel_tool_calls = parallel_tool_calls,
           require_json_arguments = require_json_arguments,
+          disable_thinking = disable_thinking,
           unknownFields = unknownFields
         )
       }

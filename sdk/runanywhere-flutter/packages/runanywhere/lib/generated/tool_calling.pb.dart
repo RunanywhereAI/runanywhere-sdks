@@ -897,6 +897,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     $core.String? forcedToolName,
     $core.bool? parallelToolCalls,
     $core.bool? requireJsonArguments,
+    $core.bool? disableThinking,
   }) {
     final result = create();
     if (tools != null) result.tools.addAll(tools);
@@ -919,6 +920,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     if (parallelToolCalls != null) result.parallelToolCalls = parallelToolCalls;
     if (requireJsonArguments != null)
       result.requireJsonArguments = requireJsonArguments;
+    if (disableThinking != null) result.disableThinking = disableThinking;
     return result;
   }
 
@@ -954,6 +956,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     ..aOS(14, _omitFieldNames ? '' : 'forcedToolName')
     ..aOB(15, _omitFieldNames ? '' : 'parallelToolCalls')
     ..aOB(16, _omitFieldNames ? '' : 'requireJsonArguments')
+    ..aOB(17, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1135,6 +1138,19 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   $core.bool hasRequireJsonArguments() => $_has(15);
   @$pb.TagNumber(16)
   void clearRequireJsonArguments() => $_clearField(16);
+
+  /// When true, suppress the model's thinking/reasoning phase during
+  /// tool-enabled generation (commons prepends the model no-think directive
+  /// at the prompt level — same contract as
+  /// LLMGenerationOptions.disable_thinking). Default false.
+  @$pb.TagNumber(17)
+  $core.bool get disableThinking => $_getBF(16);
+  @$pb.TagNumber(17)
+  set disableThinking($core.bool value) => $_setBool(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasDisableThinking() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearDisableThinking() => $_clearField(17);
 }
 
 /// ---------------------------------------------------------------------------
@@ -2089,6 +2105,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     $core.double? temperature,
     $core.double? topP,
     $core.String? systemPrompt,
+    $core.bool? disableThinking,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
@@ -2104,6 +2121,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     if (temperature != null) result.temperature = temperature;
     if (topP != null) result.topP = topP;
     if (systemPrompt != null) result.systemPrompt = systemPrompt;
+    if (disableThinking != null) result.disableThinking = disableThinking;
     return result;
   }
 
@@ -2136,6 +2154,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aD(13, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
     ..aOS(14, _omitFieldNames ? '' : 'systemPrompt')
+    ..aOB(15, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2275,6 +2294,18 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   $core.bool hasSystemPrompt() => $_has(11);
   @$pb.TagNumber(14)
   void clearSystemPrompt() => $_clearField(14);
+
+  /// When true, suppress the model's thinking phase for every generate in
+  /// the loop/session (maps from ToolCallingOptions.disable_thinking; same
+  /// contract as LLMGenerationOptions.disable_thinking). Default false.
+  @$pb.TagNumber(15)
+  $core.bool get disableThinking => $_getBF(12);
+  @$pb.TagNumber(15)
+  set disableThinking($core.bool value) => $_setBool(12, value);
+  @$pb.TagNumber(15)
+  $core.bool hasDisableThinking() => $_has(12);
+  @$pb.TagNumber(15)
+  void clearDisableThinking() => $_clearField(15);
 }
 
 class ToolCallingSessionCreateResult extends $pb.GeneratedMessage {

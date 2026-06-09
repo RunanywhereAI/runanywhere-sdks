@@ -32,6 +32,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -113,6 +114,9 @@ struct LoopContext {
     uint32_t max_iterations = kDefaultMaxIterations;
     bool keep_tools_available = false;
     bool validate_calls = true;
+    // Suppress the model thinking phase on every generate in the loop
+    // (ToolCallingSessionCreateRequest.disable_thinking).
+    bool disable_thinking = false;
 
     // request-level tool_choice / forced_tool_name overrides.
     // When present, build_options_snapshot copies them onto the synthesized
@@ -282,6 +286,7 @@ bool run_generate_once(const LoopContext& ctx, LoopCancelState* cancel_state,
     }
     options.streaming_enabled = RAC_FALSE;
     options.system_prompt = ctx.system_prompt.empty() ? nullptr : ctx.system_prompt.c_str();
+    options.disable_thinking = ctx.disable_thinking ? RAC_TRUE : RAC_FALSE;
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
 
@@ -303,7 +308,11 @@ bool run_generate_once(const LoopContext& ctx, LoopCancelState* cancel_state,
     }
 
     rac_llm_result_t raw{};
-    rc = ref.ops->generate(ref.impl, prompt.c_str(), &options, &raw);
+    // Apply the no-think directive at the prompt level when requested (same
+    // contract as the rac_llm_generate / proto generate sites).
+    const std::string effective_prompt =
+        rac::llm::apply_no_think_directive(prompt, options.disable_thinking);
+    rc = ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw);
 
     if (cancel_state) {
         std::lock_guard<std::mutex> guard(cancel_state->active_ref_mu);
@@ -433,6 +442,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
     ctx.max_iterations =
         request.max_iterations() == 0 ? kDefaultMaxIterations : request.max_iterations();
     ctx.keep_tools_available = request.keep_tools_available();
+    ctx.disable_thinking = request.disable_thinking();
     // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
     // The field is `optional bool` so we can preserve the historical default
     // (validate=true) when the caller did not set it, while still letting hosts

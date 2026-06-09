@@ -544,6 +544,8 @@ public extension RunAnywhere {
         if toolOptions.hasForcedToolName, !toolOptions.forcedToolName.isEmpty {
             request.forcedToolName = toolOptions.forcedToolName
         }
+        // Suppress thinking when either options surface asks for it.
+        request.disableThinking = toolOptions.disableThinking || options.disableThinking
         return request
     }
 }

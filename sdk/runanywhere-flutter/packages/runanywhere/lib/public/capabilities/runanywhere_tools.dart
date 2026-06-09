@@ -224,6 +224,8 @@ class RunAnywhereTools {
       forcedToolName: effectiveForcedToolName,
       maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
       temperature: opts.hasTemperature() ? opts.temperature : 0.3,
+      // Suppress thinking when requested (commons prepends the no-think directive).
+      disableThinking: opts.hasDisableThinking() && opts.disableThinking,
     );
 
     final session = DartBridgeToolCalling.shared.createSession(request);
