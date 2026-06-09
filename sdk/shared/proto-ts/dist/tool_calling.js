@@ -1785,6 +1785,7 @@ function createBaseToolCallingResult() {
         errorMessage: undefined,
         errorCode: 0,
         rawText: "",
+        thinkingContent: undefined,
     };
 }
 exports.ToolCallingResult = {
@@ -1815,6 +1816,9 @@ exports.ToolCallingResult = {
         }
         if (message.rawText !== "") {
             writer.uint32(74).string(message.rawText);
+        }
+        if (message.thinkingContent !== undefined) {
+            writer.uint32(82).string(message.thinkingContent);
         }
         return writer;
     },
@@ -1888,6 +1892,13 @@ exports.ToolCallingResult = {
                     message.rawText = reader.string();
                     continue;
                 }
+                case 10: {
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.thinkingContent = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1939,6 +1950,11 @@ exports.ToolCallingResult = {
                 : isSet(object.raw_text)
                     ? globalThis.String(object.raw_text)
                     : "",
+            thinkingContent: isSet(object.thinkingContent)
+                ? globalThis.String(object.thinkingContent)
+                : isSet(object.thinking_content)
+                    ? globalThis.String(object.thinking_content)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -1970,6 +1986,9 @@ exports.ToolCallingResult = {
         if (message.rawText !== "") {
             obj.rawText = message.rawText;
         }
+        if (message.thinkingContent !== undefined) {
+            obj.thinkingContent = message.thinkingContent;
+        }
         return obj;
     },
     create(base) {
@@ -1986,6 +2005,7 @@ exports.ToolCallingResult = {
         message.errorMessage = object.errorMessage ?? undefined;
         message.errorCode = object.errorCode ?? 0;
         message.rawText = object.rawText ?? "";
+        message.thinkingContent = object.thinkingContent ?? undefined;
         return message;
     },
 };

@@ -34,6 +34,7 @@
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -59,6 +60,32 @@ int64_t now_us() {
 int64_t now_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+void split_display_text_and_thinking(const std::string& raw_text, std::string* out_text,
+                                     std::string* out_thinking) {
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    if (rac_llm_extract_thinking(raw_text.c_str(), &response, &response_len, &thinking,
+                                 &thinking_len) != RAC_SUCCESS) {
+        if (out_text) {
+            *out_text = raw_text;
+        }
+        if (out_thinking) {
+            out_thinking->clear();
+        }
+        return;
+    }
+
+    if (out_text) {
+        *out_text = response ? std::string(response, response_len) : std::string();
+    }
+    if (out_thinking) {
+        *out_thinking = (thinking && thinking_len > 0) ? std::string(thinking, thinking_len)
+                                                       : std::string();
+    }
 }
 
 enum class SessionState {
@@ -117,6 +144,7 @@ struct ToolCallingSession {
     std::vector<runanywhere::v1::ToolCall> all_tool_calls;
     std::vector<runanywhere::v1::ToolResult> all_tool_results;
     std::string final_text;
+    std::string final_thinking_content;
 
     std::string pending_tool_call_id;
     std::string pending_tool_name;
@@ -242,6 +270,9 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
     runanywhere::v1::ToolCallingSessionEvent event;
     auto* final_result = event.mutable_final_result();
     final_result->set_text(session.final_text);
+    if (!session.final_thinking_content.empty()) {
+        final_result->set_thinking_content(session.final_thinking_content);
+    }
     for (const auto& tc : session.all_tool_calls) {
         *final_result->add_tool_calls() = tc;
     }
@@ -541,8 +572,9 @@ void run_generate_loop(ToolCallingSession& session) {
         const bool has_call =
             parse_tool_call_from_output(session, response, &clean_text, &parsed_call);
 
-        session.final_text = clean_text;
-        emit_llm_chunk(session, clean_text, true, "stop");
+        split_display_text_and_thinking(clean_text, &session.final_text,
+                                        &session.final_thinking_content);
+        emit_llm_chunk(session, session.final_text, true, "stop");
 
         if (!has_call) {
             RAC_LOG_DEBUG(kTag, "no tool call found; loop complete");

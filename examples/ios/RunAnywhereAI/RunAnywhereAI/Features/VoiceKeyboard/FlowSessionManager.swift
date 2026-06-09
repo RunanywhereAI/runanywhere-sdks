@@ -203,16 +203,13 @@ final class FlowSessionManager: ObservableObject {
     /// Buffer accumulation is gated by sessionPhase (.listening only).
     private func startAudioCapture() async -> Bool {
         do {
-            try await audioCapture.startRecording { [weak self] data in
-                // AudioCaptureManager dispatches this callback on DispatchQueue.main
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    // Always update audio level for waveform display
-                    SharedDataBridge.shared.audioLevel = self.audioCapture.audioLevel
-                    // Only accumulate audio data during the explicit listening window
-                    guard case .listening = self.sessionPhase else { return }
-                    self.audioBuffer.append(data)
-                }
+            try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] data in
+                guard let self else { return }
+                // Always update audio level for waveform display
+                SharedDataBridge.shared.audioLevel = self.audioCapture.audioLevel
+                // Only accumulate audio data during the explicit listening window
+                guard case .listening = self.sessionPhase else { return }
+                self.audioBuffer.append(data)
             }
             return true
         } catch {

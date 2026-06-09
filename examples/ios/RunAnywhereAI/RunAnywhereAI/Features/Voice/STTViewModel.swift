@@ -175,14 +175,12 @@ class STTViewModel: VoiceComponentViewModelBase {
 
         do {
             // Batch buffers locally; live feeds the SDK streaming session.
-            try await audioCapture.startRecording { [weak self] audioData in
-                Task { @MainActor in
-                    guard let self else { return }
-                    if self.selectedMode == .live {
-                        self.liveAudioContinuation?.yield(audioData)
-                    } else {
-                        self.audioBuffer.append(audioData)
-                    }
+            try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] audioData in
+                guard let self else { return }
+                if self.selectedMode == .live {
+                    self.liveAudioContinuation?.yield(audioData)
+                } else {
+                    self.audioBuffer.append(audioData)
                 }
             }
 

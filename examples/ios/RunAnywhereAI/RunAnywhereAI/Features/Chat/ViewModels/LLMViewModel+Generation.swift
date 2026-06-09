@@ -28,11 +28,10 @@ extension LLMViewModel {
             prompt: prompt,
             events: eventStream
         ) { fullResponse in
-            let displayText = Self.stripThinkTags(from: fullResponse)
             await MainActor.run {
                 // `@Observable` publishes the message mutation; the chat view
                 // auto-scrolls via `.onChange(of: messages.last?.content)`.
-                self.updateMessageContent(at: messageIndex, content: displayText)
+                self.updateMessageContent(at: messageIndex, content: fullResponse)
             }
         }
 
@@ -42,11 +41,9 @@ extension LLMViewModel {
             ])
         }
 
-        var finalResult = result
-        finalResult.text = Self.stripThinkTags(from: result.text)
         await updateMessageWithResult(
             at: messageIndex,
-            result: finalResult,
+            result: result,
             prompt: prompt,
             options: options,
             wasInterrupted: false

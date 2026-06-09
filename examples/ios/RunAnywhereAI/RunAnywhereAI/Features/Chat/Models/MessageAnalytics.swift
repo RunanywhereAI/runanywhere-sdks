@@ -39,11 +39,9 @@ public struct MessageAnalytics: Codable, Sendable {
     let completionStatus: CompletionStatus
 
     // Performance Indicators
-    let tokensPerSecondHistory: [Double]
     let generationMode: GenerationMode
 
     // Context Information
-    let contextWindowUsage: Double
     let generationParameters: GenerationParameters
 
     public enum CompletionStatus: String, Codable, Sendable {

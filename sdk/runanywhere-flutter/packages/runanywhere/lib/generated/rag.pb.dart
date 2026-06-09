@@ -937,6 +937,7 @@ class RAGResult extends $pb.GeneratedMessage {
     $core.String? errorMessage,
     $core.int? errorCode,
     $core.String? requestId,
+    $core.String? thinkingContent,
   }) {
     final result = create();
     if (answer != null) result.answer = answer;
@@ -951,6 +952,7 @@ class RAGResult extends $pb.GeneratedMessage {
     if (errorMessage != null) result.errorMessage = errorMessage;
     if (errorCode != null) result.errorCode = errorCode;
     if (requestId != null) result.requestId = requestId;
+    if (thinkingContent != null) result.thinkingContent = thinkingContent;
     return result;
   }
 
@@ -980,6 +982,7 @@ class RAGResult extends $pb.GeneratedMessage {
     ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
     ..aI(11, _omitFieldNames ? '' : 'errorCode')
     ..aOS(12, _omitFieldNames ? '' : 'requestId')
+    ..aOS(13, _omitFieldNames ? '' : 'thinkingContent')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1110,6 +1113,16 @@ class RAGResult extends $pb.GeneratedMessage {
   $core.bool hasRequestId() => $_has(11);
   @$pb.TagNumber(12)
   void clearRequestId() => $_clearField(12);
+
+  /// Optional thinking/reasoning content extracted from the answer.
+  @$pb.TagNumber(13)
+  $core.String get thinkingContent => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set thinkingContent($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasThinkingContent() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearThinkingContent() => $_clearField(13);
 }
 
 /// ---------------------------------------------------------------------------

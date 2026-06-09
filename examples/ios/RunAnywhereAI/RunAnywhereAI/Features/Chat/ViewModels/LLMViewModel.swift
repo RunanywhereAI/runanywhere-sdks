@@ -642,12 +642,5 @@ final class LLMViewModel {
         }
     }
 
-    /// Thin pass-through to the app's `ThinkingContentParser.strip(from:)` so the
-    /// app has a single source of truth for `<think>` tag handling on raw
-    /// streaming-token text (the proto `RALLMGenerationResult` carries thinking
-    /// fields separately on the non-streaming path).
-    static func stripThinkTags(from text: String) -> String {
-        ThinkingContentParser.strip(from: text)
-    }
 }
 // swiftlint:enable type_body_length

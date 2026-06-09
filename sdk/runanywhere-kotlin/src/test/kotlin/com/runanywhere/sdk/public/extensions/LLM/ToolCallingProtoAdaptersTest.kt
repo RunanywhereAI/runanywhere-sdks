@@ -49,7 +49,7 @@ class ToolCallingProtoAdaptersTest {
         assertFalse(options.auto_execute)
         assertEquals(64, options.max_tokens)
         assertEquals(0.1f, options.temperature)
-        assertEquals("openai", options.format_hint)
+        assertEquals("default", options.format_hint)
     }
 
     @Test

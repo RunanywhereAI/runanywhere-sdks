@@ -318,6 +318,8 @@ export interface RAGResult {
   errorMessage?: string | undefined;
   errorCode: number;
   requestId: string;
+  /** Optional thinking/reasoning content extracted from the answer. */
+  thinkingContent?: string | undefined;
 }
 
 /**
@@ -2037,6 +2039,7 @@ function createBaseRAGResult(): RAGResult {
     errorMessage: undefined,
     errorCode: 0,
     requestId: "",
+    thinkingContent: undefined,
   };
 }
 
@@ -2077,6 +2080,9 @@ export const RAGResult: MessageFns<RAGResult> = {
     }
     if (message.requestId !== "") {
       writer.uint32(98).string(message.requestId);
+    }
+    if (message.thinkingContent !== undefined) {
+      writer.uint32(106).string(message.thinkingContent);
     }
     return writer;
   },
@@ -2184,6 +2190,14 @@ export const RAGResult: MessageFns<RAGResult> = {
           message.requestId = reader.string();
           continue;
         }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.thinkingContent = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2251,6 +2265,11 @@ export const RAGResult: MessageFns<RAGResult> = {
         : isSet(object.request_id)
         ? globalThis.String(object.request_id)
         : "",
+      thinkingContent: isSet(object.thinkingContent)
+        ? globalThis.String(object.thinkingContent)
+        : isSet(object.thinking_content)
+        ? globalThis.String(object.thinking_content)
+        : undefined,
     };
   },
 
@@ -2292,6 +2311,9 @@ export const RAGResult: MessageFns<RAGResult> = {
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
     }
+    if (message.thinkingContent !== undefined) {
+      obj.thinkingContent = message.thinkingContent;
+    }
     return obj;
   },
 
@@ -2312,6 +2334,7 @@ export const RAGResult: MessageFns<RAGResult> = {
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
     message.requestId = object.requestId ?? "";
+    message.thinkingContent = object.thinkingContent ?? undefined;
     return message;
   },
 };

@@ -142,6 +142,16 @@ public class RAGResult(
     schemaIndex = 11,
   )
   public val request_id: String = "",
+  /**
+   * Optional thinking/reasoning content extracted from the answer.
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "thinkingContent",
+    schemaIndex = 12,
+  )
+  public val thinking_content: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -180,6 +190,7 @@ public class RAGResult(
     if (error_message != other.error_message) return false
     if (error_code != other.error_code) return false
     if (request_id != other.request_id) return false
+    if (thinking_content != other.thinking_content) return false
     return true
   }
 
@@ -199,6 +210,7 @@ public class RAGResult(
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + error_code.hashCode()
       result = result * 37 + request_id.hashCode()
+      result = result * 37 + (thinking_content?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -218,6 +230,7 @@ public class RAGResult(
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     result += """error_code=$error_code"""
     result += """request_id=${sanitize(request_id)}"""
+    if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     return result.joinToString(prefix = "RAGResult{", separator = ", ", postfix = "}")
   }
 
@@ -234,8 +247,9 @@ public class RAGResult(
     error_message: String? = this.error_message,
     error_code: Int = this.error_code,
     request_id: String = this.request_id,
+    thinking_content: String? = this.thinking_content,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGResult = RAGResult(answer, retrieved_chunks, context_used, retrieval_time_ms, generation_time_ms, total_time_ms, prompt_tokens, completion_tokens, total_tokens, error_message, error_code, request_id, unknownFields)
+  ): RAGResult = RAGResult(answer, retrieved_chunks, context_used, retrieval_time_ms, generation_time_ms, total_time_ms, prompt_tokens, completion_tokens, total_tokens, error_message, error_code, request_id, thinking_content, unknownFields)
 
   public companion object {
     @JvmField
@@ -281,6 +295,7 @@ public class RAGResult(
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.request_id)
         }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.thinking_content)
         return size
       }
 
@@ -317,11 +332,13 @@ public class RAGResult(
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.request_id)
         }
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.thinking_content)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.thinking_content)
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 12, value.request_id)
         }
@@ -369,6 +386,7 @@ public class RAGResult(
         var error_message: String? = null
         var error_code: Int = 0
         var request_id: String = ""
+        var thinking_content: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> answer = ProtoAdapter.STRING.decode(reader)
@@ -383,6 +401,7 @@ public class RAGResult(
             10 -> error_message = ProtoAdapter.STRING.decode(reader)
             11 -> error_code = ProtoAdapter.INT32.decode(reader)
             12 -> request_id = ProtoAdapter.STRING.decode(reader)
+            13 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -399,6 +418,7 @@ public class RAGResult(
           error_message = error_message,
           error_code = error_code,
           request_id = request_id,
+          thinking_content = thinking_content,
           unknownFields = unknownFields
         )
       }

@@ -3130,6 +3130,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGResult final : public ::google::
     kContextUsedFieldNumber = 3,
     kErrorMessageFieldNumber = 10,
     kRequestIdFieldNumber = 12,
+    kThinkingContentFieldNumber = 13,
     kRetrievalTimeMsFieldNumber = 4,
     kGenerationTimeMsFieldNumber = 5,
     kTotalTimeMsFieldNumber = 6,
@@ -3221,6 +3222,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGResult final : public ::google::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
 
   public:
+  // optional string thinking_content = 13;
+  [[nodiscard]] bool has_thinking_content()
+      const;
+  void clear_thinking_content() ;
+  [[nodiscard]] const ::std::string& thinking_content() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_thinking_content(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_thinking_content();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_thinking_content();
+  void set_allocated_thinking_content(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_thinking_content() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_thinking_content(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_thinking_content();
+
+  public:
   // int64 retrieval_time_ms = 4;
   void clear_retrieval_time_ms() ;
   [[nodiscard]] ::int64_t retrieval_time_ms() const;
@@ -3295,8 +3313,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGResult final : public ::google::
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 12,
-                          1, 82,
+      ::google::protobuf::internal::TcParseTable<4, 13,
+                          1, 98,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -3329,6 +3347,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGResult final : public ::google::
     ::google::protobuf::internal::ArenaStringPtr context_used_;
     ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::google::protobuf::internal::ArenaStringPtr thinking_content_;
     ::int64_t retrieval_time_ms_;
     ::int64_t generation_time_ms_;
     ::int64_t total_time_ms_;
@@ -6271,7 +6290,7 @@ inline void RAGResult::set_allocated_context_used(::std::string* PROTOBUF_NULLAB
 inline void RAGResult::clear_retrieval_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.retrieval_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::int64_t RAGResult::retrieval_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.retrieval_time_ms)
@@ -6279,7 +6298,7 @@ inline ::int64_t RAGResult::retrieval_time_ms() const {
 }
 inline void RAGResult::set_retrieval_time_ms(::int64_t value) {
   _internal_set_retrieval_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.retrieval_time_ms)
 }
 inline ::int64_t RAGResult::_internal_retrieval_time_ms() const {
@@ -6295,7 +6314,7 @@ inline void RAGResult::_internal_set_retrieval_time_ms(::int64_t value) {
 inline void RAGResult::clear_generation_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.generation_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int64_t RAGResult::generation_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.generation_time_ms)
@@ -6303,7 +6322,7 @@ inline ::int64_t RAGResult::generation_time_ms() const {
 }
 inline void RAGResult::set_generation_time_ms(::int64_t value) {
   _internal_set_generation_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.generation_time_ms)
 }
 inline ::int64_t RAGResult::_internal_generation_time_ms() const {
@@ -6319,7 +6338,7 @@ inline void RAGResult::_internal_set_generation_time_ms(::int64_t value) {
 inline void RAGResult::clear_total_time_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_time_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::int64_t RAGResult::total_time_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.total_time_ms)
@@ -6327,7 +6346,7 @@ inline ::int64_t RAGResult::total_time_ms() const {
 }
 inline void RAGResult::set_total_time_ms(::int64_t value) {
   _internal_set_total_time_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.total_time_ms)
 }
 inline ::int64_t RAGResult::_internal_total_time_ms() const {
@@ -6343,7 +6362,7 @@ inline void RAGResult::_internal_set_total_time_ms(::int64_t value) {
 inline void RAGResult::clear_prompt_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prompt_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline ::int32_t RAGResult::prompt_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.prompt_tokens)
@@ -6351,7 +6370,7 @@ inline ::int32_t RAGResult::prompt_tokens() const {
 }
 inline void RAGResult::set_prompt_tokens(::int32_t value) {
   _internal_set_prompt_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.prompt_tokens)
 }
 inline ::int32_t RAGResult::_internal_prompt_tokens() const {
@@ -6367,7 +6386,7 @@ inline void RAGResult::_internal_set_prompt_tokens(::int32_t value) {
 inline void RAGResult::clear_completion_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.completion_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline ::int32_t RAGResult::completion_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.completion_tokens)
@@ -6375,7 +6394,7 @@ inline ::int32_t RAGResult::completion_tokens() const {
 }
 inline void RAGResult::set_completion_tokens(::int32_t value) {
   _internal_set_completion_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.completion_tokens)
 }
 inline ::int32_t RAGResult::_internal_completion_tokens() const {
@@ -6391,7 +6410,7 @@ inline void RAGResult::_internal_set_completion_tokens(::int32_t value) {
 inline void RAGResult::clear_total_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.total_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 inline ::int32_t RAGResult::total_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.total_tokens)
@@ -6399,7 +6418,7 @@ inline ::int32_t RAGResult::total_tokens() const {
 }
 inline void RAGResult::set_total_tokens(::int32_t value) {
   _internal_set_total_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.total_tokens)
 }
 inline ::int32_t RAGResult::_internal_total_tokens() const {
@@ -6483,7 +6502,7 @@ inline void RAGResult::set_allocated_error_message(::std::string* PROTOBUF_NULLA
 inline void RAGResult::clear_error_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline ::int32_t RAGResult::error_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.error_code)
@@ -6491,7 +6510,7 @@ inline ::int32_t RAGResult::error_code() const {
 }
 inline void RAGResult::set_error_code(::int32_t value) {
   _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.error_code)
 }
 inline ::int32_t RAGResult::_internal_error_code() const {
@@ -6565,6 +6584,74 @@ inline void RAGResult::set_allocated_request_id(::std::string* PROTOBUF_NULLABLE
     _impl_.request_id_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGResult.request_id)
+}
+
+// optional string thinking_content = 13;
+inline bool RAGResult::has_thinking_content() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  return value;
+}
+inline void RAGResult::clear_thinking_content() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.thinking_content_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline const ::std::string& RAGResult::thinking_content() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGResult.thinking_content)
+  return _internal_thinking_content();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void RAGResult::set_thinking_content(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.thinking_content_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGResult.thinking_content)
+}
+inline ::std::string* PROTOBUF_NONNULL RAGResult::mutable_thinking_content()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::std::string* _s = _internal_mutable_thinking_content();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGResult.thinking_content)
+  return _s;
+}
+inline const ::std::string& RAGResult::_internal_thinking_content() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.thinking_content_.Get();
+}
+inline void RAGResult::_internal_set_thinking_content(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.thinking_content_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL RAGResult::_internal_mutable_thinking_content() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.thinking_content_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE RAGResult::release_thinking_content() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGResult.thinking_content)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  auto* released = _impl_.thinking_content_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.thinking_content_.Set("", GetArena());
+  }
+  return released;
+}
+inline void RAGResult::set_allocated_thinking_content(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+  _impl_.thinking_content_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.thinking_content_.IsDefault()) {
+    _impl_.thinking_content_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGResult.thinking_content)
 }
 
 // -------------------------------------------------------------------

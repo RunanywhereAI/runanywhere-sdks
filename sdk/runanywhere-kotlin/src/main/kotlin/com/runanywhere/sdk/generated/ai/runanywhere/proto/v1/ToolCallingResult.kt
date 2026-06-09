@@ -105,6 +105,16 @@ public class ToolCallingResult(
     schemaIndex = 8,
   )
   public val raw_text: String = "",
+  /**
+   * Optional thinking/reasoning content extracted from the final response.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "thinkingContent",
+    schemaIndex = 9,
+  )
+  public val thinking_content: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -150,6 +160,7 @@ public class ToolCallingResult(
     if (error_message != other.error_message) return false
     if (error_code != other.error_code) return false
     if (raw_text != other.raw_text) return false
+    if (thinking_content != other.thinking_content) return false
     return true
   }
 
@@ -166,6 +177,7 @@ public class ToolCallingResult(
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + error_code.hashCode()
       result = result * 37 + raw_text.hashCode()
+      result = result * 37 + (thinking_content?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -182,6 +194,7 @@ public class ToolCallingResult(
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     result += """error_code=$error_code"""
     result += """raw_text=${sanitize(raw_text)}"""
+    if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     return result.joinToString(prefix = "ToolCallingResult{", separator = ", ", postfix = "}")
   }
 
@@ -195,8 +208,9 @@ public class ToolCallingResult(
     error_message: String? = this.error_message,
     error_code: Int = this.error_code,
     raw_text: String = this.raw_text,
+    thinking_content: String? = this.thinking_content,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, conversation_id, iterations_used, error_message, error_code, raw_text, unknownFields)
+  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, conversation_id, iterations_used, error_message, error_code, raw_text, thinking_content, unknownFields)
 
   public companion object {
     @JvmField
@@ -229,6 +243,7 @@ public class ToolCallingResult(
         if (value.raw_text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.raw_text)
         }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.thinking_content)
         return size
       }
 
@@ -252,11 +267,13 @@ public class ToolCallingResult(
         if (value.raw_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.raw_text)
         }
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.thinking_content)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.thinking_content)
         if (value.raw_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.raw_text)
         }
@@ -288,6 +305,7 @@ public class ToolCallingResult(
         var error_message: String? = null
         var error_code: Int = 0
         var raw_text: String = ""
+        var thinking_content: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -299,6 +317,7 @@ public class ToolCallingResult(
             7 -> error_message = ProtoAdapter.STRING.decode(reader)
             8 -> error_code = ProtoAdapter.INT32.decode(reader)
             9 -> raw_text = ProtoAdapter.STRING.decode(reader)
+            10 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -312,6 +331,7 @@ public class ToolCallingResult(
           error_message = error_message,
           error_code = error_code,
           raw_text = raw_text,
+          thinking_content = thinking_content,
           unknownFields = unknownFields
         )
       }

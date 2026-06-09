@@ -36,6 +36,7 @@
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -100,6 +101,30 @@ std::shared_ptr<LoopCancelState> lookup_loop_state(uint64_t handle) {
 int64_t now_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+void set_display_text_and_thinking(runanywhere::v1::ToolCallingResult* result,
+                                   const std::string& raw_text) {
+    if (!result) {
+        return;
+    }
+
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    if (rac_llm_extract_thinking(raw_text.c_str(), &response, &response_len, &thinking,
+                                 &thinking_len) != RAC_SUCCESS) {
+        result->set_text(raw_text);
+        return;
+    }
+
+    result->set_text(response ? std::string(response, response_len) : std::string());
+    if (thinking && thinking_len > 0) {
+        result->set_thinking_content(std::string(thinking, thinking_len));
+    } else {
+        result->clear_thinking_content();
+    }
 }
 
 // Snapshot of immutable per-loop inputs. Mirrors the per-session struct in
@@ -489,7 +514,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
             const bool cancelled = cancel_state->cancel_requested.load(std::memory_order_acquire);
             const rac_result_t report_rc = cancelled ? RAC_ERROR_CANCELLED : rc;
             const char* msg = cancelled ? "LLM generation cancelled" : "LLM generation failed";
-            final_result.set_text(final_text);
+            set_display_text_and_thinking(&final_result, final_text);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
             final_result.set_error_code(static_cast<int32_t>(report_rc));
@@ -607,7 +632,7 @@ run_loop_impl(const uint8_t* in_request_bytes, size_t in_size,
         is_complete = true;
     }
 
-    final_result.set_text(final_text);
+    set_display_text_and_thinking(&final_result, final_text);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
 

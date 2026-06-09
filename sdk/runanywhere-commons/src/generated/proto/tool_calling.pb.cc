@@ -2441,11 +2441,11 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
     {
       PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._has_bits_),
       0, // no _extensions_
-      9, 120,  // max_field_number, fast_idx_mask
+      10, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
+      4294966272,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      10,  // num_field_entries
       2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -2469,30 +2469,33 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
        {26, 1, 1,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_results_)}},
       // bool is_complete = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolCallingResult, _impl_.is_complete_), 6>(),
-       {32, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolCallingResult, _impl_.is_complete_), 7>(),
+       {32, 7, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_)}},
       // optional string conversation_id = 5;
       {::_pbi::TcParser::FastUS1,
        {42, 3, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.conversation_id_)}},
       // int32 iterations_used = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.iterations_used_), 7>(),
-       {48, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.iterations_used_), 8>(),
+       {48, 8, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_)}},
       // optional string error_message = 7;
       {::_pbi::TcParser::FastUS1,
        {58, 4, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_message_)}},
       // int32 error_code = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.error_code_), 8>(),
-       {64, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.error_code_), 9>(),
+       {64, 9, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_)}},
       // string raw_text = 9;
       {::_pbi::TcParser::FastUS1,
        {74, 5, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.raw_text_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional string thinking_content = 10;
+      {::_pbi::TcParser::FastUS1,
+       {82, 6, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -2508,17 +2511,19 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
       // repeated .runanywhere.v1.ToolResult tool_results = 3;
       {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_results_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // bool is_complete = 4;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional string conversation_id = 5;
       {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.conversation_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 iterations_used = 6;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional string error_message = 7;
       {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_message_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 error_code = 8;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string raw_text = 9;
       {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.raw_text_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional string thinking_content = 10;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2533,12 +2538,13 @@ constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGeneratePar
         #endif
     }},
     {{
-      "\40\4\0\0\0\17\0\15\0\10\0\0\0\0\0\0"
+      "\40\4\0\0\0\17\0\15\0\10\20\0\0\0\0\0"
       "runanywhere.v1.ToolCallingResult"
       "text"
       "conversation_id"
       "error_message"
       "raw_text"
+      "thinking_content"
     }},
   };
 }
@@ -2568,6 +2574,9 @@ inline constexpr ToolCallingResult::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         raw_text_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        thinking_content_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         is_complete_{false},
@@ -4829,7 +4838,7 @@ const ::uint32_t
         16,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_._has_bits_),
-        12, // hasbit index offset
+        13, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_calls_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_results_),
@@ -4839,15 +4848,17 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.error_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.raw_text_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.thinking_content_),
         2,
         0,
         1,
-        6,
-        3,
         7,
-        4,
+        3,
         8,
+        4,
+        9,
         5,
+        6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseRequest, _impl_._has_bits_),
         5, // hasbit index offset
@@ -5025,19 +5036,19 @@ static const ::_pbi::MigrationSchema
         {87, sizeof(::runanywhere::v1::ToolResult)},
         {106, sizeof(::runanywhere::v1::ToolCallingOptions)},
         {143, sizeof(::runanywhere::v1::ToolCallingResult)},
-        {164, sizeof(::runanywhere::v1::ToolParseRequest)},
-        {171, sizeof(::runanywhere::v1::ToolParseResult)},
-        {184, sizeof(::runanywhere::v1::ToolPromptFormatRequest)},
-        {195, sizeof(::runanywhere::v1::ToolPromptFormatResult)},
-        {208, sizeof(::runanywhere::v1::ToolCallValidationRequest)},
-        {215, sizeof(::runanywhere::v1::ToolCallValidationResult)},
-        {230, sizeof(::runanywhere::v1::ToolCallingStreamEvent)},
-        {253, sizeof(::runanywhere::v1::ToolRegistrySnapshot)},
-        {260, sizeof(::runanywhere::v1::ToolCallingSessionCreateRequest)},
-        {289, sizeof(::runanywhere::v1::ToolCallingSessionCreateResult)},
-        {294, sizeof(::runanywhere::v1::ToolCallingSessionEvent)},
-        {309, sizeof(::runanywhere::v1::ToolCallingSessionStepWithResultRequest)},
-        {320, sizeof(::runanywhere::v1::ToolCallingSessionDestroyRequest)},
+        {166, sizeof(::runanywhere::v1::ToolParseRequest)},
+        {173, sizeof(::runanywhere::v1::ToolParseResult)},
+        {186, sizeof(::runanywhere::v1::ToolPromptFormatRequest)},
+        {197, sizeof(::runanywhere::v1::ToolPromptFormatResult)},
+        {210, sizeof(::runanywhere::v1::ToolCallValidationRequest)},
+        {217, sizeof(::runanywhere::v1::ToolCallValidationResult)},
+        {232, sizeof(::runanywhere::v1::ToolCallingStreamEvent)},
+        {255, sizeof(::runanywhere::v1::ToolRegistrySnapshot)},
+        {262, sizeof(::runanywhere::v1::ToolCallingSessionCreateRequest)},
+        {291, sizeof(::runanywhere::v1::ToolCallingSessionCreateResult)},
+        {296, sizeof(::runanywhere::v1::ToolCallingSessionEvent)},
+        {311, sizeof(::runanywhere::v1::ToolCallingSessionStepWithResultRequest)},
+        {322, sizeof(::runanywhere::v1::ToolCallingSessionDestroyRequest)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -5123,122 +5134,123 @@ const char descriptor_table_protodef_tool_5fcalling_2eproto[] ABSL_ATTRIBUTE_SEC
     "\014_temperatureB\r\n\013_max_tokensB\020\n\016_system_"
     "promptB\t\n\007_formatB\027\n\025_custom_system_prom"
     "ptB\021\n\017_max_tool_callsB\023\n\021_forced_tool_na"
-    "meB\023\n\021_disable_thinking\"\265\002\n\021ToolCallingR"
+    "meB\023\n\021_disable_thinking\"\351\002\n\021ToolCallingR"
     "esult\022\014\n\004text\030\001 \001(\t\022,\n\ntool_calls\030\002 \003(\0132"
     "\030.runanywhere.v1.ToolCall\0220\n\014tool_result"
     "s\030\003 \003(\0132\032.runanywhere.v1.ToolResult\022\023\n\013i"
     "s_complete\030\004 \001(\010\022\034\n\017conversation_id\030\005 \001("
     "\tH\000\210\001\001\022\027\n\017iterations_used\030\006 \001(\005\022\032\n\rerror"
     "_message\030\007 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\010 \001(\005\022"
-    "\020\n\010raw_text\030\t \001(\tB\022\n\020_conversation_idB\020\n"
-    "\016_error_message\"f\n\020ToolParseRequest\022\014\n\004t"
-    "ext\030\001 \001(\t\0228\n\007options\030\002 \001(\0132\".runanywhere"
-    ".v1.ToolCallingOptionsH\000\210\001\001B\n\n\010_options\""
-    "\260\001\n\017ToolParseResult\022\025\n\rhas_tool_call\030\001 \001"
-    "(\010\022,\n\ntool_calls\030\002 \003(\0132\030.runanywhere.v1."
-    "ToolCall\022\026\n\016remaining_text\030\003 \001(\t\022\032\n\rerro"
-    "r_message\030\004 \001(\tH\000\210\001\001\022\022\n\nerror_code\030\005 \001(\005"
-    "B\020\n\016_error_message\"\326\001\n\027ToolPromptFormatR"
-    "equest\022\023\n\013user_prompt\030\001 \001(\t\0228\n\007options\030\002"
-    " \001(\0132\".runanywhere.v1.ToolCallingOptions"
-    "H\000\210\001\001\0220\n\014tool_results\030\003 \003(\0132\032.runanywher"
-    "e.v1.ToolResult\022\033\n\016assistant_text\030\004 \001(\tH"
-    "\001\210\001\001B\n\n\010_optionsB\021\n\017_assistant_text\"\275\001\n\026"
-    "ToolPromptFormatResult\022\030\n\020formatted_prom"
-    "pt\030\001 \001(\t\0222\n\006format\030\002 \001(\0162\".runanywhere.v"
-    "1.ToolCallFormatName\022\023\n\013format_hint\030\003 \001("
-    "\t\022\032\n\rerror_message\030\004 \001(\tH\000\210\001\001\022\022\n\nerror_c"
-    "ode\030\005 \001(\005B\020\n\016_error_message\"\216\001\n\031ToolCall"
-    "ValidationRequest\022+\n\ttool_call\030\001 \001(\0132\030.r"
-    "unanywhere.v1.ToolCall\0228\n\007options\030\002 \001(\0132"
-    "\".runanywhere.v1.ToolCallingOptionsH\000\210\001\001"
-    "B\n\n\010_options\"\370\001\n\030ToolCallValidationResul"
-    "t\022\020\n\010is_valid\030\001 \001(\010\022\031\n\021validation_errors"
-    "\030\002 \003(\t\0229\n\014matched_tool\030\003 \001(\0132\036.runanywhe"
-    "re.v1.ToolDefinitionH\000\210\001\001\022!\n\031normalized_"
-    "arguments_json\030\004 \001(\t\022\032\n\rerror_message\030\005 "
-    "\001(\tH\001\210\001\001\022\022\n\nerror_code\030\006 \001(\005B\017\n\r_matched"
-    "_toolB\020\n\016_error_message\"\250\003\n\026ToolCallingS"
-    "treamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030"
-    "\002 \001(\003\022\027\n\017conversation_id\030\003 \001(\t\0228\n\004kind\030\004"
-    " \001(\0162*.runanywhere.v1.ToolCallingStreamE"
-    "ventKind\022\r\n\005token\030\005 \001(\t\0220\n\ttool_call\030\006 \001"
-    "(\0132\030.runanywhere.v1.ToolCallH\000\210\001\001\0224\n\013too"
-    "l_result\030\007 \001(\0132\032.runanywhere.v1.ToolResu"
-    "ltH\001\210\001\001\0226\n\006result\030\010 \001(\0132!.runanywhere.v1"
-    ".ToolCallingResultH\002\210\001\001\022\032\n\rerror_message"
-    "\030\t \001(\tH\003\210\001\001\022\022\n\nerror_code\030\n \001(\005B\014\n\n_tool"
-    "_callB\016\n\014_tool_resultB\t\n\007_resultB\020\n\016_err"
-    "or_message\"\\\n\024ToolRegistrySnapshot\022-\n\005to"
-    "ols\030\001 \003(\0132\036.runanywhere.v1.ToolDefinitio"
-    "n\022\025\n\rupdated_at_ms\030\002 \001(\003\"\310\003\n\037ToolCalling"
-    "SessionCreateRequest\022\016\n\006prompt\030\001 \001(\t\022\022\n\n"
-    "max_tokens\030\013 \001(\005\022\023\n\013temperature\030\014 \001(\002\022\r\n"
-    "\005top_p\030\r \001(\002\022\025\n\rsystem_prompt\030\016 \001(\t\022-\n\005t"
-    "ools\030\002 \003(\0132\036.runanywhere.v1.ToolDefiniti"
-    "on\022\023\n\013format_hint\030\003 \001(\t\022\026\n\016max_iteration"
-    "s\030\004 \001(\r\022\034\n\024keep_tools_available\030\005 \001(\010\022\033\n"
-    "\016validate_calls\030\006 \001(\010H\000\210\001\001\0228\n\013tool_choic"
-    "e\030\007 \001(\0162\036.runanywhere.v1.ToolChoiceModeH"
-    "\001\210\001\001\022\035\n\020forced_tool_name\030\010 \001(\tH\002\210\001\001\022\030\n\020d"
-    "isable_thinking\030\017 \001(\010B\021\n\017_validate_calls"
-    "B\016\n\014_tool_choiceB\023\n\021_forced_tool_nameJ\004\010"
-    "\t\020\013\"8\n\036ToolCallingSessionCreateResult\022\026\n"
-    "\016session_handle\030\001 \001(\004\"\321\001\n\027ToolCallingSes"
-    "sionEvent\022 \n\026llm_stream_event_bytes\030\001 \001("
-    "\014H\000\022-\n\ttool_call\030\002 \001(\0132\030.runanywhere.v1."
-    "ToolCallH\000\0229\n\014final_result\030\003 \001(\0132!.runan"
-    "ywhere.v1.ToolCallingResultH\000\022\025\n\013error_b"
-    "ytes\030\004 \001(\014H\000\022\013\n\003seq\030\005 \001(\004B\006\n\004kind\"\212\001\n\'To"
-    "olCallingSessionStepWithResultRequest\022\026\n"
-    "\016session_handle\030\001 \001(\004\022\024\n\014tool_call_id\030\002 "
-    "\001(\t\022\023\n\013result_json\030\003 \001(\t\022\022\n\005error\030\004 \001(\tH"
-    "\000\210\001\001B\010\n\006_error\":\n ToolCallingSessionDest"
-    "royRequest\022\026\n\016session_handle\030\001 \001(\004*\330\001\n\021T"
-    "oolParameterType\022#\n\037TOOL_PARAMETER_TYPE_"
-    "UNSPECIFIED\020\000\022\036\n\032TOOL_PARAMETER_TYPE_STR"
-    "ING\020\001\022\036\n\032TOOL_PARAMETER_TYPE_NUMBER\020\002\022\037\n"
-    "\033TOOL_PARAMETER_TYPE_BOOLEAN\020\003\022\036\n\032TOOL_P"
-    "ARAMETER_TYPE_OBJECT\020\004\022\035\n\031TOOL_PARAMETER"
-    "_TYPE_ARRAY\020\005*\216\002\n\022ToolCallFormatName\022%\n!"
-    "TOOL_CALL_FORMAT_NAME_UNSPECIFIED\020\000\022\036\n\032T"
-    "OOL_CALL_FORMAT_NAME_JSON\020\001\022\035\n\031TOOL_CALL"
-    "_FORMAT_NAME_XML\020\002\022 \n\034TOOL_CALL_FORMAT_N"
-    "AME_NATIVE\020\003\022\"\n\036TOOL_CALL_FORMAT_NAME_PY"
-    "THONIC\020\004\022*\n&TOOL_CALL_FORMAT_NAME_OPENAI"
-    "_FUNCTIONS\020\005\022 \n\034TOOL_CALL_FORMAT_NAME_HE"
-    "RMES\020\006*\246\001\n\016ToolChoiceMode\022 \n\034TOOL_CHOICE"
-    "_MODE_UNSPECIFIED\020\000\022\031\n\025TOOL_CHOICE_MODE_"
-    "AUTO\020\001\022\031\n\025TOOL_CHOICE_MODE_NONE\020\002\022\035\n\031TOO"
-    "L_CHOICE_MODE_REQUIRED\020\003\022\035\n\031TOOL_CHOICE_"
-    "MODE_SPECIFIC\020\004*\201\003\n\032ToolCallingStreamEve"
-    "ntKind\022.\n*TOOL_CALLING_STREAM_EVENT_KIND"
-    "_UNSPECIFIED\020\000\022.\n*TOOL_CALLING_STREAM_EV"
-    "ENT_KIND_MODEL_TOKEN\020\001\0223\n/TOOL_CALLING_S"
-    "TREAM_EVENT_KIND_TOOL_CALL_PARSED\020\002\0229\n5T"
-    "OOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECU"
-    "TION_STARTED\020\003\022;\n7TOOL_CALLING_STREAM_EV"
-    "ENT_KIND_TOOL_EXECUTION_COMPLETED\020\004\022,\n(T"
-    "OOL_CALLING_STREAM_EVENT_KIND_COMPLETED\020"
-    "\005\022(\n$TOOL_CALLING_STREAM_EVENT_KIND_ERRO"
-    "R\020\0062\237\002\n\013ToolCalling\022J\n\005Parse\022 .runanywhe"
-    "re.v1.ToolParseRequest\032\037.runanywhere.v1."
-    "ToolParseResult\022_\n\014FormatPrompt\022\'.runany"
-    "where.v1.ToolPromptFormatRequest\032&.runan"
-    "ywhere.v1.ToolPromptFormatResult\022c\n\014Vali"
-    "dateCall\022).runanywhere.v1.ToolCallValida"
-    "tionRequest\032(.runanywhere.v1.ToolCallVal"
-    "idationResultB\213\001\n\027ai.runanywhere.proto.v"
-    "1B\020ToolCallingProtoP\001Z<github.com/runany"
-    "where/runanywhere-sdks/idl/v1;runanywher"
-    "ev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
-    "to3"
+    "\020\n\010raw_text\030\t \001(\t\022\035\n\020thinking_content\030\n "
+    "\001(\tH\002\210\001\001B\022\n\020_conversation_idB\020\n\016_error_m"
+    "essageB\023\n\021_thinking_content\"f\n\020ToolParse"
+    "Request\022\014\n\004text\030\001 \001(\t\0228\n\007options\030\002 \001(\0132\""
+    ".runanywhere.v1.ToolCallingOptionsH\000\210\001\001B"
+    "\n\n\010_options\"\260\001\n\017ToolParseResult\022\025\n\rhas_t"
+    "ool_call\030\001 \001(\010\022,\n\ntool_calls\030\002 \003(\0132\030.run"
+    "anywhere.v1.ToolCall\022\026\n\016remaining_text\030\003"
+    " \001(\t\022\032\n\rerror_message\030\004 \001(\tH\000\210\001\001\022\022\n\nerro"
+    "r_code\030\005 \001(\005B\020\n\016_error_message\"\326\001\n\027ToolP"
+    "romptFormatRequest\022\023\n\013user_prompt\030\001 \001(\t\022"
+    "8\n\007options\030\002 \001(\0132\".runanywhere.v1.ToolCa"
+    "llingOptionsH\000\210\001\001\0220\n\014tool_results\030\003 \003(\0132"
+    "\032.runanywhere.v1.ToolResult\022\033\n\016assistant"
+    "_text\030\004 \001(\tH\001\210\001\001B\n\n\010_optionsB\021\n\017_assista"
+    "nt_text\"\275\001\n\026ToolPromptFormatResult\022\030\n\020fo"
+    "rmatted_prompt\030\001 \001(\t\0222\n\006format\030\002 \001(\0162\".r"
+    "unanywhere.v1.ToolCallFormatName\022\023\n\013form"
+    "at_hint\030\003 \001(\t\022\032\n\rerror_message\030\004 \001(\tH\000\210\001"
+    "\001\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_error_message\""
+    "\216\001\n\031ToolCallValidationRequest\022+\n\ttool_ca"
+    "ll\030\001 \001(\0132\030.runanywhere.v1.ToolCall\0228\n\007op"
+    "tions\030\002 \001(\0132\".runanywhere.v1.ToolCalling"
+    "OptionsH\000\210\001\001B\n\n\010_options\"\370\001\n\030ToolCallVal"
+    "idationResult\022\020\n\010is_valid\030\001 \001(\010\022\031\n\021valid"
+    "ation_errors\030\002 \003(\t\0229\n\014matched_tool\030\003 \001(\013"
+    "2\036.runanywhere.v1.ToolDefinitionH\000\210\001\001\022!\n"
+    "\031normalized_arguments_json\030\004 \001(\t\022\032\n\rerro"
+    "r_message\030\005 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\006 \001(\005"
+    "B\017\n\r_matched_toolB\020\n\016_error_message\"\250\003\n\026"
+    "ToolCallingStreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014t"
+    "imestamp_us\030\002 \001(\003\022\027\n\017conversation_id\030\003 \001"
+    "(\t\0228\n\004kind\030\004 \001(\0162*.runanywhere.v1.ToolCa"
+    "llingStreamEventKind\022\r\n\005token\030\005 \001(\t\0220\n\tt"
+    "ool_call\030\006 \001(\0132\030.runanywhere.v1.ToolCall"
+    "H\000\210\001\001\0224\n\013tool_result\030\007 \001(\0132\032.runanywhere"
+    ".v1.ToolResultH\001\210\001\001\0226\n\006result\030\010 \001(\0132!.ru"
+    "nanywhere.v1.ToolCallingResultH\002\210\001\001\022\032\n\re"
+    "rror_message\030\t \001(\tH\003\210\001\001\022\022\n\nerror_code\030\n "
+    "\001(\005B\014\n\n_tool_callB\016\n\014_tool_resultB\t\n\007_re"
+    "sultB\020\n\016_error_message\"\\\n\024ToolRegistrySn"
+    "apshot\022-\n\005tools\030\001 \003(\0132\036.runanywhere.v1.T"
+    "oolDefinition\022\025\n\rupdated_at_ms\030\002 \001(\003\"\310\003\n"
+    "\037ToolCallingSessionCreateRequest\022\016\n\006prom"
+    "pt\030\001 \001(\t\022\022\n\nmax_tokens\030\013 \001(\005\022\023\n\013temperat"
+    "ure\030\014 \001(\002\022\r\n\005top_p\030\r \001(\002\022\025\n\rsystem_promp"
+    "t\030\016 \001(\t\022-\n\005tools\030\002 \003(\0132\036.runanywhere.v1."
+    "ToolDefinition\022\023\n\013format_hint\030\003 \001(\t\022\026\n\016m"
+    "ax_iterations\030\004 \001(\r\022\034\n\024keep_tools_availa"
+    "ble\030\005 \001(\010\022\033\n\016validate_calls\030\006 \001(\010H\000\210\001\001\0228"
+    "\n\013tool_choice\030\007 \001(\0162\036.runanywhere.v1.Too"
+    "lChoiceModeH\001\210\001\001\022\035\n\020forced_tool_name\030\010 \001"
+    "(\tH\002\210\001\001\022\030\n\020disable_thinking\030\017 \001(\010B\021\n\017_va"
+    "lidate_callsB\016\n\014_tool_choiceB\023\n\021_forced_"
+    "tool_nameJ\004\010\t\020\013\"8\n\036ToolCallingSessionCre"
+    "ateResult\022\026\n\016session_handle\030\001 \001(\004\"\321\001\n\027To"
+    "olCallingSessionEvent\022 \n\026llm_stream_even"
+    "t_bytes\030\001 \001(\014H\000\022-\n\ttool_call\030\002 \001(\0132\030.run"
+    "anywhere.v1.ToolCallH\000\0229\n\014final_result\030\003"
+    " \001(\0132!.runanywhere.v1.ToolCallingResultH"
+    "\000\022\025\n\013error_bytes\030\004 \001(\014H\000\022\013\n\003seq\030\005 \001(\004B\006\n"
+    "\004kind\"\212\001\n\'ToolCallingSessionStepWithResu"
+    "ltRequest\022\026\n\016session_handle\030\001 \001(\004\022\024\n\014too"
+    "l_call_id\030\002 \001(\t\022\023\n\013result_json\030\003 \001(\t\022\022\n\005"
+    "error\030\004 \001(\tH\000\210\001\001B\010\n\006_error\":\n ToolCallin"
+    "gSessionDestroyRequest\022\026\n\016session_handle"
+    "\030\001 \001(\004*\330\001\n\021ToolParameterType\022#\n\037TOOL_PAR"
+    "AMETER_TYPE_UNSPECIFIED\020\000\022\036\n\032TOOL_PARAME"
+    "TER_TYPE_STRING\020\001\022\036\n\032TOOL_PARAMETER_TYPE"
+    "_NUMBER\020\002\022\037\n\033TOOL_PARAMETER_TYPE_BOOLEAN"
+    "\020\003\022\036\n\032TOOL_PARAMETER_TYPE_OBJECT\020\004\022\035\n\031TO"
+    "OL_PARAMETER_TYPE_ARRAY\020\005*\216\002\n\022ToolCallFo"
+    "rmatName\022%\n!TOOL_CALL_FORMAT_NAME_UNSPEC"
+    "IFIED\020\000\022\036\n\032TOOL_CALL_FORMAT_NAME_JSON\020\001\022"
+    "\035\n\031TOOL_CALL_FORMAT_NAME_XML\020\002\022 \n\034TOOL_C"
+    "ALL_FORMAT_NAME_NATIVE\020\003\022\"\n\036TOOL_CALL_FO"
+    "RMAT_NAME_PYTHONIC\020\004\022*\n&TOOL_CALL_FORMAT"
+    "_NAME_OPENAI_FUNCTIONS\020\005\022 \n\034TOOL_CALL_FO"
+    "RMAT_NAME_HERMES\020\006*\246\001\n\016ToolChoiceMode\022 \n"
+    "\034TOOL_CHOICE_MODE_UNSPECIFIED\020\000\022\031\n\025TOOL_"
+    "CHOICE_MODE_AUTO\020\001\022\031\n\025TOOL_CHOICE_MODE_N"
+    "ONE\020\002\022\035\n\031TOOL_CHOICE_MODE_REQUIRED\020\003\022\035\n\031"
+    "TOOL_CHOICE_MODE_SPECIFIC\020\004*\201\003\n\032ToolCall"
+    "ingStreamEventKind\022.\n*TOOL_CALLING_STREA"
+    "M_EVENT_KIND_UNSPECIFIED\020\000\022.\n*TOOL_CALLI"
+    "NG_STREAM_EVENT_KIND_MODEL_TOKEN\020\001\0223\n/TO"
+    "OL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_P"
+    "ARSED\020\002\0229\n5TOOL_CALLING_STREAM_EVENT_KIN"
+    "D_TOOL_EXECUTION_STARTED\020\003\022;\n7TOOL_CALLI"
+    "NG_STREAM_EVENT_KIND_TOOL_EXECUTION_COMP"
+    "LETED\020\004\022,\n(TOOL_CALLING_STREAM_EVENT_KIN"
+    "D_COMPLETED\020\005\022(\n$TOOL_CALLING_STREAM_EVE"
+    "NT_KIND_ERROR\020\0062\237\002\n\013ToolCalling\022J\n\005Parse"
+    "\022 .runanywhere.v1.ToolParseRequest\032\037.run"
+    "anywhere.v1.ToolParseResult\022_\n\014FormatPro"
+    "mpt\022\'.runanywhere.v1.ToolPromptFormatReq"
+    "uest\032&.runanywhere.v1.ToolPromptFormatRe"
+    "sult\022c\n\014ValidateCall\022).runanywhere.v1.To"
+    "olCallValidationRequest\032(.runanywhere.v1"
+    ".ToolCallValidationResultB\213\001\n\027ai.runanyw"
+    "here.proto.v1B\020ToolCallingProtoP\001Z<githu"
+    "b.com/runanywhere/runanywhere-sdks/idl/v"
+    "1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere."
+    "V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_tool_5fcalling_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_tool_5fcalling_2eproto = {
     false,
     false,
-    6523,
+    6575,
     descriptor_table_protodef_tool_5fcalling_2eproto,
     "tool_calling.proto",
     &descriptor_table_tool_5fcalling_2eproto_once,
@@ -8660,7 +8672,8 @@ PROTOBUF_NDEBUG_INLINE ToolCallingResult::Impl_::Impl_(
         text_(arena, from.text_),
         conversation_id_(arena, from.conversation_id_),
         error_message_(arena, from.error_message_),
-        raw_text_(arena, from.raw_text_) {}
+        raw_text_(arena, from.raw_text_),
+        thinking_content_(arena, from.thinking_content_) {}
 
 ToolCallingResult::ToolCallingResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -8703,7 +8716,8 @@ PROTOBUF_NDEBUG_INLINE ToolCallingResult::Impl_::Impl_(
         text_(arena),
         conversation_id_(arena),
         error_message_(arena),
-        raw_text_(arena) {}
+        raw_text_(arena),
+        thinking_content_(arena) {}
 
 inline void ToolCallingResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -8729,6 +8743,7 @@ inline void ToolCallingResult::SharedDtor(MessageLite& self) {
   this_._impl_.conversation_id_.Destroy();
   this_._impl_.error_message_.Destroy();
   this_._impl_.raw_text_.Destroy();
+  this_._impl_.thinking_content_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -8766,7 +8781,7 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.tool_calls_.Clear();
     }
@@ -8785,13 +8800,16 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.raw_text_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      _impl_.thinking_content_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000c0U)) {
-    ::memset(&_impl_.is_complete_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.iterations_used_) -
-        reinterpret_cast<char*>(&_impl_.is_complete_)) + sizeof(_impl_.iterations_used_));
+  _impl_.is_complete_ = false;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    ::memset(&_impl_.iterations_used_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.error_code_) -
+        reinterpret_cast<char*>(&_impl_.iterations_used_)) + sizeof(_impl_.error_code_));
   }
-  _impl_.error_code_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -8852,7 +8870,7 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
   }
 
   // bool is_complete = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_is_complete() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -8869,7 +8887,7 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
   }
 
   // int32 iterations_used = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_iterations_used() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
@@ -8886,7 +8904,7 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
   }
 
   // int32 error_code = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_error_code() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
@@ -8902,6 +8920,14 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
           _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolCallingResult.raw_text");
       target = stream->WriteStringMaybeAliased(9, _s, target);
     }
+  }
+
+  // optional string thinking_content = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    const ::std::string& _s = this_._internal_thinking_content();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolCallingResult.thinking_content");
+    target = stream->WriteStringMaybeAliased(10, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -8968,23 +8994,28 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
                                         this_._internal_raw_text());
       }
     }
-    // bool is_complete = 4;
+    // optional string thinking_content = 10;
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_thinking_content());
+    }
+    // bool is_complete = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_is_complete() != 0) {
         total_size += 2;
       }
     }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
     // int32 iterations_used = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_iterations_used() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_iterations_used());
       }
     }
-  }
-   {
     // int32 error_code = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_error_code() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_error_code());
@@ -9045,19 +9076,24 @@ void ToolCallingResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      _this->_internal_set_thinking_content(from._internal_thinking_content());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_is_complete() != 0) {
         _this->_impl_.is_complete_ = from._impl_.is_complete_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (from._internal_iterations_used() != 0) {
         _this->_impl_.iterations_used_ = from._impl_.iterations_used_;
       }
     }
-  }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_error_code() != 0) {
-      _this->_impl_.error_code_ = from._impl_.error_code_;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -9085,6 +9121,7 @@ void ToolCallingResult::InternalSwap(ToolCallingResult* PROTOBUF_RESTRICT PROTOB
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.conversation_id_, &other->_impl_.conversation_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.raw_text_, &other->_impl_.raw_text_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.thinking_content_, &other->_impl_.thinking_content_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_)
       + sizeof(ToolCallingResult::_impl_.error_code_)

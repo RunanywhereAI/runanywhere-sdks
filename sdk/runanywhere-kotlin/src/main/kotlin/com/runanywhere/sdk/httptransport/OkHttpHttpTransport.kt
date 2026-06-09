@@ -43,7 +43,6 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
@@ -107,7 +106,7 @@ object OkHttpHttpTransport {
             return base
                 .newBuilder()
                 .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(Duration.ofHours(24))
+                .readTimeout(24, TimeUnit.HOURS)
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .build()
         }

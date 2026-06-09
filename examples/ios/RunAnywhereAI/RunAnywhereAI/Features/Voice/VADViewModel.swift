@@ -144,12 +144,10 @@ class VADViewModel: VoiceComponentViewModelBase {
         startDetectionStream()
 
         do {
-            try await audioCapture.startRecording { [weak self] audioData in
-                Task { @MainActor in
-                    guard let self else { return }
-                    // SDK expects Float32 PCM; framing is handled natively.
-                    self.vadAudioContinuation?.yield(RunAnywhere.pcm16ToFloat32(audioData))
-                }
+            try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] audioData in
+                guard let self else { return }
+                // SDK expects Float32 PCM; framing is handled natively.
+                self.vadAudioContinuation?.yield(RunAnywhere.pcm16ToFloat32(audioData))
             }
 
             isListening = true

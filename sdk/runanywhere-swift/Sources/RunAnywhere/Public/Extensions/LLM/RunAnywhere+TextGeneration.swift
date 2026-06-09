@@ -173,12 +173,18 @@ public extension RunAnywhere {
         let final = finalEvent.flatMap { $0.hasResult ? $0.result : nil }
         var result = RALLMGenerationResult()
         result.text = final?.text ?? fullResponse
+        if let final, final.hasThinkingContent {
+            result.thinkingContent = final.thinkingContent
+        }
         result.inputTokens = final.map { $0.promptTokens } ?? Int32(max(1, prompt.count / 4))
         result.tokensGenerated = final.map { $0.completionTokens } ?? Int32(tokenCount)
         result.responseTokens = final.map { $0.completionTokens } ?? Int32(tokenCount)
+        result.totalTokens = final.map { $0.totalTokens } ?? (result.inputTokens + result.tokensGenerated)
         result.modelUsed = modelID
         result.generationTimeMs = final.map { Double($0.totalTimeMs) } ?? totalLatency
         result.framework = framework
+        result.promptEvalTimeMs = final.map { $0.promptEvalTimeMs } ?? 0
+        result.decodeTimeMs = final.map { $0.decodeTimeMs } ?? 0
         result.tokensPerSecond = final.map { Double($0.tokensPerSecond) }
             ?? (totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0)
         if let ttftFromFinal = final.map({ Double($0.timeToFirstTokenMs) }) {

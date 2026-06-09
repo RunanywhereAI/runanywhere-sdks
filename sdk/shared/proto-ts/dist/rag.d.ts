@@ -234,6 +234,8 @@ export interface RAGResult {
     errorMessage?: string | undefined;
     errorCode: number;
     requestId: string;
+    /** Optional thinking/reasoning content extracted from the answer. */
+    thinkingContent?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

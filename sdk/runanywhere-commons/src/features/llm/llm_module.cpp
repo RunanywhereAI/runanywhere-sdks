@@ -1527,6 +1527,8 @@ struct ProtoStreamContext {
     bool inside_thinking = false;
     bool emit_thoughts = false;
     int64_t started_ms = 0;
+    int64_t first_token_ms = 0;
+    int32_t prompt_tokens = 0;
     int32_t token_count = 0;
     std::string request_id;
     std::string conversation_id;
@@ -1672,9 +1674,10 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
     ctx->token_count += 1;
     if (!ctx->first_token_sent) {
         ctx->first_token_sent = true;
+        ctx->first_token_ms = now_ms();
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
                                  nullptr, token.c_str(), nullptr, nullptr, ctx->ref->model_id, 1,
-                                 now_ms() - ctx->started_ms);
+                                 ctx->first_token_ms - ctx->started_ms);
     }
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED, nullptr,
                              token.c_str(), nullptr, nullptr, ctx->ref->model_id, ctx->token_count,
@@ -1782,9 +1785,19 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     if (!ctx->thinking_text.empty()) {
         final_result.set_thinking_content(ctx->thinking_text);
     }
+    final_result.set_prompt_tokens(ctx->prompt_tokens);
     final_result.set_completion_tokens(ctx->token_count);
-    final_result.set_total_tokens(ctx->token_count);
-    final_result.set_total_time_ms(now_ms() - ctx->started_ms);
+    final_result.set_total_tokens(ctx->prompt_tokens + ctx->token_count);
+    const int64_t total_time_ms = now_ms() - ctx->started_ms;
+    final_result.set_total_time_ms(total_time_ms);
+    if (ctx->first_token_ms > 0) {
+        final_result.set_time_to_first_token_ms(ctx->first_token_ms - ctx->started_ms);
+    }
+    if (total_time_ms > 0 && ctx->token_count > 0) {
+        final_result.set_tokens_per_second(
+            static_cast<float>(static_cast<double>(ctx->token_count) /
+                               (static_cast<double>(total_time_ms) / 1000.0)));
+    }
     final_result.set_finish_reason(
         (finish_reason != nullptr) && finish_reason[0] != '\0' ? finish_reason : "stop");
     if ((error_message != nullptr) && error_message[0] != '\0') {
@@ -1961,6 +1974,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.user_data = user_data;
     ctx.ref = &ref;
     ctx.started_ms = now_ms();
+    ctx.prompt_tokens = estimate_tokens(request.prompt().c_str());
     ctx.emit_thoughts = request.emit_thoughts();
     ctx.request_id = request.request_id();
     ctx.conversation_id = request.conversation_id();

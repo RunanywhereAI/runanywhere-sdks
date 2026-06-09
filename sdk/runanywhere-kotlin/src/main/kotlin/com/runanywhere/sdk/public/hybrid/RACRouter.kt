@@ -15,7 +15,7 @@
  * Only the STT capability is wired today (offline sherpa ↔ cloud, e.g.
  * the Sarvam provider).
  * `router.tts` / `router.vlm` accessors exist for the API shape but raise
- * NotImplementedError.
+ * [UnsupportedOperationException].
  */
 
 package com.runanywhere.sdk.public.hybrid
@@ -465,7 +465,7 @@ class RACRouter internal constructor() : Closeable {
 
     /**
      * Placeholder slot for capabilities not yet wired. Every call surface
-     * throws [NotImplementedError] with the capability name — the type
+     * throws [UnsupportedOperationException] with the capability name — the type
      * exists so `router.tts` / `router.vlm` compile and the
      * multi-capability API surface stays consistent.
      *
@@ -475,16 +475,31 @@ class RACRouter internal constructor() : Closeable {
         private val name: String,
     ) {
         /** Throws — TTS/VLM not wired. */
-        fun addPair(model1: RACModel, model2: RACModel, routerPolicy: RouterPolicyBase): Nothing =
-            throw NotImplementedError("router.$name is not wired yet (STT only)")
+        fun addPair(model1: RACModel, model2: RACModel, routerPolicy: RouterPolicyBase): Nothing {
+            markUnsupportedArgsUsed(model1, model2, routerPolicy)
+            throwUnsupported()
+        }
 
         /** Throws — TTS not wired. */
-        fun synthesize(text: String): Nothing =
-            throw NotImplementedError("router.$name.synthesize is not wired yet")
+        fun synthesize(text: String): Nothing {
+            markUnsupportedArgsUsed(text)
+            throwUnsupported("synthesize")
+        }
 
         /** Throws — VLM/etc. not wired. */
-        fun generate(input: Any): Nothing =
-            throw NotImplementedError("router.$name.generate is not wired yet")
+        fun generate(input: Any): Nothing {
+            markUnsupportedArgsUsed(input)
+            throwUnsupported("generate")
+        }
+
+        private fun throwUnsupported(operation: String? = null): Nothing {
+            val suffix = operation?.let { ".$it" }.orEmpty()
+            throw UnsupportedOperationException("router.$name$suffix is not wired yet")
+        }
+
+        private fun markUnsupportedArgsUsed(vararg values: Any?) {
+            require(values.isNotEmpty())
+        }
     }
 
     // Static entry point: RACRouter.stt.init(backendOffline, backendOnline)

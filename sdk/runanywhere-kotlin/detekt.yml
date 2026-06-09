@@ -103,6 +103,8 @@ empty-blocks:
     active: true
   EmptyInitBlock:
     active: true
+    excludes:
+      - '**/generated/**'
   EmptyKtFile:
     active: true
   EmptySecondaryConstructor:

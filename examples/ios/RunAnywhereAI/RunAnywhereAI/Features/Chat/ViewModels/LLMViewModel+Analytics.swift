@@ -73,9 +73,7 @@ extension LLMViewModel {
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,
-            tokensPerSecondHistory: [],
             generationMode: .nonStreaming,
-            contextWindowUsage: 0.0,
             generationParameters: generationParameters
         )
     }

@@ -348,7 +348,7 @@ cd examples/ios/RunAnywhereAI/
 # macOS target
 ./scripts/build_and_run_ios_sample.sh mac
 
-# CI verification
+# Local verification
 ./scripts/verify.sh     # Checks XCFrameworks exist, resolves packages, xcodebuild
 ./scripts/smoke.sh      # Greps source for SDK API calls (no compilation)
 

@@ -1167,6 +1167,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     $core.String? errorMessage,
     $core.int? errorCode,
     $core.String? rawText,
+    $core.String? thinkingContent,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -1178,6 +1179,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     if (errorMessage != null) result.errorMessage = errorMessage;
     if (errorCode != null) result.errorCode = errorCode;
     if (rawText != null) result.rawText = rawText;
+    if (thinkingContent != null) result.thinkingContent = thinkingContent;
     return result;
   }
 
@@ -1205,6 +1207,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
     ..aI(8, _omitFieldNames ? '' : 'errorCode')
     ..aOS(9, _omitFieldNames ? '' : 'rawText')
+    ..aOS(10, _omitFieldNames ? '' : 'thinkingContent')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1300,6 +1303,16 @@ class ToolCallingResult extends $pb.GeneratedMessage {
   $core.bool hasRawText() => $_has(8);
   @$pb.TagNumber(9)
   void clearRawText() => $_clearField(9);
+
+  /// Optional thinking/reasoning content extracted from the final response.
+  @$pb.TagNumber(10)
+  $core.String get thinkingContent => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set thinkingContent($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasThinkingContent() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearThinkingContent() => $_clearField(10);
 }
 
 class ToolParseRequest extends $pb.GeneratedMessage {

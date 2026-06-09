@@ -272,6 +272,9 @@ message RAGResult {
     optional string error_message = 10;
     int32 error_code             = 11;
     string request_id            = 12;
+
+    // Optional thinking/reasoning content extracted from the answer.
+    optional string thinking_content = 13;
 }
 
 // ---------------------------------------------------------------------------

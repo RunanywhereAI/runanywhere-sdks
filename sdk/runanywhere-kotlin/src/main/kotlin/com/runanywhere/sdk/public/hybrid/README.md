@@ -9,7 +9,7 @@ Today only the **STT** capability is wired: offline **sherpa-onnx** ↔ the
 generic **cloud** engine. Its HTTP provider is chosen per registered model —
 either a built-in adapter (e.g. **Sarvam**) or a developer-defined host-side
 callback for any other vendor (see [Custom cloud providers](#custom-cloud-providers)).
-`router.tts` / `router.vlm` exist for API shape but throw `NotImplementedError`.
+`router.tts` / `router.vlm` exist for API shape but throw `UnsupportedOperationException`.
 
 ---
 

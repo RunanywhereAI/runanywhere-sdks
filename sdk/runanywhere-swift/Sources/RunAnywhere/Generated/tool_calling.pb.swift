@@ -795,12 +795,23 @@ public nonisolated struct RAToolCallingResult: Sendable {
 
   public var rawText: String = String()
 
+  /// Optional thinking/reasoning content extracted from the final response.
+  public var thinkingContent: String {
+    get {_thinkingContent ?? String()}
+    set {_thinkingContent = newValue}
+  }
+  /// Returns true if `thinkingContent` has been explicitly set.
+  public var hasThinkingContent: Bool {self._thinkingContent != nil}
+  /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
+  public mutating func clearThinkingContent() {self._thinkingContent = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _conversationID: String? = nil
   fileprivate var _errorMessage: String? = nil
+  fileprivate var _thinkingContent: String? = nil
 }
 
 public nonisolated struct RAToolParseRequest: Sendable {
@@ -1940,7 +1951,7 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCallingResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}conversation_id\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}raw_text\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}tool_calls\0\u{3}tool_results\0\u{3}is_complete\0\u{3}conversation_id\0\u{3}iterations_used\0\u{3}error_message\0\u{3}error_code\0\u{3}raw_text\0\u{3}thinking_content\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1957,6 +1968,7 @@ nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf.
       case 7: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
       case 8: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.rawText) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
       default: break
       }
     }
@@ -1994,6 +2006,9 @@ nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf.
     if !self.rawText.isEmpty {
       try visitor.visitSingularStringField(value: self.rawText, fieldNumber: 9)
     }
+    try { if let v = self._thinkingContent {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2007,6 +2022,7 @@ nonisolated extension RAToolCallingResult: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs.errorCode != rhs.errorCode {return false}
     if lhs.rawText != rhs.rawText {return false}
+    if lhs._thinkingContent != rhs._thinkingContent {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

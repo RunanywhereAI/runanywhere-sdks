@@ -208,15 +208,8 @@ private struct SimplifiedModelRow: View {
         }
     }
 
-    /// Check if this is a built-in model that doesn't require download
-    private var isBuiltIn: Bool {
-        model.framework == .foundationModels ||
-        model.framework == .systemTts ||
-        model.artifactType == .builtIn
-    }
-
     private var isReady: Bool {
-        isBuiltIn || model.localPathURL != nil
+        model.isBuiltIn || model.localPathURL != nil
     }
 
     var body: some View {
@@ -265,7 +258,7 @@ private struct SimplifiedModelRow: View {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            let statusText = isBuiltIn
+                            let statusText = model.isBuiltIn
                                 ? "Built-in"
                                 : (model.localPathURL != nil ? "Ready" : "Download")
                             Text(statusText)
@@ -292,7 +285,7 @@ private struct SimplifiedModelRow: View {
             Spacer()
 
             // Action button
-            if isBuiltIn {
+            if model.isBuiltIn {
                 // Built-in models (Foundation Models, System TTS) - always ready
                 Button("Use") {
                     onSelectModel()

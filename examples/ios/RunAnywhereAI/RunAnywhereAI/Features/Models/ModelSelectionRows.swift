@@ -187,13 +187,6 @@ struct FlatModelRow: View {
         model.supportsLora
     }
 
-    /// Check if this is a built-in model that doesn't require download
-    private var isBuiltIn: Bool {
-        model.framework == .foundationModels ||
-        model.framework == .systemTts ||
-        model.artifactType == .builtIn
-    }
-
     private var downloadAccessibilityLabel: String {
         let size = model.downloadSizeBytes
         if size > 0 {
@@ -206,7 +199,7 @@ struct FlatModelRow: View {
     private var statusIcon: String {
         if availabilityReason != nil || downloadErrorMessage != nil {
             return "exclamationmark.triangle.fill"
-        } else if isBuiltIn {
+        } else if model.isBuiltIn {
             return "checkmark.circle.fill"
         } else if model.localPathURL != nil {
             return "checkmark.circle.fill"
@@ -218,7 +211,7 @@ struct FlatModelRow: View {
     private var statusColor: Color {
         if availabilityReason != nil || downloadErrorMessage != nil {
             return AppColors.statusOrange
-        } else if isBuiltIn || model.localPathURL != nil {
+        } else if model.isBuiltIn || model.localPathURL != nil {
             return AppColors.statusGreen
         } else {
             return AppColors.primaryAccent
@@ -230,7 +223,7 @@ struct FlatModelRow: View {
             return availabilityReason
         } else if let downloadErrorMessage {
             return downloadErrorMessage
-        } else if isBuiltIn {
+        } else if model.isBuiltIn {
             return "Built-in"
         } else if model.localPathURL != nil {
             return "Ready"
@@ -349,7 +342,7 @@ struct FlatModelRow: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .disabled(true)
-        } else if isBuiltIn {
+        } else if model.isBuiltIn {
             // Built-in models (Foundation Models, System TTS) - always ready
             Button("Use") {
                 onSelectModel()

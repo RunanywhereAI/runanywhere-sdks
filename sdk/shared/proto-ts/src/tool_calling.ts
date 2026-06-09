@@ -515,6 +515,8 @@ export interface ToolCallingResult {
   errorMessage?: string | undefined;
   errorCode: number;
   rawText: string;
+  /** Optional thinking/reasoning content extracted from the final response. */
+  thinkingContent?: string | undefined;
 }
 
 export interface ToolParseRequest {
@@ -2319,6 +2321,7 @@ function createBaseToolCallingResult(): ToolCallingResult {
     errorMessage: undefined,
     errorCode: 0,
     rawText: "",
+    thinkingContent: undefined,
   };
 }
 
@@ -2350,6 +2353,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     }
     if (message.rawText !== "") {
       writer.uint32(74).string(message.rawText);
+    }
+    if (message.thinkingContent !== undefined) {
+      writer.uint32(82).string(message.thinkingContent);
     }
     return writer;
   },
@@ -2433,6 +2439,14 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
           message.rawText = reader.string();
           continue;
         }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.thinkingContent = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2485,6 +2499,11 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
         : isSet(object.raw_text)
         ? globalThis.String(object.raw_text)
         : "",
+      thinkingContent: isSet(object.thinkingContent)
+        ? globalThis.String(object.thinkingContent)
+        : isSet(object.thinking_content)
+        ? globalThis.String(object.thinking_content)
+        : undefined,
     };
   },
 
@@ -2517,6 +2536,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     if (message.rawText !== "") {
       obj.rawText = message.rawText;
     }
+    if (message.thinkingContent !== undefined) {
+      obj.thinkingContent = message.thinkingContent;
+    }
     return obj;
   },
 
@@ -2534,6 +2556,7 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
     message.rawText = object.rawText ?? "";
+    message.thinkingContent = object.thinkingContent ?? undefined;
     return message;
   },
 };

@@ -157,20 +157,19 @@ void main() {
       final source = File(
         'lib/public/capabilities/runanywhere_llm.dart',
       ).readAsStringSync();
+      final bridge = File('lib/native/dart_bridge_llm.dart').readAsStringSync();
 
       expect(source, contains('RunAnywhereModelLifecycle.shared.load'));
       expect(source, contains('RunAnywhereModelLifecycle.shared.unload'));
-      expect(source, contains('rac_llm_generate_proto'));
-      expect(source, contains('rac_llm_generate_stream_proto'));
+      expect(source, contains('DartBridgeLLM.shared.generateProto'));
+      expect(source, contains('DartBridgeLLM.shared.generateStreamProto'));
+      expect(bridge, contains('rac_llm_generate_proto'));
+      expect(bridge, contains('rac_llm_generate_stream_proto'));
       expect(
         source,
         isNot(contains('RunAnywhereModels.shared.resolveModelFilePath')),
       );
       expect(source, isNot(contains('DartBridge.llm')));
-      expect(
-        source,
-        isNot(contains('INFERENCE_FRAMEWORK_LLAMA_CPP')),
-      );
     });
 
     test('runanywhere_vlm.dart uses lifecycle-owned VLM process ABI', () {

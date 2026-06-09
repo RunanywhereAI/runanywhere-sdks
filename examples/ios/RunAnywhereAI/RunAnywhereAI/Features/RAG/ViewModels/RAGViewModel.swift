@@ -33,22 +33,6 @@ struct RAGMessage: Identifiable {
         self.thinkingContent = thinkingContent
     }
 
-    // MARK: - Think Tag Helpers
-    //
-    // Thin pass-throughs to the app's `ThinkingContentParser` (raw-text helper).
-    // `RARAGResult.answer` carries `<think>` tags inline because the RAG proto
-    // result has no dedicated thinking_content field; this helper splits them
-    // out for separate rendering in the UI.
-
-    /// Extract the content inside `<think>...</think>` tags.
-    static func extractThinkingContent(from text: String) -> String? {
-        ThinkingContentParser.extract(from: text).thinking
-    }
-
-    /// Strip all `<think>...</think>` blocks and trailing incomplete `<think>` tags.
-    static func stripThinkTags(from text: String) -> String {
-        ThinkingContentParser.strip(from: text)
-    }
 }
 
 // MARK: - RAG View Model
@@ -158,9 +142,11 @@ final class RAGViewModel {
 
             logger.info("Querying RAG pipeline: \(question)")
             let result = try await RunAnywhere.ragQuery(options)
-            let thinkingContent = RAGMessage.extractThinkingContent(from: result.answer)
-            let displayText = RAGMessage.stripThinkTags(from: result.answer)
-            messages.append(RAGMessage(role: .assistant, text: displayText, thinkingContent: thinkingContent))
+            messages.append(RAGMessage(
+                role: .assistant,
+                text: result.answer,
+                thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil
+            ))
             logger.info("Query complete (\(Double(result.totalTimeMs), format: .fixed(precision: 0))ms)")
         } catch {
             self.error = error

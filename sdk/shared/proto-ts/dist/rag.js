@@ -1571,6 +1571,7 @@ function createBaseRAGResult() {
         errorMessage: undefined,
         errorCode: 0,
         requestId: "",
+        thinkingContent: undefined,
     };
 }
 exports.RAGResult = {
@@ -1610,6 +1611,9 @@ exports.RAGResult = {
         }
         if (message.requestId !== "") {
             writer.uint32(98).string(message.requestId);
+        }
+        if (message.thinkingContent !== undefined) {
+            writer.uint32(106).string(message.thinkingContent);
         }
         return writer;
     },
@@ -1704,6 +1708,13 @@ exports.RAGResult = {
                     message.requestId = reader.string();
                     continue;
                 }
+                case 13: {
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.thinkingContent = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1770,6 +1781,11 @@ exports.RAGResult = {
                 : isSet(object.request_id)
                     ? globalThis.String(object.request_id)
                     : "",
+            thinkingContent: isSet(object.thinkingContent)
+                ? globalThis.String(object.thinkingContent)
+                : isSet(object.thinking_content)
+                    ? globalThis.String(object.thinking_content)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -1810,6 +1826,9 @@ exports.RAGResult = {
         if (message.requestId !== "") {
             obj.requestId = message.requestId;
         }
+        if (message.thinkingContent !== undefined) {
+            obj.thinkingContent = message.thinkingContent;
+        }
         return obj;
     },
     create(base) {
@@ -1829,6 +1848,7 @@ exports.RAGResult = {
         message.errorMessage = object.errorMessage ?? undefined;
         message.errorCode = object.errorCode ?? 0;
         message.requestId = object.requestId ?? "";
+        message.thinkingContent = object.thinkingContent ?? undefined;
         return message;
     },
 };

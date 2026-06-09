@@ -25,7 +25,7 @@ cd examples/ios/RunAnywhereAI/
 # Open via Xcode (SPM resolves dependencies automatically)
 open RunAnywhereAI.xcodeproj
 
-# Verify XCFrameworks exist (CI gate)
+# Verify XCFrameworks exist locally
 ./scripts/verify.sh
 
 # Quick smoke test (greps for SDK API calls, no compilation)
@@ -375,7 +375,7 @@ All styling is centralized — no inline magic numbers or color literals in view
 | Script | Purpose |
 |--------|---------|
 | `scripts/build_and_run_ios_sample.sh` | End-to-end build+deploy (simulator/device/mac) with optional SDK rebuild |
-| `scripts/verify.sh` | CI gate: checks XCFrameworks exist, resolves packages, runs full xcodebuild |
+| `scripts/verify.sh` | Local gate: checks XCFrameworks exist, resolves packages, runs full xcodebuild |
 | `scripts/smoke.sh` | Fast preflight: greps source for SDK API call patterns (no compilation) |
 | `scripts/patch-framework-plist.sh` | Post-build: patches MinimumOSVersion in XCFramework plists for App Store |
 

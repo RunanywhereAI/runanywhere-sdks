@@ -294,6 +294,8 @@ export interface ToolCallingResult {
     errorMessage?: string | undefined;
     errorCode: number;
     rawText: string;
+    /** Optional thinking/reasoning content extracted from the final response. */
+    thinkingContent?: string | undefined;
 }
 export interface ToolParseRequest {
     text: string;

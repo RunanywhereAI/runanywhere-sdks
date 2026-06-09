@@ -77,33 +77,23 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             benchRequest.systemPrompt = systemPrompt
             let benchEvents = try await RunAnywhere.generateStream(benchRequest)
 
-            var tokenCount = 0
-            var firstTokenTime: Date?
-            for await event in benchEvents {
-                if !event.token.isEmpty {
-                    if firstTokenTime == nil { firstTokenTime = Date() }
-                    tokenCount += 1
-                }
-                if event.isFinal { break }
+            let result = await RunAnywhere.aggregateStream(prompt: prompt, events: benchEvents)
+            let wallMs = Date().timeIntervalSince(benchStart) * 1000
+            let generationMs = result.generationTimeMs > 0 ? result.generationTimeMs : wallMs
+
+            metrics.endToEndLatencyMs = generationMs
+            metrics.ttftMs = result.ttftMs > 0 ? result.ttftMs : nil
+            metrics.tokensPerSecond = result.tokensPerSecond > 0 ? result.tokensPerSecond : nil
+            metrics.inputTokens = result.inputTokens > 0 ? Int(result.inputTokens) : nil
+            metrics.outputTokens = result.tokensGenerated > 0 ? Int(result.tokensGenerated) : nil
+
+            if result.decodeTimeMs > 0, result.tokensGenerated > 0 {
+                metrics.decodeTokensPerSecond =
+                    Double(result.tokensGenerated) / (Double(result.decodeTimeMs) / 1000.0)
             }
-            let inputTokens = max(1, prompt.count / 4)
-
-            let e2eMs = Date().timeIntervalSince(benchStart) * 1000
-            metrics.endToEndLatencyMs = e2eMs
-            metrics.ttftMs = firstTokenTime.map { $0.timeIntervalSince(benchStart) * 1000 }
-            metrics.tokensPerSecond = e2eMs > 0 ? Double(tokenCount) / (e2eMs / 1000.0) : 0
-            metrics.inputTokens = inputTokens
-            metrics.outputTokens = tokenCount
-
-            if let ttft = metrics.ttftMs, ttft > 0 {
-                let decodeMs = e2eMs - ttft
-                let decodeTokens = max(tokenCount - 1, 0)
-                if decodeMs > 0, decodeTokens > 0 {
-                    metrics.decodeTokensPerSecond = Double(decodeTokens) / (decodeMs / 1000.0)
-                }
-                if inputTokens > 0 {
-                    metrics.prefillTokensPerSecond = Double(inputTokens) / (ttft / 1000.0)
-                }
+            if result.promptEvalTimeMs > 0, result.inputTokens > 0 {
+                metrics.prefillTokensPerSecond =
+                    Double(result.inputTokens) / (Double(result.promptEvalTimeMs) / 1000.0)
             }
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()

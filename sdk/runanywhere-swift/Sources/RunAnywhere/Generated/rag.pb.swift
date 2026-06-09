@@ -541,11 +541,22 @@ public nonisolated struct RARAGResult: Sendable {
 
   public var requestID: String = String()
 
+  /// Optional thinking/reasoning content extracted from the answer.
+  public var thinkingContent: String {
+    get {_thinkingContent ?? String()}
+    set {_thinkingContent = newValue}
+  }
+  /// Returns true if `thinkingContent` has been explicitly set.
+  public var hasThinkingContent: Bool {self._thinkingContent != nil}
+  /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
+  public mutating func clearThinkingContent() {self._thinkingContent = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _errorMessage: String? = nil
+  fileprivate var _thinkingContent: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -1207,7 +1218,7 @@ nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}answer\0\u{3}retrieved_chunks\0\u{3}context_used\0\u{3}retrieval_time_ms\0\u{3}generation_time_ms\0\u{3}total_time_ms\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}request_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}answer\0\u{3}retrieved_chunks\0\u{3}context_used\0\u{3}retrieval_time_ms\0\u{3}generation_time_ms\0\u{3}total_time_ms\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}request_id\0\u{3}thinking_content\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1227,6 +1238,7 @@ nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 10: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
       case 11: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       case 12: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 13: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
       default: break
       }
     }
@@ -1273,6 +1285,9 @@ nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.requestID.isEmpty {
       try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 12)
     }
+    try { if let v = self._thinkingContent {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1289,6 +1304,7 @@ nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs.errorCode != rhs.errorCode {return false}
     if lhs.requestID != rhs.requestID {return false}
+    if lhs._thinkingContent != rhs._thinkingContent {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

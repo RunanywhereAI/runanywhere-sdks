@@ -25,16 +25,11 @@ extension LLMViewModel {
         // fields exist on RALLMGenerationResult; ToolCallInfo is unavailable here.
         let toolCallInfo: ToolCallInfo? = nil
 
-        // Split `<think>...</think>` content from the response so the UI can render
-        // the thinking block separately and avoid silently dropping SDK-provided
-        // thinking content on the tool-calling path.
-        let (displayText, thinkingContent) = ThinkingContentParser.extract(from: result.text)
-
         // Update the message with the result
         await updateMessageWithToolResult(
             at: messageIndex,
-            text: displayText,
-            thinkingContent: thinkingContent,
+            text: result.text,
+            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             toolCallInfo: toolCallInfo
         )
     }

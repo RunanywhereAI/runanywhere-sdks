@@ -291,6 +291,8 @@ message ToolCallingResult {
     optional string error_message    = 7;
     int32 error_code                 = 8;
     string raw_text                  = 9;
+    // Optional thinking/reasoning content extracted from the final response.
+    optional string thinking_content = 10;
 }
 
 message ToolParseRequest {

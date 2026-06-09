@@ -29,6 +29,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/rag/rac_rag.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -543,8 +544,20 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     }
 
     runanywhere::v1::RAGResult proto;
-    if (llm_result.text)
+    const char* raw_answer = llm_result.text ? llm_result.text : "";
+    const char* answer = nullptr;
+    size_t answer_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    if (rac_llm_extract_thinking(raw_answer, &answer, &answer_len, &thinking, &thinking_len) ==
+        RAC_SUCCESS) {
+        proto.set_answer(answer ? std::string(answer, answer_len) : std::string());
+        if (thinking && thinking_len > 0) {
+            proto.set_thinking_content(std::string(thinking, thinking_len));
+        }
+    } else if (llm_result.text) {
         proto.set_answer(llm_result.text);
+    }
 
     if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
         proto.set_context_used(metadata["context_used"].get<std::string>());
