@@ -491,6 +491,8 @@ _rac_dev_config_get_supabase_key
 _rac_dev_config_get_supabase_url
 _rac_dev_config_has_build_token
 _rac_dev_config_is_available
+_rac_dev_config_is_usable_credential
+_rac_dev_config_is_usable_http_url
 
 # Device registration manager — the commons-side device id cache and
 # deferred registration trigger called by CppBridge+Device.swift.
@@ -639,17 +641,7 @@ _rac_voice_agent_destroy
 _rac_voice_agent_generate_response
 _rac_voice_agent_initialize
 _rac_voice_agent_initialize_with_loaded_models
-_rac_voice_agent_is_llm_loaded
 _rac_voice_agent_is_ready
-_rac_voice_agent_is_stt_loaded
-_rac_voice_agent_is_tts_loaded
-_rac_voice_agent_load_llm_model
-_rac_voice_agent_load_stt_model
-_rac_voice_agent_load_tts_voice
-_rac_voice_agent_process_voice_turn
-_rac_voice_agent_result_free
-_rac_voice_agent_synthesize_speech
-_rac_voice_agent_transcribe
 
 # Tool calling — struct-based helpers still called from Swift CppBridge+ToolCalling.swift.
 _rac_tool_call_format_prompt
@@ -805,12 +797,9 @@ _rac_download_compute_destination
 _rac_download_requires_extraction
 
 # Archive extraction helpers (ONNX .tar.bz2, diffusion bundles, etc.).
-_rac_extract_archive
 _rac_extract_archive_native
 
 # Lower-level event bus (analytics/track). Public event stream remains rac_sdk_event_*.
-_rac_event_subscribe
-_rac_event_track
 
 # Structured error API — rac_error_message and related helpers called from
 # Swift runtime shims (ONNX.swift, MetalRT.swift) and JNI error bridges.
@@ -854,19 +843,6 @@ _rac_log_metadata_should_redact
 # CMake when the matching RAC_BACKEND_* flag is ON.
 # ============================================================================
 
-_rac_analytics_emit_model_download_completed
-_rac_analytics_emit_model_download_failed
-_rac_analytics_emit_model_download_started
-_rac_analytics_emit_stt_model_load_completed
-_rac_analytics_emit_stt_model_load_failed
-_rac_analytics_emit_stt_transcription_completed
-_rac_analytics_emit_stt_transcription_failed
-_rac_analytics_emit_tts_synthesis_completed
-_rac_analytics_emit_tts_synthesis_failed
-_rac_analytics_emit_tts_voice_load_completed
-_rac_analytics_emit_tts_voice_load_failed
-_rac_analytics_emit_vad_speech_ended
-_rac_analytics_emit_vad_speech_started
 _rac_archive_type_extension
 _rac_archive_type_from_path
 _rac_artifact_infer_from_url
@@ -879,23 +855,6 @@ _rac_audio_pipeline_is_valid_transition
 _rac_audio_pipeline_state_name
 _rac_audio_wav_header_size
 _rac_auth_response_free
-_rac_benchmark_capture_metrics
-_rac_benchmark_extended_metrics_init
-_rac_benchmark_set_metrics_provider
-_rac_benchmark_stats_count
-_rac_benchmark_stats_create
-_rac_benchmark_stats_destroy
-_rac_benchmark_stats_get_summary
-_rac_benchmark_stats_record
-_rac_benchmark_stats_reset
-_rac_benchmark_stats_summary_to_json
-_rac_benchmark_timing_init
-_rac_benchmark_timing_log
-_rac_benchmark_timing_to_csv
-_rac_benchmark_timing_to_json
-_rac_capability_resource_type_raw_value
-_rac_clear_last_error
-_rac_component_to_resource_type
 _rac_cpu_runtime_get_provider_session
 _rac_cpu_runtime_register_provider
 _rac_cpu_runtime_unregister_provider
@@ -984,32 +943,6 @@ _rac_engine_manifest_count
 _rac_engine_manifest_detach_vtable
 _rac_engine_manifest_find
 _rac_engine_manifest_validate_vtable
-_rac_error_add_frame
-_rac_error_capture_stack_trace
-_rac_error_category_name
-_rac_error_code_name
-_rac_error_copy
-_rac_error_create
-_rac_error_create_at
-_rac_error_createf
-_rac_error_destroy
-_rac_error_get_telemetry_properties
-_rac_error_is_expected_error
-_rac_error_log_and_track
-_rac_error_log_and_track_model
-_rac_error_recovery_suggestion
-_rac_error_set_custom
-_rac_error_set_model_context
-_rac_error_set_session
-_rac_error_set_source
-_rac_error_set_underlying
-_rac_error_to_debug_string
-_rac_error_to_json
-_rac_error_to_string
-_rac_event_category_name
-_rac_event_publish
-_rac_event_subscribe_all
-_rac_event_unsubscribe
 _rac_events_flush_telemetry_sink
 _rac_events_set_telemetry_sink
 _rac_expected_model_files_alloc
@@ -1034,7 +967,6 @@ _rac_generation_analytics_start_streaming
 _rac_generation_analytics_track_failed
 _rac_generation_analytics_track_first_token
 _rac_generation_analytics_track_streaming_update
-_rac_get_last_error
 _rac_get_model_by_path
 _rac_http_request_resume
 _rac_lifecycle_acquire_service
@@ -1053,29 +985,17 @@ _rac_lifecycle_reset
 _rac_lifecycle_state_name
 _rac_lifecycle_track_error
 _rac_lifecycle_unload
-_rac_llm_analytics_complete_generation
-_rac_llm_analytics_create
-_rac_llm_analytics_destroy
-_rac_llm_analytics_get_metrics
-_rac_llm_analytics_start_generation
-_rac_llm_analytics_start_streaming_generation
-_rac_llm_analytics_track_error
-_rac_llm_analytics_track_first_token
-_rac_llm_analytics_track_generation_failed
-_rac_llm_analytics_track_streaming_update
 _rac_llm_append_context
 _rac_llm_cleanup
 _rac_llm_clear_context
 _rac_llm_component_clear_lora
 _rac_llm_component_configure
-_rac_llm_component_generate_stream_with_timing
 _rac_llm_component_get_metrics
 _rac_llm_component_get_state
 _rac_llm_component_load_lora
 _rac_llm_component_remove_lora
 _rac_llm_destroy
 _rac_llm_generate_from_context
-_rac_llm_generate_stream_with_timing
 _rac_llm_get_info
 _rac_llm_initialize
 _rac_llm_inject_system_prompt
@@ -1154,7 +1074,6 @@ _rac_proto_bytes_validate
 _rac_register_lora
 _rac_register_model
 _rac_resource_type_name
-_rac_resource_type_to_component
 _rac_runtime_abi_version
 _rac_runtime_count
 _rac_runtime_get_by_id
@@ -1164,8 +1083,6 @@ _rac_runtime_list
 _rac_runtime_load
 _rac_runtime_register
 _rac_runtime_unregister
-_rac_sdk_component_display_name
-_rac_sdk_component_raw_value
 _rac_sdk_get_environment
 _rac_sdk_is_initialized
 _rac_sdk_reset
@@ -1176,9 +1093,6 @@ _rac_server_set_request_callback
 _rac_server_start
 _rac_server_stop
 _rac_server_wait
-_rac_set_error
-_rac_set_last_error
-_rac_state_get_instance
 _rac_storage_analyzer_check_available
 _rac_storage_availability_free
 _rac_storage_strategy_get
@@ -1199,16 +1113,6 @@ _rac_structured_output_find_matching_brace
 _rac_structured_output_find_matching_bracket
 _rac_structured_output_parse_result_free
 _rac_structured_output_validation_free
-_rac_stt_analytics_complete_transcription
-_rac_stt_analytics_create
-_rac_stt_analytics_destroy
-_rac_stt_analytics_get_metrics
-_rac_stt_analytics_start_transcription
-_rac_stt_analytics_track_error
-_rac_stt_analytics_track_final_transcript
-_rac_stt_analytics_track_language_detection
-_rac_stt_analytics_track_partial_transcript
-_rac_stt_analytics_track_transcription_failed
 _rac_stt_cleanup
 _rac_stt_component_detect_language
 _rac_stt_component_get_metrics
@@ -1240,14 +1144,6 @@ _rac_tool_call_parse_with_format
 _rac_tool_call_validate_json
 _rac_tool_call_validation_free
 _rac_tool_calling_session_cancel_proto
-_rac_tts_analytics_complete_synthesis
-_rac_tts_analytics_create
-_rac_tts_analytics_destroy
-_rac_tts_analytics_get_metrics
-_rac_tts_analytics_start_synthesis
-_rac_tts_analytics_track_error
-_rac_tts_analytics_track_synthesis_chunk
-_rac_tts_analytics_track_synthesis_failed
 _rac_tts_cleanup
 _rac_tts_component_configure
 _rac_tts_component_get_metrics
@@ -1263,22 +1159,6 @@ _rac_tts_platform_create
 _rac_tts_platform_destroy
 _rac_tts_platform_stop
 _rac_tts_platform_synthesize
-_rac_vad_analytics_create
-_rac_vad_analytics_destroy
-_rac_vad_analytics_get_metrics
-_rac_vad_analytics_track_cleaned_up
-_rac_vad_analytics_track_initialization_failed
-_rac_vad_analytics_track_initialized
-_rac_vad_analytics_track_model_load_completed
-_rac_vad_analytics_track_model_load_failed
-_rac_vad_analytics_track_model_load_started
-_rac_vad_analytics_track_model_unloaded
-_rac_vad_analytics_track_paused
-_rac_vad_analytics_track_resumed
-_rac_vad_analytics_track_speech_end
-_rac_vad_analytics_track_speech_start
-_rac_vad_analytics_track_started
-_rac_vad_analytics_track_stopped
 _rac_vad_component_get_metrics
 _rac_vad_component_get_state
 _rac_vad_component_set_activity_callback
@@ -1304,11 +1184,6 @@ _rac_vlm_get_info
 _rac_vlm_proto_quiesce
 _rac_vlm_resolve_model_files
 _rac_vlm_result_free
-_rac_voice_agent_detect_speech
-_rac_voice_agent_get_llm_model_id
-_rac_voice_agent_get_stt_model_id
-_rac_voice_agent_get_tts_voice_id
-_rac_voice_agent_process_stream
 
 # Catch-up additions after the alphabetical sort above.
 _rac_cloud_has_stt_provider

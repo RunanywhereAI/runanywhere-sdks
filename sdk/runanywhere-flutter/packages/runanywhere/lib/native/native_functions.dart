@@ -134,42 +134,6 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Int32 Function(RacHandle, Pointer<Int32>),
           int Function(RacHandle, Pointer<Int32>)>('rac_voice_agent_is_ready');
 
-  static final int Function(RacHandle, Pointer<Int32>) voiceAgentIsSTTLoaded =
-      _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Int32>),
-          int Function(
-              RacHandle, Pointer<Int32>)>('rac_voice_agent_is_stt_loaded');
-
-  static final int Function(RacHandle, Pointer<Int32>) voiceAgentIsLLMLoaded =
-      _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Int32>),
-          int Function(
-              RacHandle, Pointer<Int32>)>('rac_voice_agent_is_llm_loaded');
-
-  static final int Function(RacHandle, Pointer<Int32>) voiceAgentIsTTSLoaded =
-      _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Int32>),
-          int Function(
-              RacHandle, Pointer<Int32>)>('rac_voice_agent_is_tts_loaded');
-
-  static final int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>)
-      voiceAgentLoadSTTModel = _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_voice_agent_load_stt_model');
-
-  static final int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>)
-      voiceAgentLoadLLMModel = _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_voice_agent_load_llm_model');
-
-  static final int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>)
-      voiceAgentLoadTTSVoice = _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_voice_agent_load_tts_voice');
-
   static final int Function(RacHandle) voiceAgentInitializeWithLoadedModels =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
           'rac_voice_agent_initialize_with_loaded_models');

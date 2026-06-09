@@ -75,7 +75,6 @@ extern "C" const rac_llm_service_ops_t g_probe_llm_ops = {
     .initialize = nullptr,
     .generate = nullptr,
     .generate_stream = nullptr,
-    .generate_stream_with_timing = nullptr,
     .get_info = nullptr,
     .cancel = nullptr,
     .cleanup = nullptr,

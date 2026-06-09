@@ -2935,6 +2935,34 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigGetBuildTok
     return env->NewStringUTF(token);
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableCredential(
+    JNIEnv* env, jclass clazz, jstring value) {
+    (void)clazz;
+    if (value == nullptr) {
+        return JNI_FALSE;
+    }
+    const char* cValue = env->GetStringUTFChars(value, nullptr);
+    const jboolean result =
+        rac_dev_config_is_usable_credential(cValue) ? JNI_TRUE : JNI_FALSE;
+    env->ReleaseStringUTFChars(value, cValue);
+    return result;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDevConfigIsUsableHttpUrl(
+    JNIEnv* env, jclass clazz, jstring value) {
+    (void)clazz;
+    if (value == nullptr) {
+        return JNI_FALSE;
+    }
+    const char* cValue = env->GetStringUTFChars(value, nullptr);
+    const jboolean result =
+        rac_dev_config_is_usable_http_url(cValue) ? JNI_TRUE : JNI_FALSE;
+    env->ReleaseStringUTFChars(value, cValue);
+    return result;
+}
+
 // =============================================================================
 // SDK Configuration Initialization
 // =============================================================================

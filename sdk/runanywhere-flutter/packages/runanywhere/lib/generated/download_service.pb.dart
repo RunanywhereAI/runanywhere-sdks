@@ -679,6 +679,7 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     $core.String? storageNamespace,
     $core.String? resumeToken,
     $fixnum.Int64? requiredFreeBytesAfterDownload,
+    DownloadFailureReason? failureReason,
   }) {
     final result = create();
     if (canStart != null) result.canStart = canStart;
@@ -695,6 +696,7 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     if (resumeToken != null) result.resumeToken = resumeToken;
     if (requiredFreeBytesAfterDownload != null)
       result.requiredFreeBytesAfterDownload = requiredFreeBytesAfterDownload;
+    if (failureReason != null) result.failureReason = failureReason;
     return result;
   }
 
@@ -724,6 +726,8 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     ..aOS(10, _omitFieldNames ? '' : 'storageNamespace')
     ..aOS(11, _omitFieldNames ? '' : 'resumeToken')
     ..aInt64(12, _omitFieldNames ? '' : 'requiredFreeBytesAfterDownload')
+    ..aE<DownloadFailureReason>(13, _omitFieldNames ? '' : 'failureReason',
+        enumValues: DownloadFailureReason.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -841,6 +845,15 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
   $core.bool hasRequiredFreeBytesAfterDownload() => $_has(11);
   @$pb.TagNumber(12)
   void clearRequiredFreeBytesAfterDownload() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  DownloadFailureReason get failureReason => $_getN(12);
+  @$pb.TagNumber(13)
+  set failureReason(DownloadFailureReason value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasFailureReason() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearFailureReason() => $_clearField(13);
 }
 
 class DownloadStartRequest extends $pb.GeneratedMessage {
@@ -957,6 +970,7 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     DownloadProgress? initialProgress,
     $core.String? errorMessage,
     $core.String? resumeToken,
+    DownloadFailureReason? failureReason,
   }) {
     final result = create();
     if (accepted != null) result.accepted = accepted;
@@ -965,6 +979,7 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     if (initialProgress != null) result.initialProgress = initialProgress;
     if (errorMessage != null) result.errorMessage = errorMessage;
     if (resumeToken != null) result.resumeToken = resumeToken;
+    if (failureReason != null) result.failureReason = failureReason;
     return result;
   }
 
@@ -988,6 +1003,8 @@ class DownloadStartResult extends $pb.GeneratedMessage {
         subBuilder: DownloadProgress.create)
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(6, _omitFieldNames ? '' : 'resumeToken')
+    ..aE<DownloadFailureReason>(7, _omitFieldNames ? '' : 'failureReason',
+        enumValues: DownloadFailureReason.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1064,6 +1081,15 @@ class DownloadStartResult extends $pb.GeneratedMessage {
   $core.bool hasResumeToken() => $_has(5);
   @$pb.TagNumber(6)
   void clearResumeToken() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  DownloadFailureReason get failureReason => $_getN(6);
+  @$pb.TagNumber(7)
+  set failureReason(DownloadFailureReason value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFailureReason() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFailureReason() => $_clearField(7);
 }
 
 class DownloadCancelRequest extends $pb.GeneratedMessage {
@@ -1398,6 +1424,7 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     DownloadProgress? initialProgress,
     $core.String? errorMessage,
     $core.String? resumeToken,
+    DownloadFailureReason? failureReason,
   }) {
     final result = create();
     if (accepted != null) result.accepted = accepted;
@@ -1406,6 +1433,7 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     if (initialProgress != null) result.initialProgress = initialProgress;
     if (errorMessage != null) result.errorMessage = errorMessage;
     if (resumeToken != null) result.resumeToken = resumeToken;
+    if (failureReason != null) result.failureReason = failureReason;
     return result;
   }
 
@@ -1429,6 +1457,8 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
         subBuilder: DownloadProgress.create)
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(6, _omitFieldNames ? '' : 'resumeToken')
+    ..aE<DownloadFailureReason>(7, _omitFieldNames ? '' : 'failureReason',
+        enumValues: DownloadFailureReason.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1505,6 +1535,15 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
   $core.bool hasResumeToken() => $_has(5);
   @$pb.TagNumber(6)
   void clearResumeToken() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  DownloadFailureReason get failureReason => $_getN(6);
+  @$pb.TagNumber(7)
+  set failureReason(DownloadFailureReason value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFailureReason() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFailureReason() => $_clearField(7);
 }
 
 class DownloadApi {

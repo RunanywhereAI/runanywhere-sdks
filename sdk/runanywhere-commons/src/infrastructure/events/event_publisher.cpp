@@ -23,7 +23,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
-#include "rac/infrastructure/events/rac_events.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -38,13 +38,6 @@
 
 namespace {
 
-struct Subscription {
-    uint64_t id;
-    rac_event_callback_fn callback;
-    void* user_data;
-    std::shared_ptr<std::atomic<bool>> alive;
-};
-
 struct SDKEventSubscription {
     uint64_t id;
     rac_sdk_event_callback_fn callback;
@@ -52,15 +45,7 @@ struct SDKEventSubscription {
     std::shared_ptr<std::atomic<bool>> alive;
 };
 
-std::mutex g_event_mutex;
-std::atomic<uint64_t> g_next_subscription_id{1};
 std::atomic<uint64_t> g_next_sdk_event_subscription_id{1};
-
-// Subscriptions per category
-std::unordered_map<rac_event_category_t, std::vector<Subscription>> g_subscriptions;
-
-// All-events subscriptions
-std::vector<Subscription> g_all_subscriptions;
 
 std::mutex g_sdk_event_mutex;
 std::vector<SDKEventSubscription> g_sdk_event_subscriptions;
@@ -128,26 +113,6 @@ std::string lowercase(const char* value) {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-runanywhere::v1::ErrorCategory error_category_for_code(rac_result_t code) {
-    if (code <= -150 && code >= -179)
-        return runanywhere::v1::ERROR_CATEGORY_NETWORK;
-    if (code <= -250 && code >= -279)
-        return runanywhere::v1::ERROR_CATEGORY_VALIDATION;
-    if (code <= -110 && code >= -129)
-        return runanywhere::v1::ERROR_CATEGORY_MODEL;
-    if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299)) {
-        return runanywhere::v1::ERROR_CATEGORY_IO;
-    }
-    if (code <= -320 && code >= -329)
-        return runanywhere::v1::ERROR_CATEGORY_AUTH;
-    if (code <= -100 && code >= -109)
-        return runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
-    if ((code <= -230 && code >= -249) || (code <= -300 && code >= -319)) {
-        return runanywhere::v1::ERROR_CATEGORY_COMPONENT;
-    }
-    return runanywhere::v1::ERROR_CATEGORY_INTERNAL;
-}
-
 runanywhere::v1::SDKComponent component_from_string(const char* component) {
     const std::string c = lowercase(component);
     if (c == "stt" || c == "asr")
@@ -197,7 +162,7 @@ void populate_error(runanywhere::v1::SDKError* error, rac_result_t code, const c
     // for forward compat.
     // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
     error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
-    error->set_category(error_category_for_code(code));
+    error->set_category(rac::foundation::rac_result_to_proto_category(code));
     error->set_message(message != nullptr && message[0] != '\0' ? message
                                                                 : rac_error_message(code));
     error->set_c_abi_code(c_code);
@@ -225,178 +190,6 @@ rac_result_t publish_message(const runanywhere::v1::SDKEvent& event) {
 #endif
 
 }  // namespace
-
-// =============================================================================
-// EVENT SUBSCRIPTION API
-// =============================================================================
-
-extern "C" {
-
-uint64_t rac_event_subscribe(rac_event_category_t category, rac_event_callback_fn callback,
-                             void* user_data) {
-    if (callback == nullptr) {
-        return 0;
-    }
-
-    std::lock_guard<std::mutex> lock(g_event_mutex);
-
-    Subscription sub;
-    sub.id = g_next_subscription_id.fetch_add(1);
-    sub.callback = callback;
-    sub.user_data = user_data;
-    sub.alive = std::make_shared<std::atomic<bool>>(true);
-
-    g_subscriptions[category].push_back(sub);
-
-    return sub.id;
-}
-
-uint64_t rac_event_subscribe_all(rac_event_callback_fn callback, void* user_data) {
-    if (callback == nullptr) {
-        return 0;
-    }
-
-    std::lock_guard<std::mutex> lock(g_event_mutex);
-
-    Subscription sub;
-    sub.id = g_next_subscription_id.fetch_add(1);
-    sub.callback = callback;
-    sub.user_data = user_data;
-    sub.alive = std::make_shared<std::atomic<bool>>(true);
-
-    g_all_subscriptions.push_back(sub);
-
-    return sub.id;
-}
-
-void rac_event_unsubscribe(uint64_t subscription_id) {
-    if (subscription_id == 0) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(g_event_mutex);
-
-    auto remove_from = [subscription_id](std::vector<Subscription>& subs) {
-        auto removed = std::ranges::remove_if(subs, [subscription_id](Subscription& s) {
-            if (s.id == subscription_id) {
-                s.alive->store(false);
-                return true;
-            }
-            return false;
-        });
-        if (removed.begin() != subs.end()) {
-            subs.erase(removed.begin(), subs.end());
-            return true;
-        }
-        return false;
-    };
-
-    // Check all-events subscriptions
-    if (remove_from(g_all_subscriptions)) {
-        return;
-    }
-
-    // Check category-specific subscriptions
-    for (auto& pair : g_subscriptions) {
-        if (remove_from(pair.second)) {
-            return;
-        }
-    }
-}
-
-rac_result_t rac_event_publish(const rac_event_t* event) {
-    if (event == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    // Create a copy with timestamp if not set
-    rac_event_t event_copy = *event;
-    if (event_copy.timestamp_ms == 0) {
-        event_copy.timestamp_ms = static_cast<int64_t>(current_time_ms());
-    }
-
-    // Copy subscriber lists under lock, then invoke callbacks without lock
-    // to avoid deadlock if a callback subscribes/unsubscribes/publishes.
-    std::vector<Subscription> category_subs;
-    std::vector<Subscription> all_subs;
-
-    {
-        std::lock_guard<std::mutex> lock(g_event_mutex);
-
-        auto it = g_subscriptions.find(event_copy.category);
-        if (it != g_subscriptions.end()) {
-            category_subs = it->second;
-        }
-        all_subs = g_all_subscriptions;
-    }
-
-    // Notify category-specific subscribers (skip if unsubscribed after snapshot)
-    for (const auto& sub : category_subs) {
-        if (sub.alive->load()) {
-            sub.callback(&event_copy, sub.user_data);
-        }
-    }
-
-    // Notify all-events subscribers (skip if unsubscribed after snapshot)
-    for (const auto& sub : all_subs) {
-        if (sub.alive->load()) {
-            sub.callback(&event_copy, sub.user_data);
-        }
-    }
-
-    return RAC_SUCCESS;
-}
-
-rac_result_t rac_event_track(const char* type, rac_event_category_t category,
-                             rac_event_destination_t destination, const char* properties_json) {
-    if (type == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    // Generate event ID
-    static thread_local std::string s_event_id;
-    s_event_id = generate_event_id();
-
-    rac_event_t event = {};
-    event.id = s_event_id.c_str();
-    event.type = type;
-    event.category = category;
-    event.timestamp_ms = static_cast<int64_t>(current_time_ms());
-    event.session_id = nullptr;
-    event.destination = destination;
-    event.properties_json = properties_json;
-
-    return rac_event_publish(&event);
-}
-
-const char* rac_event_category_name(rac_event_category_t category) {
-    switch (category) {
-        case RAC_EVENT_CATEGORY_SDK:
-            return "sdk";
-        case RAC_EVENT_CATEGORY_MODEL:
-            return "model";
-        case RAC_EVENT_CATEGORY_LLM:
-            return "llm";
-        case RAC_EVENT_CATEGORY_STT:
-            return "stt";
-        case RAC_EVENT_CATEGORY_TTS:
-            return "tts";
-        case RAC_EVENT_CATEGORY_VOICE:
-            return "voice";
-        case RAC_EVENT_CATEGORY_STORAGE:
-            return "storage";
-        case RAC_EVENT_CATEGORY_DEVICE:
-            return "device";
-        case RAC_EVENT_CATEGORY_NETWORK:
-            return "network";
-        case RAC_EVENT_CATEGORY_ERROR:
-            return "error";
-        default:
-            return "unknown";
-    }
-}
-
-}  // extern "C"
 
 // =============================================================================
 // CANONICAL SDK EVENT PROTO-BYTE STREAM API
@@ -767,16 +560,10 @@ rac_result_t publish_auth_failed(rac_result_t error_code, const char* message, c
 namespace rac_internal {
 
 void reset_event_publisher() {
-    std::lock_guard<std::mutex> lock(g_event_mutex);
-    g_subscriptions.clear();
-    g_all_subscriptions.clear();
-    g_next_subscription_id.store(1);
-    {
-        std::lock_guard<std::mutex> sdk_lock(g_sdk_event_mutex);
-        g_sdk_event_subscriptions.clear();
-        g_sdk_event_queue.clear();
-        g_next_sdk_event_subscription_id.store(1);
-    }
+    std::lock_guard<std::mutex> sdk_lock(g_sdk_event_mutex);
+    g_sdk_event_subscriptions.clear();
+    g_sdk_event_queue.clear();
+    g_next_sdk_event_subscription_id.store(1);
 }
 
 }  // namespace rac_internal

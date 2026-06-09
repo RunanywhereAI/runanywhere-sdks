@@ -57,6 +57,8 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_down
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
+enum DownloadFailureReason : int;
+extern const uint32_t DownloadFailureReason_internal_data_[];
 enum DownloadStage : int;
 extern const uint32_t DownloadStage_internal_data_[];
 enum DownloadState : int;
@@ -155,6 +157,9 @@ extern const DownloadSubscribeRequestGlobalsTypeInternal DownloadSubscribeReques
 }  // namespace runanywhere
 namespace google {
 namespace protobuf {
+template <>
+internal::EnumTraitsT<::runanywhere::v1::DownloadFailureReason_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::DownloadFailureReason>;
 template <>
 internal::EnumTraitsT<::runanywhere::v1::DownloadStage_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::DownloadStage>;
@@ -258,6 +263,50 @@ template <>
 [[nodiscard]] inline bool DownloadState_Parse(
     ::absl::string_view name, DownloadState* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<DownloadState>(DownloadState_descriptor(), name,
+                                           value);
+}
+enum DownloadFailureReason : int {
+  DOWNLOAD_FAILURE_REASON_UNSPECIFIED = 0,
+  DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES = 1,
+  DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED = 2,
+  DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET = 3,
+  DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME = 4,
+  DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE = 5,
+  DownloadFailureReason_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  DownloadFailureReason_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t DownloadFailureReason_internal_data_[];
+inline constexpr DownloadFailureReason DownloadFailureReason_MIN =
+    static_cast<DownloadFailureReason>(0);
+inline constexpr DownloadFailureReason DownloadFailureReason_MAX =
+    static_cast<DownloadFailureReason>(5);
+[[nodiscard]] inline bool DownloadFailureReason_IsValid(int value) {
+  return 0 <= value && value <= 5;
+}
+inline constexpr int DownloadFailureReason_ARRAYSIZE = 5 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+DownloadFailureReason_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(DownloadFailureReason) {
+  return DownloadFailureReason_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& DownloadFailureReason_Name(T value) {
+  static_assert(::std::is_same<T, DownloadFailureReason>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to DownloadFailureReason_Name().");
+  return DownloadFailureReason_Name(static_cast<DownloadFailureReason>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& DownloadFailureReason_Name(DownloadFailureReason value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<DownloadFailureReason_descriptor, 0, 5>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool DownloadFailureReason_Parse(
+    ::absl::string_view name, DownloadFailureReason* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<DownloadFailureReason>(DownloadFailureReason_descriptor(), name,
                                            value);
 }
 enum HttpDownloadStatus : int {
@@ -1959,6 +2008,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadStartResult final : public 
     kResumeTokenFieldNumber = 6,
     kInitialProgressFieldNumber = 4,
     kAcceptedFieldNumber = 1,
+    kFailureReasonFieldNumber = 7,
   };
   // string task_id = 2;
   void clear_task_id() ;
@@ -2046,11 +2096,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadStartResult final : public 
   void _internal_set_accepted(bool value);
 
   public:
+  // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
+  void clear_failure_reason() ;
+  [[nodiscard]] ::runanywhere::v1::DownloadFailureReason failure_reason() const;
+  void set_failure_reason(::runanywhere::v1::DownloadFailureReason value);
+
+  private:
+  ::runanywhere::v1::DownloadFailureReason _internal_failure_reason() const;
+  void _internal_set_failure_reason(::runanywhere::v1::DownloadFailureReason value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadStartResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 7,
                           1, 83,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -2085,6 +2145,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadStartResult final : public 
     ::google::protobuf::internal::ArenaStringPtr resume_token_;
     ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE initial_progress_;
     bool accepted_;
+    int failure_reason_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2246,6 +2307,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadResumeResult final : public
     kResumeTokenFieldNumber = 6,
     kInitialProgressFieldNumber = 4,
     kAcceptedFieldNumber = 1,
+    kFailureReasonFieldNumber = 7,
   };
   // string task_id = 2;
   void clear_task_id() ;
@@ -2333,11 +2395,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadResumeResult final : public
   void _internal_set_accepted(bool value);
 
   public:
+  // .runanywhere.v1.DownloadFailureReason failure_reason = 7;
+  void clear_failure_reason() ;
+  [[nodiscard]] ::runanywhere::v1::DownloadFailureReason failure_reason() const;
+  void set_failure_reason(::runanywhere::v1::DownloadFailureReason value);
+
+  private:
+  ::runanywhere::v1::DownloadFailureReason _internal_failure_reason() const;
+  void _internal_set_failure_reason(::runanywhere::v1::DownloadFailureReason value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadResumeResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 7,
                           1, 84,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -2372,6 +2444,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadResumeResult final : public
     ::google::protobuf::internal::ArenaStringPtr resume_token_;
     ::runanywhere::v1::DownloadProgress* PROTOBUF_NULLABLE initial_progress_;
     bool accepted_;
+    int failure_reason_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2828,11 +2901,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadPlanResult final : public :
     kStorageNamespaceFieldNumber = 10,
     kResumeTokenFieldNumber = 11,
     kTotalBytesFieldNumber = 4,
-    kResumeFromBytesFieldNumber = 7,
-    kRequiredFreeBytesAfterDownloadFieldNumber = 12,
     kCanStartFieldNumber = 1,
     kRequiresExtractionFieldNumber = 5,
     kCanResumeFieldNumber = 6,
+    kFailureReasonFieldNumber = 13,
+    kResumeFromBytesFieldNumber = 7,
+    kRequiredFreeBytesAfterDownloadFieldNumber = 12,
   };
   // repeated .runanywhere.v1.DownloadFilePlan files = 3;
   [[nodiscard]] int files_size()
@@ -2952,26 +3026,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadPlanResult final : public :
   void _internal_set_total_bytes(::int64_t value);
 
   public:
-  // int64 resume_from_bytes = 7;
-  void clear_resume_from_bytes() ;
-  [[nodiscard]] ::int64_t resume_from_bytes() const;
-  void set_resume_from_bytes(::int64_t value);
-
-  private:
-  ::int64_t _internal_resume_from_bytes() const;
-  void _internal_set_resume_from_bytes(::int64_t value);
-
-  public:
-  // int64 required_free_bytes_after_download = 12;
-  void clear_required_free_bytes_after_download() ;
-  [[nodiscard]] ::int64_t required_free_bytes_after_download() const;
-  void set_required_free_bytes_after_download(::int64_t value);
-
-  private:
-  ::int64_t _internal_required_free_bytes_after_download() const;
-  void _internal_set_required_free_bytes_after_download(::int64_t value);
-
-  public:
   // bool can_start = 1;
   void clear_can_start() ;
   [[nodiscard]] bool can_start() const;
@@ -3002,11 +3056,41 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadPlanResult final : public :
   void _internal_set_can_resume(bool value);
 
   public:
+  // .runanywhere.v1.DownloadFailureReason failure_reason = 13;
+  void clear_failure_reason() ;
+  [[nodiscard]] ::runanywhere::v1::DownloadFailureReason failure_reason() const;
+  void set_failure_reason(::runanywhere::v1::DownloadFailureReason value);
+
+  private:
+  ::runanywhere::v1::DownloadFailureReason _internal_failure_reason() const;
+  void _internal_set_failure_reason(::runanywhere::v1::DownloadFailureReason value);
+
+  public:
+  // int64 resume_from_bytes = 7;
+  void clear_resume_from_bytes() ;
+  [[nodiscard]] ::int64_t resume_from_bytes() const;
+  void set_resume_from_bytes(::int64_t value);
+
+  private:
+  ::int64_t _internal_resume_from_bytes() const;
+  void _internal_set_resume_from_bytes(::int64_t value);
+
+  public:
+  // int64 required_free_bytes_after_download = 12;
+  void clear_required_free_bytes_after_download() ;
+  [[nodiscard]] ::int64_t required_free_bytes_after_download() const;
+  void set_required_free_bytes_after_download(::int64_t value);
+
+  private:
+  ::int64_t _internal_required_free_bytes_after_download() const;
+  void _internal_set_required_free_bytes_after_download(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.DownloadPlanResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 12,
+      ::google::protobuf::internal::TcParseTable<4, 13,
                           1, 108,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -3042,11 +3126,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DownloadPlanResult final : public :
     ::google::protobuf::internal::ArenaStringPtr storage_namespace_;
     ::google::protobuf::internal::ArenaStringPtr resume_token_;
     ::int64_t total_bytes_;
-    ::int64_t resume_from_bytes_;
-    ::int64_t required_free_bytes_after_download_;
     bool can_start_;
     bool requires_extraction_;
     bool can_resume_;
+    int failure_reason_;
+    ::int64_t resume_from_bytes_;
+    ::int64_t required_free_bytes_after_download_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -5277,7 +5362,7 @@ inline void DownloadFilePlan::_internal_set_is_resume_candidate(bool value) {
 inline void DownloadPlanResult::clear_can_start() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.can_start_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline bool DownloadPlanResult::can_start() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.can_start)
@@ -5285,7 +5370,7 @@ inline bool DownloadPlanResult::can_start() const {
 }
 inline void DownloadPlanResult::set_can_start(bool value) {
   _internal_set_can_start(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.can_start)
 }
 inline bool DownloadPlanResult::_internal_can_start() const {
@@ -5444,7 +5529,7 @@ inline void DownloadPlanResult::_internal_set_total_bytes(::int64_t value) {
 inline void DownloadPlanResult::clear_requires_extraction() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.requires_extraction_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline bool DownloadPlanResult::requires_extraction() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.requires_extraction)
@@ -5452,7 +5537,7 @@ inline bool DownloadPlanResult::requires_extraction() const {
 }
 inline void DownloadPlanResult::set_requires_extraction(bool value) {
   _internal_set_requires_extraction(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.requires_extraction)
 }
 inline bool DownloadPlanResult::_internal_requires_extraction() const {
@@ -5468,7 +5553,7 @@ inline void DownloadPlanResult::_internal_set_requires_extraction(bool value) {
 inline void DownloadPlanResult::clear_can_resume() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.can_resume_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline bool DownloadPlanResult::can_resume() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.can_resume)
@@ -5476,7 +5561,7 @@ inline bool DownloadPlanResult::can_resume() const {
 }
 inline void DownloadPlanResult::set_can_resume(bool value) {
   _internal_set_can_resume(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.can_resume)
 }
 inline bool DownloadPlanResult::_internal_can_resume() const {
@@ -5492,7 +5577,7 @@ inline void DownloadPlanResult::_internal_set_can_resume(bool value) {
 inline void DownloadPlanResult::clear_resume_from_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.resume_from_bytes_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 inline ::int64_t DownloadPlanResult::resume_from_bytes() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.resume_from_bytes)
@@ -5500,7 +5585,7 @@ inline ::int64_t DownloadPlanResult::resume_from_bytes() const {
 }
 inline void DownloadPlanResult::set_resume_from_bytes(::int64_t value) {
   _internal_set_resume_from_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.resume_from_bytes)
 }
 inline ::int64_t DownloadPlanResult::_internal_resume_from_bytes() const {
@@ -5780,7 +5865,7 @@ inline void DownloadPlanResult::set_allocated_resume_token(::std::string* PROTOB
 inline void DownloadPlanResult::clear_required_free_bytes_after_download() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.required_free_bytes_after_download_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline ::int64_t DownloadPlanResult::required_free_bytes_after_download() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.required_free_bytes_after_download)
@@ -5788,7 +5873,7 @@ inline ::int64_t DownloadPlanResult::required_free_bytes_after_download() const 
 }
 inline void DownloadPlanResult::set_required_free_bytes_after_download(::int64_t value) {
   _internal_set_required_free_bytes_after_download(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.required_free_bytes_after_download)
 }
 inline ::int64_t DownloadPlanResult::_internal_required_free_bytes_after_download() const {
@@ -5798,6 +5883,30 @@ inline ::int64_t DownloadPlanResult::_internal_required_free_bytes_after_downloa
 inline void DownloadPlanResult::_internal_set_required_free_bytes_after_download(::int64_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.required_free_bytes_after_download_ = value;
+}
+
+// .runanywhere.v1.DownloadFailureReason failure_reason = 13;
+inline void DownloadPlanResult::clear_failure_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.failure_reason_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+}
+inline ::runanywhere::v1::DownloadFailureReason DownloadPlanResult::failure_reason() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadPlanResult.failure_reason)
+  return _internal_failure_reason();
+}
+inline void DownloadPlanResult::set_failure_reason(::runanywhere::v1::DownloadFailureReason value) {
+  _internal_set_failure_reason(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadPlanResult.failure_reason)
+}
+inline ::runanywhere::v1::DownloadFailureReason DownloadPlanResult::_internal_failure_reason() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::DownloadFailureReason>(_impl_.failure_reason_);
+}
+inline void DownloadPlanResult::_internal_set_failure_reason(::runanywhere::v1::DownloadFailureReason value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.failure_reason_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -6458,6 +6567,30 @@ inline void DownloadStartResult::set_allocated_resume_token(::std::string* PROTO
     _impl_.resume_token_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadStartResult.resume_token)
+}
+
+// .runanywhere.v1.DownloadFailureReason failure_reason = 7;
+inline void DownloadStartResult::clear_failure_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.failure_reason_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline ::runanywhere::v1::DownloadFailureReason DownloadStartResult::failure_reason() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadStartResult.failure_reason)
+  return _internal_failure_reason();
+}
+inline void DownloadStartResult::set_failure_reason(::runanywhere::v1::DownloadFailureReason value) {
+  _internal_set_failure_reason(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadStartResult.failure_reason)
+}
+inline ::runanywhere::v1::DownloadFailureReason DownloadStartResult::_internal_failure_reason() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::DownloadFailureReason>(_impl_.failure_reason_);
+}
+inline void DownloadStartResult::_internal_set_failure_reason(::runanywhere::v1::DownloadFailureReason value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.failure_reason_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -7598,6 +7731,30 @@ inline void DownloadResumeResult::set_allocated_resume_token(::std::string* PROT
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DownloadResumeResult.resume_token)
 }
 
+// .runanywhere.v1.DownloadFailureReason failure_reason = 7;
+inline void DownloadResumeResult::clear_failure_reason() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.failure_reason_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
+inline ::runanywhere::v1::DownloadFailureReason DownloadResumeResult::failure_reason() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DownloadResumeResult.failure_reason)
+  return _internal_failure_reason();
+}
+inline void DownloadResumeResult::set_failure_reason(::runanywhere::v1::DownloadFailureReason value) {
+  _internal_set_failure_reason(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DownloadResumeResult.failure_reason)
+}
+inline ::runanywhere::v1::DownloadFailureReason DownloadResumeResult::_internal_failure_reason() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::DownloadFailureReason>(_impl_.failure_reason_);
+}
+inline void DownloadResumeResult::_internal_set_failure_reason(::runanywhere::v1::DownloadFailureReason value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.failure_reason_ = value;
+}
+
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -7621,6 +7778,12 @@ struct is_proto_enum<::runanywhere::v1::DownloadState> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::DownloadState>() {
   return ::runanywhere::v1::DownloadState_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::DownloadFailureReason> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::DownloadFailureReason>() {
+  return ::runanywhere::v1::DownloadFailureReason_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::HttpDownloadStatus> : std::true_type {};

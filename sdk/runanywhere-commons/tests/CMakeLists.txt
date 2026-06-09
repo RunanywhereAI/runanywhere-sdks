@@ -166,40 +166,6 @@ rac_link_archive_deps(test_graph_scheduler)
 target_compile_features(test_graph_scheduler PRIVATE cxx_std_17)
 add_test(NAME graph_scheduler_tests COMMAND test_graph_scheduler)
 
-# --- VoiceAgentPipeline unit tests --------------------------
-# Backend-free tests for the GraphScheduler-driven voice pipeline. Verifies
-# the public C ABI input contract, error-propagation, and cancel hooks
-# wired into rac_voice_agent_destroy / cleanup. End-to-end coverage with
-# real backends still lives in test_voice_agent.cpp.
-add_executable(test_voice_agent_pipeline test_voice_agent_pipeline.cpp)
-target_include_directories(test_voice_agent_pipeline PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_voice_agent_pipeline PRIVATE rac_commons)
-rac_link_archive_deps(test_voice_agent_pipeline)
-target_compile_features(test_voice_agent_pipeline PRIVATE cxx_std_17)
-add_test(NAME voice_agent_pipeline_tests COMMAND test_voice_agent_pipeline)
-
-# --- pipeline_mutex shared_ptr race regression --
-# Backend-free concurrent stress test for the `rac_voice_agent::pipeline`
-# shared_ptr slot. Drives the same store/snapshot/reset pattern that
-# `rac_voice_agent_process_stream()` and `rac_voice_agent_destroy()` use
-# internally from many threads to verify `pipeline_mutex` serializes access
-# to the control block. Designed to be run under TSAN as the primary gate
-# (see test header for `-fsanitize=thread` invocation), but also runs as a
-# regular ctest target under all presets so a future revert of the lock is
-# caught even without sanitizers.
-add_executable(test_voice_agent_pipeline_race test_voice_agent_pipeline_race.cpp)
-target_include_directories(test_voice_agent_pipeline_race PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_voice_agent_pipeline_race PRIVATE rac_commons)
-rac_link_archive_deps(test_voice_agent_pipeline_race)
-target_compile_features(test_voice_agent_pipeline_race PRIVATE cxx_std_17)
-add_test(NAME voice_agent_pipeline_race_tests COMMAND test_voice_agent_pipeline_race)
-
 # --- PipelineExecutor + SolutionRunner (Solutions-gated) ---------------
 # The executor / runner / C ABI live behind RAC_ENABLE_SOLUTIONS. Each test
 # TU compiles a SKIP-style stub when the symbol is undefined (e.g. CI
@@ -326,7 +292,7 @@ add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
 #   3. sticky cancel non-regression: step_with_result after
 #      session_cancel returns RAC_ERROR_INVALID_STATE.
 #   4. idempotent session cancel on stale/destroyed/zero handles.
-# Designed to be TSAN-clean — mirrors test_voice_agent_pipeline_race.cpp.
+# Designed to be TSAN-clean.
 add_executable(test_tool_calling_cancel test_tool_calling_cancel.cpp)
 target_include_directories(test_tool_calling_cancel PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -366,22 +332,6 @@ rac_link_archive_deps(test_schema_to_json)
 target_compile_features(test_schema_to_json PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_schema_to_json)
 add_test(NAME schema_to_json_tests COMMAND test_schema_to_json)
-
-# --- Proto-byte event dispatch test --------------------
-# Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
-# VoiceEvent → SerializeToArray → callback path that was declared
-# but left as a stub. Tests round-trip per oneof arm + monotonic seq +
-# unregister-stops-dispatch. SKIP-style when RAC_HAVE_PROTOBUF is undefined.
-add_executable(test_proto_event_dispatch test_proto_event_dispatch.cpp)
-target_include_directories(test_proto_event_dispatch PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-)
-target_link_libraries(test_proto_event_dispatch PRIVATE rac_commons)
-rac_link_archive_deps(test_proto_event_dispatch)
-target_compile_features(test_proto_event_dispatch PRIVATE cxx_std_17)
-rac_test_define_have_protobuf(test_proto_event_dispatch)
-add_test(NAME proto_event_dispatch_tests COMMAND test_proto_event_dispatch)
 
 # --- LLM proto-byte stream dispatch test --------------
 # Exercises rac::llm::dispatch_llm_stream_event() — the token → LLMStreamEvent
@@ -1353,25 +1303,10 @@ if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
     add_test(NAME llm_tests COMMAND test_llm --run-all)
 endif()
 
-# --- Voice Agent test: Requires Sherpa (speech ops) + ONNX (typedefs) + LlamaCPP ---
-if(RAC_BACKEND_ONNX AND RAC_BACKEND_LLAMACPP AND RAC_BACKEND_SHERPA
-   AND TARGET rac_backend_onnx AND TARGET rac_backend_llamacpp AND TARGET rac_backend_sherpa)
-    add_executable(test_voice_agent test_voice_agent.cpp)
-    target_include_directories(test_voice_agent PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/sherpa
-    )
-    target_link_libraries(test_voice_agent PRIVATE
-        rac_commons rac_backend_onnx rac_backend_sherpa rac_backend_llamacpp)
-    target_compile_features(test_voice_agent PRIVATE cxx_std_20)
-    add_test(NAME voice_agent_tests COMMAND test_voice_agent --run-all)
-endif()
-
 # --- macOS RPATH for ONNX Runtime dylib ---
 if(APPLE)
     set(ONNX_MACOS_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_wakeword)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "${ONNX_MACOS_LIB_DIR}"
@@ -1384,7 +1319,7 @@ endif()
 # --- Linux RPATH for Sherpa-ONNX shared libs ---
 if(UNIX AND NOT APPLE)
     set(SHERPA_LINUX_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/sherpa-onnx-linux/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_wakeword)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "$ORIGIN;${SHERPA_LINUX_LIB_DIR}"
@@ -1400,7 +1335,7 @@ endif()
 # is ON). If it's unset the EXISTS check silently evaluates against
 # "/lib/onnxruntime.dll" which is never what we want.
 if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" STREQUAL "")
-    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
+    foreach(test_target test_vad test_stt test_tts test_wakeword)
         if(TARGET ${test_target})
             if(EXISTS "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll")
                 add_custom_command(TARGET ${test_target} POST_BUILD
@@ -1528,9 +1463,6 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(rac_benchmark_tests
     benchmark/test_monotonic_clock.cpp
-    benchmark/test_timing_struct.cpp
-    benchmark/test_benchmark_log.cpp
-    benchmark/test_benchmark_stats.cpp
 )
 
 target_link_libraries(rac_benchmark_tests

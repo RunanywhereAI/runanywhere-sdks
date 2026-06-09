@@ -115,6 +115,18 @@ public class DownloadPlanResult(
     schemaIndex = 11,
   )
   public val required_free_bytes_after_download: Long = 0L,
+  /**
+   * structured companion to error_message
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.DownloadFailureReason#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "failureReason",
+    schemaIndex = 12,
+  )
+  public val failure_reason:
+      DownloadFailureReason = DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadPlanResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -155,6 +167,7 @@ public class DownloadPlanResult(
     if (storage_namespace != other.storage_namespace) return false
     if (resume_token != other.resume_token) return false
     if (required_free_bytes_after_download != other.required_free_bytes_after_download) return false
+    if (failure_reason != other.failure_reason) return false
     return true
   }
 
@@ -174,6 +187,7 @@ public class DownloadPlanResult(
       result = result * 37 + storage_namespace.hashCode()
       result = result * 37 + resume_token.hashCode()
       result = result * 37 + required_free_bytes_after_download.hashCode()
+      result = result * 37 + failure_reason.hashCode()
       super.hashCode = result
     }
     return result
@@ -193,6 +207,7 @@ public class DownloadPlanResult(
     result += """storage_namespace=${sanitize(storage_namespace)}"""
     result += """resume_token=${sanitize(resume_token)}"""
     result += """required_free_bytes_after_download=$required_free_bytes_after_download"""
+    result += """failure_reason=$failure_reason"""
     return result.joinToString(prefix = "DownloadPlanResult{", separator = ", ", postfix = "}")
   }
 
@@ -209,8 +224,9 @@ public class DownloadPlanResult(
     storage_namespace: String = this.storage_namespace,
     resume_token: String = this.resume_token,
     required_free_bytes_after_download: Long = this.required_free_bytes_after_download,
+    failure_reason: DownloadFailureReason = this.failure_reason,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadPlanResult = DownloadPlanResult(can_start, model_id, files, total_bytes, requires_extraction, can_resume, resume_from_bytes, warnings, error_message, storage_namespace, resume_token, required_free_bytes_after_download, unknownFields)
+  ): DownloadPlanResult = DownloadPlanResult(can_start, model_id, files, total_bytes, requires_extraction, can_resume, resume_from_bytes, warnings, error_message, storage_namespace, resume_token, required_free_bytes_after_download, failure_reason, unknownFields)
 
   public companion object {
     @JvmField
@@ -257,6 +273,9 @@ public class DownloadPlanResult(
         if (value.required_free_bytes_after_download != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.required_free_bytes_after_download)
         }
+        if (value.failure_reason != ai.runanywhere.proto.v1.DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED) {
+          size += DownloadFailureReason.ADAPTER.encodedSizeWithTag(13, value.failure_reason)
+        }
         return size
       }
 
@@ -293,11 +312,17 @@ public class DownloadPlanResult(
         if (value.required_free_bytes_after_download != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 12, value.required_free_bytes_after_download)
         }
+        if (value.failure_reason != ai.runanywhere.proto.v1.DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED) {
+          DownloadFailureReason.ADAPTER.encodeWithTag(writer, 13, value.failure_reason)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadPlanResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.failure_reason != ai.runanywhere.proto.v1.DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED) {
+          DownloadFailureReason.ADAPTER.encodeWithTag(writer, 13, value.failure_reason)
+        }
         if (value.required_free_bytes_after_download != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 12, value.required_free_bytes_after_download)
         }
@@ -345,6 +370,7 @@ public class DownloadPlanResult(
         var storage_namespace: String = ""
         var resume_token: String = ""
         var required_free_bytes_after_download: Long = 0L
+        var failure_reason: DownloadFailureReason = DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> can_start = ProtoAdapter.BOOL.decode(reader)
@@ -359,6 +385,11 @@ public class DownloadPlanResult(
             10 -> storage_namespace = ProtoAdapter.STRING.decode(reader)
             11 -> resume_token = ProtoAdapter.STRING.decode(reader)
             12 -> required_free_bytes_after_download = ProtoAdapter.INT64.decode(reader)
+            13 -> try {
+              failure_reason = DownloadFailureReason.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -375,6 +406,7 @@ public class DownloadPlanResult(
           storage_namespace = storage_namespace,
           resume_token = resume_token,
           required_free_bytes_after_download = required_free_bytes_after_download,
+          failure_reason = failure_reason,
           unknownFields = unknownFields
         )
       }

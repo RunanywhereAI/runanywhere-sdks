@@ -488,6 +488,8 @@ _rac_dev_config_get_supabase_key
 _rac_dev_config_get_supabase_url
 _rac_dev_config_has_build_token
 _rac_dev_config_is_available
+_rac_dev_config_is_usable_credential
+_rac_dev_config_is_usable_http_url
 
 # Device registration manager — the commons-side device id cache and
 # deferred registration trigger called by CppBridge+Device.swift.
@@ -637,17 +639,7 @@ _rac_voice_agent_destroy
 _rac_voice_agent_generate_response
 _rac_voice_agent_initialize
 _rac_voice_agent_initialize_with_loaded_models
-_rac_voice_agent_is_llm_loaded
 _rac_voice_agent_is_ready
-_rac_voice_agent_is_stt_loaded
-_rac_voice_agent_is_tts_loaded
-_rac_voice_agent_load_llm_model
-_rac_voice_agent_load_stt_model
-_rac_voice_agent_load_tts_voice
-_rac_voice_agent_process_voice_turn
-_rac_voice_agent_result_free
-_rac_voice_agent_synthesize_speech
-_rac_voice_agent_transcribe
 
 # Tool calling — struct-based helpers still called from Swift CppBridge+ToolCalling.swift.
 _rac_tool_call_format_prompt
@@ -802,12 +794,9 @@ _rac_download_compute_destination
 _rac_download_requires_extraction
 
 # Archive extraction helpers (ONNX .tar.bz2, diffusion bundles, etc.).
-_rac_extract_archive
 _rac_extract_archive_native
 
 # Lower-level event bus (analytics/track). Public event stream remains rac_sdk_event_*.
-_rac_event_subscribe
-_rac_event_track
 
 # Structured error API — rac_error_message and related helpers called from
 # Swift runtime shims (ONNX.swift, MetalRT.swift) and JNI error bridges.

@@ -8,7 +8,6 @@
  * (set once at init) and the device registration flag.
  *
  * Pattern mirrors Swift's ServiceContainer:
- * - Singleton access via rac_state_get_instance()
  * - Lazy initialization for sub-components
  * - Thread-safe access via internal mutex
  * - Reset capability for testing
@@ -36,28 +35,6 @@ extern "C" {
 // =============================================================================
 // State Structure (Opaque - internal structure hidden from C API)
 // =============================================================================
-
-/**
- * @brief Opaque handle to SDK state
- *
- * The internal structure is hidden to allow C++ implementation
- * while exposing a clean C API for platform interop.
- */
-typedef struct rac_sdk_state* rac_sdk_state_handle_t;
-
-// =============================================================================
-// Singleton Access
-// =============================================================================
-
-/**
- * @brief Get the singleton SDK state instance
- *
- * Creates the instance on first call (lazy initialization).
- * Thread-safe.
- *
- * @return Handle to the SDK state (never NULL after first call)
- */
-RAC_API rac_sdk_state_handle_t rac_state_get_instance(void);
 
 // =============================================================================
 // Initialization & Lifecycle

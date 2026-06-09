@@ -5,11 +5,13 @@
 //   protoc               v7.35.0
 // source: download_service.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DownloadResumeResult = exports.DownloadResumeRequest = exports.DownloadCancelResult = exports.DownloadCancelRequest = exports.DownloadStartResult = exports.DownloadStartRequest = exports.DownloadPlanResult = exports.DownloadFilePlan = exports.DownloadPlanRequest = exports.DownloadProgress = exports.DownloadSubscribeRequest = exports.HttpDownloadStatus = exports.DownloadState = exports.DownloadStage = exports.protobufPackage = void 0;
+exports.DownloadResumeResult = exports.DownloadResumeRequest = exports.DownloadCancelResult = exports.DownloadCancelRequest = exports.DownloadStartResult = exports.DownloadStartRequest = exports.DownloadPlanResult = exports.DownloadFilePlan = exports.DownloadPlanRequest = exports.DownloadProgress = exports.DownloadSubscribeRequest = exports.HttpDownloadStatus = exports.DownloadFailureReason = exports.DownloadState = exports.DownloadStage = exports.protobufPackage = void 0;
 exports.downloadStageFromJSON = downloadStageFromJSON;
 exports.downloadStageToJSON = downloadStageToJSON;
 exports.downloadStateFromJSON = downloadStateFromJSON;
 exports.downloadStateToJSON = downloadStateToJSON;
+exports.downloadFailureReasonFromJSON = downloadFailureReasonFromJSON;
+exports.downloadFailureReasonToJSON = downloadFailureReasonToJSON;
 exports.httpDownloadStatusFromJSON = httpDownloadStatusFromJSON;
 exports.httpDownloadStatusToJSON = httpDownloadStatusToJSON;
 /* eslint-disable */
@@ -140,6 +142,71 @@ function downloadStateToJSON(object) {
         case DownloadState.DOWNLOAD_STATE_RESUMING:
             return "DOWNLOAD_STATE_RESUMING";
         case DownloadState.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+/**
+ * Structured reason for a download plan/start/resume rejection. Lets every SDK
+ * branch on a stable enum instead of substring-matching the human-readable
+ * error_message (the prior approach, which silently broke on any reword).
+ */
+var DownloadFailureReason;
+(function (DownloadFailureReason) {
+    DownloadFailureReason[DownloadFailureReason["DOWNLOAD_FAILURE_REASON_UNSPECIFIED"] = 0] = "DOWNLOAD_FAILURE_REASON_UNSPECIFIED";
+    /** DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES - On-disk partial download is larger than the expected total byte count. */
+    DownloadFailureReason[DownloadFailureReason["DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES"] = 1] = "DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES";
+    /** DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED - Requested resume offset is past the expected total size. */
+    DownloadFailureReason[DownloadFailureReason["DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED"] = 2] = "DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED";
+    /** DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET - On-disk partial is smaller than the requested resume offset. */
+    DownloadFailureReason[DownloadFailureReason["DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET"] = 3] = "DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET";
+    /** DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME - The partial file changed (size/mtime) since the resume token was issued. */
+    DownloadFailureReason[DownloadFailureReason["DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME"] = 4] = "DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME";
+    /** DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE - Not enough free space to complete the download. */
+    DownloadFailureReason[DownloadFailureReason["DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE"] = 5] = "DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE";
+    DownloadFailureReason[DownloadFailureReason["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(DownloadFailureReason || (exports.DownloadFailureReason = DownloadFailureReason = {}));
+function downloadFailureReasonFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "DOWNLOAD_FAILURE_REASON_UNSPECIFIED":
+            return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED;
+        case 1:
+        case "DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES":
+            return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES;
+        case 2:
+        case "DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED":
+            return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED;
+        case 3:
+        case "DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET":
+            return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET;
+        case 4:
+        case "DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME":
+            return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME;
+        case 5:
+        case "DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE":
+            return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return DownloadFailureReason.UNRECOGNIZED;
+    }
+}
+function downloadFailureReasonToJSON(object) {
+    switch (object) {
+        case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED:
+            return "DOWNLOAD_FAILURE_REASON_UNSPECIFIED";
+        case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES:
+            return "DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES";
+        case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED:
+            return "DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED";
+        case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET:
+            return "DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET";
+        case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME:
+            return "DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME";
+        case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE:
+            return "DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE";
+        case DownloadFailureReason.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1166,6 +1233,7 @@ function createBaseDownloadPlanResult() {
         storageNamespace: "",
         resumeToken: "",
         requiredFreeBytesAfterDownload: 0,
+        failureReason: 0,
     };
 }
 exports.DownloadPlanResult = {
@@ -1205,6 +1273,9 @@ exports.DownloadPlanResult = {
         }
         if (message.requiredFreeBytesAfterDownload !== 0) {
             writer.uint32(96).int64(message.requiredFreeBytesAfterDownload);
+        }
+        if (message.failureReason !== 0) {
+            writer.uint32(104).int32(message.failureReason);
         }
         return writer;
     },
@@ -1299,6 +1370,13 @@ exports.DownloadPlanResult = {
                     message.requiredFreeBytesAfterDownload = longToNumber(reader.int64());
                     continue;
                 }
+                case 13: {
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.failureReason = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1363,6 +1441,11 @@ exports.DownloadPlanResult = {
                 : isSet(object.required_free_bytes_after_download)
                     ? globalThis.Number(object.required_free_bytes_after_download)
                     : 0,
+            failureReason: isSet(object.failureReason)
+                ? downloadFailureReasonFromJSON(object.failureReason)
+                : isSet(object.failure_reason)
+                    ? downloadFailureReasonFromJSON(object.failure_reason)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -1403,6 +1486,9 @@ exports.DownloadPlanResult = {
         if (message.requiredFreeBytesAfterDownload !== 0) {
             obj.requiredFreeBytesAfterDownload = Math.round(message.requiredFreeBytesAfterDownload);
         }
+        if (message.failureReason !== 0) {
+            obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+        }
         return obj;
     },
     create(base) {
@@ -1422,6 +1508,7 @@ exports.DownloadPlanResult = {
         message.storageNamespace = object.storageNamespace ?? "";
         message.resumeToken = object.resumeToken ?? "";
         message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
+        message.failureReason = object.failureReason ?? 0;
         return message;
     },
 };
@@ -1553,7 +1640,15 @@ exports.DownloadStartRequest = {
     },
 };
 function createBaseDownloadStartResult() {
-    return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "", resumeToken: "" };
+    return {
+        accepted: false,
+        taskId: "",
+        modelId: "",
+        initialProgress: undefined,
+        errorMessage: "",
+        resumeToken: "",
+        failureReason: 0,
+    };
 }
 exports.DownloadStartResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1574,6 +1669,9 @@ exports.DownloadStartResult = {
         }
         if (message.resumeToken !== "") {
             writer.uint32(50).string(message.resumeToken);
+        }
+        if (message.failureReason !== 0) {
+            writer.uint32(56).int32(message.failureReason);
         }
         return writer;
     },
@@ -1626,6 +1724,13 @@ exports.DownloadStartResult = {
                     message.resumeToken = reader.string();
                     continue;
                 }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.failureReason = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1662,6 +1767,11 @@ exports.DownloadStartResult = {
                 : isSet(object.resume_token)
                     ? globalThis.String(object.resume_token)
                     : "",
+            failureReason: isSet(object.failureReason)
+                ? downloadFailureReasonFromJSON(object.failureReason)
+                : isSet(object.failure_reason)
+                    ? downloadFailureReasonFromJSON(object.failure_reason)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -1684,6 +1794,9 @@ exports.DownloadStartResult = {
         if (message.resumeToken !== "") {
             obj.resumeToken = message.resumeToken;
         }
+        if (message.failureReason !== 0) {
+            obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+        }
         return obj;
     },
     create(base) {
@@ -1699,6 +1812,7 @@ exports.DownloadStartResult = {
             : undefined;
         message.errorMessage = object.errorMessage ?? "";
         message.resumeToken = object.resumeToken ?? "";
+        message.failureReason = object.failureReason ?? 0;
         return message;
     },
 };
@@ -2126,7 +2240,15 @@ exports.DownloadResumeRequest = {
     },
 };
 function createBaseDownloadResumeResult() {
-    return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "", resumeToken: "" };
+    return {
+        accepted: false,
+        taskId: "",
+        modelId: "",
+        initialProgress: undefined,
+        errorMessage: "",
+        resumeToken: "",
+        failureReason: 0,
+    };
 }
 exports.DownloadResumeResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -2147,6 +2269,9 @@ exports.DownloadResumeResult = {
         }
         if (message.resumeToken !== "") {
             writer.uint32(50).string(message.resumeToken);
+        }
+        if (message.failureReason !== 0) {
+            writer.uint32(56).int32(message.failureReason);
         }
         return writer;
     },
@@ -2199,6 +2324,13 @@ exports.DownloadResumeResult = {
                     message.resumeToken = reader.string();
                     continue;
                 }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.failureReason = reader.int32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2235,6 +2367,11 @@ exports.DownloadResumeResult = {
                 : isSet(object.resume_token)
                     ? globalThis.String(object.resume_token)
                     : "",
+            failureReason: isSet(object.failureReason)
+                ? downloadFailureReasonFromJSON(object.failureReason)
+                : isSet(object.failure_reason)
+                    ? downloadFailureReasonFromJSON(object.failure_reason)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -2257,6 +2394,9 @@ exports.DownloadResumeResult = {
         if (message.resumeToken !== "") {
             obj.resumeToken = message.resumeToken;
         }
+        if (message.failureReason !== 0) {
+            obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+        }
         return obj;
     },
     create(base) {
@@ -2272,6 +2412,7 @@ exports.DownloadResumeResult = {
             : undefined;
         message.errorMessage = object.errorMessage ?? "";
         message.resumeToken = object.resumeToken ?? "";
+        message.failureReason = object.failureReason ?? 0;
         return message;
     },
 };

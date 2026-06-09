@@ -53,7 +53,6 @@
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/foundation/rac_proto_buffer.h"
-#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -747,8 +746,6 @@ struct llm_stream_context {
     int32_t token_count;  // Track tokens for streaming updates
 
     std::atomic<bool>* cancel_flag;
-    // Benchmark timing (optional, NULL when not benchmarking)
-    rac_benchmark_timing_t* timing_out;
 
     // Component handle for the proto-byte stream
     // dispatcher. Each delivered token fires a LLMStreamEvent to any
@@ -787,11 +784,6 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
     if (!ctx->first_token_recorded && !cleaned_empty) {
         ctx->first_token_recorded = true;
         ctx->first_token_time = std::chrono::steady_clock::now();
-
-        // Record t4 (first token) for benchmark timing
-        if (ctx->timing_out != nullptr) {
-            ctx->timing_out->t4_first_token_ms = rac_monotonic_now_ms();
-        }
 
         // Calculate TTFT
         auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -941,7 +933,6 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
     ctx.cancel_flag = &component->cancel_requested;
-    ctx.timing_out = nullptr;  // No benchmark timing for regular generate_stream
     ctx.component_handle = handle;
     // Pre-allocate to avoid repeated reallocations during streaming
     ctx.full_text.reserve(2048);
@@ -1052,252 +1043,6 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     free(final_result.text);
 
     RAC_LOG_INFO("LLM.Component", "Streaming generation completed");
-
-    return RAC_SUCCESS;
-}
-
-extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
-    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
-    rac_llm_component_token_callback_fn token_callback,
-    rac_llm_component_complete_callback_fn complete_callback,
-    rac_llm_component_error_callback_fn error_callback, void* user_data,
-    rac_benchmark_timing_t* timing_out) {
-    if (!handle)
-        return RAC_ERROR_INVALID_HANDLE;
-    if (!prompt)
-        return RAC_ERROR_INVALID_ARGUMENT;
-
-    auto* component = reinterpret_cast<rac_llm_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
-
-    // Initialize timing if provided
-    if (timing_out != nullptr) {
-        rac_benchmark_timing_init(timing_out);
-        // Record t0 (request start) - first thing after validation
-        timing_out->t0_request_start_ms = rac_monotonic_now_ms();
-    }
-
-    // Generate unique ID for this generation
-    std::string generation_id = generate_unique_id();
-    const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
-    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
-
-    // Get service from lifecycle manager
-    rac_handle_t service = nullptr;
-    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("LLM.Component", "No model loaded - cannot generate stream");
-
-        // Emit generation failed event
-#if defined(RAC_HAVE_PROTOBUF)
-        emit_llm_generation_failed(generation_id.c_str(), model_id, model_name, "No model loaded");
-#endif
-
-        if (timing_out != nullptr) {
-            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
-            timing_out->error_code = result;
-            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        }
-
-        if (error_callback) {
-            error_callback(result, "No model loaded", user_data);
-        }
-        return result;
-    }
-
-    // Check if streaming is supported
-    rac_llm_info_t info;
-    result = rac_llm_get_info(service, &info);
-    if (result != RAC_SUCCESS || (info.supports_streaming == 0)) {
-        RAC_LOG_ERROR("LLM.Component", "Streaming not supported");
-
-        // Emit generation failed event
-#if defined(RAC_HAVE_PROTOBUF)
-        emit_llm_generation_failed(generation_id.c_str(), model_id, model_name,
-                                   "Streaming not supported");
-#endif
-
-        if (timing_out != nullptr) {
-            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
-            timing_out->error_code = RAC_ERROR_NOT_SUPPORTED;
-            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        }
-
-        if (error_callback) {
-            error_callback(RAC_ERROR_NOT_SUPPORTED, "Streaming not supported", user_data);
-        }
-        return RAC_ERROR_NOT_SUPPORTED;
-    }
-
-    RAC_LOG_INFO("LLM.Component", "Starting streaming generation with timing");
-
-    // Get context_length from service info
-    int32_t context_length = info.context_length;
-
-    // Use provided options or defaults
-    const rac_llm_options_t* effective_options = options ? options : &component->default_options;
-
-    // Emit generation started event
-#if defined(RAC_HAVE_PROTOBUF)
-    emit_llm_generation_started(generation_id.c_str(), model_id, model_name, /*is_streaming=*/true,
-                                component->actual_framework, effective_options->temperature,
-                                effective_options->max_tokens, context_length);
-#endif
-
-    // Setup streaming context
-    llm_stream_context ctx;
-    ctx.token_callback = token_callback;
-    ctx.complete_callback = complete_callback;
-    ctx.error_callback = error_callback;
-    ctx.user_data = user_data;
-    ctx.start_time = std::chrono::steady_clock::now();
-    ctx.first_token_recorded = false;
-    ctx.prompt_tokens = estimate_tokens(prompt);
-    ctx.generation_id = generation_id;
-    ctx.model_id = model_id;
-    ctx.model_name = model_name;
-    ctx.framework = component->actual_framework;
-    ctx.temperature = effective_options->temperature;
-    ctx.max_tokens = effective_options->max_tokens;
-    ctx.token_count = 0;
-    ctx.timing_out = timing_out;  // Pass timing for t4 capture in callback
-    ctx.cancel_flag = &component->cancel_requested;
-    ctx.component_handle = handle;
-
-    // Perform streaming generation with timing
-    // Note: Backend timing (t2, t3, t5) will be captured if backend supports it
-    result = rac_llm_generate_stream_with_timing(service, prompt, effective_options,
-                                                 llm_stream_token_callback, &ctx, timing_out);
-
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("LLM.Component", "Streaming generation failed");
-        rac_lifecycle_track_error(component->lifecycle, result, "generateStream");
-
-        // Emit generation failed event
-#if defined(RAC_HAVE_PROTOBUF)
-        emit_llm_generation_failed(generation_id.c_str(), model_id, model_name,
-                                   "Streaming generation failed");
-#endif
-
-        if (timing_out != nullptr) {
-            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
-            timing_out->error_code = result;
-            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        }
-
-        // Terminal error event on the proto stream.
-        rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, /*kind*/ 0, 0, 0.0f,
-                                            /*finish_reason*/ "error",
-                                            /*error_message*/ "Streaming generation failed");
-
-        if (error_callback) {
-            error_callback(result, "Streaming generation failed", user_data);
-        }
-        return result;
-    }
-
-    // Build final result for completion callback
-    auto end_time = std::chrono::steady_clock::now();
-    auto total_duration =
-        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - ctx.start_time);
-    int64_t total_time_ms = total_duration.count();
-
-    rac_llm_result_t final_result = {};
-    final_result.text = strdup(ctx.full_text.c_str());
-    if (final_result.text == nullptr) {
-        RAC_LOG_ERROR("LLM.Component", "strdup failed for result text");
-        if (timing_out != nullptr) {
-            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
-            timing_out->error_code = RAC_ERROR_OUT_OF_MEMORY;
-            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        }
-        if (error_callback) {
-            error_callback(RAC_ERROR_OUT_OF_MEMORY, "Failed to allocate result text", user_data);
-        }
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    // Use actual backend token counts if available, fall back to estimates
-    if (timing_out != nullptr && timing_out->prompt_tokens > 0) {
-        final_result.prompt_tokens = timing_out->prompt_tokens;
-    } else {
-        final_result.prompt_tokens = ctx.prompt_tokens;
-    }
-
-    if (timing_out != nullptr && timing_out->output_tokens > 0) {
-        final_result.completion_tokens = timing_out->output_tokens;
-    } else {
-        final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
-    }
-
-    final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
-    final_result.total_time_ms = total_time_ms;
-
-    double ttft_ms = 0.0;
-    // Calculate TTFT
-    if (ctx.first_token_recorded) {
-        auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            ctx.first_token_time - ctx.start_time);
-        final_result.time_to_first_token_ms = ttft_duration.count();
-        ttft_ms = static_cast<double>(ttft_duration.count());
-    }
-
-    // Calculate tokens per second
-    double tokens_per_second = 0.0;
-    if (final_result.total_time_ms > 0) {
-        tokens_per_second = static_cast<double>(final_result.completion_tokens) /
-                            (static_cast<double>(final_result.total_time_ms) / 1000.0);
-        final_result.tokens_per_second = static_cast<float>(tokens_per_second);
-    }
-
-    // Record t6 (request end) before complete callback.
-    // Backfill prompt/output tokens when backend didn't populate them (fallback path)
-    // so downstream decode-TPS and CSV/JSON stats are computed from estimates, not zero.
-    if (timing_out != nullptr) {
-        if (timing_out->prompt_tokens <= 0) {
-            timing_out->prompt_tokens = final_result.prompt_tokens;
-        }
-        if (timing_out->output_tokens <= 0) {
-            timing_out->output_tokens = final_result.completion_tokens;
-        }
-        timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        timing_out->status = RAC_BENCHMARK_STATUS_SUCCESS;
-        timing_out->error_code = RAC_SUCCESS;
-    }
-
-    if (complete_callback) {
-        complete_callback(&final_result, user_data);
-    }
-
-    // Emit generation completed event
-#if defined(RAC_HAVE_PROTOBUF)
-    emit_llm_generation_completed(generation_id.c_str(), model_id, model_name,
-                                  final_result.prompt_tokens, final_result.completion_tokens,
-                                  static_cast<double>(total_time_ms), tokens_per_second,
-                                  /*is_streaming=*/true, ttft_ms, component->actual_framework,
-                                  effective_options->temperature, effective_options->max_tokens,
-                                  context_length);
-#endif
-
-    // Terminal success event on the proto stream.
-    // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
-    // (matches OpenAI chat.completions contract — proto is modeled after it).
-    const char* finish_reason_str_t = "stop";
-    if (component->cancel_requested.load(std::memory_order_relaxed)) {
-        finish_reason_str_t = "cancelled";
-    } else if (effective_options->max_tokens > 0 &&
-               ctx.token_count >= effective_options->max_tokens) {
-        finish_reason_str_t = "length";
-    }
-    rac::llm::dispatch_llm_stream_event(handle, "", /*is_final*/ true, /*kind*/ 1 /* ANSWER */, 0,
-                                        0.0f,
-                                        /*finish_reason*/ finish_reason_str_t,
-                                        /*error_message*/ nullptr);
-
-    // Free the duplicated text
-    free(final_result.text);
-
-    RAC_LOG_INFO("LLM.Component", "Streaming generation with timing completed");
 
     return RAC_SUCCESS;
 }

@@ -27,6 +27,27 @@ export declare enum DownloadState {
 export declare function downloadStateFromJSON(object: any): DownloadState;
 export declare function downloadStateToJSON(object: DownloadState): string;
 /**
+ * Structured reason for a download plan/start/resume rejection. Lets every SDK
+ * branch on a stable enum instead of substring-matching the human-readable
+ * error_message (the prior approach, which silently broke on any reword).
+ */
+export declare enum DownloadFailureReason {
+    DOWNLOAD_FAILURE_REASON_UNSPECIFIED = 0,
+    /** DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES - On-disk partial download is larger than the expected total byte count. */
+    DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES = 1,
+    /** DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED - Requested resume offset is past the expected total size. */
+    DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED = 2,
+    /** DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET - On-disk partial is smaller than the requested resume offset. */
+    DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET = 3,
+    /** DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME - The partial file changed (size/mtime) since the resume token was issued. */
+    DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME = 4,
+    /** DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE - Not enough free space to complete the download. */
+    DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE = 5,
+    UNRECOGNIZED = -1
+}
+export declare function downloadFailureReasonFromJSON(object: any): DownloadFailureReason;
+export declare function downloadFailureReasonToJSON(object: DownloadFailureReason): string;
+/**
  * HTTP transport download status — numeric values MUST match
  * rac_http_download_status_t (RAC_HTTP_DL_*) in
  * sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
@@ -123,6 +144,8 @@ export interface DownloadPlanResult {
     storageNamespace: string;
     resumeToken: string;
     requiredFreeBytesAfterDownload: number;
+    /** structured companion to error_message */
+    failureReason: DownloadFailureReason;
 }
 export interface DownloadStartRequest {
     modelId: string;
@@ -138,6 +161,8 @@ export interface DownloadStartResult {
     initialProgress?: DownloadProgress | undefined;
     errorMessage: string;
     resumeToken: string;
+    /** structured companion to error_message */
+    failureReason: DownloadFailureReason;
 }
 export interface DownloadCancelRequest {
     taskId: string;
@@ -168,6 +193,8 @@ export interface DownloadResumeResult {
     initialProgress?: DownloadProgress | undefined;
     errorMessage: string;
     resumeToken: string;
+    /** structured companion to error_message */
+    failureReason: DownloadFailureReason;
 }
 export declare const DownloadSubscribeRequest: MessageFns<DownloadSubscribeRequest>;
 export declare const DownloadProgress: MessageFns<DownloadProgress>;

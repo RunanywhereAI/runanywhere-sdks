@@ -27,7 +27,6 @@
 
 // Infrastructure
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
-#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_download.h"

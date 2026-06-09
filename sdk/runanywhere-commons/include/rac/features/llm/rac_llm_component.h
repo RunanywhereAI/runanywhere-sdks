@@ -12,7 +12,7 @@
  *   - Component lifecycle/generation entry points
  *     (rac_llm_component_create, configure, load_model, unload,
  *     cleanup, cancel, generate, generate_stream,
- *     generate_stream_with_timing, get_state, get_metrics, destroy):
+ *     get_state, get_metrics, destroy):
  *     `delete after SDK migration` for SDK callers — replaced by
  *     rac_model_lifecycle_load_proto + rac_llm_*_proto.
  *   - LoRA helpers (rac_llm_component_load_lora, remove_lora,
@@ -207,42 +207,6 @@ RAC_API rac_result_t rac_llm_component_generate_stream(
     rac_llm_component_token_callback_fn token_callback,
     rac_llm_component_complete_callback_fn complete_callback,
     rac_llm_component_error_callback_fn error_callback, void* user_data);
-
-/**
- * @brief Generate text with streaming and benchmark timing
- *
- * Same as rac_llm_component_generate_stream but with optional benchmark timing.
- * When timing_out is non-NULL, captures detailed timing information:
- * - t0: Request start (set at API entry)
- * - t4: First token (set in token callback)
- * - t6: Request end (set before complete callback)
- *
- * Backend timestamps (t2, t3, t5) are captured by the backend if it supports timing.
- *
- * Zero overhead when timing_out is NULL - behaves exactly like generate_stream.
- *
- * @param handle Component handle
- * @param prompt Input prompt
- * @param options Generation options (can be NULL for defaults)
- * @param token_callback Called for each generated token
- * @param complete_callback Called when generation completes
- * @param error_callback Called on error
- * @param user_data User context passed to callbacks
- * @param timing_out Output: Benchmark timing struct, caller-allocated.
- *                   Must remain valid for the duration of the call.
- *                   Caller should initialize via rac_benchmark_timing_init() before passing.
- *                   Component fills t0/t4/t6, backend fills t2/t3/t5.
- *                   On success, all timing fields are populated.
- *                   On failure, status is set but timing fields may be partial.
- *                   Pass NULL to skip timing (zero overhead).
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_llm_component_generate_stream_with_timing(
-    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
-    rac_llm_component_token_callback_fn token_callback,
-    rac_llm_component_complete_callback_fn complete_callback,
-    rac_llm_component_error_callback_fn error_callback, void* user_data,
-    rac_benchmark_timing_t* timing_out);
 
 /**
  * @brief Get lifecycle state

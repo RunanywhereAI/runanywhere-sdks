@@ -211,35 +211,46 @@ object CppBridgeDevConfig {
     }
 
     /**
-     * Whether [value] looks like a template placeholder. Matches the
-     * regex Swift uses in `DevConfig.looksLikePlaceholder`.
+     * Whether [value] is a usable credential — non-blank and not a
+     * placeholder. Delegates to the canonical commons rule
+     * (`rac_dev_config_is_usable_credential`) so every SDK agrees instead of
+     * each carrying its own regex; falls back to the local pattern when the
+     * native symbol predates the loaded library. Mirrors Swift's
+     * `DevConfig.isUsableCredential`.
      */
-    fun looksLikePlaceholder(value: String?): Boolean {
-        if (value.isNullOrBlank()) return true
-        return placeholderPattern.containsMatchIn(value)
+    fun isUsableCredential(value: String?): Boolean {
+        if (value == null) return false
+        return try {
+            RunAnywhereBridge.racDevConfigIsUsableCredential(value)
+        } catch (_: UnsatisfiedLinkError) {
+            value.isNotBlank() && !placeholderPattern.containsMatchIn(value)
+        }
     }
 
     /**
-     * Whether [value] is a usable credential — non-blank and not a
-     * placeholder. Mirrors Swift's `DevConfig.isUsableCredential`.
+     * Whether [value] looks like a template placeholder — the inverse of
+     * [isUsableCredential], retained for callers that ask it that way.
+     * Mirrors Swift's `DevConfig.looksLikePlaceholder`.
      */
-    fun isUsableCredential(value: String?): Boolean = !looksLikePlaceholder(value)
+    fun looksLikePlaceholder(value: String?): Boolean = !isUsableCredential(value)
 
     /**
-     * Whether [value] is a usable HTTP/HTTPS URL with a real host.
+     * Whether [value] is a usable HTTP/HTTPS URL with a real host. Delegates to
+     * the canonical commons rule (`rac_dev_config_is_usable_http_url`); falls
+     * back to a local scheme + host check when the symbol predates the library.
      * Mirrors Swift's `DevConfig.isUsableHTTPURL`.
      */
     fun isUsableHTTPURL(value: String?): Boolean {
         val trimmed = value?.trim() ?: return false
-        if (looksLikePlaceholder(trimmed)) return false
-        if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) return false
-        // Strip scheme + any path/query, leaving the host.
-        val schemeStripped = trimmed.substringAfter("://")
-        val host = schemeStripped.substringBefore('/').substringBefore('?')
-        if (host.isBlank()) return false
-        if (host.contains('<') || host.contains('>')) return false
-        if (host.any { it.isWhitespace() }) return false
-        return true
+        return try {
+            RunAnywhereBridge.racDevConfigIsUsableHttpUrl(trimmed)
+        } catch (_: UnsatisfiedLinkError) {
+            if (!isUsableCredential(trimmed)) return false
+            if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) return false
+            val host = trimmed.substringAfter("://").substringBefore('/').substringBefore('?')
+            host.isNotBlank() && !host.contains('<') && !host.contains('>') &&
+                host.none { it.isWhitespace() }
+        }
     }
 }
 

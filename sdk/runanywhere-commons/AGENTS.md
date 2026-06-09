@@ -157,9 +157,9 @@ NULL slot = "not supported." ABI version mismatch → immediate rejection at reg
 `rac_platform_adapter_t` (`include/rac/core/rac_platform_adapter.h`) is the single struct through which all platform services enter C++. The platform SDK populates it before calling `rac_init()`:
 
 - **Mandatory**: `file_exists`, `file_read`, `file_write`, `file_delete`, `secure_get/set/delete`, `log`, `now_ms`
-- **Optional (NULL-safe, each slot is null-checked at the call site with a documented fallback)**: `get_memory_info`, `track_error` (Sentry hook), `http_download/cancel`, `extract_archive` (falls back to libarchive), `file_list_directory`, `is_non_empty_directory`, `get_vendor_id` (Apple-only)
+- **Optional (NULL-safe, each slot is null-checked at the call site with a documented fallback)**: `get_memory_info`, `http_download/cancel`, `extract_archive` (currently unused — commons extracts via built-in libarchive `rac_extract_archive_native` directly), `file_list_directory`, `is_non_empty_directory`, `get_vendor_id` (Apple-only)
 
-`rac_init()` only enforces that `platform_adapter` itself is non-NULL — it does **not** validate individual slots, so the "Mandatory" list above is a contract for SDK authors rather than an enforced invariant. Slots listed as Optional are genuinely null-checked before every use (e.g. Kotlin's JNI ships without `get_memory_info`/`track_error`, which is why they are Optional and not Mandatory).
+`rac_init()` validates the adapter's `abi_version` + `struct_size` (rejecting a mismatch with `RAC_ERROR_ABI_VERSION_MISMATCH`) **and** all 9 Mandatory slots above (returning `RAC_ERROR_ADAPTER_NOT_SET` if any is NULL) — see `rac_core.cpp:151-195`. Optional slots are not enforced; each is null-checked before use with a documented fallback (e.g. Kotlin's JNI ships without `get_memory_info`, which is why it is Optional). There is no `track_error` slot.
 
 All file I/O, secure storage, HTTP, and logging pass through this struct. C++ code never calls platform APIs directly.
 
@@ -172,9 +172,9 @@ Foundation Models, System TTS, and CoreML Diffusion all use the same pattern:
 
 ### Dual Event System
 
-1. **Lower-level** (`rac_event_publish/subscribe` in `src/infrastructure/events/event_publisher.cpp`): Subscription model with lock-copy-dispatch pattern (snapshot subscribers under mutex, dispatch outside to prevent deadlock). Used by `LifecycleManager` for load/unload events.
+1. **Legacy struct-based** (`rac_event_publish/subscribe/track` in `src/infrastructure/events/event_publisher.cpp`): category-keyed pub/sub with lock-copy-dispatch (snapshot subscribers under mutex, dispatch outside to prevent deadlock). Still live — used by `LifecycleManager` and the engine plugins (sherpa, llamacpp) to emit analytics breadcrumbs via `rac_event_track`.
 
-2. **Higher-level** (`rac_analytics_event_emit` in `src/core/events.cpp`): Two fixed callbacks — analytics (telemetry) and public (app developer). Events routed by destination: `PUBLIC_ONLY` (streaming updates), `ANALYTICS_ONLY` (VAD, network), `ALL` (everything else).
+2. **Canonical proto** (`rac::events::emit_*` in `src/core/events.cpp`, published through `src/infrastructure/events/sdk_event_publish.cpp`): builds `runanywhere.v1.SDKEvent` payloads carrying a **destination bitmask** (`EVENT_DESTINATION_PUBLIC` | `TELEMETRY` | `LOG`; `ALL` = PUBLIC\|TELEMETRY). `route()` fans out to the public proto stream, the telemetry manager, and an opt-in log breadcrumb. The former fixed analytics/public callback registry (`rac_analytics_event_emit`, `rac_event_get_destination`) was removed.
 
 ### Thread Safety Patterns
 
@@ -202,15 +202,15 @@ Ports Swift's `ManagedLifecycle.swift`. States: `IDLE → LOADING → LOADED →
 - `rac_model_registry_t` — CRUD for model metadata; `discover_downloaded()` scans filesystem; `refresh()` combines remote catalog + local rescan + orphan pruning
 - `rac_model_paths_t` — All paths follow `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
 - `rac_lora_registry_t` — LoRA adapter entries with compatible model ID matching
-- `rac_model_assignment_t` — Fetches device-assigned models from backend API with cache
+- Model assignment (`rac_model_assignment_*` functions in `model_assignment.cpp`) — fetches device-assigned models from the backend API with a TTL cache. Function-based API; there is no `rac_model_assignment_t` handle type.
 
 ### Download Manager (`include/rac/infrastructure/download/rac_download_orchestrator.h`)
 
 Orchestration (not HTTP transport). Stages: `DOWNLOADING` (0-80%) → `EXTRACTING` (80-95%) → `VALIDATING` (95-99%) → `COMPLETED` (100%). HTTP delegated to `rac_http_download` (platform adapter).
 
-### Structured Error Tracking (`include/rac/core/rac_structured_error.h`)
+### Error Categories (`include/rac/core/rac_structured_error.h`)
 
-`rac_error_log_and_track()` / `RAC_RETURN_TRACKED_ERROR(code, category, msg)` — creates structured error with stack trace, logs it, serializes to JSON, sends to `adapter->track_error()` (Sentry), stores as thread-local last error, returns error code.
+SDK-facing errors cross the boundary as `runanywhere.v1.SDKError` proto bytes via `rac_result_to_proto_error()` — the canonical, single error path. `rac_structured_error.h` now holds only the `rac_error_category_t` taxonomy (`RAC_CATEGORY_*`), mapped onto the proto `ErrorCategory` by `rac_proto_adapters`. The old structured-error subsystem (`rac_error_t`, stack-trace capture, thread-local last-error, `rac_error_log_and_track`, the bespoke JSON / `rac::Error` surface) was retired — it had no remaining callers once the proto path became canonical. Per-result message/expectedness lookups live in `rac_error.cpp` (`rac_error_message`, `rac_error_is_expected`).
 
 ### Logging
 

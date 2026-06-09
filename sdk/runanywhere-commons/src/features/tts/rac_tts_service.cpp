@@ -62,9 +62,7 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
          .select_ops = tts_ops,
          .model_create_id = model_ref.path.c_str(),
          .model_id_for_service = voice_id,
-         .config_json = nullptr,
-         .created_event_name = "tts.backend.created",
-         .created_event_category = RAC_EVENT_CATEGORY_TTS},
+         .config_json = nullptr},
         &service);
     if (result != RAC_SUCCESS) {
         return result;

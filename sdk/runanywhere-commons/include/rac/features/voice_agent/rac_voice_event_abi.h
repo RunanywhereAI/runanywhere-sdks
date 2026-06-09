@@ -2,26 +2,17 @@
  * @file rac_voice_event_abi.h
  * @brief Proto-encoded VoiceEvent callback ABI for the voice agent.
  *
- * This is the second event-delivery path on the voice agent, alongside the
- * existing struct callback (`rac_voice_agent_event_callback_fn` declared in
- * `rac_voice_agent.h`). Frontends that consume the IDL-generated
- * `runanywhere.v1.VoiceEvent` proto type subscribe through here; frontends
- * that already speak the C struct stay on the legacy path.
- *
- * Why a second path:
- *   - The struct path emits one of several union arms. Per-language
- *     mappings hand-write a switch to translate the union into the
- *     idiomatic event type (~90 LOC × 5 languages today).
- *   - The proto path emits one consistent serialized payload. Per-language
- *     adapter is ~60 LOC of "deserialize bytes → AsyncStream<VoiceEvent>"
- *     using the codegen'd type. Saves ~150 LOC per SDK.
+ * The voice agent delivers events as one consistent serialized
+ * `runanywhere.v1.VoiceEvent` payload. Each SDK's adapter is ~60 LOC of
+ * "deserialize bytes → AsyncStream<VoiceEvent>" using the codegen'd type — no
+ * hand-written union-arm switch per language.
  *
  * Stability:
- *   - This header is new. The struct path is unchanged. Both
- *     callbacks may be set on the same handle; both fire per event. No
- *     contention with the plugin ABI version.
- *   - RAC_ABI_VERSION (declared below) bumped to 2 by this header so
- *     consumers can detect runtime support.
+ *   - This proto-byte callback and the d7 per-turn event callback
+ *     (`rac_voice_agent_process_turn_proto`) carry the same VoiceEvent wire
+ *     format. No contention with the plugin ABI version.
+ *   - RAC_ABI_VERSION (declared below) is 2 so consumers can detect runtime
+ *     support.
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `SDK-facing default`.
  * rac_voice_agent_set_proto_callback and the
@@ -71,10 +62,8 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
 /**
  * @brief Register a proto-byte event callback on a voice agent handle.
  *
- * Coexists with the per-call struct callback passed to
- * `rac_voice_agent_process_stream(..., rac_voice_agent_event_callback_fn,
- * void* user_data)` (declared in `rac_voice_agent.h`). Both fire on every
- * event when both are installed.
+ * The registered callback fires once per VoiceEvent emitted by the agent's
+ * streaming / per-turn paths.
  *
  * @param handle     Voice agent handle obtained from rac_voice_agent_create().
  * @param callback   Proto-byte event callback function. Pass NULL to clear.
@@ -107,9 +96,9 @@ RAC_API rac_result_t rac_voice_agent_set_proto_callback(
  *       slot.fn() invocation has returned;
  *   (c) free @p user_data.
  *
- * Without (b), a concurrent `dispatch_proto_event` / `dispatch_proto_voice_event`
- * thread that copied the slot before (a) ran can still be inside `slot.fn()`
- * with a stale `user_data` pointer when the caller frees it.
+ * Without (b), a concurrent `dispatch_proto_voice_event` thread that copied
+ * the slot before (a) ran can still be inside `slot.fn()` with a stale
+ * `user_data` pointer when the caller frees it.
  *
  * Safe to call from any thread; non-blocking when no dispatch is active.
  */

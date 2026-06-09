@@ -240,6 +240,7 @@ export async function aggregateStream(
   const startTimeMs = Date.now();
   let finishReason = '';
   let terminalError = '';
+  let finalEvent: LLMStreamEventType | undefined;
 
   for await (const event of iterable) {
     if (event.token && event.token.length > 0) {
@@ -253,6 +254,7 @@ export async function aggregateStream(
       }
     }
     if (event.isFinal) {
+      finalEvent = event;
       finishReason = event.finishReason ?? '';
       terminalError = event.errorMessage ?? '';
       break;
@@ -273,17 +275,24 @@ export async function aggregateStream(
       ? inferenceFrameworkToJSON(modelInfo.framework)
       : '';
 
+  // Prefer the backend's terminal aggregate result (text + metrics) when the
+  // final event carries one, matching the Web SDK; fall back to the locally
+  // concatenated text / wall-clock metrics for backends that omit it.
+  const final = finalEvent?.result;
   return LLMGenerationResultMessage.fromPartial({
-    text: fullResponse,
-    inputTokens: Math.max(1, Math.floor(prompt.length / 4)),
-    tokensGenerated: tokenCount,
-    responseTokens: tokenCount,
+    text: final?.text ?? fullResponse,
+    inputTokens: final?.promptTokens ?? Math.max(1, Math.floor(prompt.length / 4)),
+    tokensGenerated: final?.completionTokens ?? tokenCount,
+    responseTokens: final?.completionTokens ?? tokenCount,
     modelUsed: modelId,
-    generationTimeMs: totalLatencyMs,
+    generationTimeMs: final?.totalTimeMs ?? totalLatencyMs,
     framework,
     tokensPerSecond:
-      totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0,
-    ...(ttftMs !== undefined ? { ttftMs } : {}),
+      final?.tokensPerSecond ??
+      (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
+    ...((final?.timeToFirstTokenMs ?? ttftMs) !== undefined
+      ? { ttftMs: final?.timeToFirstTokenMs ?? ttftMs }
+      : {}),
     ...(finishReason.length > 0 ? { finishReason } : {}),
     ...(terminalError.length > 0 ? { errorMessage: terminalError } : {}),
   });

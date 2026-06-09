@@ -12,6 +12,7 @@ import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
@@ -59,15 +60,6 @@ class DartBridgeTelemetry {
     _logger.debug('Telemetry sync init for ${environment.name}');
   }
 
-  /// Detect unfilled .env / dart-define template placeholders.
-  /// Returns true for strings like "YOUR_SUPABASE_PROJECT_URL",
-  /// `<your-key>`, "REPLACE_ME", etc.
-  static bool _looksLikePlaceholder(String? value) {
-    if (value == null) return false;
-    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
-        .hasMatch(value);
-  }
-
   /// Flush any queued telemetry events.
   /// Static method that delegates to instance if initialized.
   /// Matches Swift: CppBridge.Telemetry.flush()
@@ -100,7 +92,8 @@ class DartBridgeTelemetry {
     // Bail out if the example app forwarded an unfilled
     // .env / dart-define placeholder. We don't want to POST telemetry
     // to a literal "YOUR_SUPABASE_PROJECT_URL" string.
-    if (_looksLikePlaceholder(baseURL) || _looksLikePlaceholder(accessToken)) {
+    if (!DartBridgeDevConfig.isUsableCredential(baseURL) ||
+        !DartBridgeDevConfig.isUsableCredential(accessToken)) {
       _logger.warning(
         'Telemetry skipped — baseURL/accessToken looks like a placeholder. '
         'Set real values via dart-define or runtime config.',

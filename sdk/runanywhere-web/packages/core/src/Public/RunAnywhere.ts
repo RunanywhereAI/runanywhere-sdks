@@ -27,6 +27,7 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import {
+  DownloadFailureReason,
   DownloadState,
   type DownloadPlanRequest,
   type DownloadPlanResult,
@@ -573,7 +574,11 @@ async function planDownloadWithSelfHeal(
   request: DownloadPlanRequest,
 ): Promise<DownloadPlanResult | null> {
   const plan = DownloadsCapability.plan(request);
-  if (!plan || plan.canStart || !plan.errorMessage.includes('existing partial bytes exceed')) {
+  if (
+    !plan ||
+    plan.canStart ||
+    plan.failureReason !== DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES
+  ) {
     return plan;
   }
 

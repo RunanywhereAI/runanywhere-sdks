@@ -25,6 +25,7 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_environment.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
@@ -145,9 +146,8 @@ class HTTPClientAdapter {
 
   void configureDev(
       {required String supabaseURL, required String supabaseKey}) {
-    if (_looksLikePlaceholder(supabaseURL) ||
-        _looksLikePlaceholder(supabaseKey) ||
-        !_isUsableHttpUrl(supabaseURL)) {
+    if (!DartBridgeDevConfig.isUsableHttpUrl(supabaseURL) ||
+        !DartBridgeDevConfig.isUsableCredential(supabaseKey)) {
       _supabaseURL = '';
       _supabaseKey = '';
       _logger.warning('Dev Supabase config ignored: missing or placeholder');
@@ -524,18 +524,6 @@ class HTTPClientAdapter {
         : url.substring(0, url.length.clamp(0, 30));
   }
 
-  bool _looksLikePlaceholder(String value) {
-    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
-        .hasMatch(value);
-  }
-
-  bool _isUsableHttpUrl(String value) {
-    final uri = Uri.tryParse(value);
-    return uri != null &&
-        uri.hasScheme &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
-  }
 }
 
 /// Thrown when the underlying libcurl call fails before we have a

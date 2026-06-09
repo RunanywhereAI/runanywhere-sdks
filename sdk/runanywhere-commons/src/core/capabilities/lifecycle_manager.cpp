@@ -20,7 +20,6 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
-#include "rac/infrastructure/events/rac_events.h"
 
 // =============================================================================
 // INTERNAL STRUCTURES
@@ -85,42 +84,14 @@ int64_t current_time_ms() {
  */
 void track_lifecycle_event(LifecycleManager* mgr, const char* event_type, const char* model_id,
                            double duration_ms, rac_result_t error_code) {
-    // Determine event category based on resource type
-    // Mirrors Swift's createEvent() switch on resourceType
-    rac_event_category_t category = RAC_EVENT_CATEGORY_MODEL;
-    switch (mgr->resource_type) {
-        case RAC_RESOURCE_TYPE_LLM_MODEL:
-            category = RAC_EVENT_CATEGORY_LLM;
-            break;
-        case RAC_RESOURCE_TYPE_STT_MODEL:
-            category = RAC_EVENT_CATEGORY_STT;
-            break;
-        case RAC_RESOURCE_TYPE_TTS_VOICE:
-            category = RAC_EVENT_CATEGORY_TTS;
-            break;
-        case RAC_RESOURCE_TYPE_VAD_MODEL:
-        case RAC_RESOURCE_TYPE_DIARIZATION_MODEL:
-        default:
-            // category already initialized to RAC_EVENT_CATEGORY_MODEL
-            break;
-    }
-
-    // Build properties JSON (simplified version)
-    char properties[512];
-    if (error_code != RAC_SUCCESS) {
-        snprintf(properties, sizeof(properties),
-                 R"({"modelId":"%s","durationMs":%.1f,"errorCode":%d})", model_id ? model_id : "",
-                 duration_ms, error_code);
-    } else if (duration_ms > 0) {
-        snprintf(properties, sizeof(properties), R"({"modelId":"%s","durationMs":%.1f})",
-                 model_id ? model_id : "", duration_ms);
-    } else {
-        snprintf(properties, sizeof(properties), R"({"modelId":"%s"})", model_id ? model_id : "");
-    }
-
-    // Track event (mirrors Swift's EventPublisher.shared.track(event))
-    rac_event_track(event_type, category, RAC_EVENT_DESTINATION_ALL, properties);
-
+    // Legacy struct-event emission removed; lifecycle events flow via the proto
+    // SDKEvent stream from the feature modules. Retained only to stamp the
+    // metrics' last-event time (this manager is slated for removal — see the
+    // lifecycle consolidation).
+    (void)event_type;
+    (void)model_id;
+    (void)duration_ms;
+    (void)error_code;
     mgr->last_event_time_ms = current_time_ms();
 }
 
@@ -451,18 +422,12 @@ void rac_lifecycle_track_error(rac_handle_t handle, rac_result_t error_code,
         return;
     }
 
-    // Note: handle parameter reserved for future use (e.g., category from mgr->resource_type)
+    // Legacy struct-event emission removed; errors surface via the proto SDKError
+    // path at the feature-module layer. (This lifecycle manager is slated for
+    // removal — see the lifecycle consolidation.)
     (void)handle;
-
-    // Build error event properties
-    char properties[256];
-    snprintf(properties, sizeof(properties),
-             R"({"operation":"%s","errorCode":%d,"errorMessage":"%s"})",
-             operation ? operation : "unknown", error_code, rac_error_message(error_code));
-
-    // Track error event (mirrors Swift: EventPublisher.shared.track(errorEvent))
-    rac_event_track("error.operation", RAC_EVENT_CATEGORY_ERROR, RAC_EVENT_DESTINATION_ALL,
-                    properties);
+    (void)error_code;
+    (void)operation;
 }
 
 rac_result_t rac_lifecycle_get_metrics(rac_handle_t handle, rac_lifecycle_metrics_t* out_metrics) {

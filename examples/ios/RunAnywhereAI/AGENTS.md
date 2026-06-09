@@ -48,6 +48,8 @@ See `docs/RELEASE_INSTRUCTIONS.md`. Key step: after building, run `./scripts/pat
 
 ## Architecture Overview
 
+> **Layering contract (the #1 rule).** The SDK must be seamless here: every modality (LLM/STT/TTS/VAD/VLM/RAG/LoRA/Voice) is driven by **one** `RunAnywhere.*` entry point that does all the heavy lifting. This app holds **only** UI + thin SDK calls — no segmentation loops, no model/engine constants, no prompt post-processing, no multi-step bootstrap. If you need one of those, it's an SDK bug to fix down a layer (see root `AGENTS.md` → Business Logic Layering Rules).
+
 ### Pattern: MVVM with Swift Observation
 - **Views** are pure SwiftUI with no business logic
 - **ViewModels** are `@MainActor @Observable` (or `@MainActor ObservableObject`) classes owning all state and SDK calls

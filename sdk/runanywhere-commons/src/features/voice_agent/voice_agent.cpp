@@ -8,15 +8,11 @@
  * CRITICAL: This is a direct port of the Swift implementation - do NOT add
  * custom logic.
  *
- * SRP split: the legacy 2,291-LoC monolith was
+ * SRP split: the voice-agent feature is
  * decomposed into per-ABI translation units:
  *   - voice_agent.cpp                          — lifecycle (create/destroy)
  *                                                + synchronous initialize +
  *                                                cleanup
- *   - voice_agent_legacy_abi.cpp               — legacy non-proto C ABI
- *                                                (model loading + voice
- *                                                turn/stream + individual
- *                                                helpers + result-free)
  *   - voice_agent_proto_abi.cpp                — synchronous proto C ABI
  *   - voice_agent_d7_abi.cpp                   — full-session
  *                                                proto ABI
@@ -24,8 +20,6 @@
  *                                                machine helpers
  *   - voice_agent_internal_helpers.{h,cpp}     — shared emit / state /
  *                                                proto-byte helpers
- *   - voice_agent_pipeline.cpp / .hpp          — graph
- *                                                pipeline
  *
  * Public C ABI is unchanged across the split. The `rac_voice_agent` struct
  * definition lives in `voice_agent_internal.h`.
@@ -41,15 +35,6 @@
  *   established in `rac_vlm_process_proto` where the
  *   component-handle pointer arithmetic produced an EXC_BAD_ACCESS on
  *   iPhone 17 Pro Max.
- *
- *   Legacy non-proto entry points (`rac_voice_agent_process_voice_turn`,
- *   `rac_voice_agent_process_stream`, individual `transcribe`/
- *   `generate_response`/`synthesize_speech`/`detect_speech` helpers) keep
- *   using `handle->*_handle` for backward compatibility — those entry
- *   points live in voice_agent_legacy_abi.cpp and are marked
- *   `[[deprecated]]` via `RAC_VOICE_AGENT_LEGACY_DEPRECATED` so external
- *   callers (Playground/linux-voice, commons tests) surface as
- *   `-Wdeprecated-declarations` warnings.
  */
 
 #include "voice_agent_internal.h"
@@ -57,19 +42,18 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
-#include <memory>
 #include <mutex>
 #include <new>
 #include <thread>
 
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
-#include "voice_agent_pipeline.hpp"
 
 // =============================================================================
 // LIFECYCLE API
@@ -179,34 +163,6 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     handle->is_shutting_down.store(true, std::memory_order_release);
     handle->is_configured.store(false, std::memory_order_release);
 
-    // Propagate cancel to any GraphScheduler-driven
-    // pipeline run currently in flight.
-    // Snapshot the shared_ptr under handle->pipeline_mutex (held only
-    // while copying the control block) so we never race the
-    // process_stream store/reset, then call cancel() OUTSIDE the lock.
-    // The pipeline's cancel_all() is non-blocking and idempotent, so
-    // racing destroy() against an in-flight run is safe once the
-    // shared_ptr copy is established without UB.
-    //
-    // A second "late_snapshot" re-cancel
-    // pass once we acquire the outer mutex would only fire if a
-    // concurrent process_stream stored a fresh pipeline AFTER our pre-
-    // mutex snapshot ran. process_stream holds handle->mutex from the
-    // moment it stores `handle->pipeline = pipeline` through `reset()`
-    // on the way out, so by the time we acquire the outer mutex below
-    // any such concurrent run has already drained and reset the
-    // pipeline back to null. The previously-emitted late-snapshot
-    // branch was unreachable; removed to keep the teardown path
-    // straightforward.
-    std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
-    {
-        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
-        pipeline_snapshot = handle->pipeline;
-    }
-    if (pipeline_snapshot) {
-        pipeline_snapshot->cancel();
-    }
-
     // Wait for in-flight lock-free ops (e.g. detect_speech)
     // to drain. Sleep 1ms between checks rather than yield-spinning: on a
     // multi-second LLM call holding the counter the yield form burns 100%
@@ -229,13 +185,6 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
 
-        // Drop the pipeline before component handles so its nodes (which
-        // call into stt/llm/tts/vad) cannot outlive the handles they use.
-        {
-            std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
-            handle->pipeline.reset();
-        }
-
         if (handle->owns_components) {
             RAC_LOG_DEBUG("VoiceAgent", "Destroying owned component handles");
             if (handle->vad_handle)
@@ -257,7 +206,7 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     // the very first VoiceEvent dispatch.
     rac_voice_agent_set_proto_callback(handle, nullptr, nullptr);
     // Spin-wait until every in-flight
-    // dispatch_proto_event/dispatch_proto_voice_event invocation on another
+    // dispatch_proto_voice_event invocation on another
     // thread has returned before freeing the handle memory. Without this,
     // a thread that copied the CallbackSlot before the unset above can
     // still be inside slot.fn() with a now-stale `handle`-derived
@@ -332,36 +281,9 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Cancel any in-flight pipeline BEFORE taking the
-    // outer mutex; the pipeline run holds the same mutex while it drains
-    // and cancel_all() is the only way out of a stalled stage.
-    // Snapshot under pipeline_mutex so the
-    // shared_ptr copy is synchronized with process_stream's store/reset.
-    //
-    // process_stream holds handle->mutex for
-    // the entire store->run->reset window. By the time we acquire the
-    // outer mutex below, any concurrent run has drained and reset
-    // handle->pipeline to null, so the previously-emitted late-snapshot
-    // re-cancel branch was unreachable; removed for clarity.
-    std::shared_ptr<rac::voice_agent::VoiceAgentPipeline> pipeline_snapshot;
-    {
-        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
-        pipeline_snapshot = handle->pipeline;
-    }
-    if (pipeline_snapshot) {
-        pipeline_snapshot->cancel();
-    }
-
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     RAC_LOG_INFO("VoiceAgent", "Cleaning up Voice Agent");
-
-    // Tear the pipeline down before the underlying components so its
-    // worker threads cannot dispatch into stt/llm/tts/vad after cleanup.
-    {
-        std::lock_guard<std::mutex> pipeline_lock(handle->pipeline_mutex);
-        handle->pipeline.reset();
-    }
 
     // Cleanup all components (mirrors Swift's cleanup)
     rac_llm_component_cleanup(handle->llm_handle);
@@ -372,6 +294,77 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
     rac_vad_component_reset(handle->vad_handle);
 
     handle->is_configured.store(false, std::memory_order_release);
+
+    return RAC_SUCCESS;
+}
+
+// Initialize the agent against components that are already loaded on the handle
+// (the SDK loads STT/LLM/TTS, then flips the agent to ready). Moved here from
+// the now-removed legacy ABI because Kotlin (JNI) and React Native call it.
+rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handle_t handle) {
+    if (!handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::unique_lock<std::mutex> lock(handle->mutex);
+
+    if (!handle->vad_handle) {
+        RAC_LOG_ERROR("VoiceAgent",
+                      "Cannot initialize with loaded models: no VAD component on the handle");
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    RAC_LOG_INFO("VoiceAgent", "Initializing Voice Agent with already-loaded models");
+
+    rac_result_t result = rac_vad_component_initialize(handle->vad_handle);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VoiceAgent", "VAD component failed to initialize");
+        return result;
+    }
+
+    handle->is_configured.store(true, std::memory_order_release);
+    RAC_LOG_INFO("VoiceAgent", "Voice Agent initialized with pre-loaded models");
+
+    return RAC_SUCCESS;
+}
+
+// Whether the agent has been configured/initialized. Moved here from the legacy
+// ABI (Kotlin/RN call it); just reflects the handle's configured flag.
+rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle, rac_bool_t* out_is_ready) {
+    if (!handle || !out_is_ready) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    *out_is_ready = handle->is_configured.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
+    return RAC_SUCCESS;
+}
+
+// LLM-only text→text helper for the voice agent. Moved here from the legacy ABI
+// because Flutter's `RunAnywhere.voice.generateResponse(_)` calls it; the
+// composed handle's `llm_handle` is populated by create_standalone (the same
+// handle the d7 full-session path generates against), so this is a thin wrapper
+// over the LLM component — not part of the retired struct-event/pipeline surface.
+rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, const char* prompt,
+                                               char** out_response) {
+    if (!handle || !prompt || !out_response) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    if (!handle->is_configured.load(std::memory_order_acquire)) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_llm_result_t llm_result = {};
+    rac_result_t result =
+        rac_llm_component_generate(handle->llm_handle, prompt, nullptr, &llm_result);
+
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    *out_response = rac_strdup(llm_result.text);
+    rac_llm_result_free(&llm_result);
 
     return RAC_SUCCESS;
 }

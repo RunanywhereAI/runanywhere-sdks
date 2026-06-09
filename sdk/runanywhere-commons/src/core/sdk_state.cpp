@@ -181,10 +181,6 @@ class SDKState {
 
 extern "C" {
 
-rac_sdk_state_handle_t rac_state_get_instance(void) {
-    return reinterpret_cast<rac_sdk_state_handle_t>(&SDKState::instance());
-}
-
 rac_result_t rac_state_initialize(rac_environment_t env, const char* api_key, const char* base_url,
                                   const char* device_id) {
     return SDKState::instance().initialize(env, api_key, base_url, device_id);

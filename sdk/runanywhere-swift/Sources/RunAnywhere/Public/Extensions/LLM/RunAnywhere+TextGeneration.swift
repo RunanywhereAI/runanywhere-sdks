@@ -137,6 +137,7 @@ public extension RunAnywhere {
         let startTime = Date()
         var finishReason = ""
         var terminalError = ""
+        var finalEvent: RALLMStreamEvent?
 
         for await event in events {
             if !event.token.isEmpty {
@@ -148,6 +149,7 @@ public extension RunAnywhere {
                 }
             }
             if event.isFinal {
+                finalEvent = event
                 finishReason = event.finishReason
                 terminalError = event.errorMessage
                 break
@@ -165,18 +167,25 @@ public extension RunAnywhere {
             ? snapshot.model.framework.analyticsKey
             : InferenceFramework.unknown.analyticsKey
 
+        // Prefer the backend's terminal aggregate result (text + metrics) when
+        // the final event carries one, matching the Web SDK; otherwise fall back
+        // to the locally concatenated text / wall-clock metrics.
+        let final = finalEvent.flatMap { $0.hasResult ? $0.result : nil }
         var result = RALLMGenerationResult()
-        result.text = fullResponse
-        result.inputTokens = Int32(max(1, prompt.count / 4))
-        result.tokensGenerated = Int32(tokenCount)
-        result.responseTokens = Int32(tokenCount)
+        result.text = final?.text ?? fullResponse
+        result.inputTokens = final.map { $0.promptTokens } ?? Int32(max(1, prompt.count / 4))
+        result.tokensGenerated = final.map { $0.completionTokens } ?? Int32(tokenCount)
+        result.responseTokens = final.map { $0.completionTokens } ?? Int32(tokenCount)
         result.modelUsed = modelID
-        result.generationTimeMs = totalLatency
+        result.generationTimeMs = final.map { Double($0.totalTimeMs) } ?? totalLatency
         result.framework = framework
-        result.tokensPerSecond = totalLatency > 0
-            ? Double(tokenCount) / (totalLatency / 1000)
-            : 0
-        if let ttft { result.ttftMs = ttft }
+        result.tokensPerSecond = final.map { Double($0.tokensPerSecond) }
+            ?? (totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0)
+        if let ttftFromFinal = final.map({ Double($0.timeToFirstTokenMs) }) {
+            result.ttftMs = ttftFromFinal
+        } else if let ttft {
+            result.ttftMs = ttft
+        }
         if !finishReason.isEmpty { result.finishReason = finishReason }
         if !terminalError.isEmpty { result.errorMessage = terminalError }
         return result

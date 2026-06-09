@@ -72,6 +72,30 @@ RAC_API bool rac_dev_config_has_supabase(void);
  */
 RAC_API bool rac_dev_config_has_build_token(void);
 
+// =============================================================================
+// Usability Checks (canonical, shared by all SDKs)
+// =============================================================================
+
+/**
+ * @brief Whether a baked-in credential string is usable: non-empty and not a
+ *        scaffolding placeholder ("your_...", "<your...", "replace_me",
+ *        "placeholder").
+ *
+ * The single source of truth for the dev-config placeholder rule. SDKs should
+ * call this instead of re-implementing the regex per platform.
+ * @param value Credential string (may be NULL → not usable)
+ * @return true if the credential looks real and usable
+ */
+RAC_API bool rac_dev_config_is_usable_credential(const char* value);
+
+/**
+ * @brief Whether a string is a usable absolute http(s) URL: a real http/https
+ *        scheme, a non-empty whitespace-free host, and not a placeholder.
+ * @param value URL string (may be NULL → not usable)
+ * @return true if the URL is well-formed and usable
+ */
+RAC_API bool rac_dev_config_is_usable_http_url(const char* value);
+
 #ifdef __cplusplus
 }
 #endif

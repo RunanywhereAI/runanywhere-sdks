@@ -16,6 +16,8 @@
 #include <utility>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -26,6 +28,8 @@
 #ifdef RAC_HAVE_PROTOBUF
 #include "model_types.pb.h"
 #endif
+
+using json = nlohmann::json;
 
 static const char* LOG_CAT = "ModelAssignment";
 
@@ -70,311 +74,111 @@ static bool is_cache_valid() {
     return std::cmp_less(elapsed, g_cache_timeout_seconds);
 }
 
-// JSON string extraction that honours escaped
-// quotes and brace-depth tracking. The previous implementation walked
-// to the next `"` without escape handling and looked at byte
-// substrings (e.g. `find("null", pos)`), so a value containing `\"`,
-// `},`, or `\\` could either be truncated mid-string or — worse —
-// snap the field boundary so the wrong key/value pair got assigned.
-// Reimplementation: scan once with an explicit in-string state machine.
-static std::string json_get_string(const std::string& json, const std::string& key) {
-    auto skip_ws = [&](size_t& i) {
-        while (i < json.size() &&
-               (json[i] == ' ' || json[i] == '\t' || json[i] == '\n' || json[i] == '\r')) {
-            ++i;
-        }
-    };
-    // Locate the key as a top-level (depth-aware) field name.
-    bool in_string = false;
-    bool escaped = false;
-    int depth = 0;
-    for (size_t i = 0; i < json.size(); ++i) {
-        const char ch = json[i];
-        if (in_string) {
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (ch == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (ch == '"') {
-                in_string = false;
-            }
+// ---------------------------------------------------------------------------
+// nlohmann/json field accessors. Mirror the lenient behaviour of the former
+// hand-rolled getters: return the first present, non-null key (numbers coerced
+// to their text form) and fall back to the default for absent / null /
+// wrong-type values. Parsing is strict — json::parse(..., allow_exceptions=
+// false) rejects a malformed body; the proto fetch path tries the binary
+// ModelInfoList / RefreshResult decoders before this JSON fallback runs.
+// ---------------------------------------------------------------------------
+static std::string json_first_string(const json& obj,
+                                     std::initializer_list<const char*> keys) {
+    for (const char* key : keys) {
+        const auto it = obj.find(key);
+        if (it == obj.end() || it->is_null())
             continue;
-        }
-        if (ch == '"') {
-            // Read the key string honouring escapes.
-            size_t k = i + 1;
-            std::string found_key;
-            bool key_escaped = false;
-            for (; k < json.size(); ++k) {
-                const char kc = json[k];
-                if (key_escaped) {
-                    found_key.push_back(kc);
-                    key_escaped = false;
-                    continue;
-                }
-                if (kc == '\\') {
-                    key_escaped = true;
-                    continue;
-                }
-                if (kc == '"') {
-                    break;
-                }
-                found_key.push_back(kc);
-            }
-            if (k >= json.size()) {
-                return "";
-            }
-            i = k;
-            // Match must be at depth 1 (inside the model object) — keys at
-            // other depths belong to nested objects we should not pluck.
-            if (depth != 1 || found_key != key) {
-                continue;
-            }
-            // Walk to the ':' that starts the value.
-            size_t colon = i + 1;
-            skip_ws(colon);
-            if (colon >= json.size() || json[colon] != ':') {
-                return "";
-            }
-            size_t v = colon + 1;
-            skip_ws(v);
-            if (v >= json.size()) {
-                return "";
-            }
-            // String value: read with escape handling.
-            if (json[v] == '"') {
-                std::string out;
-                bool v_escaped = false;
-                for (size_t p = v + 1; p < json.size(); ++p) {
-                    const char vc = json[p];
-                    if (v_escaped) {
-                        // Minimal JSON escape support — the same one
-                        // the proto path's `json_unescape_string` uses.
-                        switch (vc) {
-                            case '"':
-                            case '\\':
-                            case '/':
-                                out.push_back(vc);
-                                break;
-                            case 'b':
-                                out.push_back('\b');
-                                break;
-                            case 'f':
-                                out.push_back('\f');
-                                break;
-                            case 'n':
-                                out.push_back('\n');
-                                break;
-                            case 'r':
-                                out.push_back('\r');
-                                break;
-                            case 't':
-                                out.push_back('\t');
-                                break;
-                            default:
-                                out.push_back(vc);
-                                break;
-                        }
-                        v_escaped = false;
-                        continue;
-                    }
-                    if (vc == '\\') {
-                        v_escaped = true;
-                        continue;
-                    }
-                    if (vc == '"') {
-                        return out;
-                    }
-                    out.push_back(vc);
-                }
-                return "";
-            }
-            // null
-            if (json.compare(v, 4, "null") == 0) {
-                return "";
-            }
-            // Number / boolean — stop at the next top-level delimiter.
-            size_t end = v;
-            while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != ']') {
-                ++end;
-            }
-            std::string val = json.substr(v, end - v);
-            while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\n' ||
-                                    val.back() == '\r')) {
-                val.pop_back();
-            }
-            return val;
-        }
-        if (ch == '{' || ch == '[') {
-            ++depth;
-        } else if (ch == '}' || ch == ']') {
-            --depth;
-        }
+        if (it->is_string())
+            return it->get<std::string>();
+        if (it->is_number_integer())
+            return std::to_string(it->get<int64_t>());
+        if (it->is_number_unsigned())
+            return std::to_string(it->get<uint64_t>());
+        if (it->is_number_float())
+            return std::to_string(it->get<double>());
+        if (it->is_boolean())
+            return it->get<bool>() ? "true" : "false";
     }
-    return "";
+    return std::string();
 }
 
-static int64_t json_get_int(const std::string& json, const std::string& key,
-                            int64_t default_val = 0) {
-    std::string val = json_get_string(json, key);
-    if (val.empty())
-        return default_val;
-    return std::strtoll(val.c_str(), nullptr, 10);
-}
-
-static bool json_get_bool(const std::string& json, const std::string& key,
-                          bool default_val = false) {
-    std::string val = json_get_string(json, key);
-    if (val.empty())
-        return default_val;
-    return val == "true";
-}
-
-// Walk from `pos` to the end of the next
-// top-level JSON value (object/array/string/scalar), honouring strings
-// and escapes. Returns the one-past-end index of the value, or npos
-// when the JSON is truncated.
-static size_t fast_json_value_end(const std::string& json, size_t start) {
-    if (start >= json.size()) {
-        return std::string::npos;
-    }
-    const char first = json[start];
-    if (first == '"') {
-        bool escaped = false;
-        for (size_t i = start + 1; i < json.size(); ++i) {
-            const char ch = json[i];
-            if (escaped) {
-                escaped = false;
-                continue;
-            }
-            if (ch == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (ch == '"') {
-                return i + 1;
-            }
+static int64_t json_first_int(const json& obj, int64_t default_value,
+                              std::initializer_list<const char*> keys) {
+    for (const char* key : keys) {
+        const auto it = obj.find(key);
+        if (it == obj.end() || it->is_null())
+            continue;
+        if (it->is_number_integer() || it->is_number_unsigned())
+            return it->get<int64_t>();
+        if (it->is_number_float())
+            return static_cast<int64_t>(it->get<double>());
+        if (it->is_string()) {
+            const std::string text = it->get<std::string>();
+            char* end = nullptr;
+            const long long parsed = std::strtoll(text.c_str(), &end, 10);
+            if (end != text.c_str() && end != nullptr && *end == '\0')
+                return static_cast<int64_t>(parsed);
         }
-        return std::string::npos;
     }
-    if (first == '{' || first == '[') {
-        const char open = first;
-        const char close = (first == '{') ? '}' : ']';
-        int depth = 1;
-        bool in_string = false;
-        bool escaped = false;
-        for (size_t i = start + 1; i < json.size(); ++i) {
-            const char ch = json[i];
-            if (in_string) {
-                if (escaped) {
-                    escaped = false;
-                } else if (ch == '\\') {
-                    escaped = true;
-                } else if (ch == '"') {
-                    in_string = false;
-                }
-                continue;
-            }
-            if (ch == '"') {
-                in_string = true;
-                continue;
-            }
-            if (ch == open) {
-                ++depth;
-            } else if (ch == close) {
-                --depth;
-                if (depth == 0) {
-                    return i + 1;
-                }
-            }
-        }
-        return std::string::npos;
-    }
-    size_t end = start;
-    while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != ']') {
-        ++end;
-    }
-    return end;
+    return default_value;
 }
 
-// Parse models array from JSON response
+static bool json_first_bool(const json& obj, bool default_value,
+                            std::initializer_list<const char*> keys) {
+    for (const char* key : keys) {
+        const auto it = obj.find(key);
+        if (it == obj.end() || it->is_null())
+            continue;
+        if (it->is_boolean())
+            return it->get<bool>();
+        if (it->is_number_integer())
+            return it->get<int64_t>() != 0;
+        if (it->is_string()) {
+            const std::string text = it->get<std::string>();
+            return text == "true" || text == "1";
+        }
+    }
+    return default_value;
+}
+
+// Parse a backend model-list JSON response into C-ABI model structs.
 static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, size_t len) {
     std::vector<rac_model_info_t*> models;
     if (!json_str || len == 0)
         return models;
 
-    std::string json(json_str, len);
-
-    // Find "models" array (the key may appear escaped inside a value;
-    // require depth-0 match by walking the top-level structure first).
-    size_t models_pos = json.find("\"models\"");
-    if (models_pos == std::string::npos) {
+    const json root = json::parse(std::string(json_str, len), nullptr, false);
+    if (root.is_discarded() || !root.is_object())
+        return models;
+    const auto models_it = root.find("models");
+    if (models_it == root.end() || !models_it->is_array()) {
         RAC_LOG_WARNING(LOG_CAT, "No 'models' array in response");
         return models;
     }
 
-    // Find array start
-    size_t arr_start = json.find('[', models_pos);
-    if (arr_start == std::string::npos)
-        return models;
-
-    // Depth- and escape-aware scan over the
-    // models array. The previous implementation only counted braces,
-    // so a quote-balanced string containing `{` or `}` could pull the
-    // wrong substring as an object.
-    size_t pos = arr_start + 1;
-    while (pos < json.size()) {
-        // Skip whitespace and array separators between objects.
-        while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n' ||
-                                     json[pos] == '\r' || json[pos] == ',')) {
-            ++pos;
-        }
-        if (pos >= json.size() || json[pos] == ']') {
-            break;
-        }
-        if (json[pos] != '{') {
-            ++pos;
+    for (const json& obj : *models_it) {
+        if (!obj.is_object())
             continue;
-        }
-
-        size_t obj_end = fast_json_value_end(json, pos);
-        if (obj_end == std::string::npos) {
-            break;
-        }
-
-        std::string obj = json.substr(pos, obj_end - pos);
-
-        // Parse model fields
-        std::string id = json_get_string(obj, "id");
-        std::string name = json_get_string(obj, "name");
-        std::string category = json_get_string(obj, "category");
-        std::string format = json_get_string(obj, "format");
-        std::string framework = json_get_string(obj, "preferred_framework");
-        std::string download_url = json_get_string(obj, "download_url");
-        std::string description = json_get_string(obj, "description");
-        int64_t size = json_get_int(obj, "size", 0);
-        int context_length = static_cast<int>(json_get_int(obj, "context_length", 0));
-        bool supports_thinking = json_get_bool(obj, "supports_thinking", false);
-
-        if (id.empty()) {
-            pos = obj_end;
+        const std::string id = json_first_string(obj, {"id"});
+        if (id.empty())
             continue;
-        }
+        const std::string name = json_first_string(obj, {"name"});
+        const std::string category = json_first_string(obj, {"category"});
+        const std::string format = json_first_string(obj, {"format"});
+        const std::string framework = json_first_string(obj, {"preferred_framework"});
+        const std::string download_url = json_first_string(obj, {"download_url"});
+        const std::string description = json_first_string(obj, {"description"});
+        const int64_t size = json_first_int(obj, 0, {"size"});
+        const int context_length = static_cast<int>(json_first_int(obj, 0, {"context_length"}));
+        const bool supports_thinking = json_first_bool(obj, false, {"supports_thinking"});
 
-        // Create model info
         rac_model_info_t* model = rac_model_info_alloc();
         if (!model)
             continue;
-
         model->id = strdup(id.c_str());
         model->name = strdup(name.c_str());
         if (!model->id || !model->name) {
             rac_model_info_free(model);
-            pos = obj_end;
             continue;
         }
         model->download_url = download_url.empty() ? nullptr : strdup(download_url.c_str());
@@ -384,7 +188,6 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
         model->supports_thinking = supports_thinking ? RAC_TRUE : RAC_FALSE;
         model->source = RAC_MODEL_SOURCE_REMOTE;
 
-        // Parse category
         if (category == "language")
             model->category = RAC_MODEL_CATEGORY_LANGUAGE;
         else if (category == "speech" || category == "stt")
@@ -400,7 +203,6 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
         else
             model->category = RAC_MODEL_CATEGORY_LANGUAGE;
 
-        // Parse format
         if (format == "gguf")
             model->format = RAC_MODEL_FORMAT_GGUF;
         else if (format == "ggml")
@@ -432,7 +234,6 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
         else
             model->format = RAC_MODEL_FORMAT_UNKNOWN;
 
-        // Parse framework
         if (framework == "llama.cpp" || framework == "llamacpp")
             model->framework = RAC_FRAMEWORK_LLAMACPP;
         else if (framework == "onnx" || framework == "onnxruntime")
@@ -455,11 +256,10 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->framework = RAC_FRAMEWORK_UNKNOWN;
 
         models.push_back(model);
-        pos = obj_end;
     }
-
     return models;
 }
+
 
 // Copy models array for output
 static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& models,
@@ -985,228 +785,6 @@ static rac_result_t update_assignment_cache_from_proto_locked(const std::vector<
     return RAC_SUCCESS;
 }
 
-static std::string trim_copy(const std::string& value) {
-    size_t start = 0;
-    while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start])) != 0) {
-        ++start;
-    }
-    size_t end = value.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1])) != 0) {
-        --end;
-    }
-    return value.substr(start, end - start);
-}
-
-static size_t json_string_end(const std::string& json, size_t quote_pos) {
-    if (quote_pos >= json.size() || json[quote_pos] != '"') {
-        return std::string::npos;
-    }
-    bool escaped = false;
-    for (size_t i = quote_pos + 1; i < json.size(); ++i) {
-        const char ch = json[i];
-        if (escaped) {
-            escaped = false;
-            continue;
-        }
-        if (ch == '\\') {
-            escaped = true;
-            continue;
-        }
-        if (ch == '"') {
-            return i;
-        }
-    }
-    return std::string::npos;
-}
-
-static size_t json_value_end(const std::string& json, size_t value_start) {
-    if (value_start >= json.size()) {
-        return std::string::npos;
-    }
-    const char first = json[value_start];
-    if (first == '"') {
-        size_t end = json_string_end(json, value_start);
-        return end == std::string::npos ? end : end + 1;
-    }
-    if (first == '{' || first == '[') {
-        const char open = first;
-        const char close = first == '{' ? '}' : ']';
-        int depth = 1;
-        bool in_string = false;
-        bool escaped = false;
-        for (size_t i = value_start + 1; i < json.size(); ++i) {
-            const char ch = json[i];
-            if (in_string) {
-                if (escaped) {
-                    escaped = false;
-                } else if (ch == '\\') {
-                    escaped = true;
-                } else if (ch == '"') {
-                    in_string = false;
-                }
-                continue;
-            }
-            if (ch == '"') {
-                in_string = true;
-                continue;
-            }
-            if (ch == open) {
-                ++depth;
-            } else if (ch == close) {
-                --depth;
-                if (depth == 0) {
-                    return i + 1;
-                }
-            }
-        }
-        return std::string::npos;
-    }
-
-    size_t end = value_start;
-    while (end < json.size() && json[end] != ',' && json[end] != '}' && json[end] != ']') {
-        ++end;
-    }
-    return end;
-}
-
-static std::string json_unescape_string(const std::string& quoted_or_raw) {
-    std::string value = trim_copy(quoted_or_raw);
-    if (value.size() < 2 || value.front() != '"' || value.back() != '"') {
-        return value == "null" ? std::string() : value;
-    }
-
-    std::string out;
-    out.reserve(value.size() - 2);
-    bool escaped = false;
-    for (size_t i = 1; i + 1 < value.size(); ++i) {
-        const char ch = value[i];
-        if (!escaped) {
-            if (ch == '\\') {
-                escaped = true;
-            } else {
-                out.push_back(ch);
-            }
-            continue;
-        }
-
-        switch (ch) {
-            case '"':
-            case '\\':
-            case '/':
-                out.push_back(ch);
-                break;
-            case 'b':
-                out.push_back('\b');
-                break;
-            case 'f':
-                out.push_back('\f');
-                break;
-            case 'n':
-                out.push_back('\n');
-                break;
-            case 'r':
-                out.push_back('\r');
-                break;
-            case 't':
-                out.push_back('\t');
-                break;
-            default:
-                out.push_back(ch);
-                break;
-        }
-        escaped = false;
-    }
-    return out;
-}
-
-static bool assignment_json_value(const std::string& json, const char* key,
-                                  std::string* out_value) {
-    if (!key || !out_value) {
-        return false;
-    }
-
-    bool in_string = false;
-    bool escaped = false;
-    for (size_t i = 0; i < json.size(); ++i) {
-        const char ch = json[i];
-        if (in_string) {
-            if (escaped) {
-                escaped = false;
-            } else if (ch == '\\') {
-                escaped = true;
-            } else if (ch == '"') {
-                in_string = false;
-            }
-            continue;
-        }
-        if (ch != '"') {
-            continue;
-        }
-
-        const size_t key_end = json_string_end(json, i);
-        if (key_end == std::string::npos) {
-            return false;
-        }
-        const std::string found_key = json_unescape_string(json.substr(i, key_end - i + 1));
-        i = key_end;
-        if (found_key != key) {
-            continue;
-        }
-
-        size_t colon = i + 1;
-        while (colon < json.size() && std::isspace(static_cast<unsigned char>(json[colon])) != 0) {
-            ++colon;
-        }
-        if (colon >= json.size() || json[colon] != ':') {
-            continue;
-        }
-        size_t value_start = colon + 1;
-        while (value_start < json.size() &&
-               std::isspace(static_cast<unsigned char>(json[value_start])) != 0) {
-            ++value_start;
-        }
-        const size_t value_end = json_value_end(json, value_start);
-        if (value_end == std::string::npos) {
-            return false;
-        }
-        *out_value = json.substr(value_start, value_end - value_start);
-        return true;
-    }
-    return false;
-}
-
-static std::string assignment_json_string_any(const std::string& json, const char* key_a,
-                                              const char* key_b = nullptr,
-                                              const char* key_c = nullptr) {
-    std::string value;
-    if ((key_a && assignment_json_value(json, key_a, &value)) ||
-        (key_b && assignment_json_value(json, key_b, &value)) ||
-        (key_c && assignment_json_value(json, key_c, &value))) {
-        return json_unescape_string(value);
-    }
-    return "";
-}
-
-static int64_t assignment_json_int_any(const std::string& json, int64_t default_value,
-                                       const char* key_a, const char* key_b = nullptr,
-                                       const char* key_c = nullptr) {
-    const std::string value = assignment_json_string_any(json, key_a, key_b, key_c);
-    if (value.empty()) {
-        return default_value;
-    }
-    char* end = nullptr;
-    const long long parsed = std::strtoll(value.c_str(), &end, 10);
-    return end == value.c_str() ? default_value : static_cast<int64_t>(parsed);
-}
-
-static bool assignment_json_bool_any(const std::string& json, bool default_value, const char* key_a,
-                                     const char* key_b = nullptr) {
-    const std::string value = lower_copy(assignment_json_string_any(json, key_a, key_b));
-    if (value.empty()) {
-        return default_value;
-    }
-    return value == "true" || value == "1";
-}
 
 static bool parse_int_token(const std::string& token, int64_t* out) {
     if (!out || token.empty()) {
@@ -1394,157 +972,100 @@ static InferenceFramework framework_from_assignment_token(const std::string& tok
     return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
 }
 
-static std::vector<std::string> json_top_level_objects(const std::string& array_json) {
-    std::vector<std::string> objects;
-    const std::string array = trim_copy(array_json);
-    if (array.empty() || array.front() != '[') {
-        return objects;
-    }
-
-    size_t pos = 1;
-    while (pos < array.size()) {
-        while (pos < array.size() &&
-               (std::isspace(static_cast<unsigned char>(array[pos])) != 0 || array[pos] == ',')) {
-            ++pos;
-        }
-        if (pos >= array.size() || array[pos] == ']') {
-            break;
-        }
-        if (array[pos] != '{') {
-            ++pos;
-            continue;
-        }
-        const size_t end = json_value_end(array, pos);
-        if (end == std::string::npos) {
-            break;
-        }
-        objects.push_back(array.substr(pos, end - pos));
-        pos = end;
-    }
-    return objects;
-}
-
-static void add_json_string_array_to_metadata(const std::string& object, const char* key,
-                                              ModelInfo* model) {
-    std::string array_value;
-    if (!assignment_json_value(object, key, &array_value)) {
-        return;
-    }
-
-    const std::string array = trim_copy(array_value);
-    if (array.empty() || array.front() != '[') {
-        return;
-    }
-    size_t pos = 1;
-    while (pos < array.size()) {
-        while (pos < array.size() &&
-               (std::isspace(static_cast<unsigned char>(array[pos])) != 0 || array[pos] == ',')) {
-            ++pos;
-        }
-        if (pos >= array.size() || array[pos] == ']') {
-            break;
-        }
-        const size_t end = json_value_end(array, pos);
-        if (end == std::string::npos) {
-            break;
-        }
-        const std::string tag = json_unescape_string(array.substr(pos, end - pos));
-        if (!tag.empty()) {
-            model->mutable_metadata()->add_tags(tag);
-        }
-        pos = end;
-    }
-}
-
+// Parse a backend assignment JSON response into proto ModelInfo messages.
+// Accepts either a top-level array or a {"models": [...]} envelope.
 static bool parse_assignment_json_models(const char* data, size_t len,
                                          std::vector<ModelInfo>* out_models) {
-    if (!out_models || !data || len == 0) {
+    if (!out_models || !data || len == 0)
         return false;
-    }
 
-    const std::string json(data, len);
-    std::string models_array;
-    const std::string trimmed = trim_copy(json);
-    if (!trimmed.empty() && trimmed.front() == '[') {
-        models_array = trimmed;
-    } else if (!assignment_json_value(json, "models", &models_array)) {
+    const json root = json::parse(std::string(data, len), nullptr, false);
+    if (root.is_discarded())
         return false;
+    const json* array = nullptr;
+    if (root.is_array()) {
+        array = &root;
+    } else if (root.is_object()) {
+        const auto it = root.find("models");
+        if (it != root.end() && it->is_array())
+            array = &*it;
     }
+    if (array == nullptr)
+        return false;
 
-    std::vector<std::string> objects = json_top_level_objects(models_array);
     out_models->clear();
-    out_models->reserve(objects.size());
-    for (const std::string& object : objects) {
+    out_models->reserve(array->size());
+    for (const json& object : *array) {
+        if (!object.is_object())
+            continue;
         ModelInfo model;
-        model.set_id(assignment_json_string_any(object, "id", "model_id", "modelId"));
-        model.set_name(assignment_json_string_any(object, "name", "display_name", "displayName"));
-        model.set_download_url(
-            assignment_json_string_any(object, "download_url", "downloadUrl", "url"));
-        model.set_description(assignment_json_string_any(object, "description"));
-        model.set_download_size_bytes(assignment_json_int_any(object, 0, "download_size_bytes",
-                                                              "download_size", "downloadSize"));
-        model.set_context_length(static_cast<int32_t>(
-            assignment_json_int_any(object, 0, "context_length", "contextLength")));
+        model.set_id(json_first_string(object, {"id", "model_id", "modelId"}));
+        model.set_name(json_first_string(object, {"name", "display_name", "displayName"}));
+        model.set_download_url(json_first_string(object, {"download_url", "downloadUrl", "url"}));
+        model.set_description(json_first_string(object, {"description"}));
+        model.set_download_size_bytes(
+            json_first_int(object, 0, {"download_size_bytes", "download_size", "downloadSize"}));
+        model.set_context_length(
+            static_cast<int32_t>(json_first_int(object, 0, {"context_length", "contextLength"})));
         model.set_supports_thinking(
-            assignment_json_bool_any(object, false, "supports_thinking", "supportsThinking"));
-        model.set_supports_lora(
-            assignment_json_bool_any(object, false, "supports_lora", "supportsLora"));
+            json_first_bool(object, false, {"supports_thinking", "supportsThinking"}));
+        model.set_supports_lora(json_first_bool(object, false, {"supports_lora", "supportsLora"}));
 
-        const std::string category = assignment_json_string_any(object, "category");
-        if (!category.empty()) {
+        const std::string category = json_first_string(object, {"category"});
+        if (!category.empty())
             model.set_category(category_from_assignment_token(category));
-        }
-        const std::string format = assignment_json_string_any(object, "format");
-        if (!format.empty()) {
+        const std::string format = json_first_string(object, {"format"});
+        if (!format.empty())
             model.set_format(format_from_assignment_token(format));
-        }
-        const std::string framework = assignment_json_string_any(object, "preferred_framework",
-                                                                 "preferredFramework", "framework");
-        if (!framework.empty()) {
+        const std::string framework =
+            json_first_string(object, {"preferred_framework", "preferredFramework", "framework"});
+        if (!framework.empty())
             model.set_framework(framework_from_assignment_token(framework));
-        }
-        const int64_t memory = assignment_json_int_any(object, 0, "memory_required_bytes",
-                                                       "memory_required", "memoryRequired");
-        if (memory > 0) {
-            model.set_memory_required_bytes(memory);
-        }
-        const std::string checksum =
-            assignment_json_string_any(object, "checksum_sha256", "checksum", "sha256");
-        if (!checksum.empty()) {
-            model.set_checksum_sha256(checksum);
-        }
 
-        std::string metadata_object;
-        if (assignment_json_value(object, "metadata", &metadata_object)) {
-            const std::string metadata_description =
-                assignment_json_string_any(metadata_object, "description");
-            if (!metadata_description.empty()) {
-                model.mutable_metadata()->set_description(metadata_description);
-            }
-            const std::string author = assignment_json_string_any(metadata_object, "author");
-            if (!author.empty()) {
+        const int64_t memory = json_first_int(
+            object, 0, {"memory_required_bytes", "memory_required", "memoryRequired"});
+        if (memory > 0)
+            model.set_memory_required_bytes(memory);
+        const std::string checksum =
+            json_first_string(object, {"checksum_sha256", "checksum", "sha256"});
+        if (!checksum.empty())
+            model.set_checksum_sha256(checksum);
+
+        const auto metadata_it = object.find("metadata");
+        const bool has_metadata = metadata_it != object.end() && metadata_it->is_object();
+        const json& tag_source = has_metadata ? *metadata_it : object;
+        if (has_metadata) {
+            const std::string desc = json_first_string(*metadata_it, {"description"});
+            if (!desc.empty())
+                model.mutable_metadata()->set_description(desc);
+            const std::string author = json_first_string(*metadata_it, {"author"});
+            if (!author.empty())
                 model.mutable_metadata()->set_author(author);
-            }
-            const std::string license = assignment_json_string_any(metadata_object, "license");
-            if (!license.empty()) {
+            const std::string license = json_first_string(*metadata_it, {"license"});
+            if (!license.empty())
                 model.mutable_metadata()->set_license(license);
-            }
-            const std::string version = assignment_json_string_any(metadata_object, "version");
-            if (!version.empty()) {
+            const std::string version = json_first_string(*metadata_it, {"version"});
+            if (!version.empty())
                 model.mutable_metadata()->set_version(version);
+        }
+        const auto tags_it = tag_source.find("tags");
+        if (tags_it != tag_source.end() && tags_it->is_array()) {
+            for (const json& tag : *tags_it) {
+                if (!tag.is_string())
+                    continue;
+                const std::string tag_value = tag.get<std::string>();
+                if (!tag_value.empty())
+                    model.mutable_metadata()->add_tags(tag_value);
             }
-            add_json_string_array_to_metadata(metadata_object, "tags", &model);
-        } else {
-            add_json_string_array_to_metadata(object, "tags", &model);
         }
 
         normalize_assignment_model(&model);
-        if (!model.id().empty()) {
+        if (!model.id().empty())
             out_models->push_back(std::move(model));
-        }
     }
     return true;
 }
+
 
 static rac_result_t parse_assignment_response_models(const char* data, size_t len,
                                                      std::vector<ModelInfo>* out_models,

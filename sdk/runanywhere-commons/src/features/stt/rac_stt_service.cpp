@@ -62,9 +62,7 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
          .select_ops = stt_ops,
          .model_create_id = model_ref.path.c_str(),
          .model_id_for_service = model_path,
-         .config_json = nullptr,
-         .created_event_name = "stt.backend.created",
-         .created_event_category = RAC_EVENT_CATEGORY_STT},
+         .config_json = nullptr},
         &service);
     if (result != RAC_SUCCESS) {
         return result;

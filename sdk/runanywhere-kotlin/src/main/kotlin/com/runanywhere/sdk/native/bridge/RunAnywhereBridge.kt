@@ -809,6 +809,19 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racDevConfigGetBuildToken(): String?
 
+    /**
+     * Whether a baked-in credential is usable: non-empty and not a scaffolding
+     * placeholder. Canonical commons rule shared by all SDKs.
+     */
+    @JvmStatic
+    external fun racDevConfigIsUsableCredential(value: String): Boolean
+
+    /**
+     * Whether a string is a usable absolute http(s) URL. Canonical commons rule.
+     */
+    @JvmStatic
+    external fun racDevConfigIsUsableHttpUrl(value: String): Boolean
+
     // SDK configuration initialization
 
     /**

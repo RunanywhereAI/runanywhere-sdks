@@ -2920,59 +2920,74 @@ public nonisolated struct RAModelRegistryEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RADownloadEvent: Sendable {
+public nonisolated struct RADownloadEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var kind: RADownloadEventKind = .unspecified
+  public var kind: RADownloadEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
 
-  public var modelID: String = String()
+  public var modelID: String {
+    get {_storage._modelID}
+    set {_uniqueStorage()._modelID = newValue}
+  }
 
-  public var taskID: String = String()
+  public var taskID: String {
+    get {_storage._taskID}
+    set {_uniqueStorage()._taskID = newValue}
+  }
 
-  public var error: String = String()
+  public var error: String {
+    get {_storage._error}
+    set {_uniqueStorage()._error = newValue}
+  }
 
-  public var payload: RADownloadEvent.OneOf_Payload? = nil
+  public var payload: OneOf_Payload? {
+    get {return _storage._payload}
+    set {_uniqueStorage()._payload = newValue}
+  }
 
   public var planResult: RADownloadPlanResult {
     get {
-      if case .planResult(let v)? = payload {return v}
+      if case .planResult(let v)? = _storage._payload {return v}
       return RADownloadPlanResult()
     }
-    set {payload = .planResult(newValue)}
+    set {_uniqueStorage()._payload = .planResult(newValue)}
   }
 
   public var startResult: RADownloadStartResult {
     get {
-      if case .startResult(let v)? = payload {return v}
+      if case .startResult(let v)? = _storage._payload {return v}
       return RADownloadStartResult()
     }
-    set {payload = .startResult(newValue)}
+    set {_uniqueStorage()._payload = .startResult(newValue)}
   }
 
   public var progress: RADownloadProgress {
     get {
-      if case .progress(let v)? = payload {return v}
+      if case .progress(let v)? = _storage._payload {return v}
       return RADownloadProgress()
     }
-    set {payload = .progress(newValue)}
+    set {_uniqueStorage()._payload = .progress(newValue)}
   }
 
   public var cancelResult: RADownloadCancelResult {
     get {
-      if case .cancelResult(let v)? = payload {return v}
+      if case .cancelResult(let v)? = _storage._payload {return v}
       return RADownloadCancelResult()
     }
-    set {payload = .cancelResult(newValue)}
+    set {_uniqueStorage()._payload = .cancelResult(newValue)}
   }
 
   public var resumeResult: RADownloadResumeResult {
     get {
-      if case .resumeResult(let v)? = payload {return v}
+      if case .resumeResult(let v)? = _storage._payload {return v}
       return RADownloadResumeResult()
     }
-    set {payload = .resumeResult(newValue)}
+    set {_uniqueStorage()._payload = .resumeResult(newValue)}
   }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -2987,6 +3002,8 @@ public nonisolated struct RADownloadEvent: Sendable {
   }
 
   public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// ---------------------------------------------------------------------------
@@ -5585,135 +5602,179 @@ nonisolated extension RADownloadEvent: SwiftProtobuf.Message, SwiftProtobuf._Mes
   public static let protoMessageName: String = _protobuf_package + ".DownloadEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}model_id\0\u{3}task_id\0\u{1}error\0\u{4}\u{10}plan_result\0\u{3}start_result\0\u{1}progress\0\u{3}cancel_result\0\u{3}resume_result\0")
 
+  fileprivate class _StorageClass {
+    var _kind: RADownloadEventKind = .unspecified
+    var _modelID: String = String()
+    var _taskID: String = String()
+    var _error: String = String()
+    var _payload: RADownloadEvent.OneOf_Payload?
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _kind = source._kind
+      _modelID = source._modelID
+      _taskID = source._taskID
+      _error = source._error
+      _payload = source._payload
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.taskID) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.error) }()
-      case 20: try {
-        var v: RADownloadPlanResult?
-        var hadOneofValue = false
-        if let current = self.payload {
-          hadOneofValue = true
-          if case .planResult(let m) = current {v = m}
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._taskID) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._error) }()
+        case 20: try {
+          var v: RADownloadPlanResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .planResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .planResult(v)
+          }
+        }()
+        case 21: try {
+          var v: RADownloadStartResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .startResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .startResult(v)
+          }
+        }()
+        case 22: try {
+          var v: RADownloadProgress?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .progress(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .progress(v)
+          }
+        }()
+        case 23: try {
+          var v: RADownloadCancelResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .cancelResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .cancelResult(v)
+          }
+        }()
+        case 24: try {
+          var v: RADownloadResumeResult?
+          var hadOneofValue = false
+          if let current = _storage._payload {
+            hadOneofValue = true
+            if case .resumeResult(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._payload = .resumeResult(v)
+          }
+        }()
+        default: break
         }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.payload = .planResult(v)
-        }
-      }()
-      case 21: try {
-        var v: RADownloadStartResult?
-        var hadOneofValue = false
-        if let current = self.payload {
-          hadOneofValue = true
-          if case .startResult(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.payload = .startResult(v)
-        }
-      }()
-      case 22: try {
-        var v: RADownloadProgress?
-        var hadOneofValue = false
-        if let current = self.payload {
-          hadOneofValue = true
-          if case .progress(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.payload = .progress(v)
-        }
-      }()
-      case 23: try {
-        var v: RADownloadCancelResult?
-        var hadOneofValue = false
-        if let current = self.payload {
-          hadOneofValue = true
-          if case .cancelResult(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.payload = .cancelResult(v)
-        }
-      }()
-      case 24: try {
-        var v: RADownloadResumeResult?
-        var hadOneofValue = false
-        if let current = self.payload {
-          hadOneofValue = true
-          if case .resumeResult(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.payload = .resumeResult(v)
-        }
-      }()
-      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.kind != .unspecified {
-      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 1)
-    }
-    if !self.modelID.isEmpty {
-      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
-    }
-    if !self.taskID.isEmpty {
-      try visitor.visitSingularStringField(value: self.taskID, fieldNumber: 3)
-    }
-    if !self.error.isEmpty {
-      try visitor.visitSingularStringField(value: self.error, fieldNumber: 4)
-    }
-    switch self.payload {
-    case .planResult?: try {
-      guard case .planResult(let v)? = self.payload else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
-    }()
-    case .startResult?: try {
-      guard case .startResult(let v)? = self.payload else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
-    }()
-    case .progress?: try {
-      guard case .progress(let v)? = self.payload else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
-    }()
-    case .cancelResult?: try {
-      guard case .cancelResult(let v)? = self.payload else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
-    }()
-    case .resumeResult?: try {
-      guard case .resumeResult(let v)? = self.payload else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
-    }()
-    case nil: break
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 1)
+      }
+      if !_storage._modelID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 2)
+      }
+      if !_storage._taskID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._taskID, fieldNumber: 3)
+      }
+      if !_storage._error.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._error, fieldNumber: 4)
+      }
+      switch _storage._payload {
+      case .planResult?: try {
+        guard case .planResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      }()
+      case .startResult?: try {
+        guard case .startResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+      }()
+      case .progress?: try {
+        guard case .progress(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      }()
+      case .cancelResult?: try {
+        guard case .cancelResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+      }()
+      case .resumeResult?: try {
+        guard case .resumeResult(let v)? = _storage._payload else { preconditionFailure() }
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+      }()
+      case nil: break
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RADownloadEvent, rhs: RADownloadEvent) -> Bool {
-    if lhs.kind != rhs.kind {return false}
-    if lhs.modelID != rhs.modelID {return false}
-    if lhs.taskID != rhs.taskID {return false}
-    if lhs.error != rhs.error {return false}
-    if lhs.payload != rhs.payload {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._modelID != rhs_storage._modelID {return false}
+        if _storage._taskID != rhs_storage._taskID {return false}
+        if _storage._error != rhs_storage._error {return false}
+        if _storage._payload != rhs_storage._payload {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

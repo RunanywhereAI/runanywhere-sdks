@@ -147,26 +147,14 @@ class LlamaCppTextGeneration {
     TextGenerationResult generate(const TextGenerationRequest& request);
 
     /**
-     * Generate text with streaming, optional prompt-token output, and optional
-     * benchmark timing.
-     *
-     * When @p timing_out is non-null, captures:
-     *   - t2_prefill_start_ms: before the first llama_decode on the prompt
-     *   - t3_prefill_end_ms:   after the prompt prefill loop completes
-     *   - t5_last_token_ms:    after the decode loop exits
-     *   - output_tokens:       number of tokens generated
-     * Note: t4 (first token) is written at the LLM component layer, not in the
-     * backend.
+     * Generate text with streaming and optional prompt-token output.
      *
      * @param request           Generation request.
      * @param callback          Streaming callback; return false to cancel.
      * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
-     * @param timing_out        Optional: benchmark timing struct (may be NULL for
-     * no timing).
      */
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens = nullptr,
-                         rac_benchmark_timing_t* timing_out = nullptr);
+                         int* out_prompt_tokens = nullptr);
 
     void cancel();
 
@@ -229,15 +217,11 @@ class LlamaCppTextGeneration {
     // accumulator). On return, KV/sampler ownership stays with the caller.
     //
     // Caller MUST already hold mutex_ and have prefilled the prompt into @p
-    // batch's sequence. @p timing_out (may be NULL) receives t5_last_token_ms /
-    // output_tokens at the same point generate_stream historically recorded
-    // them — immediately after the decode loop exits, before the trailing
-    // UTF-8/stop-window flush.
+    // batch's sequence. On return, KV/sampler ownership stays with the caller.
     //
     // @return number of output tokens generated (excludes the prompt).
     int run_decode_loop(llama_sampler* sampler, llama_batch& batch, int start_n_cur,
-                        int effective_max_tokens, const TextStreamCallback& sink,
-                        rac_benchmark_timing_t* timing_out);
+                        int effective_max_tokens, const TextStreamCallback& sink);
 
     LlamaCppBackend* backend_;
     llama_model* model_ = nullptr;

@@ -85,6 +85,72 @@ class DownloadState extends $pb.ProtobufEnum {
   const DownloadState._(super.value, super.name);
 }
 
+/// Structured reason for a download plan/start/resume rejection. Lets every SDK
+/// branch on a stable enum instead of substring-matching the human-readable
+/// error_message (the prior approach, which silently broke on any reword).
+class DownloadFailureReason extends $pb.ProtobufEnum {
+  static const DownloadFailureReason DOWNLOAD_FAILURE_REASON_UNSPECIFIED =
+      DownloadFailureReason._(
+          0, _omitEnumNames ? '' : 'DOWNLOAD_FAILURE_REASON_UNSPECIFIED');
+
+  /// On-disk partial download is larger than the expected total byte count.
+  static const DownloadFailureReason
+      DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES = DownloadFailureReason._(
+          1,
+          _omitEnumNames
+              ? ''
+              : 'DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES');
+
+  /// Requested resume offset is past the expected total size.
+  static const DownloadFailureReason
+      DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED =
+      DownloadFailureReason._(
+          2,
+          _omitEnumNames
+              ? ''
+              : 'DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED');
+
+  /// On-disk partial is smaller than the requested resume offset.
+  static const DownloadFailureReason
+      DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET =
+      DownloadFailureReason._(
+          3,
+          _omitEnumNames
+              ? ''
+              : 'DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET');
+
+  /// The partial file changed (size/mtime) since the resume token was issued.
+  static const DownloadFailureReason
+      DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME =
+      DownloadFailureReason._(
+          4,
+          _omitEnumNames
+              ? ''
+              : 'DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME');
+
+  /// Not enough free space to complete the download.
+  static const DownloadFailureReason
+      DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE = DownloadFailureReason._(5,
+          _omitEnumNames ? '' : 'DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE');
+
+  static const $core.List<DownloadFailureReason> values =
+      <DownloadFailureReason>[
+    DOWNLOAD_FAILURE_REASON_UNSPECIFIED,
+    DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES,
+    DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED,
+    DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET,
+    DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME,
+    DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE,
+  ];
+
+  static final $core.List<DownloadFailureReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static DownloadFailureReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DownloadFailureReason._(super.value, super.name);
+}
+
 /// HTTP transport download status — numeric values MUST match
 /// rac_http_download_status_t (RAC_HTTP_DL_*) in
 /// sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.

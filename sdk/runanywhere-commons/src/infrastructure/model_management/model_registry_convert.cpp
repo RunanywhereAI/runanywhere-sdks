@@ -119,213 +119,75 @@ namespace rac::infra::model_registry::detail {
 namespace {
 
 ModelCategory model_category_to_proto(rac_model_category_t category) {
-    switch (category) {
-        case RAC_MODEL_CATEGORY_LANGUAGE:
-            return runanywhere::v1::MODEL_CATEGORY_LANGUAGE;
-        case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION:
-            return runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION;
-        case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS:
-            return runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS;
-        case RAC_MODEL_CATEGORY_VISION:
-            return runanywhere::v1::MODEL_CATEGORY_VISION;
-        case RAC_MODEL_CATEGORY_IMAGE_GENERATION:
-            return runanywhere::v1::MODEL_CATEGORY_IMAGE_GENERATION;
-        case RAC_MODEL_CATEGORY_MULTIMODAL:
-            return runanywhere::v1::MODEL_CATEGORY_MULTIMODAL;
-        case RAC_MODEL_CATEGORY_AUDIO:
-            return runanywhere::v1::MODEL_CATEGORY_AUDIO;
-        case RAC_MODEL_CATEGORY_EMBEDDING:
-            return runanywhere::v1::MODEL_CATEGORY_EMBEDDING;
-        case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-            return runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
-        case RAC_MODEL_CATEGORY_UNKNOWN:
-        default:
-            return runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED;
-    }
+    int32_t v = 0;
+    rac_model_category_to_proto(category, &v);
+    return static_cast<ModelCategory>(v);
 }
 
 rac_model_category_t model_category_from_proto(ModelCategory category) {
-    switch (category) {
-        case runanywhere::v1::MODEL_CATEGORY_LANGUAGE:
-            return RAC_MODEL_CATEGORY_LANGUAGE;
-        case runanywhere::v1::MODEL_CATEGORY_SPEECH_RECOGNITION:
-            return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION;
-        case runanywhere::v1::MODEL_CATEGORY_SPEECH_SYNTHESIS:
-            return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS;
-        case runanywhere::v1::MODEL_CATEGORY_VISION:
-            return RAC_MODEL_CATEGORY_VISION;
-        case runanywhere::v1::MODEL_CATEGORY_IMAGE_GENERATION:
-            return RAC_MODEL_CATEGORY_IMAGE_GENERATION;
-        case runanywhere::v1::MODEL_CATEGORY_MULTIMODAL:
-            return RAC_MODEL_CATEGORY_MULTIMODAL;
-        case runanywhere::v1::MODEL_CATEGORY_AUDIO:
-            return RAC_MODEL_CATEGORY_AUDIO;
-        case runanywhere::v1::MODEL_CATEGORY_EMBEDDING:
-            return RAC_MODEL_CATEGORY_EMBEDDING;
-        case runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-            return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
-        case runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED:
-        default:
-            return RAC_MODEL_CATEGORY_UNKNOWN;
-    }
+    rac_model_category_t out = RAC_MODEL_CATEGORY_UNKNOWN;
+    rac_model_category_from_proto(static_cast<int32_t>(category), &out);
+    return out;
 }
 
 ModelFormat model_format_to_proto(rac_model_format_t format) {
-    const int value = static_cast<int>(format);
-    return runanywhere::v1::ModelFormat_IsValid(value) ? static_cast<ModelFormat>(value)
-                                                       : runanywhere::v1::MODEL_FORMAT_UNKNOWN;
+    int32_t v = 0;
+    rac_model_format_to_proto(format, &v);
+    return static_cast<ModelFormat>(v);
 }
 
 rac_model_format_t model_format_from_proto(ModelFormat format) {
-    const int value = static_cast<int>(format);
-    return runanywhere::v1::ModelFormat_IsValid(value) ? static_cast<rac_model_format_t>(value)
-                                                       : RAC_MODEL_FORMAT_UNKNOWN;
+    rac_model_format_t out = RAC_MODEL_FORMAT_UNSPECIFIED;
+    rac_model_format_from_proto(static_cast<int32_t>(format), &out);
+    return out;
 }
 
 InferenceFramework inference_framework_to_proto(rac_inference_framework_t framework) {
-    switch (framework) {
-        case RAC_FRAMEWORK_ONNX:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_ONNX;
-        case RAC_FRAMEWORK_LLAMACPP:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS;
-        case RAC_FRAMEWORK_SYSTEM_TTS:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS;
-        case RAC_FRAMEWORK_FLUID_AUDIO:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_FLUID_AUDIO;
-        case RAC_FRAMEWORK_BUILTIN:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_BUILT_IN;
-        case RAC_FRAMEWORK_NONE:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_NONE;
-        case RAC_FRAMEWORK_MLX:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_MLX;
-        case RAC_FRAMEWORK_COREML:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
-        case RAC_FRAMEWORK_METALRT:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_METALRT;
-        case RAC_FRAMEWORK_GENIE:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_GENIE;
-        case RAC_FRAMEWORK_SHERPA:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA;
-        case RAC_FRAMEWORK_UNKNOWN:
-        default:
-            return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
-    }
+    int32_t v = 0;
+    rac_inference_framework_to_proto(framework, &v);
+    return static_cast<InferenceFramework>(v);
 }
 
 rac_inference_framework_t inference_framework_from_proto(InferenceFramework framework) {
-    switch (framework) {
-        case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
-            return RAC_FRAMEWORK_ONNX;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
-            return RAC_FRAMEWORK_LLAMACPP;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-            return RAC_FRAMEWORK_FOUNDATION_MODELS;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
-            return RAC_FRAMEWORK_SYSTEM_TTS;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_FLUID_AUDIO:
-            return RAC_FRAMEWORK_FLUID_AUDIO;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_BUILT_IN:
-            return RAC_FRAMEWORK_BUILTIN;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_NONE:
-            return RAC_FRAMEWORK_NONE;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
-            return RAC_FRAMEWORK_MLX;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
-            return RAC_FRAMEWORK_COREML;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_METALRT:
-            return RAC_FRAMEWORK_METALRT;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
-            return RAC_FRAMEWORK_GENIE;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
-            return RAC_FRAMEWORK_SHERPA;
-        case runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED:
-        default:
-            return RAC_FRAMEWORK_UNKNOWN;
-    }
+    rac_inference_framework_t out = RAC_FRAMEWORK_UNKNOWN;
+    rac_inference_framework_from_proto(static_cast<int32_t>(framework), &out);
+    return out;
 }
 
 ModelSource model_source_to_proto(rac_model_source_t source) {
-    switch (source) {
-        case RAC_MODEL_SOURCE_LOCAL:
-            return runanywhere::v1::MODEL_SOURCE_LOCAL;
-        case RAC_MODEL_SOURCE_REMOTE:
-        default:
-            return runanywhere::v1::MODEL_SOURCE_REMOTE;
-    }
+    int32_t v = 0;
+    rac_model_source_to_proto(source, &v);
+    return static_cast<ModelSource>(v);
 }
 
 rac_model_source_t model_source_from_proto(ModelSource source) {
-    switch (source) {
-        case runanywhere::v1::MODEL_SOURCE_LOCAL:
-            return RAC_MODEL_SOURCE_LOCAL;
-        case runanywhere::v1::MODEL_SOURCE_REMOTE:
-        case runanywhere::v1::MODEL_SOURCE_UNSPECIFIED:
-        default:
-            return RAC_MODEL_SOURCE_REMOTE;
-    }
+    rac_model_source_t out = RAC_MODEL_SOURCE_REMOTE;
+    rac_model_source_from_proto(static_cast<int32_t>(source), &out);
+    return out;
 }
 
 ArchiveType archive_type_to_proto(rac_archive_type_t type) {
-    switch (type) {
-        case RAC_ARCHIVE_TYPE_ZIP:
-            return runanywhere::v1::ARCHIVE_TYPE_ZIP;
-        case RAC_ARCHIVE_TYPE_TAR_BZ2:
-            return runanywhere::v1::ARCHIVE_TYPE_TAR_BZ2;
-        case RAC_ARCHIVE_TYPE_TAR_GZ:
-            return runanywhere::v1::ARCHIVE_TYPE_TAR_GZ;
-        case RAC_ARCHIVE_TYPE_TAR_XZ:
-            return runanywhere::v1::ARCHIVE_TYPE_TAR_XZ;
-        case RAC_ARCHIVE_TYPE_NONE:
-        default:
-            return runanywhere::v1::ARCHIVE_TYPE_UNSPECIFIED;
-    }
+    int32_t v = 0;
+    rac_archive_type_to_proto(type, &v);
+    return static_cast<ArchiveType>(v);
 }
 
 rac_archive_type_t archive_type_from_proto(ArchiveType type) {
-    switch (type) {
-        case runanywhere::v1::ARCHIVE_TYPE_ZIP:
-            return RAC_ARCHIVE_TYPE_ZIP;
-        case runanywhere::v1::ARCHIVE_TYPE_TAR_BZ2:
-            return RAC_ARCHIVE_TYPE_TAR_BZ2;
-        case runanywhere::v1::ARCHIVE_TYPE_TAR_GZ:
-            return RAC_ARCHIVE_TYPE_TAR_GZ;
-        case runanywhere::v1::ARCHIVE_TYPE_TAR_XZ:
-            return RAC_ARCHIVE_TYPE_TAR_XZ;
-        case runanywhere::v1::ARCHIVE_TYPE_UNSPECIFIED:
-        default:
-            return RAC_ARCHIVE_TYPE_NONE;
-    }
+    rac_archive_type_t out = RAC_ARCHIVE_TYPE_NONE;
+    rac_archive_type_from_proto(static_cast<int32_t>(type), &out);
+    return out;
 }
 
 ArchiveStructure archive_structure_to_proto(rac_archive_structure_t structure) {
-    switch (structure) {
-        case RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED:
-            return runanywhere::v1::ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
-        case RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED:
-            return runanywhere::v1::ARCHIVE_STRUCTURE_DIRECTORY_BASED;
-        case RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY:
-            return runanywhere::v1::ARCHIVE_STRUCTURE_NESTED_DIRECTORY;
-        case RAC_ARCHIVE_STRUCTURE_UNKNOWN:
-        default:
-            return runanywhere::v1::ARCHIVE_STRUCTURE_UNKNOWN;
-    }
+    int32_t v = 0;
+    rac_archive_structure_to_proto(structure, &v);
+    return static_cast<ArchiveStructure>(v);
 }
 
 rac_archive_structure_t archive_structure_from_proto(ArchiveStructure structure) {
-    switch (structure) {
-        case runanywhere::v1::ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED:
-            return RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
-        case runanywhere::v1::ARCHIVE_STRUCTURE_DIRECTORY_BASED:
-            return RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED;
-        case runanywhere::v1::ARCHIVE_STRUCTURE_NESTED_DIRECTORY:
-            return RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY;
-        case runanywhere::v1::ARCHIVE_STRUCTURE_UNSPECIFIED:
-        case runanywhere::v1::ARCHIVE_STRUCTURE_UNKNOWN:
-        default:
-            return RAC_ARCHIVE_STRUCTURE_UNKNOWN;
-    }
+    rac_archive_structure_t out = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+    rac_archive_structure_from_proto(static_cast<int32_t>(structure), &out);
+    return out;
 }
 
 ModelFileRole model_file_role_to_proto(rac_model_file_role_t role) {

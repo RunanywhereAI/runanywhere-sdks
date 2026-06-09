@@ -19,7 +19,6 @@
 
 #include "rac/audio/rac_audio_convert.h"
 #include "rac/core/rac_error.h"
-#include "rac/infrastructure/events/rac_events.h"
 
 struct rac_sherpa_stt_handle_impl {
     std::unique_ptr<runanywhere::SherpaBackend> backend;
@@ -189,9 +188,6 @@ rac_result_t rac_stt_sherpa_transcribe(rac_handle_t handle, const float* audio_s
     out_result->num_words = 0;
     out_result->confidence = result.confidence;
     out_result->processing_time_ms = result.inference_time_ms;
-
-    rac_event_track("stt.transcription.completed", RAC_EVENT_CATEGORY_STT,
-                    RAC_EVENT_DESTINATION_ALL, nullptr);
 
     return RAC_SUCCESS;
 }
@@ -382,9 +378,6 @@ void rac_stt_sherpa_destroy(rac_handle_t handle) {
         h->backend->cleanup();
     }
     delete h;
-
-    rac_event_track("stt.backend.destroyed", RAC_EVENT_CATEGORY_STT, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"sherpa"})");
 }
 
 }  // extern "C"

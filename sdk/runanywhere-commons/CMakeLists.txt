@@ -692,18 +692,13 @@ set(RAC_CORE_SOURCES
     src/core/rac_error.cpp
     src/core/rac_time.cpp
     src/core/rac_benchmark.cpp
-    src/core/rac_benchmark_metrics.cpp
-    src/core/rac_benchmark_log.cpp
-    src/core/rac_benchmark_stats.cpp
     src/core/rac_memory.cpp
     src/core/rac_uuid.cpp
     src/core/rac_logger.cpp
     src/infrastructure/logging/log_redact.cpp
     src/core/rac_audio_utils.cpp
-    src/core/component_types.cpp
     src/core/events.cpp
     src/core/sdk_state.cpp
-    src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
     # model_lifecycle.cpp was split per SRP into
     # five TUs (proto<->C translation, artifact resolution, auto-download,
@@ -766,8 +761,10 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/register_model_from_url.cpp
     src/infrastructure/model_management/artifact_expected_files_proto.cpp
     src/infrastructure/storage/storage_analyzer.cpp
+    src/infrastructure/storage/storage_event_publisher.cpp
     src/infrastructure/file_management/file_manager.cpp
     src/infrastructure/network/environment.cpp
+    src/infrastructure/network/rac_dev_config_usability.cpp
     src/infrastructure/network/endpoints.cpp
     src/infrastructure/network/api_types.cpp
     src/infrastructure/network/auth_manager.cpp
@@ -848,7 +845,6 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/llm_module.cpp
     src/features/llm/rac_llm_service.cpp
     src/features/llm/streaming_metrics.cpp
-    src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
     # JSONSchema-proto -> JSON Schema text canonical writer (replaces
     # Swift JSONSchemaWriter / per-SDK serializers).
@@ -880,7 +876,6 @@ set(RAC_FEATURES_SOURCES
     # rac_nonllm_lifecycle_proto_abi.cpp.
     src/features/stt/stt_module.cpp
     src/features/stt/rac_stt_service.cpp
-    src/features/stt/stt_analytics.cpp
     # Lifecycle-owned proto-byte STTStreamEvent ABI
     src/features/stt/rac_stt_stream.cpp
     # Canonical STTConfiguration defaults helper
@@ -890,7 +885,6 @@ set(RAC_FEATURES_SOURCES
     # rac_nonllm_lifecycle_proto_abi.cpp.
     src/features/tts/tts_module.cpp
     src/features/tts/rac_tts_service.cpp
-    src/features/tts/tts_analytics.cpp
     # Lifecycle-owned proto-byte TTSStreamEvent ABI
     src/features/tts/rac_tts_stream.cpp
     # Canonical TTSConfiguration defaults helper
@@ -901,7 +895,6 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_module.cpp
     src/features/vad/rac_vad_service.cpp
     src/features/vad/energy_vad.cpp
-    src/features/vad/vad_analytics.cpp
     # Lifecycle-owned proto-byte VADStreamEvent ABI
     src/features/vad/rac_vad_stream.cpp
     # Shared per-handle threshold-mutex registry.
@@ -940,24 +933,17 @@ set(RAC_FEATURES_SOURCES
     src/features/lora/rac_lora_service.cpp
     # Voice Agent — SRP split:
     #   voice_agent.cpp                       — lifecycle (create/destroy/init)
-    #   voice_agent_legacy_abi.cpp            — legacy non-proto C ABI
     #   voice_agent_proto_abi.cpp             — synchronous proto C ABI
     #   voice_agent_d7_abi.cpp                — full-session proto ABI
     #   voice_agent_audio_pipeline_state.cpp  — audio pipeline state helpers
     #   voice_agent_internal_helpers.cpp      — shared emit/state helpers
     src/features/voice_agent/voice_agent.cpp
     src/features/voice_agent/voice_agent_internal_helpers.cpp
-    src/features/voice_agent/voice_agent_legacy_abi.cpp
     src/features/voice_agent/voice_agent_proto_abi.cpp
     src/features/voice_agent/voice_agent_d7_abi.cpp
     src/features/voice_agent/voice_agent_audio_pipeline_state.cpp
-    # Proto-byte event ABI (coexists with struct callback).
+    # Proto-byte event ABI for VoiceEvent streaming.
     src/features/voice_agent/rac_voice_event_abi.cpp
-    # GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
-    # First DAG consumer; replaces the in-line process_stream
-    # orchestration with typed PipelineNodes + bounded StreamEdge
-    # backpressure + hierarchical CancelToken propagation.
-    src/features/voice_agent/voice_agent_pipeline.cpp
     # Hybrid router — per-request offline/online dispatch.
     src/router/hybrid/rac_stt_hybrid_router.cpp
     src/router/hybrid/rac_stt_hybrid_router_proto.cpp
@@ -1073,10 +1059,9 @@ endif()
 # is target-scoped so engine backends keep their hidden-visibility hardening.
 # TODO(v0.21): annotate all remaining legacy C ABI functions with RAC_API
 # and drop this Android-specific override. Linux and macOS shared dev builds
-# need the same override: the test executables (test_voice_agent_pipeline,
-# test_graph_scheduler, test_pipeline_executor) link directly against
-# internal C++ classes (`rac::voice_agent::VoiceAgentPipeline`,
-# `rac::graph::GraphScheduler`, etc.) that don't yet carry RAC_API. With
+# need the same override: the test executables (test_graph_scheduler,
+# test_pipeline_executor) link directly against internal C++ classes
+# (`rac::graph::GraphScheduler`, etc.) that don't yet carry RAC_API. With
 # the default hidden visibility on SHARED builds the test linker fails with
 # `undefined reference to <class>::<class>()`. The official macOS CMake presets
 # still use RAC_BUILD_SHARED=OFF, so this only affects explicit shared dev

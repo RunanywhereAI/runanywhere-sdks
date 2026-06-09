@@ -55,7 +55,8 @@ class RunAnywhereDownloads {
   ) async {
     final planResult = await plan(request);
     if (planResult.canStart ||
-        !planResult.errorMessage.contains('existing partial bytes exceed')) {
+        planResult.failureReason !=
+            DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES) {
       return planResult;
     }
 

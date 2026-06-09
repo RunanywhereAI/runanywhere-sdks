@@ -10,6 +10,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.DownloadCancelRequest
+import ai.runanywhere.proto.v1.DownloadFailureReason
 import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
@@ -180,7 +181,8 @@ private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAM
 
 private fun planDownload(request: DownloadPlanRequest): DownloadPlanResult? {
     val plan = CppBridgeDownload.plan(request) ?: return null
-    if (plan.can_start || !plan.error_message.contains("existing partial bytes exceed")) {
+    if (plan.can_start ||
+        plan.failure_reason != DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES) {
         return plan
     }
 

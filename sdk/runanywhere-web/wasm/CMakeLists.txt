@@ -379,12 +379,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # from rac/plugin/rac_plugin_entry.h.
 
     # Events
-    "_rac_event_subscribe"
-    "_rac_event_subscribe_all"
-    "_rac_event_unsubscribe"
-    "_rac_event_publish"
-    "_rac_event_track"
-    "_rac_event_category_name"
     "_rac_sdk_event_subscribe"
     "_rac_sdk_event_unsubscribe"
     "_rac_sdk_event_publish_proto"
@@ -682,26 +676,11 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_voice_agent_create_standalone"
     "_rac_voice_agent_create"
     "_rac_voice_agent_destroy"
-    "_rac_voice_agent_load_stt_model"
-    "_rac_voice_agent_load_llm_model"
-    "_rac_voice_agent_load_tts_voice"
-    "_rac_voice_agent_is_stt_loaded"
-    "_rac_voice_agent_is_llm_loaded"
-    "_rac_voice_agent_is_tts_loaded"
-    "_rac_voice_agent_get_stt_model_id"
-    "_rac_voice_agent_get_llm_model_id"
-    "_rac_voice_agent_get_tts_voice_id"
     "_rac_voice_agent_initialize"
     "_rac_voice_agent_initialize_with_loaded_models"
     "_rac_voice_agent_cleanup"
     "_rac_voice_agent_is_ready"
-    "_rac_voice_agent_process_voice_turn"
-    "_rac_voice_agent_process_stream"
-    "_rac_voice_agent_transcribe"
     "_rac_voice_agent_generate_response"
-    "_rac_voice_agent_synthesize_speech"
-    "_rac_voice_agent_detect_speech"
-    "_rac_voice_agent_result_free"
 
     # Voice Agent — proto-byte streaming ABI
     # Required by sdk/runanywhere-web/packages/core/src/Adapters/
@@ -900,19 +879,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
 
     # Platform Emit Helpers (called from TypeScript via ccall for STT/TTS/VAD/download events).
     # These now build canonical proto SDKEvents and publish through the destination router.
-    "_rac_analytics_emit_stt_model_load_completed"
-    "_rac_analytics_emit_stt_model_load_failed"
-    "_rac_analytics_emit_stt_transcription_completed"
-    "_rac_analytics_emit_stt_transcription_failed"
-    "_rac_analytics_emit_tts_voice_load_completed"
-    "_rac_analytics_emit_tts_voice_load_failed"
-    "_rac_analytics_emit_tts_synthesis_completed"
-    "_rac_analytics_emit_tts_synthesis_failed"
-    "_rac_analytics_emit_vad_speech_started"
-    "_rac_analytics_emit_vad_speech_ended"
-    "_rac_analytics_emit_model_download_started"
-    "_rac_analytics_emit_model_download_completed"
-    "_rac_analytics_emit_model_download_failed"
 
     # WASM helper functions (sizeof, ping, version)
     "_rac_wasm_ping"

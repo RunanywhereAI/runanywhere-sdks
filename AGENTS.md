@@ -34,6 +34,8 @@ Unbounded parallel builds and process/agent storms have crashed dev laptops. ALW
 
 **The single most important architectural rule in this repo:** logic must live at the lowest layer that can serve all consumers.
 
+> **Corollary — the SDK must be seamless inside every example app.** Each feature/modality (LLM, STT, TTS, VAD, VLM, RAG, LoRA, Voice) is invoked through **one** SDK entry point; the SDK — and below it, C++ commons — does *all* the heavy lifting: segmentation, derivation, download, orchestration, prompt control. If an example app builds a multi-step sequence, hardcodes a model/engine constant, or post-processes model output, that is a bug in the **SDK**, not the app — fix it down a layer.
+
 ### Decision hierarchy (top = preferred)
 
 1. **C++ commons** (`sdk/runanywhere-commons/`) — If logic is cross-platform and not I/O-specific, it belongs here. All 5 SDKs get the fix for free. Examples: model lifecycle, registry management, download orchestration, RAG session management, inference routing.
@@ -58,7 +60,7 @@ When the correct behavior is ambiguous, check the iOS Swift implementation first
 
 ## Repository Overview
 
-Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~51K LOC) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
+Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~118K first-party LOC plus ~420K generated proto bindings) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
 
 **Current version**: `0.19.13` (canonical source: `sdk/runanywhere-commons/VERSION`)
 

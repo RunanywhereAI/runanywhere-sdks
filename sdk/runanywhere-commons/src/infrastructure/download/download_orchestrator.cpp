@@ -719,8 +719,7 @@ std::shared_ptr<proto_download_task> find_task(const std::string& task_id,
             const bool active = state == rav1::DOWNLOAD_STATE_PENDING ||
                                 state == rav1::DOWNLOAD_STATE_DOWNLOADING ||
                                 state == rav1::DOWNLOAD_STATE_EXTRACTING ||
-                                state == rav1::DOWNLOAD_STATE_RESUMING ||
-                                state == rav1::DOWNLOAD_STATE_RETRYING;
+                                state == rav1::DOWNLOAD_STATE_RESUMING;
             if (active) {
                 return pair.second;
             }
@@ -1363,6 +1362,20 @@ void append_planned_file(rav1::DownloadPlanResult* result,
     out_file->set_is_resume_candidate(is_resume_candidate);
 }
 
+// Seed is_resume_candidate on a just-appended plan entry from on-disk partial
+// bytes. Returns true iff existing bytes exceed the declared expected size while
+// validate_existing_bytes was requested (caller sets invalid_existing_bytes).
+bool seed_resume_candidate(rav1::DownloadFilePlan* planned, int64_t expected_bytes,
+                           bool resume_existing, bool validate_existing_bytes) {
+    if (!resume_existing)
+        return false;
+    int64_t existing_bytes = file_size_or_zero(planned->destination_path());
+    bool candidate =
+        existing_bytes > 0 && (expected_bytes <= 0 || existing_bytes <= expected_bytes);
+    planned->set_is_resume_candidate(candidate);
+    return validate_existing_bytes && expected_bytes > 0 && existing_bytes > expected_bytes;
+}
+
 // security-privacy-storage-network-001: defensive check
 // applied to plan entries flowing in via rac_download_start_proto (which
 // lets callers skip the trusted planner). The trusted planner always emits
@@ -1740,15 +1753,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
             append_planned_file(&result, file, model_folder, model_id, url, expected_bytes,
                                 checksum, requires_extraction, false);
             rav1::DownloadFilePlan* planned = result.mutable_files(result.files_size() - 1);
-            if (request.resume_existing()) {
-                int64_t existing_bytes = file_size_or_zero(planned->destination_path());
-                bool candidate =
-                    existing_bytes > 0 && (expected_bytes <= 0 || existing_bytes <= expected_bytes);
-                planned->set_is_resume_candidate(candidate);
-                if (request.validate_existing_bytes() && expected_bytes > 0 &&
-                    existing_bytes > expected_bytes) {
-                    invalid_existing_bytes = true;
-                }
+            if (seed_resume_candidate(planned, expected_bytes, request.resume_existing(),
+                                      request.validate_existing_bytes())) {
+                invalid_existing_bytes = true;
             }
         }
     } else {
@@ -1792,15 +1799,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         append_planned_file(&result, descriptor, model_folder, model_id, url, expected_bytes,
                             model_checksum, any_extraction, false);
         result.mutable_files(0)->set_destination_path(destination);
-        if (request.resume_existing()) {
-            int64_t existing_bytes = file_size_or_zero(result.files(0).destination_path());
-            bool candidate =
-                existing_bytes > 0 && (expected_bytes <= 0 || existing_bytes <= expected_bytes);
-            result.mutable_files(0)->set_is_resume_candidate(candidate);
-            if (request.validate_existing_bytes() && expected_bytes > 0 &&
-                existing_bytes > expected_bytes) {
-                invalid_existing_bytes = true;
-            }
+        if (seed_resume_candidate(result.mutable_files(0), expected_bytes, request.resume_existing(),
+                                  request.validate_existing_bytes())) {
+            invalid_existing_bytes = true;
         }
     }
 
@@ -1826,10 +1827,12 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
     if (invalid_existing_bytes) {
         result.set_can_start(false);
         result.set_error_message("existing partial bytes exceed expected byte count");
+        result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
     } else if (request.available_storage_bytes() > 0 && required_bytes > 0 &&
                required_bytes > request.available_storage_bytes()) {
         result.set_can_start(false);
         result.set_error_message("insufficient storage for planned download");
+        result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
     } else {
         result.set_can_start(result.files_size() > 0);
     }
@@ -1898,8 +1901,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
             const bool active = state == rav1::DOWNLOAD_STATE_PENDING ||
                                 state == rav1::DOWNLOAD_STATE_DOWNLOADING ||
                                 state == rav1::DOWNLOAD_STATE_EXTRACTING ||
-                                state == rav1::DOWNLOAD_STATE_RESUMING ||
-                                state == rav1::DOWNLOAD_STATE_RETRYING;
+                                state == rav1::DOWNLOAD_STATE_RESUMING;
             if (active) {
                 result.set_accepted(true);
                 result.set_task_id(existing->task_id);
@@ -2054,6 +2056,8 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
                 actual_size > task->files.front().expected_bytes) {
                 result.set_accepted(false);
                 result.set_error_message("existing partial bytes exceed expected byte count");
+                result.set_failure_reason(
+                    runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
                 result.set_resume_token(task->resume_token);
                 return serialize_proto_to_buffer(result, out_result);
             }
@@ -2265,6 +2269,7 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
             result.set_model_id(task->model_id);
             result.set_resume_token(task->resume_token);
             result.set_error_message("existing partial bytes exceed expected byte count");
+            result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
             return serialize_proto_to_buffer(result, out_result);
         }
         resume_from = actual_size;

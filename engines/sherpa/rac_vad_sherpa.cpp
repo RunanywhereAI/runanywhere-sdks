@@ -18,7 +18,6 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
-#include "rac/infrastructure/events/rac_events.h"
 
 struct rac_sherpa_vad_handle_impl {
     std::unique_ptr<runanywhere::SherpaBackend> backend;
@@ -179,9 +178,6 @@ void rac_vad_sherpa_destroy(rac_handle_t handle) {
         h->backend->cleanup();
     }
     delete h;
-
-    rac_event_track("vad.backend.destroyed", RAC_EVENT_CATEGORY_VOICE, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"sherpa"})");
 }
 
 }  // extern "C"

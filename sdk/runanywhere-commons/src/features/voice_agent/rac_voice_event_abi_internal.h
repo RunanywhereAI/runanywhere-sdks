@@ -19,19 +19,13 @@ class VoiceEvent;
 namespace rac::voice_agent {
 
 /**
- * Fan one struct event out to the proto-byte callback registered for
- * @p handle (if any). No-op when no callback is registered or when the
- * build was configured without Protobuf.
- *
- * Safe to call from any thread that the voice agent's event dispatcher
- * runs on. Internal serialization buffers are thread_local.
- */
-void dispatch_proto_event(rac_voice_agent_handle_t handle, const rac_voice_agent_event_t* event);
-
-/**
  * Fan a generated VoiceEvent message out to the proto-byte callback registered
  * for @p handle. The dispatcher fills seq/timestamp if the caller left them
- * at proto defaults. No-op when no callback is registered.
+ * at proto defaults. No-op when no callback is registered or when the build
+ * was configured without Protobuf.
+ *
+ * Safe to call from any thread that the voice agent's event dispatcher runs
+ * on. Internal serialization buffers are thread_local.
  */
 void dispatch_proto_voice_event(rac_voice_agent_handle_t handle,
                                 const runanywhere::v1::VoiceEvent& event);

@@ -473,4 +473,56 @@ class DartBridgeDevConfig {
       return null;
     }
   }
+
+  /// Whether a baked-in credential is usable: non-empty and not a scaffolding
+  /// placeholder. Delegates to the canonical commons rule
+  /// (`rac_dev_config_is_usable_credential`) so every SDK agrees instead of
+  /// each re-implementing the regex; falls back to the local check when the
+  /// symbol predates the running native binary.
+  static bool isUsableCredential(String? value) {
+    if (value == null) return false;
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<Bool Function(Pointer<Utf8>),
+          bool Function(Pointer<Utf8>)>('rac_dev_config_is_usable_credential');
+      final ptr = value.toNativeUtf8();
+      try {
+        return fn(ptr);
+      } finally {
+        calloc.free(ptr);
+      }
+    } catch (e) {
+      _logger.debug('rac_dev_config_is_usable_credential not available: $e');
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return false;
+      return !RegExp(r'your_|<your|replace_me|placeholder', caseSensitive: false)
+          .hasMatch(trimmed);
+    }
+  }
+
+  /// Whether a string is a usable absolute http(s) URL. Delegates to the
+  /// canonical commons rule (`rac_dev_config_is_usable_http_url`); falls back to
+  /// a scheme + non-empty-host check when the symbol predates the binary.
+  static bool isUsableHttpUrl(String? value) {
+    if (value == null) return false;
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<Bool Function(Pointer<Utf8>),
+          bool Function(Pointer<Utf8>)>('rac_dev_config_is_usable_http_url');
+      final ptr = value.toNativeUtf8();
+      try {
+        return fn(ptr);
+      } finally {
+        calloc.free(ptr);
+      }
+    } catch (e) {
+      _logger.debug('rac_dev_config_is_usable_http_url not available: $e');
+      final trimmed = value.trim();
+      if (!isUsableCredential(trimmed)) return false;
+      final uri = Uri.tryParse(trimmed);
+      return uri != null &&
+          (uri.scheme == 'http' || uri.scheme == 'https') &&
+          uri.host.isNotEmpty;
+    }
+  }
 }

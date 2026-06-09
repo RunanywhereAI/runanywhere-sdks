@@ -41,6 +41,7 @@ import { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   DownloadCancelRequest,
   DownloadPlanRequest,
+  DownloadFailureReason,
   DownloadPlanResult,
   DownloadStage,
   DownloadState,
@@ -511,7 +512,10 @@ async function planDownload(
     encodeProtoMessage(request, DownloadPlanRequest)
   );
   const plan = DownloadPlanResult.decode(arrayBufferToBytes(planBytes));
-  if (plan.canStart || !plan.errorMessage.includes('existing partial bytes exceed')) {
+  if (
+    plan.canStart ||
+    plan.failureReason !== DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES
+  ) {
     return plan;
   }
 

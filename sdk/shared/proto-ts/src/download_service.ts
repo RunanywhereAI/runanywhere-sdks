@@ -143,6 +143,73 @@ export function downloadStateToJSON(object: DownloadState): string {
 }
 
 /**
+ * Structured reason for a download plan/start/resume rejection. Lets every SDK
+ * branch on a stable enum instead of substring-matching the human-readable
+ * error_message (the prior approach, which silently broke on any reword).
+ */
+export enum DownloadFailureReason {
+  DOWNLOAD_FAILURE_REASON_UNSPECIFIED = 0,
+  /** DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES - On-disk partial download is larger than the expected total byte count. */
+  DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES = 1,
+  /** DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED - Requested resume offset is past the expected total size. */
+  DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED = 2,
+  /** DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET - On-disk partial is smaller than the requested resume offset. */
+  DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET = 3,
+  /** DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME - The partial file changed (size/mtime) since the resume token was issued. */
+  DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME = 4,
+  /** DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE - Not enough free space to complete the download. */
+  DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function downloadFailureReasonFromJSON(object: any): DownloadFailureReason {
+  switch (object) {
+    case 0:
+    case "DOWNLOAD_FAILURE_REASON_UNSPECIFIED":
+      return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED;
+    case 1:
+    case "DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES":
+      return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES;
+    case 2:
+    case "DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED":
+      return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED;
+    case 3:
+    case "DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET":
+      return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET;
+    case 4:
+    case "DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME":
+      return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME;
+    case 5:
+    case "DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE":
+      return DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return DownloadFailureReason.UNRECOGNIZED;
+  }
+}
+
+export function downloadFailureReasonToJSON(object: DownloadFailureReason): string {
+  switch (object) {
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED:
+      return "DOWNLOAD_FAILURE_REASON_UNSPECIFIED";
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES:
+      return "DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES";
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED:
+      return "DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED";
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET:
+      return "DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET";
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME:
+      return "DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME";
+    case DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE:
+      return "DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE";
+    case DownloadFailureReason.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
  * HTTP transport download status — numeric values MUST match
  * rac_http_download_status_t (RAC_HTTP_DL_*) in
  * sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
@@ -324,6 +391,8 @@ export interface DownloadPlanResult {
   storageNamespace: string;
   resumeToken: string;
   requiredFreeBytesAfterDownload: number;
+  /** structured companion to error_message */
+  failureReason: DownloadFailureReason;
 }
 
 export interface DownloadStartRequest {
@@ -341,6 +410,8 @@ export interface DownloadStartResult {
   initialProgress?: DownloadProgress | undefined;
   errorMessage: string;
   resumeToken: string;
+  /** structured companion to error_message */
+  failureReason: DownloadFailureReason;
 }
 
 export interface DownloadCancelRequest {
@@ -375,6 +446,8 @@ export interface DownloadResumeResult {
   initialProgress?: DownloadProgress | undefined;
   errorMessage: string;
   resumeToken: string;
+  /** structured companion to error_message */
+  failureReason: DownloadFailureReason;
 }
 
 function createBaseDownloadSubscribeRequest(): DownloadSubscribeRequest {
@@ -1354,6 +1427,7 @@ function createBaseDownloadPlanResult(): DownloadPlanResult {
     storageNamespace: "",
     resumeToken: "",
     requiredFreeBytesAfterDownload: 0,
+    failureReason: 0,
   };
 }
 
@@ -1394,6 +1468,9 @@ export const DownloadPlanResult: MessageFns<DownloadPlanResult> = {
     }
     if (message.requiredFreeBytesAfterDownload !== 0) {
       writer.uint32(96).int64(message.requiredFreeBytesAfterDownload);
+    }
+    if (message.failureReason !== 0) {
+      writer.uint32(104).int32(message.failureReason);
     }
     return writer;
   },
@@ -1501,6 +1578,14 @@ export const DownloadPlanResult: MessageFns<DownloadPlanResult> = {
           message.requiredFreeBytesAfterDownload = longToNumber(reader.int64());
           continue;
         }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.failureReason = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1566,6 +1651,11 @@ export const DownloadPlanResult: MessageFns<DownloadPlanResult> = {
         : isSet(object.required_free_bytes_after_download)
         ? globalThis.Number(object.required_free_bytes_after_download)
         : 0,
+      failureReason: isSet(object.failureReason)
+        ? downloadFailureReasonFromJSON(object.failureReason)
+        : isSet(object.failure_reason)
+        ? downloadFailureReasonFromJSON(object.failure_reason)
+        : 0,
     };
   },
 
@@ -1607,6 +1697,9 @@ export const DownloadPlanResult: MessageFns<DownloadPlanResult> = {
     if (message.requiredFreeBytesAfterDownload !== 0) {
       obj.requiredFreeBytesAfterDownload = Math.round(message.requiredFreeBytesAfterDownload);
     }
+    if (message.failureReason !== 0) {
+      obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+    }
     return obj;
   },
 
@@ -1627,6 +1720,7 @@ export const DownloadPlanResult: MessageFns<DownloadPlanResult> = {
     message.storageNamespace = object.storageNamespace ?? "";
     message.resumeToken = object.resumeToken ?? "";
     message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
+    message.failureReason = object.failureReason ?? 0;
     return message;
   },
 };
@@ -1770,7 +1864,15 @@ export const DownloadStartRequest: MessageFns<DownloadStartRequest> = {
 };
 
 function createBaseDownloadStartResult(): DownloadStartResult {
-  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "", resumeToken: "" };
+  return {
+    accepted: false,
+    taskId: "",
+    modelId: "",
+    initialProgress: undefined,
+    errorMessage: "",
+    resumeToken: "",
+    failureReason: 0,
+  };
 }
 
 export const DownloadStartResult: MessageFns<DownloadStartResult> = {
@@ -1792,6 +1894,9 @@ export const DownloadStartResult: MessageFns<DownloadStartResult> = {
     }
     if (message.resumeToken !== "") {
       writer.uint32(50).string(message.resumeToken);
+    }
+    if (message.failureReason !== 0) {
+      writer.uint32(56).int32(message.failureReason);
     }
     return writer;
   },
@@ -1851,6 +1956,14 @@ export const DownloadStartResult: MessageFns<DownloadStartResult> = {
           message.resumeToken = reader.string();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.failureReason = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1888,6 +2001,11 @@ export const DownloadStartResult: MessageFns<DownloadStartResult> = {
         : isSet(object.resume_token)
         ? globalThis.String(object.resume_token)
         : "",
+      failureReason: isSet(object.failureReason)
+        ? downloadFailureReasonFromJSON(object.failureReason)
+        : isSet(object.failure_reason)
+        ? downloadFailureReasonFromJSON(object.failure_reason)
+        : 0,
     };
   },
 
@@ -1911,6 +2029,9 @@ export const DownloadStartResult: MessageFns<DownloadStartResult> = {
     if (message.resumeToken !== "") {
       obj.resumeToken = message.resumeToken;
     }
+    if (message.failureReason !== 0) {
+      obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+    }
     return obj;
   },
 
@@ -1927,6 +2048,7 @@ export const DownloadStartResult: MessageFns<DownloadStartResult> = {
       : undefined;
     message.errorMessage = object.errorMessage ?? "";
     message.resumeToken = object.resumeToken ?? "";
+    message.failureReason = object.failureReason ?? 0;
     return message;
   },
 };
@@ -2389,7 +2511,15 @@ export const DownloadResumeRequest: MessageFns<DownloadResumeRequest> = {
 };
 
 function createBaseDownloadResumeResult(): DownloadResumeResult {
-  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "", resumeToken: "" };
+  return {
+    accepted: false,
+    taskId: "",
+    modelId: "",
+    initialProgress: undefined,
+    errorMessage: "",
+    resumeToken: "",
+    failureReason: 0,
+  };
 }
 
 export const DownloadResumeResult: MessageFns<DownloadResumeResult> = {
@@ -2411,6 +2541,9 @@ export const DownloadResumeResult: MessageFns<DownloadResumeResult> = {
     }
     if (message.resumeToken !== "") {
       writer.uint32(50).string(message.resumeToken);
+    }
+    if (message.failureReason !== 0) {
+      writer.uint32(56).int32(message.failureReason);
     }
     return writer;
   },
@@ -2470,6 +2603,14 @@ export const DownloadResumeResult: MessageFns<DownloadResumeResult> = {
           message.resumeToken = reader.string();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.failureReason = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2507,6 +2648,11 @@ export const DownloadResumeResult: MessageFns<DownloadResumeResult> = {
         : isSet(object.resume_token)
         ? globalThis.String(object.resume_token)
         : "",
+      failureReason: isSet(object.failureReason)
+        ? downloadFailureReasonFromJSON(object.failureReason)
+        : isSet(object.failure_reason)
+        ? downloadFailureReasonFromJSON(object.failure_reason)
+        : 0,
     };
   },
 
@@ -2530,6 +2676,9 @@ export const DownloadResumeResult: MessageFns<DownloadResumeResult> = {
     if (message.resumeToken !== "") {
       obj.resumeToken = message.resumeToken;
     }
+    if (message.failureReason !== 0) {
+      obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+    }
     return obj;
   },
 
@@ -2546,6 +2695,7 @@ export const DownloadResumeResult: MessageFns<DownloadResumeResult> = {
       : undefined;
     message.errorMessage = object.errorMessage ?? "";
     message.resumeToken = object.resumeToken ?? "";
+    message.failureReason = object.failureReason ?? 0;
     return message;
   },
 };

@@ -62,9 +62,7 @@ rac_result_t create_model_vad_service(const char* model_path, rac_vad_service_t*
          .select_ops = vad_ops,
          .model_create_id = model_ref.path.c_str(),
          .model_id_for_service = model_path,
-         .config_json = nullptr,
-         .created_event_name = "vad.backend.created",
-         .created_event_category = RAC_EVENT_CATEGORY_VOICE},
+         .config_json = nullptr},
         out_service);
 }
 

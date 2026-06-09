@@ -140,35 +140,20 @@ extension CppBridge {
             return true
         }
 
-        static func looksLikePlaceholder(_ value: String?) -> Bool {
-            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return true
-            }
-            return value.range(
-                of: "YOUR_|<your|REPLACE_ME|PLACEHOLDER",
-                options: [.regularExpression, .caseInsensitive]
-            ) != nil
-        }
-
+        /// Whether a baked-in credential is usable: non-empty and not a
+        /// scaffolding placeholder. Delegates to the canonical commons rule
+        /// (`rac_dev_config_is_usable_credential`) so every SDK agrees instead
+        /// of each re-implementing the placeholder regex.
         static func isUsableCredential(_ value: String?) -> Bool {
-            !looksLikePlaceholder(value)
+            guard let value else { return false }
+            return value.withCString { rac_dev_config_is_usable_credential($0) }
         }
 
+        /// Whether a string is a usable absolute http(s) URL. Delegates to the
+        /// canonical commons rule (`rac_dev_config_is_usable_http_url`).
         static func isUsableHTTPURL(_ value: String?) -> Bool {
             guard let value else { return false }
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !looksLikePlaceholder(trimmed),
-                  let url = URL(string: trimmed),
-                  let scheme = url.scheme?.lowercased(),
-                  ["http", "https"].contains(scheme),
-                  let host = url.host,
-                  !host.isEmpty,
-                  host.rangeOfCharacter(from: .whitespacesAndNewlines) == nil,
-                  !host.contains("<"),
-                  !host.contains(">") else {
-                return false
-            }
-            return true
+            return value.withCString { rac_dev_config_is_usable_http_url($0) }
         }
     }
 }

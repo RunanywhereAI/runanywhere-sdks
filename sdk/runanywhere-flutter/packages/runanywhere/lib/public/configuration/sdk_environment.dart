@@ -99,20 +99,18 @@ class SupabaseConfig {
         final supabaseUrl = DartBridgeDevConfig.supabaseURL;
         final supabaseKey = DartBridgeDevConfig.supabaseKey;
 
+        // Delegate the placeholder + URL-shape checks to the canonical commons
+        // rule (via DartBridge) so every SDK agrees instead of each carrying its
+        // own regex.
         if (supabaseUrl == null ||
-            supabaseUrl.isEmpty ||
             supabaseKey == null ||
-            supabaseKey.isEmpty ||
-            _looksLikePlaceholder(supabaseUrl) ||
-            _looksLikePlaceholder(supabaseKey)) {
+            !DartBridgeDevConfig.isUsableHttpUrl(supabaseUrl) ||
+            !DartBridgeDevConfig.isUsableCredential(supabaseKey)) {
           return null;
         }
 
         final uri = Uri.tryParse(supabaseUrl);
-        if (uri == null ||
-            !uri.hasScheme ||
-            (uri.scheme != 'http' && uri.scheme != 'https') ||
-            uri.host.isEmpty) {
+        if (uri == null) {
           return null;
         }
 
@@ -120,11 +118,6 @@ class SupabaseConfig {
       default:
         return null;
     }
-  }
-
-  static bool _looksLikePlaceholder(String value) {
-    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
-        .hasMatch(value);
   }
 }
 

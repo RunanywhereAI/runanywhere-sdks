@@ -109,7 +109,6 @@
 // =============================================================================
 
 // Event system
-#include "rac_events.h"
 #include "rac_sdk_event_stream.h"
 
 // Download management

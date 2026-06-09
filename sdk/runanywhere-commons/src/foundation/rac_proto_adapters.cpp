@@ -935,102 +935,28 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
 // ERRORS
 // ===========================================================================
 
-::runanywhere::v1::ErrorCode rac_result_to_proto_error_code(rac_result_t code) {
-    if (code == RAC_SUCCESS)
-        return ::runanywhere::v1::ERROR_CODE_UNSPECIFIED;
-    int32_t magnitude = (code < 0) ? -code : code;
-    // The proto enum mirrors abs() of the C codes for the well-known ranges.
-    // Use a switch on the magnitude to avoid runtime errors on out-of-bounds
-    // values; unknown codes fall through to ERROR_CODE_UNKNOWN.
-    switch (magnitude) {
-        case 100:
-            return ::runanywhere::v1::ERROR_CODE_NOT_INITIALIZED;
-        case 101:
-            return ::runanywhere::v1::ERROR_CODE_ALREADY_INITIALIZED;
-        case 102:
-            return ::runanywhere::v1::ERROR_CODE_INITIALIZATION_FAILED;
-        case 103:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_CONFIGURATION;
-        case 104:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_API_KEY;
-        case 105:
-            return ::runanywhere::v1::ERROR_CODE_ENVIRONMENT_MISMATCH;
-        case 106:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_PARAMETER;
-        case 110:
-            return ::runanywhere::v1::ERROR_CODE_MODEL_NOT_FOUND;
-        case 111:
-            return ::runanywhere::v1::ERROR_CODE_MODEL_LOAD_FAILED;
-        case 112:
-            return ::runanywhere::v1::ERROR_CODE_MODEL_VALIDATION_FAILED;
-        case 113:
-            return ::runanywhere::v1::ERROR_CODE_MODEL_INCOMPATIBLE;
-        case 114:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_MODEL_FORMAT;
-        case 115:
-            return ::runanywhere::v1::ERROR_CODE_MODEL_STORAGE_CORRUPTED;
-        case 116:
-            return ::runanywhere::v1::ERROR_CODE_MODEL_NOT_LOADED;
-        case 130:
-            return ::runanywhere::v1::ERROR_CODE_GENERATION_FAILED;
-        case 131:
-            return ::runanywhere::v1::ERROR_CODE_GENERATION_TIMEOUT;
-        case 132:
-            return ::runanywhere::v1::ERROR_CODE_CONTEXT_TOO_LONG;
-        case 133:
-            return ::runanywhere::v1::ERROR_CODE_TOKEN_LIMIT_EXCEEDED;
-        case 150:
-            return ::runanywhere::v1::ERROR_CODE_NETWORK_UNAVAILABLE;
-        case 151:
-            return ::runanywhere::v1::ERROR_CODE_NETWORK_ERROR;
-        case 153:
-            return ::runanywhere::v1::ERROR_CODE_DOWNLOAD_FAILED;
-        case 155:
-            return ::runanywhere::v1::ERROR_CODE_TIMEOUT;
-        case 180:
-            return ::runanywhere::v1::ERROR_CODE_INSUFFICIENT_STORAGE;
-        case 183:
-            return ::runanywhere::v1::ERROR_CODE_FILE_NOT_FOUND;
-        case 220:
-            return ::runanywhere::v1::ERROR_CODE_HARDWARE_UNSUPPORTED;
-        case 221:
-            return ::runanywhere::v1::ERROR_CODE_INSUFFICIENT_MEMORY;
-        case 230:
-            return ::runanywhere::v1::ERROR_CODE_COMPONENT_NOT_READY;
-        case 231:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_STATE;
-        case 232:
-            return ::runanywhere::v1::ERROR_CODE_SERVICE_NOT_AVAILABLE;
-        case 250:
-            return ::runanywhere::v1::ERROR_CODE_VALIDATION_FAILED;
-        case 251:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_INPUT;
-        case 259:
-            return ::runanywhere::v1::ERROR_CODE_INVALID_ARGUMENT;
-        case 260:
-            return ::runanywhere::v1::ERROR_CODE_NULL_POINTER;
-        case 320:
-            return ::runanywhere::v1::ERROR_CODE_AUTHENTICATION_FAILED;
-        case 380:
-            return ::runanywhere::v1::ERROR_CODE_CANCELLED;
-        case 800:
-            return ::runanywhere::v1::ERROR_CODE_NOT_IMPLEMENTED;
-        case 801:
-            return ::runanywhere::v1::ERROR_CODE_FEATURE_NOT_AVAILABLE;
-        case 804:
-            return ::runanywhere::v1::ERROR_CODE_UNKNOWN;
-        case 805:
-            return ::runanywhere::v1::ERROR_CODE_INTERNAL;
-        default:
-            return ::runanywhere::v1::ERROR_CODE_UNKNOWN;
-    }
-}
-
-rac_result_t rac_proto_error_code_to_result(::runanywhere::v1::ErrorCode code) {
-    if (code == ::runanywhere::v1::ERROR_CODE_UNSPECIFIED)
-        return RAC_SUCCESS;
-    int32_t magnitude = static_cast<int32_t>(code);
-    return -magnitude;
+::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code) {
+    // Non-negative codes (success / invalid) carry no error category.
+    if (code >= 0)
+        return ::runanywhere::v1::ERROR_CATEGORY_UNSPECIFIED;
+    if (code <= -150 && code >= -179)
+        return ::runanywhere::v1::ERROR_CATEGORY_NETWORK;
+    if (code <= -250 && code >= -279)
+        return ::runanywhere::v1::ERROR_CATEGORY_VALIDATION;
+    if (code <= -110 && code >= -129)
+        return ::runanywhere::v1::ERROR_CATEGORY_MODEL;
+    if ((code <= -180 && code >= -219) || (code <= -280 && code >= -299))
+        return ::runanywhere::v1::ERROR_CATEGORY_IO;
+    if (code <= -320 && code >= -329)
+        return ::runanywhere::v1::ERROR_CATEGORY_AUTH;
+    if (code <= -100 && code >= -109)
+        return ::runanywhere::v1::ERROR_CATEGORY_CONFIGURATION;
+    if ((code <= -230 && code >= -249) || (code <= -300 && code >= -319))
+        return ::runanywhere::v1::ERROR_CATEGORY_COMPONENT;
+    // Any other negative code is an unmapped error -> INTERNAL (canonical
+    // fallback; rac_error_proto.cpp previously returned UNSPECIFIED here, the
+    // drift this consolidation fixes).
+    return ::runanywhere::v1::ERROR_CATEGORY_INTERNAL;
 }
 
 ::runanywhere::v1::ErrorCategory rac_category_to_proto(rac_error_category_t category) {

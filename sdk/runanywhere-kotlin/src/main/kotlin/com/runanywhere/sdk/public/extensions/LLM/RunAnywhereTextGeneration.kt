@@ -115,6 +115,7 @@ suspend fun RunAnywhere.aggregateStream(
     val startTimeMs = System.currentTimeMillis()
     var finishReason = ""
     var terminalError = ""
+    var finalEvent: RALLMStreamEvent? = null
 
     events.collect { event ->
         if (event.token.isNotEmpty()) {
@@ -124,6 +125,7 @@ suspend fun RunAnywhere.aggregateStream(
             onToken?.invoke(fullResponse)
         }
         if (event.is_final) {
+            finalEvent = event
             finishReason = event.finish_reason
             terminalError = event.error_message
         }
@@ -142,16 +144,21 @@ suspend fun RunAnywhere.aggregateStream(
         InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey
     }
 
+    // Prefer the backend's terminal aggregate result (text + metrics) when the
+    // final event carries one, matching the Web SDK; otherwise fall back to the
+    // locally concatenated text / wall-clock metrics.
+    val final = finalEvent?.result
     return RALLMGenerationResult(
-        text = fullResponse,
-        input_tokens = maxOf(1, prompt.length / 4),
-        tokens_generated = tokenCount,
-        response_tokens = tokenCount,
+        text = final?.text ?: fullResponse,
+        input_tokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4),
+        tokens_generated = final?.completion_tokens ?: tokenCount,
+        response_tokens = final?.completion_tokens ?: tokenCount,
         model_used = modelID,
-        generation_time_ms = totalLatencyMs,
+        generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
         framework = framework,
-        tokens_per_second = if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
-        ttft_ms = ttftMs,
+        tokens_per_second = final?.tokens_per_second?.toDouble()
+            ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
+        ttft_ms = final?.time_to_first_token_ms?.toDouble() ?: ttftMs,
         finish_reason = finishReason,
         error_message = terminalError.ifEmpty { null },
     )

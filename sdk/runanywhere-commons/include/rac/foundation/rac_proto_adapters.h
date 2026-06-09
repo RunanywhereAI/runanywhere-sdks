@@ -178,19 +178,18 @@ bool rac_model_storage_metrics_from_proto(const ::runanywhere::v1::ModelStorageM
 // ERRORS
 // ===========================================================================
 
-// Convert a single rac_result_t error code to the proto ErrorCode enum.
-// Returns ERROR_CODE_UNSPECIFIED for unknown / unmapped codes.
-::runanywhere::v1::ErrorCode rac_result_to_proto_error_code(rac_result_t code);
-
-// Inverse: convert proto ErrorCode (positive) back to the canonical signed
-// rac_result_t. Returns 0 (RAC_SUCCESS) for ERROR_CODE_UNSPECIFIED.
-rac_result_t rac_proto_error_code_to_result(::runanywhere::v1::ErrorCode code);
-
 // Convert C category enum to proto category. Folds modality categories
 // (STT/TTS/LLM/...) into ERROR_CATEGORY_COMPONENT per the canonicalized
 // 9-bucket scheme; transport / lifecycle map to their own bucket.
 ::runanywhere::v1::ErrorCategory rac_category_to_proto(rac_error_category_t category);
 rac_error_category_t rac_proto_to_category(::runanywhere::v1::ErrorCategory category);
+
+// Map a rac_result_t error code directly to the proto ErrorCategory bucket
+// (canonical -100..-329 ranges). Non-negative codes -> UNSPECIFIED; any other
+// negative code -> INTERNAL. Single source of truth for the duplicated mappers
+// that previously lived (and drifted on out-of-range codes) in
+// rac_error_proto.cpp and event_publisher.cpp.
+::runanywhere::v1::ErrorCategory rac_result_to_proto_category(rac_result_t code);
 
 }  // namespace rac::foundation
 

@@ -19,7 +19,6 @@
 #include <vector>
 
 #include "rac/core/rac_error.h"
-#include "rac/infrastructure/events/rac_events.h"
 
 struct rac_sherpa_tts_handle_impl {
     std::unique_ptr<runanywhere::SherpaBackend> backend;
@@ -131,9 +130,6 @@ rac_result_t rac_tts_sherpa_synthesize(rac_handle_t handle, const char* text,
     out_result->sample_rate = result.sample_rate;
     out_result->duration_ms = result.duration_ms;
     out_result->processing_time_ms = 0;
-
-    rac_event_track("tts.synthesis.completed", RAC_EVENT_CATEGORY_TTS, RAC_EVENT_DESTINATION_ALL,
-                    nullptr);
 
     return RAC_SUCCESS;
 }
@@ -264,9 +260,6 @@ void rac_tts_sherpa_destroy(rac_handle_t handle) {
         h->backend->cleanup();
     }
     delete h;
-
-    rac_event_track("tts.backend.destroyed", RAC_EVENT_CATEGORY_TTS, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"sherpa"})");
 }
 
 }  // extern "C"

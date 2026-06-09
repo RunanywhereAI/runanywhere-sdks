@@ -333,7 +333,7 @@ private extension RunAnywhere {
     static func planDownload(_ request: RADownloadPlanRequest) async -> RADownloadPlanResult {
         var plan = await CppBridge.Download.shared.plan(request)
         guard !plan.canStart,
-              plan.errorMessage.contains("existing partial bytes exceed") else {
+              plan.failureReason == .oversizePartialBytes else {
             return plan
         }
 

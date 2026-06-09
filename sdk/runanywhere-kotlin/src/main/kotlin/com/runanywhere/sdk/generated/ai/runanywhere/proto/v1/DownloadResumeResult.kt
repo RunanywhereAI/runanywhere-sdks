@@ -77,6 +77,18 @@ public class DownloadResumeResult(
     schemaIndex = 5,
   )
   public val resume_token: String = "",
+  /**
+   * structured companion to error_message
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.DownloadFailureReason#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "failureReason",
+    schemaIndex = 6,
+  )
+  public val failure_reason:
+      DownloadFailureReason = DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadResumeResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -95,6 +107,7 @@ public class DownloadResumeResult(
     if (initial_progress != other.initial_progress) return false
     if (error_message != other.error_message) return false
     if (resume_token != other.resume_token) return false
+    if (failure_reason != other.failure_reason) return false
     return true
   }
 
@@ -108,6 +121,7 @@ public class DownloadResumeResult(
       result = result * 37 + (initial_progress?.hashCode() ?: 0)
       result = result * 37 + error_message.hashCode()
       result = result * 37 + resume_token.hashCode()
+      result = result * 37 + failure_reason.hashCode()
       super.hashCode = result
     }
     return result
@@ -121,6 +135,7 @@ public class DownloadResumeResult(
     if (initial_progress != null) result += """initial_progress=$initial_progress"""
     result += """error_message=${sanitize(error_message)}"""
     result += """resume_token=${sanitize(resume_token)}"""
+    result += """failure_reason=$failure_reason"""
     return result.joinToString(prefix = "DownloadResumeResult{", separator = ", ", postfix = "}")
   }
 
@@ -131,8 +146,9 @@ public class DownloadResumeResult(
     initial_progress: DownloadProgress? = this.initial_progress,
     error_message: String = this.error_message,
     resume_token: String = this.resume_token,
+    failure_reason: DownloadFailureReason = this.failure_reason,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadResumeResult = DownloadResumeResult(accepted, task_id, model_id, initial_progress, error_message, resume_token, unknownFields)
+  ): DownloadResumeResult = DownloadResumeResult(accepted, task_id, model_id, initial_progress, error_message, resume_token, failure_reason, unknownFields)
 
   public companion object {
     @JvmField
@@ -165,6 +181,9 @@ public class DownloadResumeResult(
         if (value.resume_token != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.resume_token)
         }
+        if (value.failure_reason != ai.runanywhere.proto.v1.DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED) {
+          size += DownloadFailureReason.ADAPTER.encodedSizeWithTag(7, value.failure_reason)
+        }
         return size
       }
 
@@ -187,11 +206,17 @@ public class DownloadResumeResult(
         if (value.resume_token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 6, value.resume_token)
         }
+        if (value.failure_reason != ai.runanywhere.proto.v1.DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED) {
+          DownloadFailureReason.ADAPTER.encodeWithTag(writer, 7, value.failure_reason)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadResumeResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.failure_reason != ai.runanywhere.proto.v1.DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED) {
+          DownloadFailureReason.ADAPTER.encodeWithTag(writer, 7, value.failure_reason)
+        }
         if (value.resume_token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 6, value.resume_token)
         }
@@ -219,6 +244,7 @@ public class DownloadResumeResult(
         var initial_progress: DownloadProgress? = null
         var error_message: String = ""
         var resume_token: String = ""
+        var failure_reason: DownloadFailureReason = DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> accepted = ProtoAdapter.BOOL.decode(reader)
@@ -227,6 +253,11 @@ public class DownloadResumeResult(
             4 -> initial_progress = DownloadProgress.ADAPTER.decode(reader)
             5 -> error_message = ProtoAdapter.STRING.decode(reader)
             6 -> resume_token = ProtoAdapter.STRING.decode(reader)
+            7 -> try {
+              failure_reason = DownloadFailureReason.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -237,6 +268,7 @@ public class DownloadResumeResult(
           initial_progress = initial_progress,
           error_message = error_message,
           resume_token = resume_token,
+          failure_reason = failure_reason,
           unknownFields = unknownFields
         )
       }

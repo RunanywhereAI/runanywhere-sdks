@@ -26,7 +26,6 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/events/rac_events.h"
 
 // =============================================================================
 // INTERNAL HANDLE STRUCTURE
@@ -326,10 +325,6 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
             ? (float)result.tokens_generated / (result.inference_time_ms / 1000.0f)
             : 0.0f;
 
-    // Publish event
-    rac_event_track("llm.generation.completed", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
-                    nullptr);
-
     return RAC_SUCCESS;
 }
 
@@ -472,120 +467,6 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     return RAC_ERROR_INFERENCE_FAILED;
 }
 
-rac_result_t
-rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
-                                             const rac_llm_options_t* options,
-                                             rac_llm_llamacpp_stream_callback_fn callback,
-                                             void* user_data, rac_benchmark_timing_t* timing_out) {
-    if (handle == nullptr || prompt == nullptr || callback == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
-    if (!h->text_gen) {
-        return RAC_ERROR_INVALID_HANDLE;
-    }
-
-    runanywhere::TextGenerationRequest request;
-    request.prompt = prompt;
-    if (options != nullptr) {
-        request.max_tokens = options->max_tokens;
-        request.temperature = options->temperature;
-        request.top_p = options->top_p;
-        if (options->system_prompt != nullptr) {
-            request.system_prompt = options->system_prompt;
-        }
-        if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
-            for (int32_t i = 0; i < options->num_stop_sequences; i++) {
-                if (options->stop_sequences[i]) {
-                    request.stop_sequences.push_back(options->stop_sequences[i]);
-                }
-            }
-        }
-        apply_extended_sampling_options(options, &request);
-    }
-
-    // Stream using C++ class with timing (see generate for rationale on
-    // try-catch). Caller stop-sequence handling mirrors
-    // rac_llm_llamacpp_generate_stream above.
-    const std::vector<std::string> user_stops = collect_user_stop_sequences(options);
-    const size_t user_stop_max_len = max_stop_length(user_stops);
-    std::string stop_window;
-    if (user_stop_max_len > 0) {
-        stop_window.reserve(user_stop_max_len * 2);
-    }
-    bool stop_hit = false;
-    // See is_final-terminal-marker rationale on rac_llm_llamacpp_generate_stream
-    // above; the timed variant has the exact same streaming contract.
-    bool terminal_emitted = false;
-
-    int prompt_tokens = 0;
-    bool success = false;
-    try {
-        success = h->text_gen->generate_stream(
-            request,
-            [&](const std::string& token) -> bool {
-                if (user_stops.empty()) {
-                    return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
-                }
-                stop_window.append(token);
-                const size_t found_pos = find_first_stop_sequence(stop_window, user_stops);
-                if (found_pos != std::string::npos) {
-                    if (found_pos > 0) {
-                        const std::string prefix = stop_window.substr(0, found_pos);
-                        callback(prefix.c_str(), RAC_FALSE, user_data);
-                    }
-                    stop_window.clear();
-                    stop_hit = true;
-                    return false;
-                }
-                if (stop_window.size() > user_stop_max_len) {
-                    const size_t safe_len = stop_window.size() - user_stop_max_len;
-                    const std::string safe_chunk = stop_window.substr(0, safe_len);
-                    stop_window.erase(0, safe_len);
-                    return callback(safe_chunk.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
-                }
-                return true;
-            },
-            &prompt_tokens, timing_out);
-    } catch (const std::exception& e) {
-        rac_error_set_details(e.what());
-        if (!terminal_emitted) {
-            callback("", RAC_TRUE, user_data);
-            terminal_emitted = true;
-        }
-        return RAC_ERROR_INFERENCE_FAILED;
-    } catch (...) {
-        rac_error_set_details("Unknown C++ exception during timed streaming LLM generation");
-        if (!terminal_emitted) {
-            callback("", RAC_TRUE, user_data);
-            terminal_emitted = true;
-        }
-        return RAC_ERROR_INFERENCE_FAILED;
-    }
-
-    // Capture prompt token count in timing struct
-    if (timing_out != nullptr && prompt_tokens > 0) {
-        timing_out->prompt_tokens = static_cast<int32_t>(prompt_tokens);
-    }
-
-    if (stop_hit || success) {
-        if (!stop_hit && !stop_window.empty()) {
-            callback(stop_window.c_str(), RAC_FALSE, user_data);
-            stop_window.clear();
-        }
-        callback("", RAC_TRUE, user_data);  // Final token
-        terminal_emitted = true;
-        return RAC_SUCCESS;
-    }
-
-    if (!terminal_emitted) {
-        callback("", RAC_TRUE, user_data);
-        terminal_emitted = true;
-    }
-    return RAC_ERROR_INFERENCE_FAILED;
-}
-
 void rac_llm_llamacpp_cancel(rac_handle_t handle) {
     // Cancel is intentionally lock-free: LlamaCppTextGeneration::cancel() only
     // stores an atomic flag (cancel_requested_).
@@ -605,9 +486,6 @@ void rac_llm_llamacpp_cancel(rac_handle_t handle) {
     if (h->text_gen) {
         h->text_gen->cancel();
     }
-
-    rac_event_track("llm.generation.cancelled", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
-                    nullptr);
 }
 
 rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_json) {
@@ -845,9 +723,6 @@ void rac_llm_llamacpp_destroy(rac_handle_t handle) {
         h->backend->cleanup();
     }
     delete h;
-
-    rac_event_track("llm.backend.destroyed", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"llamacpp"})");
 }
 
 }  // extern "C"

@@ -79,6 +79,35 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, T* out) {
            out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
+// Load mock STT/LLM/TTS into a standalone voice agent through the proto compose
+// path. Replaces the retired legacy `rac_voice_agent_load_{stt,llm,tts}` setup
+// helpers: selecting a modality sets its `*_model_path` so `config_from_proto`
+// loads it, and `initialize_proto` runs the full VAD+STT+LLM+TTS init sequence.
+void init_mock_voice_agent(rac_voice_agent_handle_t agent, bool stt, bool llm, bool tts) {
+    runanywhere::v1::VoiceAgentComposeConfig cfg;
+    if (stt) {
+        cfg.set_stt_model_path("mock-stt");
+        cfg.set_stt_model_id("mock-stt");
+        cfg.set_stt_model_name("Mock STT");
+    }
+    if (llm) {
+        cfg.set_llm_model_path("mock-llm");
+        cfg.set_llm_model_id("mock-llm");
+        cfg.set_llm_model_name("Mock LLM");
+    }
+    if (tts) {
+        cfg.set_tts_voice_path("mock-tts");
+        cfg.set_tts_voice_id("mock-voice");
+        cfg.set_tts_voice_name("Mock Voice");
+    }
+    std::vector<uint8_t> bytes;
+    serialize(cfg, &bytes);
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_voice_agent_initialize_proto(agent, bytes.data(), bytes.size(), &out);
+    rac_proto_buffer_free(&out);
+}
+
 int test_stt_generated_service_contract() {
     const google::protobuf::FileDescriptor* file =
         runanywhere::v1::STTTranscriptionRequest::descriptor()->file();
@@ -719,13 +748,7 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     VoiceCapture capture;
     CHECK(rac_voice_agent_set_proto_callback(agent, voice_callback, &capture) == RAC_SUCCESS,
           "voice-agent proto callback registers");
-    CHECK(rac_voice_agent_load_stt_model(agent, "mock-stt", "mock-stt", "Mock STT") == RAC_SUCCESS,
-          "voice-agent STT loads");
-    CHECK(rac_voice_agent_load_llm_model(agent, "mock-llm", "mock-llm", "Mock LLM") == RAC_SUCCESS,
-          "voice-agent LLM loads");
-    CHECK(rac_voice_agent_load_tts_voice(agent, "mock-tts", "mock-voice", "Mock Voice") ==
-              RAC_SUCCESS,
-          "voice-agent TTS loads");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/true, /*tts=*/true);
     CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
           "voice-agent initializes with loaded models");
 
@@ -762,13 +785,7 @@ int test_voice_agent_proto_sequence_and_component_failure() {
 int test_voice_agent_d7_process_turn_proto_full_flow() {
     rac_voice_agent_handle_t agent = nullptr;
     CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "D-7 voice agent creates");
-    CHECK(rac_voice_agent_load_stt_model(agent, "mock-stt", "mock-stt", "Mock STT") == RAC_SUCCESS,
-          "D-7 STT loads");
-    CHECK(rac_voice_agent_load_llm_model(agent, "mock-llm", "mock-llm", "Mock LLM") == RAC_SUCCESS,
-          "D-7 LLM loads");
-    CHECK(rac_voice_agent_load_tts_voice(agent, "mock-tts", "mock-voice", "Mock Voice") ==
-              RAC_SUCCESS,
-          "D-7 TTS loads");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/true, /*tts=*/true);
     CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
           "D-7 voice agent initializes");
 
@@ -864,8 +881,7 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
 int test_voice_agent_d7_transcribe_proto() {
     rac_voice_agent_handle_t agent = nullptr;
     CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "D-7 transcribe agent creates");
-    CHECK(rac_voice_agent_load_stt_model(agent, "mock-stt", "mock-stt", "Mock STT") == RAC_SUCCESS,
-          "D-7 transcribe STT loads");
+    init_mock_voice_agent(agent, /*stt=*/true, /*llm=*/false, /*tts=*/false);
 
     runanywhere::v1::VoiceAgentTranscribeProtoRequest request;
     const int16_t audio[] = {0, 1, 2, 3};
@@ -892,9 +908,7 @@ int test_voice_agent_d7_transcribe_proto() {
 int test_voice_agent_d7_synthesize_speech_proto() {
     rac_voice_agent_handle_t agent = nullptr;
     CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS, "D-7 synthesize agent creates");
-    CHECK(rac_voice_agent_load_tts_voice(agent, "mock-tts", "mock-voice", "Mock Voice") ==
-              RAC_SUCCESS,
-          "D-7 synthesize TTS loads");
+    init_mock_voice_agent(agent, /*stt=*/false, /*llm=*/false, /*tts=*/true);
 
     runanywhere::v1::VoiceAgentSynthesizeSpeechProtoRequest request;
     request.set_text("hello world");

@@ -19,7 +19,6 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
@@ -130,8 +129,6 @@ struct PluginServiceCreateSpec {
     const char* model_create_id;
     const char* model_id_for_service;
     const char* config_json;
-    const char* created_event_name;
-    rac_event_category_t created_event_category;
 };
 
 template <typename ServiceT, typename OpsT>
@@ -177,14 +174,6 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     }
 
     *out_service = service;
-
-    if (spec.created_event_name) {
-        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
-        char props[128];
-        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
-        rac_event_track(spec.created_event_name, spec.created_event_category,
-                        RAC_EVENT_DESTINATION_ALL, props);
-    }
 
     return RAC_SUCCESS;
 }

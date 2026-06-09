@@ -12,8 +12,6 @@
  * cannot silently re-arm a cancelled session, and pass3-syn-083 nailed
  * down idempotent RAC_SUCCESS for stale-handle cancel calls.
  *
- * The voice agent ships an analogous regression test
- * (test_voice_agent_pipeline_race.cpp) for the same class of primitive.
  * Tool-calling previously had zero coverage of the concurrency contract.
  * This file closes that gap with four targeted tests:
  *

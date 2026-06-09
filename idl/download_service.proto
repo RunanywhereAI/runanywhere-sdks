@@ -69,6 +69,23 @@ enum DownloadState {
     DOWNLOAD_STATE_RESUMING    = 9;
 }
 
+// Structured reason for a download plan/start/resume rejection. Lets every SDK
+// branch on a stable enum instead of substring-matching the human-readable
+// error_message (the prior approach, which silently broke on any reword).
+enum DownloadFailureReason {
+    DOWNLOAD_FAILURE_REASON_UNSPECIFIED                    = 0;
+    // On-disk partial download is larger than the expected total byte count.
+    DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES         = 1;
+    // Requested resume offset is past the expected total size.
+    DOWNLOAD_FAILURE_REASON_RESUME_OFFSET_EXCEEDS_EXPECTED = 2;
+    // On-disk partial is smaller than the requested resume offset.
+    DOWNLOAD_FAILURE_REASON_PARTIAL_SMALLER_THAN_OFFSET    = 3;
+    // The partial file changed (size/mtime) since the resume token was issued.
+    DOWNLOAD_FAILURE_REASON_PARTIAL_CHANGED_BEFORE_RESUME  = 4;
+    // Not enough free space to complete the download.
+    DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE           = 5;
+}
+
 // HTTP transport download status — numeric values MUST match
 // rac_http_download_status_t (RAC_HTTP_DL_*) in
 // sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h.
@@ -138,6 +155,7 @@ message DownloadPlanResult {
     string                storage_namespace  = 10;
     string                resume_token       = 11;
     int64                 required_free_bytes_after_download = 12;
+    DownloadFailureReason failure_reason     = 13;  // structured companion to error_message
 }
 
 message DownloadStartRequest {
@@ -155,6 +173,7 @@ message DownloadStartResult {
     DownloadProgress initial_progress = 4;
     string           error_message    = 5;
     string           resume_token     = 6;
+    DownloadFailureReason failure_reason = 7;  // structured companion to error_message
 }
 
 message DownloadCancelRequest {
@@ -189,6 +208,7 @@ message DownloadResumeResult {
     DownloadProgress initial_progress = 4;
     string           error_message    = 5;
     string           resume_token     = 6;
+    DownloadFailureReason failure_reason = 7;  // structured companion to error_message
 }
 
 service Download {
