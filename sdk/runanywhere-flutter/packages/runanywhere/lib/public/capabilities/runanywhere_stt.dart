@@ -297,6 +297,87 @@ class RunAnywhereSTT {
     return controller.stream;
   }
 
+  /// Canonical chunk-feed stream-in / stream-out transcription.
+  ///
+  /// Consumes a `Stream<Uint8List>` of PCM audio chunks and yields
+  /// `STTPartialResult` events; the native session owns endpointing and
+  /// segmentation. Each partial carries an incremental transcript and an
+  /// `isFinal` flag; closing the input stream flushes the final result.
+  /// Bridge errors surface as a terminal partial with
+  /// `text = "STT stream failed: ..."` and `isFinal = true`.
+  ///
+  /// Mirrors Swift `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`.
+  Stream<STTPartialResult> transcribeStreamSession(
+    Stream<Uint8List> audio, {
+    STTOptions? options,
+  }) {
+    if (!DartBridge.isInitialized) {
+      return Stream.error(SDKException.notInitialized());
+    }
+
+    late final StreamController<STTPartialResult> controller;
+    controller = StreamController<STTPartialResult>(
+      onListen: () async {
+        var sawFinal = false;
+        try {
+          // Streaming sessions are handle-bound: resolve the lifecycle
+          // current model and load it onto the bridge component handle
+          // (mirrors Swift `prepareStreamingHandle`).
+          final current = await RunAnywhereModelLifecycle.shared.current(
+            model_pb.CurrentModelRequest(category: _sttCategory),
+          );
+          if (!current.found) {
+            throw SDKException.sttNotAvailable(
+              'No STT model loaded through commons lifecycle. '
+              'Call loadSTTModel() first.',
+            );
+          }
+          final modelId =
+              current.modelId.isNotEmpty ? current.modelId : current.model.id;
+          final modelPath = current.resolvedPath.isNotEmpty
+              ? current.resolvedPath
+              : current.model.localPath;
+          if (modelId.isEmpty || modelPath.isEmpty) {
+            throw SDKException.sttNotAvailable(
+              'Loaded STT model is missing a resolved path',
+            );
+          }
+          DartBridgeSTT.shared.loadModelForStreaming(
+            path: modelPath,
+            id: modelId,
+            name: current.model.name.isNotEmpty ? current.model.name : modelId,
+          );
+
+          final partials = DartBridgeSTT.shared.transcribeSessionStream(
+            audio,
+            _effectiveOptions(options ?? STTOptions()),
+          );
+          await for (final partial in partials) {
+            if (controller.isClosed) break;
+            if (partial.isFinal) sawFinal = true;
+            controller.add(partial);
+          }
+          // Swift parity: synthesize a terminal final when the native
+          // session closed without one.
+          if (!sawFinal && !controller.isClosed) {
+            controller.add(STTPartialResult(isFinal: true));
+          }
+        } catch (e, st) {
+          if (!controller.isClosed) {
+            controller.add(STTPartialResult(
+              text: 'STT stream failed: $e',
+              isFinal: true,
+            ));
+            controller.addError(e, st);
+          }
+        } finally {
+          unawaited(controller.close());
+        }
+      },
+    );
+    return controller.stream;
+  }
+
   /// Symmetric with Swift's `processStreamingAudio`. Float32 PCM samples
   /// at 16kHz are forwarded to the lifecycle-owned one-shot transcribe path.
   Future<void> processStreamingAudio(

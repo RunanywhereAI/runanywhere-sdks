@@ -31,7 +31,7 @@ enum STTMode {
       case STTMode.batch:
         return 'Record first, then transcribe all at once';
       case STTMode.live:
-        return 'Auto-transcribe on silence';
+        return 'Stream with live partial results';
     }
   }
 
@@ -79,13 +79,12 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       AudioRecordingService.instance;
   StreamSubscription<double>? _audioLevelSubscription;
 
-  // VAD state for live mode (mirrors iOS STTViewModel)
-  static const double _speechThreshold = 0.02;
-  static const Duration _silenceDuration = Duration(milliseconds: 1500);
-  static const int _minAudioBytes = 32000; // ~1s at 16kHz/16-bit mono
-  DateTime? _lastSpeechTime;
-  bool _isSpeechActive = false;
-  Timer? _vadTimer;
+  // Live mode: mic chunks are fed straight into the SDK's streaming
+  // transcription session (RunAnywhere.transcribeStreamSession), which owns
+  // endpointing/segmentation natively. No app-side silence detection.
+  // Mirrors iOS STTViewModel.
+  StreamSubscription<dynamic>? _liveSubscription;
+  String _committedTranscription = '';
 
   bool get _hasModelSelected =>
       _selectedFramework != null && _selectedModelName != null;
@@ -98,7 +97,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   @override
   void dispose() {
-    _vadTimer?.cancel();
+    unawaited(_liveSubscription?.cancel());
+    unawaited(_recordingService.stopStreaming());
     unawaited(_audioLevelSubscription?.cancel());
     super.dispose();
   }
@@ -197,11 +197,15 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       _errorMessage = null;
       _transcribedText = '';
       _partialText = '';
-      _lastSpeechTime = null;
-      _isSpeechActive = false;
+      _committedTranscription = '';
     });
 
-    // Start recording with the audio service
+    if (_selectedMode == STTMode.live) {
+      await _startLiveStreaming();
+      return;
+    }
+
+    // Batch: record to a buffer, transcribe once on stop.
     final recordingPath = await _recordingService.startRecording(
       sampleRate: 16000,
       numChannels: 1,
@@ -216,26 +220,78 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       return;
     }
 
-    // Subscribe to audio levels
+    _subscribeToAudioLevels();
+    debugPrint('Recording started in ${_selectedMode.displayName} mode');
+  }
+
+  /// Live mode: feed mic chunks into the SDK's streaming transcription
+  /// session. Non-final partials preview the current utterance; finals
+  /// commit it as a line (mirrors iOS STTViewModel.handleLivePartial).
+  Future<void> _startLiveStreaming() async {
+    final chunks = await _recordingService.startStreaming(
+      sampleRate: 16000,
+      numChannels: 1,
+    );
+    if (chunks == null) {
+      setState(() {
+        _isRecording = false;
+        _errorMessage = 'Failed to start streaming recording';
+      });
+      return;
+    }
+
+    _subscribeToAudioLevels();
+
+    _liveSubscription =
+        sdk.RunAnywhere.transcribeStreamSession(chunks).listen(
+      (partial) {
+        final text = partial.text.trim();
+        setState(() {
+          if (partial.isFinal) {
+            // Stream errors surface as a terminal partial carrying the
+            // failure text (see RunAnywhere.transcribeStreamSession).
+            if (text.startsWith('STT stream failed')) {
+              _errorMessage = text;
+              return;
+            }
+            if (text.isNotEmpty) {
+              _committedTranscription = _committedTranscription.isEmpty
+                  ? text
+                  : '$_committedTranscription\n$text';
+            }
+            _transcribedText = _committedTranscription;
+            _partialText = '';
+          } else if (text.isNotEmpty) {
+            _partialText = text;
+          }
+        });
+      },
+      onError: (Object e) {
+        setState(() {
+          _errorMessage = 'Transcription failed: $e';
+        });
+      },
+      onDone: () {
+        _liveSubscription = null;
+        if (mounted) {
+          setState(() => _isTranscribing = false);
+        }
+      },
+    );
+
+    debugPrint('Live streaming transcription started');
+  }
+
+  void _subscribeToAudioLevels() {
     _audioLevelSubscription =
         _recordingService.audioLevelStream?.listen((level) {
       setState(() {
         _audioLevel = level;
       });
     });
-
-    if (_selectedMode == STTMode.live) {
-      _startVADMonitoring();
-    }
-
-    debugPrint('Recording started in ${_selectedMode.displayName} mode');
   }
 
   Future<void> _stopRecording() async {
-    // Stop VAD monitoring if active
-    _vadTimer?.cancel();
-    _vadTimer = null;
-
     // Cancel audio level subscription
     await _audioLevelSubscription?.cancel();
     _audioLevelSubscription = null;
@@ -243,9 +299,15 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     setState(() {
       _isRecording = false;
       _audioLevel = 0.0;
-      _isSpeechActive = false;
-      _lastSpeechTime = null;
     });
+
+    if (_selectedMode == STTMode.live) {
+      // Closing the recorder ends the chunk stream, which lets the native
+      // session flush its final result; the live subscription ends with it.
+      setState(() => _isTranscribing = true);
+      await _recordingService.stopStreaming();
+      return;
+    }
 
     // Stop recording and get audio data
     final (audioData, _) = await _recordingService.stopRecording();
@@ -292,102 +354,6 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
         _isTranscribing = false;
       });
     }
-  }
-
-  /// Start VAD monitoring for live mode (mirrors iOS startVADMonitoring).
-  /// Polls audio level every 50 ms; on silence after speech, slices the
-  /// current recording segment and transcribes it mid-session.
-  void _startVADMonitoring() {
-    _vadTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
-      if (!_isRecording) return;
-      unawaited(_checkSpeechState(_audioLevel));
-    });
-  }
-
-  /// Mirrors iOS checkSpeechState — detects silence after speech and
-  /// triggers a live transcription slice.
-  Future<void> _checkSpeechState(double level) async {
-    if (!_isRecording || _selectedMode != STTMode.live) return;
-
-    if (level > _speechThreshold) {
-      _isSpeechActive = true;
-      _lastSpeechTime = DateTime.now();
-    } else if (_isSpeechActive) {
-      final last = _lastSpeechTime;
-      if (last != null &&
-          DateTime.now().difference(last) > _silenceDuration) {
-        _isSpeechActive = false;
-        _lastSpeechTime = null;
-        await _performLiveTranscription();
-      }
-    }
-  }
-
-  /// Mirrors iOS performLiveTranscription — stops the current recording
-  /// segment, transcribes it, appends to transcript, then restarts
-  /// recording so the next utterance is captured.
-  Future<void> _performLiveTranscription() async {
-    if (!_isRecording) return;
-
-    // Temporarily pause audio-level sub while we cycle the recorder.
-    await _audioLevelSubscription?.cancel();
-    _audioLevelSubscription = null;
-
-    final (audioData, _) = await _recordingService.stopRecording();
-
-    if (audioData == null || audioData.length < _minAudioBytes) {
-      // Too short — restart and discard.
-      await _restartRecordingForLive();
-      return;
-    }
-
-    setState(() {
-      _isTranscribing = true;
-    });
-
-    try {
-      if (!sdk.RunAnywhere.stt.isLoaded) {
-        throw Exception('STT component not loaded');
-      }
-      final result =
-          await sdk.RunAnywhere.stt.transcribe(Uint8List.fromList(audioData));
-      setState(() {
-        if (_transcribedText.isNotEmpty) {
-          _transcribedText += '\n';
-        }
-        _transcribedText += result.text;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Transcription failed: $e';
-      });
-    } finally {
-      setState(() {
-        _isTranscribing = false;
-      });
-    }
-
-    if (_isRecording) {
-      await _restartRecordingForLive();
-    }
-  }
-
-  /// Restart the recorder after a live-mode slice without resetting the
-  /// transcript or user-visible recording state.
-  Future<void> _restartRecordingForLive() async {
-    final recordingPath = await _recordingService.startRecording(
-      sampleRate: 16000,
-      numChannels: 1,
-      enableAudioLevels: true,
-    );
-    if (recordingPath == null) return;
-
-    _audioLevelSubscription =
-        _recordingService.audioLevelStream?.listen((level) {
-      setState(() {
-        _audioLevel = level;
-      });
-    });
   }
 
   void _clearTranscription() {

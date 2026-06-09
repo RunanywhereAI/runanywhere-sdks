@@ -576,6 +576,72 @@ typedef RacSttTranscribeStreamLifecycleProtoDart = int Function(
   ffi.Pointer<ffi.Void>,
 );
 
+// ---------------------------------------------------------------------------
+// Chunk-feed streaming STT sessions (rac_stt_stream.h). Mirrors Swift
+// STTStreamSessionABI in CppBridge+STT.swift: register a per-handle proto
+// callback, start a session (serialized STTOptions in, session id out), feed
+// PCM frames, then stop (flush final) or cancel (drop). Teardown follows the
+// header contract: unset callback → rac_stt_proto_quiesce() → free user_data.
+// ---------------------------------------------------------------------------
+
+typedef RacSttComponentLoadModelNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<Utf8>,
+  ffi.Pointer<Utf8>,
+  ffi.Pointer<Utf8>,
+);
+typedef RacSttComponentLoadModelDart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<Utf8>,
+  ffi.Pointer<Utf8>,
+  ffi.Pointer<Utf8>,
+);
+
+typedef RacSttSetStreamProtoCallbackNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+typedef RacSttSetStreamProtoCallbackDart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacSttUnsetStreamProtoCallbackNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+);
+typedef RacSttUnsetStreamProtoCallbackDart = int Function(
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacSttStreamStartProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.Uint64>,
+);
+typedef RacSttStreamStartProtoDart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<ffi.Uint64>,
+);
+
+typedef RacSttStreamFeedAudioProtoNative = ffi.Int32 Function(
+  ffi.Uint64,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+);
+typedef RacSttStreamFeedAudioProtoDart = int Function(
+  int,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+);
+
+typedef RacSttStreamFinishProtoNative = ffi.Int32 Function(ffi.Uint64);
+typedef RacSttStreamFinishProtoDart = int Function(int);
+
 // ============================================================================
 // Voice agent proto APIs (session + helpers + lifecycle-owned handle)
 // ============================================================================
@@ -1771,6 +1837,46 @@ class RacBindings {
             'rac_stt_transcribe_stream_lifecycle_proto',
           ),
         ),
+        rac_stt_component_load_model =
+            _lookupOptional<RacSttComponentLoadModelDart>(
+          () => lib.lookupFunction<RacSttComponentLoadModelNative,
+              RacSttComponentLoadModelDart>('rac_stt_component_load_model'),
+        ),
+        rac_stt_set_stream_proto_callback =
+            _lookupOptional<RacSttSetStreamProtoCallbackDart>(
+          () => lib.lookupFunction<RacSttSetStreamProtoCallbackNative,
+              RacSttSetStreamProtoCallbackDart>(
+            'rac_stt_set_stream_proto_callback',
+          ),
+        ),
+        rac_stt_unset_stream_proto_callback =
+            _lookupOptional<RacSttUnsetStreamProtoCallbackDart>(
+          () => lib.lookupFunction<RacSttUnsetStreamProtoCallbackNative,
+              RacSttUnsetStreamProtoCallbackDart>(
+            'rac_stt_unset_stream_proto_callback',
+          ),
+        ),
+        rac_stt_stream_start_proto =
+            _lookupOptional<RacSttStreamStartProtoDart>(
+          () => lib.lookupFunction<RacSttStreamStartProtoNative,
+              RacSttStreamStartProtoDart>('rac_stt_stream_start_proto'),
+        ),
+        rac_stt_stream_feed_audio_proto =
+            _lookupOptional<RacSttStreamFeedAudioProtoDart>(
+          () => lib.lookupFunction<RacSttStreamFeedAudioProtoNative,
+              RacSttStreamFeedAudioProtoDart>(
+            'rac_stt_stream_feed_audio_proto',
+          ),
+        ),
+        rac_stt_stream_stop_proto = _lookupOptional<RacSttStreamFinishProtoDart>(
+          () => lib.lookupFunction<RacSttStreamFinishProtoNative,
+              RacSttStreamFinishProtoDart>('rac_stt_stream_stop_proto'),
+        ),
+        rac_stt_stream_cancel_proto =
+            _lookupOptional<RacSttStreamFinishProtoDart>(
+          () => lib.lookupFunction<RacSttStreamFinishProtoNative,
+              RacSttStreamFinishProtoDart>('rac_stt_stream_cancel_proto'),
+        ),
         rac_voice_agent_process_turn_proto =
             _lookupOptional<RacVoiceAgentProcessTurnProto2Dart>(
           () => lib.lookupFunction<RacVoiceAgentProcessTurnProto2Native,
@@ -2166,6 +2272,30 @@ class RacBindings {
 
   final RacSttTranscribeStreamLifecycleProtoDart?
       rac_stt_transcribe_stream_lifecycle_proto;
+
+  // Chunk-feed streaming STT sessions (rac_stt_stream.h) ----------
+  // Null fields tolerate commons binaries that predate the exports.
+
+  /// `rac_stt_component_load_model(handle, path, id, name)`.
+  final RacSttComponentLoadModelDart? rac_stt_component_load_model;
+
+  /// `rac_stt_set_stream_proto_callback(handle, callback, user_data)`.
+  final RacSttSetStreamProtoCallbackDart? rac_stt_set_stream_proto_callback;
+
+  /// `rac_stt_unset_stream_proto_callback(handle)`.
+  final RacSttUnsetStreamProtoCallbackDart? rac_stt_unset_stream_proto_callback;
+
+  /// `rac_stt_stream_start_proto(handle, options_bytes, size, out_session)`.
+  final RacSttStreamStartProtoDart? rac_stt_stream_start_proto;
+
+  /// `rac_stt_stream_feed_audio_proto(session, audio_bytes, size)`.
+  final RacSttStreamFeedAudioProtoDart? rac_stt_stream_feed_audio_proto;
+
+  /// `rac_stt_stream_stop_proto(session)` — flushes the final result.
+  final RacSttStreamFinishProtoDart? rac_stt_stream_stop_proto;
+
+  /// `rac_stt_stream_cancel_proto(session)` — immediate teardown.
+  final RacSttStreamFinishProtoDart? rac_stt_stream_cancel_proto;
 
   // Voice agent proto APIs -----------------------------------------
 

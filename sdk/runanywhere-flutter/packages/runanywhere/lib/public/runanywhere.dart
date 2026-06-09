@@ -679,6 +679,14 @@ abstract final class RunAnywhere {
     STTOptions? options,
   }) => RunAnywhereSTT.shared.transcribeStream(audio, options: options);
 
+  /// Flat chunk-feed streaming alias — session-based stream-in / stream-out
+  /// transcription; the native session owns endpointing. Mirrors Swift
+  /// `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`.
+  static Stream<STTPartialResult> transcribeStreamSession(
+    Stream<Uint8List> audio, {
+    STTOptions? options,
+  }) => RunAnywhereSTT.shared.transcribeStreamSession(audio, options: options);
+
   /// Flat alias — synthesize text to proto [TTSOutput].
   /// Mirrors Swift / RN / Web `RunAnywhere.synthesize(text:options:)`.
   static Future<TTSOutput> synthesize(String text, [TTSOptions? options]) =>

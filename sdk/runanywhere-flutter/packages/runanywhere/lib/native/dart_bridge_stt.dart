@@ -4,6 +4,7 @@
 /// Mirrors Swift's CppBridge+STT.swift pattern.
 library;
 
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:typed_data';
 
@@ -11,7 +12,14 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart'
-    show STTAudioSource_Source, STTOptions, STTOutput, STTTranscriptionRequest;
+    show
+        STTAudioSource_Source,
+        STTOptions,
+        STTOutput,
+        STTPartialResult,
+        STTStreamEvent,
+        STTStreamEventKind,
+        STTTranscriptionRequest;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
@@ -177,6 +185,220 @@ class DartBridgeSTT {
       calloc.free(optionsPtr);
       calloc.free(out);
     }
+  }
+
+  // MARK: - Streaming Session (chunk-feed)
+
+  /// Load a model onto this component handle. Streaming sessions are
+  /// handle-bound, so the lifecycle-resolved model must be loaded here first
+  /// (mirrors Swift `prepareStreamingHandle`). No-op when already loaded.
+  void loadModelForStreaming({
+    required String path,
+    required String id,
+    required String name,
+  }) {
+    if (_loadedModelId == id && isLoaded) {
+      return;
+    }
+    final fn = RacNative.bindings.rac_stt_component_load_model;
+    if (fn == null) {
+      throw UnsupportedError('rac_stt_component_load_model is unavailable');
+    }
+    final handle = getHandle();
+    final pathPtr = path.toNativeUtf8();
+    final idPtr = id.toNativeUtf8();
+    final namePtr = name.toNativeUtf8();
+    try {
+      final code = fn(handle, pathPtr, idPtr, namePtr);
+      if (code != RAC_SUCCESS) {
+        throw StateError(
+          'rac_stt_component_load_model failed: '
+          '${RacResultCode.getMessage(code)}',
+        );
+      }
+      _loadedModelId = id;
+    } finally {
+      calloc.free(pathPtr);
+      calloc.free(idPtr);
+      calloc.free(namePtr);
+    }
+  }
+
+  /// Canonical chunk-feed stream-in / stream-out transcription session.
+  ///
+  /// Consumes a `Stream<Uint8List>` of PCM audio chunks and yields
+  /// `STTPartialResult` events as the native session emits them. Closing the
+  /// input stream stops the session, which flushes the final result. Mirrors
+  /// Swift `CppBridge.STT.transcribeSessionStream` over the
+  /// `rac_stt_stream_*_proto` ABI (rac_stt_stream.h).
+  ///
+  /// Events fire synchronously during `feed`/`stop` on this isolate
+  /// (`NativeCallable.isolateLocal` — same UAF rationale as the one-shot
+  /// `transcribeStream`); teardown follows the header contract:
+  /// unset callback → `rac_stt_proto_quiesce()` → close the callable.
+  Stream<STTPartialResult> transcribeSessionStream(
+    Stream<Uint8List> audio,
+    STTOptions options,
+  ) {
+    final controller = StreamController<STTPartialResult>();
+    NativeCallable<RacSttStreamEventCallbackNative>? nativeCb;
+    var cancelled = false;
+    var sessionId = 0;
+
+    void emitFailure(String message) {
+      if (controller.isClosed) return;
+      controller.add(
+        STTPartialResult(text: message, isFinal: true),
+      );
+    }
+
+    controller
+      ..onListen = () async {
+        final bindings = RacNative.bindings;
+        final setCallback = bindings.rac_stt_set_stream_proto_callback;
+        final unsetCallback = bindings.rac_stt_unset_stream_proto_callback;
+        final start = bindings.rac_stt_stream_start_proto;
+        final feed = bindings.rac_stt_stream_feed_audio_proto;
+        final stop = bindings.rac_stt_stream_stop_proto;
+        final cancel = bindings.rac_stt_stream_cancel_proto;
+        if (setCallback == null ||
+            unsetCallback == null ||
+            start == null ||
+            feed == null ||
+            stop == null ||
+            cancel == null) {
+          controller.addError(UnsupportedError(
+            'rac_stt_stream_*_proto session ABI is unavailable in this '
+            'commons binary',
+          ));
+          unawaited(controller.close());
+          return;
+        }
+
+        RacHandle? handle;
+        try {
+          handle = getHandle();
+
+          nativeCb = NativeCallable<RacSttStreamEventCallbackNative>.isolateLocal(
+            (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+              if (controller.isClosed ||
+                  cancelled ||
+                  bytesLen <= 0 ||
+                  bytesPtr == nullptr) {
+                return;
+              }
+              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+              try {
+                final event = STTStreamEvent.fromBuffer(copy);
+                switch (event.kind) {
+                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL:
+                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT:
+                    if (event.hasPartial()) {
+                      controller.add(event.partial);
+                    }
+                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL:
+                    // `event` is a local decode of copied bytes; mutating its
+                    // submessage in place is safe.
+                    final partial =
+                        event.hasPartial() ? event.partial : STTPartialResult();
+                    partial.isFinal = true;
+                    if (event.hasFinalOutput()) {
+                      partial.finalOutput = event.finalOutput;
+                      if (partial.text.isEmpty) {
+                        partial.text = event.finalOutput.text;
+                      }
+                    }
+                    controller.add(partial);
+                  case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
+                    emitFailure(
+                      event.hasErrorMessage()
+                          ? event.errorMessage
+                          : 'STT stream failed',
+                    );
+                  default:
+                    break;
+                }
+              } catch (e, st) {
+                controller.addError(e, st);
+              }
+            },
+          );
+
+          final registerCode =
+              setCallback(handle, nativeCb!.nativeFunction, nullptr);
+          if (registerCode != RAC_SUCCESS) {
+            emitFailure(
+              'STT stream callback registration failed: $registerCode',
+            );
+            return;
+          }
+
+          final optionsBytes = options.writeToBuffer();
+          final optionsPtr = DartBridgeProtoUtils.copyBytes(optionsBytes);
+          final sessionOut = calloc<Uint64>();
+          try {
+            final startCode = start(
+              handle,
+              optionsPtr,
+              optionsBytes.length,
+              sessionOut,
+            );
+            sessionId = sessionOut.value;
+            if (startCode != RAC_SUCCESS || sessionId == 0) {
+              emitFailure('STT stream start failed: $startCode');
+              return;
+            }
+          } finally {
+            calloc.free(optionsPtr);
+            calloc.free(sessionOut);
+          }
+
+          await for (final chunk in audio) {
+            if (cancelled || controller.isClosed) break;
+            if (chunk.isEmpty) continue;
+            final chunkPtr = DartBridgeProtoUtils.copyBytes(chunk);
+            try {
+              final feedCode = feed(sessionId, chunkPtr, chunk.length);
+              if (feedCode != RAC_SUCCESS) {
+                emitFailure('STT stream feed failed: $feedCode');
+                cancelled = true;
+                break;
+              }
+            } finally {
+              calloc.free(chunkPtr);
+            }
+          }
+
+          if (cancelled) {
+            cancel(sessionId);
+          } else {
+            final stopCode = stop(sessionId);
+            if (stopCode != RAC_SUCCESS) {
+              emitFailure('STT stream stop failed: $stopCode');
+            }
+          }
+          sessionId = 0;
+        } catch (e, st) {
+          controller.addError(e, st);
+        } finally {
+          if (handle != null) {
+            unsetCallback(handle);
+          }
+          bindings.rac_stt_proto_quiesce?.call();
+          nativeCb?.close();
+          nativeCb = null;
+          unawaited(controller.close());
+        }
+      }
+      ..onCancel = () {
+        cancelled = true;
+        if (sessionId != 0) {
+          RacNative.bindings.rac_stt_stream_cancel_proto?.call(sessionId);
+          sessionId = 0;
+        }
+      };
+
+    return controller.stream;
   }
 
   // MARK: - Cleanup
