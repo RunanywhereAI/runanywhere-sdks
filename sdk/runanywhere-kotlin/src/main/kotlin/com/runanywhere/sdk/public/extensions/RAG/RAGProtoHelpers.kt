@@ -29,8 +29,13 @@ import kotlinx.serialization.json.contentOrNull
 
 /**
  * Build a [RAGConfiguration] populated with the canonical RAG defaults:
- * 384-dim embeddings, top-K of 5, similarity threshold 0.3, 512-token chunks
- * with 64 tokens of overlap.
+ * top-K of 5, similarity threshold 0.3, 512-token chunks with 64 tokens of
+ * overlap (mirrors the rac_default annotations in idl/rag.proto).
+ *
+ * `embedding_dimension` is deliberately left UNSET: commons derives it from
+ * the loaded embedding model at session create (rac_embeddings_get_info), so
+ * non-384-dim encoders work without any SDK/app hardcoding. Set it on the
+ * returned config only to override.
  *
  * The threshold is 0.3 — not 0.7 — because all-MiniLM-class embeddings produce
  * cosine similarities that rarely exceed ~0.5 even for relevant chunks, so a
@@ -43,7 +48,6 @@ fun RAGConfiguration.Companion.defaults(
     RARAGConfiguration(
         embedding_model_id = embeddingModelId,
         llm_model_id = llmModelId,
-        embedding_dimension = 384,
         top_k = 5,
         similarity_threshold = 0.3f,
         chunk_size = 512,

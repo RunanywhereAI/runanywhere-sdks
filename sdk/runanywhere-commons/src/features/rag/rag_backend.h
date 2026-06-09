@@ -35,9 +35,14 @@ struct RAGBackendConfig {
     // caller passes a partial RAGConfiguration (proto zeros), so every platform
     // SDK ends up with the same chunk/retrieval behavior. Keep these in sync
     // with the IDL.
+    // Fallback only: when the caller omits embedding_dimension, the RAG proto
+    // ABI derives it from the loaded embedding model (rac_embeddings_get_info)
+    // at session create. 384 applies only if that derivation fails.
     size_t embedding_dimension = 384;
     size_t top_k = 5;
-    float similarity_threshold = 0.7f;
+    // 0.3, not 0.7 — MiniLM-class cosine similarities rarely exceed ~0.5 for
+    // relevant chunks; a 0.7 floor returns nothing (matches idl/rag.proto).
+    float similarity_threshold = 0.3f;
     size_t max_context_tokens = 2048;
     size_t chunk_size = 512;
     size_t chunk_overlap = 64;

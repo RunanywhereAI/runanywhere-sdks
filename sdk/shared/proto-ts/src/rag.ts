@@ -97,8 +97,10 @@ export interface RAGConfiguration {
   /**
    * Embedding vector dimension — must match the embedding model.
    * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-   * Optional so callers can distinguish "unset" (commons stamps the
-   * canonical default) from explicit zero / explicit override.
+   * Leave UNSET: commons derives the dimension from the loaded embedding
+   * model at session create (rac_embeddings_get_info). Set only to
+   * override. No rac_default on purpose — a generated defaults() that
+   * stamped 384 would mark the field present and defeat the derivation.
    */
   embeddingDimension?:
     | number
@@ -115,6 +117,10 @@ export interface RAGConfiguration {
    * score are discarded before being passed to the LLM as context.
    * Optional so callers can distinguish "unset" from explicit 0.0
    * (accept-everything) without losing the canonical default.
+   * Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
+   * cosine similarities that rarely exceed ~0.5 even for relevant chunks,
+   * so a 0.7 floor filters out every match and retrieval returns nothing
+   * (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
    */
   similarityThreshold?:
     | number
@@ -224,6 +230,12 @@ export interface RAGQueryOptions {
   retrievalTopK: number;
   similarityThreshold: number;
   stream: boolean;
+  /**
+   * When true, suppress the answer model's thinking phase (maps to
+   * LLMGenerationOptions.disable_thinking so commons prepends the no-think
+   * directive instead of the app injecting "/no_think"). Default false.
+   */
+  disableThinking: boolean;
 }
 
 export interface RAGQueryRequest {
@@ -1253,6 +1265,7 @@ function createBaseRAGQueryOptions(): RAGQueryOptions {
     retrievalTopK: 0,
     similarityThreshold: 0,
     stream: false,
+    disableThinking: false,
   };
 }
 
@@ -1284,6 +1297,9 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     }
     if (message.stream !== false) {
       writer.uint32(72).bool(message.stream);
+    }
+    if (message.disableThinking !== false) {
+      writer.uint32(80).bool(message.disableThinking);
     }
     return writer;
   },
@@ -1367,6 +1383,14 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
           message.stream = reader.bool();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.disableThinking = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1411,6 +1435,11 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
         ? globalThis.Number(object.similarity_threshold)
         : 0,
       stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
+      disableThinking: isSet(object.disableThinking)
+        ? globalThis.Boolean(object.disableThinking)
+        : isSet(object.disable_thinking)
+        ? globalThis.Boolean(object.disable_thinking)
+        : false,
     };
   },
 
@@ -1443,6 +1472,9 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     if (message.stream !== false) {
       obj.stream = message.stream;
     }
+    if (message.disableThinking !== false) {
+      obj.disableThinking = message.disableThinking;
+    }
     return obj;
   },
 
@@ -1460,6 +1492,7 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
     message.retrievalTopK = object.retrievalTopK ?? 0;
     message.similarityThreshold = object.similarityThreshold ?? 0;
     message.stream = object.stream ?? false;
+    message.disableThinking = object.disableThinking ?? false;
     return message;
   },
 };

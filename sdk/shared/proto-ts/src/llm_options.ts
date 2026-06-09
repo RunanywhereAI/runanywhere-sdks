@@ -230,7 +230,17 @@ export interface LLMGenerationOptions {
    * Tool-calling contract for this generation. The SDK owns executor
    * functions; proto carries only definitions and parser options.
    */
-  toolCalling?: ToolCallingOptions | undefined;
+  toolCalling?:
+    | ToolCallingOptions
+    | undefined;
+  /**
+   * When true, suppress the model's thinking/reasoning phase for this
+   * generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
+   * model's no-think directive at the prompt level, so no app prepends
+   * "/no_think" by hand. Default false = the model's normal thinking
+   * behavior.
+   */
+  disableThinking: boolean;
 }
 
 /**
@@ -475,6 +485,7 @@ function createBaseLLMGenerationOptions(): LLMGenerationOptions {
     echoPrompt: false,
     nThreads: 0,
     toolCalling: undefined,
+    disableThinking: false,
   };
 }
 
@@ -551,6 +562,9 @@ export const LLMGenerationOptions: MessageFns<LLMGenerationOptions> = {
     }
     if (message.toolCalling !== undefined) {
       ToolCallingOptions.encode(message.toolCalling, writer.uint32(194).fork()).join();
+    }
+    if (message.disableThinking !== false) {
+      writer.uint32(200).bool(message.disableThinking);
     }
     return writer;
   },
@@ -754,6 +768,14 @@ export const LLMGenerationOptions: MessageFns<LLMGenerationOptions> = {
           message.toolCalling = ToolCallingOptions.decode(reader, reader.uint32());
           continue;
         }
+        case 25: {
+          if (tag !== 200) {
+            break;
+          }
+
+          message.disableThinking = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -873,6 +895,11 @@ export const LLMGenerationOptions: MessageFns<LLMGenerationOptions> = {
         : isSet(object.tool_calling)
         ? ToolCallingOptions.fromJSON(object.tool_calling)
         : undefined,
+      disableThinking: isSet(object.disableThinking)
+        ? globalThis.Boolean(object.disableThinking)
+        : isSet(object.disable_thinking)
+        ? globalThis.Boolean(object.disable_thinking)
+        : false,
     };
   },
 
@@ -950,6 +977,9 @@ export const LLMGenerationOptions: MessageFns<LLMGenerationOptions> = {
     if (message.toolCalling !== undefined) {
       obj.toolCalling = ToolCallingOptions.toJSON(message.toolCalling);
     }
+    if (message.disableThinking !== false) {
+      obj.disableThinking = message.disableThinking;
+    }
     return obj;
   },
 
@@ -988,6 +1018,7 @@ export const LLMGenerationOptions: MessageFns<LLMGenerationOptions> = {
     message.toolCalling = (object.toolCalling !== undefined && object.toolCalling !== null)
       ? ToolCallingOptions.fromPartial(object.toolCalling)
       : undefined;
+    message.disableThinking = object.disableThinking ?? false;
     return message;
   },
 };

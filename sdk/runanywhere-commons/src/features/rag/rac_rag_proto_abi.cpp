@@ -346,8 +346,25 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
 
     try {
         auto session = std::make_unique<Session>();
+        RAGBackendConfig backend_config = build_backend_config(proto);
+        // When the caller does not pin embedding_dimension, derive it from the
+        // loaded embedding model rather than falling back to the struct default
+        // (384). This lets a non-384-dim encoder (e.g. a 768-dim model) work
+        // without the SDK/app hardcoding the value. On failure we keep the
+        // default already present in backend_config.
+        if (!proto.has_embedding_dimension()) {
+            rac_embeddings_info_t info = {};
+            if (rac_embeddings_get_info(embed_handle, &info) == RAC_SUCCESS && info.dimension > 0) {
+                backend_config.embedding_dimension = info.dimension;
+                LOGI("Derived embedding_dimension=%zu from embedding model '%s'", info.dimension,
+                     embedding_model_id.c_str());
+            } else {
+                LOGI("embedding_dimension not provided and not derivable; using default %zu",
+                     backend_config.embedding_dimension);
+            }
+        }
         session->backend =
-            std::make_unique<RAGBackend>(build_backend_config(proto), llm_handle, embed_handle,
+            std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
                                          /*owns_services=*/true);
         if (!session->backend->is_initialized()) {
             publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate",
@@ -489,6 +506,9 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     // commons-030-A: RAGQueryOptions.top_k (idl/rag.proto:55) was silently
     // dropped; thread it through. 0 = disabled (engine default).
     opts.top_k = query_proto.top_k();
+    // Thread the structured thinking-suppression flag so commons prepends the
+    // no-think directive instead of the app injecting "/no_think" into the query.
+    opts.disable_thinking = query_proto.disable_thinking() ? RAC_TRUE : RAC_FALSE;
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     // Per-query retrieval overrides from RAGQueryOptions (idl/rag.proto:180-183).

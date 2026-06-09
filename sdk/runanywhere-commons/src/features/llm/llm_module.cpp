@@ -40,6 +40,7 @@
 // events so any collectors registered via rac_llm_set_stream_proto_callback()
 // see the full decoded sequence. The proto section calls
 // `rac::llm::serialize_llm_stream_event()` directly.
+#include "features/llm/llm_thinking_directive_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_benchmark.h"
@@ -1424,6 +1425,8 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     options.min_p = has_options ? opts.min_p() : request.min_p();
     options.seed = has_options ? opts.seed() : request.seed();
     options.n_threads = has_options ? opts.n_threads() : request.n_threads();
+    options.disable_thinking =
+        (has_options && opts.disable_thinking()) ? RAC_TRUE : RAC_FALSE;
 
     grammar_storage = has_options ? opts.grammar() : request.grammar();
     options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
@@ -1856,9 +1859,14 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t r
     options.streaming_enabled = RAC_FALSE;
 
     rac_llm_result_t raw{};
+    // Apply the no-think directive at the prompt level when disable_thinking is
+    // set (proto LLMGenerationOptions.disable_thinking). Telemetry/events below
+    // keep the original prompt; only the engine sees the directive.
+    const std::string effective_prompt =
+        rac::llm::apply_no_think_directive(request.prompt(), options.disable_thinking);
     const int64_t started = now_ms();
     rc = (ref.ops && ref.ops->generate)
-             ? ref.ops->generate(ref.impl, request.prompt().c_str(), &options, &raw)
+             ? ref.ops->generate(ref.impl, effective_prompt.c_str(), &options, &raw)
              : RAC_ERROR_NOT_SUPPORTED;
     const int64_t elapsed = now_ms() - started;
 
@@ -1964,8 +1972,10 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     // extern "C" boundary into the platform SDK. On WASM this would surface
     // as an opaque `WebAssembly.Exception` (no `.message`) in JS; on native
     // SDKs it would be undefined behaviour through a C ABI return.
+    const std::string effective_prompt =
+        rac::llm::apply_no_think_directive(request.prompt(), options.disable_thinking);
     try {
-        rc = ref.ops->generate_stream(ref.impl, request.prompt().c_str(), &options,
+        rc = ref.ops->generate_stream(ref.impl, effective_prompt.c_str(), &options,
                                       stream_token_callback, &ctx);
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());

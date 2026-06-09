@@ -2337,12 +2337,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
     kRepetitionPenaltyFieldNumber = 5,
     kPreferredFrameworkFieldNumber = 8,
     kExecutionTargetFieldNumber = 12,
+    kFrequencyPenaltyFieldNumber = 16,
+    kSeedFieldNumber = 15,
+    kPresencePenaltyFieldNumber = 17,
     kStreamingEnabledFieldNumber = 7,
     kEnableRealTimeTrackingFieldNumber = 14,
     kEchoPromptFieldNumber = 22,
-    kSeedFieldNumber = 15,
-    kFrequencyPenaltyFieldNumber = 16,
-    kPresencePenaltyFieldNumber = 17,
+    kDisableThinkingFieldNumber = 25,
     kRepeatLastNFieldNumber = 18,
     kMinPFieldNumber = 19,
     kNThreadsFieldNumber = 23,
@@ -2562,6 +2563,36 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   void _internal_set_execution_target(::runanywhere::v1::ExecutionTarget value);
 
   public:
+  // float frequency_penalty = 16;
+  void clear_frequency_penalty() ;
+  [[nodiscard]] float frequency_penalty() const;
+  void set_frequency_penalty(float value);
+
+  private:
+  float _internal_frequency_penalty() const;
+  void _internal_set_frequency_penalty(float value);
+
+  public:
+  // int64 seed = 15;
+  void clear_seed() ;
+  [[nodiscard]] ::int64_t seed() const;
+  void set_seed(::int64_t value);
+
+  private:
+  ::int64_t _internal_seed() const;
+  void _internal_set_seed(::int64_t value);
+
+  public:
+  // float presence_penalty = 17;
+  void clear_presence_penalty() ;
+  [[nodiscard]] float presence_penalty() const;
+  void set_presence_penalty(float value);
+
+  private:
+  float _internal_presence_penalty() const;
+  void _internal_set_presence_penalty(float value);
+
+  public:
   // bool streaming_enabled = 7;
   void clear_streaming_enabled() ;
   [[nodiscard]] bool streaming_enabled() const;
@@ -2592,34 +2623,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
   void _internal_set_echo_prompt(bool value);
 
   public:
-  // int64 seed = 15;
-  void clear_seed() ;
-  [[nodiscard]] ::int64_t seed() const;
-  void set_seed(::int64_t value);
+  // bool disable_thinking = 25;
+  void clear_disable_thinking() ;
+  [[nodiscard]] bool disable_thinking() const;
+  void set_disable_thinking(bool value);
 
   private:
-  ::int64_t _internal_seed() const;
-  void _internal_set_seed(::int64_t value);
-
-  public:
-  // float frequency_penalty = 16;
-  void clear_frequency_penalty() ;
-  [[nodiscard]] float frequency_penalty() const;
-  void set_frequency_penalty(float value);
-
-  private:
-  float _internal_frequency_penalty() const;
-  void _internal_set_frequency_penalty(float value);
-
-  public:
-  // float presence_penalty = 17;
-  void clear_presence_penalty() ;
-  [[nodiscard]] float presence_penalty() const;
-  void set_presence_penalty(float value);
-
-  private:
-  float _internal_presence_penalty() const;
-  void _internal_set_presence_penalty(float value);
+  bool _internal_disable_thinking() const;
+  void _internal_set_disable_thinking(bool value);
 
   public:
   // int32 repeat_last_n = 18;
@@ -2656,7 +2667,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 24,
+      ::google::protobuf::internal::TcParseTable<5, 25,
                           3, 128,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -2700,12 +2711,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMGenerationOptions final : public
     float repetition_penalty_;
     int preferred_framework_;
     int execution_target_;
+    float frequency_penalty_;
+    ::int64_t seed_;
+    float presence_penalty_;
     bool streaming_enabled_;
     bool enable_real_time_tracking_;
     bool echo_prompt_;
-    ::int64_t seed_;
-    float frequency_penalty_;
-    float presence_penalty_;
+    bool disable_thinking_;
     ::int32_t repeat_last_n_;
     float min_p_;
     ::int32_t n_threads_;
@@ -3251,7 +3263,7 @@ LLMGenerationOptions::_internal_mutable_stop_sequences() {
 inline void LLMGenerationOptions::clear_streaming_enabled() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.streaming_enabled_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00040000U);
 }
 inline bool LLMGenerationOptions::streaming_enabled() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.streaming_enabled)
@@ -3259,7 +3271,7 @@ inline bool LLMGenerationOptions::streaming_enabled() const {
 }
 inline void LLMGenerationOptions::set_streaming_enabled(bool value) {
   _internal_set_streaming_enabled(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.streaming_enabled)
 }
 inline bool LLMGenerationOptions::_internal_streaming_enabled() const {
@@ -3649,7 +3661,7 @@ inline void LLMGenerationOptions::set_allocated_structured_output(::runanywhere:
 inline void LLMGenerationOptions::clear_enable_real_time_tracking() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_real_time_tracking_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
 }
 inline bool LLMGenerationOptions::enable_real_time_tracking() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.enable_real_time_tracking)
@@ -3657,7 +3669,7 @@ inline bool LLMGenerationOptions::enable_real_time_tracking() const {
 }
 inline void LLMGenerationOptions::set_enable_real_time_tracking(bool value) {
   _internal_set_enable_real_time_tracking(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.enable_real_time_tracking)
 }
 inline bool LLMGenerationOptions::_internal_enable_real_time_tracking() const {
@@ -3673,7 +3685,7 @@ inline void LLMGenerationOptions::_internal_set_enable_real_time_tracking(bool v
 inline void LLMGenerationOptions::clear_seed() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.seed_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00040000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
 }
 inline ::int64_t LLMGenerationOptions::seed() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.seed)
@@ -3681,7 +3693,7 @@ inline ::int64_t LLMGenerationOptions::seed() const {
 }
 inline void LLMGenerationOptions::set_seed(::int64_t value) {
   _internal_set_seed(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.seed)
 }
 inline ::int64_t LLMGenerationOptions::_internal_seed() const {
@@ -3697,7 +3709,7 @@ inline void LLMGenerationOptions::_internal_set_seed(::int64_t value) {
 inline void LLMGenerationOptions::clear_frequency_penalty() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.frequency_penalty_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
 }
 inline float LLMGenerationOptions::frequency_penalty() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.frequency_penalty)
@@ -3705,7 +3717,7 @@ inline float LLMGenerationOptions::frequency_penalty() const {
 }
 inline void LLMGenerationOptions::set_frequency_penalty(float value) {
   _internal_set_frequency_penalty(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.frequency_penalty)
 }
 inline float LLMGenerationOptions::_internal_frequency_penalty() const {
@@ -3721,7 +3733,7 @@ inline void LLMGenerationOptions::_internal_set_frequency_penalty(float value) {
 inline void LLMGenerationOptions::clear_presence_penalty() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.presence_penalty_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00100000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
 }
 inline float LLMGenerationOptions::presence_penalty() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.presence_penalty)
@@ -3729,7 +3741,7 @@ inline float LLMGenerationOptions::presence_penalty() const {
 }
 inline void LLMGenerationOptions::set_presence_penalty(float value) {
   _internal_set_presence_penalty(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.presence_penalty)
 }
 inline float LLMGenerationOptions::_internal_presence_penalty() const {
@@ -3745,7 +3757,7 @@ inline void LLMGenerationOptions::_internal_set_presence_penalty(float value) {
 inline void LLMGenerationOptions::clear_repeat_last_n() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.repeat_last_n_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00200000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00400000U);
 }
 inline ::int32_t LLMGenerationOptions::repeat_last_n() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.repeat_last_n)
@@ -3753,7 +3765,7 @@ inline ::int32_t LLMGenerationOptions::repeat_last_n() const {
 }
 inline void LLMGenerationOptions::set_repeat_last_n(::int32_t value) {
   _internal_set_repeat_last_n(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.repeat_last_n)
 }
 inline ::int32_t LLMGenerationOptions::_internal_repeat_last_n() const {
@@ -3769,7 +3781,7 @@ inline void LLMGenerationOptions::_internal_set_repeat_last_n(::int32_t value) {
 inline void LLMGenerationOptions::clear_min_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_p_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00400000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00800000U);
 }
 inline float LLMGenerationOptions::min_p() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.min_p)
@@ -3777,7 +3789,7 @@ inline float LLMGenerationOptions::min_p() const {
 }
 inline void LLMGenerationOptions::set_min_p(float value) {
   _internal_set_min_p(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.min_p)
 }
 inline float LLMGenerationOptions::_internal_min_p() const {
@@ -3929,7 +3941,7 @@ inline void LLMGenerationOptions::set_allocated_response_format(::std::string* P
 inline void LLMGenerationOptions::clear_echo_prompt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.echo_prompt_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00100000U);
 }
 inline bool LLMGenerationOptions::echo_prompt() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.echo_prompt)
@@ -3937,7 +3949,7 @@ inline bool LLMGenerationOptions::echo_prompt() const {
 }
 inline void LLMGenerationOptions::set_echo_prompt(bool value) {
   _internal_set_echo_prompt(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.echo_prompt)
 }
 inline bool LLMGenerationOptions::_internal_echo_prompt() const {
@@ -3953,7 +3965,7 @@ inline void LLMGenerationOptions::_internal_set_echo_prompt(bool value) {
 inline void LLMGenerationOptions::clear_n_threads() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.n_threads_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00800000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x01000000U);
 }
 inline ::int32_t LLMGenerationOptions::n_threads() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.n_threads)
@@ -3961,7 +3973,7 @@ inline ::int32_t LLMGenerationOptions::n_threads() const {
 }
 inline void LLMGenerationOptions::set_n_threads(::int32_t value) {
   _internal_set_n_threads(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
+  SetHasBit(_impl_._has_bits_[0], 0x01000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.n_threads)
 }
 inline ::int32_t LLMGenerationOptions::_internal_n_threads() const {
@@ -4064,6 +4076,30 @@ inline void LLMGenerationOptions::set_allocated_tool_calling(::runanywhere::v1::
 
   _impl_.tool_calling_ = reinterpret_cast<::runanywhere::v1::ToolCallingOptions*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LLMGenerationOptions.tool_calling)
+}
+
+// bool disable_thinking = 25;
+inline void LLMGenerationOptions::clear_disable_thinking() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.disable_thinking_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00200000U);
+}
+inline bool LLMGenerationOptions::disable_thinking() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LLMGenerationOptions.disable_thinking)
+  return _internal_disable_thinking();
+}
+inline void LLMGenerationOptions::set_disable_thinking(bool value) {
+  _internal_set_disable_thinking(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LLMGenerationOptions.disable_thinking)
+}
+inline bool LLMGenerationOptions::_internal_disable_thinking() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.disable_thinking_;
+}
+inline void LLMGenerationOptions::_internal_set_disable_thinking(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.disable_thinking_ = value;
 }
 
 // -------------------------------------------------------------------

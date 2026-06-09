@@ -94,18 +94,21 @@ extension RAVLMImage {
     }
 }
 
-// MARK: - UIImage factory
+// MARK: - CGImage factory (shared core for UIImage / NSImage)
 
-#if canImport(UIKit)
+#if canImport(CoreGraphics)
 extension RAVLMImage {
-    /// Create a proto VLM image from a UIImage. Returns nil if conversion fails.
-    public static func fromUIImage(_ image: UIImage) -> RAVLMImage? {
-        guard let rgb = rgbData(from: image), let cgImage = image.cgImage else { return nil }
+    /// Create a proto VLM image from a CGImage. Returns nil if conversion fails.
+    ///
+    /// This is the platform-neutral pixel path: the image is drawn into an
+    /// RGBA bitmap context and stripped to the packed RGB bytes the native
+    /// VLM ABI expects. `fromUIImage` / `fromNSImage` are thin wrappers.
+    public static func fromCGImage(_ cgImage: CGImage) -> RAVLMImage? {
+        guard let rgb = rgbData(from: cgImage) else { return nil }
         return fromRawRGB(rgb, width: cgImage.width, height: cgImage.height)
     }
 
-    private static func rgbData(from image: UIImage) -> Data? {
-        guard let cgImage = image.cgImage else { return nil }
+    private static func rgbData(from cgImage: CGImage) -> Data? {
         let width = cgImage.width
         let height = cgImage.height
         let bytesPerRow = 4 * width
@@ -136,6 +139,34 @@ extension RAVLMImage {
             }
         }
         return rgbData
+    }
+}
+#endif
+
+// MARK: - UIImage factory
+
+#if canImport(UIKit)
+extension RAVLMImage {
+    /// Create a proto VLM image from a UIImage. Returns nil if conversion fails.
+    public static func fromUIImage(_ image: UIImage) -> RAVLMImage? {
+        guard let cgImage = image.cgImage else { return nil }
+        return fromCGImage(cgImage)
+    }
+}
+#endif
+
+// MARK: - NSImage factory (macOS)
+
+#if canImport(AppKit) && !canImport(UIKit)
+import AppKit
+
+extension RAVLMImage {
+    /// Create a proto VLM image from an NSImage. Returns nil if conversion fails.
+    public static func fromNSImage(_ image: NSImage) -> RAVLMImage? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return nil
+        }
+        return fromCGImage(cgImage)
     }
 }
 #endif

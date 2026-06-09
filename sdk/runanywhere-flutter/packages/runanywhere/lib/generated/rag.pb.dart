@@ -145,8 +145,10 @@ class RAGConfiguration extends $pb.GeneratedMessage {
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-  /// Optional so callers can distinguish "unset" (commons stamps the
-  /// canonical default) from explicit zero / explicit override.
+  /// Leave UNSET: commons derives the dimension from the loaded embedding
+  /// model at session create (rac_embeddings_get_info). Set only to
+  /// override. No rac_default on purpose — a generated defaults() that
+  /// stamped 384 would mark the field present and defeat the derivation.
   @$pb.TagNumber(3)
   $core.int get embeddingDimension => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -171,6 +173,10 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   /// score are discarded before being passed to the LLM as context.
   /// Optional so callers can distinguish "unset" from explicit 0.0
   /// (accept-everything) without losing the canonical default.
+  /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
+  /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
+  /// so a 0.7 floor filters out every match and retrieval returns nothing
+  /// (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
   @$pb.TagNumber(5)
   $core.double get similarityThreshold => $_getN(4);
   @$pb.TagNumber(5)
@@ -512,6 +518,7 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     $core.int? retrievalTopK,
     $core.double? similarityThreshold,
     $core.bool? stream,
+    $core.bool? disableThinking,
   }) {
     final result = create();
     if (question != null) result.question = question;
@@ -524,6 +531,7 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     if (similarityThreshold != null)
       result.similarityThreshold = similarityThreshold;
     if (stream != null) result.stream = stream;
+    if (disableThinking != null) result.disableThinking = disableThinking;
     return result;
   }
 
@@ -550,6 +558,7 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     ..aD(8, _omitFieldNames ? '' : 'similarityThreshold',
         fieldType: $pb.PbFieldType.OF)
     ..aOB(9, _omitFieldNames ? '' : 'stream')
+    ..aOB(10, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -658,6 +667,18 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   $core.bool hasStream() => $_has(8);
   @$pb.TagNumber(9)
   void clearStream() => $_clearField(9);
+
+  /// When true, suppress the answer model's thinking phase (maps to
+  /// LLMGenerationOptions.disable_thinking so commons prepends the no-think
+  /// directive instead of the app injecting "/no_think"). Default false.
+  @$pb.TagNumber(10)
+  $core.bool get disableThinking => $_getBF(9);
+  @$pb.TagNumber(10)
+  set disableThinking($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasDisableThinking() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDisableThinking() => $_clearField(10);
 }
 
 class RAGQueryRequest extends $pb.GeneratedMessage {

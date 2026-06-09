@@ -24,6 +24,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "../common/rac_service_factory_internal.h"
+#include "features/llm/llm_thinking_directive_internal.h"
 
 static const char* LOG_CAT = "LLM.Service";
 
@@ -123,7 +124,10 @@ rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
                  (void*)service->ops->generate, service->impl);
     RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: calling backend generate...");
 
-    rac_result_t result = service->ops->generate(service->impl, prompt, options, out_result);
+    const std::string effective_prompt =
+        rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
+    rac_result_t result =
+        service->ops->generate(service->impl, effective_prompt.c_str(), options, out_result);
 
     RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: backend returned result=%d", result);
     return result;
@@ -140,7 +144,10 @@ rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    return service->ops->generate_stream(service->impl, prompt, options, callback, user_data);
+    const std::string effective_prompt =
+        rac::llm::apply_no_think_directive(prompt, options ? options->disable_thinking : RAC_FALSE);
+    return service->ops->generate_stream(service->impl, effective_prompt.c_str(), options, callback,
+                                         user_data);
 }
 
 rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info) {

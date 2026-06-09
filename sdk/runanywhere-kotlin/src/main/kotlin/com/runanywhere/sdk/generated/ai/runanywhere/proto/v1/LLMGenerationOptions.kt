@@ -292,6 +292,21 @@ public class LLMGenerationOptions(
     schemaIndex = 23,
   )
   public val tool_calling: ToolCallingOptions? = null,
+  /**
+   * When true, suppress the model's thinking/reasoning phase for this
+   * generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
+   * model's no-think directive at the prompt level, so no app prepends
+   * "/no_think" by hand. Default false = the model's normal thinking
+   * behavior.
+   */
+  @field:WireField(
+    tag = 25,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "disableThinking",
+    schemaIndex = 24,
+  )
+  public val disable_thinking: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -341,6 +356,7 @@ public class LLMGenerationOptions(
     if (echo_prompt != other.echo_prompt) return false
     if (n_threads != other.n_threads) return false
     if (tool_calling != other.tool_calling) return false
+    if (disable_thinking != other.disable_thinking) return false
     return true
   }
 
@@ -372,6 +388,7 @@ public class LLMGenerationOptions(
       result = result * 37 + echo_prompt.hashCode()
       result = result * 37 + n_threads.hashCode()
       result = result * 37 + (tool_calling?.hashCode() ?: 0)
+      result = result * 37 + disable_thinking.hashCode()
       super.hashCode = result
     }
     return result
@@ -403,6 +420,7 @@ public class LLMGenerationOptions(
     result += """echo_prompt=$echo_prompt"""
     result += """n_threads=$n_threads"""
     if (tool_calling != null) result += """tool_calling=$tool_calling"""
+    result += """disable_thinking=$disable_thinking"""
     return result.joinToString(prefix = "LLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
@@ -431,8 +449,9 @@ public class LLMGenerationOptions(
     echo_prompt: Boolean = this.echo_prompt,
     n_threads: Int = this.n_threads,
     tool_calling: ToolCallingOptions? = this.tool_calling,
+    disable_thinking: Boolean = this.disable_thinking,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerationOptions = LLMGenerationOptions(max_tokens, temperature, top_p, top_k, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, system_prompt, json_schema, thinking_pattern, execution_target, structured_output, enable_real_time_tracking, seed, frequency_penalty, presence_penalty, repeat_last_n, min_p, grammar, response_format, echo_prompt, n_threads, tool_calling, unknownFields)
+  ): LLMGenerationOptions = LLMGenerationOptions(max_tokens, temperature, top_p, top_k, repetition_penalty, stop_sequences, streaming_enabled, preferred_framework, system_prompt, json_schema, thinking_pattern, execution_target, structured_output, enable_real_time_tracking, seed, frequency_penalty, presence_penalty, repeat_last_n, min_p, grammar, response_format, echo_prompt, n_threads, tool_calling, disable_thinking, unknownFields)
 
   public companion object {
     @JvmField
@@ -501,6 +520,9 @@ public class LLMGenerationOptions(
           size += ProtoAdapter.INT32.encodedSizeWithTag(23, value.n_threads)
         }
         size += ToolCallingOptions.ADAPTER.encodedSizeWithTag(24, value.tool_calling)
+        if (value.disable_thinking != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(25, value.disable_thinking)
+        }
         return size
       }
 
@@ -559,11 +581,17 @@ public class LLMGenerationOptions(
           ProtoAdapter.INT32.encodeWithTag(writer, 23, value.n_threads)
         }
         ToolCallingOptions.ADAPTER.encodeWithTag(writer, 24, value.tool_calling)
+        if (value.disable_thinking != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 25, value.disable_thinking)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.disable_thinking != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 25, value.disable_thinking)
+        }
         ToolCallingOptions.ADAPTER.encodeWithTag(writer, 24, value.tool_calling)
         if (value.n_threads != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 23, value.n_threads)
@@ -645,6 +673,7 @@ public class LLMGenerationOptions(
         var echo_prompt: Boolean = false
         var n_threads: Int = 0
         var tool_calling: ToolCallingOptions? = null
+        var disable_thinking: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> max_tokens = ProtoAdapter.INT32.decode(reader)
@@ -679,6 +708,7 @@ public class LLMGenerationOptions(
             22 -> echo_prompt = ProtoAdapter.BOOL.decode(reader)
             23 -> n_threads = ProtoAdapter.INT32.decode(reader)
             24 -> tool_calling = ToolCallingOptions.ADAPTER.decode(reader)
+            25 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -707,6 +737,7 @@ public class LLMGenerationOptions(
           echo_prompt = echo_prompt,
           n_threads = n_threads,
           tool_calling = tool_calling,
+          disable_thinking = disable_thinking,
           unknownFields = unknownFields
         )
       }

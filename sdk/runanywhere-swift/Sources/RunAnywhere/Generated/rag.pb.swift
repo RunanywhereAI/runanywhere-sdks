@@ -147,8 +147,10 @@ public nonisolated struct RARAGConfiguration: Sendable {
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-  /// Optional so callers can distinguish "unset" (commons stamps the
-  /// canonical default) from explicit zero / explicit override.
+  /// Leave UNSET: commons derives the dimension from the loaded embedding
+  /// model at session create (rac_embeddings_get_info). Set only to
+  /// override. No rac_default on purpose — a generated defaults() that
+  /// stamped 384 would mark the field present and defeat the derivation.
   public var embeddingDimension: Int32 {
     get {_embeddingDimension ?? 0}
     set {_embeddingDimension = newValue}
@@ -173,6 +175,10 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// score are discarded before being passed to the LLM as context.
   /// Optional so callers can distinguish "unset" from explicit 0.0
   /// (accept-everything) without losing the canonical default.
+  /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
+  /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
+  /// so a 0.7 floor filters out every match and retrieval returns nothing
+  /// (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
   public var similarityThreshold: Float {
     get {_similarityThreshold ?? 0}
     set {_similarityThreshold = newValue}
@@ -401,6 +407,11 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   public var similarityThreshold: Float = 0
 
   public var stream: Bool = false
+
+  /// When true, suppress the answer model's thinking phase (maps to
+  /// LLMGenerationOptions.disable_thinking so commons prepends the no-think
+  /// directive instead of the app injecting "/no_think"). Default false.
+  public var disableThinking: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -999,7 +1010,7 @@ nonisolated extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0\u{3}disable_thinking\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1016,6 +1027,7 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.retrievalTopK) }()
       case 8: try { try decoder.decodeSingularFloatField(value: &self.similarityThreshold) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self.stream) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self.disableThinking) }()
       default: break
       }
     }
@@ -1053,6 +1065,9 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     if self.stream != false {
       try visitor.visitSingularBoolField(value: self.stream, fieldNumber: 9)
     }
+    if self.disableThinking != false {
+      try visitor.visitSingularBoolField(value: self.disableThinking, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1066,6 +1081,7 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs.retrievalTopK != rhs.retrievalTopK {return false}
     if lhs.similarityThreshold != rhs.similarityThreshold {return false}
     if lhs.stream != rhs.stream {return false}
+    if lhs.disableThinking != rhs.disableThinking {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -128,6 +128,19 @@ public class RAGQueryOptions(
     schemaIndex = 8,
   )
   public val stream: Boolean = false,
+  /**
+   * When true, suppress the answer model's thinking phase (maps to
+   * LLMGenerationOptions.disable_thinking so commons prepends the no-think
+   * directive instead of the app injecting "/no_think"). Default false.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "disableThinking",
+    schemaIndex = 9,
+  )
+  public val disable_thinking: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGQueryOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -149,6 +162,7 @@ public class RAGQueryOptions(
     if (retrieval_top_k != other.retrieval_top_k) return false
     if (similarity_threshold != other.similarity_threshold) return false
     if (stream != other.stream) return false
+    if (disable_thinking != other.disable_thinking) return false
     return true
   }
 
@@ -165,6 +179,7 @@ public class RAGQueryOptions(
       result = result * 37 + retrieval_top_k.hashCode()
       result = result * 37 + similarity_threshold.hashCode()
       result = result * 37 + stream.hashCode()
+      result = result * 37 + disable_thinking.hashCode()
       super.hashCode = result
     }
     return result
@@ -181,6 +196,7 @@ public class RAGQueryOptions(
     result += """retrieval_top_k=$retrieval_top_k"""
     result += """similarity_threshold=$similarity_threshold"""
     result += """stream=$stream"""
+    result += """disable_thinking=$disable_thinking"""
     return result.joinToString(prefix = "RAGQueryOptions{", separator = ", ", postfix = "}")
   }
 
@@ -194,8 +210,9 @@ public class RAGQueryOptions(
     retrieval_top_k: Int = this.retrieval_top_k,
     similarity_threshold: Float = this.similarity_threshold,
     stream: Boolean = this.stream,
+    disable_thinking: Boolean = this.disable_thinking,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGQueryOptions = RAGQueryOptions(question, system_prompt, max_tokens, temperature, top_p, top_k, retrieval_top_k, similarity_threshold, stream, unknownFields)
+  ): RAGQueryOptions = RAGQueryOptions(question, system_prompt, max_tokens, temperature, top_p, top_k, retrieval_top_k, similarity_threshold, stream, disable_thinking, unknownFields)
 
   public companion object {
     @JvmField
@@ -234,6 +251,9 @@ public class RAGQueryOptions(
         if (value.stream != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.stream)
         }
+        if (value.disable_thinking != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.disable_thinking)
+        }
         return size
       }
 
@@ -263,11 +283,17 @@ public class RAGQueryOptions(
         if (value.stream != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
         }
+        if (value.disable_thinking != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.disable_thinking)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGQueryOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.disable_thinking != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.disable_thinking)
+        }
         if (value.stream != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
         }
@@ -305,6 +331,7 @@ public class RAGQueryOptions(
         var retrieval_top_k: Int = 0
         var similarity_threshold: Float = 0f
         var stream: Boolean = false
+        var disable_thinking: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> question = ProtoAdapter.STRING.decode(reader)
@@ -316,6 +343,7 @@ public class RAGQueryOptions(
             7 -> retrieval_top_k = ProtoAdapter.INT32.decode(reader)
             8 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
             9 -> stream = ProtoAdapter.BOOL.decode(reader)
+            10 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -329,6 +357,7 @@ public class RAGQueryOptions(
           retrieval_top_k = retrieval_top_k,
           similarity_threshold = similarity_threshold,
           stream = stream,
+          disable_thinking = disable_thinking,
           unknownFields = unknownFields
         )
       }

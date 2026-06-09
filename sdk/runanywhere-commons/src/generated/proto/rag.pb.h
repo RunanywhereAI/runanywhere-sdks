@@ -845,6 +845,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
     kRetrievalTopKFieldNumber = 7,
     kSimilarityThresholdFieldNumber = 8,
     kStreamFieldNumber = 9,
+    kDisableThinkingFieldNumber = 10,
   };
   // string question = 1;
   void clear_question() ;
@@ -948,11 +949,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   void _internal_set_stream(bool value);
 
   public:
+  // bool disable_thinking = 10;
+  void clear_disable_thinking() ;
+  [[nodiscard]] bool disable_thinking() const;
+  void set_disable_thinking(bool value);
+
+  private:
+  bool _internal_disable_thinking() const;
+  void _internal_set_disable_thinking(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGQueryOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 9,
+      ::google::protobuf::internal::TcParseTable<4, 10,
                           0, 68,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -990,6 +1001,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
     ::int32_t retrieval_top_k_;
     float similarity_threshold_;
     bool stream_;
+    bool disable_thinking_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1374,7 +1386,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_reranker_model_id();
 
   public:
-  // optional int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
+  // optional int32 embedding_dimension = 3;
   [[nodiscard]] bool has_embedding_dimension()
       const;
   void clear_embedding_dimension() ;
@@ -1398,7 +1410,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_top_k(::int32_t value);
 
   public:
-  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   [[nodiscard]] bool has_similarity_threshold()
       const;
   void clear_similarity_threshold() ;
@@ -4059,7 +4071,7 @@ inline void RAGConfiguration::set_allocated_llm_model_id(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.llm_model_id)
 }
 
-// optional int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
+// optional int32 embedding_dimension = 3;
 inline bool RAGConfiguration::has_embedding_dimension() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   return value;
@@ -4115,7 +4127,7 @@ inline void RAGConfiguration::_internal_set_top_k(::int32_t value) {
   _impl_.top_k_ = value;
 }
 
-// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+// optional float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.3", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline bool RAGConfiguration::has_similarity_threshold() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
   return value;
@@ -5490,6 +5502,30 @@ inline bool RAGQueryOptions::_internal_stream() const {
 inline void RAGQueryOptions::_internal_set_stream(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stream_ = value;
+}
+
+// bool disable_thinking = 10;
+inline void RAGQueryOptions::clear_disable_thinking() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.disable_thinking_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+}
+inline bool RAGQueryOptions::disable_thinking() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.disable_thinking)
+  return _internal_disable_thinking();
+}
+inline void RAGQueryOptions::set_disable_thinking(bool value) {
+  _internal_set_disable_thinking(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.disable_thinking)
+}
+inline bool RAGQueryOptions::_internal_disable_thinking() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.disable_thinking_;
+}
+inline void RAGQueryOptions::_internal_set_disable_thinking(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.disable_thinking_ = value;
 }
 
 // -------------------------------------------------------------------

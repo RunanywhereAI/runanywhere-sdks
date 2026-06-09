@@ -272,9 +272,8 @@ public fun LoggingConfiguration.Companion.defaults(): LoggingConfiguration =
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun RAGConfiguration.Companion.defaults(): RAGConfiguration =
     RAGConfiguration(
-        embedding_dimension = 384,
         top_k = 5,
-        similarity_threshold = 0.7f,
+        similarity_threshold = 0.3f,
         chunk_size = 512,
         chunk_overlap = 64,
     )

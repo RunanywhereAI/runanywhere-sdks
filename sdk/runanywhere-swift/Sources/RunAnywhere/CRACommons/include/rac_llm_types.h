@@ -117,6 +117,15 @@ typedef struct rac_llm_options {
 
     /** Per-request backend thread hint (idl/llm_options.proto:119). 0 = backend default. */
     int32_t n_threads;
+
+    /**
+     * When RAC_TRUE, suppress the model's thinking phase for this generation
+     * (idl/llm_options.proto disable_thinking). Commons prepends the model
+     * no-think directive at the prompt level; RAC_FALSE = normal thinking.
+     * Appended at the end of the struct so zero-initialized callers default to
+     * RAC_FALSE (thinking enabled).
+     */
+    rac_bool_t disable_thinking;
 } rac_llm_options_t;
 
 /**
@@ -141,7 +150,8 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .min_p = 0.0f,
                                                           .seed = 0,
                                                           .grammar = RAC_NULL,
-                                                          .n_threads = 0};
+                                                          .n_threads = 0,
+                                                          .disable_thinking = RAC_FALSE};
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult

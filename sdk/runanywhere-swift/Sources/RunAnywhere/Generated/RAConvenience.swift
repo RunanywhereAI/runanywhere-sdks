@@ -315,9 +315,8 @@ extension RARAGConfiguration {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RARAGConfiguration {
         var r = RARAGConfiguration()
-        r.embeddingDimension = 384
         r.topK = 5
-        r.similarityThreshold = 0.7
+        r.similarityThreshold = 0.3
         r.chunkSize = 512
         r.chunkOverlap = 64
         return r

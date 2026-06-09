@@ -340,6 +340,16 @@ public nonisolated struct RALLMGenerationOptions: @unchecked Sendable {
   /// Clears the value of `toolCalling`. Subsequent reads from it will return its default value.
   public mutating func clearToolCalling() {_uniqueStorage()._toolCalling = nil}
 
+  /// When true, suppress the model's thinking/reasoning phase for this
+  /// generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
+  /// model's no-think directive at the prompt level, so no app prepends
+  /// "/no_think" by hand. Default false = the model's normal thinking
+  /// behavior.
+  public var disableThinking: Bool {
+    get {_storage._disableThinking}
+    set {_uniqueStorage()._disableThinking = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -799,7 +809,7 @@ nonisolated extension RAExecutionTarget: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}thinking_pattern\0\u{3}execution_target\0\u{3}structured_output\0\u{3}enable_real_time_tracking\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}repeat_last_n\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{3}tool_calling\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}thinking_pattern\0\u{3}execution_target\0\u{3}structured_output\0\u{3}enable_real_time_tracking\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}repeat_last_n\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{3}tool_calling\0\u{3}disable_thinking\0")
 
   fileprivate class _StorageClass {
     var _maxTokens: Int32 = 0
@@ -826,6 +836,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
     var _echoPrompt: Bool = false
     var _nThreads: Int32 = 0
     var _toolCalling: RAToolCallingOptions? = nil
+    var _disableThinking: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -860,6 +871,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       _echoPrompt = source._echoPrompt
       _nThreads = source._nThreads
       _toolCalling = source._toolCalling
+      _disableThinking = source._disableThinking
     }
   }
 
@@ -902,6 +914,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         case 22: try { try decoder.decodeSingularBoolField(value: &_storage._echoPrompt) }()
         case 23: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
         case 24: try { try decoder.decodeSingularMessageField(value: &_storage._toolCalling) }()
+        case 25: try { try decoder.decodeSingularBoolField(value: &_storage._disableThinking) }()
         default: break
         }
       }
@@ -986,6 +999,9 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       try { if let v = _storage._toolCalling {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
       } }()
+      if _storage._disableThinking != false {
+        try visitor.visitSingularBoolField(value: _storage._disableThinking, fieldNumber: 25)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1019,6 +1035,7 @@ nonisolated extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         if _storage._echoPrompt != rhs_storage._echoPrompt {return false}
         if _storage._nThreads != rhs_storage._nThreads {return false}
         if _storage._toolCalling != rhs_storage._toolCalling {return false}
+        if _storage._disableThinking != rhs_storage._disableThinking {return false}
         return true
       }
       if !storagesAreEqual {return false}

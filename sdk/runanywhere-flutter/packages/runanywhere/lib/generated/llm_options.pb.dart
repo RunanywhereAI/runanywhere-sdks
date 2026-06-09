@@ -58,6 +58,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $core.bool? echoPrompt,
     $core.int? nThreads,
     $2.ToolCallingOptions? toolCalling,
+    $core.bool? disableThinking,
   }) {
     final result = create();
     if (maxTokens != null) result.maxTokens = maxTokens;
@@ -86,6 +87,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     if (echoPrompt != null) result.echoPrompt = echoPrompt;
     if (nThreads != null) result.nThreads = nThreads;
     if (toolCalling != null) result.toolCalling = toolCalling;
+    if (disableThinking != null) result.disableThinking = disableThinking;
     return result;
   }
 
@@ -135,6 +137,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..aI(23, _omitFieldNames ? '' : 'nThreads')
     ..aOM<$2.ToolCallingOptions>(24, _omitFieldNames ? '' : 'toolCalling',
         subBuilder: $2.ToolCallingOptions.create)
+    ..aOB(25, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -405,6 +408,20 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   void clearToolCalling() => $_clearField(24);
   @$pb.TagNumber(24)
   $2.ToolCallingOptions ensureToolCalling() => $_ensure(23);
+
+  /// When true, suppress the model's thinking/reasoning phase for this
+  /// generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
+  /// model's no-think directive at the prompt level, so no app prepends
+  /// "/no_think" by hand. Default false = the model's normal thinking
+  /// behavior.
+  @$pb.TagNumber(25)
+  $core.bool get disableThinking => $_getBF(24);
+  @$pb.TagNumber(25)
+  set disableThinking($core.bool value) => $_setBool(24, value);
+  @$pb.TagNumber(25)
+  $core.bool hasDisableThinking() => $_has(24);
+  @$pb.TagNumber(25)
+  void clearDisableThinking() => $_clearField(25);
 }
 
 /// ---------------------------------------------------------------------------

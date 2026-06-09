@@ -20,9 +20,8 @@ import { ValidationError } from './_errors';
 export const rAGConfigurationDefaults = (): RAGConfiguration => ({
   embeddingModelId: '',
   llmModelId: '',
-  embeddingDimension: 384,
   topK: 5,
-  similarityThreshold: 0.7,
+  similarityThreshold: 0.3,
   chunkSize: 512,
   chunkOverlap: 64,
   persistIndex: false,
@@ -47,4 +46,5 @@ export const rAGQueryOptionsDefaults = (): RAGQueryOptions => ({
   retrievalTopK: 0,
   similarityThreshold: 0,
   stream: false,
+  disableThinking: false,
 });

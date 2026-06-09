@@ -82,9 +82,11 @@ message RAGConfiguration {
 
     // Embedding vector dimension — must match the embedding model.
     // Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-    // Optional so callers can distinguish "unset" (commons stamps the
-    // canonical default) from explicit zero / explicit override.
-    optional int32 embedding_dimension   = 3 [(runanywhere.v1.rac_default) = "384"];
+    // Leave UNSET: commons derives the dimension from the loaded embedding
+    // model at session create (rac_embeddings_get_info). Set only to
+    // override. No rac_default on purpose — a generated defaults() that
+    // stamped 384 would mark the field present and defeat the derivation.
+    optional int32 embedding_dimension   = 3;
 
     // Number of top chunks to retrieve per query.
     // Optional so callers can distinguish "unset" from an explicit value.
@@ -94,8 +96,12 @@ message RAGConfiguration {
     // score are discarded before being passed to the LLM as context.
     // Optional so callers can distinguish "unset" from explicit 0.0
     // (accept-everything) without losing the canonical default.
+    // Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
+    // cosine similarities that rarely exceed ~0.5 even for relevant chunks,
+    // so a 0.7 floor filters out every match and retrieval returns nothing
+    // (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
     optional float similarity_threshold  = 5 [
-        (runanywhere.v1.rac_default) = "0.7",
+        (runanywhere.v1.rac_default) = "0.3",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
@@ -189,6 +195,11 @@ message RAGQueryOptions {
     int32 retrieval_top_k        = 7;
     float similarity_threshold   = 8;
     bool  stream                 = 9;
+
+    // When true, suppress the answer model's thinking phase (maps to
+    // LLMGenerationOptions.disable_thinking so commons prepends the no-think
+    // directive instead of the app injecting "/no_think"). Default false.
+    bool  disable_thinking       = 10;
 }
 
 message RAGQueryRequest {
