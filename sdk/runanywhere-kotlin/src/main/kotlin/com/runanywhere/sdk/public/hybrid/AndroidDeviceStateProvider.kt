@@ -1,20 +1,20 @@
 /*
-  * Copyright 2026 RunAnywhere SDK
-  * SPDX-License-Identifier: Apache-2.0
-  *
-  * Android impl of [DeviceStateProvider]. Backed by ConnectivityManager
-  * (validated internet), BatteryManager (capacity percent), and
-  * PowerManager (thermal status on API 29+, isPowerSaveMode fallback).
-  *
-  * Register once at app startup, after SDK init:
-  *
-  *     RACRouter.setDeviceStateProvider(
-  *         AndroidDeviceStateProvider(applicationContext)
-  *     )
-  *
-  * Requires the manifest permission `android.permission.ACCESS_NETWORK_STATE`.
-  * Without it, [isOnline] gracefully degrades to `true` instead of throwing.
-  */
+ * Copyright 2026 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Android impl of [DeviceStateProvider]. Backed by ConnectivityManager
+ * (validated internet), BatteryManager (capacity percent), and
+ * PowerManager (thermal status on API 29+, isPowerSaveMode fallback).
+ *
+ * Register once at app startup, after SDK init:
+ *
+ *     RACRouter.setDeviceStateProvider(
+ *         AndroidDeviceStateProvider(applicationContext)
+ *     )
+ *
+ * Requires the manifest permission `android.permission.ACCESS_NETWORK_STATE`.
+ * Without it, [isOnline] gracefully degrades to `true` instead of throwing.
+ */
 
 package com.runanywhere.sdk.public.hybrid
 
@@ -27,8 +27,9 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.annotation.RequiresPermission
 
-class AndroidDeviceStateProvider(context: Context) : DeviceStateProvider {
-
+class AndroidDeviceStateProvider(
+    context: Context,
+) : DeviceStateProvider {
     private val appContext: Context = context.applicationContext
 
     private val connectivity: ConnectivityManager? =
@@ -47,7 +48,7 @@ class AndroidDeviceStateProvider(context: Context) : DeviceStateProvider {
             val active = cm.activeNetwork ?: return false
             val caps = cm.getNetworkCapabilities(active) ?: return false
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         } catch (_: SecurityException) {
             true
         }

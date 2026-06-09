@@ -25,7 +25,6 @@ import ai.runanywhere.proto.v1.HybridModelDescriptor
 import ai.runanywhere.proto.v1.HybridRank
 import ai.runanywhere.proto.v1.HybridRoutingPolicy
 
-
 /**
  * Output of [HybridRouterProto.policy]. Carries the serialised policy
  * bytes for the native side plus any [RACRouter.RoutingPolicy.CustomDefine]
@@ -56,7 +55,6 @@ internal data class PackedPolicy(
 }
 
 internal object HybridRouterProto {
-
     /**
      * Serialise a [RACModel] + backend [kind] as a HybridModelDescriptor.
      * Native side decodes via runanywhere::v1::HybridModelDescriptor::ParseFromArray.
@@ -66,12 +64,13 @@ internal object HybridRouterProto {
      * backends, where the field is ignored.
      */
     fun descriptor(model: RACModel, kind: HybridBackendKind, provider: String = ""): ByteArray {
-        val msg = HybridModelDescriptor(
-            model_id = model.id,
-            model_type = model.modelType,
-            backend = kind,
-            provider = provider,
-        )
+        val msg =
+            HybridModelDescriptor(
+                model_id = model.id,
+                model_type = model.modelType,
+                backend = kind,
+                provider = provider,
+            )
         return HybridModelDescriptor.ADAPTER.encode(msg)
     }
 
@@ -101,11 +100,12 @@ internal object HybridRouterProto {
             }
         }
 
-        val msg = HybridRoutingPolicy(
-            cascade = cascade,
-            rank = rank,
-            hard_filters = filters,
-        )
+        val msg =
+            HybridRoutingPolicy(
+                cascade = cascade,
+                rank = rank,
+                hard_filters = filters,
+            )
         return PackedPolicy(
             bytes = HybridRoutingPolicy.ADAPTER.encode(msg),
             customFilters = customs,
@@ -117,23 +117,25 @@ internal object HybridRouterProto {
     private fun filterToProto(
         filter: RACRouter.Filter,
         customs: MutableList<RACRouter.RoutingPolicy.CustomDefine>,
-    ): HybridFilter = when (filter) {
-        is RACRouter.RoutingPolicy.NETWORK ->
-            HybridFilter(network = true)
-        is RACRouter.RoutingPolicy.Quality ->
-            HybridFilter(quality_tier = filter.tier)
-        is RACRouter.RoutingPolicy.Battery ->
-            HybridFilter(battery = BatteryFilter(min_battery_percent = filter.minPercent))
-        is RACRouter.RoutingPolicy.CustomDefine -> {
-            customs.add(filter)
-            HybridFilter(custom = CustomFilter(name = filter.name, description = filter.description))
+    ): HybridFilter =
+        when (filter) {
+            is RACRouter.RoutingPolicy.NETWORK ->
+                HybridFilter(network = true)
+            is RACRouter.RoutingPolicy.Quality ->
+                HybridFilter(quality_tier = filter.tier)
+            is RACRouter.RoutingPolicy.Battery ->
+                HybridFilter(battery = BatteryFilter(min_battery_percent = filter.minPercent))
+            is RACRouter.RoutingPolicy.CustomDefine -> {
+                customs.add(filter)
+                HybridFilter(custom = CustomFilter(name = filter.name, description = filter.description))
+            }
+            else -> HybridFilter()
         }
-        else -> HybridFilter()
-    }
 
-    private fun cascadeToProto(cascade: RACRouter.Cascade): HybridCascade = when (cascade) {
-        is RACRouter.RoutingPolicy.Confidence ->
-            HybridCascade(confidence = ConfidenceCascade(threshold = cascade.threshold))
-        else -> HybridCascade()
-    }
+    private fun cascadeToProto(cascade: RACRouter.Cascade): HybridCascade =
+        when (cascade) {
+            is RACRouter.RoutingPolicy.Confidence ->
+                HybridCascade(confidence = ConfidenceCascade(threshold = cascade.threshold))
+            else -> HybridCascade()
+        }
 }

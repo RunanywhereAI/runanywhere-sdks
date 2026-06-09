@@ -248,7 +248,9 @@ object CppBridgeDevConfig {
             if (!isUsableCredential(trimmed)) return false
             if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) return false
             val host = trimmed.substringAfter("://").substringBefore('/').substringBefore('?')
-            host.isNotBlank() && !host.contains('<') && !host.contains('>') &&
+            host.isNotBlank() &&
+                !host.contains('<') &&
+                !host.contains('>') &&
                 host.none { it.isWhitespace() }
         }
     }

@@ -134,15 +134,17 @@ suspend fun RunAnywhere.aggregateStream(
     val totalLatencyMs = (System.currentTimeMillis() - startTimeMs).toDouble()
     val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs).toDouble() }
 
-    val snapshot = currentModel(
-        CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
-    )
+    val snapshot =
+        currentModel(
+            CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+        )
     val modelID = if (snapshot.found) snapshot.model_id else ""
-    val framework = if (snapshot.found) {
-        snapshot.framework.analyticsKey
-    } else {
-        InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey
-    }
+    val framework =
+        if (snapshot.found) {
+            snapshot.framework.analyticsKey
+        } else {
+            InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey
+        }
 
     // Prefer the backend's terminal aggregate result (text + metrics) when the
     // final event carries one, matching the Web SDK; otherwise fall back to the
@@ -156,8 +158,9 @@ suspend fun RunAnywhere.aggregateStream(
         model_used = modelID,
         generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
         framework = framework,
-        tokens_per_second = final?.tokens_per_second?.toDouble()
-            ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
+        tokens_per_second =
+            final?.tokens_per_second?.toDouble()
+                ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
         ttft_ms = final?.time_to_first_token_ms?.toDouble() ?: ttftMs,
         finish_reason = finishReason,
         error_message = terminalError.ifEmpty { null },

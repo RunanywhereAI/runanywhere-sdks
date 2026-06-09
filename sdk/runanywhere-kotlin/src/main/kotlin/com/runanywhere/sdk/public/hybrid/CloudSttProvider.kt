@@ -25,7 +25,9 @@ import org.json.JSONObject
  * Audio container of the bytes handed to a [CloudSttProvider]. Wire values
  * mirror the native `rac_audio_format_enum_t`.
  */
-enum class CloudAudioFormat(val nativeValue: Int) {
+enum class CloudAudioFormat(
+    val nativeValue: Int,
+) {
     PCM(0),
     WAV(1),
     MP3(2),
@@ -99,7 +101,9 @@ fun interface CloudSttProvider {
  *
  * @suppress
  */
-class NativeCloudSttProvider(private val delegate: CloudSttProvider) {
+class NativeCloudSttProvider(
+    private val delegate: CloudSttProvider,
+) {
     /**
      * Invoked from native. Decodes [configJson] into a [CloudSttRequest], runs
      * the delegate, and returns a result-JSON string the engine parses. Never
@@ -109,23 +113,25 @@ class NativeCloudSttProvider(private val delegate: CloudSttProvider) {
     fun invoke(configJson: String, audio: ByteArray, audioFormat: Int): String {
         return try {
             val config = JSONObject(configJson)
-            val request = CloudSttRequest(
-                provider = config.optString("provider"),
-                model = config.optString("model"),
-                apiKey = config.optString("api_key"),
-                baseUrl = config.optString("base_url").ifBlank { null },
-                languageCode = config.optString("language_code").ifBlank { null },
-                audio = audio,
-                audioFormat = CloudAudioFormat.fromNative(audioFormat),
-                configJson = configJson,
-            )
+            val request =
+                CloudSttRequest(
+                    provider = config.optString("provider"),
+                    model = config.optString("model"),
+                    apiKey = config.optString("api_key"),
+                    baseUrl = config.optString("base_url").ifBlank { null },
+                    languageCode = config.optString("language_code").ifBlank { null },
+                    audio = audio,
+                    audioFormat = CloudAudioFormat.fromNative(audioFormat),
+                    configJson = configJson,
+                )
             val result = delegate.transcribe(request)
-            JSONObject().apply {
-                put("text", result.text)
-                result.languageCode?.let { put("language_code", it) }
-                if (!result.confidence.isNaN()) put("confidence", result.confidence.toDouble())
-                put("error_code", 0)
-            }.toString()
+            JSONObject()
+                .apply {
+                    put("text", result.text)
+                    result.languageCode?.let { put("language_code", it) }
+                    if (!result.confidence.isNaN()) put("confidence", result.confidence.toDouble())
+                    put("error_code", 0)
+                }.toString()
         } catch (e: Throwable) {
             JSONObject()
                 .put("error_code", 1)

@@ -312,12 +312,13 @@ object CppBridge {
             logger.debug("Base URL: $baseURL")
         }
 
-        val result = CppBridgeSdkInit.phase1(
-            environment = environment,
-            apiKey = apiKey.orEmpty(),
-            baseURL = baseURL.orEmpty(),
-            deviceId = deviceId,
-        )
+        val result =
+            CppBridgeSdkInit.phase1(
+                environment = environment,
+                apiKey = apiKey.orEmpty(),
+                baseURL = baseURL.orEmpty(),
+                deviceId = deviceId,
+            )
         logger.debug(
             "SDK config initialized (phase 1): linkedModels=${result.linked_models_count}",
         )
@@ -500,12 +501,13 @@ object CppBridge {
     suspend fun shutdownSuspending() {
         // Snapshot initialization state under the lock without holding it
         // across the suspend destroy calls below.
-        val wasInitialized = synchronized(lock) {
-            if (!CppBridgeState.isInitialized) {
-                return
+        val wasInitialized =
+            synchronized(lock) {
+                if (!CppBridgeState.isInitialized) {
+                    return
+                }
+                true
             }
-            true
-        }
         if (!wasInitialized) return
 
         // Destroy AI components sequentially before tearing down Telemetry/Events.
@@ -627,9 +629,10 @@ object CppBridge {
      */
     private fun teardownSentryLogging() {
         try {
-            val sentryDestination = Logging.destinations.find {
-                it.identifier == SentryDestination.DESTINATION_ID
-            }
+            val sentryDestination =
+                Logging.destinations.find {
+                    it.identifier == SentryDestination.DESTINATION_ID
+                }
             if (sentryDestination != null) {
                 Logging.removeDestinationSync(sentryDestination)
             }

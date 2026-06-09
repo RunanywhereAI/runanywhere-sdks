@@ -182,7 +182,8 @@ private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAM
 private fun planDownload(request: DownloadPlanRequest): DownloadPlanResult? {
     val plan = CppBridgeDownload.plan(request) ?: return null
     if (plan.can_start ||
-        plan.failure_reason != DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES) {
+        plan.failure_reason != DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES
+    ) {
         return plan
     }
 

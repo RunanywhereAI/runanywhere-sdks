@@ -251,8 +251,14 @@ fun RAToolValue.toJSONString(pretty: Boolean = false): String? {
             kotlinx.serialization.json.Json {
                 prettyPrint = true
             }
-        val element = kotlinx.serialization.json.Json.parseToJsonElement(json)
-        pretty.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), element)
+        val element =
+            kotlinx.serialization.json.Json
+                .parseToJsonElement(json)
+        pretty.encodeToString(
+            kotlinx.serialization.json.JsonElement
+                .serializer(),
+            element,
+        )
     }.getOrDefault(json)
 }
 
@@ -271,7 +277,10 @@ fun ai.runanywhere.proto.v1.ToolValue.Companion.parseObjectJSON(
         RunAnywhereBridge.racToolValueFromJsonProto(ToolValueJSON.ADAPTER.encode(wrapper))
             ?: return emptyMap()
     return runCatching {
-        RAToolValue.ADAPTER.decode(valueBytes).object_value?.fields ?: emptyMap()
+        RAToolValue.ADAPTER
+            .decode(valueBytes)
+            .object_value
+            ?.fields ?: emptyMap()
     }.getOrDefault(emptyMap())
 }
 

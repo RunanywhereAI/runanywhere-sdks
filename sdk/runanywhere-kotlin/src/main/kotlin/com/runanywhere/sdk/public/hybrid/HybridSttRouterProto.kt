@@ -21,7 +21,6 @@ import ai.runanywhere.proto.v1.HybridSttTranscribeResponse
 import okio.ByteString.Companion.toByteString
 
 internal object HybridSttRouterProto {
-
     /**
      * Build a HybridSttTranscribeRequest carrying the audio bytes, the
      * per-request routing context, and the transcription options.
@@ -44,16 +43,18 @@ internal object HybridSttRouterProto {
         audioFormat: Int = 0,
     ): ByteArray {
         val context = HybridRoutingContext()
-        val options = HybridSttTranscribeOptions(
-            language = language,
-            sample_rate = sampleRate,
-            audio_format = audioFormat,
-        )
-        val msg = HybridSttTranscribeRequest(
-            audio_bytes = audioBytes.toByteString(),
-            context = context,
-            options = options,
-        )
+        val options =
+            HybridSttTranscribeOptions(
+                language = language,
+                sample_rate = sampleRate,
+                audio_format = audioFormat,
+            )
+        val msg =
+            HybridSttTranscribeRequest(
+                audio_bytes = audioBytes.toByteString(),
+                context = context,
+                options = options,
+            )
         return HybridSttTranscribeRequest.ADAPTER.encode(msg)
     }
 
@@ -67,15 +68,16 @@ internal object HybridSttRouterProto {
         return TranscribeResult(
             text = msg.text,
             detectedLanguage = msg.detected_language,
-            routing = RoutedMetadata(
-                chosenModelId = routing?.chosen_model_id.orEmpty(),
-                wasFallback = routing?.was_fallback ?: false,
-                attemptCount = routing?.attempt_count ?: 0,
-                primaryErrorCode = routing?.primary_error_code ?: 0,
-                primaryErrorMessage = routing?.primary_error_message.orEmpty(),
-                confidence = routing?.confidence ?: Float.NaN,
-                primaryConfidence = routing?.primary_confidence ?: Float.NaN,
-            ),
+            routing =
+                RoutedMetadata(
+                    chosenModelId = routing?.chosen_model_id.orEmpty(),
+                    wasFallback = routing?.was_fallback ?: false,
+                    attemptCount = routing?.attempt_count ?: 0,
+                    primaryErrorCode = routing?.primary_error_code ?: 0,
+                    primaryErrorMessage = routing?.primary_error_message.orEmpty(),
+                    confidence = routing?.confidence ?: Float.NaN,
+                    primaryConfidence = routing?.primary_confidence ?: Float.NaN,
+                ),
         )
     }
 }

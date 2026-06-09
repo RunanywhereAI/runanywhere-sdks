@@ -53,7 +53,6 @@ typealias Rank = HybridRank
  * Always release via [close] or use as a `Closeable` in a `use { }` block.
  */
 class RACRouter internal constructor() : Closeable {
-
     /** STT capability slot. See [SttRouter]. */
     val stt: SttRouter = SttRouter()
 
@@ -127,7 +126,9 @@ class RACRouter internal constructor() : Closeable {
          *
          * @property tier Minimum tier the candidate must declare.
          */
-        class Quality(val tier: Int = 1) : Filter
+        class Quality(
+            val tier: Int = 1,
+        ) : Filter
 
         /**
          * Filter: drops online candidates when the device is below
@@ -136,7 +137,9 @@ class RACRouter internal constructor() : Closeable {
          * @property minPercent Minimum battery percentage (0–100) required
          *                      to keep the online candidate eligible.
          */
-        class Battery(val minPercent: Int = 20) : Filter
+        class Battery(
+            val minPercent: Int = 20,
+        ) : Filter
 
         /**
          * Filter: caller-supplied predicate. The router registers it by
@@ -171,7 +174,9 @@ class RACRouter internal constructor() : Closeable {
          * @property threshold Confidence value `[0..1]` below which the
          *                     cascade fires.
          */
-        class Confidence(val threshold: Float) : Cascade
+        class Confidence(
+            val threshold: Float,
+        ) : Cascade
 
         /**
          * Prefer the local (offline) candidate when both candidates pass
@@ -327,27 +332,31 @@ class RACRouter internal constructor() : Closeable {
             offlineModel = offModel
             onlineModel = onModel
 
-            val rc1 = RunAnywhereBridge.racSttHybridRouterSetOfflineService(
-                routerHandle = nativeHandle,
-                serviceHandle = offlineServiceHandle,
-                descriptorProto = HybridRouterProto.descriptor(
-                    offModel,
-                    offBackend.kindEnum,
-                    offBackend.provider,
-                ),
-            )
+            val rc1 =
+                RunAnywhereBridge.racSttHybridRouterSetOfflineService(
+                    routerHandle = nativeHandle,
+                    serviceHandle = offlineServiceHandle,
+                    descriptorProto =
+                        HybridRouterProto.descriptor(
+                            offModel,
+                            offBackend.kindEnum,
+                            offBackend.provider,
+                        ),
+                )
             check(rc1 == RunAnywhereBridge.RAC_SUCCESS) {
                 "racSttHybridRouterSetOfflineService rc=$rc1"
             }
-            val rc2 = RunAnywhereBridge.racSttHybridRouterSetOnlineService(
-                routerHandle = nativeHandle,
-                serviceHandle = onlineServiceHandle,
-                descriptorProto = HybridRouterProto.descriptor(
-                    onModel,
-                    onBackend.kindEnum,
-                    onBackend.provider,
-                ),
-            )
+            val rc2 =
+                RunAnywhereBridge.racSttHybridRouterSetOnlineService(
+                    routerHandle = nativeHandle,
+                    serviceHandle = onlineServiceHandle,
+                    descriptorProto =
+                        HybridRouterProto.descriptor(
+                            onModel,
+                            onBackend.kindEnum,
+                            onBackend.provider,
+                        ),
+                )
             check(rc2 == RunAnywhereBridge.RAC_SUCCESS) {
                 "racSttHybridRouterSetOnlineService rc=$rc2"
             }
@@ -361,10 +370,11 @@ class RACRouter internal constructor() : Closeable {
             // first so re-binding a new policy doesn't leak stale callbacks.
             unregisterCustomFilters()
             for (custom in packed.customFilters) {
-                val rc = RunAnywhereBridge.racHybridRegisterCustomFilter(
-                    name = custom.name,
-                    predicate = CustomFilterPredicate { modelId -> custom.check(modelId) },
-                )
+                val rc =
+                    RunAnywhereBridge.racHybridRegisterCustomFilter(
+                        name = custom.name,
+                        predicate = CustomFilterPredicate { modelId -> custom.check(modelId) },
+                    )
                 check(rc == RunAnywhereBridge.RAC_SUCCESS) {
                     "racHybridRegisterCustomFilter('${custom.name}') rc=$rc"
                 }
@@ -416,15 +426,17 @@ class RACRouter internal constructor() : Closeable {
             // hard-filter eligibility (including custom-filter callbacks),
             // ranking, and cascade. Kotlin marshals the request and decodes the
             // response; it does NOT pre-filter candidates or toggle slots.
-            val responseBytes = RunAnywhereBridge.racSttHybridRouterTranscribe(
-                routerHandle = nativeHandle,
-                requestProto = HybridSttRouterProto.request(
-                    audioBytes = audioBytes,
-                    language = language,
-                    sampleRate = sampleRate,
-                    audioFormat = audioFormat,
-                ),
-            ) ?: error("racSttHybridRouterTranscribe returned null envelope")
+            val responseBytes =
+                RunAnywhereBridge.racSttHybridRouterTranscribe(
+                    routerHandle = nativeHandle,
+                    requestProto =
+                        HybridSttRouterProto.request(
+                            audioBytes = audioBytes,
+                            language = language,
+                            sampleRate = sampleRate,
+                            audioFormat = audioFormat,
+                        ),
+                ) ?: error("racSttHybridRouterTranscribe returned null envelope")
             return HybridSttRouterProto.parseResponse(responseBytes)
         }
 
@@ -459,7 +471,9 @@ class RACRouter internal constructor() : Closeable {
      *
      * @property name Capability label used in error messages.
      */
-    class NotImplementedCapability internal constructor(private val name: String) {
+    class NotImplementedCapability internal constructor(
+        private val name: String,
+    ) {
         /** Throws — TTS/VLM not wired. */
         fun addPair(model1: RACModel, model2: RACModel, routerPolicy: RouterPolicyBase): Nothing =
             throw NotImplementedError("router.$name is not wired yet (STT only)")

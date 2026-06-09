@@ -33,21 +33,22 @@ import com.runanywhere.sdk.public.types.RAEmbeddingsResult
  * commons C ABI through [CppBridgeEmbeddings] and the model lifecycle.
  */
 object Embeddings {
-
     // MARK: - Lifecycle introspection
 
     /** True when commons lifecycle has a ready embeddings model. */
     suspend fun isLoaded(): Boolean {
-        val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS)
-            ?: return false
+        val snapshot =
+            RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS)
+                ?: return false
         return snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
             snapshot.model_id.isNotEmpty()
     }
 
     /** Currently-loaded embeddings model id, or null. */
     suspend fun currentModelID(): String? {
-        val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS)
-            ?: return null
+        val snapshot =
+            RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_EMBEDDINGS)
+                ?: return null
         if (snapshot.state != ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
             snapshot.model_id.isEmpty()
         ) {
@@ -106,9 +107,10 @@ object Embeddings {
 
         val modelId =
             currentModelID()
-                ?: RunAnywhere.currentModel(
-                    CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_EMBEDDING),
-                ).model_id
+                ?: RunAnywhere
+                    .currentModel(
+                        CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_EMBEDDING),
+                    ).model_id
         if (modelId.isEmpty()) return
 
         val result =

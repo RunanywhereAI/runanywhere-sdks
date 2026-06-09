@@ -114,8 +114,9 @@ fun EventBus.modelLifecycleChange(event: SDKEvent): RAModelLifecycleChange? {
     // Channels 2 + 3: model events and LLM generation events.
     val modelKind = event.model?.kind
     val generationKind = event.generation?.kind
-    val modelId = event.model?.model_id?.takeIf { it.isNotEmpty() }
-        ?: event.generation?.model_id.orEmpty()
+    val modelId =
+        event.model?.model_id?.takeIf { it.isNotEmpty() }
+            ?: event.generation?.model_id.orEmpty()
 
     return when {
         modelKind == ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ||

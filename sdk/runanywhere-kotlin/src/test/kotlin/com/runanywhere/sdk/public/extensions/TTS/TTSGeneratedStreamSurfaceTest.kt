@@ -18,4 +18,9 @@ class TTSGeneratedStreamSurfaceTest {
 
 @Suppress("unused")
 private fun ttsStreamSurface(): Flow<TTSOutput> =
-    RunAnywhere.synthesizeStream("hello", options = ai.runanywhere.proto.v1.TTSOptions())
+    RunAnywhere.synthesizeStream(
+        "hello",
+        options =
+            ai.runanywhere.proto.v1
+                .TTSOptions(),
+    )

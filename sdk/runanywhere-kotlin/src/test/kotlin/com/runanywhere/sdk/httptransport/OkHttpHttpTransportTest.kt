@@ -122,7 +122,8 @@ class OkHttpHttpTransportTest {
             header.append(response.statusLine).append("\r\n")
             header.append("Content-Length: ").append(response.body.size).append("\r\n")
             for ((name, value) in response.headers) {
-                header.append(name)
+                header
+                    .append(name)
                     .append(": ")
                     .append(value)
                     .append("\r\n")

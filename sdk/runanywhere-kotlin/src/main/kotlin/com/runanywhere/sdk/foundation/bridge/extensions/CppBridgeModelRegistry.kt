@@ -198,7 +198,8 @@ object CppBridgeModelRegistry {
 
         return try {
             val result = ProtoModelDiscoveryResult.ADAPTER.decode(bytes)
-            log(CppBridgePlatformAdapter.LogLevel.INFO,
+            log(
+                CppBridgePlatformAdapter.LogLevel.INFO,
                 "Discovery complete via proto: ${result.linked_count} models linked, ${result.scanned_count} scanned",
             )
             result

@@ -10,9 +10,9 @@
 
 package com.runanywhere.sdk.foundation.errors
 
+import ai.runanywhere.proto.v1.LogLevel
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 import ai.runanywhere.proto.v1.ErrorContext as ProtoErrorContext

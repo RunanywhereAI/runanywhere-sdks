@@ -109,7 +109,8 @@ public object HTTPClientAdapter {
         val trimmedKey = apiKey.trim()
         stateMutex.withLock {
             if (!CppBridgeDevConfig.isUsableHTTPURL(baseURL) ||
-                !CppBridgeDevConfig.isUsableCredential(trimmedKey)) {
+                !CppBridgeDevConfig.isUsableCredential(trimmedKey)
+            ) {
                 this.baseURL = null
                 this.apiKey = null
                 logger.info("HTTP adapter not configured: no usable external config")

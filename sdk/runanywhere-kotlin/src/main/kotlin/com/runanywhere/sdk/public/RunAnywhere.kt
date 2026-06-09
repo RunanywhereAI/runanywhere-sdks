@@ -20,9 +20,10 @@
 
 package com.runanywhere.sdk.public
 
+import ai.runanywhere.proto.v1.LogLevel
 import android.content.Context
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -32,7 +33,6 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
-import ai.runanywhere.proto.v1.LogLevel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -447,7 +447,8 @@ object RunAnywhere {
                 // network down) stays applicable and is still retried.
                 _httpSetupApplicable = CppBridgeTelemetry.hasUsableNetworkConfig(params.environment)
                 _hasCompletedHTTPSetup =
-                    phase2Result.has_completed_http_setup || phase2Result.http_configured
+                    phase2Result.has_completed_http_setup ||
+                    phase2Result.http_configured
                 _areServicesReady = true
 
                 if (phase2Result.warning.isNotEmpty()) {
@@ -526,7 +527,8 @@ object RunAnywhere {
         try {
             val retryResult = CppBridgeSdkInit.retryHTTP()
             _hasCompletedHTTPSetup =
-                retryResult.has_completed_http_setup || retryResult.http_configured
+                retryResult.has_completed_http_setup ||
+                retryResult.http_configured
             if (retryResult.warning.isNotEmpty()) {
                 logger.debug("HTTP retry warning: ${retryResult.warning}")
             }

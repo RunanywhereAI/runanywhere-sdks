@@ -37,7 +37,6 @@ import org.json.JSONObject
  * Internal — public callers use [RACRouter.stt].
  */
 internal object HybridRouterBridgeAdapter {
-
     /**
      * Construct a native STT service for [backend] + [model] and return its
      * handle. The router then attaches the handle to its offline or online
@@ -47,17 +46,18 @@ internal object HybridRouterBridgeAdapter {
      *         not in the registry, cloud entry not registered).
      */
     fun createService(backend: BackendId, model: RACModel): Long {
-        val handle = when (backend.kindEnum) {
-            HybridBackendKind.HYBRID_BACKEND_SHERPA -> {
-                requireSherpaRegistered()
-                // The model-registry path-resolution lives in
-                // racSttServiceCreate; it routes the create through the same
-                // plugin registry (hint "sherpa") as the online side.
-                RunAnywhereBridge.racSttServiceCreate(model.id)
+        val handle =
+            when (backend.kindEnum) {
+                HybridBackendKind.HYBRID_BACKEND_SHERPA -> {
+                    requireSherpaRegistered()
+                    // The model-registry path-resolution lives in
+                    // racSttServiceCreate; it routes the create through the same
+                    // plugin registry (hint "sherpa") as the online side.
+                    RunAnywhereBridge.racSttServiceCreate(model.id)
+                }
+                HybridBackendKind.HYBRID_BACKEND_CLOUD -> createCloudService(model.id, backend.provider)
+                else -> error("Unsupported hybrid backend: ${backend.family}.${backend.capability}")
             }
-            HybridBackendKind.HYBRID_BACKEND_CLOUD -> createCloudService(model.id, backend.provider)
-            else -> error("Unsupported hybrid backend: ${backend.family}.${backend.capability}")
-        }
         check(handle != 0L) {
             "Failed to create native service for ${backend.family}.${backend.capability} model=${model.id}"
         }
@@ -108,25 +108,27 @@ internal object HybridRouterBridgeAdapter {
      * explicitly so the routed engine never has to guess.
      */
     private fun createCloudService(id: String, backendProvider: String): Long {
-        val entry = BACKEND.CLOUD.lookup(id)
-            ?: error(
-                "Cloud model id '$id' not registered. " +
-                    "Call BACKEND.CLOUD.register(id, model, apiKey) at app startup.",
-            )
+        val entry =
+            BACKEND.CLOUD.lookup(id)
+                ?: error(
+                    "Cloud model id '$id' not registered. " +
+                        "Call BACKEND.CLOUD.register(id, model, apiKey) at app startup.",
+                )
         val provider = entry.provider.ifBlank { backendProvider }.ifBlank { BACKEND.DEFAULT_PROVIDER }
         // Carry the cloud config in the generated wire-schema shape. The
         // optional fields stay at their proto defaults (empty/0) when the entry
         // omits them; toSnakeCaseJson() then drops those so the provider
         // auto-detects (language) / uses its own default (base URL / timeout)
         // rather than seeing a literal empty value.
-        val config = CloudSttBackendConfig(
-            provider = provider,
-            model = entry.model,
-            api_key = entry.apiKey,
-            language_code = entry.languageCode.orEmpty(),
-            base_url = entry.baseUrl.orEmpty(),
-            timeout_ms = entry.timeoutMs ?: 0,
-        )
+        val config =
+            CloudSttBackendConfig(
+                provider = provider,
+                model = entry.model,
+                api_key = entry.apiKey,
+                language_code = entry.languageCode.orEmpty(),
+                base_url = entry.baseUrl.orEmpty(),
+                timeout_ms = entry.timeoutMs ?: 0,
+            )
         return RunAnywhereBridge.racSttHybridRouterCreateService(
             engineHint = CLOUD_ENGINE_HINT,
             // Cloud engine takes everything via config_json; no model path.
@@ -144,10 +146,11 @@ internal object HybridRouterBridgeAdapter {
      * auto-detects / falls back to its own defaults.
      */
     private fun CloudSttBackendConfig.toSnakeCaseJson(): String {
-        val json = JSONObject()
-            .put("provider", provider)
-            .put("api_key", api_key)
-            .put("model", model)
+        val json =
+            JSONObject()
+                .put("provider", provider)
+                .put("api_key", api_key)
+                .put("model", model)
         if (language_code.isNotEmpty()) json.put("language_code", language_code)
         if (base_url.isNotEmpty()) json.put("base_url", base_url)
         if (timeout_ms != 0) json.put("timeout_ms", timeout_ms)

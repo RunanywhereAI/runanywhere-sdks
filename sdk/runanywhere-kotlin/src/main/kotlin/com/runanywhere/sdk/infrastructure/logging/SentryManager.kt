@@ -10,7 +10,6 @@ package com.runanywhere.sdk.infrastructure.logging
 
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.generated.convenience.wireString
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import io.sentry.Sentry
 import io.sentry.SentryOptions

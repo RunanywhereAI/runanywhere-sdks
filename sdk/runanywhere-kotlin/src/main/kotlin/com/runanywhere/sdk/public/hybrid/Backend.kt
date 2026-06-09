@@ -155,15 +155,16 @@ object BACKEND {
             // same bootstrap point the app registers credentials — symmetric to
             // ONNX.register() seeding the on-device backend.
             ensurePluginRegistered()
-            registry[id] = CloudModelEntry(
-                id = id,
-                model = model,
-                apiKey = apiKey,
-                provider = provider,
-                languageCode = languageCode,
-                baseUrl = baseUrl,
-                timeoutMs = timeoutMs,
-            )
+            registry[id] =
+                CloudModelEntry(
+                    id = id,
+                    model = model,
+                    apiKey = apiKey,
+                    provider = provider,
+                    languageCode = languageCode,
+                    baseUrl = baseUrl,
+                    timeoutMs = timeoutMs,
+                )
         }
 
         @JvmStatic

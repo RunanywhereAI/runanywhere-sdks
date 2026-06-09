@@ -141,7 +141,6 @@ object CppBridgeFileManager {
     fun checkStorage(requiredBytes: Long): Boolean =
         RunAnywhereBridge.racFileManagerCheckStorage(requiredBytes)
 
-
     /**
      * Provides platform file I/O methods called by C++ via JNI.
      * Method signatures must match JNI expectations exactly.

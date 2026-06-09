@@ -45,15 +45,19 @@ suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResul
                 error_message = "SDK not initialized",
             )
         }
-        try { ensureServicesReady() } catch (_: Throwable) {}
-        val result = CppBridgeModelLifecycle.load(request)
-            ?: return@withContext RAModelLoadResult(
-                success = false,
-                model_id = request.model_id,
-                category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
-                framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-                error_message = "Native model lifecycle load proto API unavailable",
-            )
+        try {
+            ensureServicesReady()
+        } catch (_: Throwable) {
+        }
+        val result =
+            CppBridgeModelLifecycle.load(request)
+                ?: return@withContext RAModelLoadResult(
+                    success = false,
+                    model_id = request.model_id,
+                    category = request.category ?: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+                    framework = request.framework ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+                    error_message = "Native model lifecycle load proto API unavailable",
+                )
         if (result.success) {
             val modelID = result.model_id.ifEmpty { request.model_id }
             logger.info("Model load succeeded for $modelID")
@@ -87,9 +91,10 @@ suspend fun RunAnywhere.currentModel(request: CurrentModelRequest): CurrentModel
  * populated proto instead of reconstructing a stand-in.
  */
 suspend fun RunAnywhere.modelInfoForCategory(category: ModelCategory): ModelInfo? {
-    val result = currentModel(
-        CurrentModelRequest(category = category, include_model_metadata = true),
-    )
+    val result =
+        currentModel(
+            CurrentModelRequest(category = category, include_model_metadata = true),
+        )
     return if (result.found) result.model else null
 }
 
