@@ -195,7 +195,7 @@ Orchestrates VAD → STT → LLM → TTS with 8 pipeline states (`rac_audio_pipe
 
 ### Lifecycle Manager (`src/core/capabilities/lifecycle_manager.cpp`)
 
-Ports Swift's `ManagedLifecycle.swift`. States: `IDLE → LOADING → LOADED → FAILED`. Handles auto-unload of previous model when loading a new one (waits for refcount == 0), tracks load metrics (count, total time, failures). `current_service` is `std::atomic<rac_handle_t>` for lock-free cancel reads.
+The `rac_lifecycle_*` C API is a thin **per-handle facade over the canonical global `g_loaded` store** (`src/core/model_lifecycle.cpp`), not a separate state machine. A `LifecycleManager` owns no model state — only its config, per-handle metrics, and a pin token. `load()` calls the feature module's own `create_fn` (path-based — no registry lookup, no download) and stores the resulting `rac_<mod>_service_t` into `g_loaded`; the single store/pin is `g_loaded` + `LoadedModel::active_refs` + `g_lifecycle_cv`. Every facade op is **owner-scoped** (only touches the `g_loaded[component]` slot whose `owner_lifecycle` is this handle), so destroying a never-loaded component handle never evicts a user's registry-loaded model. State maps READY→LOADED, ERROR→FAILED. `get_state`/`get_service` take `g_lifecycle_mutex` briefly (never held across model creation). Auto-unload of a previous model drains in-flight refs via `g_lifecycle_cv` before destroying. Under `#if !defined(RAC_HAVE_PROTOBUF)` (no `g_loaded`), the original self-contained per-handle implementation is retained verbatim.
 
 ### Model Registry & Paths
 

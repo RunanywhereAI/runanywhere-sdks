@@ -109,10 +109,10 @@ static void embeddings_destroy_service(rac_handle_t service, void* user_data) {
 // =============================================================================
 
 extern "C" rac_result_t rac_embeddings_component_create(rac_handle_t* out_handle) {
-    // Embedding models reuse the LLM resource type.
     return rac::features::create_lifecycle_component<rac_embeddings_component>(
-        out_handle, RAC_RESOURCE_TYPE_LLM_MODEL, "Embeddings.Lifecycle", embeddings_create_service,
-        embeddings_destroy_service, LOG_CAT, "Embeddings component created");
+        out_handle, RAC_RESOURCE_TYPE_EMBEDDINGS_MODEL, "Embeddings.Lifecycle",
+        embeddings_create_service, embeddings_destroy_service, LOG_CAT,
+        "Embeddings component created");
 }
 
 extern "C" rac_result_t rac_embeddings_component_configure(rac_handle_t handle,

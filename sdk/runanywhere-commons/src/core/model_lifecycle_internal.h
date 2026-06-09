@@ -75,6 +75,18 @@ struct LoadedModel {
     int64_t loaded_at_ms{0};
     int64_t updated_at_ms{0};
     std::string error_message;
+    // Human-readable name; populated by the per-handle lifecycle facade
+    // (path-loaded entries). Registry-loaded entries leave this empty.
+    std::string model_name;
+    // Non-null when this entry was loaded through the per-handle
+    // `rac_lifecycle_*` facade. Holds the owning `LifecycleManager*` so the
+    // facade can scope its load/unload/query to entries it created. Null for
+    // registry-loaded entries (`rac_model_lifecycle_load_proto`).
+    void* owner_lifecycle{nullptr};
+    // The `rac_<mod>_service_t*` wrapper handed back by the facade's create
+    // callback. The facade returns this from get/require/acquire_service;
+    // registry-loaded entries leave it null (they dispatch via ops+impl).
+    rac_handle_t service_handle{nullptr};
     rac_primitive_t primitive{RAC_PRIMITIVE_UNSPECIFIED};
     const rac_llm_service_ops_t* llm_ops{nullptr};
     const rac_stt_service_ops_t* stt_ops{nullptr};
