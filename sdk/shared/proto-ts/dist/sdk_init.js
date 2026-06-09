@@ -420,6 +420,7 @@ function createBaseSdkInitResult() {
         warning: "",
         durationMs: 0,
         hasCompletedHttpSetup: false,
+        httpApplicable: false,
     };
 }
 exports.SdkInitResult = {
@@ -453,6 +454,9 @@ exports.SdkInitResult = {
         }
         if (message.hasCompletedHttpSetup !== false) {
             writer.uint32(80).bool(message.hasCompletedHttpSetup);
+        }
+        if (message.httpApplicable !== false) {
+            writer.uint32(88).bool(message.httpApplicable);
         }
         return writer;
     },
@@ -533,6 +537,13 @@ exports.SdkInitResult = {
                     message.hasCompletedHttpSetup = reader.bool();
                     continue;
                 }
+                case 11: {
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.httpApplicable = reader.bool();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -577,6 +588,11 @@ exports.SdkInitResult = {
                 : isSet(object.has_completed_http_setup)
                     ? globalThis.Boolean(object.has_completed_http_setup)
                     : false,
+            httpApplicable: isSet(object.httpApplicable)
+                ? globalThis.Boolean(object.httpApplicable)
+                : isSet(object.http_applicable)
+                    ? globalThis.Boolean(object.http_applicable)
+                    : false,
         };
     },
     toJSON(message) {
@@ -611,6 +627,9 @@ exports.SdkInitResult = {
         if (message.hasCompletedHttpSetup !== false) {
             obj.hasCompletedHttpSetup = message.hasCompletedHttpSetup;
         }
+        if (message.httpApplicable !== false) {
+            obj.httpApplicable = message.httpApplicable;
+        }
         return obj;
     },
     create(base) {
@@ -630,6 +649,7 @@ exports.SdkInitResult = {
         message.warning = object.warning ?? "";
         message.durationMs = object.durationMs ?? 0;
         message.hasCompletedHttpSetup = object.hasCompletedHttpSetup ?? false;
+        message.httpApplicable = object.httpApplicable ?? false;
         return message;
     },
 };

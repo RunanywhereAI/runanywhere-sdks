@@ -6,7 +6,7 @@
  * per CANONICAL_API.md §12.
  *
  * Round 2 KOTLIN: Replaced flat API (loadPlugin, unloadPlugin, etc.)
- * with the canonical `RunAnywhere.pluginLoader: PluginLoader` namespace,
+ * with the canonical `RunAnywhere.pluginLoader: PluginLoaderNamespace` namespace,
  * matching Swift, Flutter, RN and Web SDK surfaces.
  */
 
@@ -19,13 +19,13 @@ import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// PluginLoader — namespaced capability class
+// PluginLoaderNamespace — namespaced capability class
 // PluginInfo is the proto-generated descriptor (ai.runanywhere.proto.v1.PluginInfo);
 // `path` is "" for plugins the native registry reports by name only.
 
 // RunAnywhere.pluginLoader accessor
 
-class PluginLoader {
+class PluginLoaderNamespace {
     val apiVersion: UInt
         get() = RunAnywhereBridge.racRegistryGetPluginApiVersion().toUInt()
 
@@ -90,7 +90,7 @@ class PluginLoader {
 }
 
 // Singleton instance — one per SDK singleton.
-private val pluginLoaderInstance = PluginLoader()
+private val pluginLoaderInstance = PluginLoaderNamespace()
 
-val RunAnywhere.pluginLoader: PluginLoader
+val RunAnywhere.pluginLoader: PluginLoaderNamespace
     get() = pluginLoaderInstance

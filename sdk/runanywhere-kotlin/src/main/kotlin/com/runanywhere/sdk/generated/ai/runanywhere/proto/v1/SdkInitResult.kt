@@ -160,6 +160,20 @@ public class SdkInitResult(
     schemaIndex = 9,
   )
   public val has_completed_http_setup: Boolean = false,
+  /**
+   * True when this SDK configuration has a usable network credential/url
+   * pair and therefore HTTP/auth setup can eventually succeed. Local-only
+   * development builds without baked-in Supabase config set this false so
+   * platform SDKs do not retry HTTP on every guarded API call.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "httpApplicable",
+    schemaIndex = 10,
+  )
+  public val http_applicable: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SdkInitResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -182,6 +196,7 @@ public class SdkInitResult(
     if (warning != other.warning) return false
     if (duration_ms != other.duration_ms) return false
     if (has_completed_http_setup != other.has_completed_http_setup) return false
+    if (http_applicable != other.http_applicable) return false
     return true
   }
 
@@ -199,6 +214,7 @@ public class SdkInitResult(
       result = result * 37 + warning.hashCode()
       result = result * 37 + duration_ms.hashCode()
       result = result * 37 + has_completed_http_setup.hashCode()
+      result = result * 37 + http_applicable.hashCode()
       super.hashCode = result
     }
     return result
@@ -216,6 +232,7 @@ public class SdkInitResult(
     result += """warning=${sanitize(warning)}"""
     result += """duration_ms=$duration_ms"""
     result += """has_completed_http_setup=$has_completed_http_setup"""
+    result += """http_applicable=$http_applicable"""
     return result.joinToString(prefix = "SdkInitResult{", separator = ", ", postfix = "}")
   }
 
@@ -230,8 +247,9 @@ public class SdkInitResult(
     warning: String = this.warning,
     duration_ms: Long = this.duration_ms,
     has_completed_http_setup: Boolean = this.has_completed_http_setup,
+    http_applicable: Boolean = this.http_applicable,
     unknownFields: ByteString = this.unknownFields,
-  ): SdkInitResult = SdkInitResult(phase, success, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, has_completed_http_setup, unknownFields)
+  ): SdkInitResult = SdkInitResult(phase, success, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, has_completed_http_setup, http_applicable, unknownFields)
 
   public companion object {
     @JvmField
@@ -275,6 +293,9 @@ public class SdkInitResult(
         if (value.has_completed_http_setup != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.has_completed_http_setup)
         }
+        if (value.http_applicable != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.http_applicable)
+        }
         return size
       }
 
@@ -309,11 +330,17 @@ public class SdkInitResult(
         if (value.has_completed_http_setup != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_completed_http_setup)
         }
+        if (value.http_applicable != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.http_applicable)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SdkInitResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.http_applicable != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.http_applicable)
+        }
         if (value.has_completed_http_setup != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.has_completed_http_setup)
         }
@@ -357,6 +384,7 @@ public class SdkInitResult(
         var warning: String = ""
         var duration_ms: Long = 0L
         var has_completed_http_setup: Boolean = false
+        var http_applicable: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -373,6 +401,7 @@ public class SdkInitResult(
             8 -> warning = ProtoAdapter.STRING.decode(reader)
             9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
             10 -> has_completed_http_setup = ProtoAdapter.BOOL.decode(reader)
+            11 -> http_applicable = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -387,6 +416,7 @@ public class SdkInitResult(
           warning = warning,
           duration_ms = duration_ms,
           has_completed_http_setup = has_completed_http_setup,
+          http_applicable = http_applicable,
           unknownFields = unknownFields
         )
       }

@@ -41,6 +41,7 @@
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/lifecycle/rac_sdk_init.h"
@@ -105,6 +106,19 @@ void set_error_from_code(SdkInitResult* result, rac_result_t code, const char* f
 
 bool environment_requires_external_config(rac_environment_t env) {
     return rac_env_requires_auth(env);
+}
+
+bool http_setup_applicable_for_state() {
+    const rac_environment_t env = rac_state_get_environment();
+    if (!environment_requires_external_config(env)) {
+        return rac_dev_config_is_usable_http_url(rac_dev_config_get_supabase_url()) &&
+               rac_dev_config_is_usable_credential(rac_dev_config_get_supabase_key());
+    }
+
+    const char* api_key = rac_state_get_api_key();
+    const char* base_url = rac_state_get_base_url();
+    return rac_dev_config_is_usable_http_url(base_url) &&
+           rac_dev_config_is_usable_credential(api_key);
 }
 
 std::string warning_from_code(const char* prefix, rac_result_t code) {
@@ -585,6 +599,7 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
 
     SdkInitResult result;
     result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
+    result.set_http_applicable(http_setup_applicable_for_state());
 
     // Step 1: Authenticate through the registered platform HTTP transport.
     // Development mode does not require auth; staging/production require
@@ -682,6 +697,7 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
         result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
         return serialize_result(result, out_RASdkInitResult);
     }
+    result.set_http_applicable(http_setup_applicable_for_state());
 
     // Idempotent fast path: authenticated and token is still valid.
     if (rac_auth_is_authenticated() && !rac_auth_needs_refresh()) {

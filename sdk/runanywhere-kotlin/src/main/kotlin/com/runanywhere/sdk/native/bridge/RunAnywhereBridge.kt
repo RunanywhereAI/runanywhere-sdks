@@ -133,7 +133,7 @@ object RunAnywhereBridge {
     external fun racResultToProtoError(code: Int): ByteArray?
 
     // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
-    // Path shape: {base_dir}/RunAnywhere/Models/{framework.rawValue}/{modelId}/
+    // Path shape: {base_dir}/RunAnywhere/Models/{framework.wireString}/{modelId}/
 
     /**
      * Set the base directory used by C++ path utilities.

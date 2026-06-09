@@ -4,10 +4,8 @@
  *
  * Ergonomic helpers for canonical VLM proto types.
  *
- * Mirrors Swift RAVLMImage+Helpers.swift. Only the platform-agnostic
- * factories live here; Apple-only (UIImage / CVPixelBuffer) and
- * Android-only (Bitmap) factories live in their respective platform
- * source sets — see `androidMain/.../VLM/VLMImage+Bitmap.kt`.
+ * Mirrors Swift RAVLMImage+Helpers.swift. This SDK is an Android library, so
+ * the Android Bitmap factory lives alongside the platform-agnostic factories.
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -16,6 +14,7 @@ import ai.runanywhere.proto.v1.VLMConfiguration
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMImageFormat
+import android.graphics.Bitmap
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import okio.ByteString.Companion.toByteString
@@ -113,3 +112,24 @@ fun VLMImage.Companion.fromRawRGBA(
         height = height,
         format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGBA,
     )
+
+/**
+ * Create a [VLMImage] from an Android [Bitmap], encoded as tightly-packed RGBA
+ * bytes to match Swift's UIKit/AppKit image helpers.
+ */
+fun VLMImage.Companion.fromBitmap(bitmap: Bitmap): RAVLMImage {
+    val width = bitmap.width
+    val height = bitmap.height
+    val pixels = IntArray(width * height)
+    bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+
+    val rgba = ByteArray(pixels.size * 4)
+    pixels.forEachIndexed { index, pixel ->
+        val offset = index * 4
+        rgba[offset] = ((pixel shr 16) and 0xFF).toByte()
+        rgba[offset + 1] = ((pixel shr 8) and 0xFF).toByte()
+        rgba[offset + 2] = (pixel and 0xFF).toByte()
+        rgba[offset + 3] = ((pixel shr 24) and 0xFF).toByte()
+    }
+    return fromRawRGBA(rgba, width, height)
+}

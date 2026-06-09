@@ -8,8 +8,8 @@
 //  bytes are represented as a generated model artifact so download/storage
 //  policy (planning, resume, checksum, progress events, placement) runs on the
 //  canonical model-download path — no app-side URLSession, no app-invented
-//  on-disk layout. Mirrors the Kotlin SDK (RunAnywhereLoRA.kt
-//  registerLoraArtifact / toLoraArtifactModelInfo).
+//  on-disk layout. Mirrors the Kotlin SDK's `lora.registerArtifact` /
+//  `toLoraArtifactModelInfo` helpers.
 //
 
 import Foundation

@@ -223,23 +223,6 @@ object CppBridgeTelemetry {
         )
     }
 
-    /**
-     * Whether the current configuration is usable for outbound HTTP.
-     * Mirrors Swift's `CppBridge.DevConfig.hasUsableSupabaseConfig` (dev)
-     * + `HTTPClientAdapter.hasUsableConfiguration` (prod) gating.
-     *
-     * A `null` [environment] (typically before Phase 1 init completes)
-     * defers to the development branch, mirroring Swift's `environment
-     * == .development` check on an unset `activeEnvironment`.
-     */
-    fun hasUsableNetworkConfig(environment: SDKEnvironment? = currentEnvironment): Boolean =
-        if (environment == null || environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-            CppBridgeDevConfig.hasUsableSupabaseConfig
-        } else {
-            CppBridgeDevConfig.isUsableHTTPURL(_baseUrl) &&
-                CppBridgeDevConfig.isUsableCredential(_apiKey)
-        }
-
     // HTTP callback path
 
     /**

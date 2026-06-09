@@ -14,7 +14,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.extensions.Models.rawValue
+import com.runanywhere.sdk.public.extensions.Models.wireString
 import java.io.File
 
 /**
@@ -147,10 +147,10 @@ object CppBridgeModelPaths {
 
         // JNI not available (e.g. pure JVM unit tests). Fall back to a local
         // computation that still uses the canonical schema. The string segment
-        // is sourced from the codegen-driven `InferenceFramework.rawValue`
+        // is sourced from the codegen-driven `InferenceFramework.wireString`
         // helper (see commonMain/.../Models/ModelTypes.kt) so any future
         // framework added to the proto picks up its path name automatically.
-        val frameworkName = racFrameworkIntToProto(framework).rawValue
+        val frameworkName = racFrameworkIntToProto(framework).wireString
         return File(File(File(base, "RunAnywhere"), "Models"), "$frameworkName${File.separator}$modelId").absolutePath
     }
 
@@ -161,7 +161,7 @@ object CppBridgeModelPaths {
      * proto wire numbering, so a small adapter is required.
      *
      * Unknown / unmapped ints fall through to [InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN]
-     * which yields the string "Unknown" via the codegen `rawValue` helper.
+     * which yields the string "Unknown" via the codegen `wireString` helper.
      */
     private fun racFrameworkIntToProto(framework: Int): InferenceFramework =
         when (framework) {

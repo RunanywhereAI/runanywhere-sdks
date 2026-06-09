@@ -32,12 +32,9 @@ private val vadLogger = SDKLogger.vad
 
 private const val VAD_SAMPLE_RATE_HZ = 16_000
 
-suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): RAVADResult =
-    detectVoiceActivity(audioData, RAVADOptions())
-
 suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
-    options: RAVADOptions,
+    options: RAVADOptions? = null,
 ): RAVADResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -57,7 +54,7 @@ suspend fun RunAnywhere.detectVoiceActivity(
                     encoding = VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
                     sample_rate = VAD_SAMPLE_RATE_HZ,
                 ),
-            options = options,
+            options = options ?: RAVADOptions(),
         )
 
     val result = CppBridgeVAD.processLifecycle(request)
@@ -69,12 +66,9 @@ suspend fun RunAnywhere.detectVoiceActivity(
     return result
 }
 
-fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<RAVADResult> =
-    streamVAD(audioSamples, RAVADOptions())
-
 fun RunAnywhere.streamVAD(
     audioSamples: Flow<FloatArray>,
-    options: RAVADOptions,
+    options: RAVADOptions? = null,
 ): Flow<RAVADResult> =
     channelFlow {
         if (!isInitialized) {

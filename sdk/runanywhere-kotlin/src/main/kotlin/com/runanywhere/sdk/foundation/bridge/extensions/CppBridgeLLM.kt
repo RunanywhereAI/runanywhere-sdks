@@ -141,8 +141,13 @@ object CppBridgeLLM {
 
     /** One-shot generation. */
     suspend fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
-        inner.getHandle()
         val request = options.toGenerateRequest(prompt, streaming = false)
+        return generate(request)
+    }
+
+    /** One-shot generation through the generated request ABI. */
+    suspend fun generate(request: RALLMGenerateRequest): RALLMGenerationResult {
+        inner.getHandle()
         return decodeOrThrow(
             LLMGenerationResult.ADAPTER,
             RunAnywhereBridge.racLlmGenerateProto(LLMGenerateRequest.ADAPTER.encode(request)),
@@ -204,8 +209,16 @@ object CppBridgeLLM {
         options: RALLMGenerationOptions?,
         onEvent: (RALLMStreamEvent) -> Boolean,
     ) {
-        inner.getHandle()
         val request = options.toGenerateRequest(prompt, streaming = true)
+        generateStream(request, onEvent)
+    }
+
+    /** Streaming generation through the generated request ABI. */
+    suspend fun generateStream(
+        request: RALLMGenerateRequest,
+        onEvent: (RALLMStreamEvent) -> Boolean,
+    ) {
+        inner.getHandle()
         val rc =
             RunAnywhereBridge.racLlmGenerateStreamProto(
                 LLMGenerateRequest.ADAPTER.encode(request),

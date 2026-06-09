@@ -155,7 +155,7 @@ suspend fun RunAnywhere.downloadModel(
  * Flow-shaped convenience wrapper around [downloadModel]. Collects the suspend+callback
  * form into a cold [Flow] for Kotlin consumers who prefer reactive collection.
  */
-fun RunAnywhere.downloadModelFlow(model: RAModelInfo): Flow<DownloadProgress> =
+fun RunAnywhere.downloadModelStream(model: RAModelInfo): Flow<DownloadProgress> =
     flow {
         downloadModel(model) { progress -> emit(progress) }
     }

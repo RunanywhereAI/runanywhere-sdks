@@ -220,6 +220,13 @@ export interface SdkInitResult {
    * the cross-phase latched bit that survives between phase calls.
    */
   hasCompletedHttpSetup: boolean;
+  /**
+   * True when this SDK configuration has a usable network credential/url
+   * pair and therefore HTTP/auth setup can eventually succeed. Local-only
+   * development builds without baked-in Supabase config set this false so
+   * platform SDKs do not retry HTTP on every guarded API call.
+   */
+  httpApplicable: boolean;
 }
 
 function createBaseSdkInitPhase1Request(): SdkInitPhase1Request {
@@ -540,6 +547,7 @@ function createBaseSdkInitResult(): SdkInitResult {
     warning: "",
     durationMs: 0,
     hasCompletedHttpSetup: false,
+    httpApplicable: false,
   };
 }
 
@@ -574,6 +582,9 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
     }
     if (message.hasCompletedHttpSetup !== false) {
       writer.uint32(80).bool(message.hasCompletedHttpSetup);
+    }
+    if (message.httpApplicable !== false) {
+      writer.uint32(88).bool(message.httpApplicable);
     }
     return writer;
   },
@@ -665,6 +676,14 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
           message.hasCompletedHttpSetup = reader.bool();
           continue;
         }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.httpApplicable = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -710,6 +729,11 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
         : isSet(object.has_completed_http_setup)
         ? globalThis.Boolean(object.has_completed_http_setup)
         : false,
+      httpApplicable: isSet(object.httpApplicable)
+        ? globalThis.Boolean(object.httpApplicable)
+        : isSet(object.http_applicable)
+        ? globalThis.Boolean(object.http_applicable)
+        : false,
     };
   },
 
@@ -745,6 +769,9 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
     if (message.hasCompletedHttpSetup !== false) {
       obj.hasCompletedHttpSetup = message.hasCompletedHttpSetup;
     }
+    if (message.httpApplicable !== false) {
+      obj.httpApplicable = message.httpApplicable;
+    }
     return obj;
   },
 
@@ -765,6 +792,7 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
     message.warning = object.warning ?? "";
     message.durationMs = object.durationMs ?? 0;
     message.hasCompletedHttpSetup = object.hasCompletedHttpSetup ?? false;
+    message.httpApplicable = object.httpApplicable ?? false;
     return message;
   },
 };

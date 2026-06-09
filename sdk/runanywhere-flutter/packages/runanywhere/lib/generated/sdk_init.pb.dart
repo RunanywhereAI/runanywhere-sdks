@@ -279,6 +279,7 @@ class SdkInitResult extends $pb.GeneratedMessage {
     $core.String? warning,
     $fixnum.Int64? durationMs,
     $core.bool? hasCompletedHttpSetup,
+    $core.bool? httpApplicable,
   }) {
     final result = create();
     if (phase != null) result.phase = phase;
@@ -292,6 +293,7 @@ class SdkInitResult extends $pb.GeneratedMessage {
     if (durationMs != null) result.durationMs = durationMs;
     if (hasCompletedHttpSetup != null)
       result.hasCompletedHttpSetup = hasCompletedHttpSetup;
+    if (httpApplicable != null) result.httpApplicable = httpApplicable;
     return result;
   }
 
@@ -322,6 +324,7 @@ class SdkInitResult extends $pb.GeneratedMessage {
     ..aOS(8, _omitFieldNames ? '' : 'warning')
     ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
     ..aOB(10, _omitFieldNames ? '' : 'hasCompletedHttpSetup')
+    ..aOB(11, _omitFieldNames ? '' : 'httpApplicable')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -446,6 +449,19 @@ class SdkInitResult extends $pb.GeneratedMessage {
   $core.bool hasHasCompletedHttpSetup() => $_has(9);
   @$pb.TagNumber(10)
   void clearHasCompletedHttpSetup() => $_clearField(10);
+
+  /// True when this SDK configuration has a usable network credential/url
+  /// pair and therefore HTTP/auth setup can eventually succeed. Local-only
+  /// development builds without baked-in Supabase config set this false so
+  /// platform SDKs do not retry HTTP on every guarded API call.
+  @$pb.TagNumber(11)
+  $core.bool get httpApplicable => $_getBF(10);
+  @$pb.TagNumber(11)
+  set httpApplicable($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasHttpApplicable() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearHttpApplicable() => $_clearField(11);
 }
 
 const $core.bool _omitFieldNames =

@@ -13,6 +13,7 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.EmbeddingVector
 import ai.runanywhere.proto.v1.EmbeddingsConfiguration
 import ai.runanywhere.proto.v1.EmbeddingsOptions
+import ai.runanywhere.proto.v1.EmbeddingsResult
 import kotlin.math.sqrt
 
 // MARK: - EmbeddingsConfiguration
@@ -69,6 +70,10 @@ fun EmbeddingVector.cosineSimilarity(other: EmbeddingVector): Float {
  * L2 norm of the vector. Equivalent to Swift's `computeNorm()`.
  */
 fun EmbeddingVector.computeNorm(): Float = l2(values)
+
+/** Embeddings processing time in seconds, matching Swift's TimeInterval helper. */
+val EmbeddingsResult.processingTime: Double
+    get() = processing_time_ms / 1_000.0
 
 private fun l2(values: List<Float>): Float {
     var sumSquares = 0f

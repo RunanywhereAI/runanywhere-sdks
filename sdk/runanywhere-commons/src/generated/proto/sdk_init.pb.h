@@ -889,6 +889,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
     kLinkedModelsCountFieldNumber = 6,
     kDiscoveredOrphansFieldNumber = 7,
     kDurationMsFieldNumber = 9,
+    kHttpApplicableFieldNumber = 11,
   };
   // string warning = 8;
   void clear_warning() ;
@@ -1001,11 +1002,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
   void _internal_set_duration_ms(::int64_t value);
 
   public:
+  // bool http_applicable = 11;
+  void clear_http_applicable() ;
+  [[nodiscard]] bool http_applicable() const;
+  void set_http_applicable(bool value);
+
+  private:
+  bool _internal_http_applicable() const;
+  void _internal_set_http_applicable(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SdkInitResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 10,
+      ::google::protobuf::internal::TcParseTable<4, 11,
                           1, 52,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -1044,6 +1055,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SdkInitResult final : public ::goog
     ::uint32_t linked_models_count_;
     ::uint32_t discovered_orphans_;
     ::int64_t duration_ms_;
+    bool http_applicable_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1925,6 +1937,30 @@ inline bool SdkInitResult::_internal_has_completed_http_setup() const {
 inline void SdkInitResult::_internal_set_has_completed_http_setup(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.has_completed_http_setup_ = value;
+}
+
+// bool http_applicable = 11;
+inline void SdkInitResult::clear_http_applicable() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.http_applicable_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+}
+inline bool SdkInitResult::http_applicable() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SdkInitResult.http_applicable)
+  return _internal_http_applicable();
+}
+inline void SdkInitResult::set_http_applicable(bool value) {
+  _internal_set_http_applicable(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SdkInitResult.http_applicable)
+}
+inline bool SdkInitResult::_internal_http_applicable() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.http_applicable_;
+}
+inline void SdkInitResult::_internal_set_http_applicable(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.http_applicable_ = value;
 }
 
 #ifdef __GNUC__

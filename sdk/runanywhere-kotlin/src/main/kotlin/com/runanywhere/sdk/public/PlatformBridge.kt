@@ -2,14 +2,12 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Platform-specific bridge for JVM/Android that connects RunAnywhere to CppBridge.
- * Implements the expect/actual pattern for cross-platform compatibility.
+ * Android bridge that connects the public RunAnywhere facade to CppBridge.
  */
 
 package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.foundation.bridge.CppBridge
-import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -62,19 +60,11 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
  * This wires platform services/HTTP callbacks before the public facade calls
  * `CppBridgeSdkInit.phase2`, where commons owns auth/refresh, device
  * registration, assignment fetch, telemetry flush, and model discovery.
- *
- * Returns `true` when the HTTP client adapter was configured with a usable
- * external URL + credential. The generated commons `SdkInitResult` remains
- * the canonical HTTP/auth completion signal.
  */
-internal suspend fun initializePlatformBridgeServices(): Boolean {
+internal suspend fun initializePlatformBridgeServices() {
     logger.debug("Initializing CppBridge services...")
     CppBridge.initializeServices()
-    val httpConfigured = HTTPClientAdapter.isConfigured
-    logger.debug(
-        "CppBridge services initialization complete (httpConfigured=$httpConfigured)",
-    )
-    return httpConfigured
+    logger.debug("CppBridge services initialization complete")
 }
 
 /**

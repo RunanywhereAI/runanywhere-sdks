@@ -15,7 +15,7 @@ import ai.runanywhere.proto.v1.TurnLifecycleEventKind
 import ai.runanywhere.proto.v1.VADStreamEventKind
 import com.runanywhere.sdk.public.types.RAVoiceEvent
 
-fun RAVoiceEvent.pipelineStateOrNull(): PipelineState? {
+internal fun RAVoiceEvent.pipelineStateOrNull(): PipelineState? {
     state?.current?.takeUnless { it == PipelineState.PIPELINE_STATE_UNSPECIFIED }?.let { return it }
 
     return when {
@@ -31,7 +31,7 @@ fun RAVoiceEvent.pipelineStateOrNull(): PipelineState? {
     }
 }
 
-fun RAVoiceEvent.speechDetectedOrNull(): Boolean? =
+internal fun RAVoiceEvent.speechDetectedOrNull(): Boolean? =
     when {
         audio_level != null -> audio_level!!.is_speech
         // VADEvent.type uses VADStreamEventKind; speech start/end
@@ -44,7 +44,7 @@ fun RAVoiceEvent.speechDetectedOrNull(): Boolean? =
         else -> null
     }
 
-fun RAVoiceEvent.errorMessageOrNull(): String? =
+internal fun RAVoiceEvent.errorMessageOrNull(): String? =
     session_error?.message?.takeIf { it.isNotBlank() }
         ?: error?.message?.takeIf { it.isNotBlank() }
 

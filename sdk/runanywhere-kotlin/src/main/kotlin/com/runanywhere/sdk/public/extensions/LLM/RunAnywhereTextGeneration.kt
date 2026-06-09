@@ -19,6 +19,7 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
+import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
@@ -38,7 +39,7 @@ private val llmLogger = SDKLogger.llm
 
 suspend fun RunAnywhere.generate(
     prompt: String,
-    options: RALLMGenerationOptions?,
+    options: RALLMGenerationOptions? = null,
 ): RALLMGenerationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -51,9 +52,29 @@ suspend fun RunAnywhere.generate(
     return CppBridgeLLM.generate(prompt, opts)
 }
 
+suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGenerationResult {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+
+    ensureServicesReady()
+
+    val systemPromptDesc =
+        if (request.system_prompt.isBlank()) {
+            "nil"
+        } else {
+            "set(${request.system_prompt.length} chars)"
+        }
+    llmLogger.info(
+        "[PARAMS] generate: temperature=${request.temperature}, topP=${request.top_p}, " +
+            "maxTokens=${request.max_tokens}, systemPrompt=$systemPromptDesc, streaming=${request.streaming_enabled}",
+    )
+    return CppBridgeLLM.generate(request)
+}
+
 fun RunAnywhere.generateStream(
     prompt: String,
-    options: RALLMGenerationOptions?,
+    options: RALLMGenerationOptions? = null,
 ): Flow<RALLMStreamEvent> {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -67,6 +88,39 @@ fun RunAnywhere.generateStream(
         val driver =
             launch(Dispatchers.IO) {
                 CppBridgeLLM.generateStream(prompt, opts) { event ->
+                    trySend(event)
+                    !event.is_final
+                }
+                close()
+            }
+        awaitClose {
+            driver.cancel()
+            runBlocking { CppBridgeLLM.cancelProto() }
+        }
+    }.flowOn(Dispatchers.IO)
+}
+
+fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamEvent> {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+
+    val systemPromptDesc =
+        if (request.system_prompt.isBlank()) {
+            "nil"
+        } else {
+            "set(${request.system_prompt.length} chars)"
+        }
+    llmLogger.info(
+        "[PARAMS] generateStream: temperature=${request.temperature}, topP=${request.top_p}, " +
+            "maxTokens=${request.max_tokens}, systemPrompt=$systemPromptDesc, streaming=${request.streaming_enabled}",
+    )
+
+    return callbackFlow {
+        ensureServicesReady()
+        val driver =
+            launch(Dispatchers.IO) {
+                CppBridgeLLM.generateStream(request) { event ->
                     trySend(event)
                     !event.is_final
                 }

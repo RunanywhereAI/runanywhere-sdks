@@ -141,4 +141,10 @@ message SdkInitResult {
     // "HTTP transport wired up at this phase's call site"; this field is
     // the cross-phase latched bit that survives between phase calls.
     bool         has_completed_http_setup = 10;
+
+    // True when this SDK configuration has a usable network credential/url
+    // pair and therefore HTTP/auth setup can eventually succeed. Local-only
+    // development builds without baked-in Supabase config set this false so
+    // platform SDKs do not retry HTTP on every guarded API call.
+    bool         http_applicable           = 11;
 }

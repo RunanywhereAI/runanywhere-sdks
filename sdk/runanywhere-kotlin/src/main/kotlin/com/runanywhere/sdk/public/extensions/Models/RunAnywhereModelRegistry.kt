@@ -23,6 +23,7 @@ import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ModelListResult
 import ai.runanywhere.proto.v1.ModelQuery
+import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
@@ -77,6 +78,28 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
 
 suspend fun RunAnywhere.downloadedModels(): ModelListResult =
     queryModels(ModelQuery(downloaded_only = true))
+
+suspend fun RunAnywhere.refreshModelRegistry(
+    rescanLocal: Boolean = true,
+    includeRemoteCatalog: Boolean = false,
+    pruneOrphans: Boolean = false,
+) {
+    if (!isInitialized) return
+    ensureServicesReady()
+
+    if (rescanLocal) {
+        CppBridgeModelRegistry.discoverDownloadedModels()
+    }
+
+    CppBridgeModelRegistry.refresh(
+        ModelRegistryRefreshRequest(
+            rescan_local = rescanLocal,
+            include_remote_catalog = includeRemoteCatalog,
+            prune_orphans = pruneOrphans,
+            include_downloaded_state = true,
+        ),
+    )
+}
 
 // MARK: - Helpers
 

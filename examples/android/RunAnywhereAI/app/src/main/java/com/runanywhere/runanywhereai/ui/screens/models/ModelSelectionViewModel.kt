@@ -14,7 +14,7 @@ import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.currentModel
-import com.runanywhere.sdk.public.extensions.downloadModelFlow
+import com.runanywhere.sdk.public.extensions.downloadModelStream
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -74,7 +74,7 @@ class ModelSelectionViewModel(
         viewModelScope.launch {
             state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
             try {
-                RunAnywhere.downloadModelFlow(model).collect { p ->
+                RunAnywhere.downloadModelStream(model).collect { p ->
                     val pct = if (p.total_bytes > 0) {
                         (p.bytes_downloaded * 100 / p.total_bytes).toInt()
                     } else {

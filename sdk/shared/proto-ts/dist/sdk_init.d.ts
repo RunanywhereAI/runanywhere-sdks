@@ -140,6 +140,13 @@ export interface SdkInitResult {
      * the cross-phase latched bit that survives between phase calls.
      */
     hasCompletedHttpSetup: boolean;
+    /**
+     * True when this SDK configuration has a usable network credential/url
+     * pair and therefore HTTP/auth setup can eventually succeed. Local-only
+     * development builds without baked-in Supabase config set this false so
+     * platform SDKs do not retry HTTP on every guarded API call.
+     */
+    httpApplicable: boolean;
 }
 export declare const SdkInitPhase1Request: MessageFns<SdkInitPhase1Request>;
 export declare const SdkInitPhase2Request: MessageFns<SdkInitPhase2Request>;

@@ -55,7 +55,7 @@ internal suspend fun RunAnywhere.availableTTSVoicesInternal(): List<TTSVoiceInfo
 
 suspend fun RunAnywhere.synthesize(
     text: String,
-    options: RATTSOptions,
+    options: RATTSOptions = RATTSOptions.defaults(),
 ): RATTSOutput {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -85,7 +85,7 @@ suspend fun RunAnywhere.synthesize(
 
 fun RunAnywhere.synthesizeStream(
     text: String,
-    options: RATTSOptions,
+    options: RATTSOptions = RATTSOptions.defaults(),
 ): Flow<RATTSOutput> =
     callbackFlow {
         if (!isInitialized) {
@@ -159,7 +159,7 @@ suspend fun RunAnywhere.stopSynthesis() {
 
 suspend fun RunAnywhere.speak(
     text: String,
-    options: RATTSOptions,
+    options: RATTSOptions = RATTSOptions.defaults(),
 ): TTSSpeakResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -210,9 +210,6 @@ private fun convertPcmToWav(pcmData: ByteArray, sampleRate: Int): ByteArray {
     return RunAnywhereBridge.racAudioFloat32ToWav(pcmData, sampleRate)
         ?: throw SDKException.tts("Failed to convert PCM to WAV")
 }
-
-val RunAnywhere.isSpeaking: Boolean
-    get() = ttsAudioPlayback.isPlaying
 
 suspend fun RunAnywhere.stopSpeaking() {
     ttsAudioPlayback.stop()

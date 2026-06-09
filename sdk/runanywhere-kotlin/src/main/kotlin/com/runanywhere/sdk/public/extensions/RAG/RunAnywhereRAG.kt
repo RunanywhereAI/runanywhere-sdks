@@ -185,13 +185,16 @@ suspend fun RunAnywhere.ragGetDocumentCount(): Int =
 
 suspend fun RunAnywhere.ragQuery(
     question: String,
-    options: RAGQueryOptions?,
+    options: RAGQueryOptions? = null,
 ): RAGResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.query((options ?: RAGQueryOptions.defaults(question)).copy(question = question))
     }
 }
+
+suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
+    ragQuery(options.question, options)
 
 suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")

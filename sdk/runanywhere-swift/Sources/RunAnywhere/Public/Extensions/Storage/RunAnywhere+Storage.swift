@@ -257,6 +257,29 @@ public extension RunAnywhere {
         }
     }
 
+    /// Stream download progress for a registered model. Mirrors Kotlin's
+    /// `downloadModelStream(_:)` convenience over the callback-based
+    /// `downloadModel(_:onProgress:)` API.
+    static func downloadModelStream(_ model: RAModelInfo) -> AsyncThrowingStream<RADownloadProgress, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    _ = try await downloadModel(model) { progress in
+                        continuation.yield(progress)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { termination in
+                if case .cancelled = termination {
+                    task.cancel()
+                }
+            }
+        }
+    }
+
     /// Import a stable, platform-normalized local model path into the generated
     /// registry. This is also the public local-import entry point for file
     /// picker/bookmark flows after Swift has handled sandbox access.

@@ -20,7 +20,6 @@
 
 package com.runanywhere.sdk.public
 
-import ai.runanywhere.proto.v1.LogLevel
 import android.content.Context
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
@@ -29,12 +28,14 @@ import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.generated.convenience.wireString
+import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -106,6 +107,7 @@ object RunAnywhere {
 
     private val lock = Any()
     private val servicesMutex = Mutex()
+    private var servicesInitJob: Job? = null
 
     /**
      * Coroutine scope used to spawn Phase 2 in the background from the
@@ -324,14 +326,7 @@ object RunAnywhere {
 
                 // Apply default log level for this environment. Mirrors Swift's
                 // `Logging.shared.applyEnvironmentConfiguration(params.environment)`.
-                val logLevel =
-                    when (params.environment) {
-                        SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.LOG_LEVEL_DEBUG
-                        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.LOG_LEVEL_INFO
-                        SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.LOG_LEVEL_WARNING
-                        SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.LOG_LEVEL_DEBUG
-                    }
-                SDKLogger.setLevel(logLevel)
+                Logging.applyEnvironmentConfiguration(params.environment)
 
                 // Hand off to the platform bridge, which loads native libs,
                 // registers the platform adapter, runs CppBridgeSdkInit.phase1
@@ -352,21 +347,31 @@ object RunAnywhere {
                     // Spawn Phase 2 in the background. Mirrors Swift's
                     // `Task.detached(priority: .userInitiated) { try await completeServicesInitialization() }`.
                     logger.debug("Starting Phase 2 (services) in background...")
-                    initScope.launch {
-                        try {
-                            completeServicesInitialization()
-                            logger.debug("Phase 2 complete (background)")
-                        } catch (error: Throwable) {
-                            logger.warn("Phase 2 failed (non-critical): ${error.message}")
+                    servicesInitJob =
+                        initScope.launch {
+                            try {
+                                completeServicesInitialization()
+                                logger.debug("Phase 2 complete (background)")
+                            } catch (error: Throwable) {
+                                logger.warn("Phase 2 failed (non-critical): ${error.message}")
+                            } finally {
+                                synchronized(lock) {
+                                    servicesInitJob = null
+                                }
+                            }
                         }
-                    }
                 }
             } catch (error: Throwable) {
                 logger.error("Initialization failed: ${error.message}")
+                CppBridgeTelemetry.emitSDKInitFailed(SDKException.from(error))
                 // Roll back state on failure so a corrected retry can succeed.
                 _initParams = null
                 _currentEnvironment = null
                 _isInitialized = false
+                _areServicesReady = false
+                _hasCompletedHTTPSetup = false
+                _httpSetupApplicable = true
+                servicesInitJob = null
                 throw error
             }
         }
@@ -401,7 +406,7 @@ object RunAnywhere {
             }
 
             if (!_isInitialized) {
-                throw IllegalStateException("SDK must be initialized before completing services initialization")
+                throw SDKException.notInitialized("RunAnywhere")
             }
 
             val params =
@@ -435,17 +440,15 @@ object RunAnywhere {
                 // `_hasCompletedHTTPSetup = false`. That keeps the recovery
                 // branch in [ensureServicesReady] reachable for the next
                 // online call (auth, device registration, telemetry flush,
-                // remote catalog/device paths). Mirrors Swift
-                // `RunAnywhere.swift:261-265` which derives
-                // `hasCompletedHTTPSetup` from `CppBridge.HTTP.shared.isConfigured`.
+                // remote catalog/device paths).
                 //
-                // Record whether HTTP/auth is even applicable: when there is no
+                // Record whether HTTP/auth is even applicable: commons owns this
+                // decision so all SDKs share the same retry gate. When there is no
                 // usable external config (local-only / dev without a backend),
                 // `_hasCompletedHTTPSetup` can never flip, so [ensureServicesReady]
-                // must not keep retrying — that would re-run this whole bootstrap
-                // on every API call. A transient offline failure (config present,
-                // network down) stays applicable and is still retried.
-                _httpSetupApplicable = CppBridgeTelemetry.hasUsableNetworkConfig(params.environment)
+                // must not keep retrying on every API call. A transient offline
+                // failure (config present, network down) stays applicable.
+                _httpSetupApplicable = phase2Result.http_applicable
                 _hasCompletedHTTPSetup =
                     phase2Result.has_completed_http_setup ||
                     phase2Result.http_configured
@@ -481,8 +484,8 @@ object RunAnywhere {
      *    return (O(1)).
      *  - Recovery path: services ready, HTTP applicable but not yet completed
      *    (offline init with a backend configured) → retry HTTP/auth via
-     *    [retryHTTPSetup]. This re-runs the Phase 2 service bootstrap, so it is
-     *    gated on [_httpSetupApplicable] to avoid re-running on every call in
+     *    [retryHTTPSetup]. This uses the idempotent commons retry path and is
+     *    gated on [_httpSetupApplicable] to avoid retrying on every call in
      *    local-only mode where HTTP can never complete.
      *  - Cold start path: services not ready → kick off
      *    [completeServicesInitialization].
@@ -491,7 +494,7 @@ object RunAnywhere {
      * to await Phase 2 explicitly. The Mutex guard inside
      * [completeServicesInitialization] serializes concurrent first-callers.
      *
-     * @throws IllegalStateException if Phase 1 ([initialize]) has not run.
+     * @throws SDKException if Phase 1 ([initialize]) has not run.
      */
     internal suspend fun ensureServicesReady() {
         if (_areServicesReady) {
@@ -548,7 +551,7 @@ object RunAnywhere {
      */
     internal fun requireInitialized() {
         if (!_isInitialized) {
-            throw IllegalStateException("SDK not initialized. Call RunAnywhere.initialize() first.")
+            throw SDKException.notInitialized("RunAnywhere")
         }
     }
 
@@ -562,6 +565,9 @@ object RunAnywhere {
         logger.info("Resetting SDK state...")
 
         synchronized(lock) {
+            servicesInitJob?.cancel()
+            servicesInitJob = null
+
             // Shutdown CppBridge
             shutdownPlatformBridge()
 
@@ -577,5 +583,4 @@ object RunAnywhere {
     }
 }
 
-// Platform-specific bridge functions (expect/actual pattern)
-// Platform-specific auth/device state accessors (expect/actual pattern)
+// Platform-specific bridge functions and auth/device state accessors.

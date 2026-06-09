@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.lora
 
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
-import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,9 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.downloadModelFlow
 import com.runanywhere.sdk.public.extensions.lora
-import com.runanywhere.sdk.public.extensions.registerLoraArtifact
 import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
 import com.runanywhere.sdk.public.types.RALoRAApplyRequest
 import com.runanywhere.sdk.public.types.RALoRARemoveRequest
@@ -53,8 +50,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                 val path = if (existing != null) {
                     existing.absolutePath
                 } else {
-                    val artifact = RunAnywhere.registerLoraArtifact(entry)
-                    RunAnywhere.downloadModelFlow(artifact).collect { progress ->
+                    RunAnywhere.lora.download(entry) { progress ->
                         val pct = if (progress.total_bytes > 0) {
                             (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
                         } else {
@@ -62,12 +58,10 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         state = state.copy(progressPercent = pct)
                     }
-                    findAdapterFile(entry)?.absolutePath.orEmpty()
                 }
 
                 if (path.isNotBlank()) {
                     downloadedPaths[entry.id] = path
-                    finalizeDownload(entry, path)
                 }
                 state = state.copy(busyId = null, progressPercent = null)
                 reload()
@@ -137,19 +131,6 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
 
     fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean =
         downloadedPaths.containsKey(entry.id) || findAdapterFile(entry) != null
-
-    private suspend fun finalizeDownload(entry: LoraAdapterCatalogEntry, localPath: String) {
-        runCatching {
-            RunAnywhere.lora.markDownloadCompleted(
-                LoraAdapterDownloadCompletedRequest(
-                    adapter_id = entry.id,
-                    local_path = localPath,
-                    size_bytes = entry.size_bytes.takeIf { it > 0 },
-                    completed_at_unix_ms = System.currentTimeMillis(),
-                ),
-            )
-        }.onFailure { RACLog.w("lora markDownloadCompleted failed: ${it.message}") }
-    }
 
     private fun adapterFilename(entry: LoraAdapterCatalogEntry): String =
         entry.filename.ifBlank { entry.url.substringAfterLast('/').substringBefore('?') }

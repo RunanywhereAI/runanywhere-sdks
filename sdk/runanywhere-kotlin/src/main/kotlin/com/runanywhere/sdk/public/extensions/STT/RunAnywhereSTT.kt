@@ -43,7 +43,7 @@ private val sttLogger = SDKLogger.stt
 
 suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
-    options: RASTTOptions,
+    options: RASTTOptions = RASTTOptions.defaults(),
 ): RASTTOutput {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -71,7 +71,7 @@ suspend fun RunAnywhere.transcribe(
 
 fun RunAnywhere.transcribeStream(
     audio: Flow<ByteArray>,
-    options: RASTTOptions?,
+    options: RASTTOptions = RASTTOptions.defaults(),
 ): Flow<RASTTPartialResult> =
     callbackFlow {
         if (!isInitialized) {
@@ -91,8 +91,6 @@ fun RunAnywhere.transcribeStream(
             return@callbackFlow
         }
 
-        val effectiveOptions = options ?: RASTTOptions()
-
         val streamJob =
             launch {
                 try {
@@ -103,7 +101,7 @@ fun RunAnywhere.transcribeStream(
                     val buffer = ByteArrayOutputStream()
                     audio.collect { chunk -> buffer.write(chunk) }
 
-                    CppBridgeSTT.transcribeStream(buffer.toByteArray(), effectiveOptions) { event ->
+                    CppBridgeSTT.transcribeStream(buffer.toByteArray(), options) { event ->
                         when (event.kind) {
                             STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL -> {
                                 val partial = event.partial

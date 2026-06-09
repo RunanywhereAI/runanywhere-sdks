@@ -23,11 +23,9 @@ import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RAStructuredOutputResult
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -103,55 +101,44 @@ suspend fun RunAnywhere.extractStructuredOutput(
     }
 }
 
-@Suppress("UnusedParameter")
 fun RunAnywhere.generateStructuredStream(
     prompt: String,
     schema: RAJSONSchema,
-    options: RALLMGenerationOptions?,
+    options: RALLMGenerationOptions? = null,
 ): Flow<StructuredOutputStreamEvent> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
-    // Commons owns the full streaming pipeline: it drives the LLM, emits
-    // TOKEN / PARTIAL_JSON events as complete JSON values become available,
-    // and a single terminal COMPLETED / ERROR event with the parsed result.
-    // Kotlin simply decodes and forwards — no client-side accumulation.
-    // `options` is intentionally accepted for Swift signature parity but
-    // not yet threaded through the StructuredOutputRequest proto; LLM
-    // generation options are picked up from the lifecycle-owned LLM
-    // service. Wiring user-supplied options through the streaming proto
-    // surface is a follow-up parity item.
-    return callbackFlow {
-        val requestId = UUID.randomUUID().toString()
-        val driver =
-            launch(Dispatchers.IO) {
-                val structuredOptions =
-                    StructuredOutputOptions(
-                        schema = schema,
-                        include_schema_in_prompt = true,
-                        mode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-                    )
-                try {
-                    CppBridgeStructuredOutput.generateStream(
-                        StructuredOutputRequest(
-                            request_id = requestId,
-                            prompt = prompt,
-                            options = structuredOptions,
-                        ),
-                    ) { event ->
-                        trySend(event)
-                        val terminal =
-                            event.kind == StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED ||
-                                event.kind == StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR
-                        !terminal
-                    }
-                    close()
-                } catch (e: Exception) {
-                    close(e)
-                }
+    return flow {
+        val structuredOptions = StructuredOutputOptions.defaults(schema = schema)
+        val internalOptions =
+            (options ?: RALLMGenerationOptions()).copy(
+                structured_output = structuredOptions,
+            )
+        var accumulated = ""
+        var seq = 0L
+        generateStream(prompt, internalOptions.copy(streaming_enabled = true)).collect { event ->
+            if (event.token.isNotEmpty()) {
+                accumulated += event.token
+                seq += 1
+                emit(
+                    StructuredOutputStreamEvent(
+                        kind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+                        token = event.token,
+                        seq = seq,
+                    ),
+                )
             }
-        awaitClose {
-            driver.cancel()
         }
+
+        seq += 1
+        val parsed = extractStructuredOutput(accumulated, schema)
+        emit(
+            StructuredOutputStreamEvent(
+                kind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
+                result = parsed,
+                seq = seq,
+            ),
+        )
     }.flowOn(Dispatchers.IO)
 }
 

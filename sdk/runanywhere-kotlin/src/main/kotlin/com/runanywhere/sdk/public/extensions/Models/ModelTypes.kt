@@ -11,8 +11,8 @@ import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelFormat
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import java.net.URI
 // `ModelSelectionContext` lived here as a UI filter helper but had
 // zero consumers inside the SDK. It was moved to the Android example app at
 // `examples/android/RunAnywhereAI/.../models/ModelSelectionContext.kt`.
@@ -45,75 +45,75 @@ val ModelCategory.defaultFramework: InferenceFramework
             else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
         }
 
-val ModelCategory.catalogKey: String
-    get() =
-        when (this) {
-            ModelCategory.MODEL_CATEGORY_LANGUAGE -> "language"
-            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> "speech-recognition"
-            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> "speech-synthesis"
-            ModelCategory.MODEL_CATEGORY_VISION -> "vision"
-            ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> "image-generation"
-            ModelCategory.MODEL_CATEGORY_MULTIMODAL -> "multimodal"
-            ModelCategory.MODEL_CATEGORY_AUDIO -> "audio"
-            ModelCategory.MODEL_CATEGORY_EMBEDDING -> "embedding"
-            ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> "voice-activity-detection"
-            ModelCategory.MODEL_CATEGORY_UNSPECIFIED -> "unspecified"
-        }
-
-val ModelFormat.catalogKey: String
-    get() =
-        when (this) {
-            ModelFormat.MODEL_FORMAT_GGUF -> "gguf"
-            ModelFormat.MODEL_FORMAT_GGML -> "ggml"
-            ModelFormat.MODEL_FORMAT_ONNX -> "onnx"
-            ModelFormat.MODEL_FORMAT_ORT -> "ort"
-            ModelFormat.MODEL_FORMAT_BIN -> "bin"
-            ModelFormat.MODEL_FORMAT_COREML -> "coreml"
-            ModelFormat.MODEL_FORMAT_MLMODEL -> "mlmodel"
-            ModelFormat.MODEL_FORMAT_MLPACKAGE -> "mlpackage"
-            ModelFormat.MODEL_FORMAT_TFLITE -> "tflite"
-            ModelFormat.MODEL_FORMAT_SAFETENSORS -> "safetensors"
-            ModelFormat.MODEL_FORMAT_QNN_CONTEXT -> "qnn_context"
-            ModelFormat.MODEL_FORMAT_ZIP -> "zip"
-            ModelFormat.MODEL_FORMAT_FOLDER -> "folder"
-            ModelFormat.MODEL_FORMAT_PROPRIETARY -> "proprietary"
-            ModelFormat.MODEL_FORMAT_UNKNOWN -> "unknown"
-            ModelFormat.MODEL_FORMAT_UNSPECIFIED -> "unspecified"
-        }
-
 /**
  * Canonical wire string for a framework (e.g. "LlamaCpp", "ONNX"). Routes
  * through commons' `rac_framework_raw_value` so the Kotlin, Swift, and C++
- * tables can never drift. Mirrors Swift's `RAInferenceFramework.rawValue`
+ * tables can never drift. Mirrors Swift's `RAInferenceFramework.wireString`
  * surface. Falls back to the proto enum name when the native lib is
  * unavailable (e.g. non-inference unit-test contexts).
  */
-val InferenceFramework.rawValue: String
+val InferenceFramework.wireString: String
     get() = RunAnywhereBridge.racFrameworkRawValue(value) ?: name
 
 /**
  * Human-readable display name from commons'
  * `rac_inference_framework_display_name` (e.g. "llama.cpp",
  * "Foundation Models"). Mirrors Swift's `RAInferenceFramework.displayName`.
- * Falls back to [rawValue] when the native lib is unavailable.
+ * Falls back to [wireString] when the native lib is unavailable.
  */
 val InferenceFramework.displayName: String
-    get() = RunAnywhereBridge.racInferenceFrameworkDisplayName(value) ?: rawValue
+    get() = RunAnywhereBridge.racInferenceFrameworkDisplayName(value) ?: wireString
 
 /**
  * Snake_case analytics key from commons'
  * `rac_inference_framework_analytics_key` (e.g. "llama_cpp",
  * "foundation_models"). Mirrors Swift's `RAInferenceFramework.analyticsKey`.
- * Falls back to a local normalization of [rawValue] when the native lib is
+ * Falls back to a local normalization of [wireString] when the native lib is
  * unavailable.
  */
 val InferenceFramework.analyticsKey: String
     get() =
         RunAnywhereBridge.racInferenceFrameworkAnalyticsKey(value)
-            ?: rawValue
+            ?: wireString
                 .replace(Regex("([a-z])([A-Z])"), "$1_$2")
                 .replace('-', '_')
                 .lowercase()
+
+val InferenceFramework.Companion.knownCases: List<InferenceFramework>
+    get() =
+        listOf(
+            InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+            InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS,
+            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+            InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO,
+            InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+            InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+            InferenceFramework.INFERENCE_FRAMEWORK_METALRT,
+            InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
+            InferenceFramework.INFERENCE_FRAMEWORK_TFLITE,
+            InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH,
+            InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE,
+            InferenceFramework.INFERENCE_FRAMEWORK_MLC,
+            InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM,
+            InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
+            InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS,
+            InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN,
+            InferenceFramework.INFERENCE_FRAMEWORK_NONE,
+            InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+        )
+
+fun InferenceFramework.Companion.fromCaseInsensitive(value: String): InferenceFramework? {
+    val normalized = value.trim().lowercase()
+    if (normalized.isEmpty()) return null
+    return knownCases.firstOrNull { framework ->
+        framework.name.lowercase() == normalized ||
+            framework.wireString.lowercase() == normalized ||
+            framework.displayName.lowercase() == normalized ||
+            framework.analyticsKey.lowercase() == normalized
+    }
+}
 
 val ArchiveType.fileExtension: String
     get() =
@@ -141,13 +141,16 @@ val ModelArtifactType.displayName: String
             ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED -> "Unspecified"
         }
 
+fun ArchiveType.Companion.from(url: URI): ArchiveType? =
+    archiveTypeFromPath(url.path.orEmpty())
+
 /**
  * Detect the archive type for a URL/file-path. Routes through commons'
  * `rac_archive_type_from_path` (the same detector Swift's `ArchiveType.from(url:)`
  * wraps) so archive sniffing can never drift between SDKs. Returns null when
  * the path is not a recognized archive.
  */
-fun archiveTypeFromPath(path: String): ArchiveType? {
+internal fun archiveTypeFromPath(path: String): ArchiveType? {
     val protoValue = RunAnywhereBridge.racArchiveTypeFromPath(path)
     return if (protoValue < 0) null else ArchiveType.fromValue(protoValue)
 }

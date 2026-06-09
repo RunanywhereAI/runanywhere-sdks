@@ -29,6 +29,7 @@ public enum RunAnywhere {
         var isInitialized = false
         var hasCompletedServicesInit = false
         var hasCompletedHTTPSetup = false
+        var httpSetupApplicable = true
         var servicesInitTask: Task<Void, Error>?
     }
 
@@ -162,6 +163,7 @@ public enum RunAnywhere {
             $0.initParams = params
             $0.hasCompletedServicesInit = false
             $0.hasCompletedHTTPSetup = false
+            $0.httpSetupApplicable = true
             $0.servicesInitTask = nil
         }
         Logging.shared.applyEnvironmentConfiguration(params.environment)
@@ -237,6 +239,7 @@ public enum RunAnywhere {
                 $0.isInitialized = false
                 $0.hasCompletedServicesInit = false
                 $0.hasCompletedHTTPSetup = false
+                $0.httpSetupApplicable = true
                 $0.servicesInitTask = nil
             }
             CppBridge.Events.emitSDKInitFailed(error: SDKException.from(error))
@@ -322,6 +325,7 @@ public enum RunAnywhere {
 
         state.withLock {
             $0.hasCompletedHTTPSetup = completedHTTPSetup
+            $0.httpSetupApplicable = phase2Result.httpApplicable
             $0.hasCompletedServicesInit = true
         }
     }
@@ -330,14 +334,17 @@ public enum RunAnywhere {
     /// O(1) after first successful initialization with HTTP configured.
     /// If core services are done but HTTP/auth failed (offline init), retries auth only.
     internal static func ensureServicesReady() async throws {
-        let readiness = state.withLock { (
-            services: $0.hasCompletedServicesInit,
-            http: $0.hasCompletedHTTPSetup
-        ) }
-        if readiness.services && readiness.http {
+        let readiness = state.withLock {
+            (
+                services: $0.hasCompletedServicesInit,
+                http: $0.hasCompletedHTTPSetup,
+                applicable: $0.httpSetupApplicable
+            )
+        }
+        if readiness.services && (readiness.http || !readiness.applicable) {
             return
         }
-        if readiness.services && !readiness.http {
+        if readiness.services && !readiness.http && readiness.applicable {
             await retryHTTPSetup()
             return
         }
@@ -359,7 +366,10 @@ public enum RunAnywhere {
         }
 
         let completedHTTPSetup = proto.hasCompletedHTTPSetup_p || proto.httpConfigured
-        state.withLock { $0.hasCompletedHTTPSetup = completedHTTPSetup }
+        state.withLock {
+            $0.hasCompletedHTTPSetup = completedHTTPSetup
+            $0.httpSetupApplicable = proto.httpApplicable
+        }
 
         if !proto.warning.isEmpty {
             logger.debug("HTTP retry warning: \(proto.warning)")

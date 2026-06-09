@@ -415,7 +415,7 @@ fun RAModelInfo.setBuiltInArtifact(enabled: Boolean = true): RAModelInfo =
  * @param archiveType If known, forces the archive variant of the inferred
  *   artifact. Pass `null` to let the helper infer from the URL.
  */
-fun ModelInfo.Companion.create(
+fun ModelInfo.Companion.make(
     id: String,
     name: String,
     category: ModelCategory,

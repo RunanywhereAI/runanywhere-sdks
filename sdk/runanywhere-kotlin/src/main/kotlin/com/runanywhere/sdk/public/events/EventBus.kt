@@ -118,30 +118,10 @@ object EventBus {
     }
 
     /**
-     * Extract a specific payload type from the proto envelope stream.
-     *
-     * Replaces the pre-proto `eventsOfType<T : SDKEvent>()` API. The
-     * generated `SDKEvent` is the top-level Wire envelope with optional
-     * `oneof` payload fields (model, generation, voice, etc.); payload
-     * types like [ModelEvent] are sibling messages, not subclasses, so
-     * the old `is T` filter could not work. Use the per-payload helpers
-     * below for common cases, or call this directly:
-     *
-     * ```kotlin
-     * RunAnywhere.events
-     *     .eventsOfPayload { it.model }
-     *     .collect { modelEvent: ModelEvent -> ... }
-     * ```
+     * Extract a specific payload type from the proto envelope stream for
+     * internal convenience streams.
      */
-    fun <T : Any> eventsOfPayload(selector: (SDKEvent) -> T?): Flow<T> = events.mapNotNull(selector)
-
-    /** Stream of [ModelEvent] payloads extracted from the SDKEvent envelope. */
-    val modelEventPayloads: Flow<ModelEvent>
-        get() = eventsOfPayload { it.model }
-
-    /** Stream of [GenerationEvent] payloads (LLM token + streaming generation events). */
-    val generationEventPayloads: Flow<GenerationEvent>
-        get() = eventsOfPayload { it.generation }
+    private fun <T : Any> eventsOfPayload(selector: (SDKEvent) -> T?): Flow<T> = events.mapNotNull(selector)
 
     /** Stream of [VoiceEvent] payloads (voice-agent pipeline events). */
     val voiceEventPayloads: Flow<VoiceEvent>

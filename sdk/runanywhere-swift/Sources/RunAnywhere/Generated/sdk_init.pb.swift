@@ -312,6 +312,15 @@ public nonisolated struct RASdkInitResult: @unchecked Sendable {
     set {_uniqueStorage()._hasCompletedHTTPSetup_p = newValue}
   }
 
+  /// True when this SDK configuration has a usable network credential/url
+  /// pair and therefore HTTP/auth setup can eventually succeed. Local-only
+  /// development builds without baked-in Supabase config set this false so
+  /// platform SDKs do not retry HTTP on every guarded API call.
+  public var httpApplicable: Bool {
+    get {_storage._httpApplicable}
+    set {_uniqueStorage()._httpApplicable = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -438,7 +447,7 @@ nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0\u{3}http_applicable\0")
 
   fileprivate class _StorageClass {
     var _phase: RASdkInitPhase = .unspecified
@@ -451,6 +460,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
     var _warning: String = String()
     var _durationMs: Int64 = 0
     var _hasCompletedHTTPSetup_p: Bool = false
+    var _httpApplicable: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -471,6 +481,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
       _warning = source._warning
       _durationMs = source._durationMs
       _hasCompletedHTTPSetup_p = source._hasCompletedHTTPSetup_p
+      _httpApplicable = source._httpApplicable
     }
   }
 
@@ -499,6 +510,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._warning) }()
         case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._durationMs) }()
         case 10: try { try decoder.decodeSingularBoolField(value: &_storage._hasCompletedHTTPSetup_p) }()
+        case 11: try { try decoder.decodeSingularBoolField(value: &_storage._httpApplicable) }()
         default: break
         }
       }
@@ -541,6 +553,9 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
       if _storage._hasCompletedHTTPSetup_p != false {
         try visitor.visitSingularBoolField(value: _storage._hasCompletedHTTPSetup_p, fieldNumber: 10)
       }
+      if _storage._httpApplicable != false {
+        try visitor.visitSingularBoolField(value: _storage._httpApplicable, fieldNumber: 11)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -560,6 +575,7 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
         if _storage._warning != rhs_storage._warning {return false}
         if _storage._durationMs != rhs_storage._durationMs {return false}
         if _storage._hasCompletedHTTPSetup_p != rhs_storage._hasCompletedHTTPSetup_p {return false}
+        if _storage._httpApplicable != rhs_storage._httpApplicable {return false}
         return true
       }
       if !storagesAreEqual {return false}
