@@ -1,17 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:runanywhere/public/runanywhere_tool_calling.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart'
+    show ToolDefinition, ToolCallingOptions;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 
 /// ToolsView - Demonstrates tool calling functionality
 ///
@@ -27,8 +24,12 @@ class _ToolsViewState extends State<ToolsView> {
   final TextEditingController _promptController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  // Single source of truth for the tool-calling toggle (B-FL-2-001).
+  // The Settings tab also reads/writes this same singleton so toggling
+  // in one place reflects in the other.
+  final ToolSettingsViewModel _toolSettings = ToolSettingsViewModel.shared;
+
   // State
-  bool _toolCallingEnabled = true;
   bool _isGenerating = false;
   String? _errorMessage;
   List<ToolDefinition> _registeredTools = [];
@@ -40,35 +41,30 @@ class _ToolsViewState extends State<ToolsView> {
   // Model state
   String? _loadedModelName;
 
+  bool get _toolCallingEnabled => _toolSettings.toolCallingEnabled;
+
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSettings());
+    _toolSettings.addListener(_onToolSettingsChanged);
     unawaited(_syncModelState());
-    _registerDemoTools();
+    unawaited(_registerDemoTools());
   }
 
   @override
   void dispose() {
+    _toolSettings.removeListener(_onToolSettingsChanged);
     _promptController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _toolCallingEnabled = prefs.getBool('tool_calling_enabled') ?? true;
-    });
-  }
-
-  Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('tool_calling_enabled', _toolCallingEnabled);
+  void _onToolSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.currentLLMModel();
+    final model = await sdk.RunAnywhere.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -76,310 +72,21 @@ class _ToolsViewState extends State<ToolsView> {
     }
   }
 
-  /// Register demo tools matching iOS/Android examples
-  void _registerDemoTools() {
-    // Clear any existing tools
-    RunAnywhereTools.clearTools();
-
-    // 1. Weather tool
-    RunAnywhereTools.registerTool(
-      const ToolDefinition(
-        name: 'get_weather',
-        description: 'Get current weather for a location',
-        parameters: [
-          ToolParameter(
-            name: 'location',
-            type: ToolParameterType.string,
-            description: 'City name or coordinates (e.g., "San Francisco, CA")',
-          ),
-        ],
-      ),
-      _fetchWeather,
-    );
-
-    // 2. Calculator tool
-    RunAnywhereTools.registerTool(
-      const ToolDefinition(
-        name: 'calculate',
-        description: 'Perform basic arithmetic calculations',
-        parameters: [
-          ToolParameter(
-            name: 'expression',
-            type: ToolParameterType.string,
-            description: 'Math expression (e.g., "2 + 2", "10 * 5")',
-          ),
-        ],
-      ),
-      _calculate,
-    );
-
-    // 3. Time tool
-    RunAnywhereTools.registerTool(
-      const ToolDefinition(
-        name: 'get_current_time',
-        description: 'Get the current date and time',
-        parameters: [],
-      ),
-      _getCurrentTime,
-    );
-
+  /// Register the three demo tools through the shared
+  /// `ToolSettingsViewModel.shared.registerDemoTools()` so this view and the
+  /// Settings tab use the SAME executors (single source of truth). Also
+  /// refresh local UI state from the SDK registry.
+  Future<void> _registerDemoTools() async {
+    sdk.RunAnywhere.tools.clearTools();
+    await _toolSettings.registerDemoTools();
+    if (!mounted) return;
     setState(() {
-      _registeredTools = RunAnywhereTools.getRegisteredTools();
+      _registeredTools = sdk.RunAnywhere.tools.getRegisteredTools();
     });
   }
 
-  /// Weather tool executor - fetches real weather data
-  Future<Map<String, ToolValue>> _fetchWeather(
-    Map<String, ToolValue> args,
-  ) async {
-    final rawLocation = args['location']?.stringValue;
-
-    // Require location argument - no hardcoded defaults
-    if (rawLocation == null || rawLocation.isEmpty) {
-      return {
-        'error': const StringToolValue('Missing required argument: location'),
-      };
-    }
-
-    // Clean up location string for better geocoding
-    final location = _cleanLocationString(rawLocation);
-
-    try {
-      // Use Open-Meteo API (no key required)
-      final geocodeUrl = Uri.parse(
-        'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=5&language=en&format=json',
-      );
-
-      final geocodeResponse = await http.get(geocodeUrl);
-      if (geocodeResponse.statusCode != 200) {
-        throw Exception('Geocoding failed');
-      }
-
-      final geocodeData = jsonDecode(geocodeResponse.body) as Map<String, dynamic>;
-      final results = geocodeData['results'] as List?;
-      if (results == null || results.isEmpty) {
-        return {
-          'error': StringToolValue('Could not find location: $location'),
-          'location': StringToolValue(location),
-        };
-      }
-
-      final firstResult = results[0] as Map<String, dynamic>;
-      final lat = firstResult['latitude'] as num;
-      final lon = firstResult['longitude'] as num;
-      final cityName = firstResult['name'] as String? ?? location;
-
-      // Fetch weather
-      final weatherUrl = Uri.parse(
-        'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph',
-      );
-
-      final weatherResponse = await http.get(weatherUrl);
-      if (weatherResponse.statusCode != 200) {
-        throw Exception('Weather fetch failed');
-      }
-
-      final weatherData = jsonDecode(weatherResponse.body) as Map<String, dynamic>;
-      final current = weatherData['current'] as Map<String, dynamic>;
-      final temp = current['temperature_2m'] as num? ?? 0;
-      final humidity = current['relative_humidity_2m'] as num? ?? 0;
-      final windSpeed = current['wind_speed_10m'] as num? ?? 0;
-      final weatherCode = current['weather_code'] as int? ?? 0;
-
-      return {
-        'location': StringToolValue(cityName),
-        'temperature': NumberToolValue(temp.toDouble()),
-        'unit': const StringToolValue('fahrenheit'),
-        'humidity': NumberToolValue(humidity.toDouble()),
-        'wind_speed_mph': NumberToolValue(windSpeed.toDouble()),
-        'condition': StringToolValue(_weatherCodeToCondition(weatherCode)),
-      };
-    } catch (e) {
-      return {
-        'error': StringToolValue('Weather fetch failed: $e'),
-        'location': StringToolValue(location),
-      };
-    }
-  }
-
-  /// Clean location string for better geocoding results
-  String _cleanLocationString(String location) {
-    var cleaned = location.trim();
-
-    // Common patterns to remove: ", CA", ", NY", ", US", ", USA"
-    final patterns = [
-      RegExp(r',\s*(US|USA|United States)$', caseSensitive: false),
-      RegExp(r',\s*[A-Z]{2}$'), // State abbreviations like ", CA", ", NY"
-      RegExp(r',\s*[A-Z]{2},\s*(US|USA)$', caseSensitive: false),
-    ];
-
-    for (final pattern in patterns) {
-      cleaned = cleaned.replaceAll(pattern, '');
-    }
-
-    // Handle common abbreviations
-    final abbreviations = {
-      'SF': 'San Francisco',
-      'NYC': 'New York City',
-      'LA': 'Los Angeles',
-      'DC': 'Washington DC',
-    };
-
-    final upperCleaned = cleaned.toUpperCase();
-    if (abbreviations.containsKey(upperCleaned)) {
-      return abbreviations[upperCleaned]!;
-    }
-
-    return cleaned;
-  }
-
-  String _weatherCodeToCondition(int code) {
-    switch (code) {
-      case 0:
-        return 'Clear sky';
-      case 1:
-        return 'Mainly clear';
-      case 2:
-        return 'Partly cloudy';
-      case 3:
-        return 'Overcast';
-      case 45:
-      case 48:
-        return 'Foggy';
-      case 51:
-      case 53:
-      case 55:
-        return 'Drizzle';
-      case 56:
-      case 57:
-        return 'Freezing drizzle';
-      case 61:
-      case 63:
-      case 65:
-        return 'Rain';
-      case 66:
-      case 67:
-        return 'Freezing rain';
-      case 71:
-      case 73:
-      case 75:
-        return 'Snow';
-      case 77:
-        return 'Snow grains';
-      case 80:
-      case 81:
-      case 82:
-        return 'Rain showers';
-      case 85:
-      case 86:
-        return 'Snow showers';
-      case 95:
-        return 'Thunderstorm';
-      case 96:
-      case 99:
-        return 'Thunderstorm with hail';
-      default:
-        return 'Unknown';
-    }
-  }
-
-  /// Calculator tool executor
-  Future<Map<String, ToolValue>> _calculate(
-    Map<String, ToolValue> args,
-  ) async {
-    final expression = args['expression']?.stringValue;
-    
-    // Require expression argument - no hardcoded defaults
-    if (expression == null || expression.isEmpty) {
-      return {
-        'error': const StringToolValue('Missing required argument: expression'),
-      };
-    }
-
-    try {
-      // Simple expression parser for basic arithmetic
-      final result = _evaluateExpression(expression);
-      return {
-        'expression': StringToolValue(expression),
-        'result': NumberToolValue(result),
-      };
-    } catch (e) {
-      return {
-        'error': StringToolValue('Calculation failed: $e'),
-        'expression': StringToolValue(expression),
-      };
-    }
-  }
-
-  double _evaluateExpression(String expr) {
-    // Remove spaces
-    expr = expr.replaceAll(' ', '');
-
-    // Handle power operator first (** or ^)
-    if (expr.contains('**')) {
-      final parts = expr.split('**');
-      var result = double.parse(parts[0]);
-      for (var i = 1; i < parts.length; i++) {
-        result = _pow(result, double.parse(parts[i]));
-      }
-      return result;
-    } else if (expr.contains('^')) {
-      final parts = expr.split('^');
-      var result = double.parse(parts[0]);
-      for (var i = 1; i < parts.length; i++) {
-        result = _pow(result, double.parse(parts[i]));
-      }
-      return result;
-    }
-
-    // Handle simple operations
-    if (expr.contains('+')) {
-      final parts = expr.split('+');
-      return parts.map(double.parse).reduce((a, b) => a + b);
-    } else if (expr.contains('-')) {
-      final parts = expr.split('-');
-      var result = double.parse(parts[0]);
-      for (var i = 1; i < parts.length; i++) {
-        result -= double.parse(parts[i]);
-      }
-      return result;
-    } else if (expr.contains('*')) {
-      final parts = expr.split('*');
-      return parts.map(double.parse).reduce((a, b) => a * b);
-    } else if (expr.contains('/')) {
-      final parts = expr.split('/');
-      var result = double.parse(parts[0]);
-      for (var i = 1; i < parts.length; i++) {
-        result /= double.parse(parts[i]);
-      }
-      return result;
-    }
-
-    return double.parse(expr);
-  }
-  
-  double _pow(double base, double exponent) {
-    return math.pow(base, exponent).toDouble();
-  }
-
-  /// Time tool executor
-  Future<Map<String, ToolValue>> _getCurrentTime(
-    Map<String, ToolValue> args,
-  ) async {
-    final now = DateTime.now();
-    return {
-      'date': StringToolValue(
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
-      ),
-      'time': StringToolValue(
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
-      ),
-      'timezone': StringToolValue(now.timeZoneName),
-    };
-  }
-
   Future<void> _runToolCalling() async {
-    if (!sdk.RunAnywhere.isModelLoaded) {
+    if (!sdk.RunAnywhere.llm.isLoaded) {
       setState(() {
         _errorMessage = 'Please load an LLM model first';
       });
@@ -404,28 +111,26 @@ class _ToolsViewState extends State<ToolsView> {
     try {
       _addToLog('Starting generation with tools...');
 
-      final result = await RunAnywhereTools.generateWithTools(
+      final result = await sdk.RunAnywhere.tools.generateWithTools(
         prompt,
-        options: const ToolCallingOptions(
-          maxToolCalls: 3,
-          autoExecute: true,
-        ),
+        options: ToolCallingOptions(maxIterations: 3, autoExecute: true),
       );
 
       // Log tool calls
       for (final toolCall in result.toolCalls) {
-        _addToLog('Tool called: ${toolCall.toolName}');
-        _addToLog('Arguments: ${toolCall.arguments}');
+        _addToLog('Tool called: ${toolCall.name}');
+        _addToLog('Arguments: ${toolCall.argumentsJson}');
       }
 
       // Log tool results
       for (final toolResult in result.toolResults) {
-        _addToLog('Tool result: ${toolResult.toolName}');
-        _addToLog('Success: ${toolResult.success}');
-        if (toolResult.result != null) {
-          _addToLog('Result: ${toolResult.result}');
+        _addToLog('Tool result: ${toolResult.name}');
+        final hasError = toolResult.error.isNotEmpty;
+        _addToLog('Success: ${!hasError}');
+        if (toolResult.resultJson.isNotEmpty) {
+          _addToLog('Result: ${toolResult.resultJson}');
         }
-        if (toolResult.error != null) {
+        if (hasError) {
           _addToLog('Error: ${toolResult.error}');
         }
       }
@@ -516,9 +221,7 @@ class _ToolsViewState extends State<ToolsView> {
       padding: const EdgeInsets.all(AppSpacing.padding16),
       decoration: BoxDecoration(
         color: AppColors.backgroundSecondary(context),
-        border: Border(
-          bottom: BorderSide(color: AppColors.separator(context)),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.separator(context))),
       ),
       child: Row(
         children: [
@@ -526,24 +229,21 @@ class _ToolsViewState extends State<ToolsView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Tool Calling',
-                  style: AppTypography.headline(context),
-                ),
+                Text('Tool Calling', style: AppTypography.headline(context)),
                 const SizedBox(height: 4),
                 if (_loadedModelName != null)
                   Text(
                     'Model: $_loadedModelName',
-                    style: AppTypography.caption(context).copyWith(
-                      color: AppColors.textSecondary(context),
-                    ),
+                    style: AppTypography.caption(
+                      context,
+                    ).copyWith(color: AppColors.textSecondary(context)),
                   )
                 else
                   Text(
                     'No model loaded',
-                    style: AppTypography.caption(context).copyWith(
-                      color: AppColors.primaryOrange,
-                    ),
+                    style: AppTypography.caption(
+                      context,
+                    ).copyWith(color: AppColors.primaryOrange),
                   ),
               ],
             ),
@@ -565,10 +265,9 @@ class _ToolsViewState extends State<ToolsView> {
         subtitle: const Text('Allow LLM to use external tools'),
         value: _toolCallingEnabled,
         onChanged: (value) {
-          setState(() {
-            _toolCallingEnabled = value;
-          });
-          unawaited(_saveSettings());
+          // Routes through ToolSettingsViewModel.shared so the Settings
+          // tab toggle stays in sync (B-FL-2-001).
+          _toolSettings.toolCallingEnabled = value;
         },
       ),
     );
@@ -580,9 +279,9 @@ class _ToolsViewState extends State<ToolsView> {
       children: [
         Text(
           'Registered Tools (${_registeredTools.length})',
-          style: AppTypography.subheadline(context).copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.subheadline(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: AppSpacing.small),
         ...(_registeredTools.map((tool) => _buildToolCard(context, tool))),
@@ -600,30 +299,34 @@ class _ToolsViewState extends State<ToolsView> {
           children: [
             Row(
               children: [
-                Icon(Icons.build_outlined, size: 16, color: AppColors.primaryAccent),
+                Icon(
+                  Icons.build_outlined,
+                  size: 16,
+                  color: AppColors.primaryAccent,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   tool.name,
-                  style: AppTypography.body(context).copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTypography.body(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
             const SizedBox(height: 4),
             Text(
               tool.description,
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
             if (tool.parameters.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Parameters: ${tool.parameters.map((p) => p.name).join(", ")}',
-                style: AppTypography.caption2(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
+                style: AppTypography.caption2(
+                  context,
+                ).copyWith(color: AppColors.textSecondary(context)),
               ),
             ],
           ],
@@ -638,9 +341,9 @@ class _ToolsViewState extends State<ToolsView> {
       children: [
         Text(
           'Test Prompt',
-          style: AppTypography.subheadline(context).copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.subheadline(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: AppSpacing.small),
         TextField(
@@ -648,9 +351,7 @@ class _ToolsViewState extends State<ToolsView> {
           maxLines: 3,
           decoration: InputDecoration(
             hintText: 'Try: "What\'s the weather in San Francisco?"',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
             fillColor: AppColors.backgroundSecondary(context),
           ),
@@ -712,9 +413,9 @@ class _ToolsViewState extends State<ToolsView> {
       children: [
         Text(
           'Execution Log',
-          style: AppTypography.subheadline(context).copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.subheadline(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: AppSpacing.small),
         Container(
@@ -742,9 +443,9 @@ class _ToolsViewState extends State<ToolsView> {
       children: [
         Text(
           'Final Response',
-          style: AppTypography.subheadline(context).copyWith(
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.subheadline(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: AppSpacing.small),
         Container(
@@ -757,10 +458,7 @@ class _ToolsViewState extends State<ToolsView> {
               color: AppColors.primaryAccent.withValues(alpha: 0.3),
             ),
           ),
-          child: Text(
-            _finalResponse,
-            style: AppTypography.body(context),
-          ),
+          child: Text(_finalResponse, style: AppTypography.body(context)),
         ),
       ],
     );

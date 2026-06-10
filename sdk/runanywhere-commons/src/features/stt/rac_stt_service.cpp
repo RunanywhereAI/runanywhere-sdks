@@ -8,14 +8,24 @@
 
 #include "rac/features/stt/rac_stt_service.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "STT.Service";
+
+namespace {
+
+const rac_stt_service_ops_t* stt_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->stt_ops : nullptr;
+}
+
+}  // namespace
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -32,57 +42,35 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
 
     RAC_LOG_INFO(LOG_CAT, "Creating STT service for: %s", model_path ? model_path : "NULL");
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t reg_result = RAC_ERROR_NOT_FOUND;
-    if (model_path) {
-        reg_result = rac_get_model(model_path, &model_info);
-
-        if (reg_result != RAC_SUCCESS) {
-            RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_path);
-            reg_result = rac_get_model_by_path(model_path, &model_info);
-        }
-
-        if (reg_result != RAC_SUCCESS) {
-            const char* last_slash = strrchr(model_path, '/');
-            if (last_slash && last_slash[1] != '\0') {
-                const char* extracted_id = last_slash + 1;
-                RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
-                reg_result = rac_get_model(extracted_id, &model_info);
-            }
-        }
-    }
-
-    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
-    const char* resolved_path = model_path;
-
-    if (reg_result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        if (model_info->local_path) {
-            resolved_path = model_info->local_path;
-        }
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d",
-                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework));
-    }
-
-    // Build service request
-    rac_service_request_t request = {};
-    request.identifier = model_path;
-    request.capability = RAC_CAPABILITY_STT;
-    request.framework = framework;
-    request.model_path = resolved_path;
-
-    // Service registry returns an rac_stt_service_t* with vtable already set
-    rac_result_t result = rac_service_create(RAC_CAPABILITY_STT, &request, out_handle);
-
-    if (model_info) {
-        rac_model_info_free(model_info);
-    }
-
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        model_path,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_UNKNOWN,
+         .allow_null_model_id = true,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = "/"},  // explicit caller paths win over
+         // the registry row (LLM uses ".gguf" for the same rule) — required for
+         // archive models whose registry local_path is the outer extract folder
+         // while loaders need the resolved inner artifact dir
+        &model_ref);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry");
         return result;
     }
+
+    rac_stt_service_t* service = nullptr;
+    result = rac::features::create_plugin_service<rac_stt_service_t, rac_stt_service_ops_t>(
+        {.log_cat = LOG_CAT,
+         .primitive = RAC_PRIMITIVE_TRANSCRIBE,
+         .select_ops = stt_ops,
+         .model_create_id = model_ref.path.c_str(),
+         .model_id_for_service = model_path,
+         .config_json = nullptr},
+        &service);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+    *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "STT service created");
     return RAC_SUCCESS;
@@ -174,6 +162,34 @@ void rac_stt_destroy(rac_handle_t handle) {
 
     // Free service struct
     free(service);
+}
+
+rac_result_t rac_stt_get_languages(rac_handle_t handle, char** out_json) {
+    if (!handle || !out_json)
+        return RAC_ERROR_NULL_POINTER;
+
+    *out_json = nullptr;
+    auto* service = static_cast<rac_stt_service_t*>(handle);
+    if (!service->ops || !service->ops->get_languages) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->get_languages(service->impl, out_json);
+}
+
+rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* audio_data, size_t audio_size,
+                                     const rac_stt_options_t* options, char** out_language) {
+    if (!handle || !audio_data || !out_language)
+        return RAC_ERROR_NULL_POINTER;
+
+    *out_language = nullptr;
+    auto* service = static_cast<rac_stt_service_t*>(handle);
+    if (!service->ops || !service->ops->detect_language) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->detect_language(service->impl, audio_data, audio_size, options,
+                                         out_language);
 }
 
 void rac_stt_result_free(rac_stt_result_t* result) {

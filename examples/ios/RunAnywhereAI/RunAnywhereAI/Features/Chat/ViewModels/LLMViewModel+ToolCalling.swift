@@ -9,75 +9,27 @@ import Foundation
 import RunAnywhere
 
 extension LLMViewModel {
-    // MARK: - Tool Calling Format Detection
-
-    /// Determines the optimal tool calling format based on the model name/ID.
-    /// Different models are trained on different tool calling formats.
-    /// Returns format name string (C++ is single source of truth for valid formats).
-    private func detectToolCallFormat(for modelName: String?) -> String {
-        guard let name = modelName?.lowercased() else {
-            return ToolCallFormatName.default
-        }
-
-        // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
-        if name.contains("lfm2") && name.contains("tool") {
-            return ToolCallFormatName.lfm2
-        }
-
-        // Default JSON format for general-purpose models
-        return ToolCallFormatName.default
-    }
-
     // MARK: - Tool Calling Generation
 
     func generateWithToolCalling(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        // Auto-detect the tool calling format based on the loaded model
-        let format = detectToolCallFormat(for: loadedModelName)
+        // The SDK derives the tool-calling format from the loaded model and
+        // orchestrates the tool call → execute → respond loop internally.
+        let result = try await RunAnywhere.generateWithTools(prompt: prompt, options: options)
 
-        // Get tool calling options with the appropriate format
-        let toolOptions = ToolCallingOptions(
-            maxToolCalls: 3,
-            autoExecute: true,
-            temperature: options.temperature,
-            maxTokens: options.maxTokens,
-            format: format
-        )
-
-        // Log the format being used for debugging
-        print("Using tool calling with format: \(format) for model: \(loadedModelName ?? "unknown")")
-
-        // Generate with tools
-        let result = try await RunAnywhere.generateWithTools(prompt, options: toolOptions)
-
-        // Extract tool call info if any tools were called
-        let toolCallInfo: ToolCallInfo?
-        if let lastCall = result.toolCalls.last,
-           let lastResult = result.toolResults.last {
-            toolCallInfo = ToolCallInfo(
-                toolName: lastCall.toolName,
-                arguments: lastCall.arguments,
-                result: lastResult.result,
-                success: lastResult.success,
-                error: lastResult.error
-            )
-        } else {
-            toolCallInfo = nil
-        }
-
-        // Split `<think>...</think>` content from the response so the UI can render
-        // the thinking block separately and avoid silently dropping SDK-provided
-        // thinking content on the tool-calling path.
-        let (displayText, thinkingContent) = ThinkingContentParser.extract(from: result.text)
+        // Tool call metadata is embedded in the result text (the SDK orchestrates
+        // tool call → execute → respond internally). No separate toolCalls/toolResults
+        // fields exist on RALLMGenerationResult; ToolCallInfo is unavailable here.
+        let toolCallInfo: ToolCallInfo? = nil
 
         // Update the message with the result
         await updateMessageWithToolResult(
             at: messageIndex,
-            text: displayText,
-            thinkingContent: thinkingContent,
+            text: result.text,
+            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             toolCallInfo: toolCallInfo
         )
     }

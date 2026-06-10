@@ -16,17 +16,9 @@ class KeychainHelper {
     required bool data,
   }) async {
     final bytes = Uint8List.fromList([data ? 1 : 0]);
-    await saveBytes(key: key, data: bytes);
-  }
-
-  /// Save bytes to keychain
-  static Future<void> saveBytes({
-    required String key,
-    required Uint8List data,
-  }) async {
     await KeychainService.shared.saveBytes(
       key: _prefixKey(key),
-      data: data,
+      data: bytes,
     );
   }
 
@@ -43,16 +35,11 @@ class KeychainHelper {
 
   /// Load a boolean value from keychain
   static Future<bool> loadBool(String key, {bool defaultValue = false}) async {
-    final data = await loadBytes(key);
+    final data = await KeychainService.shared.readBytes(_prefixKey(key));
     if (data == null || data.isEmpty) {
       return defaultValue;
     }
     return data.first == 1;
-  }
-
-  /// Load bytes from keychain
-  static Future<Uint8List?> loadBytes(String key) {
-    return KeychainService.shared.readBytes(_prefixKey(key));
   }
 
   /// Load string from keychain

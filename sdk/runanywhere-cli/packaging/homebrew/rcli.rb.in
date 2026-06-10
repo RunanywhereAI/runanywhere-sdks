@@ -1,0 +1,48 @@
+# rcli Homebrew formula template.
+#
+# Rendered by sdk/runanywhere-cli/scripts/update-tap.sh after a GitHub release
+# publishes the platform tarballs: @VERSION@, @SHA256_MACOS_ARM64@ and
+# @SHA256_LINUX_X86_64@ are substituted from the release's .sha256 sidecars,
+# then the result is committed to the RunanywhereAI/homebrew-tap repository as
+# Formula/rcli.rb (`brew install runanywhere-ai/tap/rcli`).
+class Rcli < Formula
+  desc "RunAnywhere on-device AI CLI — run, manage and serve local models"
+  homepage "https://github.com/RunanywhereAI/runanywhere-sdks"
+  version "@VERSION@"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v@VERSION@/rcli-macos-arm64-v@VERSION@.tar.gz"
+      sha256 "@SHA256_MACOS_ARM64@"
+    end
+  end
+
+  on_linux do
+    on_intel do
+      url "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v@VERSION@/rcli-linux-x86_64-v@VERSION@.tar.gz"
+      sha256 "@SHA256_LINUX_X86_64@"
+    end
+    depends_on "curl"
+  end
+
+  def install
+    bin.install "bin/rcli"
+    lib.install Dir["lib/*"] unless Dir["lib/*"].empty?
+    doc.install "README.md"
+  end
+
+  def caveats
+    <<~EOS
+      Models are stored under ~/.local/share/runanywhere (override with
+      RUNANYWHERE_HOME). Get started:
+        rcli list --all
+        rcli run qwen3
+    EOS
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/rcli version")
+    system bin/"rcli", "backends"
+  end
+end

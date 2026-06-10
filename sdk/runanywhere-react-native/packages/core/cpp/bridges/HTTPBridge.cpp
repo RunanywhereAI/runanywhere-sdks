@@ -2,7 +2,8 @@
  * @file HTTPBridge.cpp
  * @brief HTTP bridge implementation
  *
- * NOTE: HTTP is handled by the JS layer. This bridge manages configuration.
+ * NOTE: Public RN HTTP is handled by rac_http_client_*; this bridge manages
+ * shared configuration and optional legacy executors.
  */
 
 #include "HTTPBridge.hpp"
@@ -63,7 +64,7 @@ std::optional<HTTPResponse> HTTPBridge::execute(
     bool requiresAuth
 ) {
     if (!executor_) {
-        LOGE("No HTTP executor registered - HTTP requests must go through JS layer");
+        LOGE("No HTTP executor registered for legacy HTTPBridge::execute caller");
         return std::nullopt;
     }
 

@@ -7,7 +7,6 @@
 //
 
 import CRACommons
-import Foundation
 import LlamaCPPBackend
 import os.log
 import RunAnywhere
@@ -31,18 +30,26 @@ import RunAnywhere
 /// ## Usage
 ///
 /// LLM services are accessed through the main SDK APIs - the C++ backend handles
-/// service creation and lifecycle internally:
+/// service creation and lifecycle internally. Use the canonical proto-request
+/// entry points:
 ///
 /// ```swift
 /// // Generate text via public API
-/// let response = try await RunAnywhere.chat("Hello!")
+/// var req = RALLMGenerateRequest()
+/// req.prompt = "Hello!"
+/// let result = try await RunAnywhere.generate(req)
+/// print(result.text)
 ///
 /// // Stream text via public API
-/// for try await token in try await RunAnywhere.streamChat("Tell me a story") {
-///     print(token, terminator: "")
+/// var streamReq = RALLMGenerateRequest()
+/// streamReq.prompt = "Tell me a story"
+/// for try await event in try await RunAnywhere.generateStream(streamReq) {
+///     if event.eventKind == .token {
+///         print(event.token, terminator: "")
+///     }
 /// }
 /// ```
-public enum LlamaCPP: RunAnywhereModule {
+public enum LlamaCPP {
     private static let logger = SDKLogger(category: "LlamaCPP")
 
     // MARK: - Module Info
@@ -53,33 +60,24 @@ public enum LlamaCPP: RunAnywhereModule {
     /// LlamaCPP library version (underlying C++ library)
     public static let llamaCppVersion = "b7199"
 
-    // MARK: - RunAnywhereModule Conformance
-
-    public static let moduleId = "llamacpp"
-    public static let moduleName = "LlamaCPP"
-    public static let capabilities: Set<SDKComponent> = [.llm]
-    public static let defaultPriority: Int = 100
-
-    /// LlamaCPP uses the llama.cpp inference framework
-    public static let inferenceFramework: InferenceFramework = .llamaCpp
-
     // MARK: - Registration State
 
     private static var isRegistered = false
-    private static var isVLMRegistered = false
 
     // MARK: - Registration
 
     /// Register LlamaCPP backend with the C++ service registry.
     ///
     /// This calls `rac_backend_llamacpp_register()` to register the
-    /// LlamaCPP service provider with the C++ commons layer.
-    /// Also registers VLM backend if available.
+    /// LlamaCPP service provider with the C++ commons layer. The unified
+    /// llama.cpp plugin publishes a single vtable that fills both `llm_ops`
+    /// and `vlm_ops` slots, so this single call covers both LLM and VLM
+    /// modalities.
     ///
     /// Safe to call multiple times - subsequent calls are no-ops.
     ///
     /// - Parameter priority: Ignored (C++ uses its own priority system)
-    /// - Throws: SDKError if registration fails
+    /// - Throws: SDKException if registration fails
     @MainActor
     public static func register(priority _: Int = 100) {
         guard !isRegistered else {
@@ -89,7 +87,7 @@ public enum LlamaCPP: RunAnywhereModule {
 
         logger.info("Registering LlamaCPP backend with C++ registry...")
 
-        // Register LLM backend
+        // Register unified LlamaCPP backend (covers both LLM and VLM)
         let result = rac_backend_llamacpp_register()
 
         // RAC_ERROR_MODULE_ALREADY_REGISTERED is OK
@@ -101,54 +99,26 @@ public enum LlamaCPP: RunAnywhereModule {
         }
 
         isRegistered = true
-        logger.info("LlamaCPP LLM backend registered successfully")
-
-        // Register VLM backend (Vision Language Model)
-        registerVLM()
-    }
-
-    /// Register VLM (Vision Language Model) backend
-    @MainActor
-    private static func registerVLM() {
-        guard !isVLMRegistered else { return }
-
-        logger.info("Registering LlamaCPP VLM backend...")
-
-        let vlmResult = rac_backend_llamacpp_vlm_register()
-
-        if vlmResult != RAC_SUCCESS && vlmResult != RAC_ERROR_MODULE_ALREADY_REGISTERED {
-            let errorMsg = String(cString: rac_error_message(vlmResult))
-            logger.warning("LlamaCPP VLM registration failed: \(errorMsg) (VLM features may not be available)")
-            return
-        }
-
-        isVLMRegistered = true
-        logger.info("LlamaCPP VLM backend registered successfully")
+        logger.info("LlamaCPP backend registered successfully (LLM + VLM)")
     }
 
     /// Unregister the LlamaCPP backend from C++ registry.
+    ///
+    /// `@MainActor` so the `isRegistered` static flag stays in the same
+    /// isolation domain as `register(priority:)` and the `autoRegister` Task
+    /// hop. Without this annotation, a teardown call on a background thread
+    /// would race the registration path and could leave the C registry in an
+    /// inconsistent state (double-unregister or skipped unregister, see
+    /// comment record `mlt-003`).
+    @MainActor
     public static func unregister() {
-        if isVLMRegistered {
-            _ = rac_backend_llamacpp_vlm_unregister()
-            isVLMRegistered = false
-            logger.info("LlamaCPP VLM backend unregistered")
-        }
-
         if isRegistered {
             _ = rac_backend_llamacpp_unregister()
             isRegistered = false
-            logger.info("LlamaCPP LLM backend unregistered")
+            logger.info("LlamaCPP backend unregistered")
         }
     }
 
-    // MARK: - Model Handling
-
-    /// Check if LlamaCPP can handle a given model
-    /// Uses file extension pattern matching - actual framework info is in C++ registry
-    public static func canHandle(modelId: String?) -> Bool {
-        guard let modelId = modelId else { return false }
-        return modelId.lowercased().hasSuffix(".gguf")
-    }
 }
 
 // MARK: - Auto-Registration

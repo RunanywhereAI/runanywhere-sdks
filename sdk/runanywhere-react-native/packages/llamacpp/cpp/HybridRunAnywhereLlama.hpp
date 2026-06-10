@@ -5,10 +5,7 @@
  * This single C++ file works on both iOS and Android.
  *
  * Llama-specific implementation:
- * - Backend Registration
- * - Model Loading/Unloading
- * - Text Generation (streaming and non-streaming)
- * - Structured Output (JSON schema generation)
+ * - Backend registration hook (single call covers both LLM and VLM modalities)
  *
  * Matches Swift SDK: LlamaCPPRuntime/LlamaCPP.swift
  *
@@ -26,16 +23,13 @@
 #include "../nitrogen/generated/shared/c++/HybridRunAnywhereLlamaSpec.hpp"
 #endif
 
-#include <mutex>
-#include <string>
-
 namespace margelo::nitro::runanywhere::llama {
 
 /**
  * HybridRunAnywhereLlama - Llama backend native implementation
  *
  * Implements the RunAnywhereLlama interface defined in RunAnywhereLlama.nitro.ts
- * Delegates to LLMBridge and StructuredOutputBridge for actual inference.
+ * Registers native providers only. Core owns lifecycle and inference.
  */
 class HybridRunAnywhereLlama : public HybridRunAnywhereLlamaSpec {
 public:
@@ -50,88 +44,8 @@ public:
   std::shared_ptr<Promise<bool>> unregisterBackend() override;
   std::shared_ptr<Promise<bool>> isBackendRegistered() override;
 
-  // ============================================================================
-  // Model Loading
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> loadModel(
-    const std::string& path,
-    const std::optional<std::string>& modelId,
-    const std::optional<std::string>& modelName,
-    const std::optional<std::string>& configJson) override;
-  std::shared_ptr<Promise<bool>> isModelLoaded() override;
-  std::shared_ptr<Promise<bool>> unloadModel() override;
-  std::shared_ptr<Promise<std::string>> getModelInfo() override;
-
-  // ============================================================================
-  // Text Generation
-  // ============================================================================
-
-  std::shared_ptr<Promise<std::string>> generate(
-    const std::string& prompt,
-    const std::optional<std::string>& optionsJson) override;
-  std::shared_ptr<Promise<std::string>> generateStream(
-    const std::string& prompt,
-    const std::string& optionsJson,
-    const std::function<void(const std::string&, bool)>& callback) override;
-  std::shared_ptr<Promise<bool>> cancelGeneration() override;
-
-  // ============================================================================
-  // Structured Output
-  // ============================================================================
-
-  std::shared_ptr<Promise<std::string>> generateStructured(
-    const std::string& prompt,
-    const std::string& schema,
-    const std::optional<std::string>& optionsJson) override;
-
-  // ============================================================================
-  // Utilities
-  // ============================================================================
-
-  std::shared_ptr<Promise<std::string>> getLastError() override;
-  std::shared_ptr<Promise<double>> getMemoryUsage() override;
-
-  // ============================================================================
-  // VLM (Vision Language Model)
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> registerVLMBackend() override;
-  std::shared_ptr<Promise<bool>> loadVLMModel(
-    const std::string& modelPath,
-    const std::string& mmprojPath,
-    const std::optional<std::string>& modelId,
-    const std::optional<std::string>& modelName) override;
-  std::shared_ptr<Promise<bool>> isVLMModelLoaded() override;
-  std::shared_ptr<Promise<bool>> unloadVLMModel() override;
-  std::shared_ptr<Promise<std::string>> processVLMImage(
-    double imageFormat,
-    const std::string& imageData,
-    double imageWidth,
-    double imageHeight,
-    const std::string& prompt,
-    const std::optional<std::string>& optionsJson) override;
-  std::shared_ptr<Promise<std::string>> processVLMImageStream(
-    double imageFormat,
-    const std::string& imageData,
-    double imageWidth,
-    double imageHeight,
-    const std::string& prompt,
-    const std::string& optionsJson,
-    const std::function<void(const std::string&, bool)>& callback) override;
-  std::shared_ptr<Promise<bool>> cancelVLMGeneration() override;
-
 private:
-  // Thread safety
-  std::mutex modelMutex_;
-
-  // State tracking
-  std::string lastError_;
   bool isRegistered_ = false;
-  bool isVLMRegistered_ = false;
-
-  // Helper methods
-  void setLastError(const std::string& error);
 };
 
 } // namespace margelo::nitro::runanywhere::llama

@@ -1,0 +1,44 @@
+// RunAnywhere IDL — engine-router capability-query types.
+//
+// Moves per-SDK SDKComponent → ModelCategory →
+// framework mapping into commons. Frontends call
+// `rac_router_frameworks_for_capability_proto` with an
+// `SDKComponent` and receive the ordered list of `InferenceFramework`
+// values that can serve that capability, derived from the plugins
+// currently registered with the engine-router plugin registry.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+import "sdk_events.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "RouterProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Request: ask commons which frameworks can serve a given SDK component.
+// Maps to the engine-router plugin registry (not the model registry); this
+// answers "which engines CAN run this capability on this host" independent
+// of whether any matching model has been registered yet.
+// ---------------------------------------------------------------------------
+message FrameworksForCapabilityRequest {
+    SDKComponent component = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Response: ordered list of inference frameworks. Ordering matches the
+// engine-router's priority-descending scan of registered plugins for the
+// primitive(s) mapped from `component`. Duplicates are removed while
+// preserving first-seen order.
+// ---------------------------------------------------------------------------
+message FrameworksForCapabilityResponse {
+    repeated InferenceFramework frameworks = 1;
+}

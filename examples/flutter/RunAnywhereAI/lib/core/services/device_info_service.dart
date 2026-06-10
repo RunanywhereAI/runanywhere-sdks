@@ -9,7 +9,12 @@ import 'package:runanywhere_ai/core/models/app_types.dart';
 
 /// DeviceInfoService (mirroring iOS DeviceInfoService.swift)
 ///
-/// Retrieves device information (model, chip, memory, OS version, Neural Engine availability).
+/// Retrieves device model / OS / app version from platform plugins. Chip, NPU
+/// and total-memory facts used to come from the SDK's hardware ABI, but that
+/// ABI was removed when the routing scorer was retired (the engine router no
+/// longer needs a hardware profile). Device-info display is a UI concern, so
+/// the example reads what the platform exposes and leaves the rest empty; the
+/// UI hides rows with empty values.
 class DeviceInfoService extends ChangeNotifier {
   static final DeviceInfoService shared = DeviceInfoService._();
 
@@ -32,51 +37,31 @@ class DeviceInfoService extends ChangeNotifier {
       final packageInfo = await PackageInfo.fromPlatform();
 
       String modelName = '';
-      String chipName = '';
-      int totalMemory = 0;
-      int availableMemory = 0;
-      bool neuralEngineAvailable = false;
       String osVersion = '';
+      String chipName = '';
 
       if (Platform.isIOS) {
         final iosInfo = await deviceInfoPlugin.iosInfo;
         modelName = iosInfo.utsname.machine;
-        chipName = _getChipNameFromModel(modelName);
         osVersion = iosInfo.systemVersion;
-        neuralEngineAvailable = _checkNeuralEngineAvailability(modelName);
-        // TODO: Get actual memory info via native channel
-        totalMemory = 4 * 1024 * 1024 * 1024; // Placeholder: 4GB
-        availableMemory = 2 * 1024 * 1024 * 1024; // Placeholder: 2GB
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfoPlugin.androidInfo;
         modelName = '${androidInfo.manufacturer} ${androidInfo.model}';
-        chipName = androidInfo.hardware;
         osVersion = 'Android ${androidInfo.version.release}';
-        // TODO: Get actual memory info via native channel
-        totalMemory = 4 * 1024 * 1024 * 1024; // Placeholder
-        availableMemory = 2 * 1024 * 1024 * 1024; // Placeholder
-        neuralEngineAvailable = true; // Android devices generally have NPU
+        // Best-effort chip name from the platform (no SDK hardware probe).
+        chipName = androidInfo.hardware;
       } else if (Platform.isMacOS) {
         final macOSInfo = await deviceInfoPlugin.macOsInfo;
         modelName = macOSInfo.model;
-        chipName = _getChipNameFromModel(modelName);
         osVersion = 'macOS ${macOSInfo.osRelease}';
-        totalMemory = macOSInfo.memorySize;
-        availableMemory = totalMemory ~/ 2; // Estimate
-        neuralEngineAvailable = modelName.contains('arm64') ||
-            chipName.contains('Apple') ||
-            chipName.contains('M1') ||
-            chipName.contains('M2') ||
-            chipName.contains('M3') ||
-            chipName.contains('M4');
       }
 
       _deviceInfo = SystemDeviceInfo(
         modelName: modelName,
         chipName: chipName,
-        totalMemory: totalMemory,
-        availableMemory: availableMemory,
-        neuralEngineAvailable: neuralEngineAvailable,
+        totalMemory: 0,
+        availableMemory: 0,
+        neuralEngineAvailable: false,
         osVersion: osVersion,
         appVersion: packageInfo.version,
       );
@@ -92,38 +77,5 @@ class DeviceInfoService extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-  }
-
-  String _getChipNameFromModel(String modelName) {
-    // iOS device chip detection
-    if (modelName.contains('iPhone')) {
-      if (modelName.contains('iPhone17')) return 'A18 Pro';
-      if (modelName.contains('iPhone16')) return 'A17 Pro';
-      if (modelName.contains('iPhone15')) return 'A16 Bionic';
-      if (modelName.contains('iPhone14')) return 'A15 Bionic';
-      if (modelName.contains('iPhone13')) return 'A15 Bionic';
-      if (modelName.contains('iPhone12')) return 'A14 Bionic';
-      return 'Apple Silicon';
-    }
-
-    // Mac chip detection
-    if (modelName.contains('Mac')) {
-      if (modelName.contains('arm64')) return 'Apple Silicon';
-      return 'Intel';
-    }
-
-    return 'Unknown';
-  }
-
-  bool _checkNeuralEngineAvailability(String modelName) {
-    // Neural Engine available on A11+ chips (iPhone 8 and later)
-    if (modelName.contains('iPhone')) {
-      final match = RegExp(r'iPhone(\d+)').firstMatch(modelName);
-      if (match != null) {
-        final version = int.tryParse(match.group(1) ?? '0') ?? 0;
-        return version >= 10; // iPhone 8 = iPhone10
-      }
-    }
-    return true; // Assume available for modern devices
   }
 }

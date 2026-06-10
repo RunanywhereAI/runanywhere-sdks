@@ -1,18 +1,20 @@
-/// Qualcomm Genie NPU backend for RunAnywhere Flutter SDK.
+/// Experimental Qualcomm Genie NPU backend shell for RunAnywhere Flutter SDK.
 ///
-/// This module provides LLM (Language Model) capabilities via Qualcomm Genie NPU.
-/// It is a **thin wrapper** that registers the C++ backend with the service registry.
+/// Functional LLM routing is Android/Snapdragon-only and requires native
+/// binaries built with the Qualcomm Genie SDK. Without those binaries, the
+/// backend remains unavailable and is not selected by the native router.
+/// It is a **thin wrapper** around the native plugin shell. The module reports
+/// LLM capability only after native registration succeeds.
 ///
 /// ## Architecture (matches Swift/Kotlin)
 ///
-/// The C++ backend (RABackendGenie) handles all business logic:
-/// - Service provider registration
-/// - Model loading and inference on Snapdragon NPU
-/// - Streaming generation
+/// The C++ backend shell handles registration. Model loading, inference, and
+/// streaming require a future SDK-backed implementation built with the
+/// Qualcomm Genie SDK; the public shell returns backend-unavailable.
 ///
 /// This Dart module just:
 /// 1. Calls `rac_backend_genie_register()` to register the backend
-/// 2. The core SDK handles all LLM operations via `rac_llm_component_*`
+/// 2. Lets the core SDK route LLM calls only if native registration succeeds
 ///
 /// ## Quick Start
 ///
@@ -22,32 +24,25 @@
 /// // Register the module (matches Swift: Genie.register())
 /// await Genie.register();
 ///
-/// // Add models
-/// Genie.addModel(
-///   name: 'Qwen3 4B NPU',
-///   url: 'https://huggingface.co/.../model.zip',
-///   memoryRequirement: 4000000000,
-/// );
+/// // Register models through RunAnywhere.models after register()
+/// // succeeds. The commons registry/router owns framework selection and routing.
 /// ```
-library runanywhere_genie;
+library;
 
-import 'dart:async' show unawaited;
+import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/public/runanywhere.dart' show RunAnywhere;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_genie/native/genie_bindings.dart';
 
-// Re-export for backward compatibility
-export 'genie_error.dart';
-
-/// Qualcomm Genie NPU module for LLM text generation.
+/// Experimental Qualcomm Genie NPU module for LLM text generation.
 ///
-/// Provides large language model capabilities using Qualcomm Genie
-/// on Snapdragon NPU hardware.
+/// Provides large language model capability only after SDK-backed native
+/// registration succeeds on Android/Snapdragon hardware.
 ///
 /// Matches the Swift/Kotlin Genie module pattern.
 class Genie implements RunAnywhereModule {
@@ -63,8 +58,17 @@ class Genie implements RunAnywhereModule {
   // Module Info (matches Swift exactly)
   // ============================================================================
 
-  /// Current version of the Genie Runtime module
-  static const String version = '1.0.0';
+  /// Current version of the Genie Runtime Dart module.
+  ///
+  /// Matches the version convention used by `LlamaCpp.version` and
+  /// `Onnx.version` ('2.0.0' per AGENTS.md Flutter SDK rules).
+  static const String version = '2.0.0';
+
+  /// Qualcomm Genie native backend version (single source of truth).
+  ///
+  /// Used by Android `binary_config.gradle` (`genieVersion = '0.3.0'`) for
+  /// release URL resolution.
+  static const String genieNativeVersion = '0.3.0';
 
   // ============================================================================
   // RunAnywhereModule Conformance (matches Swift exactly)
@@ -77,13 +81,15 @@ class Genie implements RunAnywhereModule {
   String get moduleName => 'Genie';
 
   @override
-  Set<SDKComponent> get capabilities => {SDKComponent.llm};
+  Set<SDKComponent> get capabilities =>
+      _isRegistered ? {SDKComponent.SDK_COMPONENT_LLM} : {};
 
   @override
-  int get defaultPriority => 200;
+  int get defaultPriority => _isRegistered ? 200 : 0;
 
   @override
-  InferenceFramework get inferenceFramework => InferenceFramework.genie;
+  InferenceFramework get inferenceFramework =>
+      InferenceFramework.INFERENCE_FRAMEWORK_GENIE;
 
   // ============================================================================
   // Registration State
@@ -93,17 +99,15 @@ class Genie implements RunAnywhereModule {
   static GenieBindings? _bindings;
   static final _logger = SDKLogger('Genie');
 
-  /// Internal model registry for models added via addModel
-  static final List<ModelInfo> _registeredModels = [];
-
   // ============================================================================
   // Registration (matches Swift Genie.register() exactly)
   // ============================================================================
 
   /// Register Genie backend with the C++ service registry.
   ///
-  /// This calls `rac_backend_genie_register()` to register the
-  /// Genie service provider with the C++ commons layer.
+  /// This calls `rac_backend_genie_register()` to register the Genie plugin
+  /// with the C++ commons layer. SDK-absent shells are rejected by the native
+  /// capability check and remain unavailable to the router.
   ///
   /// Safe to call multiple times - subsequent calls are no-ops.
   static Future<void> register({int priority = 200}) async {
@@ -128,6 +132,13 @@ class Genie implements RunAnywhereModule {
       final result = _bindings!.register();
       _logger.info(
           'rac_backend_genie_register() returned: $result (${RacResultCode.getMessage(result)})');
+
+      if (result == RacResultCode.errorBackendUnavailable ||
+          result == RacResultCode.errorCapabilityUnsupported) {
+        _logger.error(
+            'Genie backend unavailable; Qualcomm Genie SDK-backed native ops are required.');
+        return;
+      }
 
       // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
       if (result != RacResultCode.success &&
@@ -155,70 +166,13 @@ class Genie implements RunAnywhereModule {
     }
   }
 
-  // ============================================================================
-  // Model Handling (matches Swift exactly)
-  // ============================================================================
-
-  /// Check if the native backend is available on this platform.
+  /// Check if the native backend library can be loaded on this platform.
   ///
-  /// Genie is Android/Snapdragon only:
-  /// - On Android: Checks if librac_backend_genie_jni.so can be loaded
+  /// Genie is experimental and Android/Snapdragon only:
+  /// - On Android: Checks only whether the native registration symbol exists.
+  ///   Successful [register] is still required before this module advertises LLM.
   /// - On iOS/other: Always returns false
   static bool get isAvailable => GenieBindings.checkAvailability();
-
-  /// Check if Genie can handle a given model.
-  /// Checks if the model ID contains "genie" or "npu" identifiers.
-  static bool canHandle(String? modelId) {
-    if (modelId == null) return false;
-    final lowered = modelId.toLowerCase();
-    return lowered.contains('genie') || lowered.contains('npu');
-  }
-
-  // ============================================================================
-  // Model Registration (convenience API)
-  // ============================================================================
-
-  /// Add a LLM model to the registry.
-  ///
-  /// This is a convenience method that registers a model with the SDK.
-  /// The model will be associated with the Genie NPU backend.
-  ///
-  /// Matches Swift pattern - models are registered globally via RunAnywhere.
-  static void addModel({
-    String? id,
-    required String name,
-    required String url,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _logger.error('Invalid URL for model: $name');
-      return;
-    }
-
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    // Register with the global SDK registry (matches Swift pattern)
-    final model = RunAnywhere.registerModel(
-      id: modelId,
-      name: name,
-      url: uri,
-      framework: InferenceFramework.genie,
-      modality: ModelCategory.language,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-
-    // Keep local reference for convenience
-    _registeredModels.add(model);
-    _logger.info('Added Genie model: $name ($modelId)');
-  }
-
-  /// Get all models registered with this module
-  static List<ModelInfo> get registeredModels =>
-      List.unmodifiable(_registeredModels);
 
   // ============================================================================
   // Cleanup
@@ -227,7 +181,6 @@ class Genie implements RunAnywhereModule {
   /// Dispose of resources
   static void dispose() {
     _bindings = null;
-    _registeredModels.clear();
     _isRegistered = false;
     _logger.info('Genie disposed');
   }

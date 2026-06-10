@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability, please report it responsibly:
 
-**Email:** security@runanywhere.ai
+**Email:** founders@runanywhere.ai
 
 Please include:
 - Description of the vulnerability

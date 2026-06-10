@@ -7,6 +7,7 @@
  * - TTS (Text-to-Speech)
  * - Voice (Voice Assistant - STT + LLM + TTS)
  * - Vision (VLM only; image generation is Swift sample app only)
+ * - Validation (deterministic evidence harness)
  * - Settings (includes Tool Settings)
  */
 
@@ -24,8 +25,10 @@ import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
 import RAGScreen from '../screens/RAGScreen';
+import SolutionsScreen from '../screens/SolutionsScreen';
 import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
+import ValidationHarnessScreen from '../screens/ValidationHarnessScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -44,6 +47,8 @@ const tabIcons: Record<
   Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
   RAG: { focused: 'search', unfocused: 'search-outline' }, // search for RAG
   Vision: { focused: 'eye', unfocused: 'eye-outline' }, // eye for vision/VLM
+  Solutions: { focused: 'layers', unfocused: 'layers-outline' }, // YAML pipeline runner
+  Validation: { focused: 'flask', unfocused: 'flask-outline' },
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
@@ -58,6 +63,8 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   Voice: 'Voice',
   RAG: 'RAG',
   Vision: 'Vision',
+  Solutions: 'Solutions',
+  Validation: 'Validation',
   Settings: 'Settings',
 };
 
@@ -130,7 +137,19 @@ export const TabNavigator: React.FC = () => {
         component={VisionStackScreen}
         options={{ tabBarLabel: tabLabels.Vision }}
       />
-      {/* Tab 6: Settings */}
+      {/* Tab 6: Solutions (YAML pipeline runner) */}
+      <Tab.Screen
+        name="Solutions"
+        component={SolutionsScreen}
+        options={{ tabBarLabel: tabLabels.Solutions }}
+      />
+      {/* Tab 7: Validation evidence harness */}
+      <Tab.Screen
+        name="Validation"
+        component={ValidationHarnessScreen}
+        options={{ tabBarLabel: tabLabels.Validation }}
+      />
+      {/* Tab 8: Settings */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

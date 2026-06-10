@@ -60,7 +60,6 @@ export const Colors = {
 
   // Framework-specific colors (from iOS)
   frameworkLlamaCpp: '#FF6B35',
-  frameworkWhisperKit: '#00C853',
   frameworkONNX: '#1E88E5',
   frameworkCoreML: '#FF9500',
   frameworkFoundationModels: '#AF52DE',

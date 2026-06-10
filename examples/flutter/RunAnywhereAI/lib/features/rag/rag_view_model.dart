@@ -1,29 +1,22 @@
 // RAG View Model
 //
-// ViewModel for the RAG feature. Orchestrates document loading,
-// text extraction, SDK pipeline lifecycle, and query flow.
-// Mirrors iOS RAGViewModel.swift adapted for Flutter ChangeNotifier pattern.
+// Coordinates document extraction, SDK pipeline lifecycle, and query state.
 
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:runanywhere/public/extensions/runanywhere_rag.dart';
-import 'package:runanywhere/public/types/rag_types.dart';
+import 'package:runanywhere/runanywhere.dart' hide ModelInfo;
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
+import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/rag/document_service.dart';
-
-// MARK: - Message Role
-
-enum RAGMessageRole { user, assistant }
-
-// MARK: - RAG Message
 
 /// A single message in the RAG conversation.
 ///
 /// User messages contain only text. Assistant messages also carry
 /// the [RAGResult] for displaying retrieved chunks and timing info.
 class RAGMessage {
-  final RAGMessageRole role;
+  final proto.MessageRole role;
   final String text;
 
   /// The RAG result associated with this assistant message.
@@ -37,15 +30,10 @@ class RAGMessage {
   });
 }
 
-// MARK: - RAG View Model
-
 /// ViewModel managing the full RAG pipeline lifecycle, document state, and query flow.
 ///
-/// Mirrors iOS RAGViewModel.swift. Exposes observable state via ChangeNotifier
-/// for use with Flutter's ListenableBuilder / ChangeNotifierProvider.
+/// Exposes observable state via ChangeNotifier for ListenableBuilder.
 class RAGViewModel extends ChangeNotifier {
-  // MARK: - Document State
-
   String? _documentName;
   String? get documentName => _documentName;
 
@@ -54,8 +42,6 @@ class RAGViewModel extends ChangeNotifier {
 
   bool _isLoadingDocument = false;
   bool get isLoadingDocument => _isLoadingDocument;
-
-  // MARK: - Query State
 
   List<RAGMessage> _messages = [];
   List<RAGMessage> get messages => List.unmodifiable(_messages);
@@ -71,8 +57,6 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // MARK: - Input
-
   String _currentQuestion = '';
   String get currentQuestion => _currentQuestion;
   set currentQuestion(String value) {
@@ -80,25 +64,22 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // MARK: - Last Result
-
   RAGResult? _lastResult;
   RAGResult? get lastResult => _lastResult;
 
-  // MARK: - Computed Properties
-
   bool get canAskQuestion =>
-      _isDocumentLoaded &&
-      !_isQuerying &&
-      _currentQuestion.trim().isNotEmpty;
-
-  // MARK: - Public Methods
+      _isDocumentLoaded && !_isQuerying && _currentQuestion.trim().isNotEmpty;
 
   /// Load a document: extract text, create RAG pipeline, ingest text.
   ///
   /// [filePath] - Absolute path to the document (PDF or JSON).
-  /// [config] - RAG pipeline configuration with model paths and tuning parameters.
-  Future<void> loadDocument(String filePath, RAGConfiguration config) async {
+  /// [embeddingModel] - Registry model selected for embeddings.
+  /// [llmModel] - Registry model selected for answer generation.
+  Future<void> loadDocument(
+    String filePath,
+    ModelInfo embeddingModel,
+    ModelInfo llmModel,
+  ) async {
     _isLoadingDocument = true;
     _error = null;
     notifyListeners();
@@ -106,8 +87,11 @@ class RAGViewModel extends ChangeNotifier {
     try {
       final extractedText = await DocumentService.extractText(filePath);
 
-      await RunAnywhereRAG.ragCreatePipeline(config);
-      await RunAnywhereRAG.ragIngest(extractedText);
+      await RunAnywhere.rag.ragCreatePipelineForModels(
+        embeddingModel: embeddingModel,
+        llmModel: llmModel,
+      );
+      await RunAnywhere.rag.ingest(extractedText);
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;
@@ -128,25 +112,32 @@ class RAGViewModel extends ChangeNotifier {
     if (question.isEmpty) return;
     if (!_isDocumentLoaded) return;
 
-    _messages = [..._messages, RAGMessage(role: RAGMessageRole.user, text: question)];
+    _messages = [
+      ..._messages,
+      RAGMessage(role: proto.MessageRole.MESSAGE_ROLE_USER, text: question)
+    ];
     _currentQuestion = '';
     _isQuerying = true;
     _error = null;
     notifyListeners();
 
     try {
-      final result = await RunAnywhereRAG.ragQuery(question);
+      final result = await RunAnywhere.rag.query(question);
 
       _messages = [
         ..._messages,
-        RAGMessage(role: RAGMessageRole.assistant, text: result.answer, result: result),
+        RAGMessage(
+            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+            text: result.answer,
+            result: result),
       ];
       _lastResult = result;
     } catch (e) {
       _error = e.toString();
       _messages = [
         ..._messages,
-        RAGMessage(role: RAGMessageRole.assistant, text: 'Error: $e'),
+        RAGMessage(
+            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT, text: 'Error: $e'),
       ];
     } finally {
       _isQuerying = false;
@@ -158,7 +149,7 @@ class RAGViewModel extends ChangeNotifier {
   ///
   /// Resets all document and conversation state.
   Future<void> clearDocument() async {
-    await RunAnywhereRAG.ragDestroyPipeline();
+    await RunAnywhere.rag.destroyPipeline();
 
     _documentName = null;
     _isDocumentLoaded = false;

@@ -11,7 +11,7 @@ name: Auto-Tag Release
 # this workflow:
 #   1. Determines the current PROJECT_VERSION from sdk/runanywhere-commons/VERSIONS
 #   2. Bumps it according to the label
-#   3. Runs scripts/sync-versions.sh to propagate the new version across all manifests
+#   3. Runs scripts/release/sync-versions.sh to propagate the new version across all manifests
 #   4. Commits the bump to main and pushes tag v{new-version}
 #   5. The tag push then triggers release.yml → builds everything → draft GH Release
 #
@@ -19,7 +19,7 @@ name: Auto-Tag Release
 # just land the code on main as normal — releases are explicit opt-in.
 #
 # Alternative (manual): engineer can still run this flow manually:
-#   scripts/sync-versions.sh 0.20.0
+#   scripts/release/sync-versions.sh 0.20.0
 #   git tag v0.20.0 && git push origin v0.20.0
 # Both paths converge on release.yml.
 # =============================================================================
@@ -115,8 +115,8 @@ jobs:
           NEW_VERSION: ${{ steps.version.outputs.new-version }}
         run: |
           set -euo pipefail
-          chmod +x scripts/sync-versions.sh
-          ./scripts/sync-versions.sh "${NEW_VERSION}"
+          chmod +x scripts/release/sync-versions.sh
+          ./scripts/release/sync-versions.sh "${NEW_VERSION}"
 
       - name: Configure git identity
         if: steps.label.outputs.should-release == 'true'
@@ -138,7 +138,7 @@ jobs:
           git add -u
           if ! git diff --cached --quiet; then
             echo "::error::PR merged with release:${{ steps.label.outputs.bump }} label but VERSIONS/manifests are out of sync with tag v${NEW_VERSION}."
-            echo "::error::Before opening a release PR, run: scripts/sync-versions.sh ${NEW_VERSION}  →  commit  →  open PR  →  merge with release label."
+            echo "::error::Before opening a release PR, run: scripts/release/sync-versions.sh ${NEW_VERSION}  →  commit  →  open PR  →  merge with release label."
             git diff --cached
             exit 1
           fi

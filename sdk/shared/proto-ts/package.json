@@ -1,0 +1,69 @@
+{
+  "name": "@runanywhere/proto-ts",
+  "version": "0.19.13",
+  "description": "Shared RunAnywhere ts-proto generated types and stream wrappers",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "license": "MIT",
+  "author": "RunAnywhere AI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/shared/proto-ts"
+  },
+  "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/shared/proto-ts",
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js",
+      "require": "./dist/streams/*.js",
+      "default": "./dist/streams/*.js"
+    },
+    "./dist/*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "require": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./dist/streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js",
+      "require": "./dist/streams/*.js",
+      "default": "./dist/streams/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.12.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,8 +1,26 @@
 /**
  * KeychainManager.swift
  *
- * iOS Keychain manager for secure storage of sensitive data.
- * Matches Swift SDK's KeychainManager pattern.
+ * iOS Keychain manager for secure storage used by the RN core pod's
+ * `PlatformAdapterBridge.m` `[KeychainManager shared]` ObjC consumer.
+ *
+ * This is intentionally a small per-pod facade and NOT a copy of the
+ * full Swift SDK class. The Swift SDK's
+ * `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Security/KeychainManager.swift`
+ * is owned by the standalone Swift SDK target — it depends on Swift-SDK
+ * types (`SDKException`, `SDKInitParams`, `SDKEnvironment`, `SDKLogger`)
+ * that are not vended from the `RunAnywhereCore` CocoaPod (which only
+ * ships the `RACommons.xcframework` C ABI). Pulling the Swift SDK class
+ * in via SwiftPM here would force the RN pod to also import the entire
+ * Swift SDK and would conflict with the C++ commons ABI it already
+ * binds.
+ *
+ * Operations (store/retrieve/delete/exists) construct their Keychain
+ * queries through the single `baseQuery(for:)` helper below, mirroring
+ * the Swift SDK `KeychainManager.baseQuery` pattern so the two
+ * implementations stay structurally aligned. The set/get/delete bodies
+ * are now query-shape-only — no per-method duplication of the access
+ * control or accessibility flags.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Security/KeychainManager.swift
  */
@@ -10,107 +28,92 @@
 import Foundation
 import Security
 
-/// Keychain manager for secure storage (singleton)
+/// Keychain manager for secure storage used by the RN core pod (singleton).
 @objc public class KeychainManager: NSObject {
-    
+
     // MARK: - Singleton
-    
+
     @objc public static let shared = KeychainManager()
-    
+
     // MARK: - Properties
-    
+
     private let serviceName = "com.runanywhere.sdk"
-    
+    private let deviceUUIDKey = "com.runanywhere.sdk.device.uuid"
+
     // MARK: - Initialization
-    
+
     private override init() {
         super.init()
     }
-    
-    // MARK: - Public API
-    
-    /// Store a value in the keychain
-    /// - Parameters:
-    ///   - value: Value to store
-    ///   - key: Key to store under
-    /// - Returns: true if successful
-    @objc public func set(_ value: String, forKey key: String) -> Bool {
-        guard let data = value.data(using: .utf8) else {
-            return false
-        }
-        
-        // Delete existing item first (update by delete + add)
-        _ = delete(forKey: key)
-        
-        let query: [String: Any] = [
+
+    // MARK: - Private Query Builder
+
+    /// Single source of truth for Keychain query construction; mirrors the
+    /// Swift SDK `KeychainManager.baseQuery(for:)` so per-op bodies don't
+    /// duplicate the service-name / accessibility / class flags.
+    private func baseQuery(forKey key: String) -> [String: Any] {
+        return [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            kSecAttrSynchronizable as String: false,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         ]
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
+    }
+
+    // MARK: - Public API (ObjC-exposed for PlatformAdapterBridge.m)
+
+    /// Store a value in the keychain.
+    @objc public func set(_ value: String, forKey key: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
+
+        // Update-then-add pattern matches the Swift SDK store(data:for:).
+        var query = baseQuery(forKey: key)
+        let updateAttributes: [String: Any] = [kSecValueData as String: data]
+        var status = SecItemUpdate(query as CFDictionary, updateAttributes as CFDictionary)
+        if status == errSecItemNotFound {
+            query[kSecValueData as String] = data
+            status = SecItemAdd(query as CFDictionary, nil)
+        }
         return status == errSecSuccess
     }
-    
-    /// Retrieve a value from the keychain
-    /// - Parameter key: Key to retrieve
-    /// - Returns: Stored value or nil
+
+    /// Retrieve a value from the keychain.
     @objc public func get(forKey key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
+        var query = baseQuery(forKey: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
         var dataTypeRef: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
-        
         guard status == errSecSuccess,
               let data = dataTypeRef as? Data,
               let value = String(data: data, encoding: .utf8) else {
             return nil
         }
-        
         return value
     }
-    
-    /// Delete a value from the keychain
-    /// - Parameter key: Key to delete
-    /// - Returns: true if successful or item didn't exist
+
+    /// Delete a value from the keychain.
     @objc public func delete(forKey key: String) -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: key
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(baseQuery(forKey: key) as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
-    
-    /// Check if a key exists in the keychain
-    /// - Parameter key: Key to check
-    /// - Returns: true if key exists
+
+    /// Check whether a key exists in the keychain.
     @objc public func exists(forKey key: String) -> Bool {
         return get(forKey: key) != nil
     }
-    
+
     // MARK: - Device UUID Convenience
-    
-    private let deviceUUIDKey = "com.runanywhere.sdk.device.uuid"
-    
-    /// Store device UUID
+
+    /// Store device UUID.
     @objc public func storeDeviceUUID(_ uuid: String) -> Bool {
         return set(uuid, forKey: deviceUUIDKey)
     }
-    
-    /// Retrieve device UUID
+
+    /// Retrieve device UUID.
     @objc public func retrieveDeviceUUID() -> String? {
         return get(forKey: deviceUUIDKey)
     }
 }
-

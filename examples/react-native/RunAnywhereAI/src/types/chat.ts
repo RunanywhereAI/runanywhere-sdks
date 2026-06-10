@@ -4,6 +4,8 @@
  * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Models/
  */
 
+import type { PerformanceMetrics } from '@runanywhere/proto-ts/llm_options';
+
 /**
  * Message role in conversation
  */
@@ -14,52 +16,49 @@ export enum MessageRole {
 }
 
 /**
- * Message analytics data
+ * Message analytics data.
+ *
+ * Timing and token counts live on the canonical proto `PerformanceMetrics`
+ * (see `@runanywhere/proto-ts/llm_options`) — this DTO nests that proto so
+ * consumers read `analytics.performance.latencyMs / promptTokens /
+ * completionTokens / throughputTokensPerSec` instead of duplicating fields.
+ * UI-only flags (thinking mode, completion state, retries) remain inline.
  */
 export interface MessageAnalytics {
-  /** Time to first token in milliseconds */
+  /** Canonical proto performance snapshot. */
+  performance: PerformanceMetrics;
+
+  /** Time to first token in milliseconds (UI-only; not on proto yet). */
   timeToFirstToken?: number;
 
-  /** Total generation time in milliseconds */
-  totalGenerationTime: number;
-
-  /** Time spent on thinking/reasoning */
+  /** Time spent on thinking/reasoning (UI-only). */
   thinkingTime?: number;
 
-  /** Time for actual response */
+  /** Time for actual response (UI-only). */
   responseTime?: number;
 
-  /** Number of input tokens */
-  inputTokens: number;
-
-  /** Number of output tokens */
-  outputTokens: number;
-
-  /** Number of thinking tokens */
+  /** Number of thinking tokens (UI-only). */
   thinkingTokens?: number;
 
-  /** Number of response tokens */
+  /** Number of response tokens (UI-only). */
   responseTokens?: number;
 
-  /** Average tokens per second */
-  averageTokensPerSecond?: number;
-
-  /** History of tokens per second over time */
+  /** History of tokens per second over time (UI-only). */
   tokensPerSecondHistory?: number[];
 
-  /** Whether generation completed successfully */
+  /** Whether generation completed successfully (UI-only). */
   completionStatus: 'completed' | 'interrupted' | 'error';
 
-  /** Whether thinking mode was used */
+  /** Whether thinking mode was used (UI-only). */
   wasThinkingMode: boolean;
 
-  /** Whether generation was interrupted */
+  /** Whether generation was interrupted (UI-only). */
   wasInterrupted: boolean;
 
-  /** Number of retry attempts */
+  /** Number of retry attempts (UI-only). */
   retryCount: number;
 
-  /** Generation parameters used */
+  /** Generation parameters used (UI-only). */
   generationParameters?: {
     temperature: number;
     maxTokens: number;

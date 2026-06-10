@@ -4,8 +4,8 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
@@ -34,13 +34,14 @@ class DartBridgeEnvironment {
   bool requiresAuth(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final requiresAuthFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_requires_auth');
+      final requiresAuthFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_requires_auth');
 
       return requiresAuthFn(_environmentToInt(environment)) != 0;
     } catch (e) {
       // Fallback: dev doesn't require auth
-      return environment != SDKEnvironment.development;
+      return environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     }
   }
 
@@ -48,13 +49,14 @@ class DartBridgeEnvironment {
   bool requiresBackendURL(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final requiresUrlFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_requires_backend_url');
+      final requiresUrlFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_requires_backend_url');
 
       return requiresUrlFn(_environmentToInt(environment)) != 0;
     } catch (e) {
       // Fallback: dev doesn't require URL
-      return environment != SDKEnvironment.development;
+      return environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     }
   }
 
@@ -62,12 +64,13 @@ class DartBridgeEnvironment {
   bool isProduction(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final isProdFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_is_production');
+      final isProdFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_is_production');
 
       return isProdFn(_environmentToInt(environment)) != 0;
     } catch (e) {
-      return environment == SDKEnvironment.production;
+      return environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
     }
   }
 
@@ -75,12 +78,13 @@ class DartBridgeEnvironment {
   bool isTesting(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final isTestFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_is_testing');
+      final isTestFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_is_testing');
 
       return isTestFn(_environmentToInt(environment)) != 0;
     } catch (e) {
-      return environment != SDKEnvironment.production;
+      return environment != SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
     }
   }
 
@@ -88,19 +92,22 @@ class DartBridgeEnvironment {
   int getDefaultLogLevel(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final getLogLevelFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_default_log_level');
+      final getLogLevelFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_default_log_level');
 
       return getLogLevelFn(_environmentToInt(environment));
     } catch (e) {
       // Fallback defaults
       switch (environment) {
-        case SDKEnvironment.development:
+        case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
           return RacLogLevel.debug;
-        case SDKEnvironment.staging:
+        case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
           return RacLogLevel.info;
-        case SDKEnvironment.production:
+        case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
           return RacLogLevel.warning;
+        default:
+          return RacLogLevel.debug;
       }
     }
   }
@@ -109,13 +116,14 @@ class DartBridgeEnvironment {
   bool shouldSendTelemetry(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final shouldSendFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_should_send_telemetry');
+      final shouldSendFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_should_send_telemetry');
 
       return shouldSendFn(_environmentToInt(environment)) != 0;
     } catch (e) {
       // Only production sends telemetry
-      return environment == SDKEnvironment.production;
+      return environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
     }
   }
 
@@ -123,12 +131,13 @@ class DartBridgeEnvironment {
   bool shouldSyncWithBackend(SDKEnvironment environment) {
     try {
       final lib = PlatformLoader.loadCommons();
-      final shouldSyncFn = lib.lookupFunction<Int32 Function(Int32),
-          int Function(int)>('rac_env_should_sync_with_backend');
+      final shouldSyncFn =
+          lib.lookupFunction<Int32 Function(Int32), int Function(int)>(
+              'rac_env_should_sync_with_backend');
 
       return shouldSyncFn(_environmentToInt(environment)) != 0;
     } catch (e) {
-      return environment != SDKEnvironment.development;
+      return environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     }
   }
 
@@ -144,12 +153,14 @@ class DartBridgeEnvironment {
       return result.toDartString();
     } catch (e) {
       switch (environment) {
-        case SDKEnvironment.development:
+        case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
           return 'Development Environment';
-        case SDKEnvironment.staging:
+        case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
           return 'Staging Environment';
-        case SDKEnvironment.production:
+        case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
           return 'Production Environment';
+        default:
+          return 'Development Environment';
       }
     }
   }
@@ -168,14 +179,15 @@ class DartBridgeEnvironment {
 
       final apiKeyPtr = apiKey?.toNativeUtf8() ?? nullptr;
       try {
-        final result = validateFn(apiKeyPtr.cast<Utf8>(), _environmentToInt(environment));
+        final result =
+            validateFn(apiKeyPtr.cast<Utf8>(), _environmentToInt(environment));
         return ValidationResult.fromCode(result);
       } finally {
         if (apiKeyPtr != nullptr) calloc.free(apiKeyPtr);
       }
     } catch (e) {
       // Fallback validation
-      if (environment == SDKEnvironment.development) {
+      if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
         return ValidationResult.ok;
       }
       if (apiKey == null || apiKey.isEmpty) {
@@ -198,14 +210,15 @@ class DartBridgeEnvironment {
 
       final urlPtr = url?.toNativeUtf8() ?? nullptr;
       try {
-        final result = validateFn(urlPtr.cast<Utf8>(), _environmentToInt(environment));
+        final result =
+            validateFn(urlPtr.cast<Utf8>(), _environmentToInt(environment));
         return ValidationResult.fromCode(result);
       } finally {
         if (urlPtr != nullptr) calloc.free(urlPtr);
       }
     } catch (e) {
       // Fallback validation
-      if (environment == SDKEnvironment.development) {
+      if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
         return ValidationResult.ok;
       }
       if (url == null || url.isEmpty) {
@@ -214,7 +227,8 @@ class DartBridgeEnvironment {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         return ValidationResult.urlInvalidScheme;
       }
-      if (environment == SDKEnvironment.production && !url.startsWith('https://')) {
+      if (environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION &&
+          !url.startsWith('https://')) {
         return ValidationResult.urlHttpsRequired;
       }
       return ValidationResult.ok;
@@ -282,12 +296,14 @@ class DartBridgeEnvironment {
 
   int _environmentToInt(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 1;
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
+      default:
+        return 0;
     }
   }
 }
@@ -360,6 +376,153 @@ class ValidationResult {
         return productionDebugBuild;
       default:
         return unknown;
+    }
+  }
+}
+
+// =============================================================================
+// Development Config Bridge
+// =============================================================================
+
+/// Development configuration bridge
+///
+/// Wraps C++ rac_dev_config.h functions for development mode with Supabase backend.
+/// Credentials are stored ONLY in C++ development_config.cpp (git-ignored).
+/// Matches Swift's `CppBridge.DevConfig` sub-namespace in `CppBridge+Environment.swift`.
+class DartBridgeDevConfig {
+  static final _logger = SDKLogger('DartBridge.DevConfig');
+
+  /// Check if development config is available
+  static bool get isAvailable {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final isAvailable = lib.lookupFunction<Bool Function(), bool Function()>(
+        'rac_dev_config_is_available',
+      );
+      return isAvailable();
+    } catch (e) {
+      _logger.debug('rac_dev_config_is_available not available: $e');
+      return false;
+    }
+  }
+
+  /// Get Supabase URL for development mode
+  /// Returns null if not configured
+  static String? get supabaseURL {
+    if (!isAvailable) return null;
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final getUrl = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+        'rac_dev_config_get_supabase_url',
+      );
+
+      final result = getUrl();
+      if (result == nullptr) return null;
+      return result.toDartString();
+    } catch (e) {
+      _logger.debug('rac_dev_config_get_supabase_url not available: $e');
+      return null;
+    }
+  }
+
+  /// Get Supabase anon key for development mode
+  /// Returns null if not configured
+  static String? get supabaseKey {
+    if (!isAvailable) return null;
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final getKey = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+        'rac_dev_config_get_supabase_key',
+      );
+
+      final result = getKey();
+      if (result == nullptr) return null;
+      return result.toDartString();
+    } catch (e) {
+      _logger.debug('rac_dev_config_get_supabase_key not available: $e');
+      return null;
+    }
+  }
+
+  /// Get build token for development mode
+  /// Returns null if not configured
+  static String? get buildToken {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final hasBuildToken =
+          lib.lookupFunction<Bool Function(), bool Function()>(
+        'rac_dev_config_has_build_token',
+      );
+
+      if (!hasBuildToken()) return null;
+
+      final getToken = lib
+          .lookupFunction<Pointer<Utf8> Function(), Pointer<Utf8> Function()>(
+        'rac_dev_config_get_build_token',
+      );
+
+      final result = getToken();
+      if (result == nullptr) return null;
+      return result.toDartString();
+    } catch (e) {
+      _logger.debug('rac_dev_config_get_build_token not available: $e');
+      return null;
+    }
+  }
+
+  /// Whether a baked-in credential is usable: non-empty and not a scaffolding
+  /// placeholder. Delegates to the canonical commons rule
+  /// (`rac_dev_config_is_usable_credential`) so every SDK agrees instead of
+  /// each re-implementing the regex; falls back to the local check when the
+  /// symbol predates the running native binary.
+  static bool isUsableCredential(String? value) {
+    if (value == null) return false;
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<Bool Function(Pointer<Utf8>),
+          bool Function(Pointer<Utf8>)>('rac_dev_config_is_usable_credential');
+      final ptr = value.toNativeUtf8();
+      try {
+        return fn(ptr);
+      } finally {
+        calloc.free(ptr);
+      }
+    } catch (e) {
+      _logger.debug('rac_dev_config_is_usable_credential not available: $e');
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return false;
+      return !RegExp(r'your_|<your|replace_me|placeholder', caseSensitive: false)
+          .hasMatch(trimmed);
+    }
+  }
+
+  /// Whether a string is a usable absolute http(s) URL. Delegates to the
+  /// canonical commons rule (`rac_dev_config_is_usable_http_url`); falls back to
+  /// a scheme + non-empty-host check when the symbol predates the binary.
+  static bool isUsableHttpUrl(String? value) {
+    if (value == null) return false;
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<Bool Function(Pointer<Utf8>),
+          bool Function(Pointer<Utf8>)>('rac_dev_config_is_usable_http_url');
+      final ptr = value.toNativeUtf8();
+      try {
+        return fn(ptr);
+      } finally {
+        calloc.free(ptr);
+      }
+    } catch (e) {
+      _logger.debug('rac_dev_config_is_usable_http_url not available: $e');
+      final trimmed = value.trim();
+      if (!isUsableCredential(trimmed)) return false;
+      final uri = Uri.tryParse(trimmed);
+      return uri != null &&
+          (uri.scheme == 'http' || uri.scheme == 'https') &&
+          uri.host.isNotEmpty;
     }
   }
 }

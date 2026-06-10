@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Intentionally empty.
+
+	  Previously declared `keychain-access-groups` to make flutter_secure_storage
+	  pass on device. That entitlement only matters for sharing the Keychain
+	  with another app or extension; for an app that only reads/writes its own
+	  Keychain items it is unnecessary, and on the iOS simulator it actively
+	  breaks: simulator builds are ad-hoc signed, the entitlement cannot be
+	  resolved against a real provisioning profile, and every Keychain call
+	  fails with OSStatus -34018 (errSecMissingEntitlement) — observed on
+	  iPhone 17 Pro / iOS 26.1 simulators.
+
+	  Mirrors the iOS Swift example (`examples/ios/RunAnywhereAI/.../RunAnywhereAI.entitlements`),
+	  whose main app entitlements likewise do not declare keychain-access-groups,
+	  and the React Native example (no entitlements file at all).
+
+	  This file is still wired into Runner.xcodeproj via CODE_SIGN_ENTITLEMENTS
+	  so future capabilities (app groups, push, associated domains, etc.) have
+	  a place to land without touching the build settings again.
+	-->
+</dict>
+</plist>

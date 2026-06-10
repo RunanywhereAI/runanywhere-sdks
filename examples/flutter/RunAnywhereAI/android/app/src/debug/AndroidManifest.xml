@@ -4,4 +4,9 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- BUG-FLT-ANDROID-003: permit cleartext traffic to localhost/emulator loopback
+         in debug builds only (Flutter tooling + local dev servers). -->
+    <application
+        android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>

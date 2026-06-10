@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // ts-proto v2 output imports the exports-map-only subpath
+    // "@bufbuild/protobuf/wire". The legacy "node" (node10) resolver cannot
+    // read package.json "exports" and fails with TS2307. "node16" reads exports
+    // maps; because this package is CommonJS (no "type":"module" in
+    // package.json) it still EMITS CommonJS require()/module.exports and still
+    // accepts the extensionless relative imports ts-proto generates (the
+    // ESM-only explicit-extension rule does not apply to CJS emit), so the dist
+    // stays drop-in for the existing `require(...)` consumers.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

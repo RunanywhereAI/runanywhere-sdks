@@ -12,12 +12,34 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "../common/rac_service_factory_internal.h"
+
+// B-AK-17-003: mirror JNI.RAG and use __android_log_print directly so the
+// embeddings creation path is always visible in logcat — the platform
+// adapter logging is silent for these categories on Android per
+// AK-17-phase6-final-v2.log observations.
+#ifdef __ANDROID__
+#include <android/log.h>
+#define EMBED_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "Embeddings.Service", __VA_ARGS__)
+#define EMBED_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "Embeddings.Service", __VA_ARGS__)
+#else
+#define EMBED_LOGI(...) RAC_LOG_INFO("Embeddings.Service", __VA_ARGS__)
+#define EMBED_LOGE(...) RAC_LOG_ERROR("Embeddings.Service", __VA_ARGS__)
+#endif
 
 static const char* LOG_CAT = "Embeddings.Service";
+
+namespace {
+
+const rac_embeddings_service_ops_t* embedding_ops(const rac_engine_vtable_t* vt) {
+    return vt ? vt->embedding_ops : nullptr;
+}
+
+}  // namespace
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -33,65 +55,53 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
 
     *out_handle = nullptr;
 
+    EMBED_LOGI("Creating embeddings service for: %s", model_id);
     RAC_LOG_INFO(LOG_CAT, "Creating embeddings service for: %s", model_id);
 
-    // Query model registry to get framework
-    rac_model_info_t* model_info = nullptr;
-    rac_result_t result = rac_get_model(model_id, &model_info);
-
-    // If not found by model_id, try looking up by path
+    rac::features::ResolvedModelReference model_ref;
+    rac_result_t result = rac::features::resolve_model_reference(
+        model_id,
+        {.log_cat = LOG_CAT,
+         .default_framework = RAC_FRAMEWORK_LLAMACPP,
+         .allow_null_model_id = false,
+         .lookup_last_path_component = true,
+         .prefer_input_path_when_contains = nullptr},
+        &model_ref);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_id);
-        result = rac_get_model_by_path(model_id, &model_info);
+        EMBED_LOGE("Model reference resolution failed: result=%d", result);
+        return result;
     }
 
-    rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
-    const char* model_path = model_id;
-
-    if (result == RAC_SUCCESS && model_info) {
-        framework = model_info->framework;
-        model_path = model_info->local_path ? model_info->local_path : model_id;
-        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path ? model_path : "NULL");
-    } else {
-        // Model not in registry — infer framework from file extension
-        // so the correct service provider handles it (ONNX for .onnx files).
-        size_t path_len = model_id ? strlen(model_id) : 0;
+    if (!model_ref.found) {
+        size_t path_len = strlen(model_id);
         if (path_len >= 5) {
             const char* ext = model_id + path_len - 5;
             if (strcmp(ext, ".onnx") == 0 || strcmp(ext, ".ONNX") == 0) {
-                framework = RAC_FRAMEWORK_ONNX;
+                model_ref.framework = RAC_FRAMEWORK_ONNX;
             }
         }
         RAC_LOG_WARNING(LOG_CAT,
-                        "Model NOT found in registry (result=%d), inferred framework=%d from path",
-                        result, static_cast<int>(framework));
+                        "Model NOT found in registry, inferred framework=%d from path",
+                        static_cast<int>(model_ref.framework));
     }
 
-    // Build service request
-    rac_service_request_t request = {};
-    request.identifier = model_id;
-    request.capability = RAC_CAPABILITY_EMBEDDINGS;
-    request.framework = framework;
-    request.model_path = model_path;
-    request.config_json = config_json;
-
-    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s, has_config=%s",
-                 static_cast<int>(request.framework),
-                 request.model_path ? request.model_path : "NULL", config_json ? "yes" : "no");
-
-    // Service registry returns an rac_embeddings_service_t* with vtable already set
-    result = rac_service_create(RAC_CAPABILITY_EMBEDDINGS, &request, out_handle);
-
-    if (model_info) {
-        rac_model_info_free(model_info);
-    }
-
+    rac_embeddings_service_t* service = nullptr;
+    result =
+        rac::features::create_plugin_service<rac_embeddings_service_t, rac_embeddings_service_ops_t>(
+            {.log_cat = LOG_CAT,
+             .primitive = RAC_PRIMITIVE_EMBED,
+             .select_ops = embedding_ops,
+             .model_create_id = model_ref.path.c_str(),
+             .model_id_for_service = model_id,
+             .config_json = config_json},
+            &service);
     if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);
+        EMBED_LOGE("Plugin create failed: result=%d", result);
         return result;
     }
+
+    EMBED_LOGI("Embeddings service created via model_path=%s", model_ref.path.c_str());
+    *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "Embeddings service created");
     return RAC_SUCCESS;

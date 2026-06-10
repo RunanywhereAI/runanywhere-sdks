@@ -7,7 +7,6 @@
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
-@preconcurrency import AVFoundation
 import CRACommons
 import Foundation
 
@@ -15,203 +14,86 @@ import Foundation
 
 public extension RunAnywhere {
 
-    // MARK: - Voice Loading
-
-    /// Load a TTS voice
-    /// - Parameter voiceId: The voice identifier
-    /// - Throws: Error if loading fails
-    static func loadTTSVoice(_ voiceId: String) async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
-        // Resolve voice ID to local file path
-        let allModels = try await availableModels()
-        guard let modelInfo = allModels.first(where: { $0.id == voiceId }) else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' not found in registry")
-        }
-        guard let localPath = modelInfo.localPath else {
-            throw SDKError.tts(.modelNotFound, "Voice '\(voiceId)' is not downloaded")
-        }
-
-        try await CppBridge.TTS.shared.loadVoice(localPath.path, voiceId: voiceId, voiceName: modelInfo.name)
-    }
-
-    /// Unload the currently loaded TTS voice
-    static func unloadTTSVoice() async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
-        await CppBridge.TTS.shared.unload()
-    }
-
-    /// Check if a TTS voice is loaded
-    static var isTTSVoiceLoaded: Bool {
-        get async {
-            await CppBridge.TTS.shared.isLoaded
-        }
-    }
-
-    /// Get available TTS voices
-    static var availableTTSVoices: [String] {
-        get async {
-            let allModels = await CppBridge.ModelRegistry.shared.getByFrameworks([.onnx])
-            let ttsModels = allModels.filter { $0.category == .speechSynthesis }
-            return ttsModels.map { $0.id }
-        }
-    }
-
     // MARK: - Synthesis
 
-    /// Synthesize text to speech
-    /// - Parameters:
-    ///   - text: Text to synthesize
-    ///   - options: Synthesis options
-    /// - Returns: TTS output with audio data
+    /// Synthesize text to speech.
+    ///
+    /// A TTS voice must be loaded via `RAModelLoadRequest` (lifecycle) before calling this.
     static func synthesize(
         _ text: String,
-        options: TTSOptions = TTSOptions()
-    ) async throws -> TTSOutput {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        options: RATTSOptions = .defaults()
+    ) async throws -> RATTSOutput {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+
+        // Use ModelLifecycle.currentModel to check if a TTS voice is loaded in
+        // the lifecycle — CppBridge.TTS.shared.isLoaded queries the Swift
+        // actor's own handle which is separate from the lifecycle's handle,
+        // and would return false even after a successful RunAnywhere.loadModel().
+        guard loadedModelSnapshot(category: .speechSynthesis).found else {
+            throw SDKException(code: .notInitialized, message: "TTS voice not loaded", category: .component)
         }
 
-        let handle = try await CppBridge.TTS.shared.getHandle()
-
-        guard await CppBridge.TTS.shared.isLoaded else {
-            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
-        }
-
-        let voiceId = await CppBridge.TTS.shared.currentVoiceId ?? "unknown"
-        let startTime = Date()
-
-        // Build C options
-        var cOptions = rac_tts_options_t()
-        cOptions.rate = options.rate
-        cOptions.pitch = options.pitch
-        cOptions.volume = options.volume
-        cOptions.sample_rate = Int32(options.sampleRate)
-
-        // Synthesize (C++ emits events)
-        var ttsResult = rac_tts_result_t()
-        defer { rac_tts_result_free(&ttsResult) }
-        let synthesizeResult = text.withCString { textPtr in
-            rac_tts_component_synthesize(handle, textPtr, &cOptions, &ttsResult)
-        }
-
-        guard synthesizeResult == RAC_SUCCESS else {
-            throw SDKError.tts(.processingFailed, "Synthesis failed: \(synthesizeResult)")
-        }
-
-        let endTime = Date()
-        let processingTime = endTime.timeIntervalSince(startTime)
-
-        // Extract audio data
-        let audioData: Data
-        if let audioPtr = ttsResult.audio_data, ttsResult.audio_size > 0 {
-            audioData = Data(bytes: audioPtr, count: ttsResult.audio_size)
-        } else {
-            audioData = Data()
-        }
-
-        let sampleRate = Int(ttsResult.sample_rate)
-        let numSamples = audioData.count / 4  // Float32 = 4 bytes
-        let durationSec = Double(numSamples) / Double(sampleRate)
-
-        let metadata = TTSSynthesisMetadata(
-            voice: voiceId,
-            language: options.language,
-            processingTime: processingTime,
-            characterCount: text.count
-        )
-
-        return TTSOutput(
-            audioData: audioData,
-            format: options.audioFormat,
-            duration: durationSec,
-            phonemeTimestamps: nil,
-            metadata: metadata
-        )
+        var request = RATTSSynthesisRequest()
+        request.text = text
+        request.options = options
+        return try await CppBridge.TTS.shared.synthesize(request)
     }
 
-    /// Stream synthesis for long text
-    /// - Parameters:
-    ///   - text: Text to synthesize
-    ///   - options: Synthesis options
-    ///   - onAudioChunk: Callback for each audio chunk
-    /// - Returns: TTS output with full audio data
+    /// Stream synthesis through a lifecycle-derived native TTS session.
     static func synthesizeStream(
         _ text: String,
-        options: TTSOptions = TTSOptions(),
-        onAudioChunk: @escaping (Data) -> Void
-    ) async throws -> TTSOutput {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        options: RATTSOptions = .defaults()
+    ) -> AsyncStream<RATTSOutput> {
+        AsyncStream { continuation in
+            let task = Task {
+                guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+                do {
+                    try await ensureServicesReady()
+                } catch {
+                    continuation.finish()
+                    return
+                }
+                // Mirror synthesize(): query ModelLifecycle (the canonical
+                // source of truth) instead of the CppBridge.TTS actor's own
+                // handle, which is separate from the lifecycle's handle.
+                let snapshot = loadedModelSnapshot(category: .speechSynthesis)
+                guard snapshot.found else {
+                    continuation.finish()
+                    return
+                }
+                var request = RATTSSynthesisRequest()
+                request.text = text
+                request.options = options
+                let stream: AsyncStream<RATTSOutput>
+                do {
+                    stream = try await CppBridge.TTS.shared.synthesizeSessionStream(
+                        request,
+                        loadedModel: snapshot
+                    )
+                } catch {
+                    var failure = RATTSOutput()
+                    failure.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
+                    failure.isFinal = true
+                    failure.errorMessage = "TTS stream failed: \(error)"
+                    failure.errorCode = Int32(RAC_ERROR_PROCESSING_FAILED)
+                    continuation.yield(failure)
+                    continuation.finish()
+                    return
+                }
+                for await output in stream {
+                    if Task.isCancelled { break }
+                    continuation.yield(output)
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
-
-        let handle = try await CppBridge.TTS.shared.getHandle()
-
-        guard await CppBridge.TTS.shared.isLoaded else {
-            throw SDKError.tts(.notInitialized, "TTS voice not loaded")
-        }
-
-        let voiceId = await CppBridge.TTS.shared.currentVoiceId ?? "unknown"
-        let startTime = Date()
-
-        // Build C options
-        var cOptions = rac_tts_options_t()
-        cOptions.rate = options.rate
-        cOptions.pitch = options.pitch
-        cOptions.volume = options.volume
-        cOptions.sample_rate = Int32(options.sampleRate)
-
-        // Create callback context - owns its own Data
-        let context = TTSStreamContext(onChunk: onAudioChunk)
-        let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-        let streamResult = text.withCString { textPtr in
-            rac_tts_component_synthesize_stream(
-                handle,
-                textPtr,
-                &cOptions,
-                { audioPtr, audioSize, userData in
-                    guard let audioPtr = audioPtr, let userData = userData else { return }
-                    let ctx = Unmanaged<TTSStreamContext>.fromOpaque(userData).takeUnretainedValue()
-                    let chunk = Data(bytes: audioPtr, count: audioSize)
-                    ctx.onChunk(chunk)
-                    ctx.totalData.append(chunk)
-                },
-                contextPtr
-            )
-        }
-
-        let finalContext = Unmanaged<TTSStreamContext>.fromOpaque(contextPtr).takeRetainedValue()
-        let totalAudioData = finalContext.totalData
-
-        guard streamResult == RAC_SUCCESS else {
-            throw SDKError.tts(.processingFailed, "Streaming synthesis failed: \(streamResult)")
-        }
-
-        let endTime = Date()
-        let processingTime = endTime.timeIntervalSince(startTime)
-        let numSamples = totalAudioData.count / 4
-        let durationSec = Double(numSamples) / Double(options.sampleRate)
-
-        let metadata = TTSSynthesisMetadata(
-            voice: voiceId,
-            language: options.language,
-            processingTime: processingTime,
-            characterCount: text.count
-        )
-
-        return TTSOutput(
-            audioData: totalAudioData,
-            format: options.audioFormat,
-            duration: durationSec,
-            phonemeTimestamps: nil,
-            metadata: metadata
-        )
     }
 
     /// Stop current TTS synthesis
@@ -221,50 +103,30 @@ public extension RunAnywhere {
 
     // MARK: - Speak (Simple API)
 
-    /// Speak text aloud - the simplest way to use TTS.
+    /// Speak text aloud through the device speakers.
     ///
-    /// The SDK handles audio synthesis and playback internally.
-    /// Just call this method and the text will be spoken through the device speakers.
-    ///
-    /// ## Example
-    /// ```swift
-    /// // Simple usage
-    /// try await RunAnywhere.speak("Hello world")
-    ///
-    /// // With options
-    /// let result = try await RunAnywhere.speak("Hello", options: TTSOptions(rate: 1.2))
-    /// print("Duration: \(result.duration)s")
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - text: Text to speak
-    ///   - options: Synthesis options (rate, pitch, voice, etc.)
-    /// - Returns: Result containing metadata about the spoken audio
-    /// - Throws: Error if synthesis or playback fails
+    /// Synthesizes via the C++ TTS ABI then plays the resulting PCM through the
+    /// platform `AudioPlaybackManager`.
     static func speak(
         _ text: String,
-        options: TTSOptions = TTSOptions()
-    ) async throws -> TTSSpeakResult {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+        options: RATTSOptions = .defaults()
+    ) async throws -> RATTSSpeakResult {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         let output = try await synthesize(text, options: options)
 
         // Convert Float32 PCM to WAV format using C++ utility
-        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: Int32(options.sampleRate))
+        let sampleRate = output.sampleRate > 0 ? output.sampleRate : options.sampleRate
+        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: sampleRate > 0 ? sampleRate : 22_050)
 
         // Play the audio using platform audio manager
         if !wavData.isEmpty {
             try await ttsAudioPlayback.play(wavData)
         }
 
-        return TTSSpeakResult(from: output)
-    }
-
-    /// Whether speech is currently playing
-    static var isSpeaking: Bool {
-        get async { false }
+        return RATTSSpeakResult(output: output)
     }
 
     /// Stop current speech playback
@@ -296,23 +158,12 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = wavDataPtr, wavSize > 0 else {
-            throw SDKError.tts(.processingFailed, "Failed to convert PCM to WAV: \(result)")
+            throw SDKException(code: .processingFailed, message: "Failed to convert PCM to WAV: \(result)", category: .component)
         }
 
         let wavData = Data(bytes: ptr, count: wavSize)
         rac_free(ptr)
 
         return wavData
-    }
-}
-
-// MARK: - Streaming Context
-
-private final class TTSStreamContext: @unchecked Sendable {
-    let onChunk: (Data) -> Void
-    var totalData = Data()
-
-    init(onChunk: @escaping (Data) -> Void) {
-        self.onChunk = onChunk
     }
 }

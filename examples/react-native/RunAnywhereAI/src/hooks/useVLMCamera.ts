@@ -33,15 +33,12 @@ export interface VLMCameraState {
 export interface VLMCameraActions {
   requestCameraPermission: () => Promise<void>;
   checkModelStatus: () => Promise<void>;
-  loadModel: (
-    modelPath: string,
-    modelName: string,
-    mmprojPath?: string
-  ) => Promise<void>;
+  loadModel: (modelId: string, modelName: string) => Promise<void>;
   captureAndDescribe: () => Promise<void>;
   selectPhotoAndDescribe: () => Promise<void>;
   toggleAutoStreaming: () => void;
   cancelGeneration: () => void;
+  clearError: () => void;
 }
 
 export type VLMCameraHook = VLMCameraState & VLMCameraActions;
@@ -54,6 +51,20 @@ const SINGLE_CAPTURE_MAX_TOKENS = 200;
 const SINGLE_CAPTURE_PROMPT = 'Describe what you see briefly.';
 const GALLERY_MAX_TOKENS = 300;
 const GALLERY_PROMPT = 'Describe this image in detail.';
+
+/**
+ * Some VLM tokenizers (notably SmolVLM and Qwen-VL) emit literal special
+ * tokens at the end of generation. The runtime usually swallows them but
+ * occasionally one slips through into the streaming callback. Strip
+ * common variants before rendering so we don't display angle-bracket
+ * artifacts to the user (B-RN-14-001).
+ */
+const VLM_EOS_TOKEN_REGEX =
+  /<end_of_utterance>|<\|endoftext\|>|<eot>|<\|im_end\|>|<\|eot_id\|>/g;
+
+function stripEosTokens(text: string): string {
+  return text.replace(VLM_EOS_TOKEN_REGEX, '');
+}
 
 export function useVLMCamera(
   cameraRef: React.RefObject<Camera | null>
@@ -113,11 +124,11 @@ export function useVLMCamera(
   }, [vlmService]);
 
   const loadModel = useCallback(
-    async (modelPath: string, modelName: string, mmprojPath?: string) => {
+    async (modelId: string, modelName: string) => {
       try {
         setIsProcessing(true);
         // Load into the persistent service instance
-        await vlmService.loadModel(modelPath, mmprojPath, modelName);
+        await vlmService.loadModel(modelId, modelName);
         setIsModelLoaded(true);
         setLoadedModelName(modelName);
         setError(null);
@@ -148,13 +159,13 @@ export function useVLMCamera(
       // Strip file:// prefix if present (VisionCamera may return a URI)
       const cleanPath = photo.path.replace('file://', '');
 
-      // Use the service to describe with a callback for streaming
-      await vlmService.describeImage(
+      // Use the service to process the image with a callback for streaming
+      await vlmService.processImage(
         cleanPath,
         SINGLE_CAPTURE_PROMPT,
         SINGLE_CAPTURE_MAX_TOKENS,
         (token) => {
-          setCurrentDescription((prev) => prev + token);
+          setCurrentDescription((prev) => stripEosTokens(prev + token));
         }
       );
     } catch (err) {
@@ -182,12 +193,12 @@ export function useVLMCamera(
       // Strip file prefix if needed
       const cleanPath = photoUri.replace('file://', '');
 
-      await vlmService.describeImage(
+      await vlmService.processImage(
         cleanPath,
         GALLERY_PROMPT,
         GALLERY_MAX_TOKENS,
         (token) => {
-          setCurrentDescription((prev) => prev + token);
+          setCurrentDescription((prev) => stripEosTokens(prev + token));
         }
       );
     } catch (err) {
@@ -214,13 +225,13 @@ export function useVLMCamera(
       const cleanPath = photo.path.replace('file://', '');
 
       let accumulatedText = '';
-      await vlmService.describeImage(
+      await vlmService.processImage(
         cleanPath,
         AUTO_STREAM_PROMPT,
         AUTO_STREAM_MAX_TOKENS,
         (token) => {
           accumulatedText += token;
-          setCurrentDescription(accumulatedText);
+          setCurrentDescription(stripEosTokens(accumulatedText));
         }
       );
     } catch (err) {
@@ -262,5 +273,6 @@ export function useVLMCamera(
     selectPhotoAndDescribe,
     toggleAutoStreaming,
     cancelGeneration: () => vlmService.cancel(),
+    clearError: () => setError(null),
   };
 }

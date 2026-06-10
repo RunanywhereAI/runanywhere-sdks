@@ -50,7 +50,7 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     // to be managed carefully for lifetime.
     static std::string s_deviceId, s_deviceModel, s_deviceName, s_platform;
     static std::string s_osVersion, s_formFactor, s_architecture, s_chipName;
-    static std::string s_gpuFamily, s_batteryState, s_deviceType, s_osName;
+    static std::string s_gpuFamily, s_batteryState;
     static std::string s_deviceFingerprint;
 
     s_deviceId = info.deviceId;
@@ -63,8 +63,6 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     s_chipName = info.chipName;
     s_gpuFamily = info.gpuFamily;
     s_batteryState = info.batteryState;
-    s_deviceType = info.formFactor; // Use formFactor as device_type
-    s_osName = info.osName.empty() ? info.platform : info.osName;
     s_deviceFingerprint = info.deviceId;
 
     // Fill out the struct - matches Swift's implementation
@@ -88,12 +86,6 @@ static void deviceGetInfoCallback(rac_device_registration_info_t* outInfo, void*
     outInfo->performance_cores = info.performanceCores;
     outInfo->efficiency_cores = info.efficiencyCores;
     outInfo->device_fingerprint = s_deviceFingerprint.c_str();
-
-    // Legacy fields
-    outInfo->device_type = s_deviceType.c_str();
-    outInfo->os_name = s_osName.c_str();
-    outInfo->processor_count = info.coreCount;
-    outInfo->is_simulator = info.isSimulator ? RAC_TRUE : RAC_FALSE;
 
     LOGD("Device info populated: model=%s, platform=%s", s_deviceModel.c_str(), s_platform.c_str());
 }
@@ -219,33 +211,8 @@ rac_result_t DeviceBridge::registerCallbacks() {
     return result;
 }
 
-rac_result_t DeviceBridge::registerIfNeeded(rac_environment_t environment, const std::string& buildToken) {
-    if (!callbacksRegistered_) {
-        LOGE("Device callbacks not registered - call registerCallbacks() first");
-        return RAC_ERROR_NOT_INITIALIZED;
-    }
-
-    LOGI("Registering device if needed (env=%d)...", static_cast<int>(environment));
-
-    const char* tokenPtr = buildToken.empty() ? nullptr : buildToken.c_str();
-    rac_result_t result = rac_device_manager_register_if_needed(environment, tokenPtr);
-
-    if (result == RAC_SUCCESS) {
-        LOGI("Device registration completed successfully");
-    } else {
-        LOGE("Device registration failed: %d", result);
-    }
-
-    return result;
-}
-
 bool DeviceBridge::isRegistered() const {
     return rac_device_manager_is_registered() == RAC_TRUE;
-}
-
-void DeviceBridge::clearRegistration() {
-    rac_device_manager_clear_registration();
-    LOGI("Device registration cleared");
 }
 
 std::string DeviceBridge::getDeviceId() const {
@@ -258,9 +225,9 @@ DeviceInfo DeviceBridge::getDeviceInfo() const {
         LOGE("getDeviceInfo callback not available");
         return DeviceInfo{};
     }
-    
+
     DeviceInfo info = g_deviceCallbacks->getDeviceInfo();
-    LOGD("Device info retrieved: availableMemory=%lld bytes", 
+    LOGD("Device info retrieved: availableMemory=%lld bytes",
          static_cast<long long>(info.availableMemory));
     return info;
 }

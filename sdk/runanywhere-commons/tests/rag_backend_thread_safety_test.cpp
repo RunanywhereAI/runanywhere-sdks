@@ -1,39 +1,32 @@
+#include "rag_backend.h"
+
 #include <atomic>
+#include <gtest/gtest.h>
 #include <memory>
 #include <thread>
 #include <vector>
 
-#include <gtest/gtest.h>
-
-#include "rag_backend.h"
-
 namespace runanywhere::rag {
 
 class DummyEmbeddingProvider final : public IEmbeddingProvider {
-public:
+   public:
     explicit DummyEmbeddingProvider(size_t dimension) : dimension_(dimension) {}
 
     std::vector<float> embed(const std::string&) override {
         return std::vector<float>(dimension_, 0.1f);
     }
 
-    size_t dimension() const noexcept override {
-        return dimension_;
-    }
+    size_t dimension() const noexcept override { return dimension_; }
 
-    bool is_ready() const noexcept override {
-        return true;
-    }
+    bool is_ready() const noexcept override { return true; }
 
-    const char* name() const noexcept override {
-        return "DummyEmbeddingProvider";
-    }
+    const char* name() const noexcept override { return "DummyEmbeddingProvider"; }
 
-private:
+   private:
     size_t dimension_;
 };
 
-} // namespace runanywhere::rag
+}  // namespace runanywhere::rag
 
 TEST(RAGBackendThreadSafety, ConcurrentSearchAndProviderSwap) {
     using namespace runanywhere::rag;
@@ -45,10 +38,8 @@ TEST(RAGBackendThreadSafety, ConcurrentSearchAndProviderSwap) {
     config.top_k = 1;
     config.similarity_threshold = 0.0f;
 
-    RAGBackend backend(
-        config,
-        std::make_unique<DummyEmbeddingProvider>(config.embedding_dimension)
-    );
+    RAGBackend backend(config,
+                       std::make_unique<DummyEmbeddingProvider>(config.embedding_dimension));
 
     bool added = backend.add_document("hello world");
     ASSERT_TRUE(added) << "Failed to add document in setup";
@@ -70,8 +61,7 @@ TEST(RAGBackendThreadSafety, ConcurrentSearchAndProviderSwap) {
         try {
             for (int i = 0; i < 1000; ++i) {
                 backend.set_embedding_provider(
-                    std::make_unique<DummyEmbeddingProvider>(config.embedding_dimension)
-                );
+                    std::make_unique<DummyEmbeddingProvider>(config.embedding_dimension));
             }
         } catch (...) {
             failed.store(true);

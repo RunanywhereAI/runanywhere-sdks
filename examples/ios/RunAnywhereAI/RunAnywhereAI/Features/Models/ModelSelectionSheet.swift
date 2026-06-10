@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhere
+import os
 
 // MARK: - Model Selection Context
 
@@ -75,24 +76,25 @@ struct ModelSelectionSheet: View {
     @Environment(\.dismiss)
     var dismiss
 
-    @State private var selectedModel: ModelInfo?
+    @State private var selectedModel: RAModelInfo?
     @State private var expandedFramework: InferenceFramework?
     @State private var availableFrameworks: [InferenceFramework] = []
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
+    @State private var loadErrorMessage: String?
 
     let context: ModelSelectionContext
-    let onModelSelected: (ModelInfo) async -> Void
+    let onModelSelected: (RAModelInfo) async -> Void
 
     init(
         context: ModelSelectionContext = .llm,
-        onModelSelected: @escaping (ModelInfo) async -> Void
+        onModelSelected: @escaping (RAModelInfo) async -> Void
     ) {
         self.context = context
         self.onModelSelected = onModelSelected
     }
 
-    private var availableModels: [ModelInfo] {
+    private var availableModels: [RAModelInfo] {
         viewModel.availableModels
             .filter { model in
                 guard context.relevantCategories.contains(model.category) else { return false }
@@ -109,14 +111,21 @@ struct ModelSelectionSheet: View {
                 }
                 return true
             }
-            .sorted { modelPriority($0) != modelPriority($1)
-                ? modelPriority($0) < modelPriority($1)
-                : $0.name < $1.name
+            .sorted {
+                let lhsPriority = modelPriority($0)
+                let rhsPriority = modelPriority($1)
+                return lhsPriority != rhsPriority ? lhsPriority < rhsPriority : $0.name < $1.name
             }
     }
 
-    private func modelPriority(_ model: ModelInfo) -> Int {
-        model.framework == .foundationModels ? 0 : (model.localPath != nil ? 1 : 2)
+    private func modelPriority(_ model: RAModelInfo) -> Int {
+        if unavailableReason(for: model) != nil { return 3 }
+        return model.framework == .foundationModels ? 0 : (model.localPathURL != nil ? 1 : 2)
+    }
+
+    private func unavailableReason(for model: RAModelInfo) -> String? {
+        guard model.framework == .foundationModels else { return nil }
+        return SystemFoundationModels.unavailableReason
     }
 
     var body: some View {
@@ -132,12 +141,25 @@ struct ModelSelectionSheet: View {
             }
             .navigationTitle(context.title)
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar { toolbarContent }
         }
         .adaptiveSheetFrame()
         .task { await loadInitialData() }
+        .alert(
+            "Unable to Load Model",
+            isPresented: Binding(
+                get: { loadErrorMessage != nil },
+                set: { if !$0 { loadErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { loadErrorMessage = nil }
+        } message: {
+            if let loadErrorMessage {
+                Text(loadErrorMessage)
+            }
+        }
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
@@ -160,8 +182,8 @@ struct ModelSelectionSheet: View {
     private func loadAvailableFrameworks() async {
         let allFrameworks = await RunAnywhere.getRegisteredFrameworks()
         var filtered = allFrameworks.filter { shouldShowFramework($0) }
-        if context == .tts && !filtered.contains(.systemTTS) {
-            filtered.insert(.systemTTS, at: 0)
+        if context == .tts && !filtered.contains(.systemTts) {
+            filtered.insert(.systemTts, at: 0)
         }
         await MainActor.run { self.availableFrameworks = filtered }
     }
@@ -240,6 +262,7 @@ extension ModelSelectionSheet {
         ForEach(availableModels, id: \.id) { model in
             FlatModelRow(
                 model: model,
+                availabilityReason: unavailableReason(for: model),
                 isSelected: selectedModel?.id == model.id,
                 isLoading: isLoadingModel,
                 onDownloadCompleted: { Task { await viewModel.loadModels() } },
@@ -253,9 +276,25 @@ extension ModelSelectionSheet {
 // MARK: - Model Loading Actions
 
 extension ModelSelectionSheet {
-    private func selectAndLoadModel(_ model: ModelInfo) async {
-        if model.framework != .foundationModels {
-            guard model.localPath != nil else { return }
+    private func selectAndLoadModel(_ model: RAModelInfo) async {
+        if let reason = unavailableReason(for: model) {
+            await MainActor.run {
+                selectedModel = nil
+                loadErrorMessage = reason
+            }
+            return
+        }
+
+        // Built-in models (Foundation Models, System TTS, artifactType .builtIn)
+        // have no on-disk artifact and are always ready to load via the platform
+        // backend. All other frameworks require a resolved local path — if it is
+        // missing we surface an error rather than silently dropping the tap.
+        if !model.isBuiltIn, model.localPathURL == nil {
+            await MainActor.run {
+                selectedModel = nil
+                loadErrorMessage = "Model files are not available on this device. Download the model and try again."
+            }
+            return
         }
 
         // RAG model selection does not pre-load into memory; just select and dismiss.
@@ -281,58 +320,75 @@ extension ModelSelectionSheet {
             await handleModelLoadSuccess(model)
             await MainActor.run { dismiss() }
         } catch {
+            // Surface the failure to the user instead of silently printing.
+            // The sheet stays open so the user can retry or pick a different
+            // model without navigating back through the setup flow.
+            let message = (error as? SDKException)?.message ?? error.localizedDescription
             await MainActor.run {
                 isLoadingModel = false
                 loadingProgress = ""
                 selectedModel = nil
+                loadErrorMessage = message.isEmpty
+                    ? "Failed to load \(model.name)."
+                    : "Failed to load \(model.name): \(message)"
             }
-            print("Failed to load model: \(error)")
         }
     }
 
-    private func loadModelForContext(_ model: ModelInfo) async throws {
+    private func loadModelForContext(_ model: RAModelInfo) async throws {
+        let category: RAModelCategory
         switch context {
-        case .llm: try await RunAnywhere.loadModel(model.id)
-        case .stt: try await RunAnywhere.loadSTTModel(model.id)
-        case .tts: try await RunAnywhere.loadTTSModel(model.id)
-        case .vad: try await RunAnywhere.loadVADModel(model.id)
-        case .voice: try await loadModelForVoiceContext(model)
-        case .vlm: try await RunAnywhere.loadVLMModel(model)
+        case .llm: category = .language
+        case .stt: category = .speechRecognition
+        case .tts: category = .speechSynthesis
+        case .vad: category = .voiceActivityDetection
+        case .voice: category = voiceContextCategory(for: model)
+        case .vlm: category = .multimodal
         case .ragEmbedding, .ragLLM:
             // RAG models are referenced by local file path at pipeline creation time,
             // not pre-loaded into memory via the SDK model loader.
-            break
+            return
         }
+        try await loadViaCanonicalAPI(modelID: model.id, category: category)
     }
 
-    private func loadModelForVoiceContext(_ model: ModelInfo) async throws {
+    private func voiceContextCategory(for model: RAModelInfo) -> RAModelCategory {
         switch model.category {
-        case .speechRecognition: try await RunAnywhere.loadSTTModel(model.id)
-        case .speechSynthesis: try await RunAnywhere.loadTTSModel(model.id)
-        default: try await RunAnywhere.loadModel(model.id)
+        case .speechRecognition: return .speechRecognition
+        case .speechSynthesis: return .speechSynthesis
+        default: return .language
         }
     }
 
-    private func handleModelLoadSuccess(_ model: ModelInfo) async {
+    private func loadViaCanonicalAPI(modelID: String, category: RAModelCategory) async throws {
+        var request = RAModelLoadRequest()
+        request.modelID = modelID
+        request.category = category
+        let result = await RunAnywhere.loadModel(request)
+        if !result.success {
+            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
+        }
+        let resolvedID = result.modelID.isEmpty ? modelID : result.modelID
+        Logger(subsystem: "com.runanywhere", category: "Models").info(
+            "Model load succeeded for \(resolvedID, privacy: .public)"
+        )
+        if context == .stt {
+            Logger(subsystem: "com.runanywhere", category: "STT").info(
+                "STT model loaded successfully: \(resolvedID, privacy: .public)"
+            )
+        }
+    }
+
+    private func handleModelLoadSuccess(_ model: RAModelInfo) async {
         let isLLM = context == .llm ||
             (context == .voice && [.language, .multimodal].contains(model.category))
 
+        // `RunAnywhere.loadModel` already published the canonical
+        // component-lifecycle event the LLM/VLM ViewModels subscribe to, so the
+        // app only updates its own shared selection state here.
         if isLLM {
             await MainActor.run {
                 viewModel.setCurrentModel(model)
-                NotificationCenter.default.post(
-                    name: Notification.Name("ModelLoaded"),
-                    object: model
-                )
-            }
-        }
-
-        if context == .vlm {
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: Notification.Name("VLMModelLoaded"),
-                    object: model
-                )
             }
         }
 

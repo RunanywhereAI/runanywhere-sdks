@@ -1,0 +1,57 @@
+// RunAnywhere IDL — cross-platform device telemetry.
+//
+// Every SDK emits an identical device-telemetry record for analytics/routing:
+// Swift `Infrastructure/Device/Models/Domain/DeviceInfo.swift` and Kotlin
+// `CppBridgeDevice` produce the same 19-field snake_case JSON (the header on
+// the Swift struct notes it "matches backend schemas/device.py DeviceInfo");
+// RN exposes the same field universe via getters; Web carries a subset
+// (`DeviceInfoData`). This is the single source of truth for that schema.
+//
+// Distinct from hardware_profile.proto's `HardwareProfile` — that is the
+// static silicon-capability subset consumed by the `Hardware` service for
+// accelerator routing. DeviceInfo is identity + runtime telemetry. The
+// platform-only fields (Web hasWebGPU/hasSharedArrayBuffer, Android extras)
+// go in `platform_extras` rather than the typed core.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "DeviceInfoProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+message DeviceInfo {
+    string device_model        = 1;   // e.g. "iPhone16,2", "Pixel 8 Pro".
+    string device_name         = 2;   // User-facing device name.
+    string platform            = 3;   // "ios" | "android" | "macos" | "web" | ...
+    string os_version          = 4;
+    string form_factor         = 5;   // "phone" | "tablet" | "desktop" | ...
+    string architecture        = 6;   // "arm64" | "x86_64" | "wasm32" | ...
+    string chip_name           = 7;   // e.g. "Apple A17 Pro".
+    int64  total_memory        = 8;   // Bytes.
+    int64  available_memory    = 9;   // Bytes.
+    bool   has_neural_engine   = 10;
+    int32  neural_engine_cores = 11;
+    string gpu_family          = 12;
+
+    optional float  battery_level = 13;  // 0.0–1.0; unset when unavailable.
+    optional string battery_state = 14;  // "charging" | "unplugged" | "full" | ...
+    bool   is_low_power_mode   = 15;
+
+    int32  core_count          = 16;
+    int32  performance_cores   = 17;
+    int32  efficiency_cores    = 18;
+
+    optional string device_fingerprint = 19;
+
+    // Platform-specific fields that are not part of the cross-SDK core
+    // (e.g. web: "has_webgpu", "has_shared_array_buffer"; android: "manufacturer",
+    // "android_api_level", "os_build_id", ...).
+    map<string, string> platform_extras = 20;
+}

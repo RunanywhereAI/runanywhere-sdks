@@ -127,8 +127,9 @@ typedef struct {
 /**
  * @brief Model download task configuration (strategy-specific)
  *
- * Note: This is separate from rac_model_download_config_t in rac_download.h which
- * is used for the download manager. This struct is strategy-specific.
+ * This struct belongs to the per-framework download-strategy registry
+ * (rac_download_strategy_*). It is independent of the proto download workflow
+ * in rac_download_orchestrator.h.
  */
 typedef struct rac_model_download_config {
     /** Model ID being downloaded */

@@ -5,7 +5,12 @@
     "rootDir": "./src",
     "declarationDir": "./dist/types",
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"],
+      "@runanywhere/proto-ts": ["../../../shared/proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../shared/proto-ts/dist/*.d.ts"],
+      "@runanywhere/proto-ts/streams/*": ["../../../shared/proto-ts/dist/streams/*.d.ts"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "wasm", "**/*.test.ts", "**/*.spec.ts", "**/*.test-d.ts"]

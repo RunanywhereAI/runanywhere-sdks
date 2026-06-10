@@ -11,6 +11,7 @@
 #define RAC_TTS_SERVICE_H
 
 #include "rac_error.h"
+#include "rac_proto_buffer.h"
 #include "rac_tts_types.h"
 
 #ifdef __cplusplus
@@ -49,6 +50,23 @@ typedef struct rac_tts_service_ops {
 
     /** Destroy the service */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new TTS service instance.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     *
+     * For TTS, `model_id` is a voice ID or voice-model path.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
+
+    /**
+     * Enumerate synthesis languages the backend currently supports (derived
+     * from the loaded voice(s)) as a JSON array, e.g. "[\"en\",\"de\"]".
+     * Callee allocates with malloc; caller MUST free via free(). Leave this
+     * slot NULL to return RAC_ERROR_NOT_SUPPORTED from the generic dispatcher.
+     */
+    rac_result_t (*get_languages)(void* impl, char** out_json);
 } rac_tts_service_ops_t;
 
 /**
@@ -154,6 +172,43 @@ RAC_API void rac_tts_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_tts_result_free(rac_tts_result_t* result);
+
+/**
+ * @brief Get supported languages for the loaded TTS model as a JSON array string.
+ *
+ * Dispatches through the backend vtable. Returns RAC_ERROR_NOT_SUPPORTED if the
+ * backend does not enumerate languages.
+ *
+ * @param handle      Service handle
+ * @param out_json    Output: malloc'd JSON string (e.g. "[\"en\",\"de\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json);
+
+// =============================================================================
+// CANONICAL DEFAULTS
+// =============================================================================
+
+/**
+ * @brief Populate a default-initialised runanywhere.v1.TTSConfiguration.
+ *
+ * out_RATTSConfiguration receives serialized runanywhere.v1.TTSConfiguration
+ * bytes. Caller MUST release with rac_proto_buffer_free().
+ */
+RAC_API rac_result_t rac_tts_configuration_defaults_proto(
+    rac_proto_buffer_t* out_RATTSConfiguration);
+
+/**
+ * @brief Enumerate voices available on the lifecycle-loaded TTS voice/model.
+ *
+ * Lifecycle-driven variant of the legacy handle-based listVoices ABI. Uses the
+ * currently lifecycle-loaded TTS service — no handle threading required.
+ * Returns serialized runanywhere.v1.TTSVoiceList bytes.
+ *
+ * @param out Owned proto buffer with serialized runanywhere.v1.TTSVoiceList.
+ *            Caller MUST release with rac_proto_buffer_free().
+ */
+RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out);
 
 #ifdef __cplusplus
 }

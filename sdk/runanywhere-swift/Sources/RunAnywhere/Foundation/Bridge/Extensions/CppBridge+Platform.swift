@@ -2,21 +2,19 @@
 //  CppBridge+Platform.swift
 //  RunAnywhere SDK
 //
-//  Bridge extension for Platform backend (Apple Foundation Models + System TTS + CoreML Diffusion).
+//  Bridge extension for Platform backend (Apple Foundation Models + System TTS).
 //  This file registers Swift callbacks with the C++ platform backend.
 //
 
 import CRACommons
 import Foundation
-import StableDiffusion
+import os
 
 // MARK: - Platform Bridge
 
 extension CppBridge {
 
-    // swiftlint:disable type_body_length
-
-    /// Bridge for platform-native services (Foundation Models, System TTS, CoreML Diffusion)
+    /// Bridge for platform-native services (Foundation Models, System TTS)
     ///
     /// This bridge connects the C++ platform backend to Swift implementations.
     /// The C++ side handles registration with the service registry, while Swift
@@ -26,16 +24,18 @@ extension CppBridge {
         private static let logger = SDKLogger(category: "CppBridge.Platform")
         private static var isInitialized = false
 
-        // MARK: - Service Instances
-
-        /// Cached Foundation Models service (type-erased for iOS 26+ availability)
-        private static var foundationModelsService: (any Sendable)?
-
-        /// Cached System TTS service instance
-        private static var systemTTSService: SystemTTSService?
-
-        /// Cached CoreML Diffusion service (type-erased for availability)
-        private static var diffusionService: (any Sendable)?
+        // MARK: - Service Handle Convention
+        //
+        // The platform C ABI (`rac_platform_llm_create_fn` /
+        // `rac_platform_tts_create_fn`) documents the create return value as a
+        // "Swift object pointer". We honour that literally: `create` retains the
+        // freshly built service with `Unmanaged.passRetained` and returns its
+        // opaque pointer as the `rac_handle_t`. `generate` / `synthesize` /
+        // `stop` recover the same instance with `takeUnretainedValue()`, and
+        // `destroy` balances the retain with `takeRetainedValue()`. Storing the
+        // service inside the handle (rather than a single static slot) keeps
+        // each session self-contained and supports concurrent sessions, mirroring
+        // the `ProtoStreamContext` Unmanaged idiom used elsewhere in this bridge.
 
         // MARK: - Initialization
 
@@ -58,10 +58,6 @@ extension CppBridge {
             logger.info("  - Registering TTS callbacks...")
             registerTTSCallbacks()
 
-            // Register Swift callbacks for Diffusion (CoreML)
-            logger.info("  - Registering Diffusion callbacks...")
-            registerDiffusionCallbacks()
-
             // Register the backend module and service providers
             logger.info("  - Calling rac_backend_platform_register()...")
             let result = rac_backend_platform_register()
@@ -70,6 +66,43 @@ extension CppBridge {
                 logger.info("✅ Platform backend registered successfully (result=\(result))")
             } else {
                 logger.error("❌ Failed to register platform backend: \(result)")
+                return
+            }
+
+            // `rac_backend_platform_register()` only registers the module
+            // record + built-in catalog entries; it does NOT wire the
+            // unified plugin vtable into the plugin router. Without this
+            // step the router has no `platform` engine so `loadModel` for
+            // `framework == .foundationModels / .systemTts / .coreml`
+            // returns "no backend route". Register the vtable here so the
+            // router can resolve the Apple FM + System TTS + CoreML
+            // Diffusion primitives via `rac_plugin_entry_platform()`.
+            registerPlatformPlugin()
+        }
+
+        /// Register the Apple platform engine plugin with the unified plugin
+        /// registry so the router can route `framework == .foundationModels`
+        /// (Apple FM), `.systemTts` (AVSpeechSynthesizer), and `.coreml`
+        /// (Stable Diffusion) model loads to the platform vtable.
+        @MainActor
+        private static func registerPlatformPlugin() {
+            guard let vtable = rac_plugin_entry_platform() else {
+                logger.warning("Platform plugin entry returned null — FM / System TTS / CoreML will not route")
+                return
+            }
+
+            let registerResult = vtable.withMemoryRebound(
+                to: rac_engine_vtable_t.self, capacity: 1
+            ) { typedPointer -> rac_result_t in
+                return rac_plugin_register(typedPointer)
+            }
+
+            if registerResult == RAC_SUCCESS ||
+               registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
+                logger.info("Platform engine plugin registered (LLM + TTS + Diffusion via Apple APIs)")
+            } else {
+                let errorMsg = String(cString: rac_error_message(registerResult))
+                logger.error("Platform plugin registration failed: \(errorMsg)")
             }
         }
 
@@ -78,24 +111,116 @@ extension CppBridge {
             guard isInitialized else { return }
 
             _ = rac_backend_platform_unregister()
-            foundationModelsService = nil
-            systemTTSService = nil
-            diffusionService = nil
             isInitialized = false
             logger.info("Platform backend unregistered")
         }
 
+        // MARK: - Synchronous Bridging
+
+        // The C++ platform router invokes the create/generate/synthesize
+        // callbacks synchronously on the caller's thread, which can be the
+        // main actor (Phase-2 init and `loadModel` UI flows). The platform
+        // services hop to the main actor internally (AVSpeechSynthesizer,
+        // Foundation Models), so a `DispatchGroup.wait()` / `DispatchQueue
+        // .main.sync` on that thread dead-locks against work that needs the
+        // same actor. `Task.detached` breaks actor inheritance so the work
+        // runs off the caller's actor, and the bounded semaphore wait turns a
+        // hang into a clean timeout the router can recover from.
+
+        /// Upper bound for a single platform create/generate/synthesize call.
+        /// Speech and on-device generation finish well inside this; exceeding
+        /// it indicates a stall, surfaced as a failure rather than a hang.
+        private static let callbackTimeout: DispatchTime = .now() + .seconds(120)
+
+        /// Run `work` to completion off the caller's actor and return its
+        /// handle, or `nil` on timeout / error.
+        private static func syncWait(
+            _ work: @escaping @Sendable () async throws -> rac_handle_t?,
+            onTimeout: @Sendable () -> Void,
+            onError: @escaping @Sendable (Error) -> Void,
+            releaseAfterTimeout: @escaping @Sendable (rac_handle_t) -> Void
+        ) -> rac_handle_t? {
+            let semaphore = DispatchSemaphore(value: 0)
+            let box = TimedPlatformHandleBox()
+            Task.detached(priority: .userInitiated) {
+                let handle: rac_handle_t?
+                do {
+                    handle = try await work()
+                } catch {
+                    onError(error)
+                    handle = nil
+                }
+                if let lateHandle = box.complete(handle) {
+                    releaseAfterTimeout(lateHandle)
+                }
+                semaphore.signal()
+            }
+            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+                onTimeout()
+                if let handle = box.markTimedOut() {
+                    releaseAfterTimeout(handle)
+                }
+                return nil
+            }
+            return box.value
+        }
+
+        /// Run `work` to completion off the caller's actor and return its
+        /// `rac_result_t`, mapping timeout → `RAC_ERROR_TIMEOUT` and a thrown
+        /// error → `RAC_ERROR_INTERNAL`.
+        private static func syncWaitResult(
+            _ work: @escaping @Sendable () async throws -> rac_result_t,
+            onError: @escaping @Sendable (Error) -> Void
+        ) -> rac_result_t {
+            let semaphore = DispatchSemaphore(value: 0)
+            let box = UnsafeResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
+            Task.detached(priority: .userInitiated) {
+                do { box.value = try await work() } catch { onError(error) }
+                semaphore.signal()
+            }
+            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+                return RAC_ERROR_TIMEOUT
+            }
+            return box.value
+        }
+
+        /// Run `work` to completion off the caller's actor and return a
+        /// Swift-owned value. The C callback must write borrowed/out C pointers
+        /// only after this wait succeeds, so late timeout completions cannot
+        /// mutate C stack memory owned by the caller.
+        private static func syncWaitValue<T: Sendable>(
+            _ work: @escaping @Sendable () async throws -> T,
+            onError: @escaping @Sendable (Error) -> Void
+        ) -> (result: rac_result_t, value: T?) {
+            let semaphore = DispatchSemaphore(value: 0)
+            let valueBox = UnsafeResultBox<T?>(nil)
+            let resultBox = UnsafeResultBox<rac_result_t>(RAC_ERROR_INTERNAL)
+            Task.detached(priority: .userInitiated) {
+                do {
+                    valueBox.value = try await work()
+                    resultBox.value = RAC_SUCCESS
+                } catch {
+                    onError(error)
+                    resultBox.value = RAC_ERROR_INTERNAL
+                }
+                semaphore.signal()
+            }
+            guard semaphore.wait(timeout: callbackTimeout) == .success else {
+                return (RAC_ERROR_TIMEOUT, nil)
+            }
+            return (resultBox.value, valueBox.value)
+        }
+
         // MARK: - LLM Callbacks (Foundation Models)
 
-        // swiftlint:disable:next function_body_length
         private static func registerLLMCallbacks() {
             var callbacks = rac_platform_llm_callbacks_t()
 
             callbacks.can_handle = { modelIdPtr, _ -> rac_bool_t in
                 let modelId = modelIdPtr.map { String(cString: $0) }
 
-                // Check if Foundation Models can handle this model
-                guard #available(iOS 26.0, macOS 26.0, *) else {
+                // Check if Foundation Models can handle this model on this runtime.
+                guard SystemFoundationModels.isAvailable else {
                     return RAC_FALSE
                 }
 
@@ -116,37 +241,38 @@ extension CppBridge {
 
             callbacks.create = { _, _, _ -> rac_handle_t? in
                 // Create Foundation Models service
+                guard SystemFoundationModels.isAvailable else {
+                    Platform.logger.error(
+                        "Foundation Models unavailable: \(SystemFoundationModels.unavailableReason ?? "unknown reason")"
+                    )
+                    return nil
+                }
+
                 guard #available(iOS 26.0, macOS 26.0, *) else {
                     return nil
                 }
 
-                // Use a dispatch group to synchronously wait for async creation
-                var serviceHandle: rac_handle_t?
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        let service = SystemFoundationModelsService()
-                        try await service.initialize(modelPath: "built-in")
-                        Platform.foundationModelsService = service
-
-                        // Return a marker handle - actual service is managed by Swift
-                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xF00DADE1)
-                        Platform.logger.info("Foundation Models service created")
-                    } catch {
-                        Platform.logger.error("Failed to create Foundation Models service: \(error)")
-                        serviceHandle = nil
-                    }
-                    group.leave()
+                return Platform.syncWait {
+                    let service = SystemFoundationModelsService()
+                    try await service.initialize(modelPath: "built-in")
+                    // Retain the service and hand its opaque pointer back as the
+                    // handle; `generate`/`destroy` recover it via Unmanaged.
+                    let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
+                    Platform.logger.info("Foundation Models service created")
+                    return handle
+                } onTimeout: {
+                    Platform.logger.error("Foundation Models service creation timed out")
+                } onError: { error in
+                    Platform.logger.error("Failed to create Foundation Models service: \(error)")
+                } releaseAfterTimeout: { handle in
+                    guard #available(iOS 26.0, macOS 26.0, *) else { return }
+                    Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
                 }
-
-                group.wait()
-                return serviceHandle
             }
 
-            callbacks.generate = { _, promptPtr, _, outResponsePtr, _ -> rac_result_t in
-                guard let promptPtr = promptPtr,
+            callbacks.generate = { handle, promptPtr, _, outResponsePtr, _ -> rac_result_t in
+                guard let handle = handle,
+                      let promptPtr = promptPtr,
                       let outResponsePtr = outResponsePtr else {
                     return RAC_ERROR_INVALID_PARAMETER
                 }
@@ -155,37 +281,38 @@ extension CppBridge {
                     return RAC_ERROR_NOT_SUPPORTED
                 }
 
-                guard let service = Platform.foundationModelsService as? SystemFoundationModelsService else {
-                    return RAC_ERROR_NOT_INITIALIZED
-                }
+                let service = Unmanaged<SystemFoundationModelsService>
+                    .fromOpaque(handle).takeUnretainedValue()
 
                 let prompt = String(cString: promptPtr)
 
-                var result: rac_result_t = RAC_ERROR_INTERNAL
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        let response = try await service.generate(
-                            prompt: prompt,
-                            options: LLMGenerationOptions()
-                        )
-                        outResponsePtr.pointee = strdup(response)
-                        result = RAC_SUCCESS
-                    } catch {
-                        Platform.logger.error("Foundation Models generate failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
-                    }
-                    group.leave()
+                let waitResult = Platform.syncWaitValue {
+                    try await service.generate(
+                        prompt: prompt,
+                        options: RALLMGenerationOptions.defaults()
+                    )
+                } onError: { error in
+                    Platform.logger.error("Foundation Models generate failed: \(error)")
                 }
-
-                group.wait()
-                return result
+                guard waitResult.result == RAC_SUCCESS else {
+                    return waitResult.result
+                }
+                guard let response = waitResult.value else {
+                    return RAC_ERROR_INTERNAL
+                }
+                guard let responsePtr = strdup(response) else {
+                    return RAC_ERROR_OUT_OF_MEMORY
+                }
+                outResponsePtr.pointee = responsePtr
+                return RAC_SUCCESS
             }
 
-            callbacks.destroy = { _, _ in
-                Platform.foundationModelsService = nil
+            callbacks.destroy = { handle, _ in
+                guard let handle = handle else { return }
+                // The handle can only have been minted by `create`, which is
+                // gated to iOS/macOS 26+, so the release is too.
+                guard #available(iOS 26.0, macOS 26.0, *) else { return }
+                Unmanaged<SystemFoundationModelsService>.fromOpaque(handle).release()
                 Platform.logger.debug("Foundation Models service destroyed")
             }
 
@@ -201,7 +328,6 @@ extension CppBridge {
 
         // MARK: - TTS Callbacks (System TTS)
 
-        // swiftlint:disable:next function_body_length
         private static func registerTTSCallbacks() {
             var callbacks = rac_platform_tts_callbacks_t()
 
@@ -223,30 +349,32 @@ extension CppBridge {
             }
 
             callbacks.create = { _, _ -> rac_handle_t? in
-                var serviceHandle: rac_handle_t?
-
-                // Use DispatchQueue.main.sync to create the MainActor-isolated service
-                // This ensures proper thread safety for AVSpeechSynthesizer
-                DispatchQueue.main.sync {
-                    let service = SystemTTSService()
-                    Platform.systemTTSService = service
-
-                    // Return a marker handle
-                    serviceHandle = UnsafeMutableRawPointer(bitPattern: 0x5157E775)
+                // `SystemTTSService` is `@MainActor`-isolated (AVSpeechSynthesizer).
+                // Build it on the main actor via a detached task so this works even
+                // when the C++ router invokes `create` from the main thread, where a
+                // direct `DispatchQueue.main.sync` would dead-lock.
+                Platform.syncWait {
+                    let service = await MainActor.run { SystemTTSService() }
+                    // Retain the service and hand its opaque pointer back as the
+                    // handle; synthesize/stop/destroy recover it via Unmanaged.
+                    let handle = UnsafeMutableRawPointer(Unmanaged.passRetained(service).toOpaque())
                     Platform.logger.info("System TTS service created")
+                    return handle
+                } onTimeout: {
+                    Platform.logger.error("System TTS service creation timed out")
+                } onError: { error in
+                    Platform.logger.error("Failed to create System TTS service: \(error)")
+                } releaseAfterTimeout: { handle in
+                    Unmanaged<SystemTTSService>.fromOpaque(handle).release()
                 }
-
-                return serviceHandle
             }
 
-            callbacks.synthesize = { _, textPtr, optionsPtr, _ -> rac_result_t in
-                guard let textPtr = textPtr else {
+            callbacks.synthesize = { handle, textPtr, optionsPtr, _ -> rac_result_t in
+                guard let handle = handle, let textPtr = textPtr else {
                     return RAC_ERROR_INVALID_PARAMETER
                 }
 
-                guard let service = Platform.systemTTSService else {
-                    return RAC_ERROR_NOT_INITIALIZED
-                }
+                let service = Unmanaged<SystemTTSService>.fromOpaque(handle).takeUnretainedValue()
 
                 let text = String(cString: textPtr)
 
@@ -254,7 +382,7 @@ extension CppBridge {
                 var rate: Float = 1.0
                 var pitch: Float = 1.0
                 var volume: Float = 1.0
-                var voice: String?
+                var voice = ""
 
                 if let optionsPtr = optionsPtr {
                     rate = optionsPtr.pointee.rate
@@ -265,42 +393,35 @@ extension CppBridge {
                     }
                 }
 
-                let options = TTSOptions(
-                    voice: voice,
-                    rate: rate,
-                    pitch: pitch,
-                    volume: volume
-                )
+                var options = RATTSOptions.defaults()
+                options.voice = voice
+                options.speakingRate = rate
+                options.pitch = pitch
+                options.volume = volume
 
-                var result: rac_result_t = RAC_ERROR_INTERNAL
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        _ = try await service.synthesize(text: text, options: options)
-                        result = RAC_SUCCESS
-                    } catch {
-                        Platform.logger.error("System TTS synthesize failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
-                    }
-                    group.leave()
-                }
-
-                group.wait()
-                return result
-            }
-
-            callbacks.stop = { _, _ in
-                DispatchQueue.main.async {
-                    Platform.systemTTSService?.stop()
+                return Platform.syncWaitResult {
+                    try await service.speak(text: text, options: options)
+                    return RAC_SUCCESS
+                } onError: { error in
+                    Platform.logger.error("System TTS speak failed: \(error)")
                 }
             }
 
-            callbacks.destroy = { _, _ in
+            callbacks.stop = { handle, _ in
+                guard let handle = handle else { return }
+                let service = Unmanaged<SystemTTSService>.fromOpaque(handle).takeUnretainedValue()
                 DispatchQueue.main.async {
-                    Platform.systemTTSService?.stop()
-                    Platform.systemTTSService = nil
+                    service.stop()
+                }
+            }
+
+            callbacks.destroy = { handle, _ in
+                guard let handle = handle else { return }
+                // Recover the +1 retain from `create`; stop on the main actor
+                // first, then drop the final reference so the service deinits.
+                let service = Unmanaged<SystemTTSService>.fromOpaque(handle).takeRetainedValue()
+                DispatchQueue.main.async {
+                    service.stop()
                     Platform.logger.debug("System TTS service destroyed")
                 }
             }
@@ -314,302 +435,46 @@ extension CppBridge {
                 logger.error("Failed to register TTS callbacks: \(result)")
             }
         }
+    }
+}
 
-        // MARK: - Diffusion Callbacks (CoreML Stable Diffusion)
+/// Single-writer/single-reader handoff across the platform-callback semaphore
+/// boundary. The detached task writes before signalling; the caller reads only
+/// after a successful wait, so there is no concurrent access.
+private final class UnsafeResultBox<T>: @unchecked Sendable {
+    var value: T
+    init(_ value: T) { self.value = value }
+}
 
-        // swiftlint:disable:next function_body_length cyclomatic_complexity
-        private static func registerDiffusionCallbacks() {
-            var callbacks = rac_platform_diffusion_callbacks_t()
+/// Thread-safe handoff for platform create callbacks. If the C callback times
+/// out, a later async success must release its retained service handle instead
+/// of storing a value nobody will destroy.
+private final class TimedPlatformHandleBox: @unchecked Sendable {
+    private struct State: @unchecked Sendable {
+        var timedOut = false
+        var handle: rac_handle_t?
+    }
 
-            callbacks.can_handle = { modelIdPtr, _ -> rac_bool_t in
-                let modelId = modelIdPtr.map { String(cString: $0) }
+    private let state = OSAllocatedUnfairLock<State>(initialState: State())
 
-                // Check if CoreML diffusion can handle this model
-                guard #available(iOS 16.2, macOS 13.1, *) else {
-                    return RAC_FALSE
-                }
+    var value: rac_handle_t? {
+        state.withLock { $0.handle }
+    }
 
-                guard let modelId = modelId, !modelId.isEmpty else {
-                    // Accept nil for default diffusion model
-                    return RAC_TRUE
-                }
-
-                let lowercased = modelId.lowercased()
-                if lowercased.contains("coreml") ||
-                   lowercased.contains("stable-diffusion") ||
-                   lowercased.contains("diffusion") ||
-                   lowercased.contains("sd-") ||
-                   lowercased.contains("sdxl") {
-                    return RAC_TRUE
-                }
-
-                return RAC_FALSE
-            }
-
-            callbacks.create = { modelPathPtr, configPtr, _ -> rac_handle_t? in
-                guard #available(iOS 16.2, macOS 13.1, *) else {
-                    Platform.logger.error("CoreML Diffusion requires iOS 16.2+ or macOS 13.1+")
-                    return nil
-                }
-
-                guard let modelPathPtr = modelPathPtr else {
-                    Platform.logger.error("Model path is required for diffusion")
-                    return nil
-                }
-
-                let modelPath = String(cString: modelPathPtr)
-
-                // Parse config
-                var reduceMemory = true
-                var disableSafety = false
-                var modelVariant: DiffusionModelVariant = .sd15
-
-                if let configPtr = configPtr {
-                    reduceMemory = configPtr.pointee.reduce_memory == RAC_TRUE
-                    disableSafety = configPtr.pointee.enable_safety_checker == RAC_FALSE
-                    modelVariant = DiffusionModelVariant(cValue: configPtr.pointee.model_variant)
-                }
-
-                // Determine tokenizer source from model variant
-                let tokenizerSource = modelVariant.defaultTokenizerSource
-
-                // Create service asynchronously but wait for completion
-                // NOTE: First-time model loading can take 5-15 minutes as Core ML compiles for the device
-                var serviceHandle: rac_handle_t?
-                let group = DispatchGroup()
-                group.enter()
-
-                Platform.logger.info("Starting async diffusion service creation...")
-                Platform.logger.info("⏳ First-time Core ML compilation may take 5-15 minutes. Please wait...")
-
-                Task {
-                    do {
-                        let service = DiffusionPlatformService()
-                        try await service.initialize(
-                            modelPath: modelPath,
-                            reduceMemory: reduceMemory,
-                            disableSafetyChecker: disableSafety,
-                            tokenizerSource: tokenizerSource
-                        )
-                        Platform.diffusionService = service
-
-                        // Return a marker handle
-                        serviceHandle = UnsafeMutableRawPointer(bitPattern: 0xD1FF0510)
-                        Platform.logger.info("✅ CoreML Diffusion service created successfully")
-                    } catch {
-                        Platform.logger.error("❌ Failed to create diffusion service: \(error)")
-                        serviceHandle = nil
-                    }
-                    group.leave()
-                }
-
-                group.wait()
-                return serviceHandle
-            }
-
-            callbacks.generate = { _, optionsPtr, outResultPtr, _ -> rac_result_t in
-                guard #available(iOS 16.2, macOS 13.1, *) else {
-                    return RAC_ERROR_NOT_SUPPORTED
-                }
-
-                guard let optionsPtr = optionsPtr, let outResultPtr = outResultPtr else {
-                    return RAC_ERROR_INVALID_PARAMETER
-                }
-
-                guard let service = Platform.diffusionService as? DiffusionPlatformService else {
-                    return RAC_ERROR_NOT_INITIALIZED
-                }
-
-                // Extract options
-                let prompt = optionsPtr.pointee.prompt.map { String(cString: $0) } ?? ""
-                let negativePrompt = optionsPtr.pointee.negative_prompt.map { String(cString: $0) } ?? ""
-                let width = Int(optionsPtr.pointee.width)
-                let height = Int(optionsPtr.pointee.height)
-                let steps = Int(optionsPtr.pointee.steps)
-                let guidanceScale = optionsPtr.pointee.guidance_scale
-                let seed = optionsPtr.pointee.seed
-
-                var result: rac_result_t = RAC_ERROR_INTERNAL
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        let genResult = try await service.generate(
-                            prompt: prompt,
-                            negativePrompt: negativePrompt,
-                            width: width,
-                            height: height,
-                            stepCount: steps,
-                            guidanceScale: guidanceScale,
-                            seed: seed >= 0 ? UInt32(seed) : nil
-                        )
-
-                        // Copy result to output
-                        outResultPtr.pointee.width = Int32(genResult.width)
-                        outResultPtr.pointee.height = Int32(genResult.height)
-                        outResultPtr.pointee.seed_used = genResult.seedUsed
-                        outResultPtr.pointee.safety_triggered = genResult.safetyTriggered ? RAC_TRUE : RAC_FALSE
-
-                        if let imageData = genResult.imageData {
-                            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: imageData.count)
-                            imageData.copyBytes(to: buffer, count: imageData.count)
-                            outResultPtr.pointee.image_data = buffer
-                            outResultPtr.pointee.image_size = imageData.count
-                        }
-
-                        result = RAC_SUCCESS
-                    } catch {
-                        Platform.logger.error("Diffusion generate failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
-                    }
-                    group.leave()
-                }
-
-                group.wait()
-                return result
-            }
-
-            callbacks.generate_with_progress = { _, optionsPtr, progressCallback, progressUserData, outResultPtr, _ -> rac_result_t in
-                guard #available(iOS 16.2, macOS 13.1, *) else {
-                    return RAC_ERROR_NOT_SUPPORTED
-                }
-
-                guard let optionsPtr = optionsPtr, let outResultPtr = outResultPtr else {
-                    return RAC_ERROR_INVALID_PARAMETER
-                }
-
-                guard let service = Platform.diffusionService as? DiffusionPlatformService else {
-                    return RAC_ERROR_NOT_INITIALIZED
-                }
-
-                // Extract options
-                let prompt = optionsPtr.pointee.prompt.map { String(cString: $0) } ?? ""
-                let negativePrompt = optionsPtr.pointee.negative_prompt.map { String(cString: $0) } ?? ""
-                let width = Int(optionsPtr.pointee.width)
-                let height = Int(optionsPtr.pointee.height)
-                let steps = Int(optionsPtr.pointee.steps)
-                let guidanceScale = optionsPtr.pointee.guidance_scale
-                let seed = optionsPtr.pointee.seed
-
-                var result: rac_result_t = RAC_ERROR_INTERNAL
-                let group = DispatchGroup()
-                group.enter()
-
-                Task {
-                    do {
-                        let genResult = try await service.generate(
-                            prompt: prompt,
-                            negativePrompt: negativePrompt,
-                            width: width,
-                            height: height,
-                            stepCount: steps,
-                            guidanceScale: guidanceScale,
-                            seed: seed >= 0 ? UInt32(seed) : nil,
-                            progressHandler: { progressInfo in
-                                // Call C++ progress callback if provided
-                                if let callback = progressCallback {
-                                    let shouldContinue = callback(
-                                        progressInfo.progress,
-                                        Int32(progressInfo.step),
-                                        Int32(progressInfo.totalSteps),
-                                        progressUserData
-                                    )
-                                    return shouldContinue == RAC_TRUE
-                                }
-                                return true
-                            }
-                        )
-
-                        // Copy result to output
-                        outResultPtr.pointee.width = Int32(genResult.width)
-                        outResultPtr.pointee.height = Int32(genResult.height)
-                        outResultPtr.pointee.seed_used = genResult.seedUsed
-                        outResultPtr.pointee.safety_triggered = genResult.safetyTriggered ? RAC_TRUE : RAC_FALSE
-
-                        if let imageData = genResult.imageData {
-                            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: imageData.count)
-                            imageData.copyBytes(to: buffer, count: imageData.count)
-                            outResultPtr.pointee.image_data = buffer
-                            outResultPtr.pointee.image_size = imageData.count
-                        }
-
-                        result = RAC_SUCCESS
-                    } catch {
-                        Platform.logger.error("Diffusion generate_with_progress failed: \(error)")
-                        result = RAC_ERROR_INTERNAL
-                    }
-                    group.leave()
-                }
-
-                group.wait()
-                return result
-            }
-
-            callbacks.cancel = { _, _ -> rac_result_t in
-                guard #available(iOS 16.2, macOS 13.1, *) else {
-                    return RAC_SUCCESS
-                }
-
-                if let service = Platform.diffusionService as? DiffusionPlatformService {
-                    Task {
-                        await service.cancel()
-                    }
-                }
-                return RAC_SUCCESS
-            }
-
-            callbacks.destroy = { _, _ in
-                guard #available(iOS 16.2, macOS 13.1, *) else {
-                    return
-                }
-
-                if let service = Platform.diffusionService as? DiffusionPlatformService {
-                    Task {
-                        await service.unload()
-                    }
-                }
-                Platform.diffusionService = nil
-                Platform.logger.debug("CoreML Diffusion service destroyed")
-            }
-
-            callbacks.user_data = nil
-
-            let result = rac_platform_diffusion_set_callbacks(&callbacks)
-            if result == RAC_SUCCESS {
-                logger.debug("Diffusion callbacks registered")
-            } else {
-                logger.error("Failed to register Diffusion callbacks: \(result)")
-            }
-        }
-
-        // MARK: - Service Access
-
-        /// Get the cached Foundation Models service (if created)
-        @available(iOS 26.0, macOS 26.0, *)
-        public static func getFoundationModelsService() -> SystemFoundationModelsService? {
-            return foundationModelsService as? SystemFoundationModelsService
-        }
-
-        /// Get the cached System TTS service (if created)
-        public static func getSystemTTSService() -> SystemTTSService? {
-            return systemTTSService
-        }
-
-        /// Get the cached Diffusion service (if created)
-        @available(iOS 16.2, macOS 13.1, *)
-        public static func getDiffusionService() -> DiffusionPlatformService? {
-            return diffusionService as? DiffusionPlatformService
-        }
-
-        /// Check if CoreML Diffusion is available on this platform
-        public static var isDiffusionAvailable: Bool {
-            if #available(iOS 16.2, macOS 13.1, *) {
-                return true
-            }
-            return false
+    func complete(_ handle: rac_handle_t?) -> rac_handle_t? {
+        state.withLock { current in
+            guard !current.timedOut else { return handle }
+            current.handle = handle
+            return nil
         }
     }
 
-    // swiftlint:enable type_body_length
+    func markTimedOut() -> rac_handle_t? {
+        state.withLock { current in
+            current.timedOut = true
+            let handle = current.handle
+            current.handle = nil
+            return handle
+        }
+    }
 }

@@ -1,46 +1,28 @@
 /**
  * @runanywhere/web-onnx
  *
- * ONNX backend for the RunAnywhere Web SDK.
- * Provides on-device STT (speech-to-text), TTS (text-to-speech),
- * and VAD (voice activity detection) via sherpa-onnx compiled to WASM.
+ * ONNX/Sherpa speech backend for the RunAnywhere Web SDK. Loads the
+ * dedicated `racommons-onnx-sherpa.{js,wasm}` artifact and registers the
+ * ONNX runtime + Sherpa speech vtables with the C++ plugin registry so
+ * STT/TTS/VAD inference flows through `RunAnywhere.transcribe`,
+ * `RunAnywhere.synthesize`, and `RunAnywhere.detectVoiceActivity`
+ * end-to-end.
+ *
+ * Calling `ONNX.register()`:
+ *   1. Loads the `racommons-onnx-sherpa.wasm` Emscripten module from
+ *      `packages/onnx/wasm/`.
+ *   2. Calls `_rac_backend_onnx_register()` and
+ *      `_rac_backend_sherpa_register()` so STT/TTS/VAD operations route
+ *      through the proto-byte adapters in `@runanywhere/web` core.
+ *
+ * # Public surface
+ *
+ * The package root intentionally exposes ONLY the registration facade
+ * (`ONNX`, `autoRegister`) and its option types. The `SherpaONNXBridge`
+ * singleton is an internal implementation detail.
  *
  * @packageDocumentation
- *
- * @example
- * ```typescript
- * import { RunAnywhere } from '@runanywhere/web';
- * import { ONNX } from '@runanywhere/web-onnx';
- *
- * await RunAnywhere.initialize();
- * await ONNX.register();
- *
- * // Now STT, TTS, VAD are available
- * const result = await STT.transcribe(audioData);
- * ```
  */
 
-// Module facade & provider
 export { ONNX, autoRegister } from './ONNX';
 export type { ONNXRegisterOptions } from './ONNX';
-export { ONNXProvider } from './ONNXProvider';
-
-// Extensions (backend-specific implementations + backend-specific config types)
-export { STT, STTModelType } from './Extensions/RunAnywhere+STT';
-export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles } from './Extensions/RunAnywhere+STT';
-export { TTS } from './Extensions/RunAnywhere+TTS';
-export type { TTSVoiceConfig } from './Extensions/RunAnywhere+TTS';
-export { VAD } from './Extensions/RunAnywhere+VAD';
-export type { VADModelConfig } from './Extensions/RunAnywhere+VAD';
-
-// Backward-compatible re-exports of shared contract types
-export type {
-  STTTranscriptionResult, STTWord, STTTranscribeOptions,
-  STTStreamCallback, STTStreamingSession,
-  TTSSynthesisResult, TTSSynthesizeOptions,
-  SpeechActivityCallback, SpeechSegment,
-} from '@runanywhere/web';
-export { SpeechActivity } from '@runanywhere/web';
-
-// Foundation
-export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';

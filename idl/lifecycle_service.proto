@@ -1,0 +1,49 @@
+// RunAnywhere IDL — model lifecycle service.
+//
+// Formalizes the C ABI in
+// sdk/runanywhere-commons/include/rac/core/rac_model_lifecycle.h as a
+// gRPC-style service definition. Request/result messages already exist in
+// model_types.proto (load/unload/current) and sdk_events.proto (component
+// lifecycle snapshot). This file imports them and exposes the
+// LifecycleService surface so SDK code generators can emit a single
+// canonical client stub for load/unload/current/snapshot.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "model_types.proto";
+import "sdk_events.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LifecycleServiceProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// Logical model-lifecycle service contract. Mirrors the C ABI entry points
+// rac_model_lifecycle_load_proto, rac_model_lifecycle_unload_proto,
+// rac_model_lifecycle_current_model_proto, and
+// rac_component_lifecycle_snapshot_proto. Platform adapters remain
+// responsible for native filesystem permissions, sandbox/bookmark/SAF
+// handles, and OS-level process lifecycle; this service carries only the
+// portable load/unload/current/snapshot contracts owned by C++.
+service Lifecycle {
+    // Load a registered model. Mirrors rac_model_lifecycle_load_proto.
+    rpc Load(ModelLoadRequest) returns (ModelLoadResult);
+
+    // Unload one or all models. Mirrors rac_model_lifecycle_unload_proto.
+    rpc Unload(ModelUnloadRequest) returns (ModelUnloadResult);
+
+    // Query the currently loaded model for a component/framework. Mirrors
+    // rac_model_lifecycle_current_model_proto.
+    rpc Current(CurrentModelRequest) returns (CurrentModelResult);
+
+    // Snapshot the lifecycle state of one or more SDKComponent values.
+    // Mirrors rac_component_lifecycle_snapshot_proto.
+    rpc Snapshot(ComponentLifecycleSnapshotRequest)
+        returns (ComponentLifecycleSnapshotResult);
+}

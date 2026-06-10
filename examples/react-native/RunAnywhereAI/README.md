@@ -25,37 +25,60 @@
 
 ---
 
-## 🚀 Running This App (Local Development)
+## Running This App (Local Development)
 
-> **Important:** This sample app consumes the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/) as local workspace dependencies. Before opening this project, you must first build the SDK's native libraries.
+> **Important:** This sample app consumes the [RunAnywhere React Native SDK](../../../sdk/runanywhere-react-native/) through local `file:` packages. A clean clone needs JavaScript dependencies, generated Nitro/React Native codegen output, CocoaPods, and locally staged native binaries before both platforms are reproducible.
 
-### First-Time Setup
+### Clean-Clone Bring-Up
+
+Prerequisites:
+
+- Node.js 18+ and Corepack-enabled Yarn 3 (`corepack enable`; this project uses `nodeLinker: node-modules`).
+- Xcode 15+ with iOS simulator runtimes and command line tools selected.
+- CocoaPods (`pod --version` should succeed).
+- Android Studio with Android SDK 24+, build tools, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+- JDK 17 and enough local disk for native build output plus downloaded AI models.
+
+From a fresh checkout:
 
 ```bash
-# 1. Navigate to the React Native SDK directory
-cd runanywhere-sdks/sdk/runanywhere-react-native
+cd examples/react-native/RunAnywhereAI
+corepack enable
+yarn install --ignore-scripts
 
-# 2. Run the setup script (~15-20 minutes on first run)
-#    This builds the native C++ frameworks/libraries and enables local mode
-./scripts/build-react-native.sh --setup
+# Refresh local file: packages after dependency or package layout changes.
+yarn install --ignore-scripts --force
 
-# 3. Navigate to this sample app
-cd ../../examples/react-native/RunAnywhereAI
+# Build or refresh local SDK native artifacts when the checkout has no staged binaries.
+cd ../../..
+./scripts/build/build-core-android.sh arm64-v8a
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+cd examples/react-native/RunAnywhereAI
 
-# 4. Install dependencies
-npm install
+# Generate React Native/Nitro iOS codegen through the locked Bundler/CocoaPods graph.
+# scripts/pod-install.sh runs `bundle install` if needed, then `bundle exec pod install`.
+yarn pod-install
 
-# 5. For iOS: Install pods
-cd ios && pod install && cd ..
+# Android build gate.
+cd android && ./gradlew :app:assembleDebug && cd ..
 
-# 6a. Run on iOS
-npx react-native run-ios
-
-# 6b. Or run on Android
-npx react-native run-android
-
-# Or open in VS Code / Cursor and run from there
+# iOS build gate.
+xcodebuild \
+  -project ios/RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  build
 ```
+
+Notes:
+
+- The default install command intentionally uses `--ignore-scripts` so `patch-package` postinstall hooks do not hide clean-clone issues. If you need to apply local patches, run `yarn postinstall` after inspecting them.
+- Local iOS XCFrameworks are staged by `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` into the Swift SDK and synced into the React Native packages. Missing `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, or `RABackendSherpa.xcframework` usually means the root native artifact step has not run.
+- Generated Nitro and React Native codegen files are produced during `pod install`; remove stale `ios/build/generated` output if schema changes are not reflected.
+- If formatting tools disagree after a dependency refresh, use the existing workaround: run `yarn format:fix` from this sample and review the diff before committing.
+- `scripts/verify.sh` runs the reproducible build gates; set `RUN_IOS=1` to include the optional iOS build.
 
 ### How It Works
 
@@ -66,23 +89,31 @@ This Sample App → Local RN SDK packages (sdk/runanywhere-react-native/packages
                           ↓
               Local XCFrameworks/JNI libs (in each package's ios/ and android/ directories)
                           ↑
-           Built by: ./scripts/build-react-native.sh --setup
+        Staged by: sdk/runanywhere-react-native/scripts/package-sdk.sh --natives-from PATH
 ```
 
-The `build-react-native.sh --setup` script:
-1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
-2. Builds the native C++ libraries from `runanywhere-commons`
-3. Copies XCFrameworks to `packages/*/ios/Binaries/` and `packages/*/ios/Frameworks/`
-4. Copies JNI `.so` files to `packages/*/android/src/main/jniLibs/`
-5. Creates `.testlocal` marker files (enables local library consumption)
+`scripts/package-sdk.sh --natives-from PATH`:
+1. Stages prebuilt natives from the owning layer (`runanywhere-commons`) into each RN package: `packages/core` gets `RACommons`, `packages/llamacpp` gets `RABackendLLAMACPP`, `packages/onnx` gets `RABackendONNX` + `RABackendSherpa`.
+2. Copies XCFrameworks to `packages/*/ios/Binaries/`.
+3. Copies JNI `.so` files into `packages/*/android/src/main/jniLibs/<abi>/`.
+4. Type-checks each package and produces `dist/sdk-rn/*.tgz` with matching `.sha256` files.
+
+`yarn native:local` writes the `.testlocal` marker files that enable local library consumption (use `yarn native:remote` to revert).
+
+If you do not need to rebuild commons from source, run the per-package download helpers (`yarn core:download-ios`, `yarn core:download-android`, etc.) from `sdk/runanywhere-react-native/` to pull prebuilt natives from a GitHub release directly.
 
 ### After Modifying the SDK
 
 - **TypeScript SDK code changes**: Metro bundler picks them up automatically (Fast Refresh)
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
+  # Rebuild natives in the owning layer
+  ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS
+  ./scripts/build/build-core-android.sh       # Android
+
+  # Re-stage them into the RN packages
   cd sdk/runanywhere-react-native
-  ./scripts/build-react-native.sh --local --rebuild-commons
+  ./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
   ```
 
 ---
@@ -120,11 +151,12 @@ This sample app demonstrates the full power of the RunAnywhere React Native SDK:
 | **AI Chat** | Interactive LLM conversations with streaming responses | `RunAnywhere.generateStream()` |
 | **Conversation Management** | Create, switch, and delete chat conversations | `ConversationStore` |
 | **Real-time Analytics** | Token speed, generation time, inference metrics | Message analytics display |
-| **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.transcribeFile()` |
+| **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.transcribe()` |
 | **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.synthesize()` |
 | **Voice Assistant** | Full STT → LLM → TTS pipeline | Voice pipeline orchestration |
 | **Model Management** | Download, load, and manage multiple AI models | `RunAnywhere.downloadModel()` |
 | **Storage Management** | View storage usage and delete models | `RunAnywhere.getStorageInfo()` |
+| **Validation Harness** | Deterministic evidence for structured output, tool calls, VAD, LoRA, and PluginLoader | `RunAnywhere.extractStructuredOutput()`, `RunAnywhere.executeTool()`, `RunAnywhere.detectVoiceActivity()`, `RunAnywhere.lora.*`, `RunAnywhere.pluginLoader.*` |
 | **Offline Support** | All features work without internet | On-device inference |
 | **Cross-Platform** | Single codebase for iOS and Android | React Native + Nitrogen/Nitro |
 
@@ -192,6 +224,7 @@ RunAnywhereAI/
 │   │   ├── STTScreen.tsx             # Speech-to-text with batch/live modes
 │   │   ├── TTSScreen.tsx             # Text-to-speech synthesis & playback
 │   │   ├── VoiceAssistantScreen.tsx  # Full STT → LLM → TTS pipeline
+│   │   ├── ValidationHarnessScreen.tsx # Deterministic validation evidence
 │   │   └── SettingsScreen.tsx        # Model & storage management
 │   │
 │   ├── components/
@@ -209,7 +242,7 @@ RunAnywhereAI/
 │   │       └── index.ts
 │   │
 │   ├── navigation/
-│   │   └── TabNavigator.tsx          # Bottom tab navigation (5 tabs)
+│   │   └── TabNavigator.tsx          # Bottom tab navigation
 │   │
 │   ├── stores/
 │   │   └── conversationStore.ts      # Zustand store for chat persistence
@@ -270,8 +303,8 @@ cd runanywhere-sdks/examples/react-native/RunAnywhereAI
 # Install JavaScript dependencies
 npm install
 
-# Install iOS dependencies
-cd ios && pod install && cd ..
+# Install iOS dependencies (bootstraps locked Bundler gemset, then runs pod install)
+yarn pod-install
 ```
 
 ### Run on iOS
@@ -316,81 +349,125 @@ npx react-native run-android --mode release
 The SDK is initialized in `App.tsx` with a two-phase initialization pattern:
 
 ```typescript
-import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  SDKEnvironment,
+} from '@runanywhere/core';
+import {
+  ModelCategory,
+  InferenceFramework,
+  ModelArtifactType,
+  CurrentModelRequest,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
 import { LlamaCPP } from '@runanywhere/llamacpp';
-import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
+import { ONNX } from '@runanywhere/onnx';
 
 // Phase 1: Initialize SDK
 await RunAnywhere.initialize({
   apiKey: '',  // Empty in development mode
   baseURL: 'https://api.runanywhere.ai',
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
-// Phase 2: Register backends and models
-LlamaCPP.register();
-await LlamaCPP.addModel({
-  id: 'smollm2-360m-q8_0',
-  name: 'SmolLM2 360M Q8_0',
-  url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/...',
-  memoryRequirement: 500_000_000,
-});
+// Phase 2: Register optional backends and proto-described models. Both
+// `LlamaCPP.register()` and `ONNX.register()` return `Promise<boolean>` and
+// must be awaited before registering models against them; a `false` result
+// means the native backend was not installed and dependent models should be
+// skipped.
+const llamaRegistered = await LlamaCPP.register();
+if (llamaRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'smollm2-360m-q8_0',
+    name: 'SmolLM2 360M Q8_0',
+    url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/...',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    memoryRequirement: 500_000_000,
+  });
+}
 
-ONNX.register();
-await ONNX.addModel({
-  id: 'sherpa-onnx-whisper-tiny.en',
-  name: 'Sherpa Whisper Tiny (ONNX)',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/...',
-  modality: ModelCategory.SpeechRecognition,
-  artifactType: ModelArtifactType.TarGzArchive,
-  memoryRequirement: 75_000_000,
-});
+const onnxRegistered = await ONNX.register();
+if (onnxRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'sherpa-onnx-whisper-tiny.en',
+    name: 'Sherpa Whisper Tiny (ONNX)',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/...',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    memoryRequirement: 75_000_000,
+  });
+}
 ```
 
 ### Download & Load a Model
 
 ```typescript
-// Download with progress tracking
-await RunAnywhere.downloadModel(modelId, (progress) => {
+// Download with progress tracking (AsyncIterable — Hermes-safe iterator loop)
+const downloadIter = RunAnywhere.downloadModel(modelId)[Symbol.asyncIterator]();
+let downloadResult = await downloadIter.next();
+while (!downloadResult.done) {
+  const progress = downloadResult.value;
   console.log(`Download: ${(progress.progress * 100).toFixed(1)}%`);
-});
+  downloadResult = await downloadIter.next();
+}
 
-// Load LLM model into memory
-const success = await RunAnywhere.loadModel(modelPath);
+// Load LLM model into memory (proto request, matches iOS Swift)
+const loadResult = await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId,
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+}));
+if (!loadResult.success) {
+  throw new Error(loadResult.errorMessage || 'Model load failed');
+}
 
 // Check if model is loaded
-const isLoaded = await RunAnywhere.isModelLoaded();
+const current = await RunAnywhere.currentModel(CurrentModelRequest.fromPartial({
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+  includeModelMetadata: false,
+}));
+const isLoaded = current.found && current.modelId.length > 0;
 ```
 
 ### Stream Text Generation
 
 ```typescript
-// Generate with streaming
-const streamResult = await RunAnywhere.generateStream(prompt, {
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+
+// Generate with streaming (proto-canonical: AsyncIterable<LLMStreamEvent>)
+const options = LLMGenerationOptions.fromPartial({
   maxTokens: 1000,
   temperature: 0.7,
+  streamingEnabled: true,
 });
+const stream = RunAnywhere.generateStream(prompt, options);
 
+// Hermes constraint: `for await...of` does not work with NitroModules
+// custom async iterables — use manual iterator.next() loops.
 let fullResponse = '';
-for await (const token of streamResult.stream) {
-  fullResponse += token;
-  // Update UI in real-time
-  updateMessage(fullResponse);
+const iterator = stream[Symbol.asyncIterator]();
+let result = await iterator.next();
+while (!result.done) {
+  const event = result.value;
+  if (event.token) {
+    fullResponse += event.token;
+    updateMessage(fullResponse);
+  }
+  if (event.isFinal) break;
+  result = await iterator.next();
 }
-
-// Get final metrics
-const result = await streamResult.result;
-console.log(`Speed: ${result.tokensPerSecond} tok/s`);
-console.log(`Latency: ${result.latencyMs}ms`);
 ```
 
 ### Non-Streaming Generation
 
 ```typescript
-const result = await RunAnywhere.generate(prompt, {
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+
+const options = LLMGenerationOptions.fromPartial({
   maxTokens: 256,
   temperature: 0.7,
 });
+const result = await RunAnywhere.generate(prompt, options);
 
 console.log('Response:', result.text);
 console.log('Tokens:', result.tokensUsed);
@@ -400,15 +477,20 @@ console.log('Model:', result.modelUsed);
 ### Speech-to-Text
 
 ```typescript
-// Load STT model
-await RunAnywhere.loadSTTModel(modelPath, 'whisper');
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 
-// Check if loaded
-const isLoaded = await RunAnywhere.isSTTModelLoaded();
+// Load STT model by id (proto request, matches iOS Swift)
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId,
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+}));
 
-// Transcribe audio file
-const result = await RunAnywhere.transcribeFile(audioPath, {
-  language: 'en',
+// Transcribe audio bytes or base64 captured by the platform recorder
+const result = await RunAnywhere.transcribe(audioBase64, {
+  language: STTLanguage.STT_LANGUAGE_EN,
+  audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
+  sampleRate: 16000,
 });
 
 console.log('Transcription:', result.text);
@@ -418,24 +500,36 @@ console.log('Confidence:', result.confidence);
 ### Text-to-Speech
 
 ```typescript
-// Load TTS voice model
-await RunAnywhere.loadTTSModel(modelPath, 'piper');
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
-// Synthesize speech
+// Load TTS voice model by id
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId,
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+}));
+
+// Synthesize speech (proto-canonical TTSOptions)
 const result = await RunAnywhere.synthesize(text, {
   voice: 'default',
-  rate: 1.0,
+  languageCode: '',
+  speakingRate: 1.0,
   pitch: 1.0,
   volume: 1.0,
+  enableSsml: false,
+  audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
 });
 
-// result.audio contains base64-encoded float32 PCM
-// result.sampleRate, result.numSamples, result.duration
+// result.audioData (Uint8Array of float32 PCM bytes)
+// result.sampleRate, result.durationMs
 ```
 
 ### Voice Pipeline (STT → LLM → TTS)
 
 ```typescript
+import RNFS from 'react-native-fs';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
+
 // 1. Record audio using AudioService
 const audioPath = await AudioService.startRecording();
 
@@ -443,7 +537,12 @@ const audioPath = await AudioService.startRecording();
 const { uri } = await AudioService.stopRecording();
 
 // 3. Transcribe
-const sttResult = await RunAnywhere.transcribeFile(uri, { language: 'en' });
+const audioBase64 = await RNFS.readFile(uri, 'base64');
+const sttResult = await RunAnywhere.transcribe(audioBase64, {
+  language: STTLanguage.STT_LANGUAGE_EN,
+  audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
+  sampleRate: 16000,
+});
 
 // 4. Generate LLM response
 const llmResult = await RunAnywhere.generate(sttResult.text, {
@@ -460,21 +559,27 @@ const ttsResult = await RunAnywhere.synthesize(llmResult.text);
 ### Model Management
 
 ```typescript
+import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
+
 // Get available models
-const models = await RunAnywhere.getAvailableModels();
-const downloaded = await RunAnywhere.getDownloadedModels();
+const models = await RunAnywhere.listModels();
+const downloaded = await RunAnywhere.downloadedModels();
 
 // Get storage info
 const storage = await RunAnywhere.getStorageInfo();
-console.log('Used:', storage.usedSpace);
-console.log('Free:', storage.freeSpace);
-console.log('Models:', storage.modelsSize);
+console.log('Free:', storage.device?.freeBytes ?? 0);
+console.log('Models:', storage.totalModelsBytes);
 
-// Delete a model
-await RunAnywhere.deleteModel(modelId);
+// Delete a model through the canonical storage bridge
+await RunAnywhere.deleteStorage(StorageDeleteRequest.fromPartial({
+  modelIds: [modelId],
+  deleteFiles: true,
+  clearRegistryPaths: true,
+  unloadIfLoaded: true,
+  allowPlatformDelete: true,
+}));
 
-// Clear cache
-await RunAnywhere.clearCache();
+// Clear temporary storage through the V2 storage-plan bridge when available
 await RunAnywhere.cleanTempFiles();
 ```
 
@@ -492,10 +597,10 @@ await RunAnywhere.cleanTempFiles();
 - Model status banner showing loaded model
 
 **Key SDK APIs:**
-- `RunAnywhere.generateStream()` — Streaming generation
-- `RunAnywhere.loadModel()` — Load LLM model
-- `RunAnywhere.isModelLoaded()` — Check model status
-- `RunAnywhere.getAvailableModels()` — List models
+- `RunAnywhere.generateStream(prompt, LLMGenerationOptions)` — Streaming generation
+- `RunAnywhere.loadModel(ModelLoadRequest)` — Load LLM model
+- `RunAnywhere.currentModel(CurrentModelRequest)` — Check model status
+- `RunAnywhere.listModels()` — List models
 
 ### 2. Speech-to-Text Screen (`STTScreen.tsx`)
 
@@ -507,9 +612,9 @@ await RunAnywhere.cleanTempFiles();
 - Microphone permission handling
 
 **Key SDK APIs:**
-- `RunAnywhere.loadSTTModel()` — Load Whisper model
-- `RunAnywhere.isSTTModelLoaded()` — Check STT model status
-- `RunAnywhere.transcribeFile()` — Transcribe audio file
+- `RunAnywhere.loadModel(ModelLoadRequest)` — Load Whisper model
+- `RunAnywhere.currentModel(CurrentModelRequest)` — Check STT model status
+- `RunAnywhere.transcribe()` — Transcribe audio bytes/base64
 - Native audio recording via `AudioService`
 
 ### 3. Text-to-Speech Screen (`TTSScreen.tsx`)
@@ -522,8 +627,8 @@ await RunAnywhere.cleanTempFiles();
 - WAV file generation from float32 PCM
 
 **Key SDK APIs:**
-- `RunAnywhere.loadTTSModel()` — Load TTS model
-- `RunAnywhere.isTTSModelLoaded()` — Check TTS model status
+- `RunAnywhere.loadModel(ModelLoadRequest)` — Load TTS model
+- `RunAnywhere.currentModel(CurrentModelRequest)` — Check TTS model status
 - `RunAnywhere.synthesize()` — Generate speech audio
 - Native audio playback via `NativeAudioModule` (iOS)
 
@@ -551,12 +656,29 @@ await RunAnywhere.cleanTempFiles();
 - SDK version and backend information
 
 **Key SDK APIs:**
-- `RunAnywhere.getAvailableModels()` — List all models
-- `RunAnywhere.getDownloadedModels()` — List downloaded models
+- `RunAnywhere.listModels()` — List all models
+- `RunAnywhere.downloadedModels()` — List downloaded models
 - `RunAnywhere.downloadModel()` — Download with progress
-- `RunAnywhere.deleteModel()` — Remove model
+- `RunAnywhere.deleteStorage(StorageDeleteRequest)` — Remove model files and registry paths
 - `RunAnywhere.getStorageInfo()` — Storage metrics
-- `RunAnywhere.clearCache()` — Clear temporary files
+- V2 storage-plan bridge — Temporary storage cleanup
+
+### 6. Validation Harness Screen (`ValidationHarnessScreen.tsx`)
+
+**What it demonstrates:**
+- Deterministic structured-output parse and model-backed generation entrypoints
+- Deterministic `get_device_label` tool registration and execution
+- Standalone VAD evidence with synthetic silence and tone fixtures
+- LoRA list, compatibility, apply, and remove calls with a fixed fixture config
+- PluginLoader snapshot and expected-error coverage
+- Artifact-friendly action capture through `[RN_VALIDATION_ACTION]` Metro JSONL
+
+**Key SDK APIs:**
+- `RunAnywhere.extractStructuredOutput()` / `RunAnywhere.generateStructured()`
+- `RunAnywhere.registerTool()` / `RunAnywhere.executeTool()`
+- `RunAnywhere.detectVoiceActivity()`
+- `RunAnywhere.lora.list()` / `checkCompatibility()` / `apply()` / `remove()`
+- `RunAnywhere.pluginLoader.apiVersion` / `registeredNames()` / `listLoaded()` / `load()`
 
 ---
 
@@ -721,9 +843,9 @@ See [CONTRIBUTING.md](../../../CONTRIBUTING.md) for guidelines.
 git clone https://github.com/YOUR_USERNAME/runanywhere-sdks.git
 cd runanywhere-sdks/examples/react-native/RunAnywhereAI
 
-# Install dependencies
+# Install dependencies (yarn pod-install bootstraps Bundler then runs pod install)
 npm install
-cd ios && pod install && cd ..
+yarn pod-install
 
 # Create feature branch
 git checkout -b feature/your-feature

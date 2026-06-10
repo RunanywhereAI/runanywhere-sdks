@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
@@ -8,7 +9,7 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
-/// ModelStatusBanner (mirroring iOS ModelStatusBanner)
+/// ModelStatusBanner
 ///
 /// A banner that shows the current model status (framework + model name) or prompts to select a model.
 class ModelStatusBanner extends StatelessWidget {
@@ -146,15 +147,15 @@ class ModelStatusBanner extends StatelessWidget {
 
   IconData _frameworkIcon(LLMFramework framework) {
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return Icons.memory;
-      case LLMFramework.whisperKit:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return Icons.graphic_eq;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return Icons.developer_board;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Icons.apple;
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return Icons.volume_up;
       default:
         return Icons.view_in_ar;
@@ -163,15 +164,15 @@ class ModelStatusBanner extends StatelessWidget {
 
   Color _frameworkColor(LLMFramework framework) {
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return AppColors.primaryBlue;
-      case LLMFramework.whisperKit:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return AppColors.primaryGreen;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return AppColors.primaryPurple;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.black;
-      case LLMFramework.systemTTS:
+      case LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
         return AppColors.primaryOrange;
       default:
         return AppColors.statusGray;
@@ -179,7 +180,7 @@ class ModelStatusBanner extends StatelessWidget {
   }
 }
 
-/// ModelRequiredOverlay (mirroring iOS ModelRequiredOverlay)
+/// ModelRequiredOverlay
 ///
 /// An overlay that covers the screen when no model is selected, prompting the user to select one.
 class ModelRequiredOverlay extends StatelessWidget {
@@ -282,9 +283,15 @@ class ModelRequiredOverlay extends StatelessWidget {
       case ModelSelectionContext.llm:
         return 'Select a language model to start chatting. Choose from LLaMA.cpp, Foundation Models, or other frameworks.';
       case ModelSelectionContext.stt:
-        return 'Select a speech recognition model to transcribe audio. Choose from WhisperKit or ONNX Runtime.';
+        return 'Select a speech recognition model to transcribe audio. Choose from Sherpa-ONNX or ONNX Runtime.';
       case ModelSelectionContext.tts:
-        return 'Select a text-to-speech model to generate audio. Choose from Piper TTS or System TTS.';
+        // System TTS is Apple-only — the commons `platform` engine plugin
+        // is gated behind `if(APPLE AND RAC_BUILD_PLATFORM)`. Tailor the
+        // helper text accordingly so Android users aren't pointed at an
+        // unsupported option.
+        return (Platform.isIOS || Platform.isMacOS)
+            ? 'Select a text-to-speech model to generate audio. Choose from Piper TTS or System TTS.'
+            : 'Select a text-to-speech model to generate audio. Choose from Piper TTS.';
       case ModelSelectionContext.voice:
         return 'Voice assistant requires multiple models. Let\'s set them up together.';
       case ModelSelectionContext.vlm:
@@ -297,7 +304,7 @@ class ModelRequiredOverlay extends StatelessWidget {
   }
 }
 
-/// AudioLevelIndicator (mirroring iOS audio level visualization)
+/// AudioLevelIndicator
 ///
 /// A 10-bar audio level visualization.
 class AudioLevelIndicator extends StatelessWidget {
@@ -332,7 +339,7 @@ class AudioLevelIndicator extends StatelessWidget {
   }
 }
 
-/// RecordingStatusBadge (mirroring iOS status badges)
+/// RecordingStatusBadge
 ///
 /// A badge showing recording or transcribing status.
 class RecordingStatusBadge extends StatelessWidget {
@@ -409,7 +416,7 @@ class RecordingStatusBadge extends StatelessWidget {
   }
 }
 
-/// TypingIndicatorView (mirroring iOS TypingIndicatorView)
+/// TypingIndicatorView
 ///
 /// Professional typing indicator with animated dots.
 class TypingIndicatorView extends StatefulWidget {
@@ -512,7 +519,7 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
   }
 }
 
-/// CompactModelIndicator (mirroring iOS CompactModelIndicator)
+/// CompactModelIndicator
 ///
 /// A compact indicator showing current model status for use in navigation bars/headers.
 class CompactModelIndicator extends StatelessWidget {
@@ -596,13 +603,13 @@ class CompactModelIndicator extends StatelessWidget {
 
   Color _frameworkColor(LLMFramework framework) {
     switch (framework) {
-      case LLMFramework.llamaCpp:
+      case LLMFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
         return AppColors.primaryBlue;
-      case LLMFramework.whisperKit:
+      case LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN:
         return AppColors.statusGreen;
-      case LLMFramework.onnxRuntime:
+      case LLMFramework.INFERENCE_FRAMEWORK_ONNX:
         return AppColors.primaryPurple;
-      case LLMFramework.foundationModels:
+      case LLMFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
         return Colors.black;
       default:
         return AppColors.statusGray;
@@ -610,7 +617,7 @@ class CompactModelIndicator extends StatelessWidget {
   }
 }
 
-/// VoicePipelineSetupView (mirroring iOS VoicePipelineSetupView)
+/// VoicePipelineSetupView
 ///
 /// A setup view specifically for Voice Assistant which requires 3 models.
 class VoicePipelineSetupView extends StatelessWidget {
@@ -618,9 +625,9 @@ class VoicePipelineSetupView extends StatelessWidget {
   final (LLMFramework, String)? llmModel;
   final (LLMFramework, String)? ttsModel;
 
-  final AppModelLoadState sttLoadState;
-  final AppModelLoadState llmLoadState;
-  final AppModelLoadState ttsLoadState;
+  final UiModelLoadState sttLoadState;
+  final UiModelLoadState llmLoadState;
+  final UiModelLoadState ttsLoadState;
 
   final VoidCallback onSelectSTT;
   final VoidCallback onSelectLLM;
@@ -645,9 +652,9 @@ class VoicePipelineSetupView extends StatelessWidget {
       sttModel != null && llmModel != null && ttsModel != null;
 
   bool get allModelsLoaded =>
-      sttLoadState == AppModelLoadState.loaded &&
-      llmLoadState == AppModelLoadState.loaded &&
-      ttsLoadState == AppModelLoadState.loaded;
+      sttLoadState == UiModelLoadState.loaded &&
+      llmLoadState == UiModelLoadState.loaded &&
+      ttsLoadState == UiModelLoadState.loaded;
 
   @override
   Widget build(BuildContext context) {
@@ -782,7 +789,7 @@ class ModelSetupCard extends StatelessWidget {
   final Color color;
   final LLMFramework? selectedFramework;
   final String? selectedModel;
-  final AppModelLoadState loadState;
+  final UiModelLoadState loadState;
   final VoidCallback onSelect;
 
   const ModelSetupCard({
@@ -799,8 +806,8 @@ class ModelSetupCard extends StatelessWidget {
   });
 
   bool get isConfigured => selectedFramework != null && selectedModel != null;
-  bool get isLoaded => loadState == AppModelLoadState.loaded;
-  bool get isLoading => loadState == AppModelLoadState.loading;
+  bool get isLoaded => loadState == UiModelLoadState.loaded;
+  bool get isLoading => loadState == UiModelLoadState.loading;
 
   @override
   Widget build(BuildContext context) {

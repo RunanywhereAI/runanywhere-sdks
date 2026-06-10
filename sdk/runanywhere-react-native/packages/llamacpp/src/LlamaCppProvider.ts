@@ -1,52 +1,44 @@
 /**
  * @runanywhere/llamacpp - LlamaCPP Provider
  *
- * LlamaCPP module registration for React Native SDK.
- * Thin wrapper that triggers C++ backend registration.
+ * Internal LlamaCPP module registration for React Native SDK.
+ * Thin wrapper that triggers C++ backend registration behind the LlamaCPP facade.
  *
  * Reference: sdk/runanywhere-swift/Sources/LlamaCPPRuntime/LlamaCPP.swift
  */
 
 import { requireNativeLlamaModule, isNativeLlamaModuleAvailable } from './native/NativeRunAnywhereLlama';
-import { SDKLogger } from '@runanywhere/core';
+import { SDKLogger } from '@runanywhere/core/internal';
 
 // SDKLogger instance for this module
 const log = new SDKLogger('LLM.LlamaCppProvider');
-const vlmLog = new SDKLogger('VLM.LlamaCppProvider');
 
 /**
- * LlamaCPP Module
+ * Internal LlamaCPP provider implementation.
  *
- * Provides LLM capabilities using llama.cpp with GGUF models.
- * The actual service is provided by the C++ backend.
+ * Registers the llama.cpp backend provider; the single C++ registration call
+ * covers both LLM and VLM modalities. Core owns public model lifecycle and
+ * inference surfaces.
  *
- * ## Registration
- *
- * ```typescript
- * import { LlamaCppProvider } from '@runanywhere/llamacpp';
- *
- * // Register the backend
- * await LlamaCppProvider.register();
- * ```
+ * @internal
  */
 export class LlamaCppProvider {
   static readonly moduleId = 'llamacpp';
   static readonly moduleName = 'LlamaCPP';
   static readonly version = '2.0.0';
 
-  private static isRegistered = false;
-  private static isVLMRegistered = false;
+  private static registered = false;
 
   /**
    * Register LlamaCPP backend with the C++ service registry.
    * Calls rac_backend_llamacpp_register() to register the
-   * LlamaCPP service provider with the C++ commons layer.
-   * Also registers the VLM backend (matching iOS SDK pattern).
+   * LlamaCPP service provider with the C++ commons layer; the single call
+   * covers both LLM and VLM modalities.
    * Safe to call multiple times - subsequent calls are no-ops.
    * @returns Promise<boolean> true if registered successfully
    */
   static async register(): Promise<boolean> {
-    if (this.isRegistered) {
+    if (this.registered) {
       log.debug('LlamaCPP already registered, returning');
       return true;
     }
@@ -63,11 +55,8 @@ export class LlamaCppProvider {
       // Call the native registration method from the Llama module
       const success = await native.registerBackend();
       if (success) {
-        this.isRegistered = true;
-        log.info('LlamaCPP backend registered successfully');
-
-        // Register VLM backend (matches iOS: LlamaCPP.register() also registers VLM)
-        await this.registerVLM();
+        this.registered = true;
+        log.info('LlamaCPP backend registered successfully (covers LLM and VLM)');
       }
       return success;
     } catch (error) {
@@ -78,67 +67,25 @@ export class LlamaCppProvider {
   }
 
   /**
-   * Register VLM (Vision Language Model) backend.
-   * Called automatically by register() to match iOS SDK pattern.
-   * Matches iOS: LlamaCPP.registerVLM()
-   */
-  private static async registerVLM(): Promise<void> {
-    if (this.isVLMRegistered) {
-      return;
-    }
-
-    if (!isNativeLlamaModuleAvailable()) {
-      return;
-    }
-
-    vlmLog.info('Registering LlamaCPP VLM backend...');
-
-    try {
-      const native = requireNativeLlamaModule();
-      const success = await native.registerVLMBackend();
-      if (success) {
-        this.isVLMRegistered = true;
-        vlmLog.info('LlamaCPP VLM backend registered successfully');
-      } else {
-        vlmLog.warning('LlamaCPP VLM registration returned false (VLM features may not be available)');
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      vlmLog.warning(`LlamaCPP VLM registration failed: ${msg} (VLM features may not be available)`);
-    }
-  }
-
-  /**
    * Unregister the LlamaCPP backend from C++ registry.
-   * Also unregisters the VLM backend (matching iOS SDK pattern).
+   * The single unregistration call covers both LLM and VLM modalities.
    * @returns Promise<boolean> true if unregistered successfully
    */
   static async unregister(): Promise<boolean> {
+    if (!this.registered) {
+      return true;
+    }
+
     if (!isNativeLlamaModuleAvailable()) {
       return false;
     }
 
     const native = requireNativeLlamaModule();
 
-    // Unregister VLM first (matches iOS: unregister VLM before LLM)
-    if (this.isVLMRegistered) {
-      try {
-        await native.unloadVLMModel();
-        this.isVLMRegistered = false;
-        vlmLog.info('LlamaCPP VLM backend unregistered');
-      } catch (error) {
-        vlmLog.error(`LlamaCPP VLM unregistration failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-
-    if (!this.isRegistered) {
-      return true;
-    }
-
     try {
       const success = await native.unregisterBackend();
       if (success) {
-        this.isRegistered = false;
+        this.registered = false;
         log.debug('LlamaCPP backend unregistered');
       }
       return success;
@@ -149,22 +96,21 @@ export class LlamaCppProvider {
   }
 
   /**
-   * Check if LlamaCPP can handle a given model
+   * Check native registration state. Falls back to JS state if the native
+   * object cannot be created.
    */
-  static canHandle(modelId: string | null | undefined): boolean {
-    if (!modelId) {
+  static async isRegistered(): Promise<boolean> {
+    if (!isNativeLlamaModuleAvailable()) {
       return false;
     }
-    const lowercased = modelId.toLowerCase();
-    return lowercased.includes('gguf') || lowercased.endsWith('.gguf');
-  }
-}
 
-/**
- * Auto-register when module is imported
- */
-export function autoRegister(): void {
-  LlamaCppProvider.register().catch(() => {
-    // Silently handle registration failure during auto-registration
-  });
+    try {
+      const native = requireNativeLlamaModule();
+      const registered = await native.isBackendRegistered();
+      this.registered = registered;
+      return registered;
+    } catch {
+      return this.registered;
+    }
+  }
 }

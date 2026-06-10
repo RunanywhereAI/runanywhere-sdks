@@ -1,0 +1,46 @@
+name: Legacy file blocklist
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - feat/v2-architecture
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-files-blocklist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if removed legacy files reappear
+        shell: bash
+        run: |
+          set -euo pipefail
+          blocked=(
+            "sdk/runanywhere-react-native/packages/core/src/Features/VoiceSession/VoiceSessionHandle.ts"
+            "sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+VoiceSession.ts"
+            "sdk/runanywhere-react-native/scripts/build-react-native.sh"
+            "sdk/runanywhere-web/scripts/build-web.sh"
+          )
+          # T1.4 (PR #494): sdk/runanywhere-web/.../RunAnywhere+VoiceAgent.ts was
+          # erroneously on this blocklist - it is the canonical v2 VoiceAgent
+          # facade actively used by the web SDK (8+ call sites in Public/RunAnywhere.ts).
+          # The web SDK uses a flat Extensions/ layout and there is no
+          # Extensions/VoiceAgent/ subfolder counterpart. Re-add only after the
+          # web SDK is migrated to per-capability subfolders.
+
+          found=0
+          for path in "${blocked[@]}"; do
+            if [[ -e "$path" ]]; then
+              echo "Blocked legacy file reintroduced: $path"
+              found=1
+            fi
+          done
+
+          if [[ "$found" -ne 0 ]]; then
+            exit 1
+          fi

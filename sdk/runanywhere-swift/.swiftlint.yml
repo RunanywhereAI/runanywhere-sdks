@@ -76,6 +76,7 @@ excluded:
   - .build
   - DerivedData
   - Package.swift
+  - Sources/RunAnywhere/Generated
 
 # Configure individual rules
 line_length:

@@ -6,46 +6,43 @@ import os
 /// ViewModel for Voice Activity Detection functionality
 /// Manages microphone capture, VAD model loading, and real-time speech detection
 @MainActor
-class VADViewModel: ObservableObject {
-    private let logger = Logger(subsystem: "com.runanywhere", category: "VAD")
+class VADViewModel: VoiceComponentViewModelBase {
     private let audioCapture = AudioCaptureManager()
-    private var cancellables = Set<AnyCancellable>()
+
+    // MARK: - Component Identity
+
+    override var component: RASDKComponent { .vad }
+    override var eventCategory: RAEventCategory { .vad }
+    override var modelCategory: RAModelCategory { .voiceActivityDetection }
 
     // MARK: - Published Properties (UI State)
 
-    @Published var selectedFramework: InferenceFramework?
-    @Published var selectedModelName: String?
-    @Published var selectedModelId: String?
     @Published var isListening = false
     @Published var isProcessing = false
     @Published var isSpeechDetected = false
     @Published var audioLevel: Float = 0.0
-    @Published var errorMessage: String?
 
     /// Log of speech activity events with timestamps
     @Published var activityLog: [SpeechActivityLogEntry] = []
 
     // MARK: - Private Properties
 
-    private var audioBuffer = Data()
+    /// Mic chunks are fed straight into the SDK's `streamVAD` session; the
+    /// SDK owns model framing — no app-side buffer math.
+    private var vadAudioContinuation: AsyncStream<Data>.Continuation?
     private var detectionTask: Task<Void, Never>?
-    private var isInitialized = false
     private var hasSubscribedToAudioLevel = false
-    private var hasSubscribedToSDKEvents = false
 
     // MARK: - Initialization
 
     init() {
+        super.init(loggerCategory: "VAD")
         logger.debug("VADViewModel initialized")
     }
 
     /// Initialize the ViewModel - request permissions and setup subscriptions
     func initialize() async {
-        guard !isInitialized else {
-            logger.debug("VAD view model already initialized, skipping")
-            return
-        }
-        isInitialized = true
+        guard beginInitialization() else { return }
 
         logger.info("Initializing VAD view model")
 
@@ -70,22 +67,9 @@ class VADViewModel: ObservableObject {
     // MARK: - Model Management
 
     /// Load model from ModelSelectionSheet selection
-    func loadModelFromSelection(_ model: ModelInfo) async {
-        logger.info("Loading VAD model from selection: \(model.name)")
+    func loadModelFromSelection(_ model: RAModelInfo) async {
         isProcessing = true
-        errorMessage = nil
-
-        do {
-            try await RunAnywhere.loadVADModel(model.id)
-            selectedFramework = model.framework
-            selectedModelName = model.name.modelNameFromID()
-            selectedModelId = model.id
-            logger.info("VAD model loaded successfully: \(model.name)")
-        } catch {
-            logger.error("Failed to load VAD model: \(error.localizedDescription)")
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
-        }
-
+        await loadModel(from: model)
         isProcessing = false
     }
 
@@ -130,53 +114,18 @@ class VADViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func subscribeToSDKEvents() {
-        guard !hasSubscribedToSDKEvents else {
-            logger.debug("Already subscribed to SDK events, skipping")
-            return
-        }
-        hasSubscribedToSDKEvents = true
+    // MARK: - SDK Event Handling
 
-        RunAnywhere.events.events
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                Task { @MainActor in
-                    self?.handleSDKEvent(event)
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        // VAD events may arrive as "voice" or "model" category
-        // Filter by event type prefix instead
-        switch event.type {
-        case "vad_model_load_completed":
-            let modelId = event.properties["model_id"] ?? ""
-            selectedModelId = modelId
-            if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
-                selectedModelName = matchingModel.name
-                selectedFramework = matchingModel.framework
-            } else {
-                selectedModelName = modelId.modelNameFromID()
-            }
-            logger.info("VAD model loaded: \(modelId)")
-        case "vad_model_unloaded":
-            selectedModelId = nil
-            selectedModelName = nil
-            selectedFramework = nil
-            logger.info("VAD model unloaded")
-        default:
-            break
-        }
-    }
-
-    private func checkInitialModelState() async {
-        if let model = await RunAnywhere.currentVADModel {
-            selectedModelId = model.id
-            selectedModelName = model.name.modelNameFromID()
+    /// VAD resolves the display name from the model catalog when available,
+    /// falling back to the id-derived name.
+    override func applyLoadedModel(_ model: RAModelInfo) {
+        selectedModelId = model.id
+        if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == model.id }) {
+            selectedModelName = matchingModel.name
+            selectedFramework = matchingModel.framework
+        } else {
+            selectedModelName = model.id.modelNameFromID()
             selectedFramework = model.framework
-            logger.info("VAD model already loaded: \(model.name)")
         }
     }
 
@@ -185,7 +134,6 @@ class VADViewModel: ObservableObject {
     private func startListening() async {
         logger.info("Starting VAD listening")
         errorMessage = nil
-        audioBuffer = Data()
         isSpeechDetected = false
 
         guard selectedModelId != nil else {
@@ -193,92 +141,72 @@ class VADViewModel: ObservableObject {
             return
         }
 
-        // Initialize VAD if needed
-        do {
-            if await !RunAnywhere.isVADReady {
-                try await RunAnywhere.initializeVAD()
-            }
-        } catch {
-            logger.error("Failed to initialize VAD: \(error.localizedDescription)")
-            errorMessage = "VAD initialization failed: \(error.localizedDescription)"
-            return
-        }
+        startDetectionStream()
 
         do {
-            try await audioCapture.startRecording { [weak self] audioData in
-                Task { @MainActor in
-                    self?.audioBuffer.append(audioData)
-                }
+            try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] audioData in
+                guard let self else { return }
+                // SDK expects Float32 PCM; framing is handled natively.
+                self.vadAudioContinuation?.yield(RunAnywhere.pcm16ToFloat32(audioData))
             }
 
             isListening = true
-            startDetectionLoop()
             logger.info("VAD listening started")
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
             errorMessage = "Failed to start recording: \(error.localizedDescription)"
+            stopDetectionStream()
         }
     }
 
     private func stopListening() async {
         logger.info("Stopping VAD listening")
 
-        detectionTask?.cancel()
-        detectionTask = nil
-
         audioCapture.stopRecording()
+        stopDetectionStream()
 
         isListening = false
         isSpeechDetected = false
         audioLevel = 0.0
     }
 
-    /// Continuously process audio chunks through the VAD model
-    private func startDetectionLoop() {
+    /// Consume the SDK's streaming VAD session: one `RAVADResult` per mic
+    /// chunk, with speech-state transitions logged for the activity list.
+    private func startDetectionStream() {
+        let (stream, continuation) = AsyncStream<Data>.makeStream()
+        vadAudioContinuation = continuation
+
         detectionTask = Task { [weak self] in
             var wasSpeechActive = false
 
-            while !Task.isCancelled {
-                guard let self = self, self.isListening else { break }
+            for await result in RunAnywhere.streamVAD(audio: stream) {
+                guard let self, !Task.isCancelled else { break }
 
-                // Process audio buffer if we have enough data (512 samples at 16kHz = 32ms)
-                let bufferData = self.audioBuffer
-                if bufferData.count >= 1024 { // 512 Int16 samples = 1024 bytes
-                    self.audioBuffer = Data() // Clear buffer
-
-                    // Convert Int16 PCM to Float32
-                    let samples = self.convertInt16ToFloat(bufferData)
-
-                    do {
-                        let speechDetected = try await RunAnywhere.detectSpeech(in: samples)
-
-                        self.isSpeechDetected = speechDetected
-
-                        // Log state transitions
-                        if speechDetected && !wasSpeechActive {
-                            self.addLogEntry(.speechStarted)
-                            wasSpeechActive = true
-                        } else if !speechDetected && wasSpeechActive {
-                            self.addLogEntry(.speechEnded)
-                            wasSpeechActive = false
-                        }
-                    } catch {
-                        self.logger.error("VAD processing error: \(error.localizedDescription)")
-                    }
+                if !result.errorMessage.isEmpty {
+                    self.logger.error("VAD processing error: \(result.errorMessage)")
+                    continue
                 }
 
-                try? await Task.sleep(nanoseconds: 30_000_000) // 30ms
+                let speechDetected = result.isSpeech
+                self.isSpeechDetected = speechDetected
+
+                // Log state transitions
+                if speechDetected && !wasSpeechActive {
+                    self.addLogEntry(.speechStarted)
+                    wasSpeechActive = true
+                } else if !speechDetected && wasSpeechActive {
+                    self.addLogEntry(.speechEnded)
+                    wasSpeechActive = false
+                }
             }
         }
     }
 
-    /// Convert Int16 PCM data to Float32 samples
-    private func convertInt16ToFloat(_ data: Data) -> [Float] {
-        let int16Count = data.count / MemoryLayout<Int16>.size
-        return data.withUnsafeBytes { rawBuffer in
-            let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
-            return (0..<int16Count).map { Float(int16Buffer[$0]) / 32768.0 }
-        }
+    private func stopDetectionStream() {
+        vadAudioContinuation?.finish()
+        vadAudioContinuation = nil
+        detectionTask?.cancel()
+        detectionTask = nil
     }
 
     private func addLogEntry(_ type: SpeechActivityLogEntry.ActivityType) {
@@ -295,12 +223,9 @@ class VADViewModel: ObservableObject {
 
     func cleanup() {
         audioCapture.stopRecording()
-        detectionTask?.cancel()
-        detectionTask = nil
-        cancellables.removeAll()
-        isInitialized = false
+        stopDetectionStream()
         hasSubscribedToAudioLevel = false
-        hasSubscribedToSDKEvents = false
+        cleanupBase()
     }
 }
 

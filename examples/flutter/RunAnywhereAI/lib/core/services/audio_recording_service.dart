@@ -147,6 +147,53 @@ class AudioRecordingService {
     }
   }
 
+  /// Start a raw PCM16 chunk stream (no file). Used by live streaming STT —
+  /// chunks are fed straight into the SDK's streaming transcription session.
+  Future<Stream<Uint8List>?> startStreaming({
+    int sampleRate = 16000,
+    int numChannels = 1,
+  }) async {
+    if (_isRecording) {
+      await stopRecording();
+    }
+    final hasPermission = await _recorder.hasPermission();
+    if (!hasPermission) {
+      debugPrint('❌ Microphone permission not granted');
+      return null;
+    }
+    try {
+      final stream = await _recorder.startStream(RecordConfig(
+        encoder: AudioEncoder.pcm16bits,
+        sampleRate: sampleRate,
+        numChannels: numChannels,
+      ));
+      _isRecording = true;
+      _currentRecordingPath = null;
+      _startAudioLevelMonitoring();
+      debugPrint('🎙️ PCM chunk streaming started');
+      return stream;
+    } catch (e) {
+      debugPrint('❌ Failed to start chunk streaming: $e');
+      _isRecording = false;
+      return null;
+    }
+  }
+
+  /// Stop a chunk stream started with [startStreaming]. Closing the recorder
+  /// ends the chunk stream, which lets the SDK session flush its final result.
+  Future<void> stopStreaming() async {
+    if (!_isRecording) {
+      return;
+    }
+    _stopAudioLevelMonitoring();
+    try {
+      await _recorder.stop();
+    } catch (e) {
+      debugPrint('❌ Failed to stop chunk streaming: $e');
+    }
+    _isRecording = false;
+  }
+
   /// Cancel current recording without returning data
   Future<void> cancelRecording() async {
     if (!_isRecording) {

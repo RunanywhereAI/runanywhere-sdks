@@ -15,13 +15,12 @@ JavaVM* g_javaVM = nullptr;
 // PlatformAdapterBridge class and methods for secure storage (used by InitBridge.cpp)
 // NOT static - needs to be accessible from InitBridge.cpp
 jclass g_platformAdapterBridgeClass = nullptr;
-jclass g_httpResponseClass = nullptr;  // Inner class for httpPostSync response
 jmethodID g_secureSetMethod = nullptr;
 jmethodID g_secureGetMethod = nullptr;
 jmethodID g_secureDeleteMethod = nullptr;
 jmethodID g_secureExistsMethod = nullptr;
 jmethodID g_getPersistentDeviceUUIDMethod = nullptr;
-jmethodID g_httpPostSyncMethod = nullptr;
+jmethodID g_getModelBaseDirectoryMethod = nullptr;
 jmethodID g_getDeviceModelMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
 jmethodID g_getChipNameMethod = nullptr;
@@ -33,11 +32,11 @@ jmethodID g_getGPUFamilyMethod = nullptr;
 jmethodID g_isTabletMethod = nullptr;
 jmethodID g_httpDownloadMethod = nullptr;
 jmethodID g_httpDownloadCancelMethod = nullptr;
-// HttpResponse field IDs
-jfieldID g_httpResponse_successField = nullptr;
-jfieldID g_httpResponse_statusCodeField = nullptr;
-jfieldID g_httpResponse_responseBodyField = nullptr;
-jfieldID g_httpResponse_errorMessageField = nullptr;
+// Directory enumeration slots: cached so InitBridge.cpp can populate
+// rac_platform_adapter_t::file_list_directory
+// and rac_platform_adapter_t::is_non_empty_directory.
+jmethodID g_fileListDirectoryMethod = nullptr;
+jmethodID g_isNonEmptyDirectoryMethod = nullptr;
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
   g_javaVM = vm;
@@ -57,7 +56,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_secureDeleteMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
       g_secureExistsMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureExists", "(Ljava/lang/String;)Z");
       g_getPersistentDeviceUUIDMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
-      g_httpPostSyncMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpPostSync", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse;");
+      g_getModelBaseDirectoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getModelBaseDirectory", "()Ljava/lang/String;");
       g_getDeviceModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceModel", "()Ljava/lang/String;");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
       g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
@@ -69,8 +68,27 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_isTabletMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "isTablet", "()Z");
       g_httpDownloadMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownload", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)I");
       g_httpDownloadCancelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
+      // Best-effort directory enumeration lookups. If the host app's Kotlin
+      // bridge predates these methods, GetStaticMethodID returns NULL and the
+      // platform adapter falls through to its existing NULL-callback branches
+      // (commons emits the documented warning string instead).
+      g_fileListDirectoryMethod = env->GetStaticMethodID(
+          g_platformAdapterBridgeClass,
+          "fileListDirectory",
+          "(Ljava/lang/String;)[Lcom/margelo/nitro/runanywhere/PlatformAdapterBridge$RacDirectoryEntry;");
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_fileListDirectoryMethod = nullptr;
+      }
+      g_isNonEmptyDirectoryMethod = env->GetStaticMethodID(
+          g_platformAdapterBridgeClass, "isNonEmptyDirectory", "(Ljava/lang/String;)Z");
+      if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        g_isNonEmptyDirectoryMethod = nullptr;
+      }
 
       if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod &&
+          g_getModelBaseDirectoryMethod &&
           g_getDeviceModelMethod && g_getOSVersionMethod && g_getChipNameMethod &&
           g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod &&
           g_getArchitectureMethod && g_getGPUFamilyMethod && g_isTabletMethod &&
@@ -82,35 +100,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
           env->ExceptionClear();
         }
       }
-
-      // Cache HttpResponse inner class and its fields
-      jclass responseClass = env->FindClass("com/margelo/nitro/runanywhere/PlatformAdapterBridge$HttpResponse");
-      if (responseClass != nullptr) {
-        g_httpResponseClass = (jclass)env->NewGlobalRef(responseClass);
-        env->DeleteLocalRef(responseClass);
-
-        g_httpResponse_successField = env->GetFieldID(g_httpResponseClass, "success", "Z");
-        g_httpResponse_statusCodeField = env->GetFieldID(g_httpResponseClass, "statusCode", "I");
-        g_httpResponse_responseBodyField = env->GetFieldID(g_httpResponseClass, "responseBody", "Ljava/lang/String;");
-        g_httpResponse_errorMessageField = env->GetFieldID(g_httpResponseClass, "errorMessage", "Ljava/lang/String;");
-
-        if (g_httpResponse_successField && g_httpResponse_statusCodeField) {
-          LOGI("HttpResponse class and fields cached successfully");
-        } else {
-          LOGE("Failed to cache HttpResponse fields");
-        }
-      } else {
-        LOGE("Failed to find HttpResponse inner class at JNI_OnLoad");
-        if (env->ExceptionCheck()) {
-          env->ExceptionClear();
-        }
-      }
     } else {
       LOGE("Failed to find PlatformAdapterBridge class at JNI_OnLoad");
       if (env->ExceptionCheck()) {
         env->ExceptionClear();
       }
     }
+
   }
 
   return margelo::nitro::runanywhere::initialize(vm);

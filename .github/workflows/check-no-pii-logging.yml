@@ -1,0 +1,24 @@
+name: No PII logging
+
+# pass2-syn-117 / security-privacy-storage-network-003 regression guard.
+# Fails if a commit reintroduces an Android logcat / RAC_LOG_INFO call that
+# emits a signed URL alongside an active-download destination path.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - feat/v2-architecture
+
+jobs:
+  check-no-pii-logging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run PII-logging regression guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/validation/commons/check_no_pii_logging.sh

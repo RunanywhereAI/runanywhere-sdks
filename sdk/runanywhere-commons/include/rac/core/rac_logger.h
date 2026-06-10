@@ -233,13 +233,6 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
 // struct construction, and vsnprintf formatting for filtered messages.
 // rac_logger_get_min_level() is an atomic read (no mutex).
 
-#define RAC_LOG_TRACE(category, ...)                                       \
-    do {                                                                   \
-        if (RAC_LOG_TRACE >= rac_logger_get_min_level()) {                 \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
-            rac_logger_logf(RAC_LOG_TRACE, category, &_meta, __VA_ARGS__); \
-        }                                                                  \
-    } while (0)
 
 #define RAC_LOG_DEBUG(category, ...)                                       \
     do {                                                                   \
@@ -273,13 +266,6 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
         }                                                                  \
     } while (0)
 
-#define RAC_LOG_FATAL(category, ...)                                       \
-    do {                                                                   \
-        if (RAC_LOG_FATAL >= rac_logger_get_min_level()) {                 \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
-            rac_logger_logf(RAC_LOG_FATAL, category, &_meta, __VA_ARGS__); \
-        }                                                                  \
-    } while (0)
 
 // --- Error logging with code ---
 
@@ -310,174 +296,28 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
     } while (0)
 
 // =============================================================================
-// LEGACY COMPATIBILITY (maps to new logging system)
+// METADATA REDACTION POLICY
 // =============================================================================
 
 /**
- * Legacy log_info macro - maps to RAC_LOG_INFO.
- * @deprecated Use RAC_LOG_INFO instead.
+ * @brief Returns true (1) if a log metadata key should be redacted.
+ *
+ * Match policy: case-insensitive substring match against the canonical
+ * sensitive-substring list ("key", "secret", "password", "token", "auth",
+ * "credential"). Centralizes the policy across C++ and platform logs so
+ * Swift's SDKLogger and the C++ logger remain in sync.
+ *
+ * @param key      Null-terminated metadata key. Must not be NULL.
+ * @param out      Output flag (RAC_TRUE if key should be redacted, RAC_FALSE
+ *                 otherwise). Must not be NULL.
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if either argument
+ *         is NULL.
  */
-#define log_info(category, ...) RAC_LOG_INFO(category, __VA_ARGS__)
-
-/**
- * Legacy log_debug macro - maps to RAC_LOG_DEBUG.
- * @deprecated Use RAC_LOG_DEBUG instead.
- */
-#define log_debug(category, ...) RAC_LOG_DEBUG(category, __VA_ARGS__)
-
-/**
- * Legacy log_warning macro - maps to RAC_LOG_WARNING.
- * @deprecated Use RAC_LOG_WARNING instead.
- */
-#define log_warning(category, ...) RAC_LOG_WARNING(category, __VA_ARGS__)
-
-/**
- * Legacy log_error macro - maps to RAC_LOG_ERROR.
- * @deprecated Use RAC_LOG_ERROR instead.
- */
-#define log_error(category, ...) RAC_LOG_ERROR(category, __VA_ARGS__)
+RAC_API rac_result_t rac_log_metadata_should_redact(const char* key, rac_bool_t* out);
 
 #ifdef __cplusplus
 }
 #endif
 
-// =============================================================================
-// C++ CONVENIENCE CLASS
-// =============================================================================
-
-#ifdef __cplusplus
-
-#include <sstream>
-#include <string>
-
-namespace rac {
-
-/**
- * @brief C++ Logger class for convenient logging with RAII.
- *
- * Usage:
- *   rac::Logger log("STT.ONNX");
- *   log.info("Model loaded: %s", model_id);
- *   log.error("Failed with code %d", error_code);
- */
-class Logger {
-   public:
-    explicit Logger(const char* category) : category_(category) {}
-    explicit Logger(const std::string& category) : category_(category) {}
-
-    void trace(const char* format, ...) const {
-        if (RAC_LOG_TRACE < rac_logger_get_min_level())
-            return;
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_TRACE, category_.c_str(), nullptr, format, args);
-        va_end(args);
-    }
-
-    void debug(const char* format, ...) const {
-        if (RAC_LOG_DEBUG < rac_logger_get_min_level())
-            return;
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_DEBUG, category_.c_str(), nullptr, format, args);
-        va_end(args);
-    }
-
-    void info(const char* format, ...) const {
-        if (RAC_LOG_INFO < rac_logger_get_min_level())
-            return;
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_INFO, category_.c_str(), nullptr, format, args);
-        va_end(args);
-    }
-
-    void warning(const char* format, ...) const {
-        if (RAC_LOG_WARNING < rac_logger_get_min_level())
-            return;
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_WARNING, category_.c_str(), nullptr, format, args);
-        va_end(args);
-    }
-
-    void error(const char* format, ...) const {
-        if (RAC_LOG_ERROR < rac_logger_get_min_level())
-            return;
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_ERROR, category_.c_str(), nullptr, format, args);
-        va_end(args);
-    }
-
-    void error(int32_t code, const char* format, ...) const {
-        if (RAC_LOG_ERROR < rac_logger_get_min_level())
-            return;
-        rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
-        meta.error_code = code;
-
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_ERROR, category_.c_str(), &meta, format, args);
-        va_end(args);
-    }
-
-    void fatal(const char* format, ...) const {
-        // Fatal is always logged — no early exit
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_FATAL, category_.c_str(), nullptr, format, args);
-        va_end(args);
-    }
-
-    // Log with model context
-    void modelInfo(const char* model_id, const char* framework, const char* format, ...) const {
-        if (RAC_LOG_INFO < rac_logger_get_min_level())
-            return;
-        rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
-        meta.model_id = model_id;
-        meta.framework = framework;
-
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_INFO, category_.c_str(), &meta, format, args);
-        va_end(args);
-    }
-
-    void modelError(const char* model_id, const char* framework, int32_t code, const char* format,
-                    ...) const {
-        if (RAC_LOG_ERROR < rac_logger_get_min_level())
-            return;
-        rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
-        meta.model_id = model_id;
-        meta.framework = framework;
-        meta.error_code = code;
-
-        va_list args;
-        va_start(args, format);
-        rac_logger_logv(RAC_LOG_ERROR, category_.c_str(), &meta, format, args);
-        va_end(args);
-    }
-
-   private:
-    std::string category_;
-};
-
-// Predefined loggers for common categories
-namespace log {
-inline Logger llm("LLM");
-inline Logger stt("STT");
-inline Logger tts("TTS");
-inline Logger vad("VAD");
-inline Logger onnx("ONNX");
-inline Logger llamacpp("LlamaCpp");
-inline Logger download("Download");
-inline Logger models("Models");
-inline Logger core("Core");
-}  // namespace log
-
-}  // namespace rac
-
-#endif  // __cplusplus
 
 #endif /* RAC_LOGGER_H */

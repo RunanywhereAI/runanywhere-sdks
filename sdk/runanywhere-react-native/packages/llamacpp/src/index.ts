@@ -1,33 +1,40 @@
 /**
  * @runanywhere/llamacpp - LlamaCPP Backend for RunAnywhere React Native SDK
  *
- * This package provides the LlamaCPP backend for on-device LLM inference.
- * It supports GGUF models and provides the same API as the iOS SDK.
+ * This package registers the LlamaCPP native providers. Public model
+ * lifecycle, generation, VLM, structured-output, and LoRA APIs live in
+ * @runanywhere/core.
  *
  * ## Usage
  *
  * ```typescript
- * import { RunAnywhere, LLMFramework } from '@runanywhere/core';
+ * import { RunAnywhere } from '@runanywhere/core';
+ * import { InferenceFramework, ModelCategory } from '@runanywhere/proto-ts/model_types';
+ * import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
  * import { LlamaCPP } from '@runanywhere/llamacpp';
  *
  * // Initialize core SDK
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
- * // Register LlamaCPP backend
- * LlamaCPP.register();
+ * // Register LlamaCPP backend providers
+ * await LlamaCPP.register();
  *
  * // Register models via RunAnywhere (matching iOS pattern)
  * await RunAnywhere.registerModel({
  *   id: 'smollm2-360m-q8_0',
  *   name: 'SmolLM2 360M Q8_0',
  *   url: 'https://huggingface.co/.../SmolLM2-360M.Q8_0.gguf',
- *   framework: LLMFramework.LlamaCpp,
+ *   framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
  *   memoryRequirement: 500_000_000
  * });
  *
  * // Download and use
- * await RunAnywhere.downloadModel('smollm2-360m-q8_0');
- * await RunAnywhere.loadModel('smollm2-360m-q8_0');
+ * const download = RunAnywhere.downloadModel('smollm2-360m-q8_0')[Symbol.asyncIterator]();
+ * while (!(await download.next()).done) {}
+ * await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+ *   modelId: 'smollm2-360m-q8_0',
+ *   category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+ * }));
  * const result = await RunAnywhere.generate('Hello, world!');
  * ```
  *
@@ -39,35 +46,6 @@
 // =============================================================================
 
 export { LlamaCPP } from './LlamaCPP';
-export { LlamaCppProvider, autoRegister } from './LlamaCppProvider';
-
-// =============================================================================
-// Native Module
-// =============================================================================
-
-export {
-  NativeRunAnywhereLlama,
-  getNativeLlamaModule,
-  requireNativeLlamaModule,
-  isNativeLlamaModuleAvailable,
-} from './native/NativeRunAnywhereLlama';
-export type { NativeRunAnywhereLlamaModule } from './native/NativeRunAnywhereLlama';
-
-// =============================================================================
-// VLM API
-// =============================================================================
-
-export {
-  registerVLMBackend,
-  loadVLMModel,
-  isVLMModelLoaded,
-  unloadVLMModel,
-  describeImage,
-  askAboutImage,
-  processImage,
-  processImageStream,
-  cancelVLMGeneration,
-} from './RunAnywhere+VLM';
 
 // =============================================================================
 // Nitrogen Spec Types

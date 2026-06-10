@@ -62,6 +62,8 @@ declare module 'react-native-fs' {
       totalSpace: number;
       freeSpace: number;
     }>;
+    // Type declaration only. Core runtime must not call the RNFS network downloader;
+    // model downloads are handled by native C++ rac_http_download_execute.
     downloadFile(options: {
       fromUrl: string;
       toFile: string;
@@ -127,6 +129,8 @@ declare module 'rn-fetch-blob' {
       appendExt?: string;
       timeout?: number;
     }): {
+      // Type declaration only. Core runtime must not call RNFetchBlob.fetch;
+      // HTTP transport is native C++ via rac_http_client_* / rac_http_download_execute.
       fetch(
         method: string,
         url: string,

@@ -4,6 +4,13 @@
  *
  * Type definitions for wake word detection feature.
  * Follows the same patterns as VAD, STT, TTS, LLM types.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Wake-word does not yet have a generated proto service contract; the
+ * SDK-facing facades were removed during the V2 migration. These C
+ * structs/enums are kept for engine plugins (e.g., openWakeWord ONNX)
+ * and the voice-agent integration. Do NOT re-introduce a public SDK
+ * facade until a runanywhere.v1.* wake-word service exists.
  */
 
 #ifndef RAC_WAKEWORD_TYPES_H
@@ -160,7 +167,7 @@ typedef struct rac_wakeword_info {
  * for the duration of the callback.
  *
  * @param event Detection event (valid only during callback)
- * @param user_data User context passed to rac_wakeword_set_callback
+ * @param user_data User context set alongside the callback function
  */
 typedef void (*rac_wakeword_callback_fn)(const rac_wakeword_event_t* event, void* user_data);
 

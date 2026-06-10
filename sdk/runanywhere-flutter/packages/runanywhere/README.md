@@ -11,9 +11,9 @@ Privacy-first, on-device AI SDK for Flutter. Run LLMs, Speech-to-Text, Text-to-S
 
 ```yaml
 dependencies:
-  runanywhere: ^0.15.9
-  runanywhere_onnx: ^0.15.9      # STT, TTS, VAD
-  runanywhere_llamacpp: ^0.15.9  # LLM text generation
+  runanywhere: ^0.19.13
+  runanywhere_onnx: ^0.19.13      # STT, TTS, VAD
+  runanywhere_llamacpp: ^0.19.13  # LLM text generation
 ```
 
 **Step 2:** Configure platforms (see below).
@@ -29,8 +29,8 @@ After adding the packages, you **must** update your iOS Podfile for the SDK to w
 Make these **two critical changes**:
 
 ```ruby
-# Change 1: Set minimum iOS version to 14.0
-platform :ios, '14.0'
+# Change 1: Set minimum iOS version to 15.1
+platform :ios, '15.1'
 
 # ... (keep existing flutter_root function and setup) ...
 
@@ -45,7 +45,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
       # Required for microphone permission (STT/Voice features)
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
@@ -107,16 +107,18 @@ void main() async {
 ### Text Generation (LLM)
 
 ```dart
-final stream = RunAnywhere.generateStream('Tell me a joke');
-await for (final token in stream) {
-  print(token);
+final stream = RunAnywhere.llm
+    .generateStream('Tell me a joke', LLMGenerationOptions(maxTokens: 128));
+await for (final event in stream) {
+  if (event.isFinal) break;
+  if (event.token.isNotEmpty) print(event.token);
 }
 ```
 
 ### Speech-to-Text
 
 ```dart
-final result = await RunAnywhere.transcribe(audioData);
+final result = await RunAnywhere.stt.transcribe(audioData);
 print(result.text);
 ```
 
@@ -126,7 +128,7 @@ print(result.text);
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 14.0+           |
+| iOS      | 15.1+           |
 | Android  | API 24+         |
 
 ## Documentation

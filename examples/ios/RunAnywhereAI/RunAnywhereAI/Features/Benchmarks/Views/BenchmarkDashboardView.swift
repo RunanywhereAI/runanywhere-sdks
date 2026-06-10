@@ -203,7 +203,7 @@ struct BenchmarkDashboardView: View {
         }
         .navigationTitle("Benchmarks")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayModeCompat(.inline)
         #endif
         .toolbar {
             if !viewModel.pastRuns.isEmpty {
@@ -277,8 +277,6 @@ private struct CategoryScenariosRow: View {
             return "Short text, Medium text — measures audio duration, char throughput"
         case .vlm:
             return "Gradient image (224×224) — measures tok/s, completion tokens"
-        case .diffusion:
-            return "Simple prompt, 10 steps, seed 42 — measures generation time"
         }
     }
 }
@@ -314,7 +312,7 @@ private struct CategoryChip: View {
 // MARK: - Model Selection Row
 
 private struct ModelSelectionRow: View {
-    let model: ModelInfo
+    let model: RAModelInfo
     let isSelected: Bool
     let onTap: () -> Void
 

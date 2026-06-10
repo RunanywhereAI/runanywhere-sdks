@@ -63,26 +63,28 @@ RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
 
 ### Register & Load Models
 
-The starter app uses these specific model IDs and URLs:
+The starter app uses these specific model IDs and URLs. Loading is done
+through the canonical proto-backed lifecycle service (`loadModel`); the
+removed v1 helpers (`loadLLMModel` / `loadSTTModel` / `loadTTSVoice`) no
+longer exist.
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.loadLLMModel
-import com.runanywhere.sdk.public.extensions.loadSTTModel
-import com.runanywhere.sdk.public.extensions.loadTTSVoice
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
-import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.types.RAInferenceFramework
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 
 // LLM Model - SmolLM2 360M (small, fast, good for demos)
 RunAnywhere.registerModel(
     id = "smollm2-360m-instruct-q8_0",
     name = "SmolLM2 360M Instruct Q8_0",
     url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf",
-    framework = InferenceFramework.LLAMA_CPP,
-    modality = ModelCategory.LANGUAGE,
-    memoryRequirement = 400_000_000 // ~400MB
+    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    memoryRequirement = 400_000_000, // ~400MB
 )
 
 // STT Model - Whisper Tiny English (fast transcription)
@@ -90,8 +92,8 @@ RunAnywhere.registerModel(
     id = "sherpa-onnx-whisper-tiny.en",
     name = "Sherpa Whisper Tiny (ONNX)",
     url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
-    framework = InferenceFramework.ONNX,
-    modality = ModelCategory.SPEECH_RECOGNITION
+    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    modality = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
 )
 
 // TTS Model - Piper TTS (US English - Medium quality)
@@ -99,8 +101,8 @@ RunAnywhere.registerModel(
     id = "vits-piper-en_US-lessac-medium",
     name = "Piper TTS (US English - Medium)",
     url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
-    framework = InferenceFramework.ONNX,
-    modality = ModelCategory.SPEECH_SYNTHESIS
+    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    modality = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
 )
 
 // Download model (returns Flow<DownloadProgress>)
@@ -110,50 +112,76 @@ RunAnywhere.downloadModel("smollm2-360m-instruct-q8_0")
         println("Download: ${(progress.progress * 100).toInt()}%")
     }
 
-// Load model
-RunAnywhere.loadLLMModel("smollm2-360m-instruct-q8_0")
+// Load through the proto-backed lifecycle service.
+val loadResult = RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "smollm2-360m-instruct-q8_0",
+        category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ),
+)
+require(loadResult.success) { "load failed: ${loadResult.error_message}" }
 ```
 
 ### Text Generation (LLM)
 
 ```kotlin
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.chat
+import com.runanywhere.sdk.public.extensions.generate
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 
-// Simple chat - returns String directly
-val response = RunAnywhere.chat("What is AI?")
-println(response)
+// Canonical generation API: returns RALLMGenerationResult with text +
+// metrics. There is no longer a separate `chat()` helper.
+val result = RunAnywhere.generate(
+    prompt = "What is AI?",
+    options = RALLMGenerationOptions(max_tokens = 64),
+)
+println(result.text)
 ```
 
 ### Speech-to-Text (STT)
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RASTTOptions
 
-// Load STT model
-RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+// Load STT model through the canonical lifecycle service.
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "sherpa-onnx-whisper-tiny.en",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ),
+)
 
-// Transcribe audio (16kHz, mono, 16-bit PCM ByteArray)
-val transcription = RunAnywhere.transcribe(audioData)
-println("You said: $transcription")
+// Transcribe audio (16kHz, mono, 16-bit PCM ByteArray).
+val output = RunAnywhere.transcribe(audioData, RASTTOptions(language = "en"))
+println("You said: ${output.text}")
 ```
 
 ### Text-to-Speech (TTS)
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.synthesize
-import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RATTSOptions
 
-// Load TTS voice
-RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+// Load TTS voice through the canonical lifecycle service.
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "vits-piper-en_US-lessac-medium",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ),
+)
 
 // Synthesize audio - returns TTSOutput with audioData
-val output = RunAnywhere.synthesize("Hello, world!", TTSOptions())
-// output.audioData contains WAV audio bytes
-
-// Play with Android AudioTrack (see example below)
+val output = RunAnywhere.synthesize("Hello, world!", RATTSOptions())
+// output.audio_data carries the WAV audio bytes (a Wire `ByteString`).
 ```
 
 ### Voice Pipeline (STT → LLM → TTS)
@@ -175,10 +203,26 @@ import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
-// Ensure all 3 models are loaded first
-RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
-RunAnywhere.loadLLMModel("smollm2-360m-instruct-q8_0")
-RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+// Ensure all 3 models are loaded first via the canonical lifecycle service.
+import ai.runanywhere.proto.v1.ModelCategory
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "sherpa-onnx-whisper-tiny.en",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ),
+)
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "smollm2-360m-instruct-q8_0",
+        category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ),
+)
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "vits-piper-en_US-lessac-medium",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ),
+)
 
 // Your audio capture Flow (16kHz, mono, 16-bit PCM)
 // See AudioCaptureService example below
@@ -529,54 +573,41 @@ Extension functions for text generation using Large Language Models.
 
 ```kotlin
 /**
- * Simple text generation.
+ * Generate text with full metrics. Returns the proto-backed
+ * `RALLMGenerationResult` (alias for `ai.runanywhere.proto.v1.LLMGenerationResult`).
  *
  * @param prompt The text prompt
- * @return Generated response text
- */
-suspend fun RunAnywhere.chat(prompt: String): String
-
-/**
- * Generate text with full metrics.
- *
- * @param prompt The text prompt
- * @param options Generation options (optional)
- * @return LLMGenerationResult with text and metrics
+ * @param options Generation options (defaults to null → SDK defaults)
+ * @return RALLMGenerationResult with text and metrics
  */
 suspend fun RunAnywhere.generate(
     prompt: String,
-    options: LLMGenerationOptions? = null
-): LLMGenerationResult
+    options: RALLMGenerationOptions? = null,
+): RALLMGenerationResult
 ```
+
+> The v1 `chat(prompt)` convenience helper has been removed. Construct the
+> same call as `generate(prompt, RALLMGenerationOptions(...))` and read
+> the resulting `result.text`.
 
 ### Streaming Generation
 
 ```kotlin
 /**
- * Streaming text generation.
- * Returns a Flow of tokens for real-time display.
+ * Streaming text generation. One event per generated token plus a
+ * terminal event with `is_final == true` carrying `finish_reason` and
+ * any `error_message`. The v1 `generateStreamWithMetrics()` variant has
+ * been removed; derive metrics from the event sequence (e.g. record TTFT
+ * on the first non-empty `event.token_`).
  *
  * @param prompt The text prompt
- * @param options Generation options (optional)
- * @return Flow of tokens as they are generated
+ * @param options Generation options (defaults to null → SDK defaults)
+ * @return Flow<RALLMStreamEvent>
  */
 fun RunAnywhere.generateStream(
     prompt: String,
-    options: LLMGenerationOptions? = null
-): Flow<String>
-
-/**
- * Streaming with metrics.
- * Returns token stream AND deferred metrics.
- *
- * @param prompt The text prompt
- * @param options Generation options (optional)
- * @return LLMStreamingResult with stream and deferred result
- */
-suspend fun RunAnywhere.generateStreamWithMetrics(
-    prompt: String,
-    options: LLMGenerationOptions? = null
-): LLMStreamingResult
+    options: RALLMGenerationOptions? = null,
+): Flow<RALLMStreamEvent>
 ```
 
 ### Generation Control
@@ -590,61 +621,31 @@ fun RunAnywhere.cancelGeneration()
 
 ### LLM Types
 
-#### LLMGenerationOptions
+`RALLMGenerationOptions` / `RALLMGenerationResult` / `RALLMStreamEvent`
+are typealiases for the Wire-generated proto types under
+`ai.runanywhere.proto.v1.*`. They are the canonical structured-options
+surface — there are no longer hand-rolled value-types
+(`LLMGenerationOptions`, `LLMStreamingResult`, `LLMConfiguration`).
 
 ```kotlin
-data class LLMGenerationOptions(
-    val maxTokens: Int = 100,
-    val temperature: Float = 0.8f,
-    val topP: Float = 1.0f,
-    val stopSequences: List<String> = emptyList(),
-    val streamingEnabled: Boolean = false,
-    val preferredFramework: InferenceFramework? = null,
-    val structuredOutput: StructuredOutputConfig? = null,
-    val systemPrompt: String? = null
-)
+// From sdk/runanywhere-kotlin/src/main/.../types/SwiftAliases.kt
+typealias RALLMGenerationOptions = ai.runanywhere.proto.v1.LLMGenerationOptions
+typealias RALLMGenerationResult  = ai.runanywhere.proto.v1.LLMGenerationResult
+typealias RALLMStreamEvent       = ai.runanywhere.proto.v1.LLMStreamEvent
 ```
 
-#### LLMGenerationResult
+Common `RALLMGenerationOptions` fields (proto-snake_case in Kotlin):
 
 ```kotlin
-data class LLMGenerationResult(
-    val text: String,                    // Generated text
-    val thinkingContent: String?,        // Reasoning content (if model supports)
-    val inputTokens: Int,                // Prompt tokens
-    val tokensUsed: Int,                 // Output tokens
-    val modelUsed: String,               // Model ID
-    val latencyMs: Double,               // Total time in ms
-    val framework: String?,              // Framework used
-    val tokensPerSecond: Double,         // Generation speed
-    val timeToFirstTokenMs: Double?,     // TTFT (streaming only)
-    val thinkingTokens: Int?,            // Thinking tokens (if applicable)
-    val responseTokens: Int              // Response tokens
-)
+val max_tokens: Int
+val temperature: Float
+val top_p: Float
+val stop_sequences: List<String>
+val system_prompt: String
 ```
 
-#### LLMStreamingResult
-
-```kotlin
-data class LLMStreamingResult(
-    val stream: Flow<String>,            // Token stream
-    val result: Deferred<LLMGenerationResult>  // Final metrics
-)
-```
-
-#### LLMConfiguration
-
-```kotlin
-data class LLMConfiguration(
-    val modelId: String? = null,
-    val contextLength: Int = 2048,
-    val temperature: Double = 0.7,
-    val maxTokens: Int = 100,
-    val systemPrompt: String? = null,
-    val streamingEnabled: Boolean = true,
-    val preferredFramework: InferenceFramework? = null
-)
-```
+`RALLMGenerationResult` carries text, token counts, latency, framework,
+and tokens-per-second; see the proto definition for the full schema.
 
 ---
 
@@ -652,143 +653,64 @@ data class LLMConfiguration(
 
 Extension functions for speech recognition.
 
-### Basic Transcription
+### Transcription
 
 ```kotlin
 /**
- * Simple voice transcription using default model.
+ * Transcribe a one-shot audio buffer. Returns the proto-backed `RASTTOutput`
+ * (alias for `ai.runanywhere.proto.v1.STTOutput`).
  *
- * @param audioData Audio data to transcribe
- * @return Transcribed text
+ * @param audio Raw audio data (16kHz PCM by default)
+ * @param options Transcription options (defaults to `RASTTOptions()`)
  */
-suspend fun RunAnywhere.transcribe(audioData: ByteArray): String
+suspend fun RunAnywhere.transcribe(
+    audio: ByteArray,
+    options: RASTTOptions = RASTTOptions(),
+): RASTTOutput
 ```
 
-### Model Management
+> The v1 helpers `loadSTTModel(modelId)` / `unloadSTTModel()` /
+> `isSTTModelLoaded()` / `currentSTTModelId` / `transcribeWithOptions()`
+> have been removed. Load STT models through the canonical lifecycle
+> service (`loadModel(RAModelLoadRequest(category =
+> MODEL_CATEGORY_SPEECH_RECOGNITION))`) and pass options directly to
+> `transcribe()`.
+
+### Streaming Transcription
 
 ```kotlin
 /**
- * Load an STT model.
+ * Stream transcription results from a flow of audio chunks. One
+ * `RASTTPartialResult` per incremental update; the stream closes after
+ * the final event (`is_final == true`) or on error.
  *
- * @param modelId Model identifier
+ * @param audio Flow of audio chunk byte arrays
+ * @param options Transcription options (null → SDK defaults)
  */
-suspend fun RunAnywhere.loadSTTModel(modelId: String)
-
-/**
- * Unload the currently loaded STT model.
- */
-suspend fun RunAnywhere.unloadSTTModel()
-
-/**
- * Check if an STT model is loaded.
- */
-suspend fun RunAnywhere.isSTTModelLoaded(): Boolean
-
-/**
- * Get the currently loaded STT model ID (synchronous).
- */
-val RunAnywhere.currentSTTModelId: String?
-
-/**
- * Check if STT model is loaded (non-suspend version).
- */
-val RunAnywhere.isSTTModelLoadedSync: Boolean
-```
-
-### Advanced Transcription
-
-```kotlin
-/**
- * Transcribe with options.
- *
- * @param audioData Raw audio data
- * @param options Transcription options
- * @return STTOutput with text and metadata
- */
-suspend fun RunAnywhere.transcribeWithOptions(
-    audioData: ByteArray,
-    options: STTOptions
-): STTOutput
-
-/**
- * Streaming transcription with callbacks.
- *
- * @param audioData Audio data to transcribe
- * @param options Transcription options
- * @param onPartialResult Callback for partial results
- * @return Final transcription output
- */
-suspend fun RunAnywhere.transcribeStream(
-    audioData: ByteArray,
-    options: STTOptions = STTOptions(),
-    onPartialResult: (STTTranscriptionResult) -> Unit
-): STTOutput
-
-/**
- * Process audio samples for streaming transcription.
- */
-suspend fun RunAnywhere.processStreamingAudio(samples: FloatArray)
-
-/**
- * Stop streaming transcription.
- */
-suspend fun RunAnywhere.stopStreamingTranscription()
+fun RunAnywhere.transcribeStream(
+    audio: Flow<ByteArray>,
+    options: RASTTOptions? = null,
+): Flow<RASTTPartialResult>
 ```
 
 ### STT Types
 
-#### STTOptions
+`RASTTOptions` / `RASTTOutput` / `RASTTPartialResult` are typealiases for
+the Wire-generated proto types under `ai.runanywhere.proto.v1.*`. Common
+fields use the proto's snake_case names:
 
 ```kotlin
-data class STTOptions(
-    val language: String = "en",
-    val detectLanguage: Boolean = false,
-    val enablePunctuation: Boolean = true,
-    val enableDiarization: Boolean = false,
-    val maxSpeakers: Int? = null,
-    val enableTimestamps: Boolean = true,
-    val vocabularyFilter: List<String> = emptyList(),
-    val audioFormat: AudioFormat = AudioFormat.PCM,
-    val sampleRate: Int = 16000,
-    val preferredFramework: InferenceFramework? = null
-)
-```
+// RASTTOptions (= ai.runanywhere.proto.v1.STTOptions) — selected fields
+val language: String           // e.g. "en"
+val detect_language: Boolean
+val enable_punctuation: Boolean
+val enable_timestamps: Boolean
+val sample_rate: Int           // default 16000
 
-#### STTOutput
-
-```kotlin
-data class STTOutput(
-    val text: String,                              // Transcribed text
-    val confidence: Float,                         // Confidence (0.0-1.0)
-    val wordTimestamps: List<WordTimestamp>?,      // Word-level timing
-    val detectedLanguage: String?,                 // Auto-detected language
-    val alternatives: List<TranscriptionAlternative>?,
-    val metadata: TranscriptionMetadata,
-    val timestamp: Long
-)
-```
-
-#### TranscriptionMetadata
-
-```kotlin
-data class TranscriptionMetadata(
-    val modelId: String,
-    val processingTime: Double,    // Processing time in seconds
-    val audioLength: Double        // Audio length in seconds
-) {
-    val realTimeFactor: Double     // processingTime / audioLength
-}
-```
-
-#### WordTimestamp
-
-```kotlin
-data class WordTimestamp(
-    val word: String,
-    val startTime: Double,         // Start time in seconds
-    val endTime: Double,           // End time in seconds
-    val confidence: Float
-)
+// RASTTOutput (= ai.runanywhere.proto.v1.STTOutput) — selected fields
+val text: String
+val confidence: Float
+val detected_language: String
 ```
 
 ---
@@ -799,19 +721,26 @@ Extension functions for speech synthesis.
 
 ### Voice Management
 
+TTS voices are loaded through the canonical proto-backed lifecycle
+service. The v1 helpers (`loadTTSVoice`, `unloadTTSVoice`,
+`isTTSVoiceLoaded`, `currentTTSVoiceId`, `availableTTSVoices()`) have
+been removed.
+
 ```kotlin
-/**
- * Load a TTS voice.
- *
- * @param voiceId Voice identifier
- */
-suspend fun RunAnywhere.loadTTSVoice(voiceId: String)
+import ai.runanywhere.proto.v1.ModelCategory
 
-/**
- * Unload the currently loaded TTS voice.
- */
-suspend fun RunAnywhere.unloadTTSVoice()
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "vits-piper-en_US-lessac-medium",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ),
+)
+```
 
+Below is the historical reference for the deleted v1 surface (not
+present at HEAD):
+
+```kotlin
 /**
  * Check if a TTS voice is loaded.
  */
@@ -823,11 +752,6 @@ suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean
 val RunAnywhere.currentTTSVoiceId: String?
 
 /**
- * Check if TTS voice is loaded (non-suspend version).
- */
-val RunAnywhere.isTTSVoiceLoadedSync: Boolean
-
-/**
  * Get available TTS voices.
  */
 suspend fun RunAnywhere.availableTTSVoices(): List<String>
@@ -837,30 +761,26 @@ suspend fun RunAnywhere.availableTTSVoices(): List<String>
 
 ```kotlin
 /**
- * Synthesize text to speech audio.
+ * Synthesize text to speech audio. Returns the proto-backed
+ * `RATTSOutput` (alias for `ai.runanywhere.proto.v1.TTSOutput`).
  *
  * @param text Text to synthesize
- * @param options Synthesis options
- * @return TTSOutput with audio data
+ * @param options Synthesis options (defaults to `RATTSOptions()`)
  */
 suspend fun RunAnywhere.synthesize(
     text: String,
-    options: TTSOptions = TTSOptions()
-): TTSOutput
+    options: RATTSOptions = RATTSOptions(),
+): RATTSOutput
 
 /**
- * Stream synthesis for long text.
- *
- * @param text Text to synthesize
- * @param options Synthesis options
- * @param onAudioChunk Callback for each audio chunk
- * @return TTSOutput with full audio data
+ * Stream synthesis for long text. One `RATTSOutput` chunk per
+ * generated segment. The previous callback-based signature was
+ * removed in favor of a Flow.
  */
-suspend fun RunAnywhere.synthesizeStream(
+fun RunAnywhere.synthesizeStream(
     text: String,
-    options: TTSOptions = TTSOptions(),
-    onAudioChunk: (ByteArray) -> Unit
-): TTSOutput
+    options: RATTSOptions = RATTSOptions(),
+): Flow<RATTSOutput>
 
 /**
  * Stop current TTS synthesis.
@@ -872,21 +792,18 @@ suspend fun RunAnywhere.stopSynthesis()
 
 ```kotlin
 /**
- * Speak text aloud - handles synthesis and playback.
- *
- * @param text Text to speak
- * @param options Synthesis options
- * @return TTSSpeakResult with metadata
+ * Speak text aloud — synthesizes and plays through the platform audio
+ * output. Returns the proto `TTSSpeakResult` (latency, duration, etc).
  */
 suspend fun RunAnywhere.speak(
     text: String,
-    options: TTSOptions = TTSOptions()
+    options: RATTSOptions = RATTSOptions(),
 ): TTSSpeakResult
 
 /**
- * Check if speech is currently playing.
+ * Whether speech is currently playing — sync property read.
  */
-suspend fun RunAnywhere.isSpeaking(): Boolean
+val RunAnywhere.isSpeaking: Boolean
 
 /**
  * Stop current speech playback.
@@ -896,36 +813,27 @@ suspend fun RunAnywhere.stopSpeaking()
 
 ### TTS Types
 
-#### TTSOptions
+`RATTSOptions` / `RATTSOutput` / `TTSSpeakResult` are typealiases for
+the Wire-generated proto types under `ai.runanywhere.proto.v1.*`. Common
+fields use the proto's snake_case names:
 
 ```kotlin
-data class TTSOptions(
-    val voice: String? = null,
-    val language: String = "en-US",
-    val rate: Float = 1.0f,           // 0.0 to 2.0
-    val pitch: Float = 1.0f,          // 0.0 to 2.0
-    val volume: Float = 1.0f,         // 0.0 to 1.0
-    val audioFormat: AudioFormat = AudioFormat.PCM,
-    val sampleRate: Int = 22050,
-    val useSSML: Boolean = false
-)
+typealias RATTSOptions = ai.runanywhere.proto.v1.TTSOptions
+typealias RATTSOutput  = ai.runanywhere.proto.v1.TTSOutput
+
+// RATTSOptions selected fields:
+val voice: String          // optional voice id override
+val language: String       // e.g. "en-US"
+val rate: Float            // 0.0 .. 2.0
+val pitch: Float           // 0.0 .. 2.0
+val volume: Float          // 0.0 .. 1.0
+val sample_rate: Int       // default 22050
+val use_ssml: Boolean
 ```
 
-#### TTSOutput
-
-```kotlin
-data class TTSOutput(
-    val audioData: ByteArray,                      // Synthesized audio
-    val format: AudioFormat,                       // Audio format
-    val duration: Double,                          // Duration in seconds
-    val phonemeTimestamps: List<TTSPhonemeTimestamp>?,
-    val metadata: TTSSynthesisMetadata,
-    val timestamp: Long
-) {
-    val audioSizeBytes: Int
-    val hasPhonemeTimestamps: Boolean
-}
-```
+`RATTSOutput` exposes the synthesized audio bytes as a Wire
+`ByteString` on `audio_data`; convert with `.toByteArray()` for JVM
+audio APIs.
 
 #### TTSSynthesisMetadata
 
@@ -972,10 +880,10 @@ suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult
 /**
  * Stream VAD results from audio samples.
  *
- * @param audioSamples Flow of audio samples
+ * @param audio Flow of raw PCM audio chunks
  * @return Flow of VAD results
  */
-fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADResult>
+fun RunAnywhere.streamVAD(audio: Flow<ByteArray>, options: RAVADOptions? = null): Flow<RAVADResult>
 ```
 
 ### Configuration
@@ -1298,31 +1206,38 @@ suspend fun RunAnywhere.refreshModelRegistry()
 
 ### LLM Model Loading
 
+LLM (and STT/TTS/VAD) loading goes through the canonical proto-backed
+lifecycle service. The v1 per-modality helpers were deleted; use
+`loadModel(RAModelLoadRequest(...))` plus the category enum.
+
 ```kotlin
 /**
- * Load an LLM model.
+ * Load a model through the canonical lifecycle service. The C++
+ * router resolves the path/framework from the registry by `model_id`.
+ *
+ * @param request RAModelLoadRequest (alias for proto ModelLoadRequest).
+ *                Set `model_id` and `category`; other fields are optional.
+ * @return RAModelLoadResult — `success`, `error_message`, etc.
  */
-suspend fun RunAnywhere.loadLLMModel(modelId: String)
+suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult
 
 /**
- * Unload the currently loaded LLM model.
+ * Unload one or all models. `ModelUnloadRequest.unload_all = true`
+ * tears every loaded component down; otherwise pass `category`.
  */
-suspend fun RunAnywhere.unloadLLMModel()
+suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult
 
 /**
- * Check if an LLM model is loaded.
+ * Snapshot the currently loaded model for a given category. The
+ * returned `CurrentModelResult` has `found: Boolean` and `model_id`.
  */
-suspend fun RunAnywhere.isLLMModelLoaded(): Boolean
+suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModelRequest()): CurrentModelResult
 
 /**
- * Get the currently loaded LLM model ID (synchronous).
+ * Per-component lifecycle snapshot — useful for asserting readiness
+ * from tests.
  */
-val RunAnywhere.currentLLMModelId: String?
-
-/**
- * Get the currently loaded LLM model info.
- */
-suspend fun RunAnywhere.currentLLMModel(): ModelInfo?
+suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot
 
 /**
  * Get the currently loaded STT model info.
@@ -1420,84 +1335,26 @@ object EventBus {
 
 ### Event Types
 
-#### SDKEvent (Interface)
+All event types are proto-generated via Wire. The SDK re-exports them as typealiases:
 
 ```kotlin
-interface SDKEvent {
-    val id: String
-    val type: String
-    val category: EventCategory
-    val timestamp: Long
-    val sessionId: String?
-    val destination: EventDestination
-    val properties: Map<String, String>
-}
-```
+// All events use the proto-generated SDKEvent envelope
+typealias SDKEvent = ai.runanywhere.proto.v1.SDKEvent
+typealias EventCategory = ai.runanywhere.proto.v1.EventCategory
+typealias EventDestination = ai.runanywhere.proto.v1.EventDestination
 
-#### LLMEvent
-
-```kotlin
-data class LLMEvent(
-    val eventType: LLMEventType,
-    val modelId: String?,
-    val tokensGenerated: Int?,
-    val latencyMs: Double?,
-    val error: String?
-) : SDKEvent
-
-enum class LLMEventType {
-    GENERATION_STARTED, GENERATION_COMPLETED, GENERATION_FAILED,
-    STREAM_TOKEN, STREAM_COMPLETED
-}
-```
-
-#### STTEvent
-
-```kotlin
-data class STTEvent(
-    val eventType: STTEventType,
-    val modelId: String?,
-    val transcript: String?,
-    val confidence: Float?,
-    val error: String?
-) : SDKEvent
-
-enum class STTEventType {
-    TRANSCRIPTION_STARTED, TRANSCRIPTION_COMPLETED, TRANSCRIPTION_FAILED,
-    PARTIAL_RESULT
-}
-```
-
-#### TTSEvent
-
-```kotlin
-data class TTSEvent(
-    val eventType: TTSEventType,
-    val voice: String?,
-    val durationMs: Double?,
-    val error: String?
-) : SDKEvent
-
-enum class TTSEventType {
-    SYNTHESIS_STARTED, SYNTHESIS_COMPLETED, SYNTHESIS_FAILED,
-    PLAYBACK_STARTED, PLAYBACK_COMPLETED
-}
-```
-
-#### ModelEvent
-
-```kotlin
-data class ModelEvent(
-    val eventType: ModelEventType,
-    val modelId: String,
-    val progress: Float?,
-    val error: String?
-) : SDKEvent
-
-enum class ModelEventType {
-    DOWNLOAD_STARTED, DOWNLOAD_PROGRESS, DOWNLOAD_COMPLETED, DOWNLOAD_FAILED,
-    LOADED, UNLOADED, DELETED
-}
+// Typed event payloads (proto-generated)
+typealias GenerationEvent = ai.runanywhere.proto.v1.GenerationEvent
+typealias ModelEvent = ai.runanywhere.proto.v1.ModelEvent
+typealias DownloadEvent = ai.runanywhere.proto.v1.DownloadEvent
+typealias VoiceEvent = ai.runanywhere.proto.v1.VoiceEvent
+typealias PerformanceEvent = ai.runanywhere.proto.v1.PerformanceEvent
+typealias FailureEvent = ai.runanywhere.proto.v1.FailureEvent
+typealias NetworkEvent = ai.runanywhere.proto.v1.NetworkEvent
+typealias StorageLifecycleEvent = ai.runanywhere.proto.v1.StorageLifecycleEvent
+typealias ComponentInitializationEvent = ai.runanywhere.proto.v1.ComponentInitializationEvent
+typealias ComponentLifecycleEvent = ai.runanywhere.proto.v1.ComponentLifecycleEvent
+typealias ModelRegistryEvent = ai.runanywhere.proto.v1.ModelRegistryEvent
 ```
 
 ---
@@ -1633,11 +1490,14 @@ Common error codes include:
 ### Complete LLM Chat (Matching Starter App)
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.*
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
-import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.public.types.RAInferenceFramework
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 
 // Initialize
 RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
@@ -1647,9 +1507,9 @@ RunAnywhere.registerModel(
     id = "smollm2-360m-instruct-q8_0",
     name = "SmolLM2 360M Instruct Q8_0",
     url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf",
-    framework = InferenceFramework.LLAMA_CPP,
-    modality = ModelCategory.LANGUAGE,
-    memoryRequirement = 400_000_000
+    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    memoryRequirement = 400_000_000,
 )
 
 // Download model
@@ -1659,113 +1519,132 @@ RunAnywhere.downloadModel("smollm2-360m-instruct-q8_0")
         println("Download: ${(progress.progress * 100).toInt()}%")
     }
 
-// Load and use
-RunAnywhere.loadLLMModel("smollm2-360m-instruct-q8_0")
+// Load through the canonical lifecycle service.
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "smollm2-360m-instruct-q8_0",
+        category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ),
+)
 
-// Simple chat (returns String)
-val response = RunAnywhere.chat("Explain AI in simple terms")
-println("Response: $response")
+// Generate (the v1 `chat()` shortcut was deleted — use `generate`).
+val result = RunAnywhere.generate(
+    prompt = "Explain AI in simple terms",
+    options = RALLMGenerationOptions(max_tokens = 128),
+)
+println("Response: ${result.text}")
 
 // Cleanup
-RunAnywhere.unloadLLMModel()
+RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
 ```
 
 ### Complete STT Example (Matching Starter App)
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.*
+import com.runanywhere.sdk.public.types.RAInferenceFramework
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RASTTOptions
 
 // Register STT model
 RunAnywhere.registerModel(
     id = "sherpa-onnx-whisper-tiny.en",
     name = "Sherpa Whisper Tiny (ONNX)",
     url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
-    framework = InferenceFramework.ONNX,
-    modality = ModelCategory.SPEECH_RECOGNITION
+    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    modality = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
 )
 
 // Download and load
 RunAnywhere.downloadModel("sherpa-onnx-whisper-tiny.en").collect { progress ->
     println("Download: ${(progress.progress * 100).toInt()}%")
 }
-RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "sherpa-onnx-whisper-tiny.en",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ),
+)
 
-// Transcribe audio (16kHz, mono, 16-bit PCM)
-val transcription = RunAnywhere.transcribe(audioData)
-println("You said: $transcription")
+// Transcribe audio (16kHz, mono, 16-bit PCM).
+val output = RunAnywhere.transcribe(audioData, RASTTOptions(language = "en"))
+println("You said: ${output.text}")
 ```
 
 ### Complete TTS Example (Matching Starter App)
 
 ```kotlin
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.*
-import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
+import com.runanywhere.sdk.public.types.RAInferenceFramework
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RATTSOptions
 
 // Register TTS model
 RunAnywhere.registerModel(
     id = "vits-piper-en_US-lessac-medium",
     name = "Piper TTS (US English - Medium)",
     url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
-    framework = InferenceFramework.ONNX,
-    modality = ModelCategory.SPEECH_SYNTHESIS
+    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+    modality = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
 )
 
 // Download and load
 RunAnywhere.downloadModel("vits-piper-en_US-lessac-medium").collect { progress ->
     println("Download: ${(progress.progress * 100).toInt()}%")
 }
-RunAnywhere.loadTTSVoice("vits-piper-en_US-lessac-medium")
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "vits-piper-en_US-lessac-medium",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ),
+)
 
 // Synthesize audio
-val output = RunAnywhere.synthesize("Hello, world!", TTSOptions())
-// output.audioData contains WAV audio bytes
-
-// Play with playWavAudio() helper (see Voice Pipeline section)
-playWavAudio(output.audioData)
+val output = RunAnywhere.synthesize("Hello, world!", RATTSOptions())
+// output.audio_data carries the WAV audio bytes (Wire ByteString).
+playWavAudio(output.audio_data.toByteArray())
 ```
 
 ### Voice Pipeline Session (Matching Starter App)
 
 ```kotlin
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.VoiceAgentConfig
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.*
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
 
-// Ensure all 3 models are loaded
-val allModelsLoaded = RunAnywhere.isLLMModelLoaded() &&
-                     RunAnywhere.isSTTModelLoaded() &&
-                     RunAnywhere.isTTSVoiceLoaded()
+// Ensure all 3 models are loaded via the canonical lifecycle service.
+suspend fun isLoaded(category: ModelCategory): Boolean =
+    RunAnywhere.currentModel(CurrentModelRequest(category = category)).found
+
+val allModelsLoaded =
+    isLoaded(ModelCategory.MODEL_CATEGORY_LANGUAGE) &&
+        isLoaded(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION) &&
+        isLoaded(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
 
 if (allModelsLoaded) {
-    // Create audio capture flow
-    val audioCaptureService = AudioCaptureService()
-    val audioChunks = audioCaptureService.startCapture()
-
-    // Configure and start session
-    val config = VoiceSessionConfig(
-        silenceDuration = 1.5,
-        speechThreshold = 0.1f,
-        autoPlayTTS = false,
-        continuousMode = true
+    // Initialize the voice agent and consume its unified event stream.
+    RunAnywhere.initializeVoiceAgent(
+        VoiceAgentConfig(
+            stt_model_id = "sherpa-onnx-whisper-tiny.en",
+            llm_model_id = "smollm2-360m-instruct-q8_0",
+            tts_voice_id = "vits-piper-en_US-lessac-medium",
+        ),
     )
 
     scope.launch {
-        RunAnywhere.streamVoiceSession(audioChunks, config).collect { event ->
-            when (event) {
-                is VoiceSessionEvent.Listening -> updateAudioLevel(event.audioLevel)
-                is VoiceSessionEvent.SpeechStarted -> showSpeechDetected()
-                is VoiceSessionEvent.Processing -> showProcessing()
-                is VoiceSessionEvent.Transcribed -> showTranscript(event.text)
-                is VoiceSessionEvent.Responded -> showResponse(event.text)
-                is VoiceSessionEvent.TurnCompleted -> {
-                    event.audio?.let { playWavAudio(it) }
-                }
-                is VoiceSessionEvent.Error -> showError(event.message)
-                else -> { }
+        RunAnywhere.streamVoiceAgent().collect { event ->
+            event.user_said?.let { showTranscript(it.text) }
+            event.agent_said?.let { showResponse(it.text) }
+            event.synthesized_audio?.let { audio ->
+                playWavAudio(audio.audio_data.toByteArray())
             }
+            event.state_change?.let { /* update UI state */ }
         }
     }
 }

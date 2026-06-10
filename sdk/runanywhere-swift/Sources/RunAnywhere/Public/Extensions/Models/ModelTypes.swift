@@ -2,514 +2,366 @@
 //  ModelTypes.swift
 //  RunAnywhere SDK
 //
-//  Public types for model management.
-//  These are thin wrappers over C++ types in rac_model_types.h
-//  Business logic (format support, capability checks) is in C++.
+//  Public types for model management. Thin wrappers over C++ types in
+//  rac_model_types.h. Business logic (format support, capability checks)
+//  lives in C++.
+//
+//  P3-T2: most of the per-enum switch tables that used to live here have
+//  been replaced by calls into the C ABI exposed via CRACommons:
+//    - `rac_model_format_wire_string`
+//    - `rac_inference_framework_wire_string` / `_display_name` /
+//      `_analytics_key` / `_from_string`
+//    - `rac_model_category_requires_context_length`
+//    - `rac_model_category_supports_thinking`
+//    - `rac_archive_type_extension`
+//    - `rac_archive_type_from_path`
+//
+//  Wire strings now match the proto enum names emitted by swift-protobuf
+//  (e.g. `INFERENCE_FRAMEWORK_LLAMA_CPP`). The accompanying `from_string`
+//  decoder accepts wire strings, analytics keys, and display names
+//  case-insensitively, so legacy Codable inputs continue to round-trip.
+//
+//  Artifact / archive / expected-files helpers (RAModelInfo.make,
+//  resolvedPrimaryModelPath, inferredArtifact, etc.) live in
+//  `ModelTypes+Artifacts.swift` to keep this file below the SwiftLint
+//  `file_length` threshold.
 //
 
 import CRACommons
 import Foundation
 
-// MARK: - Model Source
+// MARK: - Typealiases to proto-generated enums
 
-/// Source of model data (where the model info came from)
-public enum ModelSource: String, Codable, Sendable {
-    /// Model info came from remote API (backend model catalog)
-    case remote
+public typealias ModelSource = RAModelSource
+public typealias ModelFormat = RAModelFormat
+public typealias ModelCategory = RAModelCategory
+public typealias InferenceFramework = RAInferenceFramework
+public typealias ArchiveType = RAArchiveType
+public typealias ArchiveStructure = RAArchiveStructure
 
-    /// Model info was provided locally via SDK input (addModel calls)
-    case local
+// MARK: - Internal helper for wrapping `rac_*_wire_string` style ABIs
+
+/// Calls a C ABI of shape `rac_result_t fn(IN, const char** out)` and returns
+/// the resulting null-terminated string, or `fallback` if the call fails or
+/// returns NULL. Statically-allocated literal — caller must not free.
+@inline(__always)
+private func cWireString(
+    _ fallback: String,
+    _ block: (UnsafeMutablePointer<UnsafePointer<CChar>?>) -> rac_result_t
+) -> String {
+    var ptr: UnsafePointer<CChar>?
+    guard block(&ptr) == RAC_SUCCESS, let raw = ptr else { return fallback }
+    return String(cString: raw)
 }
 
-// MARK: - Model Format
+// MARK: - ModelSource
+//
+// Note: `SwiftProtobuf.Enum` already refines `Sendable`, so no extra
+// `@unchecked Sendable` is required on the typealiased enums.
+//
+// `wireString` / `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto.
 
-/// Model formats supported
-public enum ModelFormat: String, CaseIterable, Codable, Sendable {
-    case onnx
-    case ort
-    case gguf
-    case bin
-    case coreml
-    case unknown
-}
-
-// MARK: - Model Category
-
-/// Defines the category/type of a model based on its input/output modality
-public enum ModelCategory: String, CaseIterable, Codable, Sendable {
-    case language = "language"              // Text-to-text models (LLMs)
-    case speechRecognition = "speech-recognition"  // Voice-to-text models (ASR)
-    case speechSynthesis = "speech-synthesis"      // Text-to-voice models (TTS)
-    case vision = "vision"                  // Image understanding models
-    case imageGeneration = "image-generation"      // Text-to-image models
-    case multimodal = "multimodal"          // Models that handle multiple modalities
-    case voiceActivityDetection = "voice-activity-detection"  // VAD models (Silero, etc.)
-    case audio = "audio"                    // Audio processing (diarization, etc.)
-    case embedding = "embedding"            // Embedding models (RAG, semantic search)
-
-    /// Whether this category typically requires context length
-    /// Note: C++ equivalent is rac_model_category_requires_context_length()
-    public var requiresContextLength: Bool {
-        switch self {
-        case .language, .multimodal:
-            return true
-        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .vision, .imageGeneration, .audio, .embedding:
-            return false
-        }
+extension RAModelSource: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAModelSource.from(wireString: raw) ?? .unspecified
     }
 
-    /// Whether this category typically supports thinking/reasoning
-    /// Note: C++ equivalent is rac_model_category_supports_thinking()
-    public var supportsThinking: Bool {
-        switch self {
-        case .language, .multimodal:
-            return true
-        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .vision, .imageGeneration, .audio, .embedding:
-            return false
-        }
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
-// MARK: - Inference Framework
+// MARK: - ModelFormat
 
-/// Supported inference frameworks/runtimes for executing models
-public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
-    // Model-based frameworks
-    case onnx = "ONNX"
-    case llamaCpp = "LlamaCpp"
-    case foundationModels = "FoundationModels"
-    case systemTTS = "SystemTTS"
-    case fluidAudio = "FluidAudio"
-    case coreml = "CoreML"        // Core ML (Apple Neural Engine) for diffusion models
-    case mlx = "MLX"              // MLX (Apple Silicon VLM via MLX C++)
-    case whisperKitCoreML = "WhisperKitCoreML" // WhisperKit CoreML (Apple Neural Engine) for STT
-    case metalrt = "MetalRT"      // MetalRT (custom Metal GPU kernels, Apple only)
-
-    // Special cases
-    case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
-    case none = "None"            // For services that don't use a model
-    case unknown = "Unknown"      // For unknown/unspecified frameworks
-
-    /// Human-readable display name for the framework
-    public var displayName: String {
-        switch self {
-        case .onnx: return "ONNX Runtime"
-        case .llamaCpp: return "llama.cpp"
-        case .foundationModels: return "Foundation Models"
-        case .systemTTS: return "System TTS"
-        case .fluidAudio: return "FluidAudio"
-        case .coreml: return "Core ML"
-        case .mlx: return "MLX"
-        case .whisperKitCoreML: return "WhisperKit CoreML"
-        case .metalrt: return "MetalRT"
-        case .builtIn: return "Built-in"
-        case .none: return "None"
-        case .unknown: return "Unknown"
-        }
+extension RAModelFormat: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAModelFormat.fromWireString(raw) ?? .unknown
     }
 
-    /// Snake_case key for analytics/telemetry
-    public var analyticsKey: String {
-        switch self {
-        case .onnx: return "onnx"
-        case .llamaCpp: return "llama_cpp"
-        case .foundationModels: return "foundation_models"
-        case .systemTTS: return "system_tts"
-        case .fluidAudio: return "fluid_audio"
-        case .coreml: return "coreml"
-        case .mlx: return "mlx"
-        case .whisperKitCoreML: return "whisperkit_coreml"
-        case .metalrt: return "metalrt"
-        case .builtIn: return "built_in"
-        case .none: return "none"
-        case .unknown: return "unknown"
-        }
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
-// MARK: - InferenceFramework C++ Bridge
-
-public extension InferenceFramework {
-    /// Convert Swift InferenceFramework to C rac_inference_framework_t
-    func toCFramework() -> rac_inference_framework_t {
-        switch self {
-        case .onnx: return RAC_FRAMEWORK_ONNX
-        case .llamaCpp: return RAC_FRAMEWORK_LLAMACPP
-        case .foundationModels: return RAC_FRAMEWORK_FOUNDATION_MODELS
-        case .systemTTS: return RAC_FRAMEWORK_SYSTEM_TTS
-        case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
-        case .coreml: return RAC_FRAMEWORK_COREML
-        case .mlx: return RAC_FRAMEWORK_MLX
-        case .whisperKitCoreML: return RAC_FRAMEWORK_WHISPERKIT_COREML
-        case .metalrt: return RAC_FRAMEWORK_METALRT
-        case .builtIn: return RAC_FRAMEWORK_BUILTIN
-        case .none: return RAC_FRAMEWORK_NONE
-        case .unknown: return RAC_FRAMEWORK_UNKNOWN
+public extension RAModelFormat {
+    /// Canonical wire string. Returns the proto enum name
+    /// (e.g. `MODEL_FORMAT_GGUF`) supplied by `rac_model_format_wire_string`.
+    ///
+    /// The proto enum (`RAModelFormat`) is value-aligned with the C++ binary's
+    /// `rac_model_format_t`. We forward `rawValue` directly rather than via
+    /// `ModelTypes+CppBridge.toC()` because the local `rac_model_types.h`
+    /// header in CRACommons/include/ still uses pre-proto numeric ordering.
+    var wireString: String {
+        cWireString("MODEL_FORMAT_UNKNOWN") {
+            rac_model_format_wire_string(rac_model_format_t(UInt32(self.rawValue)), $0)
         }
     }
 
-    /// Create Swift InferenceFramework from C rac_inference_framework_t
-    static func fromCFramework(_ cFramework: rac_inference_framework_t) -> InferenceFramework {
-        switch cFramework {
-        case RAC_FRAMEWORK_ONNX: return .onnx
-        case RAC_FRAMEWORK_LLAMACPP: return .llamaCpp
-        case RAC_FRAMEWORK_FOUNDATION_MODELS: return .foundationModels
-        case RAC_FRAMEWORK_SYSTEM_TTS: return .systemTTS
-        case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
-        case RAC_FRAMEWORK_COREML: return .coreml
-        case RAC_FRAMEWORK_MLX: return .mlx
-        case RAC_FRAMEWORK_WHISPERKIT_COREML: return .whisperKitCoreML
-        case RAC_FRAMEWORK_METALRT: return .metalrt
-        case RAC_FRAMEWORK_BUILTIN: return .builtIn
-        case RAC_FRAMEWORK_NONE: return .none
-        default: return .unknown
-        }
-    }
-
-    /// Initialize from a string, matching case-insensitively.
-    init?(caseInsensitive string: String) {
-        let lowercased = string.lowercased()
-
-        if let exact = InferenceFramework(rawValue: string) {
-            self = exact
-            return
-        }
-
-        if let framework = InferenceFramework.allCases.first(where: { $0.rawValue.lowercased() == lowercased }) {
-            self = framework
-            return
-        }
-
-        if let framework = InferenceFramework.allCases.first(where: { $0.analyticsKey == lowercased }) {
-            self = framework
-            return
-        }
-
-        return nil
-    }
-}
-
-// MARK: - Archive Types
-
-/// Supported archive formats for model packaging
-public enum ArchiveType: String, CaseIterable, Codable, Sendable {
-    case zip = "zip"
-    case tarBz2 = "tar.bz2"
-    case tarGz = "tar.gz"
-    case tarXz = "tar.xz"
-
-    /// File extension for this archive type
-    public var fileExtension: String {
-        rawValue
-    }
-
-    /// Detect archive type from URL
-    /// Note: C++ equivalent is rac_archive_type_from_path()
-    public static func from(url: URL) -> ArchiveType? {
-        let path = url.path.lowercased()
-        if path.hasSuffix(".tar.bz2") || path.hasSuffix(".tbz2") {
-            return .tarBz2
-        } else if path.hasSuffix(".tar.gz") || path.hasSuffix(".tgz") {
-            return .tarGz
-        } else if path.hasSuffix(".tar.xz") || path.hasSuffix(".txz") {
-            return .tarXz
-        } else if path.hasSuffix(".zip") {
-            return .zip
+    /// Parse a `RAModelFormat` from a wire string. Matches case-insensitively
+    /// against the proto-name `wireString` emitted by `rac_model_format_wire_string`
+    /// (e.g. `MODEL_FORMAT_GGUF`) AND the legacy short extension string from
+    /// `rac_model_format_extension` (e.g. `gguf`, `onnx`, `mlmodel`). The
+    /// legacy fallback preserves Codable round-trip for persisted model
+    /// metadata that was written with the pre-IDL short names — see comment
+    /// record `hotspot-swift-public-features-004`.
+    static func fromWireString(_ raw: String) -> RAModelFormat? {
+        let lowered = raw.lowercased()
+        for format in RAModelFormat.allCases {
+            if format.wireString.lowercased() == lowered { return format }
+            if let extPtr = rac_model_format_extension(format.toC()),
+               String(cString: extPtr).lowercased() == lowered {
+                return format
+            }
         }
         return nil
     }
 }
 
-/// Describes the internal structure of an archive after extraction
-public enum ArchiveStructure: String, Codable, Sendable, Equatable {
-    case singleFileNested
-    case directoryBased
-    case nestedDirectory
-    case unknown
-}
+// MARK: - ModelCategory
+//
+// `wireString` / `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto.
 
-// MARK: - Expected Model Files
-
-/// Describes what files are expected after model extraction/download
-public struct ExpectedModelFiles: Codable, Sendable, Equatable {
-    public let requiredPatterns: [String]
-    public let optionalPatterns: [String]
-    public let description: String?
-
-    public init(
-        requiredPatterns: [String] = [],
-        optionalPatterns: [String] = [],
-        description: String? = nil
-    ) {
-        self.requiredPatterns = requiredPatterns
-        self.optionalPatterns = optionalPatterns
-        self.description = description
+extension RAModelCategory: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAModelCategory.from(wireString: raw) ?? .unspecified
     }
 
-    public static let none = ExpectedModelFiles()
-}
-
-/// Describes a file that needs to be downloaded as part of a multi-file model
-public struct ModelFileDescriptor: Codable, Sendable, Equatable {
-    /// Full URL to download this file from
-    public let url: URL
-    /// Filename to save as (e.g., "model.gguf" or "mmproj.gguf")
-    public let filename: String
-    /// Whether this file is required for the model to work
-    public let isRequired: Bool
-
-    public init(url: URL, filename: String, isRequired: Bool = true) {
-        self.url = url
-        self.filename = filename
-        self.isRequired = isRequired
-    }
-
-    // Legacy compatibility
-    public var relativePath: String { url.lastPathComponent }
-    public var destinationPath: String { filename }
-}
-
-// MARK: - Model Artifact Type
-
-/// Describes how a model is packaged and what processing is needed after download.
-public enum ModelArtifactType: Codable, Sendable, Equatable {
-    case singleFile(expectedFiles: ExpectedModelFiles = .none)
-    case archive(ArchiveType, structure: ArchiveStructure, expectedFiles: ExpectedModelFiles = .none)
-    case multiFile([ModelFileDescriptor])
-    case custom(strategyId: String)
-    case builtIn
-
-    public var requiresExtraction: Bool {
-        if case .archive = self { return true }
-        return false
-    }
-
-    public var requiresDownload: Bool {
-        if case .builtIn = self { return false }
-        return true
-    }
-
-    public var expectedFiles: ExpectedModelFiles {
-        switch self {
-        case .singleFile(let expected), .archive(_, _, let expected):
-            return expected
-        default:
-            return .none
-        }
-    }
-
-    public var displayName: String {
-        switch self {
-        case .singleFile:
-            return "Single File"
-        case .archive(let type, _, _):
-            return "\(type.rawValue.uppercased()) Archive"
-        case .multiFile(let files):
-            return "Multi-File (\(files.count) files)"
-        case .custom(let strategyId):
-            return "Custom (\(strategyId))"
-        case .builtIn:
-            return "Built-in"
-        }
-    }
-
-    /// Infer artifact type from download URL
-    /// Note: C++ equivalent is rac_artifact_infer_from_url()
-    public static func infer(from url: URL?, format _: ModelFormat) -> ModelArtifactType {
-        guard let url = url else {
-            return .singleFile(expectedFiles: .none)
-        }
-        if let archiveType = ArchiveType.from(url: url) {
-            return .archive(archiveType, structure: .unknown, expectedFiles: .none)
-        }
-        return .singleFile(expectedFiles: .none)
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }
 
-// MARK: - ModelArtifactType Codable
-
-extension ModelArtifactType {
-    private enum CodingKeys: String, CodingKey {
-        case type, archiveType, structure, expectedFiles, files, strategyId
+public extension RAModelCategory {
+    /// Whether this category typically requires a context length.
+    /// Delegates to `rac_model_category_requires_context_length`.
+    var requiresContextLength: Bool {
+        rac_model_category_requires_context_length(self.toC()) == RAC_TRUE
     }
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-
-        switch type {
-        case "singleFile":
-            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: .expectedFiles) ?? .none
-            self = .singleFile(expectedFiles: expected)
-        case "archive":
-            let archiveType = try container.decode(ArchiveType.self, forKey: .archiveType)
-            let structure = try container.decode(ArchiveStructure.self, forKey: .structure)
-            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: .expectedFiles) ?? .none
-            self = .archive(archiveType, structure: structure, expectedFiles: expected)
-        case "multiFile":
-            let files = try container.decode([ModelFileDescriptor].self, forKey: .files)
-            self = .multiFile(files)
-        case "custom":
-            let strategyId = try container.decode(String.self, forKey: .strategyId)
-            self = .custom(strategyId: strategyId)
-        case "builtIn":
-            self = .builtIn
-        default:
-            self = .singleFile()
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-
-        switch self {
-        case .singleFile(let expected):
-            try container.encode("singleFile", forKey: .type)
-            if expected != .none {
-                try container.encode(expected, forKey: .expectedFiles)
-            }
-        case .archive(let archiveType, let structure, let expected):
-            try container.encode("archive", forKey: .type)
-            try container.encode(archiveType, forKey: .archiveType)
-            try container.encode(structure, forKey: .structure)
-            if expected != .none {
-                try container.encode(expected, forKey: .expectedFiles)
-            }
-        case .multiFile(let files):
-            try container.encode("multiFile", forKey: .type)
-            try container.encode(files, forKey: .files)
-        case .custom(let strategyId):
-            try container.encode("custom", forKey: .type)
-            try container.encode(strategyId, forKey: .strategyId)
-        case .builtIn:
-            try container.encode("builtIn", forKey: .type)
-        }
+    /// Whether this category typically supports thinking/reasoning.
+    /// Delegates to `rac_model_category_supports_thinking`.
+    var supportsThinking: Bool {
+        rac_model_category_supports_thinking(self.toC()) == RAC_TRUE
     }
 }
 
-// MARK: - Model Info
+// MARK: - InferenceFramework
 
-/// Information about a model - in-memory entity
-public struct ModelInfo: Codable, Sendable, Identifiable {
-    // Essential identifiers
-    public let id: String
-    public let name: String
-    public let category: ModelCategory
-
-    // Format and location
-    public let format: ModelFormat
-    public let downloadURL: URL?
-    public var localPath: URL?
-
-    // Artifact type
-    public let artifactType: ModelArtifactType
-
-    // Size information
-    public let downloadSize: Int64?
-
-    // Framework
-    public let framework: InferenceFramework
-
-    // Model-specific capabilities
-    public let contextLength: Int?
-    public let supportsThinking: Bool
-    public let thinkingPattern: ThinkingTagPattern?
-
-    // Optional metadata
-    public let description: String?
-
-    // Tracking fields
-    public let source: ModelSource
-    public let createdAt: Date
-    public var updatedAt: Date
-
-    // MARK: - Computed Properties
-
-    /// Whether this model is downloaded and available locally
-    public var isDownloaded: Bool {
-        guard let localPath = localPath else { return false }
-
-        if localPath.scheme == "builtin" {
-            return true
-        }
-
-        let (exists, isDirectory) = FileOperationsUtilities.existsWithType(at: localPath)
-
-        if exists && isDirectory {
-            return FileOperationsUtilities.isNonEmptyDirectory(at: localPath)
-        }
-
-        return exists
-    }
-
-    /// Whether this model is available for use
-    public var isAvailable: Bool {
-        isDownloaded
-    }
-
-    /// Whether this is a built-in platform model
-    public var isBuiltIn: Bool {
-        if artifactType == .builtIn {
-            return true
-        }
-        if let localPath = localPath, localPath.scheme == "builtin" {
-            return true
-        }
-        return framework == .foundationModels || framework == .systemTTS
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, category, format, downloadURL, localPath
-        case artifactType
-        case downloadSize
-        case framework
-        case contextLength, supportsThinking, thinkingPattern
-        case description
-        case source, createdAt, updatedAt
-    }
-
-    public init(
-        id: String,
-        name: String,
-        category: ModelCategory,
-        format: ModelFormat,
-        framework: InferenceFramework,
-        downloadURL: URL? = nil,
-        localPath: URL? = nil,
-        artifactType: ModelArtifactType? = nil,
-        downloadSize: Int64? = nil,
-        contextLength: Int? = nil,
-        supportsThinking: Bool = false,
-        thinkingPattern: ThinkingTagPattern? = nil,
-        description: String? = nil,
-        source: ModelSource = .remote,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date()
-    ) {
-        self.id = id
-        self.name = name
-        self.category = category
-        self.format = format
-        self.framework = framework
-        self.downloadURL = downloadURL
-        self.localPath = localPath
-
-        self.artifactType = artifactType ?? ModelArtifactType.infer(from: downloadURL, format: format)
-
-        self.downloadSize = downloadSize
-
-        if category.requiresContextLength {
-            self.contextLength = contextLength ?? 2048
+extension RAInferenceFramework: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        if let parsed = RAInferenceFramework(caseInsensitive: raw) {
+            self = parsed
         } else {
-            self.contextLength = contextLength
+            self = .unknown
         }
+    }
 
-        self.supportsThinking = category.supportsThinking ? supportsThinking : false
-        self.thinkingPattern = supportsThinking ? (thinkingPattern ?? .defaultPattern) : nil
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
+    }
+}
 
-        self.description = description
-        self.source = source
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
+public extension RAInferenceFramework {
+    /// Canonical wire string. Returns the proto enum name
+    /// (e.g. `INFERENCE_FRAMEWORK_LLAMA_CPP`) supplied by
+    /// `rac_inference_framework_wire_string`.
+    var wireString: String {
+        cWireString("INFERENCE_FRAMEWORK_UNKNOWN") {
+            rac_inference_framework_wire_string(self.toCFramework(), $0)
+        }
+    }
+
+    /// Human-readable display name from `rac_inference_framework_display_name`.
+    var displayName: String {
+        cWireString("Unknown") {
+            rac_inference_framework_display_name(self.toCFramework(), $0)
+        }
+    }
+
+    /// Snake_case key for analytics/telemetry from
+    /// `rac_inference_framework_analytics_key`.
+    var analyticsKey: String {
+        cWireString("unknown") {
+            rac_inference_framework_analytics_key(self.toCFramework(), $0)
+        }
+    }
+
+    /// Convert Swift InferenceFramework to C rac_inference_framework_t.
+    /// Delegates to commons' `rac_inference_framework_from_proto`, which
+    /// maps the proto enum int32 value (this enum's rawValue) to the C
+    /// enum's legacy ordering.
+    func toCFramework() -> rac_inference_framework_t {
+        var out: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
+        _ = rac_inference_framework_from_proto(Int32(self.rawValue), &out)
+        return out
+    }
+
+    /// Create Swift InferenceFramework from C rac_inference_framework_t.
+    /// Delegates to commons' `rac_inference_framework_to_proto`, which
+    /// maps the C enum back to the proto enum int32 value.
+    static func fromCFramework(_ cFramework: rac_inference_framework_t) -> RAInferenceFramework {
+        var protoValue: Int32 = 0
+        guard rac_inference_framework_to_proto(cFramework, &protoValue) == RAC_SUCCESS else {
+            return .unknown
+        }
+        return RAInferenceFramework(rawValue: Int(protoValue)) ?? .unknown
+    }
+
+    /// Initialize from a string matching case-insensitively against wire names,
+    /// display names, and analytics keys. Delegates to
+    /// `rac_inference_framework_from_string`.
+    init?(caseInsensitive string: String) {
+        var cFramework: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
+        guard rac_inference_framework_from_string(string, &cFramework) == RAC_SUCCESS else { return nil }
+        self = RAInferenceFramework.fromCFramework(cFramework)
+    }
+
+    /// All known concrete cases (excludes `.UNRECOGNIZED` and `.unspecified`).
+    static var knownCases: [RAInferenceFramework] {
+        [
+            .onnx, .sherpa, .llamaCpp, .foundationModels, .systemTts, .fluidAudio,
+            .coreml, .mlx, .metalrt, .genie,
+            .tflite, .executorch, .mediapipe, .mlc, .picoLlm,
+            .piperTts, .swiftTransformers,
+            .builtIn, .none, .unknown
+        ]
+    }
+
+    // MARK: - Pre-IDL case-name aliases
+    //
+    // The hand-written `InferenceFramework` enum used `.systemTTS` (UK-TLA
+    // camel-case). Proto conversion normalizes to `.systemTts`. Aliases below
+    // keep every existing call site compiling with zero edits.
+
+    static var systemTTS: RAInferenceFramework { .systemTts }
+    static var picoLLM: RAInferenceFramework { .picoLlm }
+    static var piperTTS: RAInferenceFramework { .piperTts }
+    static var execuTorch: RAInferenceFramework { .executorch }
+    static var mediaPipe: RAInferenceFramework { .mediapipe }
+}
+
+extension RAThinkingTagPattern: Codable {
+    // `defaultPattern` lives in `RALLMTypes+CppBridge.swift` (canonical
+    // C-bridge extension). Codable conformance stays here next to the other
+    // model-type Codable extensions so RAModelInfo persists cleanly to JSON.
+
+    public init(from decoder: Swift.Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        openTag = try container.decodeIfPresent(String.self, forKey: .openTag) ?? ""
+        closeTag = try container.decodeIfPresent(String.self, forKey: .closeTag) ?? ""
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(openTag, forKey: .openTag)
+        try container.encode(closeTag, forKey: .closeTag)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case openTag
+        case closeTag
+    }
+}
+
+// MARK: - ArchiveType
+
+extension RAArchiveType: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAArchiveType.fromWireString(raw) ?? .unspecified
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
+    }
+}
+
+public extension RAArchiveType {
+    /// Canonical proto wire string (e.g. `ARCHIVE_TYPE_ZIP`). The proto enum
+    /// has no `rac_archive_type_wire_string` ABI, so the name is built from the
+    /// value to stay aligned with `idl/model_types.proto`'s `ARCHIVE_TYPE_*`.
+    var wireString: String {
+        switch self {
+        case .unspecified: return "ARCHIVE_TYPE_UNSPECIFIED"
+        case .zip:         return "ARCHIVE_TYPE_ZIP"
+        case .tarBz2:      return "ARCHIVE_TYPE_TAR_BZ2"
+        case .tarGz:       return "ARCHIVE_TYPE_TAR_GZ"
+        case .tarXz:       return "ARCHIVE_TYPE_TAR_XZ"
+        default:           return "ARCHIVE_TYPE_UNSPECIFIED"
+        }
+    }
+
+    /// Parse a `RAArchiveType` from a wire string. Matches case-insensitively
+    /// against the canonical proto-name `wireString` (e.g. `ARCHIVE_TYPE_ZIP`)
+    /// AND the legacy short extension from `rac_archive_type_extension`
+    /// (e.g. `zip`, `tar.bz2`, `tbz2`). The legacy fallback preserves Codable
+    /// round-trip for persisted model metadata written with the pre-IDL short
+    /// names, mirroring `RAModelFormat.fromWireString`.
+    static func fromWireString(_ raw: String) -> RAArchiveType? {
+        let lowered = raw.lowercased()
+        switch lowered {
+        case "tbz2": return .tarBz2
+        case "tgz":  return .tarGz
+        case "txz":  return .tarXz
+        default:     break
+        }
+        for type in RAArchiveType.allCases {
+            if type.wireString.lowercased() == lowered { return type }
+            if !type.fileExtension.isEmpty,
+               type.fileExtension.lowercased() == lowered {
+                return type
+            }
+        }
+        return nil
+    }
+
+    /// File extension used in URLs, sourced from
+    /// `rac_archive_type_extension` (e.g. "zip", "tar.bz2").
+    var fileExtension: String {
+        guard let raw = rac_archive_type_extension(self.toC()) else { return "" }
+        return String(cString: raw)
+    }
+
+    /// Short uppercase form used in UI labels (e.g. "ZIP", "TAR.BZ2").
+    var displayName: String { fileExtension.uppercased() }
+
+    /// Detect archive type from URL suffix via `rac_archive_type_from_path`.
+    static func from(url: URL) -> RAArchiveType? {
+        var cType: rac_archive_type_t = RAC_ARCHIVE_TYPE_NONE
+        guard rac_archive_type_from_path(url.path, &cType) == RAC_TRUE,
+              let resolved = RAArchiveType(from: cType) else { return nil }
+        return resolved
+    }
+}
+
+// MARK: - ArchiveStructure
+//
+// `wireString` / `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto.
+
+extension RAArchiveStructure: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = RAArchiveStructure.from(wireString: raw) ?? .unspecified
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.wireString)
     }
 }

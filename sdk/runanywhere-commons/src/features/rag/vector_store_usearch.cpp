@@ -38,8 +38,7 @@ using f16_native_t = uint16_t;  // Use binary16 representation
 #define LOGW(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
-namespace runanywhere {
-namespace rag {
+namespace runanywhere::rag {
 
 using namespace unum::usearch;
 
@@ -441,5 +440,4 @@ bool VectorStoreUSearch::load(const std::string& path) {
     return impl_->load(path);
 }
 
-}  // namespace rag
-}  // namespace runanywhere
+}  // namespace runanywhere::rag

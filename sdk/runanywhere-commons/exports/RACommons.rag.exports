@@ -1,0 +1,31 @@
+# RACommons.rag.exports
+#
+# Backend-conditional exports for the RAG pipeline. Appended to the main
+# RACommons.exports list only when CMake is built with -DRAC_BACKEND_RAG=ON
+# (the default on every target except Emscripten, where the onnxruntime-wasm
+# vendor dep is gated). When RAG is OFF, the rac_rag_*_proto and
+# rac_backend_rag_* symbols do not exist in librac_commons, so listing them
+# in the unconditional exports list would make the Apple `-exported_symbols_list`
+# linker reject the entire export contract with `Undefined symbol`.
+#
+# See sdk/runanywhere-commons/CMakeLists.txt — the conditional append happens
+# right after the main `target_link_options(... -exported_symbols_list ...)`
+# block on Apple.
+#
+# pass2-syn-002 split: previously all 9 backend-conditional symbols were
+# silently omitted from RACommons.exports and tracked only by a comment
+# block. The split makes the omission explicit and toggleable from the
+# CMake flag that gates the backend.
+
+# rac_rag_* proto-byte ABI (commons-side RAG pipeline entry points).
+_rac_rag_clear_proto
+_rac_rag_ingest_proto
+_rac_rag_query_proto
+_rac_rag_session_create_proto
+_rac_rag_session_destroy_proto
+_rac_rag_stats_proto
+
+# rac_backend_rag_* — RAG backend plugin registration (publishes the engine
+# vtable to the plugin registry; reached by SDK bridges at module-load time).
+_rac_backend_rag_register
+_rac_backend_rag_unregister

@@ -166,7 +166,9 @@ final class FlowSessionManager: ObservableObject {
     /// Ensure an STT model is loaded; returns true on success. On failure the
     /// session is transitioned back to `.idle` and `lastError` is populated.
     private func ensureSTTModelLoaded() async -> Bool {
-        if await RunAnywhere.currentSTTModel != nil { return true }
+        var req = RACurrentModelRequest()
+        req.category = .speechRecognition
+        if RunAnywhere.currentModel(req).found { return true }
 
         guard let preferredId = SharedDataBridge.shared.preferredSTTModelId else {
             lastError = "No STT model selected. Open Voice Keyboard settings to download one."
@@ -177,12 +179,15 @@ final class FlowSessionManager: ObservableObject {
         }
 
         logger.info("Auto-loading preferred STT model: \(preferredId)")
-        do {
-            try await RunAnywhere.loadSTTModel(preferredId)
+        var request = RAModelLoadRequest()
+        request.modelID = preferredId
+        request.category = .speechRecognition
+        let result = await RunAnywhere.loadModel(request)
+        if result.success {
             return true
-        } catch {
+        } else {
             lastError = "Could not load model. Please check Voice Keyboard settings."
-            logger.error("Auto-load failed: \(error.localizedDescription)")
+            logger.error("Auto-load failed: \(result.errorMessage)")
             SharedDataBridge.shared.clearSession()
             transition(to: .idle)
             return false
@@ -198,16 +203,13 @@ final class FlowSessionManager: ObservableObject {
     /// Buffer accumulation is gated by sessionPhase (.listening only).
     private func startAudioCapture() async -> Bool {
         do {
-            try await audioCapture.startRecording { [weak self] data in
-                // AudioCaptureManager dispatches this callback on DispatchQueue.main
-                MainActor.assumeIsolated {
-                    guard let self else { return }
-                    // Always update audio level for waveform display
-                    SharedDataBridge.shared.audioLevel = self.audioCapture.audioLevel
-                    // Only accumulate audio data during the explicit listening window
-                    guard case .listening = self.sessionPhase else { return }
-                    self.audioBuffer.append(data)
-                }
+            try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] data in
+                guard let self else { return }
+                // Always update audio level for waveform display
+                SharedDataBridge.shared.audioLevel = self.audioCapture.audioLevel
+                // Only accumulate audio data during the explicit listening window
+                guard case .listening = self.sessionPhase else { return }
+                self.audioBuffer.append(data)
             }
             return true
         } catch {
@@ -292,7 +294,8 @@ final class FlowSessionManager: ObservableObject {
         logger.info("Transcribing \(audio.count) bytes")
 
         do {
-            let text = try await RunAnywhere.transcribe(audio)
+            let output = try await RunAnywhere.transcribe(audio: audio)
+            let text = output.text
             logger.info("Transcription complete: \"\(text)\"")
             wordCount += text.split(separator: " ").count
 
@@ -399,7 +402,7 @@ final class FlowSessionManager: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard let self else { break }
-                let phase = await self.sessionPhase
+                let phase = self.sessionPhase
                 guard phase != .idle else { break }
                 await MainActor.run {
                     self.elapsedSeconds += 1
@@ -407,7 +410,7 @@ final class FlowSessionManager: ObservableObject {
                     SharedDataBridge.shared.lastHeartbeatTimestamp = Date().timeIntervalSince1970
                 }
                 if #available(iOS 16.1, *) {
-                    let currentPhase = await self.sessionPhase
+                    let currentPhase = self.sessionPhase
                     await self.updateLiveActivity(phase: currentPhase.liveActivityPhase, transcript: "")
                 }
             }

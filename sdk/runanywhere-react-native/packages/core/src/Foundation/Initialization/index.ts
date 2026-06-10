@@ -2,20 +2,11 @@
  * Initialization Module
  *
  * Types and utilities for SDK two-phase initialization.
- * Matches iOS SDK pattern.
+ * Mirrors the Swift SDK pattern.
  */
 
-export {
-  InitializationPhase,
-  isSDKUsable,
-  areServicesReady,
-  isInitializing,
-} from './InitializationPhase';
-
-// Type exports
-export type { SDKInitParams, InitializationState } from './InitializationState';
-
-// Value exports
+export { InitializationPhase } from './InitializationPhase';
+export type { InitializationState } from './InitializationState';
 export {
   createInitialState,
   markCoreInitialized,

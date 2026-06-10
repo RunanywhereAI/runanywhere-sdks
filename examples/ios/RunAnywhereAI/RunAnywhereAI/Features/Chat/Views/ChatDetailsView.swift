@@ -48,7 +48,7 @@ struct ChatDetailsView: View {
             #endif
             .navigationTitle("Analytics")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

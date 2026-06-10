@@ -26,18 +26,18 @@ The app uses compile-time flags:
 
 | Component | Required Value |
 |-----------|----------------|
-| App Deployment Target | **iOS 17.0** |
-| SDK Requirement | iOS 17.0 (defined in `Package.swift`) |
-| Framework MinimumOSVersion | 17.0 |
+| App Deployment Target | **iOS 17.5** |
+| SDK Requirement | iOS 17.5 (defined in `Package.swift`) |
+| Framework MinimumOSVersion | 17.5 |
 
 **File:** `RunAnywhereAI.xcodeproj/project.pbxproj`
 
-Verify all `IPHONEOS_DEPLOYMENT_TARGET` entries are set to `17.0`:
+Verify all `IPHONEOS_DEPLOYMENT_TARGET` entries are set to `17.5`:
 ```
-IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+IPHONEOS_DEPLOYMENT_TARGET = 17.5;
 ```
 
-**Warning:** Do NOT set the deployment target higher than what the SDK supports. Setting it to iOS 18.x when frameworks were built for iOS 17 will cause validation errors.
+**Warning:** Do NOT set the deployment target higher than what the SDK supports. Setting it to iOS 18.x when frameworks were built for iOS 17.5 will cause validation errors.
 
 ### 3. Bump Version Number
 
@@ -62,7 +62,7 @@ Apple requires all embedded frameworks to have specific keys in their Info.plist
 
 #### Required Keys:
 - `CFBundleVersion` - Build version string
-- `MinimumOSVersion` - Must be set to **17.0** (matching SDK requirement)
+- `MinimumOSVersion` - Must be set to **17.5** (matching SDK requirement)
 
 #### Frameworks to Check:
 
@@ -93,7 +93,7 @@ We've created a script to automatically fix framework Info.plist files in Derive
 **What it does:**
 - Searches all DerivedData directories for framework Info.plist files
 - Patches `onnxruntime.framework`, `RACommons.framework`, `RABackendLLAMACPP.framework`, `RABackendONNX.framework`
-- Adds or updates `MinimumOSVersion=17.0`
+- Adds or updates `MinimumOSVersion=17.5`
 - Reports which files were patched vs. already correct
 
 **When to run:**
@@ -109,8 +109,8 @@ If you prefer to fix manually using PlistBuddy:
 # Add or update MinimumOSVersion for all frameworks in DerivedData
 for framework in onnxruntime RACommons RABackendLLAMACPP RABackendONNX; do
   for plist in $(find ~/Library/Developer/Xcode/DerivedData -path "*${framework}.framework/Info.plist" -type f 2>/dev/null); do
-    /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 17.0" "$plist" 2>/dev/null || \
-    /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 17.0" "$plist" 2>/dev/null
+    /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 17.5" "$plist" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 17.5" "$plist" 2>/dev/null
     echo "Patched: $plist"
   done
 done
@@ -179,11 +179,11 @@ Invalid Bundle. The bundle RunAnywhereAI.app/Frameworks/onnxruntime.framework do
 ```
 
 **Cause:** Mismatch between the app's deployment target and the framework's MinimumOSVersion. This happens when:
-- App deployment target is set higher than what frameworks support (e.g., iOS 18.5 when frameworks were built for iOS 17)
+- App deployment target is set higher than what frameworks support (e.g., iOS 18.5 when frameworks were built for iOS 17.5)
 - Framework MinimumOSVersion doesn't match the SDK requirements
 
 **Solution:**
-1. Verify app deployment target is `17.0` (not higher!)
+1. Verify app deployment target is `17.5` (not higher!)
 2. Run the patch script: `./scripts/patch-framework-plist.sh`
 3. Re-archive **without cleaning**
 
@@ -233,7 +233,7 @@ Ensure your Apple Developer account has:
 
 ```
 [ ] 1. Update production API key and base URL
-[ ] 2. Verify deployment target is iOS 17.0 (NOT higher!)
+[ ] 2. Verify deployment target is iOS 17.5 (NOT higher!)
 [ ] 3. Bump MARKETING_VERSION
 [ ] 4. Build project (Cmd+B)
 [ ] 5. Run patch script: ./scripts/patch-framework-plist.sh
@@ -269,13 +269,13 @@ To verify the app is in production mode:
 
 ## Technical Details
 
-### Why iOS 17.0?
+### Why iOS 17.5?
 
-The RunAnywhere SDK requires iOS 17.0 minimum (defined in `Package.swift`):
+The RunAnywhere SDK requires iOS 17.5 minimum (defined in `Package.swift`):
 ```swift
 platforms: [
-    .iOS(.v17),
-    .macOS(.v14),
+    .iOS("17.5"),
+    .macOS("14.5"),
     ...
 ]
 ```
@@ -286,11 +286,11 @@ All framework `MinimumOSVersion` values and the app's `IPHONEOS_DEPLOYMENT_TARGE
 
 | Framework | MinimumOSVersion |
 |-----------|------------------|
-| App (RunAnywhereAI) | 17.0 |
-| RACommons | 17.0 |
-| RABackendLLAMACPP | 17.0 |
-| RABackendONNX | 17.0 |
-| onnxruntime | 17.0 |
+| App (RunAnywhereAI) | 17.5 |
+| RACommons | 17.5 |
+| RABackendLLAMACPP | 17.5 |
+| RABackendONNX | 17.5 |
+| onnxruntime | 17.5 |
 
 ## Contacts
 

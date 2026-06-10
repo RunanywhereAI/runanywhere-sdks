@@ -6,7 +6,7 @@
 //  Can be used with any STT backend (ONNX, etc.)
 //
 
-import AVFoundation
+@preconcurrency import AVFoundation
 import CRACommons
 import Foundation
 
@@ -24,6 +24,13 @@ import CoreAudio
 /// - Works on: iOS, tvOS, and macOS using AVAudioEngine
 /// - NOT supported on: watchOS (AVAudioEngine inputNode tap doesn't work reliably)
 ///
+/// ## Concurrency
+/// `@unchecked Sendable` — instance mutations to `isRecording` / `audioLevel`
+/// are routed to the main queue; the underlying `AVAudioEngine` /
+/// `AVAudioInputNode` are used only from short hop closures on a serial
+/// user-initiated queue around start/stop. The class is safe to send across
+/// concurrency boundaries.
+///
 /// ## Usage
 /// ```swift
 /// let capture = AudioCaptureManager()
@@ -34,7 +41,7 @@ import CoreAudio
 ///     }
 /// }
 /// ```
-public class AudioCaptureManager: ObservableObject {
+public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
     private let logger = SDKLogger(category: "AudioCapture")
 
     private var audioEngine: AVAudioEngine?
@@ -309,19 +316,12 @@ public class AudioCaptureManager: ObservableObject {
 
     private func updateAudioLevel(buffer: AVAudioPCMBuffer) {
         guard let channelData = buffer.floatChannelData else { return }
-
-        let channelDataPointer = channelData.pointee
         let frames = Int(buffer.frameLength)
+        guard frames > 0 else { return }
 
-        // Calculate RMS (root mean square) for audio level
-        var sum: Float = 0.0
-        for i in 0..<frames {
-            let sample = channelDataPointer[i]
-            sum += sample * sample
-        }
-
-        let rms = sqrt(sum / Float(frames))
-        let dbLevel = 20 * log10(rms + 0.0001) // Add small value to avoid log(0)
+        // RMS->dB DSP centralised in commons (rac_audio_compute_level_db).
+        var dbLevel: Float = -100
+        _ = rac_audio_compute_level_db(channelData.pointee, frames, &dbLevel)
 
         // Normalize to 0-1 range (-60dB to 0dB)
         let normalizedLevel = max(0, min(1, (dbLevel + 60) / 60))
@@ -497,15 +497,18 @@ private enum MacAudioDeviceQuery {
     }
 
     private static func deviceName(_ deviceID: AudioDeviceID) -> String? {
-        var name = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        var name: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceNameCFString,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &name)
-        return status == noErr ? name as String : nil
+        let status = withUnsafeMutablePointer(to: &name) { namePtr -> OSStatus in
+            AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, namePtr)
+        }
+        guard status == noErr, let cfString = name?.takeRetainedValue() else { return nil }
+        return cfString as String
     }
 
     private static func transportType(_ deviceID: AudioDeviceID) -> UInt32 {

@@ -130,6 +130,30 @@ RAC_API bool rac_env_should_sync_with_backend(rac_environment_t env);
  */
 RAC_API const char* rac_env_description(rac_environment_t env);
 
+/**
+ * @brief Default HTTP request timeout (milliseconds) for control-plane
+ *        calls in this environment.
+ *
+ * Development mode talks to an operator-side
+ * DNS alias (e.g. `dev.runanywhere.local`) that often isn't reachable on
+ * the developer's machine; the default 30 s URLSession timeout then burns
+ * 30+ seconds per cold launch waiting for the SYSTEM resolver to give up.
+ *
+ * Returns a small value (3 000 ms) for `RAC_ENV_DEVELOPMENT` so the
+ * device-registration / auth round-trip fails fast and the SDK can
+ * proceed in offline-friendly DEV mode, and a generous value (30 000 ms)
+ * for staging / production where network reliability matters more.
+ *
+ * Platforms that own the HTTP transport (Swift URLSession, Flutter
+ * Dart HttpClient, Kotlin HttpURLConnection) are encouraged to call this
+ * helper instead of hard-coding their own timeout so all SDKs stay in
+ * sync.
+ *
+ * @param env The environment
+ * @return Timeout in milliseconds
+ */
+RAC_API int32_t rac_env_default_http_timeout_ms(rac_environment_t env);
+
 // =============================================================================
 // Validation Functions
 // =============================================================================

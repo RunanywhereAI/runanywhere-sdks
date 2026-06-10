@@ -10,8 +10,8 @@
 #include <algorithm>
 #include <filesystem>
 
-#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/llm/rac_llm_service.h"
 
 namespace rac {
 namespace server {
@@ -306,31 +306,14 @@ void HttpServer::setupCors() {
 rac_result_t HttpServer::loadModel(const std::string& modelPath) {
     RAC_LOG_INFO("Server", "Loading model: %s", modelPath.c_str());
 
-#ifdef RAC_HAS_LLAMACPP
-    // Register LlamaCPP backend if not already registered
-    rac_backend_llamacpp_register();
-
-    // Configure LlamaCPP with server settings
-    rac_llm_llamacpp_config_t llamacpp_config = RAC_LLM_LLAMACPP_CONFIG_DEFAULT;
-    llamacpp_config.context_size = config_.context_size;
-    llamacpp_config.num_threads = config_.threads;
-
-    RAC_LOG_INFO("Server", "LlamaCPP config: context_size=%d, num_threads=%d",
-                 llamacpp_config.context_size, llamacpp_config.num_threads);
-
-    // Create LLM handle using LlamaCPP-specific API with config
-    rac_result_t rc = rac_llm_llamacpp_create(modelPath.c_str(), &llamacpp_config, &llmHandle_);
+    rac_result_t rc = rac_llm_create(modelPath.c_str(), &llmHandle_);
     if (RAC_FAILED(rc)) {
-        RAC_LOG_ERROR("Server", "Failed to create LlamaCPP LLM handle: %d", rc);
+        RAC_LOG_ERROR("Server", "Failed to create generic LLM handle: %d", rc);
         return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;
     }
 
     RAC_LOG_INFO("Server", "Model loaded successfully");
     return RAC_SUCCESS;
-#else
-    RAC_LOG_ERROR("Server", "LlamaCPP backend not available");
-    return RAC_ERROR_SERVER_MODEL_LOAD_FAILED;
-#endif
 }
 
 void HttpServer::unloadModel() {

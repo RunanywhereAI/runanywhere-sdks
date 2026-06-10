@@ -3,9 +3,11 @@
  * Matches iOS CombinedSettingsView.
  */
 
+import { RunAnywhere } from '@runanywhere/web';
+
 let container: HTMLElement;
 
-// Settings state
+// Settings state — apiKey is kept in-memory only and never persisted.
 const settings = {
   temperature: 0.7,
   maxTokens: 2048,
@@ -49,6 +51,7 @@ export function initSettingsTab(el: HTMLElement): void {
         <div class="setting-row setting-row--stacked">
           <label class="label">API Key</label>
           <input type="password" class="text-input w-full" id="settings-api-key" placeholder="Enter API key..." value="${settings.apiKey}">
+          <p class="setting-hint">API key is held in memory only and not persisted — re-enter on each session.</p>
         </div>
         <div class="setting-row setting-row--stacked">
           <label class="label">Base URL</label>
@@ -70,7 +73,7 @@ export function initSettingsTab(el: HTMLElement): void {
         <div class="settings-section-title">About</div>
         <div class="setting-row">
           <span class="setting-label">SDK Version</span>
-          <span class="setting-value">0.1.0</span>
+          <span class="setting-value">${RunAnywhere.version}</span>
         </div>
         <div class="setting-row">
           <span class="setting-label">Platform</span>
@@ -144,7 +147,9 @@ function setupToggle(id: string, onChange: (on: boolean) => void): void {
 
 function saveSettings(): void {
   try {
-    localStorage.setItem('runanywhere-settings', JSON.stringify(settings));
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { apiKey: _apiKey, ...persistable } = settings;
+    localStorage.setItem('runanywhere-settings', JSON.stringify(persistable));
   } catch { /* storage may not be available */ }
 }
 
@@ -152,13 +157,16 @@ function loadSettings(): void {
   try {
     const saved = localStorage.getItem('runanywhere-settings');
     if (saved) {
-      Object.assign(settings, JSON.parse(saved));
+      const parsed = JSON.parse(saved) as Record<string, unknown>;
+      // apiKey is never persisted; omit it during restore so in-memory state stays empty.
+      const { apiKey: _apiKey, ...safe } = parsed;
+      Object.assign(settings, safe);
       // Update UI
       (container.querySelector('#settings-temp') as HTMLInputElement).value = String(settings.temperature);
       container.querySelector('#settings-temp-val')!.textContent = settings.temperature.toFixed(1);
       container.querySelector('#settings-tokens-val')!.textContent = String(settings.maxTokens);
       container.querySelector('#settings-analytics-toggle')!.classList.toggle('on', settings.analytics);
-      (container.querySelector('#settings-api-key') as HTMLInputElement).value = settings.apiKey;
+      (container.querySelector('#settings-api-key') as HTMLInputElement).value = '';
       (container.querySelector('#settings-base-url') as HTMLInputElement).value = settings.baseURL;
     }
   } catch { /* storage may not be available */ }

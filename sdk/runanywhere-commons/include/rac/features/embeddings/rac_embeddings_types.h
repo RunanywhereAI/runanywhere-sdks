@@ -7,6 +7,16 @@
  * useful for semantic search, clustering, and RAG.
  *
  * For the service interface, see rac_embeddings_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/enums (rac_embeddings_config_t,
+ *     rac_embeddings_options_t, rac_embedding_vector_t,
+ *     rac_embeddings_result_t, rac_embeddings_info_t,
+ *     rac_embeddings_normalize_t, rac_embeddings_pooling_t):
+ *     `delete after SDK migration`. Replaced by serialized
+ *     runanywhere.v1.EmbeddingsConfiguration / EmbeddingsOptions /
+ *     EmbeddingsRequest / EmbeddingsResult / EmbeddingVector bytes via
+ *     rac_embeddings_embed_batch_proto and the lifecycle proto API.
  */
 
 #ifndef RAC_EMBEDDINGS_TYPES_H

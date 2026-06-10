@@ -21,13 +21,13 @@ public final class SentryManager: @unchecked Sendable {
 
     /// Initialize Sentry with the configured DSN
     /// - Parameters:
-    ///   - dsn: Sentry DSN (if nil, uses C++ config sentryDSN)
+    ///   - dsn: Sentry DSN (app-supplied; if nil, crash reporting stays disabled)
     ///   - environment: SDK environment for tagging events
     public func initialize(dsn: String? = nil, environment: SDKEnvironment = .development) {
         guard !isInitialized else { return }
 
-        // Use provided DSN or fallback to C++ config
-        let sentryDSN = dsn ?? CppBridge.DevConfig.sentryDSN
+        // DSN is supplied by the app; commons no longer holds Sentry config.
+        let sentryDSN = dsn
 
         guard let configuredDSN = sentryDSN,
               configuredDSN != "YOUR_SENTRY_DSN_HERE" && !configuredDSN.isEmpty else {
@@ -41,7 +41,7 @@ public final class SentryManager: @unchecked Sendable {
 
         SentrySDK.start { options in
             options.dsn = configuredDSN
-            options.environment = environment.rawValue
+            options.environment = environment.wireString
             options.enableCrashHandler = true
             options.enableAutoBreadcrumbTracking = true
             options.enableAppHangTracking = true

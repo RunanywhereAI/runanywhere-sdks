@@ -6,13 +6,14 @@
  * Business logic (caching, JSON parsing, registry saving) is in C++.
  * Platform SDKs provide HTTP GET callback for network transport.
  *
- * Events are emitted via rac_analytics_event_emit().
+ * Events are emitted as canonical proto SDKEvents via rac::events::publish_*.
  */
 
 #ifndef RAC_MODEL_ASSIGNMENT_H
 #define RAC_MODEL_ASSIGNMENT_H
 
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef __cplusplus
@@ -29,7 +30,7 @@ extern "C" {
 typedef struct rac_assignment_http_response {
     rac_result_t result;        // RAC_SUCCESS on success
     int32_t status_code;        // HTTP status code (200, 400, etc.)
-    const char* response_body;  // Response JSON (must remain valid during processing)
+    const char* response_body;  // Response bytes (must remain valid during processing)
     size_t response_length;     // Length of response body
     const char* error_message;  // Error message (can be NULL)
 } rac_assignment_http_response_t;
@@ -99,6 +100,32 @@ rac_model_assignment_set_callbacks(const rac_assignment_callbacks_t* callbacks);
  */
 RAC_API rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh,
                                                 rac_model_info_t*** out_models, size_t* out_count);
+
+/**
+ * @brief Refresh model assignments using serialized ModelRegistryRefreshRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelRegistryRefreshResult bytes in out_result.
+ * The request/result schema is shared with the model registry refresh APIs so SDK
+ * adapters can use generated proto types instead of SDK-local assignment JSON
+ * parsing. C++ owns cache freshness, request interpretation, auth-required
+ * semantics, and normalization into generated ModelInfo. Platform adapters still
+ * own actual HTTP execution, auth/session storage, device facts, and prompts.
+ *
+ * No transport configured is treated as an offline/no-config refresh: the result
+ * succeeds with any valid cached assignments, otherwise an empty model list and a
+ * warning. Malformed request bytes return a typed rac_proto_buffer_t error.
+ *
+ * Deletion follow-up: once SDK adapters consume this API, legacy SDK-local
+ * assignment/cache JSON parsing can be removed.
+ *
+ * @param request_proto_bytes Serialized runanywhere.v1.ModelRegistryRefreshRequest bytes
+ * @param request_proto_size Byte count
+ * @param out_result Output serialized runanywhere.v1.ModelRegistryRefreshResult
+ * @return RAC_SUCCESS when out_result contains a result proto, or typed error code
+ */
+RAC_API rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
+                                                        rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get cached model assignments for a specific framework

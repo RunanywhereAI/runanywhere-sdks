@@ -14,6 +14,7 @@
 #include "rag_chunker.h"
 #include "vector_store_usearch.h"
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -28,12 +29,23 @@ namespace runanywhere {
 namespace rag {
 
 struct RAGBackendConfig {
+    // Canonical defaults mirrored from idl/rag.proto `rac_default` annotations
+    // (see also Swift RARAGConfiguration.defaults()). These in-struct defaults
+    // are what `build_backend_config` (rac_rag_proto_abi.cpp) applies when a
+    // caller passes a partial RAGConfiguration (proto zeros), so every platform
+    // SDK ends up with the same chunk/retrieval behavior. Keep these in sync
+    // with the IDL.
+    // Fallback only: when the caller omits embedding_dimension, the RAG proto
+    // ABI derives it from the loaded embedding model (rac_embeddings_get_info)
+    // at session create. 384 applies only if that derivation fails.
     size_t embedding_dimension = 384;
-    size_t top_k = 10;
-    float similarity_threshold = 0.12f;
+    size_t top_k = 5;
+    // 0.3, not 0.7 — MiniLM-class cosine similarities rarely exceed ~0.5 for
+    // relevant chunks; a 0.7 floor returns nothing (matches idl/rag.proto).
+    float similarity_threshold = 0.3f;
     size_t max_context_tokens = 2048;
-    size_t chunk_size = 180;
-    size_t chunk_overlap = 30;
+    size_t chunk_size = 512;
+    size_t chunk_overlap = 64;
     std::string prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:";
 };
 
@@ -72,13 +84,27 @@ class RAGBackend {
     std::vector<SearchResult> search(const std::string& query_text, size_t top_k) const;
 
     /**
-     * @brief End-to-end RAG query with adaptive context accumulation
+     * @brief End-to-end RAG query.
+     *
+     * This method constructs a per-call GraphScheduler-driven
+     * DAG (Embed → Retrieve → ContextAssembly → LLM) via `run_rag_query()`
+     * instead of running the steps imperatively. When `on_token` is non-null,
+     * tokens are forwarded as the LLM streams them.
      */
-    rac_result_t query(const std::string& question, const rac_llm_options_t* options,
-                       rac_llm_result_t* out_result, nlohmann::json& out_metadata);
+    /**
+     * Per-query retrieval overrides taken from RAGQueryOptions
+     * (idl/rag.proto). A zero/unset value falls back to the session-level
+     * `RAGConfig` defaults (top_k, similarity_threshold).
+     */
+    struct QueryOverrides {
+        int32_t retrieval_top_k = 0;
+        float similarity_threshold = 0.0f;
+    };
 
-    std::string build_context(const std::vector<SearchResult>& results) const;
-    std::string format_prompt(const std::string& query, const std::string& context) const;
+    rac_result_t query(const std::string& question, const rac_llm_options_t* options,
+                       rac_llm_result_t* out_result, nlohmann::json& out_metadata,
+                       std::function<bool(const std::string&)> on_token = nullptr,
+                       const QueryOverrides* overrides = nullptr);
 
     void clear();
     nlohmann::json get_statistics() const;

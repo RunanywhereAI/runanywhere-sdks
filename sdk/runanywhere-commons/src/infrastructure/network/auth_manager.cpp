@@ -6,8 +6,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <mutex>
+#include <string>
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 
@@ -15,6 +20,12 @@
 // Global State
 // =============================================================================
 
+// commons-005: every read/write of g_auth_state, g_storage, g_storage_available
+// must hold g_auth_mutex. Refresh fires asynchronously from a timer; sign-out
+// can happen from any UI thread; HTTP layer reads token on every request.
+// Without this lock, rac_auth_clear() can free strings still pointed at by
+// callers, and concurrent writes corrupt the state struct.
+static std::mutex g_auth_mutex;
 static rac_auth_state_t g_auth_state = {};
 static rac_secure_storage_t g_storage = {};
 static bool g_storage_available = false;
@@ -23,18 +34,8 @@ static bool g_storage_available = false;
 // Helpers
 // =============================================================================
 
-static char* str_dup(const char* src) {
-    if (!src)
-        return nullptr;
-    size_t len = strlen(src);
-    char* dst = (char*)malloc(len + 1);
-    if (dst) {
-        memcpy(dst, src, len + 1);
-    }
-    return dst;
-}
-
-static void free_auth_state_strings() {
+// Caller must hold g_auth_mutex.
+static void free_auth_state_strings_locked() {
     free(g_auth_state.access_token);
     free(g_auth_state.refresh_token);
     free(g_auth_state.device_id);
@@ -48,265 +49,60 @@ static void free_auth_state_strings() {
     g_auth_state.organization_id = nullptr;
 }
 
+// Caller must hold g_auth_mutex.
+static void reset_auth_state_locked() {
+    free_auth_state_strings_locked();
+    memset(&g_auth_state, 0, sizeof(g_auth_state));
+}
+
 static int64_t current_time_seconds() {
     return (int64_t)time(nullptr);
 }
 
-// =============================================================================
-// Initialization
-// =============================================================================
+// Caller must hold g_auth_mutex (touches no globals but kept local for symmetry).
+static const char* auth_subject_id(const rac_auth_response_t* response) {
+    if (!response) {
+        return nullptr;
+    }
+    if (response->user_id && response->user_id[0] != '\0') {
+        return response->user_id;
+    }
+    if (response->organization_id && response->organization_id[0] != '\0') {
+        return response->organization_id;
+    }
+    return nullptr;
+}
 
-void rac_auth_init(const rac_secure_storage_t* storage) {
-    rac_auth_reset();
-
-    if (storage && storage->store && storage->retrieve && storage->delete_key) {
-        g_storage = *storage;
-        g_storage_available = true;
+static void publish_auth_success_event(const rac_auth_response_t* response, bool refresh) {
+    const char* operation = refresh ? "auth.refresh" : "auth.authenticate";
+    if (refresh) {
+        rac::events::publish_auth_token_refreshed(auth_subject_id(response), "runanywhere", "sdk",
+                                                  operation,
+                                                  response ? response->device_id : nullptr);
     } else {
-        memset(&g_storage, 0, sizeof(g_storage));
-        g_storage_available = false;
+        rac::events::publish_auth_succeeded(auth_subject_id(response), "runanywhere", "sdk",
+                                            operation, response ? response->device_id : nullptr);
     }
 }
 
-void rac_auth_reset(void) {
-    free_auth_state_strings();
-    memset(&g_auth_state, 0, sizeof(g_auth_state));
+static void publish_auth_failure_event(const char* message, bool refresh) {
+    rac::events::publish_auth_failed(RAC_ERROR_AUTHENTICATION_FAILED,
+                                     message ? message : "Authentication failed", "runanywhere",
+                                     "sdk", refresh ? "auth.refresh" : "auth.authenticate");
 }
 
-// =============================================================================
-// Token State
-// =============================================================================
-
-bool rac_auth_is_authenticated(void) {
+// Caller must hold g_auth_mutex. Mirrors rac_auth_is_authenticated() without
+// re-locking so authenticated checks performed inside the lock stay consistent.
+static bool is_authenticated_locked() {
     return g_auth_state.is_authenticated && g_auth_state.access_token != nullptr &&
            g_auth_state.access_token[0] != '\0';
 }
 
-bool rac_auth_needs_refresh(void) {
-    if (!g_auth_state.refresh_token || g_auth_state.refresh_token[0] == '\0') {
-        return false;  // Can't refresh without refresh token
-    }
-
-    if (g_auth_state.token_expires_at <= 0) {
-        return true;  // Unknown expiry, assume needs refresh
-    }
-
-    // Check if token expires within 60 seconds
-    int64_t now = current_time_seconds();
-    return (g_auth_state.token_expires_at - now) < 60;
-}
-
-const char* rac_auth_get_access_token(void) {
-    if (!rac_auth_is_authenticated()) {
-        return nullptr;
-    }
-    return g_auth_state.access_token;
-}
-
-const char* rac_auth_get_device_id(void) {
-    return g_auth_state.device_id;
-}
-
-const char* rac_auth_get_user_id(void) {
-    return g_auth_state.user_id;
-}
-
-const char* rac_auth_get_organization_id(void) {
-    return g_auth_state.organization_id;
-}
-
-// =============================================================================
-// Request Building
-// =============================================================================
-
-char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config) {
-    if (!config)
-        return nullptr;
-
-    rac_auth_request_t request = {};
-    request.api_key = config->api_key;
-    request.device_id = config->device_id;
-    request.platform = config->platform;
-    request.sdk_version = config->sdk_version;
-
-    return rac_auth_request_to_json(&request);
-}
-
-char* rac_auth_build_refresh_request(void) {
-    if (!g_auth_state.refresh_token || !g_auth_state.device_id) {
-        return nullptr;
-    }
-
-    rac_refresh_request_t request = {};
-    request.device_id = g_auth_state.device_id;
-    request.refresh_token = g_auth_state.refresh_token;
-
-    return rac_refresh_request_to_json(&request);
-}
-
-// =============================================================================
-// Response Handling
-// =============================================================================
-
-static int update_auth_state_from_response(const rac_auth_response_t* response) {
-    if (!response || !response->access_token || !response->refresh_token) {
-        return -1;
-    }
-
-    // Pre-allocate required strings before modifying state
-    char* new_access = str_dup(response->access_token);
-    char* new_refresh = str_dup(response->refresh_token);
-    if (!new_access || !new_refresh) {
-        free(new_access);
-        free(new_refresh);
-        return -1;
-    }
-
-    // Free old strings
-    free_auth_state_strings();
-
-    // Assign pre-allocated required values
-    g_auth_state.access_token = new_access;
-    g_auth_state.refresh_token = new_refresh;
-
-    // Copy optional values (NULL is acceptable)
-    g_auth_state.device_id = str_dup(response->device_id);
-    g_auth_state.user_id = str_dup(response->user_id);
-    g_auth_state.organization_id = str_dup(response->organization_id);
-
-    // Calculate expiry timestamp
-    g_auth_state.token_expires_at = current_time_seconds() + response->expires_in;
-    g_auth_state.is_authenticated = true;
-
-    return 0;
-}
-
-int rac_auth_handle_authenticate_response(const char* json) {
-    if (!json)
-        return -1;
-
-    rac_auth_response_t response = {};
-    if (rac_auth_response_from_json(json, &response) != 0) {
-        return -1;
-    }
-
-    int result = update_auth_state_from_response(&response);
-
-    // Save to secure storage if available and successful
-    if (result == 0) {
-        rac_auth_save_tokens();
-    }
-
-    rac_auth_response_free(&response);
-    return result;
-}
-
-int rac_auth_handle_refresh_response(const char* json) {
-    // Same handling as authenticate - response format is identical
-    return rac_auth_handle_authenticate_response(json);
-}
-
-// =============================================================================
-// Token Management
-// =============================================================================
-
-int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh) {
-    if (!out_token || !out_needs_refresh)
-        return -1;
-
-    *out_token = nullptr;
-    *out_needs_refresh = false;
-
-    // Not authenticated at all
-    if (!rac_auth_is_authenticated()) {
-        return -1;
-    }
-
-    // Check if refresh is needed
-    if (rac_auth_needs_refresh()) {
-        *out_needs_refresh = true;
-        return 1;  // Caller should refresh
-    }
-
-    // Token is valid
-    *out_token = g_auth_state.access_token;
-    return 0;
-}
-
-void rac_auth_clear(void) {
-    // Clear in-memory state
-    rac_auth_reset();
-
-    // Clear secure storage
-    if (g_storage_available) {
-        g_storage.delete_key(RAC_KEY_ACCESS_TOKEN, g_storage.context);
-        g_storage.delete_key(RAC_KEY_REFRESH_TOKEN, g_storage.context);
-        g_storage.delete_key(RAC_KEY_DEVICE_ID, g_storage.context);
-        g_storage.delete_key(RAC_KEY_USER_ID, g_storage.context);
-        g_storage.delete_key(RAC_KEY_ORGANIZATION_ID, g_storage.context);
-    }
-}
-
-// =============================================================================
-// Persistence
-// =============================================================================
-
-int rac_auth_load_stored_tokens(void) {
+// Caller must hold g_auth_mutex. Mirrors rac_auth_save_tokens(); extracted so
+// handle_auth_response() can persist atomically without releasing the lock.
+static int save_tokens_locked() {
     if (!g_storage_available) {
-        return -1;
-    }
-
-    char buffer[2048];
-
-    // Load access token
-    if (g_storage.retrieve(RAC_KEY_ACCESS_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.access_token);
-        g_auth_state.access_token = str_dup(buffer);
-    } else {
-        return -1;  // No stored token
-    }
-
-    // Load refresh token
-    if (g_storage.retrieve(RAC_KEY_REFRESH_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.refresh_token);
-        g_auth_state.refresh_token = str_dup(buffer);
-    }
-
-    // Load device ID
-    if (g_storage.retrieve(RAC_KEY_DEVICE_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.device_id);
-        g_auth_state.device_id = str_dup(buffer);
-    }
-
-    // Load user ID (optional)
-    if (g_storage.retrieve(RAC_KEY_USER_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
-        free(g_auth_state.user_id);
-        g_auth_state.user_id = str_dup(buffer);
-    }
-
-    // Load organization ID
-    if (g_storage.retrieve(RAC_KEY_ORGANIZATION_ID, buffer, sizeof(buffer), g_storage.context) >
-        0) {
-        free(g_auth_state.organization_id);
-        g_auth_state.organization_id = str_dup(buffer);
-    }
-
-    // Mark as authenticated if we have tokens
-    if (g_auth_state.access_token && g_auth_state.access_token[0] != '\0') {
-        g_auth_state.is_authenticated = true;
-        // Token expiry is unknown when loading, so it will trigger refresh on first use
-        g_auth_state.token_expires_at = 0;
-    }
-
-    // Clear sensitive data from stack buffer
-    memset(buffer, 0, sizeof(buffer));
-
-    return 0;
-}
-
-int rac_auth_save_tokens(void) {
-    if (!g_storage_available) {
-        return 0;  // Not an error, just no-op
+        return 0;
     }
 
     int result = 0;
@@ -345,4 +141,345 @@ int rac_auth_save_tokens(void) {
     }
 
     return result;
+}
+
+// =============================================================================
+// Initialization
+// =============================================================================
+
+void rac_auth_init(const rac_secure_storage_t* storage) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    reset_auth_state_locked();
+
+    if (storage && storage->store && storage->retrieve && storage->delete_key) {
+        g_storage = *storage;
+        g_storage_available = true;
+    } else {
+        memset(&g_storage, 0, sizeof(g_storage));
+        g_storage_available = false;
+    }
+}
+
+void rac_auth_reset(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    reset_auth_state_locked();
+}
+
+// =============================================================================
+// Token State
+// =============================================================================
+
+bool rac_auth_is_authenticated(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    return is_authenticated_locked();
+}
+
+bool rac_auth_needs_refresh(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    if (!g_auth_state.refresh_token || g_auth_state.refresh_token[0] == '\0') {
+        return false;  // Can't refresh without refresh token
+    }
+
+    if (g_auth_state.token_expires_at <= 0) {
+        return true;  // Unknown expiry, assume needs refresh
+    }
+
+    // Check if token expires within 60 seconds
+    int64_t now = current_time_seconds();
+    return (g_auth_state.token_expires_at - now) < 60;
+}
+
+// commons-005: getters copy under the lock into a thread_local buffer so the
+// returned pointer remains valid even if another thread calls rac_auth_clear()
+// or handle_auth_response() right after we return. Mirrors the proven pattern
+// in sdk_state.cpp / model_paths.cpp. Contract: pointer is valid until the
+// next rac_auth_* call on this thread.
+const char* rac_auth_get_access_token(void) {
+    static thread_local std::string tl_access_token;
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    if (!is_authenticated_locked()) {
+        return nullptr;
+    }
+    tl_access_token = g_auth_state.access_token;
+    return tl_access_token.c_str();
+}
+
+const char* rac_auth_get_refresh_token(void) {
+    static thread_local std::string tl_refresh_token;
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    if (!g_auth_state.refresh_token || g_auth_state.refresh_token[0] == '\0') {
+        return nullptr;
+    }
+    tl_refresh_token = g_auth_state.refresh_token;
+    return tl_refresh_token.c_str();
+}
+
+int64_t rac_auth_get_token_expires_at(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    return g_auth_state.token_expires_at;
+}
+
+const char* rac_auth_get_device_id(void) {
+    static thread_local std::string tl_device_id;
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    if (!g_auth_state.device_id) {
+        return nullptr;
+    }
+    tl_device_id = g_auth_state.device_id;
+    return tl_device_id.c_str();
+}
+
+const char* rac_auth_get_user_id(void) {
+    static thread_local std::string tl_user_id;
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    if (!g_auth_state.user_id) {
+        return nullptr;
+    }
+    tl_user_id = g_auth_state.user_id;
+    return tl_user_id.c_str();
+}
+
+const char* rac_auth_get_organization_id(void) {
+    static thread_local std::string tl_organization_id;
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    if (!g_auth_state.organization_id) {
+        return nullptr;
+    }
+    tl_organization_id = g_auth_state.organization_id;
+    return tl_organization_id.c_str();
+}
+
+// =============================================================================
+// Request Building
+// =============================================================================
+
+char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config) {
+    if (!config)
+        return nullptr;
+
+    rac_auth_request_t request = {};
+    request.api_key = config->api_key;
+    request.device_id = config->device_id;
+    request.platform = config->platform;
+    request.sdk_version = config->sdk_version;
+
+    return rac_auth_request_to_json(&request);
+}
+
+char* rac_auth_build_refresh_request(void) {
+    // Snapshot the two strings under the lock then build the JSON outside —
+    // rac_refresh_request_to_json() allocates and is independent of globals.
+    std::string device_id_copy;
+    std::string refresh_token_copy;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        if (!g_auth_state.refresh_token || !g_auth_state.device_id) {
+            return nullptr;
+        }
+        device_id_copy = g_auth_state.device_id;
+        refresh_token_copy = g_auth_state.refresh_token;
+    }
+
+    rac_refresh_request_t request = {};
+    request.device_id = device_id_copy.c_str();
+    request.refresh_token = refresh_token_copy.c_str();
+
+    return rac_refresh_request_to_json(&request);
+}
+
+// =============================================================================
+// Response Handling
+// =============================================================================
+
+// Caller must hold g_auth_mutex.
+static int update_auth_state_from_response_locked(const rac_auth_response_t* response) {
+    if (!response || !response->access_token || !response->refresh_token) {
+        return -1;
+    }
+
+    // Pre-allocate required strings before modifying state
+    char* new_access = rac_strdup(response->access_token);
+    char* new_refresh = rac_strdup(response->refresh_token);
+    if (!new_access || !new_refresh) {
+        free(new_access);
+        free(new_refresh);
+        return -1;
+    }
+
+    // Free old strings
+    free_auth_state_strings_locked();
+
+    // Assign pre-allocated required values
+    g_auth_state.access_token = new_access;
+    g_auth_state.refresh_token = new_refresh;
+
+    // Copy optional values (NULL is acceptable)
+    g_auth_state.device_id = rac_strdup(response->device_id);
+    g_auth_state.user_id = rac_strdup(response->user_id);
+    g_auth_state.organization_id = rac_strdup(response->organization_id);
+
+    // Calculate expiry timestamp
+    g_auth_state.token_expires_at = current_time_seconds() + response->expires_in;
+    g_auth_state.is_authenticated = true;
+
+    return 0;
+}
+
+static int handle_auth_response(const char* json, bool refresh) {
+    if (!json) {
+        publish_auth_failure_event("Authentication response body is missing", refresh);
+        return -1;
+    }
+
+    rac_auth_response_t response = {};
+    if (rac_auth_response_from_json(json, &response) != 0) {
+        publish_auth_failure_event("Authentication response is invalid", refresh);
+        return -1;
+    }
+
+    int result;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        result = update_auth_state_from_response_locked(&response);
+
+        // Save to secure storage atomically while still holding the lock so
+        // we cannot race a concurrent rac_auth_clear() between the in-memory
+        // update and the persisted copy.
+        if (result == 0) {
+            save_tokens_locked();
+        }
+    }
+
+    // Publish events outside the lock (lock-copy-dispatch) — subscribers may
+    // re-enter auth APIs (e.g. to log token state) so holding the mutex would
+    // deadlock.
+    if (result == 0) {
+        publish_auth_success_event(&response, refresh);
+    } else {
+        publish_auth_failure_event("Failed to update authentication state", refresh);
+    }
+
+    rac_auth_response_free(&response);
+    return result;
+}
+
+int rac_auth_handle_authenticate_response(const char* json) {
+    return handle_auth_response(json, false);
+}
+
+int rac_auth_handle_refresh_response(const char* json) {
+    // Same response format as authenticate; event semantics are distinct.
+    return handle_auth_response(json, true);
+}
+
+// =============================================================================
+// Token Management
+// =============================================================================
+
+int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh) {
+    if (!out_token || !out_needs_refresh)
+        return -1;
+
+    *out_token = nullptr;
+    *out_needs_refresh = false;
+
+    // commons-005: copy the token under the lock into a thread_local buffer so
+    // the *out_token pointer remains valid after we drop the lock.
+    static thread_local std::string tl_valid_token;
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+
+    if (!is_authenticated_locked()) {
+        return -1;
+    }
+
+    if (g_auth_state.refresh_token && g_auth_state.refresh_token[0] != '\0' &&
+        (g_auth_state.token_expires_at <= 0 ||
+         (g_auth_state.token_expires_at - current_time_seconds()) < 60)) {
+        *out_needs_refresh = true;
+        return 1;  // Caller should refresh
+    }
+
+    tl_valid_token = g_auth_state.access_token;
+    *out_token = tl_valid_token.c_str();
+    return 0;
+}
+
+void rac_auth_clear(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+
+    // Clear in-memory state
+    reset_auth_state_locked();
+
+    // Clear secure storage
+    if (g_storage_available) {
+        g_storage.delete_key(RAC_KEY_ACCESS_TOKEN, g_storage.context);
+        g_storage.delete_key(RAC_KEY_REFRESH_TOKEN, g_storage.context);
+        g_storage.delete_key(RAC_KEY_DEVICE_ID, g_storage.context);
+        g_storage.delete_key(RAC_KEY_USER_ID, g_storage.context);
+        g_storage.delete_key(RAC_KEY_ORGANIZATION_ID, g_storage.context);
+    }
+}
+
+// =============================================================================
+// Persistence
+// =============================================================================
+
+int rac_auth_load_stored_tokens(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+
+    if (!g_storage_available) {
+        return -1;
+    }
+
+    char buffer[2048];
+
+    // Load access token
+    if (g_storage.retrieve(RAC_KEY_ACCESS_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
+        free(g_auth_state.access_token);
+        g_auth_state.access_token = rac_strdup(buffer);
+    } else {
+        return -1;  // No stored token
+    }
+
+    // Load refresh token
+    if (g_storage.retrieve(RAC_KEY_REFRESH_TOKEN, buffer, sizeof(buffer), g_storage.context) > 0) {
+        free(g_auth_state.refresh_token);
+        g_auth_state.refresh_token = rac_strdup(buffer);
+    }
+
+    // Load device ID
+    if (g_storage.retrieve(RAC_KEY_DEVICE_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
+        free(g_auth_state.device_id);
+        g_auth_state.device_id = rac_strdup(buffer);
+    }
+
+    // Load user ID (optional)
+    if (g_storage.retrieve(RAC_KEY_USER_ID, buffer, sizeof(buffer), g_storage.context) > 0) {
+        free(g_auth_state.user_id);
+        g_auth_state.user_id = rac_strdup(buffer);
+    }
+
+    // Load organization ID
+    if (g_storage.retrieve(RAC_KEY_ORGANIZATION_ID, buffer, sizeof(buffer), g_storage.context) >
+        0) {
+        free(g_auth_state.organization_id);
+        g_auth_state.organization_id = rac_strdup(buffer);
+    }
+
+    // Mark as authenticated if we have tokens
+    if (g_auth_state.access_token && g_auth_state.access_token[0] != '\0') {
+        g_auth_state.is_authenticated = true;
+        // Token expiry is unknown when loading, so it will trigger refresh on first use
+        g_auth_state.token_expires_at = 0;
+    }
+
+    // Clear sensitive data from stack buffer
+    memset(buffer, 0, sizeof(buffer));
+
+    return 0;
+}
+
+int rac_auth_save_tokens(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    return save_tokens_locked();
 }

@@ -9,24 +9,26 @@
 #include "test_common.h"
 #include "test_config.h"
 
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
+#include <exception>
+#include <string>
+#include <vector>
+
+#include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_audio_utils.h"
 #include "rac/core/rac_platform_adapter.h"
-
-#include <chrono>
-#include <cmath>
-#include <cstring>
-#include <string>
-#include <vector>
 
 // =============================================================================
 // Minimal test platform adapter
 // =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
-                               const char* /*message*/, void* /*ctx*/) {
+                              const char* /*message*/, void* /*ctx*/) {
     // silent during tests
 }
 
@@ -36,23 +38,55 @@ static int64_t test_now_ms(void* /*ctx*/) {
         .count();
 }
 
-static const rac_platform_adapter_t test_adapter = {
-    /* file_exists       */ nullptr,
-    /* file_read         */ nullptr,
-    /* file_write        */ nullptr,
-    /* file_delete       */ nullptr,
-    /* secure_get        */ nullptr,
-    /* secure_set        */ nullptr,
-    /* secure_delete     */ nullptr,
-    /* log               */ test_log_callback,
-    /* track_error       */ nullptr,
-    /* now_ms            */ test_now_ms,
-    /* get_memory_info   */ nullptr,
-    /* http_download     */ nullptr,
-    /* http_download_cancel */ nullptr,
-    /* extract_archive   */ nullptr,
-    /* user_data         */ nullptr,
-};
+// Minimal no-op mandatory-slot stubs. rac_init now fail-fasts when any
+// mandatory slot is NULL, so every mandatory slot must be a real (non-NULL)
+// function pointer even for the lifecycle-only tests.
+static rac_bool_t test_file_exists(const char* /*path*/, void* /*ctx*/) {
+    return RAC_FALSE;
+}
+static rac_result_t test_file_read(const char* /*path*/, void** /*out_data*/, size_t* /*out_size*/,
+                                   void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_file_write(const char* /*path*/, const void* /*data*/, size_t /*size*/,
+                                    void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_file_delete(const char* /*path*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_get(const char* /*key*/, char** /*out_value*/, void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_secure_set(const char* /*key*/, const char* /*value*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_delete(const char* /*key*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+
+// Build a fully-valid happy-path adapter (correct abi_version + struct_size and
+// every mandatory slot populated). Returned by value so individual tests can
+// tweak a field to exercise the new rac_init validation.
+static rac_platform_adapter_t make_valid_test_adapter() {
+    rac_platform_adapter_t adapter = {};
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t));
+    adapter.file_exists = test_file_exists;
+    adapter.file_read = test_file_read;
+    adapter.file_write = test_file_write;
+    adapter.file_delete = test_file_delete;
+    adapter.secure_get = test_secure_get;
+    adapter.secure_set = test_secure_set;
+    adapter.secure_delete = test_secure_delete;
+    adapter.log = test_log_callback;
+    adapter.now_ms = test_now_ms;
+    return adapter;
+}
+
+// Stable storage for the happy-path adapter referenced by make_test_config().
+// The adapter pointer must outlive rac_init/rac_shutdown by contract.
+static const rac_platform_adapter_t test_adapter = make_valid_test_adapter();
 
 static rac_config_t make_test_config() {
     rac_config_t config = {};
@@ -119,14 +153,83 @@ static TestResult test_get_version() {
 }
 
 // =============================================================================
+// Test: platform adapter ABI / mandatory-slot validation in rac_init
+// =============================================================================
+
+static TestResult test_init_wrong_abi_version() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION + 1;  // mismatch
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_ABI_VERSION_MISMATCH,
+              "rac_init should reject a wrong abi_version with RAC_ERROR_ABI_VERSION_MISMATCH");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_init must not initialize on ABI mismatch");
+    return TEST_PASS();
+}
+
+static TestResult test_init_wrong_struct_size() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t)) - 4;  // mismatch
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_ABI_VERSION_MISMATCH,
+              "rac_init should reject a wrong struct_size with RAC_ERROR_ABI_VERSION_MISMATCH");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_init must not initialize on struct_size mismatch");
+    return TEST_PASS();
+}
+
+static TestResult test_init_missing_mandatory_slot() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+    adapter.now_ms = nullptr;  // drop a mandatory slot
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_ADAPTER_NOT_SET,
+              "rac_init should reject a NULL mandatory slot with RAC_ERROR_ADAPTER_NOT_SET");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE,
+              "rac_init must not initialize when a mandatory slot is NULL");
+    return TEST_PASS();
+}
+
+static TestResult test_init_valid_adapter_succeeds() {
+    rac_platform_adapter_t adapter = make_valid_test_adapter();
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_SUCCESS, "rac_init should succeed with a fully-valid adapter");
+    ASSERT_EQ(rac_is_initialized(), RAC_TRUE, "rac_is_initialized should be TRUE after init");
+
+    rac_shutdown();
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE, "rac_is_initialized should be FALSE after shutdown");
+    return TEST_PASS();
+}
+
+// =============================================================================
 // Test: error messages for known codes
 // =============================================================================
 
 static TestResult test_error_message_known() {
     const char* msg_success = rac_error_message(RAC_SUCCESS);
     ASSERT_TRUE(msg_success != nullptr, "rac_error_message(RAC_SUCCESS) should not be NULL");
-    ASSERT_TRUE(std::strlen(msg_success) > 0,
-                "rac_error_message(RAC_SUCCESS) should not be empty");
+    ASSERT_TRUE(std::strlen(msg_success) > 0, "rac_error_message(RAC_SUCCESS) should not be empty");
 
     const char* msg_not_init = rac_error_message(RAC_ERROR_NOT_INITIALIZED);
     ASSERT_TRUE(msg_not_init != nullptr,
@@ -149,8 +252,7 @@ static TestResult test_error_message_known() {
 
 static TestResult test_error_message_unknown() {
     const char* msg = rac_error_message(static_cast<rac_result_t>(-9999));
-    ASSERT_TRUE(msg != nullptr,
-                "rac_error_message(-9999) should not be NULL (unknown code)");
+    ASSERT_TRUE(msg != nullptr, "rac_error_message(-9999) should not be NULL (unknown code)");
 
     return TEST_PASS();
 }
@@ -188,8 +290,7 @@ static TestResult test_error_details() {
 
     rac_error_clear_details();
     const char* cleared = rac_error_get_details();
-    ASSERT_TRUE(cleared == nullptr,
-                "rac_error_get_details should return NULL after clear");
+    ASSERT_TRUE(cleared == nullptr, "rac_error_get_details should return NULL after clear");
 
     return TEST_PASS();
 }
@@ -201,12 +302,10 @@ static TestResult test_error_details() {
 static TestResult test_logger_levels() {
     rac_result_t rc = rac_logger_init(RAC_LOG_DEBUG);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_logger_init should succeed");
-    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_DEBUG,
-              "min level should be DEBUG after init");
+    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_DEBUG, "min level should be DEBUG after init");
 
     rac_logger_set_min_level(RAC_LOG_WARNING);
-    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_WARNING,
-              "min level should be WARNING after set");
+    ASSERT_EQ(rac_logger_get_min_level(), RAC_LOG_WARNING, "min level should be WARNING after set");
 
     rac_logger_shutdown();
     return TEST_PASS();
@@ -235,53 +334,6 @@ static TestResult test_logger_no_crash() {
 }
 
 // =============================================================================
-// Test: module register / list / unregister
-// =============================================================================
-
-static TestResult test_module_register() {
-    rac_config_t config = make_test_config();
-    rac_result_t rc = rac_init(&config);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_init should succeed");
-
-    // Prepare module info
-    rac_capability_t caps[] = {RAC_CAPABILITY_STT};
-    rac_module_info_t mod = {};
-    mod.id = "test-module";
-    mod.name = "Test";
-    mod.version = "1.0";
-    mod.description = "A test module";
-    mod.capabilities = caps;
-    mod.num_capabilities = 1;
-
-    rc = rac_module_register(&mod);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_module_register should succeed");
-
-    // List modules
-    const rac_module_info_t* modules = nullptr;
-    size_t count = 0;
-    rc = rac_module_list(&modules, &count);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_module_list should succeed");
-    ASSERT_TRUE(count > 0, "module count should be > 0 after register");
-
-    // Verify our module is in the list
-    bool found = false;
-    for (size_t i = 0; i < count; ++i) {
-        if (modules[i].id && std::strcmp(modules[i].id, "test-module") == 0) {
-            found = true;
-            break;
-        }
-    }
-    ASSERT_TRUE(found, "registered module 'test-module' should appear in module list");
-
-    // Unregister
-    rc = rac_module_unregister("test-module");
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_module_unregister should succeed");
-
-    rac_shutdown();
-    return TEST_PASS();
-}
-
-// =============================================================================
 // Test: rac_alloc / rac_free / rac_strdup
 // =============================================================================
 
@@ -292,8 +344,7 @@ static TestResult test_alloc_free() {
 
     char* dup = rac_strdup("hello");
     ASSERT_TRUE(dup != nullptr, "rac_strdup(\"hello\") should return non-NULL");
-    ASSERT_TRUE(std::strcmp(dup, "hello") == 0,
-                "rac_strdup result should match original string");
+    ASSERT_TRUE(std::strcmp(dup, "hello") == 0, "rac_strdup result should match original string");
     rac_free(dup);
 
     return TEST_PASS();
@@ -317,7 +368,7 @@ static TestResult test_audio_float32_to_wav() {
     void* wav_data = nullptr;
     size_t wav_size = 0;
     rac_result_t rc = rac_audio_float32_to_wav(samples.data(), num_samples * sizeof(float),
-                                                sample_rate, &wav_data, &wav_size);
+                                               sample_rate, &wav_data, &wav_size);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_audio_float32_to_wav should succeed");
     ASSERT_TRUE(wav_data != nullptr, "wav_data should not be NULL");
     ASSERT_TRUE(wav_size > 44, "wav_size should be > 44 (WAV header)");
@@ -349,7 +400,7 @@ static TestResult test_audio_int16_to_wav() {
     void* wav_data = nullptr;
     size_t wav_size = 0;
     rac_result_t rc = rac_audio_int16_to_wav(samples.data(), num_samples * sizeof(int16_t),
-                                              sample_rate, &wav_data, &wav_size);
+                                             sample_rate, &wav_data, &wav_size);
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_audio_int16_to_wav should succeed");
     ASSERT_TRUE(wav_data != nullptr, "wav_data should not be NULL");
     ASSERT_TRUE(wav_size > 44, "wav_size should be > 44 (WAV header)");
@@ -363,21 +414,31 @@ static TestResult test_audio_int16_to_wav() {
 // =============================================================================
 
 int main(int argc, char** argv) {
-    TestSuite suite("core");
+    try {
+        TestSuite suite("core");
 
-    suite.add("init_shutdown", test_init_shutdown);
-    suite.add("double_init", test_double_init);
-    suite.add("get_version", test_get_version);
-    suite.add("error_message_known", test_error_message_known);
-    suite.add("error_message_unknown", test_error_message_unknown);
-    suite.add("error_classification", test_error_classification);
-    suite.add("error_details", test_error_details);
-    suite.add("logger_levels", test_logger_levels);
-    suite.add("logger_no_crash", test_logger_no_crash);
-    suite.add("module_register", test_module_register);
-    suite.add("alloc_free", test_alloc_free);
-    suite.add("audio_float32_to_wav", test_audio_float32_to_wav);
-    suite.add("audio_int16_to_wav", test_audio_int16_to_wav);
+        suite.add("init_shutdown", test_init_shutdown);
+        suite.add("double_init", test_double_init);
+        suite.add("get_version", test_get_version);
+        suite.add("init_wrong_abi_version", test_init_wrong_abi_version);
+        suite.add("init_wrong_struct_size", test_init_wrong_struct_size);
+        suite.add("init_missing_mandatory_slot", test_init_missing_mandatory_slot);
+        suite.add("init_valid_adapter_succeeds", test_init_valid_adapter_succeeds);
+        suite.add("error_message_known", test_error_message_known);
+        suite.add("error_message_unknown", test_error_message_unknown);
+        suite.add("error_classification", test_error_classification);
+        suite.add("error_details", test_error_details);
+        suite.add("logger_levels", test_logger_levels);
+        suite.add("logger_no_crash", test_logger_no_crash);
+        suite.add("alloc_free", test_alloc_free);
+        suite.add("audio_float32_to_wav", test_audio_float32_to_wav);
+        suite.add("audio_int16_to_wav", test_audio_int16_to_wav);
 
-    return suite.run(argc, argv);
+        return suite.run(argc, argv);
+    } catch (const std::exception& e) {
+        std::fprintf(stderr, "FATAL: %s\n", e.what());
+        return 1;
+    } catch (...) {
+        return 1;
+    }
 }

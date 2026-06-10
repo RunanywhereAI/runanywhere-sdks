@@ -78,28 +78,34 @@ final class VoiceDictationManagementViewModel: ObservableObject {
     // MARK: - Model
 
     private func checkLoadedModel() async {
-        if let model = await RunAnywhere.currentSTTModel {
-            loadedModelId = model.id
-            loadedModelName = model.name
+        var req = RACurrentModelRequest()
+        req.category = .speechRecognition
+        let snapshot = RunAnywhere.currentModel(req)
+        if snapshot.found {
+            loadedModelId = snapshot.model.id
+            loadedModelName = snapshot.model.name
         } else {
             loadedModelId = nil
             loadedModelName = nil
         }
     }
 
-    func loadModel(_ model: ModelInfo) async {
+    func loadModel(_ model: RAModelInfo) async {
         logger.info("Loading STT model: \(model.name)")
         isLoadingModel = true
         errorMessage = nil
-        do {
-            try await RunAnywhere.loadSTTModel(model.id)
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = .speechRecognition
+        let result = await RunAnywhere.loadModel(request)
+        if result.success {
             loadedModelId = model.id
             loadedModelName = model.name
             SharedDataBridge.shared.preferredSTTModelId = model.id
             logger.info("STT model loaded: \(model.name)")
-        } catch {
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
-            logger.error("Model load failed: \(error.localizedDescription)")
+        } else {
+            errorMessage = "Failed to load model: \(result.errorMessage)"
+            logger.error("Model load failed: \(result.errorMessage)")
         }
         isLoadingModel = false
     }

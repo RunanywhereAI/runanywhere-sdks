@@ -1,12 +1,11 @@
 # RunAnywhere Kotlin SDK
 
-**Privacy-first, on-device AI for Android & JVM**. Run LLMs, speech-to-text, text-to-speech, and voice agents locally with cloud fallback, OTA updates, and production observability.
+**Privacy-first, on-device AI for Android**. Run LLMs, speech-to-text, text-to-speech, and voice agents locally with cloud fallback, OTA updates, and production observability.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.runanywhere.sdk/runanywhere-kotlin?label=Maven%20Central)](https://search.maven.org/artifact/com.runanywhere.sdk/runanywhere-kotlin)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Platform: Android 7.0+](https://img.shields.io/badge/Platform-Android%207.0%2B-green)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-blue?logo=kotlin)](https://kotlinlang.org)
-[![KMP](https://img.shields.io/badge/Kotlin%20Multiplatform-Supported-purple)](https://kotlinlang.org/docs/multiplatform.html)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1%2B-blue?logo=kotlin)](https://kotlinlang.org)
 
 ---
 
@@ -31,21 +30,23 @@
 ```kotlin
 dependencies {
     // Core SDK
-    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.1.4")
+    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.19.13")
 
     // Optional: LLM support (llama.cpp backend) - ~34MB
-    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.1.4")
+    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.19.13")
 
-    // Optional: STT/TTS/VAD support (ONNX backend) - ~25MB
-    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.1.4")
+    // Optional: STT/TTS/VAD support (Sherpa/ONNX backend) - ~25MB
+    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.19.13")
 }
 ```
+
+Android System TTS is also registered by the core SDK during service initialization through the platform backend. Use the `system-tts` built-in voice when you want Android `TextToSpeech` playback instead of an ONNX/Sherpa voice model.
 
 ### 2. Initialize SDK (Application.onCreate)
 
 ```kotlin
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
 
 class MyApplication : Application() {
     override fun onCreate() {
@@ -54,7 +55,7 @@ class MyApplication : Application() {
         // Initialize RunAnywhere (fast, ~1-5ms)
         RunAnywhere.initialize(
             apiKey = "your-api-key",    // Optional for development
-            environment = SDKEnvironment.DEVELOPMENT
+            environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
         )
     }
 }
@@ -65,13 +66,13 @@ class MyApplication : Application() {
 ```kotlin
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.*
-import com.runanywhere.sdk.core.types.InferenceFramework
+import ai.runanywhere.proto.v1.InferenceFramework
 
 // Register a model from HuggingFace
 val modelInfo = RunAnywhere.registerModel(
     name = "Qwen 0.5B",
     url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf",
-    framework = InferenceFramework.LLAMA_CPP
+    framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
 )
 
 // Download the model (observe progress)
@@ -84,40 +85,45 @@ RunAnywhere.downloadModel(modelInfo.id)
 ### 4. Run Inference
 
 ```kotlin
-// Load the model
-RunAnywhere.loadLLMModel(modelInfo.id)
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import ai.runanywhere.proto.v1.ModelCategory
 
-// Simple chat
-val response = RunAnywhere.chat("What is machine learning?")
-println(response)
+// Load the model through the canonical lifecycle (proto-backed).
+val loadResult = RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = modelInfo.id,
+        category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    ),
+)
+require(loadResult.success) { "load failed: ${loadResult.error_message}" }
 
-// Or with full metrics
+// Generate text with full metrics. `RALLMGenerationOptions` is the
+// proto-canonical options type (aliased to LLMGenerationOptions).
 val result = RunAnywhere.generate(
     prompt = "Explain quantum computing",
-    options = LLMGenerationOptions(
-        maxTokens = 150,
-        temperature = 0.7f
-    )
+    options = RALLMGenerationOptions(
+        max_tokens = 150,
+        temperature = 0.7f,
+    ),
 )
 println("Response: ${result.text}")
-println("Tokens/sec: ${result.tokensPerSecond}")
-println("Latency: ${result.latencyMs}ms")
+println("Tokens used: ${result.tokens_used}")
 ```
 
 ### 5. Streaming Generation
 
 ```kotlin
-// Stream tokens as they're generated
-RunAnywhere.generateStream("Tell me a story about AI")
-    .collect { token ->
-        print(token) // Display in real-time
-    }
+import ai.runanywhere.proto.v1.LLMStreamEvent
 
-// With metrics
-val streamResult = RunAnywhere.generateStreamWithMetrics("Write a poem")
-streamResult.stream.collect { token -> print(token) }
-val metrics = streamResult.result.await()
-println("\nSpeed: ${metrics.tokensPerSecond} tok/s")
+// Stream proto events as they are generated. One event per token
+// plus a terminal event with `is_final == true` carrying
+// `finish_reason` and any `error_message`.
+RunAnywhere.generateStream("Tell me a story about AI")
+    .collect { event: LLMStreamEvent ->
+        if (event.is_final) return@collect
+        print(event.token_) // Display in real-time
+    }
 ```
 
 ---
@@ -172,22 +178,26 @@ println("\nSpeed: ${metrics.tokensPerSecond} tok/s")
 ### Text Generation (LLM)
 
 ```kotlin
-// Simple chat
-val answer = RunAnywhere.chat("What is 2+2?")
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 
-// Generation with options
+// Generate with options. `RALLMGenerationOptions` is the proto-backed
+// options type (aliased to ai.runanywhere.proto.v1.LLMGenerationOptions).
 val result = RunAnywhere.generate(
     prompt = "Write a haiku about code",
-    options = LLMGenerationOptions(
-        maxTokens = 50,
+    options = RALLMGenerationOptions(
+        max_tokens = 50,
         temperature = 0.9f,
-        systemPrompt = "You are a creative poet"
-    )
+        system_prompt = "You are a creative poet",
+    ),
 )
+println(result.text)
 
-// Streaming
+// Streaming: one proto event per token plus a terminal `is_final` event.
 RunAnywhere.generateStream("Tell me a joke")
-    .collect { token -> print(token) }
+    .collect { event ->
+        if (event.is_final) return@collect
+        print(event.token_)
+    }
 
 // Cancel ongoing generation
 RunAnywhere.cancelGeneration()
@@ -196,101 +206,107 @@ RunAnywhere.cancelGeneration()
 ### Speech-to-Text (STT)
 
 ```kotlin
-// Load an STT model
-RunAnywhere.loadSTTModel("whisper-tiny")
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RASTTOptions
+import ai.runanywhere.proto.v1.ModelCategory
 
-// Transcribe audio
-val text = RunAnywhere.transcribe(audioData)
+// Load an STT model through the canonical lifecycle service.
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "sherpa-onnx-whisper-tiny.en",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    ),
+)
 
-// With options
-val output = RunAnywhere.transcribeWithOptions(
-    audioData = audioBytes,
-    options = STTOptions(
-        language = "en",
-        enableTimestamps = true,
-        enablePunctuation = true
-    )
+// Transcribe audio with options.
+val output = RunAnywhere.transcribe(
+    audio = audioBytes,
+    options = RASTTOptions(language = "en"),
 )
 println("Text: ${output.text}")
 println("Confidence: ${output.confidence}")
 
-// Streaming transcription
-RunAnywhere.transcribeStream(audioData) { partial ->
-    println("Partial: ${partial.transcript}")
+// Streaming transcription consumes a Flow<ByteArray> of PCM chunks and
+// yields proto partial-result envelopes.
+RunAnywhere.transcribeStream(audioChunks).collect { partial ->
+    if (partial.text.isNotBlank()) println("STT partial: ${partial.text}")
 }
 ```
 
 ### Text-to-Speech (TTS)
 
 ```kotlin
-// Load a TTS voice
-RunAnywhere.loadTTSVoice("en-us-default")
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RATTSOptions
+import ai.runanywhere.proto.v1.ModelCategory
 
-// Simple speak (plays audio automatically)
-RunAnywhere.speak("Hello, world!")
-
-// Synthesize to bytes
-val output = RunAnywhere.synthesize(
-    text = "Welcome to RunAnywhere",
-    options = TTSOptions(
-        rate = 1.0f,
-        pitch = 1.0f
-    )
+// Load a TTS voice through the canonical lifecycle service.
+RunAnywhere.loadModel(
+    RAModelLoadRequest(
+        model_id = "vits-piper-en_US-lessac-medium",
+        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+    ),
 )
 
-// Stream synthesis for long text
-RunAnywhere.synthesizeStream(longText) { chunk ->
-    audioPlayer.play(chunk)
+// Simple speak — synthesize + play.
+RunAnywhere.speak("Hello, world!")
+
+// Synthesize to audio bytes.
+val output = RunAnywhere.synthesize(
+    text = "Welcome to RunAnywhere",
+    options = RATTSOptions(rate = 1.0f, pitch = 1.0f),
+)
+
+// Stream synthesis emits TTSOutput chunks as they are generated.
+RunAnywhere.synthesizeStream(longText, RATTSOptions()).collect { chunk ->
+    audioPlayer.play(chunk.audio_data.toByteArray())
 }
 ```
 
 ### Voice Activity Detection (VAD)
 
 ```kotlin
-// Detect speech in audio
+import com.runanywhere.sdk.public.types.RAVADOptions
+
+// Single-shot detection on a byte buffer.
 val result = RunAnywhere.detectVoiceActivity(audioData)
-println("Speech detected: ${result.hasSpeech}")
+println("Speech detected: ${result.has_speech}")
 println("Confidence: ${result.confidence}")
 
-// Configure VAD
-RunAnywhere.configureVAD(VADConfiguration(
-    threshold = 0.5f,
-    minSpeechDurationMs = 250,
-    minSilenceDurationMs = 300
-))
+// Streaming VAD: one proto VADResult per chunk of audio samples.
+RunAnywhere.streamVAD(audioSamplesFlow, RAVADOptions()).collect { res ->
+    if (res.has_speech) println("Speaking…")
+}
 
-// Stream VAD
-RunAnywhere.streamVAD(audioSamplesFlow)
-    .collect { result ->
-        if (result.hasSpeech) println("Speaking...")
-    }
+// Reset VAD state between sessions.
+RunAnywhere.resetVAD()
 ```
 
 ### Voice Agent (Full Pipeline)
 
 ```kotlin
-// Configure voice agent
-RunAnywhere.configureVoiceAgent(VoiceAgentConfiguration(
-    sttModelId = "whisper-tiny",
-    llmModelId = "qwen-0.5b",
-    ttsVoiceId = "en-us-default"
-))
+import ai.runanywhere.proto.v1.VoiceAgentConfig
+import ai.runanywhere.proto.v1.VoiceEvent
 
-// Start voice session
-RunAnywhere.startVoiceSession()
-    .collect { event ->
-        when (event) {
-            is VoiceSessionEvent.Listening -> println("Listening...")
-            is VoiceSessionEvent.Transcribed -> println("You: ${event.text}")
-            is VoiceSessionEvent.Thinking -> println("Thinking...")
-            is VoiceSessionEvent.Responded -> println("AI: ${event.text}")
-            is VoiceSessionEvent.Speaking -> println("Speaking...")
-            is VoiceSessionEvent.Error -> println("Error: ${event.message}")
-        }
-    }
+// Initialize the voice agent with the proto-canonical config.
+RunAnywhere.initializeVoiceAgent(
+    VoiceAgentConfig(
+        stt_model_id = "whisper-tiny",
+        llm_model_id = "qwen-0.5b",
+        tts_voice_id = "en-us-default",
+    ),
+)
 
-// Stop session
-RunAnywhere.stopVoiceSession()
+// Stream the unified voice-agent event flow. Each event is the proto
+// `VoiceEvent` oneof (user_said, llm_response, agent_spoke, state_change…).
+RunAnywhere.streamVoiceAgent().collect { event: VoiceEvent ->
+    event.user_said?.let { println("You: ${it.text}") }
+    event.agent_said?.let { println("AI: ${it.text}") }
+    event.state_change?.let { println("state: ${it.new_state}") }
+}
+
+// Cleanup releases the native voice-agent handle.
+RunAnywhere.cleanupVoiceAgent()
 ```
 
 ### Model Management
@@ -398,15 +414,21 @@ val smallModel = RunAnywhere.registerModel(
 
 ### Q: How do I know which model is loaded?
 
-**A:**
-```kotlin
-val llmModelId = RunAnywhere.currentLLMModelId
-val sttModelId = RunAnywhere.currentSTTModelId
-val ttsVoiceId = RunAnywhere.currentTTSVoiceId
+**A:** Query the canonical lifecycle service via the proto-backed
+`currentModel(category)` API:
 
-println("LLM: ${llmModelId ?: "None"}")
-println("STT: ${sttModelId ?: "None"}")
-println("TTS: ${ttsVoiceId ?: "None"}")
+```kotlin
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
+
+suspend fun loadedId(category: ModelCategory): String? {
+    val snap = RunAnywhere.currentModel(CurrentModelRequest(category = category))
+    return if (snap.found) snap.model_id else null
+}
+
+println("LLM: ${loadedId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?: "None"}")
+println("STT: ${loadedId(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION) ?: "None"}")
+println("TTS: ${loadedId(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS) ?: "None"}")
 ```
 
 ---
@@ -458,7 +480,7 @@ The SDK has two modes controlled by `runanywhere.useLocalNatives` in `gradle.pro
 
 | Mode | Setting | Description |
 |------|---------|-------------|
-| **Local** | `runanywhere.useLocalNatives=true` | Uses JNI libs from `src/androidMain/jniLibs/` (for development) |
+| **Local** | `runanywhere.useLocalNatives=true` | Uses JNI libs from `src/main/jniLibs/` (for development) |
 | **Remote** | `runanywhere.useLocalNatives=false` | Downloads JNI libs from GitHub releases (for end users) |
 
 When you run `--setup`, the script automatically sets `testLocal=true`.
@@ -514,10 +536,12 @@ cd sdk/runanywhere-kotlin
 ```
 sdk/runanywhere-kotlin/
 ├── src/
-│   ├── commonMain/          # Cross-platform Kotlin code
-│   ├── jvmAndroidMain/      # Shared JVM/Android (JNI bridges)
-│   ├── androidMain/         # Android-specific (jniLibs, platform code)
-│   └── jvmMain/             # Desktop JVM support
+│   ├── main/
+│   │   ├── kotlin/          # Kotlin source
+│   │   ├── jniLibs/         # Per-ABI native .so files
+│   │   └── AndroidManifest.xml
+│   └── test/
+│       └── kotlin/          # Unit tests
 ├── modules/
 │   ├── runanywhere-core-llamacpp/   # LLM backend module
 │   └── runanywhere-core-onnx/       # STT/TTS/VAD backend module

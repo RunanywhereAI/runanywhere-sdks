@@ -1,6 +1,6 @@
 # RunAnywhere Swift SDK
 
-A production-grade, on-device AI SDK for iOS, macOS, tvOS, and watchOS. The SDK enables low-latency, privacy-preserving inference for large language models, speech recognition, and voice synthesis with modular backend support.
+A production-grade, on-device AI SDK for iOS and macOS. The SDK enables low-latency, privacy-preserving inference for large language models, speech recognition, and voice synthesis with modular backend support.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ A production-grade, on-device AI SDK for iOS, macOS, tvOS, and watchOS. The SDK 
 
 The RunAnywhere Swift SDK enables developers to run AI models directly on Apple devices without requiring network connectivity for inference. By keeping data on-device, the SDK ensures minimal latency and maximum privacy for your users.
 
-The SDK provides a unified interface to multiple AI capabilities, including large language models (LLMs), speech-to-text (STT), text-to-speech (TTS), voice activity detection (VAD), and speaker diarization. These capabilities are delivered through pluggable backend modules that can be included as needed.
+The SDK provides a unified interface to multiple AI capabilities, including large language models (LLMs), speech-to-text (STT), text-to-speech (TTS), and voice activity detection (VAD). These capabilities are delivered through pluggable backend modules that can be included as needed.
 
 ### Key Capabilities
 
@@ -66,12 +66,6 @@ The SDK provides a unified interface to multiple AI capabilities, including larg
 - Configurable sensitivity thresholds
 - Real-time audio stream processing
 
-### Speaker Diarization
-
-- Identify multiple speakers in audio
-- Speaker segmentation and labeling
-- Integration with FluidAudio
-
 ### Voice Agent Pipeline
 
 - Full VAD to STT to LLM to TTS orchestration
@@ -98,10 +92,8 @@ The SDK provides a unified interface to multiple AI capabilities, including larg
 
 | Platform | Minimum Version |
 |----------|-----------------|
-| iOS      | 17.0+           |
-| macOS    | 14.0+           |
-| tvOS     | 17.0+           |
-| watchOS  | 10.0+           |
+| iOS      | 17.5+           |
+| macOS    | 14.5+           |
 
 **Swift Version:** 5.9+
 
@@ -159,7 +151,7 @@ This repository contains **two** `Package.swift` files for different use cases:
 
 **For app developers:** Use the root-level package via the GitHub URL (as shown above).
 
-**For SDK contributors:** Use the local package with `testLocal = true` after running the setup script.
+**For SDK contributors:** Set `useLocalNatives = true` in the root `Package.swift` (NOT `sdk/runanywhere-swift/Package.swift`, which is always-local and has no flag) after building the XCFrameworks (see [Local Development & Contributing](#local-development--contributing) below).
 
 ---
 
@@ -202,31 +194,39 @@ struct MyApp: App {
 ### 2. Generate Text
 
 ```swift
-// Simple chat interface
-let response = try await RunAnywhere.chat("What is the capital of France?")
-print(response)  // "The capital of France is Paris."
+// Build a proto-backed generate request via the v2 surface
+var options = RALLMGenerationOptions.defaults()
+options.maxTokens = 200
+options.temperature = 0.7
 
-// Full generation with metrics
-let result = try await RunAnywhere.generate(
-    "Explain quantum computing in simple terms",
-    options: LLMGenerationOptions(
-        maxTokens: 200,
-        temperature: 0.7
-    )
+var request = options.toRALLMGenerateRequest(
+    prompt: "Explain quantum computing in simple terms"
 )
+
+let result = try await RunAnywhere.generate(request)
 print("Response: \(result.text)")
-print("Tokens used: \(result.tokensUsed)")
-print("Speed: \(result.tokensPerSecond) tok/s")
+print("Tokens generated: \(result.tokensGenerated)")
 ```
 
 ### 3. Load a Model
 
 ```swift
-// Load an LLM model by ID
-try await RunAnywhere.loadModel("llama-3.2-1b-instruct-q4")
+// Load an LLM through the canonical lifecycle (RAModelLoadRequest).
+var loadRequest = RAModelLoadRequest()
+loadRequest.modelID = "llama-3.2-1b-instruct-q4"
+loadRequest.category = .language
 
-// Check if model is loaded
-let isLoaded = await RunAnywhere.isModelLoaded
+let loadResult = await RunAnywhere.loadModel(loadRequest)
+guard loadResult.success else {
+    print("Load failed: \(loadResult.errorMessage)")
+    return
+}
+
+// Check if a model is loaded for a given modality via the lifecycle service.
+var current = RACurrentModelRequest()
+current.category = .language
+let snapshot = RunAnywhere.currentModel(current)
+print("Loaded:", snapshot.found, "id=", snapshot.modelID)
 ```
 
 ---
@@ -254,15 +254,13 @@ try RunAnywhere.initialize(
 ### Generation Options
 
 ```swift
-let options = LLMGenerationOptions(
-    maxTokens: 100,
-    temperature: 0.8,
-    topP: 1.0,
-    stopSequences: ["END"],
-    streamingEnabled: false,
-    preferredFramework: .llamaCpp,
-    systemPrompt: "You are a helpful assistant."
-)
+var options = RALLMGenerationOptions.defaults()
+options.maxTokens = 100
+options.temperature = 0.8
+options.topP = 1.0
+options.stopSequences = ["END"]
+options.streamingEnabled = false
+options.systemPrompt = "You are a helpful assistant."
 ```
 
 ### Module Registration
@@ -288,46 +286,51 @@ func setupSDK() {
 ### Streaming Text Generation
 
 ```swift
-let result = try await RunAnywhere.generateStream(
-    "Write a short poem about AI",
-    options: LLMGenerationOptions(maxTokens: 150)
+var options = RALLMGenerationOptions.defaults()
+options.maxTokens = 150
+options.streamingEnabled = true
+let request = options.toRALLMGenerateRequest(
+    prompt: "Write a short poem about AI"
 )
 
-for try await token in result.stream {
-    print(token, terminator: "")
+let stream = try await RunAnywhere.generateStream(request)
+for await event in stream {
+    if event.kind == .answer {
+        print(event.token, terminator: "")
+    }
 }
-
-let metrics = try await result.result.value
-print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
 ```
 
 ### Structured Output Generation
 
 ```swift
-struct QuizQuestion: Generatable {
-    let question: String
-    let options: [String]
-    let correctAnswer: Int
+// Commons owns the full structured-output pipeline (prepare → generate →
+// strip thinking tags → extract JSON → validate). Build a `RAJSONSchema`
+// by populating its typed proto fields (the canonical JSON Schema text is
+// produced by the read-only `jsonSchemaString` computed property).
+var schema = RAJSONSchema()
+schema.type = .object
+schema.required = ["question", "options", "correctAnswer"]
 
-    static var jsonSchema: String {
-        """
-        {
-          "type": "object",
-          "properties": {
-            "question": { "type": "string" },
-            "options": { "type": "array", "items": { "type": "string" } },
-            "correctAnswer": { "type": "integer" }
-          },
-          "required": ["question", "options", "correctAnswer"]
-        }
-        """
-    }
-}
+var questionProp = RAJSONSchemaProperty()
+questionProp.type = .string
+schema.properties["question"] = questionProp
 
-let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
-    QuizQuestion.self,
-    prompt: "Create a quiz question about Swift programming"
+var optionsProp = RAJSONSchemaProperty()
+optionsProp.type = .array
+optionsProp.itemsSchema.type = .string
+schema.properties["options"] = optionsProp
+
+var correctAnswerProp = RAJSONSchemaProperty()
+correctAnswerProp.type = .integer
+schema.properties["correctAnswer"] = correctAnswerProp
+
+let result = try await RunAnywhere.generateStructured(
+    prompt: "Create a quiz question about Swift programming",
+    schema: schema
 )
+let jsonString = String(data: result.parsedJson, encoding: .utf8) ?? ""
+print("Validated JSON:", jsonString)
 ```
 
 ### Speech-to-Text Transcription
@@ -336,45 +339,50 @@ let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
 import RunAnywhere
 import ONNXRuntime
 
-await ONNX.register()
-try await RunAnywhere.loadSTTModel("whisper-base-onnx")
+ONNX.register()
+
+// Load the STT model through the canonical lifecycle.
+var loadRequest = RAModelLoadRequest()
+loadRequest.modelID = "whisper-base-onnx"
+loadRequest.category = .speechRecognition
+_ = await RunAnywhere.loadModel(loadRequest)
 
 let audioData: Data = // your audio data (16kHz, mono, Float32)
-let transcription = try await RunAnywhere.transcribe(audioData)
-print("Transcribed: \(transcription)")
+let transcription = try await RunAnywhere.transcribe(audio: audioData)
+print("Transcribed: \(transcription.text)")
 ```
 
 ### Text-to-Speech Synthesis
 
 ```swift
-try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
+// Load a TTS voice through the canonical lifecycle.
+var loadRequest = RAModelLoadRequest()
+loadRequest.modelID = "piper-en-us-amy"
+loadRequest.category = .speechSynthesis
+_ = await RunAnywhere.loadModel(loadRequest)
+
+var options = RATTSOptions.defaults()
+options.speakingRate = 1.0
+options.pitch = 1.0
+options.volume = 0.8
 
 let output = try await RunAnywhere.synthesize(
     "Hello! Welcome to RunAnywhere.",
-    options: TTSOptions(
-        speakingRate: 1.0,
-        pitch: 1.0,
-        volume: 0.8
-    )
+    options: options
 )
 ```
 
 ### Voice Agent Pipeline
 
 ```swift
-try await RunAnywhere.initializeVoiceAgent(
-    sttModelId: "whisper-base-onnx",
-    llmModelId: "llama-3.2-1b-instruct-q4",
-    ttsVoice: "com.apple.ttsbundle.siri_female_en-US_compact"
-)
+// Once STT, LLM, and TTS models are loaded via RAModelLoadRequest, compose
+// the voice agent from the lifecycle snapshots:
+try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
 
 let audioData: Data = // recorded audio
 let result = try await RunAnywhere.processVoiceTurn(audioData)
-
-print("User said: \(result.transcription)")
-print("AI response: \(result.response)")
-
-await RunAnywhere.cleanupVoiceAgent()
+print("User said:", result.transcription)
+print("AI response:", result.assistantResponse)
 ```
 
 ### Subscribing to Events
@@ -389,13 +397,13 @@ class ViewModel: ObservableObject {
         RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { event in
-                print("Event: \(event.type)")
+                print("Event: \(event.category)")
             }
             .store(in: &cancellables)
 
         RunAnywhere.events.events(for: .llm)
             .sink { event in
-                print("LLM Event: \(event.type)")
+                print("LLM Event: \(event.category)")
             }
             .store(in: &cancellables)
     }
@@ -405,15 +413,20 @@ class ViewModel: ObservableObject {
 ### Model Download with Progress
 
 ```swift
-let models = try await RunAnywhere.availableModels()
-let model = models.first { $0.id == "llama-3.2-1b-instruct-q4" }!
-
-let task = try await Download.shared.downloadModel(model)
-
-for await progress in task.progress {
-    let percent = Int(progress.overallProgress * 100)
-    print("\(progress.stage.displayName): \(percent)%")
+// List registered models via the public proto-backed registry API.
+let listResult = await RunAnywhere.listModels()
+guard let model = listResult.models.models.first(where: { $0.id == "llama-3.2-1b-instruct-q4" }) else {
+    return
 }
+
+// Download with the closure-based progress callback. Commons owns plan →
+// start → progress polling → registry import; the closure receives each
+// `RADownloadProgress` snapshot in real time.
+let final = try await RunAnywhere.downloadModel(model) { progress in
+    let percent = Int(progress.overallProgress * 100)
+    print("\(progress.stage): \(percent)%")
+}
+print("Local path: \(final.localPath)")
 ```
 
 ---
@@ -468,9 +481,9 @@ The RunAnywhere SDK follows a modular, provider-based architecture that separate
 
 ```swift
 RunAnywhere.setLogLevel(.debug)
-RunAnywhere.configureLocalLogging(enabled: true)
+RunAnywhere.setLocalLoggingEnabled(true)
 RunAnywhere.setDebugMode(true)
-await RunAnywhere.flushAll()
+RunAnywhere.flushLogs()
 ```
 
 ### Log Levels
@@ -496,49 +509,45 @@ The SDK automatically tracks key metrics:
 
 ## Error Handling
 
-All SDK errors are represented by `SDKError`, which provides:
+All SDK errors are thrown as `SDKException`, which carries a typed error
+`code` (`RASDKErrorCode`), a developer-facing `message`, and a `category`
+identifying which subsystem produced the error.
 
-- Typed error cases for each error category
-- Detailed error descriptions
-- Recovery suggestions
-- Underlying error information when applicable
+### Error Codes
 
-### Error Categories
+`RASDKErrorCode` covers the v2 surface, including:
 
-```swift
-case notInitialized
-case invalidAPIKey(String?)
-case invalidConfiguration(String)
-case modelNotFound(String)
-case modelLoadFailed(String, Error?)
-case modelIncompatible(String, String)
-case generationFailed(String)
-case generationTimeout(String?)
-case contextTooLong(Int, Int)
-case networkUnavailable
-case downloadFailed(String, Error?)
-case insufficientStorage(Int64, Int64)
-case storageFull
-```
+- `.notInitialized`
+- `.invalidAPIKey`
+- `.modelNotLoaded`
+- `.modelLoadFailed`
+- `.generationFailed`
+- `.processingFailed`
+- `.networkError`
+- `.cancelled`
+
+(See `SDKException.swift` and `Generated/sdk_errors.pb.swift` for the full
+list of codes and categories.)
 
 ### Handling Errors
 
 ```swift
 do {
-    let result = try await RunAnywhere.generate("Hello")
-} catch let error as SDKError {
+    var options = RALLMGenerationOptions.defaults()
+    options.maxTokens = 64
+    let request = options.toRALLMGenerateRequest(prompt: "Hello")
+    let result = try await RunAnywhere.generate(request)
+    print(result.text)
+} catch let error as SDKException {
     switch error.code {
     case .notInitialized:
         print("Please call RunAnywhere.initialize() first")
-    case .modelNotFound:
-        print("Model not found. Download it first.")
+    case .modelNotLoaded:
+        print("Model not loaded. Call RunAnywhere.loadModel(_:) first.")
     case .generationFailed:
         print("Generation failed: \(error.message)")
     default:
-        print("Error: \(error.localizedDescription)")
-        if let suggestion = error.recoverySuggestion {
-            print("Suggestion: \(suggestion)")
-        }
+        print("Error (\(error.category)): \(error.message)")
     }
 }
 ```
@@ -556,8 +565,10 @@ do {
 ### Memory Management
 
 ```swift
-// Unload models when not in use
-try await RunAnywhere.unloadModel()
+// Unload a model through the canonical lifecycle.
+var unloadRequest = RAModelUnloadRequest()
+unloadRequest.category = .language
+_ = await RunAnywhere.unloadModel(unloadRequest)
 
 // Check storage before downloading
 let storageInfo = await RunAnywhere.getStorageInfo()
@@ -578,9 +589,13 @@ try await RunAnywhere.cleanTempFiles()
 ### Streaming for Responsiveness
 
 ```swift
-let result = try await RunAnywhere.generateStream(prompt)
-for try await token in result.stream {
-    await MainActor.run { self.text += token }
+var options = RALLMGenerationOptions.defaults()
+options.streamingEnabled = true
+let request = options.toRALLMGenerateRequest(prompt: prompt)
+
+let stream = try await RunAnywhere.generateStream(request)
+for await event in stream where event.kind == .answer {
+    await MainActor.run { self.text += event.token }
 }
 ```
 
@@ -612,11 +627,11 @@ Model sizes vary significantly:
 
 ### Can I use multiple models simultaneously?
 
-Currently, one LLM can be loaded at a time. STT and TTS models can be loaded alongside LLM models. Use `unloadModel()` before loading a different LLM.
+Currently, one LLM can be loaded at a time. STT and TTS models can be loaded alongside LLM models. Use `RunAnywhere.unloadModel(RAModelUnloadRequest())` before loading a different LLM.
 
 ### How do I handle model updates?
 
-Call `fetchModelAssignments(forceRefresh: true)` to sync the latest model catalog. New versions can be downloaded alongside existing models.
+Call `RunAnywhere.listModels()` (or `RunAnywhere.queryModels(_:)` / `RunAnywhere.downloadedModels()`) to refresh the in-memory model catalog from the registry, then call `RunAnywhere.downloadModel(_:onProgress:)` to fetch any new or updated entries alongside existing models. Model assignment discovery runs automatically as part of the SDK's Phase-2 initialization.
 
 ### Is user data sent to the cloud?
 
@@ -628,10 +643,13 @@ By default, only anonymous analytics (latency, error rates) are collected. Actua
 2. Check logs with Pulse integration
 3. Subscribe to error events: `RunAnywhere.events.on(.error) { ... }`
 
-### What's the difference between chat() and generate()?
+### How do I send a generation request?
 
-- `chat(_:)` returns just the text string
-- `generate(_:options:)` returns `LLMGenerationResult` with full metrics
+Build a `RALLMGenerationOptions`, call `toRALLMGenerateRequest(prompt:)` to
+produce a `RALLMGenerateRequest`, and pass it to `RunAnywhere.generate(_:)`
+or `RunAnywhere.generateStream(_:)`. There is no longer a separate `chat()`
+convenience — the proto-backed `generate(_:)` API returns a full
+`RALLMGenerationResult` with metrics.
 
 ---
 
@@ -647,45 +665,42 @@ We welcome contributions to the RunAnywhere Swift SDK. This section explains how
 
 ### First-Time Setup (Build from Source)
 
-The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
+The SDK depends on native C++ libraries from `runanywhere-commons`. Build XCFrameworks locally so you can develop and test the SDK end-to-end.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks/sdk/runanywhere-swift
+cd runanywhere-sdks
 
-# 2. Run first-time setup (~5-15 minutes)
-./scripts/build-swift.sh --setup
+# 2. Build XCFrameworks (~5-15 minutes)
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
-**What the setup script does:**
+**What the build script does:**
 1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
 2. Builds `RACommons.xcframework` (core infrastructure)
 3. Builds `RABackendLLAMACPP.xcframework` (LLM backend)
 4. Builds `RABackendONNX.xcframework` (STT/TTS/VAD backend)
-5. Copies frameworks to `Binaries/`
-6. Sets `testLocal = true` in Package.swift (enables local framework consumption)
+5. Copies frameworks to `sdk/runanywhere-swift/Binaries/`
 
-### Understanding testLocal
+### Understanding useLocalNatives
 
-The SDK has two modes controlled by `testLocal` in `Package.swift`:
+The SDK has two modes controlled by `useLocalNatives` in the root `Package.swift` (the flag does not exist in `sdk/runanywhere-swift/Package.swift`, which is always-local):
 
 | Mode | Setting | Description |
 |------|---------|-------------|
-| **Local** | `testLocal = true` | Uses XCFrameworks from `Binaries/` (for development) |
-| **Remote** | `testLocal = false` | Downloads XCFrameworks from GitHub releases (for end users) |
-
-When you run `--setup`, the script automatically sets `testLocal = true`.
+| **Local** | `useLocalNatives = true` | Uses XCFrameworks from `Binaries/` (for development) |
+| **Remote** | `useLocalNatives = false` | Downloads XCFrameworks from GitHub releases (for end users) |
 
 ### Testing with the iOS Sample App
 
 The recommended way to test SDK changes is with the sample app:
 
 ```bash
-# 1. Ensure SDK is set up (from previous step)
+# 1. Ensure XCFrameworks are built (from previous step)
 
 # 2. Navigate to the sample app
-cd ../../examples/ios/RunAnywhereAI
+cd examples/ios/RunAnywhereAI
 
 # 3. Open in Xcode
 open RunAnywhereAI.xcodeproj
@@ -693,7 +708,7 @@ open RunAnywhereAI.xcodeproj
 # 4. If Xcode shows package errors, reset caches:
 #    File > Packages > Reset Package Caches
 
-# 5. Build and Run (⌘+R)
+# 5. Build and Run (Cmd+R)
 ```
 
 The sample app's `Package.swift` references the local SDK, which in turn uses the local frameworks from `Binaries/`. This creates a complete local development loop:
@@ -701,34 +716,19 @@ The sample app's `Package.swift` references the local SDK, which in turn uses th
 ```
 Sample App → Local Swift SDK → Local XCFrameworks (Binaries/)
                                       ↑
-                         Built by build-swift.sh --setup
+                         Built by sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
 
 ### Development Workflow
 
 **After modifying Swift SDK code:**
-- No rebuild needed—Xcode picks up changes automatically
+- No rebuild needed --- Xcode picks up changes automatically
 
 **After modifying runanywhere-commons (C++ code):**
 
 ```bash
-cd sdk/runanywhere-swift
-./scripts/build-swift.sh --local --build-commons
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 ```
-
-### Build Script Reference
-
-| Command | Description |
-|---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all frameworks, sets `testLocal = true` |
-| `--local` | Use local frameworks from `Binaries/` |
-| `--remote` | Use remote frameworks from GitHub releases |
-| `--build-commons` | Rebuild runanywhere-commons from source |
-| `--clean` | Clean build artifacts before building |
-| `--release` | Build in release mode (default: debug) |
-| `--skip-build` | Only setup frameworks, skip swift build |
-| `--set-local` | Set `testLocal = true` in Package.swift |
-| `--set-remote` | Set `testLocal = false` in Package.swift |
 
 ### Running Tests
 

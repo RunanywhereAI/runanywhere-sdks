@@ -9,6 +9,25 @@
  * Do NOT add features not present in the Swift code.
  *
  * Composes STT, LLM, TTS, and VAD capabilities for end-to-end voice processing.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs at the bottom of this header
+ *     (rac_voice_agent_initialize_proto,
+ *     rac_voice_agent_component_states_proto,
+ *     rac_voice_agent_process_voice_turn_proto) and
+ *     rac_voice_agent_set_proto_callback in rac_voice_event_abi.h are
+ *     the `SDK-facing default`. They emit/consume serialized
+ *     runanywhere.v1.VoiceAgentComposeConfig / VoiceAgentComponentStates /
+ *     VoiceAgentResult / VoiceEvent bytes.
+ *   - The per-component rac_voice_agent_*_config_t structs feed
+ *     rac_voice_agent_initialize and the proto compose path
+ *     (config_from_proto). rac_voice_agent_generate_response is the one
+ *     remaining non-proto verb (LLM-only text in/out), retained for the
+ *     Flutter SDK's `RunAnywhere.voice.generateResponse`.
+ *   - Audio pipeline state-manager helpers
+ *     (rac_audio_pipeline_state_t, rac_audio_pipeline_config_t,
+ *     rac_audio_pipeline_*) are `internal` voice-agent feedback
+ *     prevention plumbing.
  */
 
 #ifndef RAC_VOICE_AGENT_H
@@ -21,6 +40,7 @@
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/wakeword/rac_wakeword_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,20 +93,6 @@ typedef enum rac_audio_pipeline_state {
  * @return State name string (static, do not free)
  */
 RAC_API const char* rac_audio_pipeline_state_name(rac_audio_pipeline_state_t state);
-
-/**
- * @brief Voice agent event types.
- * Mirrors Swift's VoiceAgentEvent enum.
- */
-typedef enum rac_voice_agent_event_type {
-    RAC_VOICE_AGENT_EVENT_PROCESSED = 0,         /**< Complete processing result */
-    RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED = 1,     /**< VAD triggered (speech detected/ended) */
-    RAC_VOICE_AGENT_EVENT_TRANSCRIPTION = 2,     /**< Transcription available from STT */
-    RAC_VOICE_AGENT_EVENT_RESPONSE = 3,          /**< Response generated from LLM */
-    RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED = 4, /**< Audio synthesized from TTS */
-    RAC_VOICE_AGENT_EVENT_ERROR = 5,             /**< Error occurred during processing */
-    RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED = 6  /**< Wake word detected */
-} rac_voice_agent_event_type_t;
 
 /**
  * @brief VAD configuration for voice agent.
@@ -286,75 +292,6 @@ RAC_API rac_bool_t rac_audio_pipeline_can_play_tts(rac_audio_pipeline_state_t cu
 RAC_API rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t from_state,
                                                           rac_audio_pipeline_state_t to_state);
 
-/**
- * @brief Voice agent processing result.
- * Mirrors Swift's VoiceAgentResult.
- */
-typedef struct rac_voice_agent_result {
-    /** Whether speech was detected in the input audio */
-    rac_bool_t speech_detected;
-
-    /** Transcribed text from STT (owned, must be freed with rac_free) */
-    char* transcription;
-
-    /** Generated response text from LLM (owned, must be freed with rac_free) */
-    char* response;
-
-    /** Synthesized audio data from TTS (owned, must be freed with rac_free) */
-    void* synthesized_audio;
-
-    /** Size of synthesized audio data in bytes */
-    size_t synthesized_audio_size;
-} rac_voice_agent_result_t;
-
-/**
- * @brief Voice agent event data.
- * Contains union for different event types.
- */
-typedef struct rac_voice_agent_event {
-    /** Event type */
-    rac_voice_agent_event_type_t type;
-
-    union {
-        /** For PROCESSED event */
-        rac_voice_agent_result_t result;
-
-        /** For VAD_TRIGGERED event: true if speech started, false if ended */
-        rac_bool_t vad_speech_active;
-
-        /** For TRANSCRIPTION event */
-        const char* transcription;
-
-        /** For RESPONSE event */
-        const char* response;
-
-        /** For AUDIO_SYNTHESIZED event */
-        struct {
-            const void* audio_data;
-            size_t audio_size;
-        } audio;
-
-        /** For ERROR event */
-        rac_result_t error_code;
-
-        /** For WAKEWORD_DETECTED event */
-        struct {
-            const char* wake_word;
-            float confidence;
-            int64_t timestamp_ms;
-        } wakeword;
-    } data;
-} rac_voice_agent_event_t;
-
-/**
- * @brief Callback for voice agent events during streaming.
- *
- * @param event The event that occurred
- * @param user_data User-provided context
- */
-typedef void (*rac_voice_agent_event_callback_fn)(const rac_voice_agent_event_t* event,
-                                                  void* user_data);
-
 // =============================================================================
 // OPAQUE HANDLE
 // =============================================================================
@@ -381,10 +318,15 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
 RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
 
 /**
- * @brief Create a voice agent instance with external component handles.
+ * @brief Create a voice agent instance with externally-managed component handles.
  *
- * DEPRECATED: Prefer rac_voice_agent_create_standalone().
- * This API is for backward compatibility when you need to share handles.
+ * Use this when you already have LLM/STT/TTS/VAD ComponentActors loaded and want
+ * to compose them into a voice-agent session sharing their handles. The
+ * voice-agent owns the resulting composite but does NOT take ownership of the
+ * child component handles.
+ *
+ * For a fully-managed voice agent that creates its own children, use
+ * `rac_voice_agent_create_standalone()`.
  *
  * @param llm_component_handle Handle to LLM component (rac_llm_component)
  * @param stt_component_handle Handle to STT component (rac_stt_component)
@@ -410,101 +352,8 @@ RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
 RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
 
 // =============================================================================
-// MODEL LOADING API (for standalone voice agent)
+// INITIALIZATION & READINESS
 // =============================================================================
-
-/**
- * @brief Load an STT model into the voice agent.
- *
- * @param handle Voice agent handle
- * @param model_path File path to the model (used for loading)
- * @param model_id Model identifier (used for telemetry, e.g., "whisper-base")
- * @param model_name Human-readable model name (e.g., "Whisper Base")
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
-                                                    const char* model_path, const char* model_id,
-                                                    const char* model_name);
-
-/**
- * @brief Load an LLM model into the voice agent.
- *
- * @param handle Voice agent handle
- * @param model_path File path to the model (used for loading)
- * @param model_id Model identifier (used for telemetry, e.g., "llama-3.2-1b")
- * @param model_name Human-readable model name (e.g., "Llama 3.2 1B Instruct")
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
-                                                    const char* model_path, const char* model_id,
-                                                    const char* model_name);
-
-/**
- * @brief Load a TTS voice into the voice agent.
- *
- * @param handle Voice agent handle
- * @param voice_path File path to the voice (used for loading)
- * @param voice_id Voice identifier (used for telemetry, e.g., "vits-piper-en_GB-alba-medium")
- * @param voice_name Human-readable voice name (e.g., "Piper TTS (British English)")
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
-                                                    const char* voice_path, const char* voice_id,
-                                                    const char* voice_name);
-
-/**
- * @brief Check if STT model is loaded.
- *
- * @param handle Voice agent handle
- * @param out_loaded Output: RAC_TRUE if loaded
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
-                                                   rac_bool_t* out_loaded);
-
-/**
- * @brief Check if LLM model is loaded.
- *
- * @param handle Voice agent handle
- * @param out_loaded Output: RAC_TRUE if loaded
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
-                                                   rac_bool_t* out_loaded);
-
-/**
- * @brief Check if TTS voice is loaded.
- *
- * @param handle Voice agent handle
- * @param out_loaded Output: RAC_TRUE if loaded
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
-                                                   rac_bool_t* out_loaded);
-
-/**
- * @brief Get the currently loaded STT model ID.
- *
- * @param handle Voice agent handle
- * @return Model ID string (static, do not free) or NULL if not loaded
- */
-RAC_API const char* rac_voice_agent_get_stt_model_id(rac_voice_agent_handle_t handle);
-
-/**
- * @brief Get the currently loaded LLM model ID.
- *
- * @param handle Voice agent handle
- * @return Model ID string (static, do not free) or NULL if not loaded
- */
-RAC_API const char* rac_voice_agent_get_llm_model_id(rac_voice_agent_handle_t handle);
-
-/**
- * @brief Get the currently loaded TTS voice ID.
- *
- * @param handle Voice agent handle
- * @return Voice ID string (static, do not free) or NULL if not loaded
- */
-RAC_API const char* rac_voice_agent_get_tts_voice_id(rac_voice_agent_handle_t handle);
 
 /**
  * @brief Initialize the voice agent with configuration.
@@ -553,66 +402,15 @@ RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
                                               rac_bool_t* out_is_ready);
 
 // =============================================================================
-// VOICE PROCESSING API
+// LLM TEXT VERB
 // =============================================================================
 
 /**
- * @brief Process a complete voice turn: audio → transcription → LLM response → synthesized speech.
+ * @brief Generate an LLM response from a text prompt (no STT/TTS).
  *
- * Mirrors Swift's VoiceAgentCapability.processVoiceTurn(_:).
- *
- * @param handle Voice agent handle
- * @param audio_data Audio data from user
- * @param audio_size Size of audio data in bytes
- * @param out_result Output: Voice agent result (caller owns memory, must free with
- * rac_voice_agent_result_free)
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
-                                                        const void* audio_data, size_t audio_size,
-                                                        rac_voice_agent_result_t* out_result);
-
-/**
- * @brief Process audio with streaming events.
- *
- * Mirrors Swift's VoiceAgentCapability.processStream(_:).
- * Events are delivered via the callback as processing progresses.
- *
- * @param handle Voice agent handle
- * @param audio_data Audio data from user
- * @param audio_size Size of audio data in bytes
- * @param callback Event callback function
- * @param user_data User context passed to callback
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle,
-                                                    const void* audio_data, size_t audio_size,
-                                                    rac_voice_agent_event_callback_fn callback,
-                                                    void* user_data);
-
-// =============================================================================
-// INDIVIDUAL COMPONENT ACCESS API
-// =============================================================================
-
-/**
- * @brief Transcribe audio only (without LLM/TTS).
- *
- * Mirrors Swift's VoiceAgentCapability.transcribe(_:).
- *
- * @param handle Voice agent handle
- * @param audio_data Audio data
- * @param audio_size Size of audio data in bytes
- * @param out_transcription Output: Transcribed text (owned, must be freed with rac_free)
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
-                                                const void* audio_data, size_t audio_size,
-                                                char** out_transcription);
-
-/**
- * @brief Generate LLM response only.
- *
- * Mirrors Swift's VoiceAgentCapability.generateResponse(_:).
+ * The one remaining non-proto voice-agent verb — retained for the Flutter
+ * SDK's `RunAnywhere.voice.generateResponse`. Runs against the agent's
+ * composed LLM handle.
  *
  * @param handle Voice agent handle
  * @param prompt Input prompt
@@ -622,46 +420,125 @@ RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
 RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle,
                                                        const char* prompt, char** out_response);
 
-/**
- * @brief Synthesize speech only.
- *
- * Mirrors Swift's VoiceAgentCapability.synthesizeSpeech(_:).
- *
- * @param handle Voice agent handle
- * @param text Text to synthesize
- * @param out_audio Output: Synthesized audio data (owned, must be freed with rac_free)
- * @param out_audio_size Output: Size of audio data in bytes
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle,
-                                                       const char* text, void** out_audio,
-                                                       size_t* out_audio_size);
-
-/**
- * @brief Check if VAD detects speech.
- *
- * Mirrors Swift's VoiceAgentCapability.detectSpeech(_:).
- *
- * @param handle Voice agent handle
- * @param samples Audio samples (float32)
- * @param sample_count Number of samples
- * @param out_speech_detected Output: RAC_TRUE if speech detected
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle,
-                                                   const float* samples, size_t sample_count,
-                                                   rac_bool_t* out_speech_detected);
-
 // =============================================================================
-// MEMORY MANAGEMENT
+// GENERATED-PROTO C ABI
 // =============================================================================
 
 /**
- * @brief Free a voice agent result.
+ * @section voice_agent_audio_ingress Audio-Ingress Contract
  *
- * @param result Result to free
+ * The voice-agent C ABI is a pure-CPU library and owns NO microphone access.
+ * All audio must be captured by the platform SDK (iOS AVAudioEngine, Android
+ * AudioRecord, Web getUserMedia, Flutter platform channels, RN audio plugin)
+ * and pushed into the C core through one of the entry points below. There is
+ * no implicit "C++ pulls audio" path — anything that depends on a microphone
+ * MUST be wired by the SDK frontend.
+ *
+ * Supported ingress modes today (proto-byte path):
+ *
+ *   1. Per-utterance turn:
+ *        rac_voice_agent_process_voice_turn_proto(handle, pcm, n, &result)
+ *      or, with streamed VoiceEvent fan-out,
+ *        rac_voice_agent_process_turn_proto(handle, request_bytes, n,
+ *                                           event_callback, user_data).
+ *      The SDK feeds ONE complete, VAD-trimmed audio buffer per turn. The
+ *      C++ pipeline runs STT -> LLM -> TTS over that buffer and emits a
+ *      single TURN_COMPLETED VoiceEvent. SDKs that drive their voice screen
+ *      through these APIs MUST call them once per detected utterance — the
+ *      C core will not transcribe anything until the SDK pushes a buffer.
+ *
+ *   2. Continuous streaming (per-modality, no voice-agent aggregation):
+ *        rac_stt_stream_feed_audio_proto(session, audio_bytes, n) and
+ *        rac_vad_stream_feed_audio_proto(session, audio_bytes, n).
+ *      SDKs that prefer per-frame VAD/STT events bypass the voice-agent
+ *      turn ABI and drive the STT/VAD streams directly, then call
+ *      rac_voice_agent_transcribe_proto / synthesize_speech_proto /
+ *      generate-LLM helpers for the remaining stages.
+ *
+ * Planned (NOT yet wired): a streaming
+ * `rac_voice_agent_feed_audio_proto(handle, samples, n, sample_rate,
+ * is_final)` entry point that internally tees the audio into the STT/VAD
+ * streams and emits an aggregated VoiceEvent stream identical to the
+ * per-turn path. Until that lands, SDK frontends MUST use one of the two
+ * modes above; the voice-agent will NOT silently consume mic audio.
+ *
+ * Frontend authors: if a voice-screen view-model only calls
+ * rac_voice_agent_set_proto_callback / rac_voice_agent_process_turn_proto
+ * without ever pushing an audio buffer, expect dead-air. Either drive the
+ * per-turn API per utterance, or attach a parallel STT/VAD stream session.
  */
-RAC_API void rac_voice_agent_result_free(rac_voice_agent_result_t* result);
+
+/**
+ * @brief Initialize from serialized runanywhere.v1.VoiceAgentComposeConfig bytes.
+ */
+RAC_API rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
+                                                      const uint8_t* config_proto_bytes,
+                                                      size_t config_proto_size,
+                                                      rac_proto_buffer_t* out_component_states);
+
+/**
+ * @brief Snapshot component state as serialized runanywhere.v1.VoiceAgentComponentStates bytes.
+ */
+RAC_API rac_result_t rac_voice_agent_component_states_proto(
+    rac_voice_agent_handle_t handle, rac_proto_buffer_t* out_component_states);
+
+/**
+ * @brief Process one voice turn and return serialized runanywhere.v1.VoiceAgentResult bytes.
+ *
+ * Per-utterance entry point — see the @ref voice_agent_audio_ingress section
+ * above. SDKs MUST call this once per detected utterance with a complete
+ * (typically VAD-trimmed) PCM buffer. The C core does not capture or buffer
+ * mic audio on its own; without an explicit call the pipeline is dead-air.
+ */
+RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
+                                                              const void* audio_data,
+                                                              size_t audio_size,
+                                                              rac_proto_buffer_t* out_result);
+
+#ifdef __cplusplus
+}
+#endif
+
+// Full-session voice-agent ABI + per-helper proto wrappers.
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_bytes,
+                                                       size_t event_size, void* user_data);
+
+/**
+ * @brief Drive one voice turn and stream VoiceEvent fan-out via @p event_callback.
+ *
+ * Per-utterance entry point — see the @ref voice_agent_audio_ingress section
+ * (above the GENERATED-PROTO C ABI block). The SDK serializes a
+ * `runanywhere.v1.VoiceAgentTurnRequest` containing the complete PCM buffer
+ * for one detected utterance; the C core runs VAD/STT/LLM/TTS over it and
+ * emits VoiceEvents through @p event_callback. The C core does NOT capture
+ * microphone audio — frontends that wire up
+ * rac_voice_agent_set_proto_callback without ever calling this API (or
+ * driving a parallel rac_stt_stream_feed_audio_proto session) will see
+ * dead-air on the voice screen.
+ */
+RAC_API rac_result_t rac_voice_agent_process_turn_proto(
+    rac_voice_agent_handle_t handle, const uint8_t* request_bytes, size_t request_size,
+    rac_voice_agent_turn_event_callback_fn event_callback, void* user_data);
+
+RAC_API rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_t handle,
+                                                      const uint8_t* request_bytes,
+                                                      size_t request_size,
+                                                      rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_voice_agent_synthesize_speech_proto(rac_voice_agent_handle_t handle,
+                                                             const uint8_t* request_bytes,
+                                                             size_t request_size,
+                                                             rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_voice_agent_component_create_proto(const uint8_t* config_bytes,
+                                                            size_t config_size,
+                                                            rac_voice_agent_handle_t* out_handle);
+
+RAC_API rac_result_t rac_voice_agent_component_destroy_proto(rac_voice_agent_handle_t handle);
 
 #ifdef __cplusplus
 }

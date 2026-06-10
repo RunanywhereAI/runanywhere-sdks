@@ -5,11 +5,7 @@
  * This single C++ file works on both iOS and Android.
  *
  * ONNX-specific implementation:
- * - Backend Registration
- * - Speech-to-Text (STT)
- * - Text-to-Speech (TTS)
- * - Voice Activity Detection (VAD)
- * - Voice Agent (full pipeline orchestration)
+ * - Backend registration hooks for STT/TTS/VAD providers
  *
  * Matches Swift SDK: ONNXRuntime/ONNX.swift
  *
@@ -27,16 +23,13 @@
 #include "../nitrogen/generated/shared/c++/HybridRunAnywhereONNXSpec.hpp"
 #endif
 
-#include <mutex>
-#include <string>
-
 namespace margelo::nitro::runanywhere::onnx {
 
 /**
  * HybridRunAnywhereONNX - ONNX backend native implementation
  *
  * Implements the RunAnywhereONNX interface defined in RunAnywhereONNX.nitro.ts
- * Delegates to STTBridge, TTSBridge, VADBridge, and VoiceAgentBridge.
+ * Registers native providers only. Core owns lifecycle and inference.
  */
 class HybridRunAnywhereONNX : public HybridRunAnywhereONNXSpec {
 public:
@@ -51,89 +44,9 @@ public:
   std::shared_ptr<Promise<bool>> unregisterBackend() override;
   std::shared_ptr<Promise<bool>> isBackendRegistered() override;
 
-  // ============================================================================
-  // Speech-to-Text (STT)
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> loadSTTModel(
-    const std::string& path,
-    const std::string& modelType,
-    const std::optional<std::string>& configJson) override;
-  std::shared_ptr<Promise<bool>> isSTTModelLoaded() override;
-  std::shared_ptr<Promise<bool>> unloadSTTModel() override;
-  std::shared_ptr<Promise<std::string>> transcribe(
-    const std::string& audioBase64,
-    double sampleRate,
-    const std::optional<std::string>& language) override;
-  std::shared_ptr<Promise<std::string>> transcribeFile(
-    const std::string& filePath,
-    const std::optional<std::string>& language) override;
-  std::shared_ptr<Promise<bool>> supportsSTTStreaming() override;
-
-  // ============================================================================
-  // Text-to-Speech (TTS)
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> loadTTSModel(
-    const std::string& path,
-    const std::string& modelType,
-    const std::optional<std::string>& configJson) override;
-  std::shared_ptr<Promise<bool>> isTTSModelLoaded() override;
-  std::shared_ptr<Promise<bool>> unloadTTSModel() override;
-  std::shared_ptr<Promise<std::string>> synthesize(
-    const std::string& text,
-    const std::string& voiceId,
-    double speedRate,
-    double pitchShift) override;
-  std::shared_ptr<Promise<std::string>> getTTSVoices() override;
-
-  // ============================================================================
-  // Voice Activity Detection (VAD)
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> loadVADModel(
-    const std::string& path,
-    const std::optional<std::string>& configJson) override;
-  std::shared_ptr<Promise<bool>> isVADModelLoaded() override;
-  std::shared_ptr<Promise<bool>> unloadVADModel() override;
-  std::shared_ptr<Promise<std::string>> processVAD(
-    const std::string& audioBase64,
-    const std::optional<std::string>& optionsJson) override;
-  std::shared_ptr<Promise<void>> resetVAD() override;
-  std::shared_ptr<Promise<bool>> initializeVAD(
-    const std::optional<std::string>& configJson) override;
-  std::shared_ptr<Promise<void>> cleanupVAD() override;
-  std::shared_ptr<Promise<bool>> startVAD() override;
-  std::shared_ptr<Promise<bool>> stopVAD() override;
-
-  // ============================================================================
-  // Voice Agent
-  // ============================================================================
-
-  std::shared_ptr<Promise<bool>> initializeVoiceAgent(
-    const std::string& configJson) override;
-  std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
-  std::shared_ptr<Promise<std::string>> processVoiceTurn(
-    const std::string& audioBase64) override;
-  std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
-
-  // ============================================================================
-  // Utilities
-  // ============================================================================
-
-  std::shared_ptr<Promise<std::string>> getLastError() override;
-  std::shared_ptr<Promise<double>> getMemoryUsage() override;
-
 private:
-  // Thread safety
-  std::mutex modelMutex_;
-
-  // State tracking
-  std::string lastError_;
   bool isRegistered_ = false;
-
-  // Helper methods
-  void setLastError(const std::string& error);
+  bool isSherpaRegistered_ = false;
 };
 
 } // namespace margelo::nitro::runanywhere::onnx

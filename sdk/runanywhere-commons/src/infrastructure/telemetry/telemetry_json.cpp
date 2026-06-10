@@ -100,10 +100,10 @@ class JsonBuilder {
     }
 
     void add_bool(const char* key, rac_bool_t value, rac_bool_t has_value) {
-        if (!has_value)
+        if (has_value == RAC_FALSE)
             return;
         comma();
-        ss_ << "\"" << key << "\":" << (value ? "true" : "false");
+        ss_ << "\"" << key << "\":" << (value != RAC_FALSE ? "true" : "false");
     }
 
     // Always outputs a boolean value
@@ -163,7 +163,7 @@ class JsonBuilder {
 
     std::string escape_string(const char* s) {
         std::string result;
-        while (*s) {
+        while (*s != '\0') {
             switch (*s) {
                 case '"':
                     result += "\\\"";
@@ -471,7 +471,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_int_always("available_memory", info->available_memory);
 
         // Boolean fields
-        json.add_bool_always("has_neural_engine", info->has_neural_engine);
+        json.add_bool_always("has_neural_engine", info->has_neural_engine != RAC_FALSE);
         json.add_int_always("neural_engine_cores", info->neural_engine_cores);
 
         // GPU family with default
@@ -483,7 +483,7 @@ rac_result_t rac_device_registration_to_json(const rac_device_registration_reque
         json.add_string_or_null("battery_state", info->battery_state);
 
         // More boolean and integer fields
-        json.add_bool_always("is_low_power_mode", info->is_low_power_mode);
+        json.add_bool_always("is_low_power_mode", info->is_low_power_mode != RAC_FALSE);
         json.add_int_always("core_count", info->core_count);
         json.add_int_always("performance_cores", info->performance_cores);
         json.add_int_always("efficiency_cores", info->efficiency_cores);

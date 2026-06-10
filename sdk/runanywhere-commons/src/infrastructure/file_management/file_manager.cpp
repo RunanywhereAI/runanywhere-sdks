@@ -5,6 +5,16 @@
  * Consolidates duplicated file management logic from Swift, Kotlin, Flutter, and RN SDKs.
  * All file I/O is performed via platform callbacks (rac_file_callbacks_t).
  * Business logic (recursive traversal, path computation, threshold checks) lives here.
+ *
+ * Edge cases handled:
+ *   - Callback completeness: validate_callbacks requires
+ *     create/delete/list/free/path_exists/get_file_size — missing →
+ *     RAC_ERROR_INVALID_ARGUMENT.
+ *   - Recursive dir size skips "." / ".." (calculate_dir_size_recursive).
+ *   - Clear-dir = recursive delete then recreate empty.
+ *   - Low-storage warning threshold = 1 GB remaining post-op
+ *     (STORAGE_WARNING_THRESHOLD).
+ *   - Path join normalizes a trailing slash.
  */
 
 #include <cstring>

@@ -18,72 +18,13 @@ struct DocumentRAGView: View {
     @State private var isShowingEmbeddingModelPicker = false
     @State private var isShowingLLMModelPicker = false
     @State private var isErrorBannerVisible = false
-    @State private var selectedEmbeddingModel: ModelInfo?
-    @State private var selectedLLMModel: ModelInfo?
+    @State private var selectedEmbeddingModel: RAModelInfo?
+    @State private var selectedLLMModel: RAModelInfo?
     @FocusState private var isInputFocused: Bool
 
     private var areModelsReady: Bool {
-        selectedEmbeddingModel?.localPath != nil && selectedLLMModel?.localPath != nil
-    }
-
-    /// Resolve the actual embedding model file path.
-    ///
-    /// Multi-file models (like all-minilm-l6-v2) set localPath to the folder after download.
-    /// In that case we return the path to model.onnx inside that folder.
-    private func resolveEmbeddingFilePath(localPath: URL) -> String {
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDir), isDir.boolValue {
-            return localPath.appendingPathComponent("model.onnx").path
-        }
-        return localPath.path
-    }
-
-    /// Resolve the actual LLM model file path.
-    ///
-    /// Single-file LlamaCpp models are stored inside a directory named after the model ID.
-    /// In that case we return the path to the first `.gguf` file found in the directory.
-    private func resolveLLMFilePath(localPath: URL) -> String {
-        var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDir),
-              isDir.boolValue else {
-            return localPath.path
-        }
-        let ggufFile = (try? FileManager.default.contentsOfDirectory(at: localPath, includingPropertiesForKeys: nil))?
-            .first { $0.pathExtension.lowercased() == "gguf" }
-        return ggufFile?.path ?? localPath.path
-    }
-
-    /// Resolve the vocab file path for the embedding model.
-    ///
-    /// Multi-file embedding models (localPath = folder) have vocab.txt directly inside
-    /// the folder. Single-file models fall back to the sibling-file convention.
-    private func resolveVocabPath(for embeddingModel: ModelInfo) -> String? {
-        guard let embeddingPath = embeddingModel.localPath else { return nil }
-
-        var isDir: ObjCBool = false
-        if FileManager.default.fileExists(atPath: embeddingPath.path, isDirectory: &isDir), isDir.boolValue {
-            // Multi-file model: vocab.txt is in the same folder as model.onnx
-            return embeddingPath.appendingPathComponent("vocab.txt").path
-        }
-
-        // Single-file model: vocab.txt is a sibling of the model file
-        return embeddingPath.deletingLastPathComponent().appendingPathComponent("vocab.txt").path
-    }
-
-    private var ragConfig: RAGConfiguration? {
-        guard
-            let embeddingModel = selectedEmbeddingModel,
-            let embeddingLocalPath = embeddingModel.localPath,
-            let llmLocalPath = selectedLLMModel?.localPath
-        else { return nil }
-
-        // embeddingConfigJSON is set asynchronously via loadDocument(url:config:) after
-        // vocab path is resolved. Here we build the base config; vocab is injected by the
-        // ViewModel when it calls loadDocument.
-        return RAGConfiguration(
-            embeddingModelPath: resolveEmbeddingFilePath(localPath: embeddingLocalPath),
-            llmModelPath: resolveLLMFilePath(localPath: llmLocalPath)
-        )
+        selectedEmbeddingModel?.isAvailableForUse == true
+            && selectedLLMModel?.isAvailableForUse == true
     }
 
     var body: some View {
@@ -98,7 +39,7 @@ struct DocumentRAGView: View {
             .background(AppColors.backgroundGrouped)
             .navigationTitle("Document Q&A")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             #endif
         }
         #if os(iOS)
@@ -160,7 +101,7 @@ extension DocumentRAGView {
     private func modelPickerRow(
         label: String,
         systemImage: String,
-        model: ModelInfo?,
+        model: RAModelInfo?,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -469,28 +410,17 @@ extension DocumentRAGView {
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            guard let url = urls.first, let baseConfig = ragConfig else { return }
+            guard
+                let url = urls.first,
+                let embeddingModel = selectedEmbeddingModel,
+                let llmModel = selectedLLMModel
+            else { return }
             Task {
-                // Inject the vocab path into embeddingConfigJSON so C++ knows where to find vocab.txt
-                var finalConfig = baseConfig
-                if let embeddingModel = selectedEmbeddingModel,
-                   let vocabPath = resolveVocabPath(for: embeddingModel) {
-                    let vocabJSON = "{\"vocab_path\":\"\(vocabPath)\"}"
-                    finalConfig = RAGConfiguration(
-                        embeddingModelPath: baseConfig.embeddingModelPath,
-                        llmModelPath: baseConfig.llmModelPath,
-                        embeddingDimension: baseConfig.embeddingDimension,
-                        topK: baseConfig.topK,
-                        similarityThreshold: baseConfig.similarityThreshold,
-                        maxContextTokens: baseConfig.maxContextTokens,
-                        chunkSize: baseConfig.chunkSize,
-                        chunkOverlap: baseConfig.chunkOverlap,
-                        promptTemplate: baseConfig.promptTemplate,
-                        embeddingConfigJSON: vocabJSON,
-                        llmConfigJSON: baseConfig.llmConfigJSON
-                    )
-                }
-                await viewModel.loadDocument(url: url, config: finalConfig)
+                await viewModel.loadDocument(
+                    url: url,
+                    embeddingModel: embeddingModel,
+                    llmModel: llmModel
+                )
             }
         case .failure(let error):
             viewModel.error = error

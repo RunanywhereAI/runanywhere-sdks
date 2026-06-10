@@ -8,7 +8,7 @@
 #   ./run-tests-linux.sh --build-only     # Build image only (compile verification)
 #   ./run-tests-linux.sh --download       # Download models on host first
 #   ./run-tests-linux.sh --core           # Core tests only
-#   ./run-tests-linux.sh --onnx           # ONNX backend tests (VAD, STT, TTS, WakeWord)
+#   ./run-tests-linux.sh --onnx           # ONNX/Sherpa backend tests (VAD, STT, TTS)
 #   ./run-tests-linux.sh --llm            # LLM tests only
 #   ./run-tests-linux.sh --agent          # Voice agent tests only
 #
@@ -50,9 +50,11 @@ print_header() {
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RAC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+COMMONS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 DOCKER_IMAGE="rac-linux-tests"
 MODEL_DIR="${RAC_TEST_MODEL_DIR:-${HOME}/.local/share/runanywhere/Models}"
+CONTAINER_TEST_DIR="/build/sdk/runanywhere-commons/tests"
 
 # =============================================================================
 # Parse arguments
@@ -77,7 +79,7 @@ while [[ "$#" -gt 0 ]]; do
             shift
             ;;
         --onnx)
-            TEST_FILTER="test_vad test_stt test_tts test_wakeword"
+            TEST_FILTER="test_vad test_stt test_tts"
             shift
             ;;
         --llm)
@@ -95,7 +97,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "  --build-only   Build Docker image only (compile verification)"
             echo "  --download     Download models on host first, then run all tests"
             echo "  --core         Run core tests only (no models needed)"
-            echo "  --onnx         Run ONNX backend tests (VAD, STT, TTS, WakeWord)"
+            echo "  --onnx         Run ONNX/Sherpa backend tests (VAD, STT, TTS)"
             echo "  --llm          Run LLM tests only"
             echo "  --agent        Run voice agent tests only"
             echo "  --help         Show this help"
@@ -122,7 +124,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-echo "RAC root:    ${RAC_ROOT}"
+echo "Repo root:   ${REPO_ROOT}"
+echo "Commons:     ${COMMONS_ROOT}"
 echo "Model dir:   ${MODEL_DIR}"
 echo "Docker img:  ${DOCKER_IMAGE}"
 echo ""
@@ -144,7 +147,7 @@ fi
 print_header "Building Docker Image"
 
 print_step "Building ${DOCKER_IMAGE}..."
-docker build -f "${RAC_ROOT}/tests/Dockerfile.linux-tests" -t "${DOCKER_IMAGE}" "${RAC_ROOT}"
+docker build -f "${COMMONS_ROOT}/tests/Dockerfile.linux-tests" -t "${DOCKER_IMAGE}" "${REPO_ROOT}"
 
 print_ok "Docker image built"
 
@@ -162,9 +165,9 @@ print_header "Running Tests in Container"
 
 # Build the test command
 if [ -n "${TEST_FILTER}" ]; then
-    TEST_CMD="cd /build/tests && for t in ${TEST_FILTER}; do if [ -x \"\$t\" ]; then echo \"Running \$t...\"; ./\$t --run-all; fi; done"
+    TEST_CMD="cd ${CONTAINER_TEST_DIR} && for t in ${TEST_FILTER}; do if [ -x \"\$t\" ]; then echo \"Running \$t...\"; ./\$t --run-all; fi; done"
 else
-    TEST_CMD="cd /build/tests && for t in test_core test_vad test_stt test_tts test_wakeword test_llm test_voice_agent; do if [ -x \"\$t\" ]; then echo \"Running \$t...\"; ./\$t --run-all; fi; done"
+    TEST_CMD="cd ${CONTAINER_TEST_DIR} && for t in test_core test_vad test_stt test_tts test_llm test_voice_agent; do if [ -x \"\$t\" ]; then echo \"Running \$t...\"; ./\$t --run-all; fi; done"
 fi
 
 PASSED=0
@@ -173,7 +176,7 @@ SKIPPED=0
 FAILED_NAMES=""
 
 # Run each test individually to get per-test pass/fail
-ALL_TESTS="test_core test_vad test_stt test_tts test_wakeword test_llm test_voice_agent"
+ALL_TESTS="test_core test_vad test_stt test_tts test_llm test_voice_agent"
 if [ -n "${TEST_FILTER}" ]; then
     ALL_TESTS="${TEST_FILTER}"
 fi
@@ -185,12 +188,12 @@ for test_name in ${ALL_TESTS}; do
         -v "${MODEL_DIR}:/models:ro" \
         -e RAC_TEST_MODEL_DIR=/models \
         "${DOCKER_IMAGE}" \
-        bash -c "cd /build/tests && [ -x '${test_name}' ] && ./${test_name} --run-all" > /dev/null 2>&1; then
+        bash -c "cd '${CONTAINER_TEST_DIR}' && [ -x '${test_name}' ] && ./${test_name} --run-all" > /dev/null 2>&1; then
         echo -e "${GREEN}PASS${NC}"
         PASSED=$((PASSED + 1))
     else
         # Check if binary exists
-        EXISTS=$(docker run --rm "${DOCKER_IMAGE}" bash -c "[ -x '/build/tests/${test_name}' ] && echo yes || echo no" 2>/dev/null)
+        EXISTS=$(docker run --rm "${DOCKER_IMAGE}" bash -c "[ -x '${CONTAINER_TEST_DIR}/${test_name}' ] && echo yes || echo no" 2>/dev/null)
         if [ "${EXISTS}" = "no" ]; then
             echo -e "${YELLOW}SKIP${NC} (not built)"
             SKIPPED=$((SKIPPED + 1))
@@ -206,7 +209,7 @@ for test_name in ${ALL_TESTS}; do
                 -v "${MODEL_DIR}:/models:ro" \
                 -e RAC_TEST_MODEL_DIR=/models \
                 "${DOCKER_IMAGE}" \
-                bash -c "cd /build/tests && ./${test_name} --run-all" 2>&1 | sed 's/^/    /' || true
+                bash -c "cd '${CONTAINER_TEST_DIR}' && ./${test_name} --run-all" 2>&1 | sed 's/^/    /' || true
             echo -e "  ${RED}--- end ${test_name} ---${NC}"
             echo ""
         fi

@@ -34,8 +34,9 @@ if [ -z "${SHERPA_ONNX_VERSION_ANDROID:-}" ]; then
     exit 1
 fi
 SHERPA_VERSION="${SHERPA_ONNX_VERSION_ANDROID}"
-# Official Sherpa-ONNX Android release
-DOWNLOAD_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-android.tar.bz2"
+# RunAnywhere Sherpa-ONNX fork (whisper per-token confidence); repo from VERSIONS
+SHERPA_ONNX_REPO="${SHERPA_ONNX_REPO_ANDROID}"
+DOWNLOAD_URL="https://github.com/${SHERPA_ONNX_REPO}/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-android.tar.bz2"
 
 # Colors
 RED='\033[0;31m'
@@ -178,9 +179,9 @@ download_header() {
 download_sherpa_headers() {
     mkdir -p "${SHERPA_DIR}/include/sherpa-onnx/c-api"
     echo "Downloading headers from Sherpa-ONNX source (v${SHERPA_VERSION})..."
-    download_header "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
+    download_header "https://raw.githubusercontent.com/${SHERPA_ONNX_REPO}/v${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h" \
         "${SHERPA_DIR}/include/sherpa-onnx/c-api/c-api.h"
-    download_header "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
+    download_header "https://raw.githubusercontent.com/${SHERPA_ONNX_REPO}/v${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h" \
         "${SHERPA_DIR}/include/sherpa-onnx/c-api/cxx-api.h"
     echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
 }
@@ -221,7 +222,7 @@ ensure_headers() {
 
     # Check version sentinel — re-download if version changed or files missing
     local NEED_ONNX_HEADERS=false
-    if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ]; then
+    if [ ! -f "${SHERPA_DIR}/include/onnxruntime_c_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_cxx_api.h" ] || [ ! -f "${SHERPA_DIR}/include/onnxruntime_ep_c_api.h" ]; then
         NEED_ONNX_HEADERS=true
     elif [ -f "${SHERPA_DIR}/include/.onnx-header-version" ]; then
         local EXISTING_ONNX_VER
@@ -243,13 +244,18 @@ ensure_headers() {
         # C API (used by onnx_backend.cpp)
         download_header "${ONNX_HEADER_BASE}/onnxruntime_c_api.h" \
             "${SHERPA_DIR}/include/onnxruntime_c_api.h"
-        # C++ API wrapper (used by wakeword_onnx.cpp)
+        # C++ API wrapper (used by Sherpa wakeword compatibility code)
         download_header "${ONNX_HEADER_BASE}/onnxruntime_cxx_api.h" \
             "${SHERPA_DIR}/include/onnxruntime_cxx_api.h"
         download_header "${ONNX_HEADER_BASE}/onnxruntime_cxx_inline.h" \
             "${SHERPA_DIR}/include/onnxruntime_cxx_inline.h"
         download_header "${ONNX_HEADER_BASE}/onnxruntime_float16.h" \
             "${SHERPA_DIR}/include/onnxruntime_float16.h"
+        # ORT 1.24.x: onnxruntime_c_api.h includes onnxruntime_ep_c_api.h at EOF.
+        download_header "${ONNX_HEADER_BASE}/onnxruntime_ep_c_api.h" \
+            "${SHERPA_DIR}/include/onnxruntime_ep_c_api.h"
+        download_header "${ONNX_HEADER_BASE}/onnxruntime_ep_device_ep_metadata_keys.h" \
+            "${SHERPA_DIR}/include/onnxruntime_ep_device_ep_metadata_keys.h"
         echo "${ONNX_RT_VERSION}" > "${SHERPA_DIR}/include/.onnx-header-version"
         echo "✅ ONNX Runtime headers installed (v${ONNX_RT_VERSION})"
     fi

@@ -19,13 +19,19 @@ import os
 
 // MARK: - LogLevel
 
-/// Log severity levels matching TypeScript LogLevel enum
+/// Log severity levels matching the generated proto `LogLevel`
+/// (`@runanywhere/proto-ts/logging`, idl/logging.proto): the C-ABI-aligned
+/// numbering trace=0, debug=1, info=2, warning=3, error=4, fatal=5. The raw
+/// value is forwarded to TypeScript as-is via `NativeLogEntry.level`, so it
+/// MUST stay numerically in lock-step with the proto enum to avoid an
+/// off-by-one when TS decodes it back into `LogLevel`.
 @objc public enum RNLogLevel: Int, Comparable {
-    case debug = 0
-    case info = 1
-    case warning = 2
-    case error = 3
-    case fault = 4
+    case trace = 0
+    case debug = 1
+    case info = 2
+    case warning = 3
+    case error = 4
+    case fatal = 5
 
     public static func < (lhs: RNLogLevel, rhs: RNLogLevel) -> Bool {
         lhs.rawValue < rhs.rawValue
@@ -33,11 +39,12 @@ import os
 
     public var description: String {
         switch self {
+        case .trace: return "TRACE"
         case .debug: return "DEBUG"
         case .info: return "INFO"
         case .warning: return "WARN"
         case .error: return "ERROR"
-        case .fault: return "FAULT"
+        case .fatal: return "FATAL"
         }
     }
 }
@@ -196,12 +203,12 @@ import os
         log(level: .error, message: message, metadata: metadata)
     }
 
-    /// Log a fault/critical message.
+    /// Log a fatal/critical message.
     /// - Parameters:
     ///   - message: Log message
     ///   - metadata: Optional metadata dictionary
-    @objc public func fault(_ message: String, metadata: [String: Any]? = nil) {
-        log(level: .fault, message: message, metadata: metadata)
+    @objc public func fatal(_ message: String, metadata: [String: Any]? = nil) {
+        log(level: .fatal, message: message, metadata: metadata)
     }
 
     // MARK: - Error Logging
@@ -250,6 +257,8 @@ import os
 
         // Log to OSLog (always, for system log capture)
         switch level {
+        case .trace:
+            os_log(.debug, log: osLog, "[TRACE] %{public}@", output)
         case .debug:
             os_log(.debug, log: osLog, "%{public}@", output)
         case .info:
@@ -258,7 +267,7 @@ import os
             os_log(.default, log: osLog, "[WARN] %{public}@", output)
         case .error:
             os_log(.error, log: osLog, "%{public}@", output)
-        case .fault:
+        case .fatal:
             os_log(.fault, log: osLog, "%{public}@", output)
         }
 
@@ -266,11 +275,12 @@ import os
         if Self.localLoggingEnabled {
             let emoji: String
             switch level {
+            case .trace: emoji = "[TRACE]"
             case .debug: emoji = "[DEBUG]"
             case .info: emoji = "[INFO]"
             case .warning: emoji = "[WARN]"
             case .error: emoji = "[ERROR]"
-            case .fault: emoji = "[FAULT]"
+            case .fatal: emoji = "[FATAL]"
             }
             // swiftlint:disable:next no_print_statements
             NSLog("%@ %@", emoji, output)
@@ -324,6 +334,4 @@ import os
     /// Logger for archive/extraction operations. Category: "Archive"
     @objc public static let archive = SDKLogger(category: "Archive")
 
-    /// Logger for audio decoding operations. Category: "AudioDecoder"
-    @objc public static let audioDecoder = SDKLogger(category: "AudioDecoder")
 }

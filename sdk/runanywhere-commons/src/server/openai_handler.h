@@ -34,7 +34,7 @@ class OpenAIHandler {
     /**
      * @brief Construct handler with LLM handle
      *
-     * @param llmHandle LLM service handle (must remain valid)
+     * @param llmHandle Generic LLM service handle (must remain valid)
      * @param modelId Model ID to report
      */
     OpenAIHandler(rac_handle_t llmHandle, const std::string& modelId);

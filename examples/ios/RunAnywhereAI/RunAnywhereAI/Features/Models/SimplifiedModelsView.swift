@@ -12,22 +12,22 @@ struct SimplifiedModelsView: View {
     @StateObject private var viewModel = ModelListViewModel.shared
     @StateObject private var deviceInfo = DeviceInfoService.shared
 
-    @State private var selectedModel: ModelInfo?
+    @State private var selectedModel: RAModelInfo?
     @State private var expandedFramework: InferenceFramework?
     @State private var availableFrameworks: [InferenceFramework] = []
     @State private var showingAddModelSheet = false
 
     /// All available models sorted by availability (downloaded first)
-    private var sortedModels: [ModelInfo] {
+    private var sortedModels: [RAModelInfo] {
         viewModel.availableModels.sorted { model1, model2 in
             let m1BuiltIn = model1.framework == .foundationModels
-                || model1.framework == .systemTTS
+                || model1.framework == .systemTts
                 || model1.artifactType == .builtIn
             let m2BuiltIn = model2.framework == .foundationModels
-                || model2.framework == .systemTTS
+                || model2.framework == .systemTts
                 || model2.artifactType == .builtIn
-            let m1Priority = m1BuiltIn ? 0 : (model1.localPath != nil ? 1 : 2)
-            let m2Priority = m2BuiltIn ? 0 : (model2.localPath != nil ? 1 : 2)
+            let m1Priority = m1BuiltIn ? 0 : (model1.localPathURL != nil ? 1 : 2)
+            let m2Priority = m2BuiltIn ? 0 : (model2.localPathURL != nil ? 1 : 2)
             if m1Priority != m2Priority {
                 return m1Priority < m2Priority
             }
@@ -165,7 +165,7 @@ struct SimplifiedModelsView: View {
         }
     }
 
-    private func selectModel(_ model: ModelInfo) async {
+    private func selectModel(_ model: RAModelInfo) async {
         selectedModel = model
 
         // Update the view model state
@@ -177,7 +177,7 @@ struct SimplifiedModelsView: View {
 
 /// Simplified model row with framework badge for flat list display
 private struct SimplifiedModelRow: View {
-    let model: ModelInfo
+    let model: RAModelInfo
     let isSelected: Bool
     let isLoadingModel: Bool
     let onDownloadCompleted: () -> Void
@@ -186,14 +186,14 @@ private struct SimplifiedModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
-    @State private var downloadStage: DownloadStage = .downloading
+    @State private var downloadStage: RADownloadStage = .downloading
 
     private var frameworkColor: Color {
         switch model.framework {
         case .llamaCpp: return AppColors.primaryAccent
         case .onnx: return .purple
         case .foundationModels: return .primary
-        case .systemTTS: return .primary
+        case .systemTts: return .primary
         default: return .gray
         }
     }
@@ -203,20 +203,13 @@ private struct SimplifiedModelRow: View {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
-        case .systemTTS: return "System"
+        case .systemTts: return "System"
         default: return model.framework.displayName
         }
     }
 
-    /// Check if this is a built-in model that doesn't require download
-    private var isBuiltIn: Bool {
-        model.framework == .foundationModels ||
-        model.framework == .systemTTS ||
-        model.artifactType == .builtIn
-    }
-
     private var isReady: Bool {
-        isBuiltIn || model.localPath != nil
+        model.isBuiltIn || model.localPathURL != nil
     }
 
     var body: some View {
@@ -242,7 +235,8 @@ private struct SimplifiedModelRow: View {
 
                 // Size and status
                 HStack(spacing: AppSpacing.smallMedium) {
-                    if let size = model.downloadSize, size > 0 {
+                    let size = model.downloadSizeBytes
+                    if size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
@@ -264,9 +258,9 @@ private struct SimplifiedModelRow: View {
                             Image(systemName: isReady ? "checkmark.circle.fill" : "arrow.down.circle")
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
                                 .font(AppTypography.caption2)
-                            let statusText = isBuiltIn
+                            let statusText = model.isBuiltIn
                                 ? "Built-in"
-                                : (model.localPath != nil ? "Ready" : "Download")
+                                : (model.localPathURL != nil ? "Ready" : "Download")
                             Text(statusText)
                                 .font(AppTypography.caption2)
                                 .foregroundColor(isReady ? AppColors.statusGreen : AppColors.primaryAccent)
@@ -291,7 +285,7 @@ private struct SimplifiedModelRow: View {
             Spacer()
 
             // Action button
-            if isBuiltIn {
+            if model.isBuiltIn {
                 // Built-in models (Foundation Models, System TTS) - always ready
                 Button("Use") {
                     onSelectModel()
@@ -302,7 +296,7 @@ private struct SimplifiedModelRow: View {
                 .tint(AppColors.primaryAccent)
                 .controlSize(.small)
                 .disabled(isSelected || isLoadingModel)
-            } else if model.localPath == nil {
+            } else if model.localPathURL == nil {
                 if isDownloading {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -356,35 +350,18 @@ private struct SimplifiedModelRow: View {
         }
 
         do {
-            // Use the new convenience download API
-            let progressStream = try await RunAnywhere.downloadModel(model.id)
-
-            for await progress in progressStream {
-                switch progress.state {
-                case .completed:
-                    await MainActor.run {
-                        self.downloadProgress = 1.0
-                        self.isDownloading = false
-                        self.downloadStage = .downloading
-                        onDownloadCompleted()
-                    }
-                    return
-
-                case .failed:
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                        self.downloadStage = .downloading
-                    }
-                    return
-
-                default:
-                    await MainActor.run {
-                        self.downloadProgress = progress.overallProgress
-                        self.downloadStage = progress.stage
-                    }
-                    continue
+            try await RunAnywhere.downloadModel(model) { progress in
+                await MainActor.run {
+                    self.downloadProgress = Double(progress.overallProgress)
+                    self.downloadStage = progress.stage
                 }
+            }
+
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloading = false
+                self.downloadStage = .downloading
+                onDownloadCompleted()
             }
         } catch {
             await MainActor.run {

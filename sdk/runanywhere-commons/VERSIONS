@@ -20,7 +20,7 @@ PROJECT_VERSION=0.19.13
 # Platform Deployment Targets
 # =============================================================================
 # iOS minimum deployment target
-IOS_DEPLOYMENT_TARGET=13.0
+IOS_DEPLOYMENT_TARGET=17.0
 
 # Android minimum SDK version
 ANDROID_MIN_SDK=24
@@ -29,29 +29,92 @@ ANDROID_MIN_SDK=24
 # Build Tools
 # =============================================================================
 # Xcode version for CI/CD builds
-XCODE_VERSION=15.4
+# (2026-05-19 build-toolchain bump): 15.4 -> 26.5 (host).
+XCODE_VERSION=26.5
 
 # Android NDK (matches what scripts/build-android.sh and Kotlin SDK expect)
-NDK_VERSION=27.0.12077973
+# (2026-05-19 build-toolchain bump): 27.0.12077973 -> 27.3.13750724.
+# 27.3.13750724 is "r27d", the CURRENT LTS designation per
+# https://developer.android.com/ndk/downloads ("Latest LTS Version (r27d)").
+# Note: although NDK 28.x and 29.x are published on the SDK repo channel, only
+# the r27 line carries the LTS label, so we hold on the latest r27 patch.
+NDK_VERSION=27.3.13750724
 
 # Emscripten SDK (used by sdk/runanywhere-web/wasm/scripts/build.sh)
-EMSCRIPTEN_VERSION=3.1.51
+# (2026-05-19 build-toolchain bump): 3.1.51 -> 5.0.6 (host).
+EMSCRIPTEN_VERSION=5.0.6
 
 # Node (Web SDK + React Native SDK builds)
-NODE_VERSION=20
+# (2026-05-19 build-toolchain bump): 20 -> 22 (LTS).
+NODE_VERSION=22
 
 # JDK (Kotlin SDK + Android builds)
 JAVA_VERSION=17
 
 # Gradle wrapper version baseline
-GRADLE_VERSION=8.11.1
+# T-P3 (2026-05-19 build-toolchain bump): 8.11.1 -> 8.14.5 (latest stable 8.x).
+GRADLE_VERSION=8.14.5
 
-# CMake version installed in CI. Must be >= 3.24 because
-# cmake/FetchONNXRuntime.cmake uses the DOWNLOAD_EXTRACT_TIMESTAMP keyword
-# which was added in CMake 3.24. (The repo's CMakeLists.txt advertises
-# cmake_minimum_required(3.22) for build-system documentation, but the
-# toolchain installed in CI has to be 3.24+ to actually run the build.)
-CMAKE_VERSION=3.27
+# Flutter SDK version. Single source of truth for:
+#   - .github/workflows/pr-build.yml (flutter-pubget job)
+#   - .github/workflows/release.yml (validate_consumer_flutter job)
+#   - sdk/runanywhere-flutter/.fvm/fvm_config.json (local FVM)
+# Bump here, then run setup-toolchain with platform=flutter (or sdk-only).
+# (2026-05-19 build-toolchain bump): 3.27.0 -> 3.44.0 (latest stable).
+FLUTTER_VERSION=3.44.0
+
+# =============================================================================
+# IDL Codegen Toolchain (single source of truth)
+# =============================================================================
+# Cross-language wire-compatibility depends on every generator emitting
+# identical bytes from identical .proto files. These pins are consumed by:
+#   - scripts/setup/setup-toolchain.sh    (installs the pinned versions)
+#   - idl/codegen/generate_*.sh     (verifies the pinned versions at runtime)
+#   - gradle/libs.versions.toml     (Wire runtime, mirrored by hand)
+#   - Mintfile                      (swift-protobuf, mirrored by hand)
+#   - .syncpackrc.json              (ts-proto if added to centralized npm pins)
+#
+# When bumping any of these, update ALL mirrors in the same commit and
+# regenerate IDL bindings (idl/codegen/generate_all.sh) so idl-drift-check
+# stays green.
+# (2026-05-19 idl-codegen bump): 1.181.1 -> 2.11.8 (latest).
+# Major bump: ts-proto 2.x switched to ES modules + dropped the `protobufjs`
+# polyfill default. Generated TS still parses under tsc 5.9 strict.
+TS_PROTO_VERSION=2.11.8
+# WIRE_VERSION held within 5.x — 6.x reshuffles the Kotlin proto runtime
+# package. Mirrored by hand in gradle/libs.versions.toml (already set to
+# 5.5.1 there; this VERSIONS entry is the SoT mirror for setup-toolchain).
+WIRE_VERSION=5.5.1
+# SWIFT_PROTOBUF_VERSION stays at 1.38.0 (already latest stable as of
+# 2026-05-19; release tag matches v1.38.0 on apple/swift-protobuf).
+SWIFT_PROTOBUF_VERSION=1.38.0
+# (2026-05-19 idl-codegen bump): 22.0.0 -> 25.0.0 (latest stable on
+# pub.dev). protoc_plugin 25.x emits Dart bindings that require the
+# `protobuf` 6.x runtime — pubspec.yaml is bumped in lockstep. Requires
+# Dart 3.0+ at codegen time (Flutter 3.44 bundles Dart 3.10).
+PROTOC_GEN_DART_VERSION=25.0.0
+# (2026-05-19 idl-codegen bump): 25 -> 34 (latest matching libprotobuf
+# C++ pin 34.1 used by sdk/runanywhere-commons/src/generated/proto/*.pb.cc).
+# protoc 25.x emitted v3.25 wire-format headers; protoc 34.x emits v4.34
+# headers compatible with the bumped PROTOBUF_VERSION=34.1.
+PROTOC_VERSION_MAJOR=34
+
+# CMake version installed in CI. Toolchain present on the build host.
+# (2026-05-19 build-toolchain bump): 3.27 -> 4.3.2 (latest stable per cmake.org).
+# This is the version present on the build host; MIN_CMAKE_VERSION (below) is
+# the floor that each CMakeLists.txt advertises.
+CMAKE_VERSION=4.3.2
+
+# Minimum CMake version advertised by every `cmake_minimum_required()` in this
+# repo. Must be >= 3.24 because cmake/FetchONNXRuntime.cmake uses the
+# DOWNLOAD_EXTRACT_TIMESTAMP keyword which was added in CMake 3.24. Bumping
+# this drops support for older CMake hosts; CI/devs need this version+.
+# NOTE: `cmake_minimum_required(VERSION ...)` must be the first command and
+# cannot be parameterised by a CMake variable — keep the literal value in
+# each CMakeLists.txt in sync with this when bumping.
+# Bumped from 3.24 to 3.30; reverted to 3.24 because some CI Docker
+# base images still ship cmake 3.27 and the bump caused configure failures.
+MIN_CMAKE_VERSION=3.24
 
 # =============================================================================
 # ONNX Runtime
@@ -59,25 +122,42 @@ CMAKE_VERSION=3.27
 # iOS version MUST match:
 #   1. What sherpa-onnx was built against
 #   2. What's in runanywhere-swift/Binaries/onnxruntime.xcframework
-# sherpa-onnx 1.12.17+ requires ONNX Runtime >= 1.17.1
-ONNX_VERSION_IOS=1.17.1
+# sherpa-onnx 1.13.x requires ONNX Runtime 1.24.x. The iOS pod-archive lags
+# upstream by one patch — 1.24.4 was not published as of 2026-05-19, so iOS is
+# pinned to 1.24.3 (ABI-compatible with sherpa 1.13.2 across 1.24.x patches).
+ONNX_VERSION_IOS=1.24.3
 
-# Android version - used by Sherpa-ONNX, must be compatible
-ONNX_VERSION_ANDROID=1.17.1
+# Android version - used by Sherpa-ONNX, must be compatible.
+# Android ONNX Runtime ships INSIDE the vendored sherpa-onnx-android prebuilt
+# (third_party/sherpa-onnx-android/jniLibs/<abi>/libonnxruntime.so). Re-vendor
+# sherpa-onnx-android in lockstep with this bump.
+ONNX_VERSION_ANDROID=1.24.4
 
 # macOS version (can use latest)
-ONNX_VERSION_MACOS=1.23.2
+# ORT v1.24+ ships per-arch tarballs only (no more osx-universal2). The
+# FetchONNXRuntime.cmake macOS branch now selects osx-arm64 vs osx-x86_64
+# based on CMAKE_HOST_SYSTEM_PROCESSOR.
+ONNX_VERSION_MACOS=1.24.4
 
 # Linux version (can use latest)
-ONNX_VERSION_LINUX=1.23.2
+ONNX_VERSION_LINUX=1.24.4
 
 # Windows version (can use latest)
-ONNX_VERSION_WINDOWS=1.23.2
+ONNX_VERSION_WINDOWS=1.24.4
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
-# iOS version
+# iOS version (matched set with ONNX_VERSION_IOS — sherpa-onnx links ORT
+# statically into its xcframework on iOS, so the two must move together).
+# (2026-05-27): the matching v1.13.2 iOS xcframework was never
+# published to runanywhere-binaries (only v1.12.18 is available there). Pin
+# back to v1.12.18 so `scripts/ios/download-sherpa-onnx.sh` can actually
+# resolve the prebuilt; without it, build-core-xcframework.sh ships a
+# non-routable RABackendSherpa.xcframework (RAC_SHERPA_ROUTABLE=0) and
+# every STT/TTS load with `framework=sherpa` fails the router with
+# "no backend route". Sherpa C-API is ABI-stable across 1.12→1.13 so this
+# lag is safe; bump back to 1.13.2 when the iOS xcframework is published.
 SHERPA_ONNX_VERSION_IOS=1.12.18
 
 # Android version (v1.12.20+ has 16KB alignment for Play Store)
@@ -85,34 +165,70 @@ SHERPA_ONNX_VERSION_IOS=1.12.18
 # prebuilt .so files AND the C API headers to avoid ABI/struct mismatch:
 #   rm -rf third_party/sherpa-onnx-android
 #   ./scripts/android/download-sherpa-onnx.sh
-# The download script now auto-validates header vs .so version consistency.
-SHERPA_ONNX_VERSION_ANDROID=1.12.20
+# The download script auto-validates header vs .so version consistency.
+SHERPA_ONNX_VERSION_ANDROID=1.13.2
+# Android prebuilt source repo. RunAnywhere fork patches the Whisper greedy
+# decoder to populate the per-token ys_log_probs C-API field (hybrid-router
+# confidence); ABI/header-identical to upstream k2-fsa v1.13.2.
+SHERPA_ONNX_REPO_ANDROID=Siddhesh2377/sherpa-onnx-rac
 
 # macOS version
-SHERPA_ONNX_VERSION_MACOS=1.12.18
+SHERPA_ONNX_VERSION_MACOS=1.13.2
 
 # Linux version
-SHERPA_ONNX_VERSION_LINUX=1.12.23
+SHERPA_ONNX_VERSION_LINUX=1.13.2
 
 # Windows version
-SHERPA_ONNX_VERSION_WINDOWS=1.12.23
+SHERPA_ONNX_VERSION_WINDOWS=1.13.2
 
 # =============================================================================
 # llama.cpp (LLM inference)
 # =============================================================================
-# b8201 - latest stable release (Feb 2026), includes GGML_WEBGPU backend
-# NOTE: Bumped from b7650 to enable WebGPU acceleration for WASM builds
-LLAMACPP_VERSION=b8201
+# Latest stable upstream release.
+LLAMACPP_VERSION=b9222
 
 # =============================================================================
 # nlohmann/json
 # =============================================================================
-NLOHMANN_JSON_VERSION=3.11.3
+NLOHMANN_JSON_VERSION=3.12.0
+
+# =============================================================================
+# USearch (vector search engine used by the RAG pipeline)
+# =============================================================================
+USEARCH_VERSION=v2.25.2
+
+# =============================================================================
+# cpp-httplib (header-only HTTP server — RAC_BUILD_SERVER only)
+# =============================================================================
+CPPHTTPLIB_VERSION=v0.45.0
+
+# =============================================================================
+# zlib (bundled for Android/Emscripten where the platform SDK lacks it)
+# =============================================================================
+ZLIB_VERSION=v1.3.2
+
+# =============================================================================
+# bzip2 (bundled for Android/Emscripten — sourceware tarball, NOT a `v` prefix)
+# =============================================================================
+BZIP2_VERSION=1.0.8
+
+# =============================================================================
+# Protobuf (libprotobuf runtime + matching libprotobuf-lite/abseil)
+# =============================================================================
+# Must match what the checked-in generated headers under
+# sdk/runanywhere-commons/src/generated/proto/ were emitted by (Protobuf C++
+# 7.35.0 → upstream tag v35.0). Bumping requires regenerating those headers.
+PROTOBUF_VERSION=35.0
+
+# =============================================================================
+# GoogleTest (test framework for commons + RAG unit tests)
+# =============================================================================
+GOOGLETEST_VERSION=v1.17.0
 
 # =============================================================================
 # libarchive (archive extraction - ZIP, TAR.GZ, TAR.BZ2, TAR.XZ)
 # =============================================================================
-LIBARCHIVE_VERSION=3.8.1
+LIBARCHIVE_VERSION=3.8.7
 
 # =============================================================================
 # RAC Commons Version (for remote builds/CI)

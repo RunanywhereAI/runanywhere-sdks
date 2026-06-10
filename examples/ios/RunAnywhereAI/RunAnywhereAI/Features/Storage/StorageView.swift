@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhere
 
 struct StorageView: View {
-    @StateObject private var viewModel = StorageViewModel()
+    @ObservedObject private var viewModel = StorageViewModel.shared
 
     var body: some View {
         #if os(macOS)
@@ -344,7 +344,7 @@ struct StorageView: View {
 // MARK: - Supporting Views
 
 private struct StoredModelRow: View {
-    let model: StoredModel
+    let model: RAStoredModel
     let onDelete: () async -> Void
     @State private var showingDetails = false
     @State private var showingDeleteConfirmation = false
@@ -356,24 +356,6 @@ private struct StoredModelRow: View {
                 VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
                     Text(model.name)
                         .font(AppTypography.subheadlineMedium)
-
-                    HStack(spacing: AppSpacing.smallMedium) {
-                        Text(model.format.rawValue.uppercased())
-                            .font(AppTypography.caption2)
-                            .padding(.horizontal, AppSpacing.small)
-                            .padding(.vertical, AppSpacing.xxSmall)
-                            .background(AppColors.badgePrimary)
-                            .cornerRadius(AppSpacing.cornerRadiusSmall)
-
-                        if let framework = model.framework {
-                            Text(framework.displayName)
-                                .font(AppTypography.caption2)
-                                .padding(.horizontal, AppSpacing.small)
-                                .padding(.vertical, AppSpacing.xxSmall)
-                                .background(AppColors.badgeGreen)
-                                .cornerRadius(AppSpacing.cornerRadiusSmall)
-                        }
-                    }
                 }
 
                 Spacer()
@@ -413,39 +395,6 @@ private struct StoredModelRow: View {
 
             if showingDetails {
                 VStack(alignment: .leading, spacing: AppSpacing.small) {
-                    // Model Format and Framework
-                    HStack {
-                        Text("Format:")
-                            .font(AppTypography.caption2Medium)
-                        Text(model.format.rawValue.uppercased())
-                            .font(AppTypography.caption2)
-                            .foregroundColor(AppColors.textSecondary)
-                    }
-
-                    if let framework = model.framework {
-                        HStack {
-                            Text("Framework:")
-                                .font(AppTypography.caption2Medium)
-                            Text(framework.displayName)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                    }
-
-                    // Description
-                    if let description = model.description {
-                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                            Text("Description:")
-                                .font(AppTypography.caption2Medium)
-                            Text(description)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-
-                    Divider()
-
                     // File Information
                     VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                         Text("Path:")
@@ -454,18 +403,6 @@ private struct StoredModelRow: View {
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    if let checksum = model.checksum {
-                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                            Text("Checksum:")
-                                .font(AppTypography.caption2Medium)
-                            Text(checksum)
-                                .font(AppTypography.caption2)
-                                .foregroundColor(AppColors.textSecondary)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                        }
                     }
 
                     HStack {

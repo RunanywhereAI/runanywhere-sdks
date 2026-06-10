@@ -13,29 +13,37 @@ extension LLMViewModel {
 
     func generateStreamingResponse(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        var fullResponse = ""
-
-        let streamingResult = try await RunAnywhere.generateStream(prompt, options: options)
-        let stream = streamingResult.stream
-        let metricsTask = streamingResult.result
-
-        for try await token in stream {
-            fullResponse += token
-            let displayText = Self.stripThinkTags(from: fullResponse)
-            await updateMessageContent(at: messageIndex, content: displayText)
-            NotificationCenter.default.post(
-                name: Notification.Name("MessageContentUpdated"),
-                object: nil
-            )
+        // The SDK's `aggregateStream(prompt:events:onToken:)` consumes the
+        // RALLMStreamEvent sequence, populates the canonical
+        // RALLMGenerationResult (including `framework` resolved from the
+        // currently-loaded LLM model), and invokes `onToken` for live UI
+        // updates. Avoids the synthetic result construction the example used
+        // to do alongside a hardcoded `framework = "llamacpp"` literal.
+        let request = Self.makeRequest(prompt: prompt, options: options)
+        let eventStream = try await RunAnywhere.generateStream(request)
+        let result = await RunAnywhere.aggregateStream(
+            prompt: prompt,
+            events: eventStream
+        ) { fullResponse in
+            await MainActor.run {
+                // `@Observable` publishes the message mutation; the chat view
+                // auto-scrolls via `.onChange(of: messages.last?.content)`.
+                self.updateMessageContent(at: messageIndex, content: fullResponse)
+            }
         }
 
-        let sdkResult = try await metricsTask.value
+        if !result.errorMessage.isEmpty {
+            throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: result.errorMessage
+            ])
+        }
+
         await updateMessageWithResult(
             at: messageIndex,
-            result: sdkResult,
+            result: result,
             prompt: prompt,
             options: options,
             wasInterrupted: false
@@ -46,10 +54,11 @@ extension LLMViewModel {
 
     func generateNonStreamingResponse(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
-        let result = try await RunAnywhere.generate(prompt, options: options)
+        let request = Self.makeRequest(prompt: prompt, options: options)
+        let result = try await RunAnywhere.generate(request)
         await updateMessageWithResult(
             at: messageIndex,
             result: result,
@@ -59,124 +68,127 @@ extension LLMViewModel {
         )
     }
 
+    /// Compose a canonical `RALLMGenerateRequest` from a prompt and options.
+    /// Example-local convenience for bridging the app's options-based API into
+    /// the SDK's canonical request-based entry points.
+    static func makeRequest(prompt: String, options: RALLMGenerationOptions) -> RALLMGenerateRequest {
+        var request = RALLMGenerateRequest()
+        request.prompt = prompt
+        request.maxTokens = options.maxTokens
+        request.temperature = options.temperature
+        request.topP = options.topP
+        request.topK = options.topK
+        request.systemPrompt = options.systemPrompt
+        request.stopSequences = options.stopSequences
+        request.streamingEnabled = options.streamingEnabled
+        return request
+    }
+
     // MARK: - Message Updates
 
-    func updateMessageContent(at index: Int, content: String) async {
-        await MainActor.run {
-            guard index < self.messagesValue.count else { return }
+    func updateMessageContent(at index: Int, content: String) {
+        guard index < self.messagesValue.count else { return }
+        let currentMessage = self.messagesValue[index]
+        let updatedMessage = Message(
+            id: currentMessage.id,
+            role: currentMessage.role,
+            content: content,
+            thinkingContent: currentMessage.thinkingContent,
+            timestamp: currentMessage.timestamp
+        )
+        self.updateMessage(at: index, with: updatedMessage)
+    }
+
+    func updateMessageWithResult(
+        at index: Int,
+        result: RALLMGenerationResult,
+        prompt: String,
+        options: RALLMGenerationOptions,
+        wasInterrupted: Bool
+    ) async {
+        // LLMViewModel is @MainActor (class-level); this extension inherits that
+        // isolation so a MainActor.run wrapper here is a no-op that only adds an
+        // artificial suspension point on the streaming hot path.
+        guard index < self.messagesValue.count,
+              let conversationId = self.currentConversation?.id else { return }
+
+        let currentMessage = self.messagesValue[index]
+        let analytics = self.createAnalytics(
+            from: result,
+            messageId: currentMessage.id.uuidString,
+            conversationId: conversationId,
+            wasInterrupted: wasInterrupted,
+            options: options
+        )
+
+        let modelInfo: MessageModelInfo?
+        if let currentModel = ModelListViewModel.shared.currentModel {
+            modelInfo = MessageModelInfo(from: currentModel)
+        } else {
+            modelInfo = nil
+        }
+
+        let updatedMessage = Message(
+            id: currentMessage.id,
+            role: currentMessage.role,
+            content: result.text,
+            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
+            timestamp: currentMessage.timestamp,
+            analytics: analytics,
+            modelInfo: modelInfo
+        )
+        self.updateMessage(at: index, with: updatedMessage)
+        self.updateConversationAnalytics()
+    }
+
+    // MARK: - Error Handling
+
+    func handleGenerationError(_ error: Error, at index: Int) async {
+        self.setError(error)
+
+        if index < self.messagesValue.count {
+            let errorMessage: String
+            if error is LLMError {
+                errorMessage = error.localizedDescription
+            } else {
+                errorMessage = "Generation failed: \(error.localizedDescription)"
+            }
+
             let currentMessage = self.messagesValue[index]
             let updatedMessage = Message(
                 id: currentMessage.id,
                 role: currentMessage.role,
-                content: content,
-                thinkingContent: currentMessage.thinkingContent,
+                content: errorMessage,
                 timestamp: currentMessage.timestamp
             )
             self.updateMessage(at: index, with: updatedMessage)
         }
     }
 
-    func updateMessageWithResult(
-        at index: Int,
-        result: LLMGenerationResult,
-        prompt: String,
-        options: LLMGenerationOptions,
-        wasInterrupted: Bool
-    ) async {
-        await MainActor.run {
-            guard index < self.messagesValue.count,
-                  let conversationId = self.currentConversation?.id else { return }
-
-            let currentMessage = self.messagesValue[index]
-            let analytics = self.createAnalytics(
-                from: result,
-                messageId: currentMessage.id.uuidString,
-                conversationId: conversationId,
-                wasInterrupted: wasInterrupted,
-                options: options
-            )
-
-            let modelInfo: MessageModelInfo?
-            if let currentModel = ModelListViewModel.shared.currentModel {
-                modelInfo = MessageModelInfo(from: currentModel)
-            } else {
-                modelInfo = nil
-            }
-
-            let updatedMessage = Message(
-                id: currentMessage.id,
-                role: currentMessage.role,
-                content: result.text,
-                thinkingContent: result.thinkingContent,
-                timestamp: currentMessage.timestamp,
-                analytics: analytics,
-                modelInfo: modelInfo
-            )
-            self.updateMessage(at: index, with: updatedMessage)
-            self.updateConversationAnalytics()
-        }
-    }
-
-    // MARK: - Error Handling
-
-    func handleGenerationError(_ error: Error, at index: Int) async {
-        await MainActor.run {
-            self.setError(error)
-
-            if index < self.messagesValue.count {
-                let errorMessage: String
-                if error is LLMError {
-                    errorMessage = error.localizedDescription
-                } else {
-                    errorMessage = "Generation failed: \(error.localizedDescription)"
-                }
-
-                let currentMessage = self.messagesValue[index]
-                let updatedMessage = Message(
-                    id: currentMessage.id,
-                    role: currentMessage.role,
-                    content: errorMessage,
-                    timestamp: currentMessage.timestamp
-                )
-                self.updateMessage(at: index, with: updatedMessage)
-            }
-        }
-    }
-
     // MARK: - Finalization
 
     func finalizeGeneration(at index: Int) async {
-        await MainActor.run {
-            self.setIsGenerating(false)
-        }
-        
+        self.setIsGenerating(false)
+
         guard index < self.messagesValue.count else { return }
-        
-        // Get the assistant message that was just generated
+
         let assistantMessage = self.messagesValue[index]
-        
-        // Get the CURRENT conversation from store (not the stale local copy)
+
+        // Use the CURRENT conversation from store (not the stale local copy).
         guard let conversationId = self.currentConversation?.id,
               let conversation = self.conversationStore.conversations.first(where: { $0.id == conversationId }) else {
             return
         }
-        
-        // Add assistant message to conversation store
-        await MainActor.run {
-            self.conversationStore.addMessage(assistantMessage, to: conversation)
+
+        self.conversationStore.addMessage(assistantMessage, to: conversation)
+
+        if var updatedConversation = self.conversationStore.currentConversation {
+            updatedConversation.messages = self.messagesValue
+            updatedConversation.modelName = self.loadedModelName
+            self.conversationStore.updateConversation(updatedConversation)
+            self.setCurrentConversation(updatedConversation)
         }
-        
-        // Update conversation with all messages and model info
-        await MainActor.run {
-            if var updatedConversation = self.conversationStore.currentConversation {
-                updatedConversation.messages = self.messagesValue
-                updatedConversation.modelName = self.loadedModelName
-                self.conversationStore.updateConversation(updatedConversation)
-                self.setCurrentConversation(updatedConversation)
-            }
-        }
-        
-        // Generate smart title immediately after first AI response
+
         if self.messagesValue.count >= 2 {
             await self.conversationStore.generateSmartTitleForConversation(conversationId)
         }

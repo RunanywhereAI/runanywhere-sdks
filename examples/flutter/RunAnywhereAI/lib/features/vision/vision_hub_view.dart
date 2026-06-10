@@ -52,7 +52,8 @@ class VisionHubView extends StatelessWidget {
               ),
             ),
             title: const Text('Vision Chat'),
-            subtitle: const Text('Chat with images using your camera or photos'),
+            subtitle:
+                const Text('Chat with images using your camera or photos'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               unawaited(

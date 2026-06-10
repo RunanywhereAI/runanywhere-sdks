@@ -44,15 +44,12 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Playback state
   bool _isGenerating = false;
   bool _isPlaying = false;
-  // ignore: unused_field - kept for future TTS implementation
-  bool _hasAudio = false;
   double _currentTime = 0.0;
   double _duration = 0.0;
   double _playbackProgress = 0.0;
 
   // Voice settings
   double _speechRate = 1.0;
-  final double _pitch = 1.0;
 
   // Model state
   LLMFramework? _selectedFramework;
@@ -113,6 +110,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     });
   }
 
+
   void _showModelSelectionSheet() {
     unawaited(showModalBottomSheet<void>(
       context: context,
@@ -138,12 +136,13 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       debugPrint('🔄 Loading TTS voice: ${model.name}');
 
       // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSVoice(model.id);
+      await sdk.RunAnywhere.tts.loadVoice(model.id);
 
       setState(() {
-        _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
+        _selectedFramework = model.preferredFramework;
         _selectedModelName = model.name;
-        _isSystemTTS = model.preferredFramework == LLMFramework.systemTTS;
+        _isSystemTTS = model.preferredFramework ==
+            LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
         _isGenerating = false;
       });
 
@@ -154,6 +153,16 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         _errorMessage = 'Failed to load model: $e';
         _isGenerating = false;
       });
+      // Surface TTS load failures via SnackBar in addition to the
+      // inline error text.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('TTS load failed: $e'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 
@@ -169,44 +178,69 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
-      _hasAudio = false;
       _metadata = null;
     });
 
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      // Check if TTS voice is loaded via SDK (matches Swift: RunAnywhere.isTTSVoiceLoaded)
-      if (!sdk.RunAnywhere.isTTSVoiceLoaded) {
+      if (!sdk.RunAnywhere.tts.isLoaded) {
         throw Exception(
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      // Call SDK TTS synthesis API (matches Swift: RunAnywhere.synthesize(_:))
-      final result = await sdk.RunAnywhere.synthesize(
-        _textController.text,
-        rate: _speechRate,
-        pitch: _pitch,
+      final options = sdk.TTSOptions(
+        speakingRate: _speechRate,
+        pitch: 1.0,
         volume: 1.0,
       );
 
+      // System TTS uses platform playback (iOS/Android parity: RunAnywhere.speak).
+      if (_isSystemTTS) {
+        final result = await sdk.RunAnywhere.speak(
+          _textController.text,
+          options,
+        );
+        debugPrint(
+            '✅ System TTS speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
+        debugPrint('Speech generation complete');
+        setState(() {
+          _isGenerating = false;
+          _duration = result.durationMs.toInt() / 1000.0;
+          _metadata = TTSMetadata(
+            durationMs: result.durationMs.toDouble(),
+            audioSize: 0,
+            sampleRate: result.sampleRate,
+          );
+        });
+        return;
+      }
+
+      final result = await sdk.RunAnywhere.tts.synthesize(
+        _textController.text,
+        options,
+      );
+
+      // TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
+      final samples =
+          Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
-          '✅ TTS synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+          '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
+      debugPrint('Speech generation complete');
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = result.samples.isNotEmpty;
-        _duration = result.durationSeconds;
+        _duration = result.durationMs.toInt() / 1000.0;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),
-          audioSize: result.samples.length * 4, // 4 bytes per float sample
+          audioSize: samples.length * 4, // 4 bytes per float sample
           sampleRate: result.sampleRate,
         );
       });
 
       // Auto-play if audio was generated
-      if (result.samples.isNotEmpty) {
-        await _playFloatAudio(result.samples, result.sampleRate);
+      if (samples.isNotEmpty) {
+        await _playFloatAudio(samples, result.sampleRate);
       }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
@@ -240,31 +274,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           '🔊 Playing TTS audio: ${samples.length} samples at $sampleRate Hz');
     } catch (e) {
       debugPrint('❌ Failed to play TTS audio: $e');
-      setState(() {
-        _errorMessage = 'Failed to play audio: $e';
-      });
-    }
-  }
-
-  /// Play audio using the audio player service (for Int16 PCM data)
-  // ignore: unused_element - kept for alternative audio formats
-  Future<void> _playAudio(List<int> audioData) async {
-    try {
-      // Convert List<int> to Uint8List
-      final audioBytes = Uint8List.fromList(audioData);
-
-      // The TTS component returns PCM16 data at 22050 Hz mono
-      // We need to pass the sample rate so the audio player can create proper WAV headers
-      await _playerService.playFromBytes(
-        audioBytes,
-        volume: 1.0, // Use full volume (pitch controls are in TTS synthesis)
-        rate: _speechRate,
-        sampleRate: 22050, // Piper TTS default sample rate
-        numChannels: 1, // Mono audio
-      );
-      debugPrint('🔊 Playing audio...');
-    } catch (e) {
-      debugPrint('❌ Failed to play audio: $e');
       setState(() {
         _errorMessage = 'Failed to play audio: $e';
       });
@@ -444,23 +453,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
-          
-          /* Pitch slider - Commented out for now as it is not implemented in the current TTS models. Once supported, we can have this back.
-          const SizedBox(height: AppSpacing.mediumLarge),
-
-          _buildSliderRow(
-            label: 'Pitch',
-            value: _pitch,
-            min: 0.5,
-            max: 2.0,
-            color: AppColors.primaryPurple,
-            onChanged: (value) {
-              setState(() {
-                _pitch = value;
-              });
-            },
-          ),
-          */
         ],
       ),
     );

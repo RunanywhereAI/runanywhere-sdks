@@ -11,6 +11,18 @@
  *
  * This header defines data structures only. For the service interface,
  * see rac_stt_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_stt_config_t, rac_stt_options_t,
+ *     rac_stt_input_t, rac_stt_output_t / rac_stt_transcription_result_t,
+ *     rac_stt_result_t, rac_stt_word_t, rac_stt_info_t,
+ *     rac_transcription_metadata_t, rac_transcription_alternative_t,
+ *     rac_stt_stream_callback_t): `delete after SDK migration`.
+ *     Replaced by serialized runanywhere.v1.STTOptions / STTOutput /
+ *     STTStreamEvent bytes via rac_stt_component_transcribe_proto and
+ *     rac_stt_component_transcribe_stream_proto.
+ *   - rac_audio_format_enum_t and the RAC_STT_* numeric constants are
+ *     `internal` shared audio plumbing.
  */
 
 #ifndef RAC_STT_TYPES_H

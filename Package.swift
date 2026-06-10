@@ -1,4 +1,12 @@
 // swift-tools-version: 5.9
+// Attempted bump to 6.0 was rolled back. Bumping the manifest tools
+// version forces Swift 6 language mode on all targets, which turns several
+// pre-existing patterns in the SDK (mutable static registration flags,
+// closure-captured locals in AVAudioConverter / URLSession callbacks,
+// etc.) into hard build errors. Migrating those requires non-trivial
+// source changes (sendable globals, actor isolation) that are out of
+// scope for this dep-bump pass — see AGENTS.md "no source edits" rule.
+// Re-attempt once the Swift 6 strict-concurrency migration lands.
 import PackageDescription
 import Foundation
 
@@ -9,57 +17,55 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.17.0")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
+//   Keep `useLocalNatives = false` so SPM downloads signed XCFrameworks from
+//   the GitHub release.
 //
 // FOR LOCAL DEVELOPMENT:
-//   1. Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
-//   2. Open the example app in Xcode
-//   3. The app references this package via relative path
+//   1. Build native XCFrameworks from the repo root:
+//          ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+//      This writes RACommons.xcframework, RABackendLLAMACPP.xcframework, and
+//      RABackendONNX.xcframework into sdk/runanywhere-swift/Binaries/.
+//   2. Ensure `useLocalNatives = true` below so the package resolves to
+//      those on-disk XCFrameworks instead of the remote release URLs.
+//   3. Open the example app (examples/ios/RunAnywhereAI) in Xcode — it
+//      depends on this package via a relative path.
 //
 // =============================================================================
-
-// Combined ONNX Runtime xcframework (local dev) is created by:
-//   cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
 
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
 //
 // useLocalNatives = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
-//                           For local development. Run first-time setup:
-//                             cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+//                           For local development. Generate them with
+//                           `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` at the repo
+//                           root before building the SDK.
 //
-// useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION)
-//                           For external users via SPM. No setup needed.
+// useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION).
+//                           For external users via SPM. No local build needed.
 //
-// To toggle this value, use:
-//   ./scripts/build-swift.sh --set-local   (sets useLocalNatives = true)
-//   ./scripts/build-swift.sh --set-remote  (sets useLocalNatives = false)
+// Toggling: this is a hand-edited flag. Release tooling sets it to `false`
+// before tagging a release; local devs flip it back to `true` and run
+// `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` to regenerate the on-disk binaries.
 //
 // Historical name: this used to be called `useLocalBinaries`. The concept is
 // the same — it's been renamed to `useLocalNatives` for consistency with the
 // equivalent toggle in the other client SDKs (Kotlin, Flutter, React Native).
 // =============================================================================
-let useLocalNatives = false //  Toggle: true for local dev, false for release
+let useLocalNatives = true // Toggle: false for release (default committed to main); local devs flip to true and run ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
-// Updated automatically by CI/CD during releases
+// Updated automatically by CI/CD during releases.
 let sdkVersion = "0.19.13"
-
-// MetalRT remote binary availability flag.
-// Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip
-// has been published. When `false`, the MetalRT product/targets are only
-// exposed under `useLocalNatives = true`, so SPM resolution will not fail
-// for external consumers due to a placeholder checksum.
-let metalrtRemoteBinaryAvailable = false
-
-let includeMetalRT = useLocalNatives || metalrtRemoteBinaryAvailable
 
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14),
+        // Floor bumped from iOS 17.0 / macOS 14.0 → iOS 17.5 / macOS 14.5
+        // (latest minor of the same LTS line, matches Xcode 15.4 baseline).
+        .iOS("17.5"),
+        .macOS("14.5"),
     ],
     products: [
         // =================================================================
@@ -86,25 +92,37 @@ let package = Package(
             targets: ["LlamaCPPRuntime"]
         ),
 
-        // =================================================================
-        // WhisperKit Backend - adds STT via Apple Neural Engine
-        // =================================================================
-        .library(
-            name: "RunAnywhereWhisperKit",
-            targets: ["WhisperKitRuntime"]
-        ),
-
-    ] + metalRTProducts(),
+    ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
-        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
-        .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
-        .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
-        .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
-        // ml-stable-diffusion for CoreML-based image generation
-        .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
-        // WhisperKit for Neural Engine STT
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
+        // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a
+        // silent upstream major bump can't land in `Package.resolved` without
+        // a Package.swift edit. Version floors are mirrored in
+        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/Versions.swift
+        // (RAVersions) — keep both in sync via scripts/release/sync-versions.sh.
+        // Floor bumped 3.0.0 → 3.15.1 (latest stable 3.x at bump time).
+        .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMinor(from: "3.15.1")),
+        .package(url: "https://github.com/JohnSundell/Files.git", .upToNextMinor(from: "4.3.0")),
+        // Floor bumped 5.6.0 → 5.8.0 (latest stable at bump time).
+        .package(url: "https://github.com/devicekit/DeviceKit.git", .upToNextMinor(from: "5.8.0")),
+        // Floor bumped 8.40.0 → 8.58.2 (latest stable 8.x at bump time).
+        .package(url: "https://github.com/getsentry/sentry-cocoa", .upToNextMinor(from: "8.58.2")),
+        // swift-protobuf for idl/*.proto generated types consumed by
+        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift.
+        // Floor bumped 1.27.0 → 1.38.0 (latest stable). The earlier
+        // .upToNextMajor exception (needed because generated code uses
+        // SwiftProtobuf._NameMap(bytecode:) from 1.28.0+) is now resolved by
+        // floor >= 1.38.0, so we re-tighten to .upToNextMinor in line with
+        // the policy applied to the other deps.
+        .package(url: "https://github.com/apple/swift-protobuf.git", .upToNextMinor(from: "1.38.0")),
+        //
+        // grpc-swift intentionally NOT wired. The *.grpc.swift files under
+        // Sources/RunAnywhere/Generated/ are excluded from the RunAnywhere
+        // target below — gRPC client stubs were emitted by the codegen but
+        // are not used at runtime. Frontends consume proto events via the
+        // hand-written VoiceAgentStreamAdapter that wraps the in-process C
+        // callback (see sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/
+        // VoiceAgentStreamAdapter.swift).
+        //
     ],
     targets: [
         // =================================================================
@@ -122,7 +140,10 @@ let package = Package(
         // =================================================================
         .target(
             name: "LlamaCPPBackend",
-            dependencies: ["RABackendLlamaCPPBinary"],
+            dependencies: [
+                "CRACommons",
+                "RABackendLlamaCPPBinary",
+            ],
             path: "sdk/runanywhere-swift/Sources/LlamaCPPRuntime/include",
             publicHeadersPath: "."
         ),
@@ -134,11 +155,20 @@ let package = Package(
         // separate ONNXRuntime{iOS,macOS}Binary targets needed. They were
         // previously distributed as separate xcframeworks but are bundled
         // since v0.19.0.
+        //
+        // The Sherpa-ONNX backend ships as a peer xcframework. It owns the
+        // STT (Whisper / Zipformer / Paraformer), TTS (Piper / VITS) and
+        // VAD (Silero) primitives under `framework == .sherpa`. ONNX owns
+        // embeddings and generic ONNX Runtime services under
+        // `framework == .onnx`. Both must be linked so the unified plugin
+        // router can resolve either framework at load time.
         // =================================================================
         .target(
             name: "ONNXBackend",
             dependencies: [
+                "CRACommons",
                 "RABackendONNXBinary",
+                "RABackendSherpaBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
             publicHeadersPath: "."
@@ -151,26 +181,45 @@ let package = Package(
             name: "RunAnywhere",
             dependencies: [
                 .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
-                .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "CRACommons",
                 "RACommonsBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
-            exclude: ["CRACommons"],
+            exclude: [
+                "CRACommons",
+                "Generated/router.pb.swift",
+                "Generated/diffusion_options.pb.swift",
+                // The previously-excluded
+                // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
+                // files are no longer emitted by `idl/codegen/generate_swift.sh` and
+                // have been removed from the repo. Swift consumes the same services
+                // through the hand-written AsyncStream adapters (VoiceAgentStreamAdapter,
+                // LLMStreamAdapter) that wrap the in-process C callback, so the gRPC
+                // stubs would only be dead code on macOS 14 / iOS 17.
+            ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ],
             linkerSettings: [
                 .linkedLibrary("c++"),
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2"),
+                .linkedFramework("CFNetwork"),
+                .linkedFramework("Security"),
+                .linkedFramework("SystemConfiguration"),
             ]
         ),
 
         // =================================================================
         // ONNX Runtime Backend
+        //
+        // Depends on both RABackendONNXBinary (embeddings + Silero VAD) and
+        // RABackendSherpaBinary (Sherpa-ONNX STT/TTS/VAD). `ONNX.register()`
+        // plumbs both plugins into the commons plugin registry at SDK boot.
         // =================================================================
         .target(
             name: "ONNXRuntime",
@@ -178,6 +227,7 @@ let package = Package(
                 "RunAnywhere",
                 "ONNXBackend",
                 "RABackendONNXBinary",
+                "RABackendSherpaBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include"],
@@ -211,22 +261,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // WhisperKit Runtime Backend (Apple Neural Engine STT)
-        // =================================================================
-        .target(
-            name: "WhisperKitRuntime",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "WhisperKit", package: "whisperkit"),
-            ],
-            path: "sdk/runanywhere-swift/Sources/WhisperKitRuntime",
-            linkerSettings: [
-                .linkedFramework("CoreML"),
-                .linkedFramework("Accelerate"),
-            ]
-        ),
-
-        // =================================================================
         // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
         // =================================================================
         .testTarget(
@@ -235,61 +269,8 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
-    ] + metalRTTargets() + binaryTargets()
+    ] + binaryTargets()
 )
-
-// =============================================================================
-// METALRT PRODUCT / TARGET GATING
-// =============================================================================
-// The RABackendMetalRT.xcframework is not yet published to GitHub releases
-// with a real checksum. To avoid SPM resolution failures for external
-// consumers due to a placeholder zero-checksum binary target, the MetalRT
-// product and its dependent targets are only included when:
-//   - `useLocalNatives == true` (local dev with a checked-out xcframework), or
-//   - `metalrtRemoteBinaryAvailable == true` (once a real checksum is wired in).
-func metalRTProducts() -> [Product] {
-    guard includeMetalRT else { return [] }
-    return [
-        .library(
-            name: "RunAnywhereMetalRT",
-            targets: ["MetalRTRuntime"]
-        ),
-    ]
-}
-
-func metalRTTargets() -> [Target] {
-    guard includeMetalRT else { return [] }
-    return [
-        // MetalRT C Bridge Module - exposes rac_backend_metalrt_register()
-        .target(
-            name: "MetalRTBackend",
-            dependencies: ["RABackendMetalRTBinary"],
-            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
-            publicHeadersPath: "."
-        ),
-        // MetalRT Runtime Backend (custom Metal GPU kernels)
-        .target(
-            name: "MetalRTRuntime",
-            dependencies: [
-                "RunAnywhere",
-                "MetalRTBackend",
-                "RABackendMetalRTBinary",
-            ],
-            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
-            exclude: ["include"],
-            resources: [
-                .copy("Resources/default.metallib"),
-            ],
-            linkerSettings: [
-                .linkedLibrary("c++"),
-                .linkedFramework("Accelerate"),
-                .linkedFramework("Metal"),
-                .linkedFramework("CoreGraphics"),
-                .linkedFramework("ImageIO"),
-            ]
-        ),
-    ]
-}
 
 // =============================================================================
 // BINARY TARGET SELECTION
@@ -299,14 +280,17 @@ func binaryTargets() -> [Target] {
     if useLocalNatives {
         // =====================================================================
         // LOCAL DEVELOPMENT MODE
-        // Use XCFrameworks from sdk/runanywhere-swift/Binaries/
-        // Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
-        //
-        // For macOS support, build with --include-macos:
-        //   ./scripts/build-swift.sh --setup --include-macos
+        // Use XCFrameworks from sdk/runanywhere-swift/Binaries/.
+        // Regenerate them via: `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` at the
+        // repo root (builds iOS device + simulator + macOS slices into each
+        // of the RACommons / RABackend* xcframeworks).
         // =====================================================================
         // ONNX Runtime is statically linked into RABackendONNX — no separate
         // local xcframework targets needed (v0.19.0+).
+        //
+        // Sherpa-ONNX ships as RABackendSherpa — owner of the `sherpa` engine
+        // plugin (STT / TTS / VAD). `ONNXRuntime.register()` registers this
+        // plugin's vtable via `rac_plugin_entry_sherpa()` at boot.
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
@@ -321,8 +305,8 @@ func binaryTargets() -> [Target] {
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
             .binaryTarget(
-                name: "RABackendMetalRTBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
+                name: "RABackendSherpaBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
         ]
     } else {
@@ -330,38 +314,52 @@ func binaryTargets() -> [Target] {
         // PRODUCTION MODE (for external SPM consumers)
         // Download XCFrameworks from GitHub releases
         // All xcframeworks include iOS + macOS slices (v0.19.0+)
+        //
+        // ONNXBackend / ONNXRuntime hard-depend on RABackendSherpaBinary, so
+        // it MUST appear in this list with a real URL + checksum before tagging
+        // a release. `sdk/runanywhere-swift/scripts/release-swift-binaries.sh` zips
+        // `RABackendSherpa.xcframework` into `RABackendSherpa-ios-v<version>.zip`
+        // and `sdk/runanywhere-swift/scripts/sync-checksums.sh` patches the checksum below.
+        //
+        // RELEASE PROCEDURE — checksums MUST be regenerated before tagging:
+        //   1. Build XCFrameworks (CI native_ios job, or locally via
+        //      `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh`).
+        //   2. Run `sdk/runanywhere-swift/scripts/sync-checksums.sh <zip_dir>` against the directory
+        //      that holds the four `*-ios-v<version>.zip` artifacts. This
+        //      overwrites each `checksum:` line below with the real SHA-256.
+        //   3. The release workflow (`release.yml::publish`) runs the
+        //      checksum sync automatically right before creating the draft
+        //      Release.
+        //
+        // Real SHA-256 checksums for the current `sdkVersion` ship on `main`
+        // (committed alongside each release-bumping PR). A stale checkout that
+        // points `sdkVersion` at a future tag whose zips have not yet been
+        // refreshed by `sync-checksums.sh` will surface as a `swift package
+        // resolve` "wrong checksum" error against the new release URL — which
+        // means: the release tooling did not re-run on this tag commit. Re-run
+        // `sdk/runanywhere-swift/scripts/sync-checksums.sh` and commit before re-tagging.
         // =====================================================================
-        var targets: [Target] = [
+        return [
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "a1caaf12186c896b49bfccc7348a71c3b3428b282e5ac3f5a3181a022b5401da"
+                checksum: "1685832e2b3a40b04ae27ad8d600e8f483bc355480677395241e0ab4ecdbd6fe"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "7ff978fbc87726423c682298f04354c7c11dfbfe9403b51f63d49df9c92e097a"
+                checksum: "a551a2218e0fda0dab5aca8d803982db3ad7185021a0db16300b3d996ac1910d"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "0f8575559ac96a9a7b872bb3adca3608acef38fdec1ab8ccf9b0716a8d627c6c"
+                checksum: "cf2608b6f85622edf33ea23c73e5e6ddf9ef7f967050767c8b578428578d78c7"
+            ),
+            .binaryTarget(
+                name: "RABackendSherpaBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
+                checksum: "771b6d4273a2b3b7b1f459aaa5d29b4f42f7f341eed9018a8031cd80143556bb"
             ),
         ]
-
-        // MetalRT remote binary is only appended once a real checksum has been
-        // published. Until then the MetalRT product/targets are omitted from
-        // the package graph entirely (see metalRTProducts/metalRTTargets).
-        if metalrtRemoteBinaryAvailable {
-            targets.append(
-                .binaryTarget(
-                    name: "RABackendMetalRTBinary",
-                    url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMetalRT-ios-v\(sdkVersion).zip",
-                    checksum: "0000000000000000000000000000000000000000000000000000000000000000" // TODO: replace with real checksum
-                )
-            )
-        }
-
-        return targets
     }
 }
