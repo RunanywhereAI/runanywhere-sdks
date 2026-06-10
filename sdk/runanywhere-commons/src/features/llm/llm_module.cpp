@@ -1286,12 +1286,9 @@ void populate_event_envelope(SDKEvent* event, EventCategory category, ErrorSever
 }
 
 rac_result_t publish_sdk_event(const SDKEvent& event) {
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        return RAC_ERROR_ENCODING_ERROR;
-    }
-    return rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
+    // Route through the events layer so the event reaches the telemetry + log
+    // sinks per its destination bitmask, not just the public proto stream.
+    return rac::events::publish_prebuilt(event);
 }
 
 void publish_generation_event(GenerationEventKind kind, const char* prompt, const char* token,

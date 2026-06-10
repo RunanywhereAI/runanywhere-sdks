@@ -11,7 +11,6 @@
 #include <map>
 #include <mutex>
 #include <random>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -44,9 +43,6 @@ struct rac_telemetry_manager {
     // Event queue
     std::vector<rac_telemetry_payload_t> queue;
     std::mutex queue_mutex;
-
-    // V2 modalities for grouping
-    std::set<std::string> v2_modalities = {"llm", "stt", "tts", "model"};
 
     // Batching configuration
     static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
@@ -131,21 +127,28 @@ const char* framework_proto_to_string(int32_t framework) {
     }
 }
 
-// Component → modality string for the V2 telemetry table grouping. Mirrors the
-// legacy event_type_to_modality: LLM→"llm", STT→"stt", TTS→"tts", model events
-// →"model", everything else →"system". (VLM also routes to "llm".)
+// Component → modality string for the V2 telemetry table grouping. One string
+// per backend V2 endpoint (POST /api/v2/sdk/telemetry/{modality}): llm, stt,
+// tts, vlm, rag, imagegen, system, model. Model events override the component
+// (any component can emit a model lifecycle event). Components without a
+// dedicated endpoint (embeddings, vad, voice_agent, …) fall through to system.
 const char* component_to_modality(runanywhere::v1::SDKComponent component, bool is_model_event) {
     if (is_model_event) {
         return "model";
     }
     switch (component) {
         case runanywhere::v1::SDK_COMPONENT_LLM:
-        case runanywhere::v1::SDK_COMPONENT_VLM:
             return "llm";
+        case runanywhere::v1::SDK_COMPONENT_VLM:
+            return "vlm";
         case runanywhere::v1::SDK_COMPONENT_STT:
             return "stt";
         case runanywhere::v1::SDK_COMPONENT_TTS:
             return "tts";
+        case runanywhere::v1::SDK_COMPONENT_RAG:
+            return "rag";
+        case runanywhere::v1::SDK_COMPONENT_DIFFUSION:
+            return "imagegen";
         default:
             return "system";
     }
@@ -322,11 +325,17 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                 case runanywhere::v1::GENERATION_EVENT_KIND_STREAMING_UPDATE:
                     return "llm.generation.streaming";
                 case runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED:
+                case runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED:
                     out_is_completion = true;
                     return "llm.generation.completed";
                 case runanywhere::v1::GENERATION_EVENT_KIND_FAILED:
                     out_is_completion = true;
                     return "llm.generation.failed";
+                case runanywhere::v1::GENERATION_EVENT_KIND_CANCELLED:
+                    out_is_completion = true;
+                    return "llm.generation.cancelled";
+                case runanywhere::v1::GENERATION_EVENT_KIND_CANCEL_REQUESTED:
+                    return "llm.generation.cancel_requested";
                 case runanywhere::v1::GENERATION_EVENT_KIND_MODEL_UNLOADED:
                     return "llm.model.unloaded";
                 default:
@@ -447,10 +456,94 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
         }
         case SDKEvent::kNetwork:
             return "network.connectivity.changed";
+        case SDKEvent::kCapability: {
+            // VLM / RAG / diffusion (imagegen) capability operations. *_COMPLETED
+            // and *_FAILED are terminal → flag for immediate flush.
+            switch (ev.capability().kind()) {
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED:
+                    return "vlm.process.started";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED:
+                    out_is_completion = true;
+                    return "vlm.process.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_FAILED:
+                    out_is_completion = true;
+                    return "vlm.process.failed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED:
+                    return "imagegen.generate.started";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS:
+                    return "imagegen.generate.progress";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED:
+                    out_is_completion = true;
+                    return "imagegen.generate.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_FAILED:
+                    out_is_completion = true;
+                    return "imagegen.generate.failed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED:
+                    return "rag.ingestion.started";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED:
+                    out_is_completion = true;
+                    return "rag.ingestion.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED:
+                    return "rag.query.started";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED:
+                    out_is_completion = true;
+                    return "rag.query.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED:
+                    out_is_completion = true;
+                    return "rag.query.failed";
+                default:
+                    return "capability";
+            }
+        }
         case SDKEvent::kFailure:
             return "sdk.error";
         default:
             return "unknown";
+    }
+}
+
+// Telemetry records lifecycle MILESTONES (started / completed / failed / summary),
+// not high-frequency streaming ticks (per-token, per-partial, per-chunk, per-step,
+// per-progress). Those still reach the public event stream + log via the
+// destination bitmask — they are only excluded from the telemetry batch, so a
+// single LLM stream produces one row per generation instead of one per token (and
+// a download/diffusion run does not emit a row per progress callback).
+bool telemetry_records(const SDKEvent& ev) {
+    switch (ev.event_case()) {
+        case SDKEvent::kGeneration:
+            switch (ev.generation().kind()) {
+                case runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED:
+                case runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED:
+                case runanywhere::v1::GENERATION_EVENT_KIND_STREAMING_UPDATE:
+                case runanywhere::v1::GENERATION_EVENT_KIND_THINKING_DELTA:
+                    return false;
+                default:
+                    return true;
+            }
+        case SDKEvent::kVoice:
+            switch (ev.voice().kind()) {
+                case runanywhere::v1::VOICE_EVENT_KIND_STT_PARTIAL_RESULT:
+                case runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_PARTIAL:
+                case runanywhere::v1::VOICE_EVENT_KIND_STT_PROCESSING:
+                case runanywhere::v1::VOICE_EVENT_KIND_AUDIO_GENERATED:
+                    return false;
+                default:
+                    return true;
+            }
+        case SDKEvent::kCapability:
+            return ev.capability().kind() !=
+                   runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS;
+        case SDKEvent::kModel:
+            switch (ev.model().kind()) {
+                case runanywhere::v1::MODEL_EVENT_KIND_LOAD_PROGRESS:
+                case runanywhere::v1::MODEL_EVENT_KIND_DOWNLOAD_PROGRESS:
+                case runanywhere::v1::MODEL_EVENT_KIND_EXTRACTION_PROGRESS:
+                    return false;
+                default:
+                    return true;
+            }
+        default:
+            return true;
     }
 }
 
@@ -466,6 +559,13 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
     if (sdk_event_bytes != nullptr && len > 0 &&
         !ev.ParseFromArray(sdk_event_bytes, static_cast<int>(len))) {
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Telemetry records milestones only — drop high-frequency streaming ticks
+    // (per-token / per-partial / per-chunk / per-progress) so a stream does not
+    // emit one telemetry row per token. They still reached the public + log sinks.
+    if (!telemetry_records(ev)) {
+        return RAC_SUCCESS;
     }
 
     rac_telemetry_payload_t payload = rac_telemetry_payload_default();
@@ -504,6 +604,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             break;
         case SDKEvent::kStorage:
             payload_error = &ev.storage().error();
+            break;
+        case SDKEvent::kCapability:
+            payload_error = &ev.capability().error();
             break;
         default:
             break;
@@ -550,7 +653,8 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.temperature = g.temperature();
             payload.max_tokens = g.max_tokens();
             payload.context_length = g.context_length();
-            if (ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED &&
+            if ((ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED ||
+                 ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED) &&
                 !ev.has_error()) {
                 payload.success = RAC_TRUE;
                 payload.has_success = RAC_TRUE;
@@ -568,6 +672,12 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.processing_time_ms = static_cast<double>(m.duration_ms());
             framework_str = framework_proto_to_string(m.framework());
             payload.framework = framework_str.c_str();
+            // ModelEvent.progress is 0..1; the backend model endpoint wants 0..100.
+            // Only emit when present so non-progress events don't send progress=0.
+            if (m.progress() > 0.0f) {
+                payload.progress = static_cast<double>(m.progress()) * 100.0;
+                payload.has_progress = RAC_TRUE;
+            }
             if (m.kind() == runanywhere::v1::MODEL_EVENT_KIND_LOAD_COMPLETED && !ev.has_error()) {
                 payload.success = RAC_TRUE;
                 payload.has_success = RAC_TRUE;
@@ -639,6 +749,44 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             payload.has_is_online = RAC_TRUE;
             break;
         }
+        case SDKEvent::kCapability: {
+            // CapabilityOperationEvent is a flat analytics struct (kind, model_id,
+            // operation, progress, input_count, output_count, error). The generic
+            // counts carry different metrics per component:
+            //   VLM  → input_count = image count, output_count = output tokens
+            //   RAG  → output_count = retrieved docs count
+            //   imagegen/diffusion → only progress (not a /imagegen schema field),
+            //                        so it routes with base fields only.
+            const auto& c = ev.capability();
+            if (!c.model_id().empty())
+                payload.model_id = c.model_id().c_str();
+            switch (ev.component()) {
+                case runanywhere::v1::SDK_COMPONENT_VLM:
+                    payload.image_count = static_cast<int32_t>(c.input_count());
+                    payload.output_tokens = static_cast<int32_t>(c.output_count());
+                    payload.total_tokens = payload.input_tokens + payload.output_tokens;
+                    break;
+                case runanywhere::v1::SDK_COMPONENT_RAG:
+                    payload.retrieved_docs_count = static_cast<int32_t>(c.output_count());
+                    break;
+                default:
+                    break;
+            }
+            switch (c.kind()) {
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED:
+                    if (!ev.has_error()) {
+                        payload.success = RAC_TRUE;
+                        payload.has_success = RAC_TRUE;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
         default:
             break;
     }
@@ -694,69 +842,37 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     // Update last flush time
     manager->last_flush_time_ms = get_current_timestamp_ms();
 
-    // Get endpoint
-    const char* endpoint = rac_endpoint_telemetry(manager->environment);
-    bool requires_auth = (manager->environment != RAC_ENV_DEVELOPMENT);
+    // Group events by modality and POST each group to its own V2 endpoint:
+    // /api/v2/sdk/telemetry/{modality}. Modality is encoded in the path, not
+    // the body (the backend batch schema is extra="forbid").
+    std::map<std::string, std::vector<rac_telemetry_payload_t>> by_modality;
+    for (const auto& event : events) {
+        std::string modality = event.modality ? event.modality : "system";
+        by_modality[modality].push_back(event);
+    }
 
-    if (manager->environment == RAC_ENV_DEVELOPMENT) {
-        // Development: Send array directly to Supabase
+    for (const auto& pair : by_modality) {
+        const std::string& modality = pair.first;
+        const auto& modality_events = pair.second;
+
         rac_telemetry_batch_request_t batch = {};
-        batch.events = events.data();
-        batch.events_count = events.size();
+        batch.events = const_cast<rac_telemetry_payload_t*>(modality_events.data());
+        batch.events_count = modality_events.size();
         batch.device_id = manager->device_id.c_str();
         batch.timestamp_ms = get_current_timestamp_ms();
-        batch.modality = nullptr;  // Not used for development
 
         char* json = nullptr;
         size_t json_len = 0;
         rac_result_t result =
             rac_telemetry_manager_batch_to_json(&batch, manager->environment, &json, &json_len);
-
-        if (result == RAC_SUCCESS && json) {
-            manager->http_callback(manager->http_user_data, endpoint, json, json_len,
-                                   requires_auth ? RAC_TRUE : RAC_FALSE);
-            free(json);
-        }
-    } else {
-        // Production: Group by modality and send batch requests
-        std::map<std::string, std::vector<rac_telemetry_payload_t>> by_modality;
-
-        for (const auto& event : events) {
-            std::string modality = event.modality ? event.modality : "system";
-            // For "system" events, use V1 path (modality = nullptr)
-            if (manager->v2_modalities.find(modality) == manager->v2_modalities.end()) {
-                modality = "system";
-            }
-            by_modality[modality].push_back(event);
+        if (result != RAC_SUCCESS || !json) {
+            continue;
         }
 
-        for (const auto& pair : by_modality) {
-            const std::string& modality = pair.first;
-            const auto& modality_events = pair.second;
-
-            rac_telemetry_batch_request_t batch = {};
-            batch.events = const_cast<rac_telemetry_payload_t*>(modality_events.data());
-            batch.events_count = modality_events.size();
-            batch.device_id = manager->device_id.c_str();
-            batch.timestamp_ms = get_current_timestamp_ms();
-            batch.modality = (modality == "system") ? nullptr : modality.c_str();
-
-            char* json = nullptr;
-            size_t json_len = 0;
-            rac_result_t result =
-                rac_telemetry_manager_batch_to_json(&batch, manager->environment, &json, &json_len);
-
-            if (result == RAC_SUCCESS && json) {
-                // WARN: Log production telemetry payload for debugging (first 500 chars)
-                RAC_LOG_DEBUG("Telemetry",
-                              "Sending production telemetry (modality=%s, %zu bytes): %.500s",
-                              modality.c_str(), json_len, json);
-                manager->http_callback(manager->http_user_data, endpoint, json, json_len,
-                                       RAC_TRUE  // Production always requires auth
-                );
-                free(json);
-            }
-        }
+        const std::string endpoint = std::string(RAC_ENDPOINT_TELEMETRY_V2_PREFIX) + modality;
+        RAC_LOG_DEBUG("Telemetry", "POST %s (%zu bytes): %.500s", endpoint.c_str(), json_len, json);
+        manager->http_callback(manager->http_user_data, endpoint.c_str(), json, json_len, RAC_TRUE);
+        free(json);
     }
 
     // Free duplicated strings in events

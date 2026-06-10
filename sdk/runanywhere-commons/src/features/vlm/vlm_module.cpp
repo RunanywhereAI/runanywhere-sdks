@@ -42,6 +42,7 @@
 #include "vlm_options.pb.h"
 
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 static const char* LOG_CAT = "VLM.Component";
@@ -979,11 +980,9 @@ void populate_envelope(runanywhere::v1::SDKEvent* event, runanywhere::v1::ErrorS
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 && event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the events layer so capability events reach the telemetry +
+    // log sinks per their destination bitmask, not just the public proto stream.
+    (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,

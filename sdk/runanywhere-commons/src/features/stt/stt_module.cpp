@@ -306,11 +306,61 @@ void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind, const char* t
         voice->set_error(rac_error_message(error_code));
     }
 
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size == 0 || event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
+    // Route through the events layer so STT telemetry reaches the telemetry +
+    // log sinks per the destination bitmask, not just the public proto stream.
+    (void)rac::events::publish_prebuilt(event);
+}
+
+// Emit a fully-populated STT VoiceLifecycleEvent from the lifecycle-proto path.
+// The lifecycle ABI (rac_stt_transcribe_lifecycle_proto) calls the service vtable
+// directly and would otherwise publish nothing, so SDK consumers — which all use
+// the lifecycle path — got no STT telemetry. Mirrors the rich event the
+// handle-based rac_stt_component_transcribe emits. Pass 0 / nullptr for fields
+// that don't apply to the given kind (started vs completed vs failed).
+void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const char* transcription_id,
+                                 const char* model_id, const char* text, float confidence,
+                                 int64_t processing_ms, int64_t audio_length_ms,
+                                 int32_t audio_size_bytes, int32_t word_count,
+                                 double real_time_factor, const char* language, int32_t sample_rate,
+                                 const char* error) {
+    runanywhere::v1::VoiceLifecycleEvent voice;
+    voice.set_kind(kind);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        voice.set_model_id(model_id);
     }
+    if (text != nullptr && text[0] != '\0') {
+        voice.set_text(text);
+    }
+    if (confidence > 0.0f) {
+        voice.set_confidence(confidence);
+    }
+    if (processing_ms > 0) {
+        voice.set_duration_ms(processing_ms);
+    }
+    if (audio_length_ms > 0) {
+        voice.set_audio_length_ms(audio_length_ms);
+    }
+    if (audio_size_bytes > 0) {
+        voice.set_audio_size_bytes(audio_size_bytes);
+    }
+    if (word_count > 0) {
+        voice.set_word_count(word_count);
+    }
+    if (real_time_factor > 0.0) {
+        voice.set_real_time_factor(real_time_factor);
+    }
+    if (language != nullptr && language[0] != '\0') {
+        voice.set_language(language);
+    }
+    if (sample_rate > 0) {
+        voice.set_sample_rate(sample_rate);
+    }
+    if (error != nullptr && error[0] != '\0') {
+        voice.set_error(error);
+    }
+    rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                      runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                      transcription_id);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -1382,8 +1432,22 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     const std::string& audio = request.audio().audio_data();
     rac_stt_service_t service{ref.ops, ref.impl, ref.model_id};
     rac_stt_result_t raw = {};
+
+    const std::string transcription_id = generate_unique_id();
+    publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED,
+                                transcription_id.c_str(), ref.model_id, nullptr, 0.0f, 0, 0, 0, 0,
+                                0.0, options.language, options.sample_rate, nullptr);
+
+    const auto transcribe_start = std::chrono::steady_clock::now();
     rc = rac_stt_transcribe(&service, audio.data(), audio.size(), &options, &raw);
+    const int64_t processing_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      std::chrono::steady_clock::now() - transcribe_start)
+                                      .count();
     if (rc != RAC_SUCCESS) {
+        publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED,
+                                    transcription_id.c_str(), ref.model_id, nullptr, 0.0f,
+                                    processing_ms, 0, 0, 0, 0.0, options.language,
+                                    options.sample_rate, rac_error_message(rc));
         rac::lifecycle::release_lifecycle_stt(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -1413,6 +1477,17 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
             static_cast<float>(static_cast<double>(metadata->processing_time_ms()) /
                                static_cast<double>(duration_ms)));
     }
+
+    const int32_t word_count = count_words(raw.text);
+    const double real_time_factor =
+        (duration_ms > 0 && processing_ms > 0)
+            ? static_cast<double>(duration_ms) / static_cast<double>(processing_ms)
+            : 0.0;
+    publish_stt_lifecycle_event(
+        runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED, transcription_id.c_str(), ref.model_id,
+        raw.text, raw.confidence, processing_ms, duration_ms,
+        static_cast<int32_t>(audio.size()), word_count, real_time_factor, options.language,
+        options.sample_rate, nullptr);
 
     rc = copy_proto(output, out_result);
     rac_stt_result_free(&raw);

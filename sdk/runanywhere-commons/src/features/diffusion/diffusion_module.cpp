@@ -40,6 +40,7 @@
 #if defined(RAC_HAVE_PROTOBUF)
 #include "diffusion_options.pb.h"
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
 #endif
 
@@ -758,10 +759,9 @@ bool serialize_proto(const google::protobuf::MessageLite& message, std::vector<u
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
-    std::vector<uint8_t> bytes;
-    if (serialize_proto(event, &bytes)) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the events layer so diffusion (imagegen) telemetry reaches
+    // the telemetry + log sinks per the destination bitmask, not just public.
+    (void)rac::events::publish_prebuilt(event);
 }
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
@@ -1080,8 +1080,15 @@ rac_result_t rac_diffusion_generate_lifecycle_proto(const uint8_t* request_proto
 
     rac_diffusion_service_t service{ref.ops, ref.impl, ref.model_id};
     rac_diffusion_result_t raw = {};
+
+    // The lifecycle path calls the service vtable directly; emit the capability
+    // lifecycle events here (mirrors rac_diffusion_generate_proto) so imagegen
+    // telemetry flows for any SDK that wires the lifecycle entry point.
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_STARTED,
+                       "diffusion.generate", 0.0f, nullptr);
     rc = rac_diffusion_generate(&service, &options, &raw);
     if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "diffusion.generate", rac_error_message(rc));
         free_diffusion_options(&options);
         rac::lifecycle::release_lifecycle_diffusion(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
@@ -1096,6 +1103,8 @@ rac_result_t rac_diffusion_generate_lifecycle_proto(const uint8_t* request_proto
                                           "failed to encode DiffusionResult");
     }
     rc = copy_proto(result, out_result);
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED,
+                       "diffusion.generate", 1.0f, nullptr);
     rac_diffusion_result_free(&raw);
     free_diffusion_options(&options);
     rac::lifecycle::release_lifecycle_diffusion(&ref);
