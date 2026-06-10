@@ -6,9 +6,11 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
+import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/extensions/model_category_extensions.dart';
 
 /// Static helpers for storage + low-level download + model registration.
@@ -71,8 +73,9 @@ class RunAnywhereStorage {
       request.downloadSizeBytes = Int64(memoryRequirement);
     }
 
-    final model =
-        await DartBridgeModelRegistry.instance.registerModelFromUrl(request);
+    final model = await DartBridgeModelRegistry.instance.registerModelFromUrl(
+      request,
+    );
     if (model == null) {
       throw SDKException.internalError(
         'rac_register_model_from_url_proto failed for model "$name"',
@@ -236,5 +239,19 @@ class RunAnywhereStorage {
     if (!DartBridgeFileManager.clearTemp()) {
       throw SDKException.storageError('Failed to clean temp files');
     }
+  }
+
+  /// Execute a generated-proto storage delete request.
+  ///
+  /// Mirrors Swift `RunAnywhere.deleteStorage(_:)`; callers choose the typed
+  /// policy flags (`deleteFiles`, `clearRegistryPaths`, `unloadIfLoaded`,
+  /// `allowPlatformDelete`) while commons owns the actual plan/execution.
+  static Future<StorageDeleteResult> deleteStorage(
+    StorageDeleteRequest request,
+  ) async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeStorage.instance.deleteProto(request);
   }
 }

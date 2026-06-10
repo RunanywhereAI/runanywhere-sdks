@@ -57,6 +57,12 @@ type OptionalBackend = {
   isAvailable?: boolean;
 };
 
+type BackendRegistrationState = {
+  llamaRegistered: boolean;
+  onnxRegistered: boolean;
+  genieRegistered: boolean;
+};
+
 function hasUsableBackendConfig(options: {
   apiKey?: string | null;
   baseURL?: string | null;
@@ -148,20 +154,44 @@ const InitializationErrorView: React.FC<{
  * (`RunAnywhere.registerModel(...)` / `RunAnywhere.registerMultiFileModel(...)`).
  * Module-specific addModel() methods are NOT used.
  */
-async function registerModulesAndModels(): Promise<void> {
-  // =========================================================================
-  // LlamaCPP backend + LLM models
-  // =========================================================================
-  // LlamaCPP.register() returns Promise<boolean>; only register Llama/VLM
-  // models when the native backend was actually installed so the demo never
-  // routes inference to a backend that failed to register.
-  const llamaRegistered = LlamaCPP ? await LlamaCPP.register() : false;
+async function registerBackends(): Promise<BackendRegistrationState> {
+  const llamaResult = LlamaCPP ? await LlamaCPP.register() : false;
+  const llamaRegistered = llamaResult !== false;
   if (!llamaRegistered && LlamaCPP) {
     logDiagnostic(
       '[App] LlamaCPP.register() returned false - skipping LLM/VLM model registration'
     );
   }
 
+  let genieRegistered = false;
+  if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
+    const result = await Genie.register();
+    genieRegistered = result !== false;
+    logDiagnostic(
+      '[App] Genie backend registered; NPU model catalog is pending generated registry/catalog support'
+    );
+  }
+
+  const onnxResult = ONNX ? await ONNX.register() : false;
+  const onnxRegistered = onnxResult !== false;
+  if (!ONNX) {
+    logDiagnostic('[App] Skipping ONNX models - backend not available');
+  } else if (!onnxRegistered) {
+    logDiagnostic(
+      '[App] ONNX.register() returned false - skipping STT/TTS/VAD/embedding model registration'
+    );
+  }
+
+  return { llamaRegistered, onnxRegistered, genieRegistered };
+}
+
+async function registerModulesAndModels(
+  backendState: BackendRegistrationState
+): Promise<void> {
+  const { llamaRegistered, onnxRegistered } = backendState;
+  // =========================================================================
+  // LlamaCPP backend + LLM models
+  // =========================================================================
   if (llamaRegistered) {
     await Promise.all([
       registerModel({
@@ -188,9 +218,10 @@ async function registerModulesAndModels(): Promise<void> {
       registerModel({
         id: 'qwen2.5-0.5b-instruct-q6_k',
         name: 'Qwen 2.5 0.5B Instruct Q6_K',
-        url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+        url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirement: 600_000_000,
+        supportsLora: true,
       }),
       registerModel({
         id: 'qwen2.5-1.5b-instruct-q4_k_m',
@@ -330,37 +361,9 @@ async function registerModulesAndModels(): Promise<void> {
   }
 
   // =========================================================================
-  // Genie NPU backend (Android / Snapdragon only)
-  //
-  // Mirrors the Flutter example's Genie registration: register the backend
-  // when available and let the SDK own NPU model selection. Per-chip model
-  // catalogs (Qualcomm SoC slug → Genie model bundle URL) are SDK-internal
-  // knowledge per AGENTS.md "Business Logic Layering Rules" and belong in
-  // `@runanywhere/genie`, not in this example.
-  // =========================================================================
-  if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
-    await Genie.register();
-    logDiagnostic(
-      '[App] Genie backend registered; NPU model catalog is pending generated registry/catalog support'
-    );
-  }
-
-  // =========================================================================
   // ONNX backend + STT/TTS models
   // =========================================================================
-  // Mirror the LlamaCPP gating: ONNX.register() returns Promise<boolean>;
-  // skip STT/TTS/VAD/embedding model registration when the native backend
-  // failed to install so the demo never routes inference to a backend that
-  // failed to register.
-  const onnxRegistered = ONNX ? await ONNX.register() : false;
-  if (!ONNX) {
-    logDiagnostic('[App] Skipping ONNX models - backend not available');
-    return;
-  }
   if (!onnxRegistered) {
-    logDiagnostic(
-      '[App] ONNX.register() returned false - skipping STT/TTS/VAD/embedding model registration'
-    );
     return;
   }
 
@@ -450,6 +453,7 @@ const App: React.FC = () => {
       const startTime = Date.now();
 
       /* eslint-disable no-console -- demo app bootstrap diagnostics */
+      const backendState = await registerBackends();
       const customApiKey = await getStoredApiKey();
       const customBaseURL = await getStoredBaseURL();
       const hasCustomConfig = await hasCustomConfiguration();
@@ -478,7 +482,8 @@ const App: React.FC = () => {
         console.log('[App] SDK initialized in DEVELOPMENT mode');
       }
 
-      await registerModulesAndModels();
+      await registerModulesAndModels(backendState);
+      await RunAnywhere.refreshModelRegistry();
 
       const initTime = Date.now() - startTime;
       const isInit = await RunAnywhere.isInitialized;

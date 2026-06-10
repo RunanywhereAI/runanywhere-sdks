@@ -39,7 +39,6 @@ import { VoicePipelineStatus } from '../types/voice';
 // Import RunAnywhere SDK. Voice uses the Swift-shaped public stream facade.
 import { RunAnywhere } from '@runanywhere/core';
 import {
-  InferenceFramework,
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
@@ -83,6 +82,18 @@ export const VoiceAssistantScreen: React.FC = () => {
   // adapter's AsyncIterable consumer; calling it deregisters the C-side callback.
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
+  const cleanupVoiceSession = useCallback(async () => {
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    try {
+      await RunAnywhere.cleanupVoiceAgent();
+    } catch (error) {
+      console.warn('[VoiceAssistant] cleanupVoiceAgent failed:', error);
+    }
+  }, []);
+
   // Check if all models are loaded
   const allModelsLoaded = sttModel && llmModel && ttsModel;
 
@@ -98,12 +109,9 @@ export const VoiceAssistantScreen: React.FC = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      void cleanupVoiceSession();
     };
-  }, []);
+  }, [cleanupVoiceSession]);
 
   /**
    * Load available models from catalog
@@ -162,6 +170,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
           setStatus(VoicePipelineStatus.Idle);
           setIsSessionActive(false);
+          void cleanupVoiceSession();
           break;
         default:
           break;
@@ -236,19 +245,16 @@ export const VoiceAssistantScreen: React.FC = () => {
       Alert.alert('Error', event.error.message || 'An error occurred');
       setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
       setIsSessionActive(false);
+      void cleanupVoiceSession();
     }
-  }, []);
+  }, [cleanupVoiceSession]);
 
   /**
    * Start or stop the voice session (uses proto-stream adapter).
    */
   const handleToggleSession = useCallback(async () => {
     if (isSessionActive) {
-      // Stop: deregister the C-side callback via the adapter's unsubscribe.
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      await cleanupVoiceSession();
       setIsSessionActive(false);
       setStatus(VoicePipelineStatus.Idle);
     } else {
@@ -305,10 +311,11 @@ export const VoiceAssistantScreen: React.FC = () => {
         console.warn('[VoiceAssistant] Voice agent started');
       } catch (error) {
         console.error('[VoiceAssistant] Failed to start voice agent:', error);
+        await cleanupVoiceSession();
         Alert.alert('Error', `Failed to start voice agent: ${error}`);
       }
     }
-  }, [isSessionActive, allModelsLoaded, handleProtoEvent]);
+  }, [isSessionActive, allModelsLoaded, handleProtoEvent, cleanupVoiceSession]);
 
   /**
    * Get context for model selection
@@ -362,10 +369,10 @@ export const VoiceAssistantScreen: React.FC = () => {
               })
             );
             if (result.success) {
-              setSTTModel({
-                ...model,
-                preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-              });
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+              ).catch(() => null);
+              setSTTModel(loaded ?? model);
             } else {
               Alert.alert(
                 'Error',
@@ -384,11 +391,10 @@ export const VoiceAssistantScreen: React.FC = () => {
               })
             );
             if (result.success) {
-              setLLMModel({
-                ...model,
-                preferredFramework:
-                  InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-              });
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_LANGUAGE
+              ).catch(() => null);
+              setLLMModel(loaded ?? model);
             } else {
               Alert.alert(
                 'Error',
@@ -407,11 +413,10 @@ export const VoiceAssistantScreen: React.FC = () => {
               })
             );
             if (result.success) {
-              setTTSModel({
-                ...model,
-                preferredFramework:
-                  InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
-              });
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+              ).catch(() => null);
+              setTTSModel(loaded ?? model);
             } else {
               Alert.alert(
                 'Error',

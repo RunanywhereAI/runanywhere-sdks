@@ -16,7 +16,6 @@ import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/rag/rag_demo_view.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
-import 'package:runanywhere_ai/features/structured_output/structured_output_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// ChatInterfaceView
@@ -48,11 +47,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   // Model state synced from SDK.
   String? _loadedModelName;
   sdk.InferenceFramework? _loadedFramework;
+  bool _loadedModelSupportsThinking = false;
 
   // Analytics
   DateTime? _generationStartTime;
   double? _timeToFirstToken;
-  int _tokenCount = 0;
 
   @override
   void initState() {
@@ -86,6 +85,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       setState(() {
         _loadedModelName = model?.name;
         _loadedFramework = model?.framework;
+        _loadedModelSupportsThinking = model?.supportsThinking ?? false;
       });
     }
   }
@@ -102,19 +102,20 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     _controller.clear();
 
     setState(() {
-      _messages.add(ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        role: sdk.MessageRole.MESSAGE_ROLE_USER,
-        content: userMessage,
-        timestamp: DateTime.now(),
-      ));
+      _messages.add(
+        ChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          role: sdk.MessageRole.MESSAGE_ROLE_USER,
+          content: userMessage,
+          timestamp: DateTime.now(),
+        ),
+      );
       _isGenerating = true;
       _errorMessage = null;
       _currentStreamingContent = '';
       _currentThinkingContent = '';
       _generationStartTime = DateTime.now();
       _timeToFirstToken = null;
-      _tokenCount = 0;
     });
 
     _scrollToBottom();
@@ -124,33 +125,39 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final prefs = await SharedPreferences.getInstance();
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
-      final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
-      // Fall back to a sane default system
-      // prompt when the user hasn't customised one. Without it, smaller
-      // 0.5-1B models tend to ramble or echo the prompt verbatim.
-      final systemPromptRaw =
-          prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
-      const defaultSystemPrompt =
-          'You are a helpful, concise assistant. Keep replies brief unless asked otherwise.';
+      final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
       final systemPrompt =
-          systemPromptRaw.isNotEmpty ? systemPromptRaw : defaultSystemPrompt;
+          prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+      final thinkingModeEnabled =
+          prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
+      final disableThinking =
+          _loadedModelSupportsThinking && !thinkingModeEnabled;
 
       debugPrint(
-          '[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)');
+        '[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)',
+      );
 
       // Check if tool calling is enabled and has registered tools
       final toolSettings = ToolSettingsViewModel.shared;
-      final useToolCalling = toolSettings.toolCallingEnabled &&
+      final useToolCalling =
+          toolSettings.toolCallingEnabled &&
           toolSettings.registeredTools.isNotEmpty;
 
       if (useToolCalling) {
-        await _generateWithToolCalling(userMessage, maxTokens, temperature);
+        await _generateWithToolCalling(
+          userMessage,
+          maxTokens,
+          temperature,
+          systemPrompt,
+          disableThinking,
+        );
       } else {
         // Streaming now runs in a background isolate, so no ANR concerns
         final options = sdk.LLMGenerationOptions(
           maxTokens: maxTokens,
           temperature: temperature,
           systemPrompt: systemPrompt,
+          disableThinking: disableThinking,
         );
 
         if (_useStreaming) {
@@ -189,6 +196,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     int maxTokens,
     double temperature,
+    String systemPrompt,
+    bool disableThinking,
   ) async {
     // Capture model name from local state
     final modelName = _loadedModelName;
@@ -196,7 +205,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     // Auto-detect the tool calling format based on the loaded model
     final format = _detectToolCallFormat(modelName);
     debugPrint(
-        'Using tool calling with format: ${format.name} for model: ${modelName ?? "unknown"}');
+      'Using tool calling with format: ${format.name} for model: ${modelName ?? "unknown"}',
+    );
 
     // Add empty assistant message
     final assistantMessage = ChatMessage(
@@ -221,22 +231,26 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           format: format,
           maxTokens: maxTokens,
           temperature: temperature,
+          systemPrompt: systemPrompt,
+          disableThinking: disableThinking,
         ),
       );
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-              1000.0
+                1000.0
           : 0.0;
 
       // Create ToolCallInfo from the result if tools were called
       ToolCallInfo? toolCallInfo;
       debugPrint(
-          '📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
+        '📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}',
+      );
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
-        final lastResult =
-            result.toolResults.isNotEmpty ? result.toolResults.last : null;
+        final lastResult = result.toolResults.isNotEmpty
+            ? result.toolResults.last
+            : null;
         debugPrint('📊 Creating ToolCallInfo for: ${lastCall.name}');
 
         final hasError = lastResult != null && lastResult.error.isNotEmpty;
@@ -250,7 +264,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           error: hasError ? lastResult.error : null,
         );
         debugPrint(
-            '📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
+          '📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}',
+        );
       } else {
         debugPrint('📊 No tool calls in result - badge will NOT show');
       }
@@ -265,6 +280,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       setState(() {
         _messages[messageIndex] = _messages[messageIndex].copyWith(
           content: result.text,
+          thinkingContent: result.thinkingContent,
           analytics: analytics,
           toolCallInfo: toolCallInfo,
         );
@@ -305,43 +321,40 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final contentBuffer = StringBuffer();
 
     try {
-      // generateStream returns Stream<LLMStreamEvent>;
-      // collect token text off each non-terminal event.
-      final eventStream = sdk.RunAnywhere.llm.generateStream(prompt, options);
-
-      await for (final event in eventStream) {
-        if (event.isFinal) {
-          if (event.errorMessage.isNotEmpty) {
-            throw Exception(event.errorMessage);
+      final result = await sdk.RunAnywhere.aggregateStream(
+        prompt: prompt,
+        events: sdk.RunAnywhere.llm.generateStream(prompt, options),
+        onToken: (aggregated) async {
+          if (_timeToFirstToken == null && _generationStartTime != null) {
+            _timeToFirstToken =
+                DateTime.now()
+                    .difference(_generationStartTime!)
+                    .inMilliseconds /
+                1000.0;
           }
-          break;
-        }
-        final token = event.token;
-        if (token.isEmpty) continue;
+          contentBuffer
+            ..clear()
+            ..write(aggregated);
+          _currentStreamingContent = contentBuffer.toString();
+          if (!mounted) return;
+          setState(() {
+            _messages[messageIndex] = _messages[messageIndex].copyWith(
+              content: _currentStreamingContent,
+            );
+          });
+          _scrollToBottom();
+        },
+      );
 
-        if (_timeToFirstToken == null && _generationStartTime != null) {
-          _timeToFirstToken =
-              DateTime.now().difference(_generationStartTime!).inMilliseconds /
-                  1000.0;
-        }
-
-        _tokenCount++;
-        contentBuffer.write(token);
-        _currentStreamingContent = contentBuffer.toString();
-
-        setState(() {
-          _messages[messageIndex] = _messages[messageIndex].copyWith(
-            content: _currentStreamingContent,
-          );
-        });
-
-        _scrollToBottom();
+      if (result.errorMessage.isNotEmpty) {
+        throw Exception(result.errorMessage);
       }
+      _currentThinkingContent = result.thinkingContent;
 
       // Calculate final analytics
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-              1000.0
+                1000.0
           : 0.0;
 
       final analytics = MessageAnalytics(
@@ -349,13 +362,15 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         modelName: modelName,
         timeToFirstToken: _timeToFirstToken,
         totalGenerationTime: totalTime,
-        outputTokens: _tokenCount,
-        tokensPerSecond: totalTime > 0 ? _tokenCount / totalTime : 0,
+        outputTokens: result.tokensGenerated,
+        tokensPerSecond: result.tokensPerSecond,
+        wasThinkingMode: result.thinkingContent.isNotEmpty,
       );
 
       if (!mounted) return;
       setState(() {
         _messages[messageIndex] = _messages[messageIndex].copyWith(
+          content: result.text,
           thinkingContent: _currentThinkingContent.isNotEmpty
               ? _currentThinkingContent
               : null,
@@ -385,7 +400,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-              1000.0
+                1000.0
           : 0.0;
 
       // Extract token counts from SDK result
@@ -398,17 +413,20 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         totalGenerationTime: totalTime,
         outputTokens: outputTokens,
         tokensPerSecond: tokensPerSecond,
+        wasThinkingMode: result.thinkingContent.isNotEmpty,
       );
 
       setState(() {
-        _messages.add(ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
-          content: result.text,
-          thinkingContent: result.thinkingContent,
-          timestamp: DateTime.now(),
-          analytics: analytics,
-        ));
+        _messages.add(
+          ChatMessage(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
+            content: result.text,
+            thinkingContent: result.thinkingContent,
+            timestamp: DateTime.now(),
+            analytics: analytics,
+          ),
+        );
         _isGenerating = false;
       });
 
@@ -424,11 +442,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        unawaited(_scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: AppLayout.animationFast,
-          curve: Curves.easeOut,
-        ));
+        unawaited(
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: AppLayout.animationFast,
+            curve: Curves.easeOut,
+          ),
+        );
       }
     });
   }
@@ -471,19 +491,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
               tooltip: 'Document Q&A',
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.data_object),
-            onPressed: () {
-              unawaited(
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const StructuredOutputView(),
-                  ),
-                ),
-              );
-            },
-            tooltip: 'Structured Output Examples',
-          ),
           if (_messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline),
@@ -520,35 +527,39 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 
   void _showModelSelectionSheet() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) => ModelSelectionSheet(
-        context: ModelSelectionContext.llm,
-        onModelSelected: (model) async {
-          // Model loaded by ModelSelectionSheet via SDK
-          // Sync local state after model load
-          await _syncModelState();
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => ModelSelectionSheet(
+          context: ModelSelectionContext.llm,
+          onModelSelected: (model) async {
+            // Model loaded by ModelSelectionSheet via SDK
+            // Sync local state after model load
+            await _syncModelState();
+          },
+        ),
       ),
-    ));
+    );
   }
 
   /// Show conversation history bottom sheet driven by ConversationStore.
   void _showConversationHistory() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) => _ConversationListSheet(
-        store: ConversationStore.shared,
-        onNewChat: () {
-          Navigator.of(sheetContext).pop();
-          _clearChat();
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => _ConversationListSheet(
+          store: ConversationStore.shared,
+          onNewChat: () {
+            Navigator.of(sheetContext).pop();
+            _clearChat();
+          },
+        ),
       ),
-    ));
+    );
   }
 
   /// Map SDK InferenceFramework to LLMFramework (identity — both are the same type).
@@ -585,16 +596,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
               color: AppColors.textSecondary(context),
             ),
             const SizedBox(height: AppSpacing.large),
-            Text(
-              'Start a conversation',
-              style: AppTypography.title2(context),
-            ),
+            Text('Start a conversation', style: AppTypography.title2(context)),
             const SizedBox(height: AppSpacing.smallMedium),
             Text(
               'Type a message to begin',
-              style: AppTypography.subheadline(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.subheadline(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           ],
         ),
@@ -644,9 +652,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 
   Widget _buildTypingIndicator() {
-    return const TypingIndicatorView(
-      statusText: 'AI is thinking...',
-    );
+    return const TypingIndicatorView(statusText: 'AI is thinking...');
   }
 
   /// Heuristic check for small models (<= ~500M params) where tool
@@ -665,9 +671,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   Widget _buildInputArea() {
     final toolSettings = ToolSettingsViewModel.shared;
-    final showToolBadge = toolSettings.toolCallingEnabled &&
+    final showToolBadge =
+        toolSettings.toolCallingEnabled &&
         toolSettings.registeredTools.isNotEmpty;
-    final showSmallModelWarning = toolSettings.toolCallingEnabled &&
+    final showSmallModelWarning =
+        toolSettings.toolCallingEnabled &&
         _isLikelySmallModel(_loadedModelName);
 
     return Container(
@@ -694,16 +702,20 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                 margin: const EdgeInsets.only(bottom: AppSpacing.smallMedium),
                 decoration: BoxDecoration(
                   color: AppColors.primaryOrange.withValues(alpha: 0.1),
-                  borderRadius:
-                      BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                  borderRadius: BorderRadius.circular(
+                    AppSpacing.cornerRadiusRegular,
+                  ),
                   border: Border.all(
                     color: AppColors.primaryOrange.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline,
-                        size: 16, color: AppColors.primaryOrange),
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppColors.primaryOrange,
+                    ),
                     const SizedBox(width: AppSpacing.smallMedium),
                     Expanded(
                       child: Text(
@@ -734,7 +746,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                       hintText: 'Type a message...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(
-                            AppSpacing.cornerRadiusBubble),
+                          AppSpacing.cornerRadiusBubble,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.large,
@@ -834,8 +847,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         child: Column(
-          crossAxisAlignment:
-              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isUser
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
             // Tool call indicator (if present, matches iOS toolCallSection)
             if (widget.message.toolCallInfo != null && !isUser) ...[
@@ -871,8 +885,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
                         )
                       : null,
                   color: isUser ? null : AppColors.backgroundGray5(context),
-                  borderRadius:
-                      BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                  borderRadius: BorderRadius.circular(
+                    AppSpacing.cornerRadiusBubble,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: AppColors.shadowLight,
@@ -884,9 +899,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 child: isUser
                     ? Text(
                         widget.message.content,
-                        style: AppTypography.body(context).copyWith(
-                          color: AppColors.textWhite,
-                        ),
+                        style: AppTypography.body(
+                          context,
+                        ).copyWith(color: AppColors.textWhite),
                       )
                     : MarkdownBody(
                         data: widget.message.content,
@@ -930,48 +945,59 @@ class _MessageBubbleState extends State<_MessageBubble> {
   void _showAnalyticsSheet(BuildContext context) {
     final analytics = widget.message.analytics;
     if (analytics == null) return;
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: false,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Generation analytics', style: AppTypography.title3(context)),
-            const SizedBox(height: AppSpacing.mediumLarge),
-            if (analytics.modelName != null)
-              _analyticsRow('Model', analytics.modelName!),
-            if (analytics.timeToFirstToken != null)
-              _analyticsRow('Time to first token',
-                  '${analytics.timeToFirstToken!.toStringAsFixed(2)} s'),
-            if (analytics.totalGenerationTime != null)
-              _analyticsRow('Total time',
-                  '${analytics.totalGenerationTime!.toStringAsFixed(2)} s'),
-            if (analytics.outputTokens > 0)
-              _analyticsRow('Output tokens', '${analytics.outputTokens}'),
-            if (analytics.tokensPerSecond != null)
-              _analyticsRow('Throughput',
-                  '${analytics.tokensPerSecond!.toStringAsFixed(1)} tok/s'),
-            if (analytics.wasThinkingMode)
-              _analyticsRow('Thinking mode', 'Yes'),
-          ],
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: false,
+        builder: (context) => Padding(
+          padding: const EdgeInsets.all(AppSpacing.large),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Generation analytics',
+                style: AppTypography.title3(context),
+              ),
+              const SizedBox(height: AppSpacing.mediumLarge),
+              if (analytics.modelName != null)
+                _analyticsRow('Model', analytics.modelName!),
+              if (analytics.timeToFirstToken != null)
+                _analyticsRow(
+                  'Time to first token',
+                  '${analytics.timeToFirstToken!.toStringAsFixed(2)} s',
+                ),
+              if (analytics.totalGenerationTime != null)
+                _analyticsRow(
+                  'Total time',
+                  '${analytics.totalGenerationTime!.toStringAsFixed(2)} s',
+                ),
+              if (analytics.outputTokens > 0)
+                _analyticsRow('Output tokens', '${analytics.outputTokens}'),
+              if (analytics.tokensPerSecond != null)
+                _analyticsRow(
+                  'Throughput',
+                  '${analytics.tokensPerSecond!.toStringAsFixed(1)} tok/s',
+                ),
+              if (analytics.wasThinkingMode)
+                _analyticsRow('Thinking mode', 'Yes'),
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 
   Widget _analyticsRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label),
-            Text(value, style: AppTypography.body(context)),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label),
+        Text(value, style: AppTypography.body(context)),
+      ],
+    ),
+  );
 
   Widget _buildThinkingSection() {
     return Container(
@@ -996,9 +1022,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 const SizedBox(width: AppSpacing.xSmall),
                 Text(
                   _showThinking ? 'Hide reasoning' : 'Show reasoning',
-                  style: AppTypography.caption(context).copyWith(
-                    color: AppColors.primaryPurple,
-                  ),
+                  style: AppTypography.caption(
+                    context,
+                  ).copyWith(color: AppColors.primaryPurple),
                 ),
                 Icon(
                   _showThinking
@@ -1016,8 +1042,9 @@ class _MessageBubbleState extends State<_MessageBubble> {
               padding: const EdgeInsets.all(AppSpacing.mediumLarge),
               decoration: BoxDecoration(
                 color: AppColors.modelThinkingBg,
-                borderRadius:
-                    BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                borderRadius: BorderRadius.circular(
+                  AppSpacing.cornerRadiusRegular,
+                ),
               ),
               child: Text(
                 widget.message.thinkingContent!,
@@ -1040,17 +1067,17 @@ class _MessageBubbleState extends State<_MessageBubble> {
           if (analytics.totalGenerationTime != null)
             Text(
               '${analytics.totalGenerationTime!.toStringAsFixed(1)}s',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           if (analytics.tokensPerSecond != null) ...[
             const SizedBox(width: AppSpacing.smallMedium),
             Text(
               '${analytics.tokensPerSecond!.toStringAsFixed(1)} tok/s',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.caption(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           ],
           if (analytics.wasThinkingMode) ...[
@@ -1076,10 +1103,7 @@ class _ConversationListSheet extends StatefulWidget {
   final ConversationStore store;
   final VoidCallback onNewChat;
 
-  const _ConversationListSheet({
-    required this.store,
-    required this.onNewChat,
-  });
+  const _ConversationListSheet({required this.store, required this.onNewChat});
 
   @override
   State<_ConversationListSheet> createState() => _ConversationListSheetState();

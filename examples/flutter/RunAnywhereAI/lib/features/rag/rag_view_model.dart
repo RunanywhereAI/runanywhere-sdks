@@ -7,9 +7,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' hide ModelInfo;
 import 'package:runanywhere/runanywhere_protos.dart' as proto;
-
+import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/rag/document_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// A single message in the RAG conversation.
 ///
@@ -23,11 +24,7 @@ class RAGMessage {
   /// Null for user messages and error messages.
   final RAGResult? result;
 
-  const RAGMessage({
-    required this.role,
-    required this.text,
-    this.result,
-  });
+  const RAGMessage({required this.role, required this.text, this.result});
 }
 
 /// ViewModel managing the full RAG pipeline lifecycle, document state, and query flow.
@@ -39,6 +36,7 @@ class RAGViewModel extends ChangeNotifier {
 
   bool _isDocumentLoaded = false;
   bool get isDocumentLoaded => _isDocumentLoaded;
+  bool _llmSupportsThinking = false;
 
   bool _isLoadingDocument = false;
   bool get isLoadingDocument => _isLoadingDocument;
@@ -95,6 +93,7 @@ class RAGViewModel extends ChangeNotifier {
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;
+      _llmSupportsThinking = llmModel.supportsThinking;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -114,7 +113,7 @@ class RAGViewModel extends ChangeNotifier {
 
     _messages = [
       ..._messages,
-      RAGMessage(role: proto.MessageRole.MESSAGE_ROLE_USER, text: question)
+      RAGMessage(role: proto.MessageRole.MESSAGE_ROLE_USER, text: question),
     ];
     _currentQuestion = '';
     _isQuerying = true;
@@ -122,14 +121,23 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await RunAnywhere.rag.query(question);
+      final prefs = await SharedPreferences.getInstance();
+      final thinkingModeEnabled =
+          prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
+      final result = await RunAnywhere.rag.query(
+        question,
+        options: RAGQueryOptions(
+          disableThinking: _llmSupportsThinking && !thinkingModeEnabled,
+        ),
+      );
 
       _messages = [
         ..._messages,
         RAGMessage(
-            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
-            text: result.answer,
-            result: result),
+          role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+          text: result.answer,
+          result: result,
+        ),
       ];
       _lastResult = result;
     } catch (e) {
@@ -137,7 +145,9 @@ class RAGViewModel extends ChangeNotifier {
       _messages = [
         ..._messages,
         RAGMessage(
-            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT, text: 'Error: $e'),
+          role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+          text: 'Error: $e',
+        ),
       ];
     } finally {
       _isQuerying = false;
@@ -157,6 +167,7 @@ class RAGViewModel extends ChangeNotifier {
     _error = null;
     _currentQuestion = '';
     _lastResult = null;
+    _llmSupportsThinking = false;
     notifyListeners();
   }
 }

@@ -13,6 +13,7 @@ enum ModelSelectionContext {
   tts,
   voice,
   vlm,
+  vad,
   ragEmbedding,
   ragLLM;
 
@@ -28,6 +29,8 @@ enum ModelSelectionContext {
         return 'Select Model';
       case ModelSelectionContext.vlm:
         return 'Select VLM Model';
+      case ModelSelectionContext.vad:
+        return 'Select VAD Model';
       case ModelSelectionContext.ragEmbedding:
         return 'Select Embedding Model';
       case ModelSelectionContext.ragLLM:
@@ -59,6 +62,8 @@ enum ModelSelectionContext {
           sdk.ModelCategory.MODEL_CATEGORY_VISION,
           sdk.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         };
+      case ModelSelectionContext.vad:
+        return {sdk.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION};
       case ModelSelectionContext.ragEmbedding:
         return {sdk.ModelCategory.MODEL_CATEGORY_EMBEDDING};
       case ModelSelectionContext.ragLLM:
@@ -138,8 +143,8 @@ extension ModelFormatDisplay on ModelFormat {
 extension ExampleModelInfoView on ModelInfo {
   int? get memoryRequired =>
       hasDownloadSizeBytes() && downloadSizeBytes.toInt() > 0
-          ? downloadSizeBytes.toInt()
-          : null;
+      ? downloadSizeBytes.toInt()
+      : null;
 
   List<LLMFramework> get compatibleFrameworks => [framework];
 

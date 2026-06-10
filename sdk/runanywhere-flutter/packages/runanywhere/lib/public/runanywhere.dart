@@ -47,6 +47,8 @@ import 'package:runanywhere/generated/rag.pb.dart'
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
+import 'package:runanywhere/generated/storage_types.pb.dart'
+    show StorageDeleteRequest, StorageDeleteResult;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show
         JSONSchema,
@@ -93,6 +95,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/extensions/runanywhere_storage.dart';
 import 'package:runanywhere/public/extensions/runanywhere_structured_output.dart';
 
 /// RunAnywhere SDK entry point.
@@ -288,15 +291,13 @@ abstract final class RunAnywhere {
   /// Cancel the returned subscription to unsubscribe.
   static StreamSubscription<sdk_events_pb.SDKEvent> subscribeSDKEvents(
     void Function(sdk_events_pb.SDKEvent event) handler,
-  ) =>
-      DartBridgeEvents.instance.subscribe(handler);
+  ) => DartBridgeEvents.instance.subscribe(handler);
 
   /// Cancel a subscription returned by [subscribeSDKEvents]. Name parity
   /// with Swift `RunAnywhere.unsubscribeSDKEvents(_:)`.
   static Future<void> unsubscribeSDKEvents(
     StreamSubscription<sdk_events_pb.SDKEvent> subscription,
-  ) =>
-      subscription.cancel();
+  ) => subscription.cancel();
 
   /// Publish an event through the commons router
   /// (`rac_sdk_event_publish_proto`). Returns false when the native
@@ -316,14 +317,13 @@ abstract final class RunAnywhere {
     required String component,
     required String operation,
     bool recoverable = false,
-  }) =>
-      DartBridgeEvents.instance.publishFailure(
-        errorCode: errorCode,
-        message: message,
-        component: component,
-        operation: operation,
-        recoverable: recoverable,
-      );
+  }) => DartBridgeEvents.instance.publishFailure(
+    errorCode: errorCode,
+    message: message,
+    component: component,
+    operation: operation,
+    recoverable: recoverable,
+  );
 
   /// Consume a token stream into one aggregated [LLMGenerationResult].
   ///
@@ -387,7 +387,8 @@ abstract final class RunAnywhere {
     final finalResult = (finalEvent != null && finalEvent.hasResult())
         ? finalEvent.result
         : null;
-    final inputTokens = finalResult?.promptTokens ??
+    final inputTokens =
+        finalResult?.promptTokens ??
         (prompt.length ~/ 4 > 0 ? prompt.length ~/ 4 : 1);
     final completionTokens = finalResult?.completionTokens ?? tokenCount;
     final result = LLMGenerationResult(
@@ -397,12 +398,12 @@ abstract final class RunAnywhere {
       responseTokens: completionTokens,
       totalTokens: finalResult?.totalTokens ?? (inputTokens + completionTokens),
       modelUsed: modelId,
-      generationTimeMs:
-          finalResult?.totalTimeMs.toDouble() ?? totalLatencyMs,
+      generationTimeMs: finalResult?.totalTimeMs.toDouble() ?? totalLatencyMs,
       framework: framework,
       promptEvalTimeMs: finalResult?.promptEvalTimeMs ?? Int64.ZERO,
       decodeTimeMs: finalResult?.decodeTimeMs ?? Int64.ZERO,
-      tokensPerSecond: finalResult?.tokensPerSecond ??
+      tokensPerSecond:
+          finalResult?.tokensPerSecond ??
           (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000.0) : 0),
     );
     if (finalResult != null && finalResult.hasThinkingContent()) {
@@ -807,6 +808,14 @@ abstract final class RunAnywhere {
 
   /// Flat alias — stop any in-flight synthesis.
   static Future<void> stopSynthesis() => RunAnywhereTTS.shared.stopSynthesis();
+
+  /// Flat storage delete request. Mirrors Swift `RunAnywhere.deleteStorage`.
+  static Future<StorageDeleteResult> deleteStorage(
+    StorageDeleteRequest request,
+  ) => RunAnywhereStorage.deleteStorage(request);
+
+  /// Flat temp cleanup helper. Mirrors Swift `RunAnywhere.cleanTempFiles`.
+  static Future<void> cleanTempFiles() => RunAnywhereStorage.cleanTempFiles();
 
   /// Flat generate — canonical cross-SDK positional signature.
   /// Mirrors Swift / RN / Web `RunAnywhere.generate(prompt:options:)`.

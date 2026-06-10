@@ -52,20 +52,6 @@ const SINGLE_CAPTURE_PROMPT = 'Describe what you see briefly.';
 const GALLERY_MAX_TOKENS = 300;
 const GALLERY_PROMPT = 'Describe this image in detail.';
 
-/**
- * Some VLM tokenizers (notably SmolVLM and Qwen-VL) emit literal special
- * tokens at the end of generation. The runtime usually swallows them but
- * occasionally one slips through into the streaming callback. Strip
- * common variants before rendering so we don't display angle-bracket
- * artifacts to the user (B-RN-14-001).
- */
-const VLM_EOS_TOKEN_REGEX =
-  /<end_of_utterance>|<\|endoftext\|>|<eot>|<\|im_end\|>|<\|eot_id\|>/g;
-
-function stripEosTokens(text: string): string {
-  return text.replace(VLM_EOS_TOKEN_REGEX, '');
-}
-
 export function useVLMCamera(
   cameraRef: React.RefObject<Camera | null>
 ): VLMCameraHook {
@@ -165,7 +151,7 @@ export function useVLMCamera(
         SINGLE_CAPTURE_PROMPT,
         SINGLE_CAPTURE_MAX_TOKENS,
         (token) => {
-          setCurrentDescription((prev) => stripEosTokens(prev + token));
+          setCurrentDescription((prev) => prev + token);
         }
       );
     } catch (err) {
@@ -198,7 +184,7 @@ export function useVLMCamera(
         GALLERY_PROMPT,
         GALLERY_MAX_TOKENS,
         (token) => {
-          setCurrentDescription((prev) => stripEosTokens(prev + token));
+          setCurrentDescription((prev) => prev + token);
         }
       );
     } catch (err) {
@@ -231,7 +217,7 @@ export function useVLMCamera(
         AUTO_STREAM_MAX_TOKENS,
         (token) => {
           accumulatedText += token;
-          setCurrentDescription(stripEosTokens(accumulatedText));
+          setCurrentDescription(accumulatedText);
         }
       );
     } catch (err) {

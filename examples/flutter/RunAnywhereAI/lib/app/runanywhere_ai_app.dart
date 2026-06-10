@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
+import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
@@ -25,6 +25,9 @@ class RunAnywhereAIApp extends StatefulWidget {
 class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   final GlobalKey<ScaffoldMessengerState> _messengerKey =
       GlobalKey<ScaffoldMessengerState>();
+  bool _isSDKInitialized = false;
+  bool _isInitializing = true;
+  String? _initializationError;
 
   @override
   void initState() {
@@ -37,13 +40,24 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   Future<void> _initializeSDK() async {
     final stopwatch = Stopwatch()..start();
 
+    if (mounted) {
+      setState(() {
+        _isInitializing = true;
+        _initializationError = null;
+      });
+    }
+
     try {
       debugPrint('🎯 Initializing SDK...');
 
+      await _registerBackends();
+
       final customApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
-      final customBaseURL =
-          await KeychainHelper.loadString(KeychainKeys.baseURL);
-      final hasCustomConfig = customApiKey != null &&
+      final customBaseURL = await KeychainHelper.loadString(
+        KeychainKeys.baseURL,
+      );
+      final hasCustomConfig =
+          customApiKey != null &&
           customApiKey.isNotEmpty &&
           customBaseURL != null &&
           customBaseURL.isNotEmpty &&
@@ -61,7 +75,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         );
         debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
-        await RunAnywhere.completeServicesInitialization();
       } else {
         await RunAnywhere.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
@@ -70,24 +83,44 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       // Model paths + registry must be ready before catalog registration.
       await RunAnywhere.completeServicesInitialization();
       await _registerModulesAndModels();
+      await RunAnywhere.refreshModelRegistry();
 
       stopwatch.stop();
       debugPrint(
-          '⚡ SDK initialization completed in ${stopwatch.elapsedMilliseconds}ms');
+        '⚡ SDK initialization completed in ${stopwatch.elapsedMilliseconds}ms',
+      );
       debugPrint(
-          '🎯 SDK Status: ${RunAnywhere.isActive ? "Active" : "Inactive"}');
+        '🎯 SDK Status: ${RunAnywhere.isActive ? "Active" : "Inactive"}',
+      );
       debugPrint(
-          '🔧 Environment: ${RunAnywhere.environment?.description ?? "Unknown"}');
+        '🔧 Environment: ${RunAnywhere.environment?.description ?? "Unknown"}',
+      );
 
       debugPrint(
-          '💡 Models registered, user can now download and select models');
+        '💡 Models registered, user can now download and select models',
+      );
       debugPrint('App is ready to use');
       debugPrint('__RUNANYWHERE_AI_READY__');
       debugPrint('Services initialized for catalog refresh');
+      if (mounted) {
+        setState(() {
+          _isSDKInitialized = true;
+          _isInitializing = false;
+          _initializationError = null;
+        });
+      }
     } catch (e) {
       stopwatch.stop();
       debugPrint(
-          '❌ SDK initialization failed after ${stopwatch.elapsedMilliseconds}ms: $e');
+        '❌ SDK initialization failed after ${stopwatch.elapsedMilliseconds}ms: $e',
+      );
+      if (mounted) {
+        setState(() {
+          _isSDKInitialized = false;
+          _isInitializing = false;
+          _initializationError = e.toString();
+        });
+      }
       _messengerKey.currentState?.showSnackBar(
         SnackBar(
           content: Text('SDK init error: $e'),
@@ -99,14 +132,44 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 
   bool _looksLikePlaceholder(String value) {
-    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
-        .hasMatch(value);
+    return RegExp(
+      r'YOUR_|<your|REPLACE_ME|PLACEHOLDER',
+      caseSensitive: false,
+    ).hasMatch(value);
   }
 
   /// True once we've registered modules + models once. Without
   /// this guard, hot-reload (or any second call) re-runs the entire
   /// LLM catalog registration block, which is wasteful.
   static bool _modulesRegistered = false;
+  static bool _backendsRegistered = false;
+
+  Future<void> _registerBackends() async {
+    if (_backendsRegistered) {
+      debugPrint('📦 Backends already registered — skipping');
+      return;
+    }
+
+    LlamaCpp.register();
+
+    if (Genie.isAvailable) {
+      await Genie.register(priority: 200);
+      debugPrint(
+        '✅ Genie backend registered; NPU model catalog is pending generated registry/catalog support',
+      );
+    } else {
+      debugPrint('ℹ️ Genie NPU not available (non-Snapdragon device)');
+    }
+
+    try {
+      await Onnx.register();
+      debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
+    } catch (e) {
+      debugPrint('⚠️ ONNX backend not available: $e');
+    }
+
+    _backendsRegistered = true;
+  }
 
   Future<void> _registerLanguageModel({
     required String id,
@@ -115,6 +178,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     required InferenceFramework framework,
     required int memoryRequirement,
     bool supportsThinking = false,
+    bool supportsLora = false,
   }) => RunAnywhere.models.register(
     id: id,
     name: name,
@@ -123,6 +187,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     memoryRequirement: memoryRequirement,
     supportsThinking: supportsThinking,
+    supportsLora: supportsLora,
   );
 
   /// Register modules with their associated models
@@ -133,10 +198,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       return;
     }
     debugPrint('📦 Registering modules with their models...');
-
-    // --- LLAMACPP MODULE ---
-    LlamaCpp.register();
-    await Future<void>.delayed(Duration.zero);
 
     await _registerLanguageModel(
       id: 'smollm2-360m-q8_0',
@@ -166,9 +227,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       id: 'qwen2.5-0.5b-instruct-q6_k',
       name: 'Qwen 2.5 0.5B Instruct Q6_K',
       url:
-          'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+          'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 600000000,
+      supportsLora: true,
     );
     await _registerLanguageModel(
       id: 'qwen2.5-1.5b-instruct-q4_k_m',
@@ -241,16 +303,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     debugPrint('✅ LlamaCPP module registered');
     await Future<void>.delayed(Duration.zero);
 
-    // --- GENIE NPU MODULE (Android/Snapdragon only) ---
-    if (Genie.isAvailable) {
-      await Genie.register(priority: 200);
-      debugPrint(
-          '✅ Genie backend registered; NPU model catalog is pending generated registry/catalog support');
-    } else {
-      debugPrint('ℹ️ Genie NPU not available (non-Snapdragon device)');
-    }
-    await Future<void>.delayed(Duration.zero);
-
     // --- VLM MODULE ---
     await RunAnywhere.models.registerArchiveModel(
       id: 'smolvlm-500m-instruct-q8_0',
@@ -312,66 +364,50 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
     // --- SHERPA-ONNX MODULE (STT/TTS via Core SDK) ---
     // STT Models (Sherpa-ONNX Whisper) — served by the Sherpa-ONNX engine plugin
-    await RunAnywhere.models.register(
+    await RunAnywhere.models.registerArchiveModel(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+      archiveUrl:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+      archiveType: ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+      structure: ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       memoryRequirement: 75000000,
     );
 
-    await RunAnywhere.models.register(
-      id: 'sherpa-onnx-whisper-small.en',
-      name: 'Sherpa Whisper Small (ONNX)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz',
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
-      modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-      memoryRequirement: 250000000,
-    );
-
     // TTS Models (Piper VITS) — served by the Sherpa-ONNX engine plugin
-    await RunAnywhere.models.register(
+    await RunAnywhere.models.registerArchiveModel(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+      archiveUrl:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+      archiveType: ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+      structure: ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 65000000,
     );
 
-    await RunAnywhere.models.register(
+    await RunAnywhere.models.registerArchiveModel(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+      archiveUrl:
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+      archiveType: ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+      structure: ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
       framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 65000000,
     );
 
-    // System TTS pseudo-model — Apple-only. The commons `platform` engine
-    // plugin (AVSpeechSynthesizer-backed) is gated behind
-    // `if(APPLE AND RAC_BUILD_PLATFORM)` in
-    // sdk/runanywhere-commons/CMakeLists.txt:732, so on Android there is
-    // no native route for `framework=platform`. Mirrors the Swift SDK and
-    // the Kotlin SDK (which only registers SystemTTSModule on Apple via
-    // the platform plugin path).
-    if (Platform.isIOS || Platform.isMacOS) {
-      await RunAnywhere.models.register(
-        id: 'system-tts',
-        name: 'System TTS',
-        url: 'about:blank',
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
-        modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        memoryRequirement: 0,
-      );
-    }
     // VAD (Silero) — registered here so the voice-agent pipeline has a
     // default detector available alongside STT/TTS.
     await RunAnywhere.models.register(
       id: 'silero-vad',
       name: 'Silero VAD',
-      url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+      url:
+          'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       // Actual silero_vad.onnx artifact size (verified Content-Length).
@@ -380,8 +416,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       // tripped the guard on a valid ~2.3 MB download.
       memoryRequirement: 2327524,
     );
-    debugPrint(
-        '✅ STT/TTS/VAD models registered via Core SDK (incl. system-tts)');
+    debugPrint('✅ STT/TTS/VAD models registered via Core SDK');
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---
@@ -409,14 +444,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     debugPrint('✅ ONNX Embedding models registered');
     await Future<void>.delayed(Duration.zero);
 
-    // --- ONNX BACKEND (required for embeddings used by RAG) ---
-    try {
-      await Onnx.register();
-      debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
-    } catch (e) {
-      debugPrint('⚠️ ONNX backend not available: $e');
-    }
-
     // --- RAG BACKEND ---
     try {
       await RAGModule.register();
@@ -441,10 +468,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
         navigationBarTheme: NavigationBarThemeData(
           indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
         ),
@@ -455,10 +479,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),
       themeMode: ThemeMode.system,
       home: _buildHome(),
@@ -466,6 +487,79 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   }
 
   Widget _buildHome() {
-    return const ContentView();
+    if (_isSDKInitialized) {
+      return const ContentView();
+    }
+    if (_isInitializing) {
+      return const _InitializationLoadingView();
+    }
+    return _InitializationErrorView(
+      message: _initializationError ?? 'SDK initialization failed',
+      onRetry: () => unawaited(_initializeSDK()),
+    );
+  }
+}
+
+class _InitializationLoadingView extends StatelessWidget {
+  const _InitializationLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: AppSpacing.large),
+            Text('Initializing SDK...'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InitializationErrorView extends StatelessWidget {
+  const _InitializationErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.large),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: AppColors.primaryRed,
+                size: AppSpacing.iconLarge,
+              ),
+              const SizedBox(height: AppSpacing.large),
+              Text(
+                'SDK Initialization Failed',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.smallMedium),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: AppSpacing.large),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

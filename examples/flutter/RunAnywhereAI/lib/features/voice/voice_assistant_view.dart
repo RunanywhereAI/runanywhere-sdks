@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -134,8 +133,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   Future<void> _startConversation() async {
     // Request STT permissions before starting
-    final hasPermission =
-        await PermissionService.shared.requestSTTPermissions(context);
+    final hasPermission = await PermissionService.shared.requestSTTPermissions(
+      context,
+    );
     if (!hasPermission) {
       setState(() {
         _sessionState = UiVoiceSessionState.error;
@@ -218,10 +218,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               _sessionState = UiVoiceSessionState.speaking;
               // Flush accumulated assistant tokens as a completed turn.
               if (_assistantResponse.isNotEmpty) {
-                _conversation.add(_ConversationTurn(
-                  role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
-                  text: _assistantResponse,
-                ));
+                _conversation.add(
+                  _ConversationTurn(
+                    role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+                    text: _assistantResponse,
+                  ),
+                );
                 _assistantResponse = '';
               }
             });
@@ -252,26 +254,31 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.speechTurnDetection:
         final turn = event.speechTurnDetection;
         switch (turn.kind) {
-          case proto.SpeechTurnDetectionEventKind
-                .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
+          case proto
+              .SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
             setState(() {
               _isSpeechDetected = true;
               _sessionState = UiVoiceSessionState.listening;
             });
             break;
-          case proto.SpeechTurnDetectionEventKind
-                .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
+          case proto
+              .SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
             setState(() {
               _isSpeechDetected = false;
               _sessionState = UiVoiceSessionState.processing;
             });
             break;
-          case proto.SpeechTurnDetectionEventKind
-                .SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED:
-          case proto.SpeechTurnDetectionEventKind
-                .SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS:
-          case proto.SpeechTurnDetectionEventKind
-                .SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED:
+          case proto
+              .SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED:
+          case proto
+              .SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS:
+          case proto
+              .SpeechTurnDetectionEventKind
+              .SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED:
             break;
         }
         break;
@@ -287,10 +294,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         final text = event.userSaid.text;
         setState(() {
           if (text.isNotEmpty) {
-            _conversation.add(_ConversationTurn(
-              role: proto.MessageRole.MESSAGE_ROLE_USER,
-              text: text,
-            ));
+            _conversation.add(
+              _ConversationTurn(
+                role: proto.MessageRole.MESSAGE_ROLE_USER,
+                text: text,
+              ),
+            );
           }
           // Clear in-progress transcript so the committed bubble above
           // is not double-rendered.
@@ -379,45 +388,51 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   }
 
   void _showSTTModelSelection() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ModelSelectionSheet(
-        context: ModelSelectionContext.stt,
-        onModelSelected: (model) async {
-          await _refreshComponentStates();
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ModelSelectionSheet(
+          context: ModelSelectionContext.stt,
+          onModelSelected: (model) async {
+            await _refreshComponentStates();
+          },
+        ),
       ),
-    ));
+    );
   }
 
   void _showLLMModelSelection() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ModelSelectionSheet(
-        context: ModelSelectionContext.llm,
-        onModelSelected: (model) async {
-          await _refreshComponentStates();
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ModelSelectionSheet(
+          context: ModelSelectionContext.llm,
+          onModelSelected: (model) async {
+            await _refreshComponentStates();
+          },
+        ),
       ),
-    ));
+    );
   }
 
   void _showTTSModelSelection() {
-    unawaited(showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ModelSelectionSheet(
-        context: ModelSelectionContext.tts,
-        onModelSelected: (model) async {
-          await _refreshComponentStates();
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => ModelSelectionSheet(
+          context: ModelSelectionContext.tts,
+          onModelSelected: (model) async {
+            await _refreshComponentStates();
+          },
+        ),
       ),
-    ));
+    );
   }
 
   @override
@@ -473,9 +488,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
             const SizedBox(height: AppSpacing.smallMedium),
             Text(
               'Select models for each component to enable voice conversations.',
-              style: AppTypography.body(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.body(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
             const SizedBox(height: AppSpacing.xxLarge),
 
@@ -511,34 +526,6 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               onTap: _showTTSModelSelection,
             ),
             const SizedBox(height: AppSpacing.smallMedium),
-            // Short-circuit row for the platform's built-in
-            // TTS engine — bypasses the model selection sheet entirely.
-            // Apple-only: the commons `platform` engine plugin is gated
-            // behind `if(APPLE AND RAC_BUILD_PLATFORM)` and
-            // `runanywhere_ai_app.dart` only seeds the `system-tts`
-            // pseudo-model on iOS/macOS, so on Android tapping the toggle
-            // would silently fail with `model not found`. Mirrors the gate
-            // applied in `features/models/model_status_components.dart`.
-            if (Platform.isIOS || Platform.isMacOS)
-              SwitchListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Use system voice (no model required)'),
-                subtitle: const Text(
-                  'Routes TTS through the OS engine instead of an on-device model.',
-                ),
-                value: _currentTTSModel == 'system-tts',
-                onChanged: (enabled) async {
-                  if (enabled) {
-                    try {
-                      await sdk.RunAnywhere.tts.loadVoice('system-tts');
-                      await _refreshComponentStates();
-                    } catch (e) {
-                      debugPrint('Failed to load system-tts: $e');
-                    }
-                  }
-                },
-              ),
 
             const Spacer(),
 
@@ -613,8 +600,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
                   Text(
                     modelName,
                     style: AppTypography.caption(context).copyWith(
-                      color:
-                          isLoaded ? color : AppColors.textSecondary(context),
+                      color: isLoaded
+                          ? color
+                          : AppColors.textSecondary(context),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -644,10 +632,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           IconButton(
             onPressed: () {
               // Show model selection options
-              unawaited(showModalBottomSheet<void>(
-                context: context,
-                builder: (context) => _buildModelSelectionMenu(),
-              ));
+              unawaited(
+                showModalBottomSheet<void>(
+                  context: context,
+                  builder: (context) => _buildModelSelectionMenu(),
+                ),
+              );
             },
             icon: Container(
               padding: const EdgeInsets.all(8),
@@ -675,9 +665,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               const SizedBox(width: 6),
               Text(
                 _sessionState.name,
-                style: AppTypography.caption(context).copyWith(
-                  color: AppColors.textSecondary(context),
-                ),
+                style: AppTypography.caption(
+                  context,
+                ).copyWith(color: AppColors.textSecondary(context)),
               ),
             ],
           ),
@@ -734,8 +724,10 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
             },
           ),
           ListTile(
-            leading:
-                const Icon(Icons.volume_up, color: AppColors.primaryPurple),
+            leading: const Icon(
+              Icons.volume_up,
+              color: AppColors.primaryPurple,
+            ),
             title: const Text('Text-to-Speech'),
             subtitle: Text(_currentTTSModel),
             trailing: const Icon(Icons.chevron_right),
@@ -798,9 +790,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
             const SizedBox(height: AppSpacing.mediumLarge),
             Text(
               'Tap the microphone to start',
-              style: AppTypography.subheadline(context).copyWith(
-                color: AppColors.textSecondary(context),
-              ),
+              style: AppTypography.subheadline(
+                context,
+              ).copyWith(color: AppColors.textSecondary(context)),
             ),
           ],
         ),
@@ -815,17 +807,21 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
         // Current transcription (in progress)
         if (_currentTranscript.isNotEmpty)
-          _buildConversationBubble(_ConversationTurn(
-            role: proto.MessageRole.MESSAGE_ROLE_USER,
-            text: _currentTranscript,
-          )),
+          _buildConversationBubble(
+            _ConversationTurn(
+              role: proto.MessageRole.MESSAGE_ROLE_USER,
+              text: _currentTranscript,
+            ),
+          ),
 
         // Current assistant response (in progress)
         if (_assistantResponse.isNotEmpty)
-          _buildConversationBubble(_ConversationTurn(
-            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
-            text: _assistantResponse,
-          )),
+          _buildConversationBubble(
+            _ConversationTurn(
+              role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+              text: _assistantResponse,
+            ),
+          ),
       ],
     );
   }
@@ -853,13 +849,11 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               color: isUser
                   ? AppColors.backgroundGray5(context)
                   : AppColors.primaryBlue.withValues(alpha: 0.08),
-              borderRadius:
-                  BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+              borderRadius: BorderRadius.circular(
+                AppSpacing.cornerRadiusBubble,
+              ),
             ),
-            child: Text(
-              turn.text,
-              style: AppTypography.body(context),
-            ),
+            child: Text(turn.text, style: AppTypography.body(context)),
           ),
         ],
       ),
@@ -1123,10 +1117,9 @@ class _ModelBadge extends StatelessWidget {
               ),
               Text(
                 value,
-                style: AppTypography.caption2(context).copyWith(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 10,
-                ),
+                style: AppTypography.caption2(
+                  context,
+                ).copyWith(fontWeight: FontWeight.w500, fontSize: 10),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

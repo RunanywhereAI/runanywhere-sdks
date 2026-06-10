@@ -7,7 +7,7 @@ import {
 } from '@runanywhere/proto-ts/model_types';
 
 export const DEFAULT_INFERENCE_FRAMEWORK =
-  InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
+  InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED;
 
 // Display-name table lives in the SDK (`RunAnywhere.formatFramework`),
 // proxying the canonical `rac_framework_display_name` C ABI in

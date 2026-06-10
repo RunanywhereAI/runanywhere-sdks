@@ -25,6 +25,7 @@ import type {
 } from '@runanywhere/proto-ts/llm_options';
 import {
   executionTargetToJSON,
+  LLMGenerationOptions as LLMGenerationOptionsMessage,
 } from '@runanywhere/proto-ts/llm_options';
 import {
   LLMGenerationResult as LLMGenerationResultMessage,
@@ -44,6 +45,13 @@ function buildLLMGenerateRequest(
   options?: LLMGenerationOptions,
   streamingEnabled: boolean = false
 ): LLMGenerateRequest {
+  const canonicalOptions = options
+    ? LLMGenerationOptionsMessage.fromPartial({
+        ...options,
+        streamingEnabled,
+      })
+    : undefined;
+
   return LLMGenerateRequest.fromPartial({
     prompt,
     // Defaults mirror Swift RALLMTypes+CppBridge.swift (maxTokens 100,
@@ -74,6 +82,7 @@ function buildLLMGenerateRequest(
     responseFormat: options?.responseFormat ?? '',
     echoPrompt: options?.echoPrompt ?? false,
     nThreads: options?.nThreads ?? 0,
+    options: canonicalOptions,
   });
 }
 

@@ -51,7 +51,6 @@ import {
 import { RunAnywhere } from '@runanywhere/core';
 import {
   AudioFormat,
-  InferenceFramework,
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
@@ -185,12 +184,7 @@ export const TTSScreen: React.FC = () => {
         const loaded = await RunAnywhere.modelInfoForCategory(
           ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
         );
-        setCurrentModel(
-          loaded ?? {
-            ...model,
-            preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-          }
-        );
+        setCurrentModel(loaded ?? model);
       } else {
         const error =
           result.errorMessage ||

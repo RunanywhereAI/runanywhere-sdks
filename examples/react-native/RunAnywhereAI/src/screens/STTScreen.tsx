@@ -54,20 +54,19 @@ import { STTMode } from '../types/voice';
 import { RunAnywhere, AudioCaptureManager } from '@runanywhere/core';
 import {
   AudioFormat,
-  InferenceFramework,
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
+import {
+  STTLanguage,
+  type STTPartialResult,
+} from '@runanywhere/proto-ts/stt_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
 /** SDK capture emits 16kHz mono Int16 PCM. */
 const CAPTURE_SAMPLE_RATE = 16000;
 const CAPTURE_BYTES_PER_MS = (CAPTURE_SAMPLE_RATE * 2) / 1000;
-/** Skip transcription of chunks shorter than ~150ms (parity with the old
- * 5000-byte recorded-file threshold). */
-const MIN_PCM_BYTES = 5000;
 
 /** Wrap raw 16kHz mono Int16 PCM bytes in a WAV container. */
 function wrapPcm16InWav(pcmChunks: Uint8Array[]): Uint8Array {
@@ -111,6 +110,70 @@ async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
   });
 }
 
+type PushableAudioStream = {
+  iterable: AsyncIterable<Uint8Array>;
+  push: (chunk: Uint8Array) => void;
+  close: () => void;
+};
+
+function createPushableAudioStream(): PushableAudioStream {
+  const queue: Uint8Array[] = [];
+  const waiters: Array<(result: IteratorResult<Uint8Array>) => void> = [];
+  let closed = false;
+
+  const resolveNext = (result: IteratorResult<Uint8Array>) => {
+    const waiter = waiters.shift();
+    if (waiter) {
+      waiter(result);
+    } else if (!result.done) {
+      queue.push(result.value);
+    }
+  };
+
+  const finish = () => {
+    closed = true;
+    while (waiters.length > 0) {
+      waiters.shift()?.({
+        value: undefined as unknown as Uint8Array,
+        done: true,
+      });
+    }
+  };
+
+  return {
+    iterable: {
+      [Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
+        return {
+          next(): Promise<IteratorResult<Uint8Array>> {
+            const chunk = queue.shift();
+            if (chunk) return Promise.resolve({ value: chunk, done: false });
+            if (closed) {
+              return Promise.resolve({
+                value: undefined as unknown as Uint8Array,
+                done: true,
+              });
+            }
+            return new Promise((resolve) => waiters.push(resolve));
+          },
+          return(): Promise<IteratorResult<Uint8Array>> {
+            finish();
+            return Promise.resolve({
+              value: undefined as unknown as Uint8Array,
+              done: true,
+            });
+          },
+        };
+      },
+    },
+    push(chunk: Uint8Array) {
+      if (!closed && chunk.byteLength > 0) {
+        resolveNext({ value: chunk, done: false });
+      }
+    },
+    close: finish,
+  };
+}
+
 // Canonical SDK methods (Swift parity).
 const listModels = async (): Promise<SDKModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
@@ -150,10 +213,10 @@ export const STTScreen: React.FC = () => {
   // Live mode accumulated transcript ref
   const accumulatedTranscriptRef = useRef('');
 
-  // Live mode interval-based transcription refs
-  const liveRecordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Live mode streaming refs
+  const liveAudioStreamRef = useRef<PushableAudioStream | null>(null);
+  const liveTranscriptionTaskRef = useRef<Promise<void> | null>(null);
   const isLiveRecordingRef = useRef(false);
-  const liveChunkCountRef = useRef(0);
 
   // Animation for recording indicator
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -187,10 +250,8 @@ export const STTScreen: React.FC = () => {
     return () => {
       // Stop live recording if active
       isLiveRecordingRef.current = false;
-      if (liveRecordingIntervalRef.current) {
-        clearTimeout(liveRecordingIntervalRef.current);
-        liveRecordingIntervalRef.current = null;
-      }
+      liveAudioStreamRef.current?.close();
+      liveAudioStreamRef.current = null;
       // Stop the SDK capture manager
       try {
         captureManagerRef.current?.stopRecording();
@@ -304,12 +365,10 @@ export const STTScreen: React.FC = () => {
           ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
         );
         if (isLoaded) {
-          // Set model with framework so ModelStatusBanner shows it properly
-          // Use ONNX since STT uses Sherpa-ONNX (ONNX Runtime)
-          setCurrentModel({
-            ...model,
-            preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-          });
+          const loaded = await RunAnywhere.modelInfoForCategory(
+            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+          );
+          setCurrentModel(loaded ?? model);
           console.warn(
             `[STTScreen] Model ${model.name} loaded successfully, currentModel set`
           );
@@ -405,12 +464,16 @@ export const STTScreen: React.FC = () => {
    * Begin SDK microphone capture, accumulating PCM chunks in memory.
    * Audio level + recording duration come straight from the capture stream.
    */
-  const beginCapture = async () => {
+  const beginCapture = async (onChunk?: (chunk: Uint8Array) => void) => {
     const capture = getCaptureManager();
     pcmChunksRef.current = [];
     pcmBytesRef.current = 0;
     await capture.startRecording((chunk: Uint8Array) => {
-      pcmChunksRef.current.push(chunk);
+      if (onChunk) {
+        onChunk(chunk);
+      } else {
+        pcmChunksRef.current.push(chunk);
+      }
       pcmBytesRef.current += chunk.length;
       setAudioLevel(capture.audioLevel);
       setRecordingDuration(pcmBytesRef.current / CAPTURE_BYTES_PER_MS);
@@ -506,26 +569,17 @@ export const STTScreen: React.FC = () => {
 
   /**
    * Start live transcription mode
-   *
-   * Implements pseudo-streaming for Whisper models (which are batch-only):
-   * the SDK capture runs continuously while a 3-second timer drains the
-   * accumulated PCM buffer, transcribes it, and appends the result for a
-   * live-like experience matching Swift SDK.
    */
   const startLiveTranscription = async () => {
     try {
-      console.warn(
-        '[STTScreen] Starting live transcription (pseudo-streaming)...'
-      );
+      console.warn('[STTScreen] Starting live transcription stream...');
 
-      // Request microphone permission first
       const hasPermission = await requestMicrophonePermission();
       if (!hasPermission) {
         console.warn('[STTScreen] Microphone permission denied');
         return;
       }
 
-      // Check if model is loaded
       const isLoaded = await isModelLoadedForCategory(
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
@@ -541,11 +595,17 @@ export const STTScreen: React.FC = () => {
       setConfidence(null);
       setRecordingDuration(0);
       isLiveRecordingRef.current = true;
-      liveChunkCountRef.current = 0;
 
-      // Start continuous SDK capture, then schedule the first chunk drain
-      await beginCapture();
-      scheduleLiveChunk();
+      const audioStream = createPushableAudioStream();
+      liveAudioStreamRef.current = audioStream;
+      const partials = RunAnywhere.transcribeStream(audioStream.iterable, {
+        language: STTLanguage.STT_LANGUAGE_EN,
+        audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+        sampleRate: CAPTURE_SAMPLE_RATE,
+      });
+      liveTranscriptionTaskRef.current = consumeLiveTranscription(partials);
+
+      await beginCapture((chunk) => audioStream.push(chunk));
       setIsRecording(true);
 
       console.warn('[STTScreen] Live transcription started');
@@ -556,79 +616,36 @@ export const STTScreen: React.FC = () => {
         `Failed to start live transcription: ${error}`
       );
       isLiveRecordingRef.current = false;
+      liveAudioStreamRef.current?.close();
     }
   };
 
-  /**
-   * Schedule the next live chunk drain (3 seconds of audio per chunk).
-   */
-  const scheduleLiveChunk = () => {
-    if (!isLiveRecordingRef.current) {
-      console.warn(
-        '[STTScreen] Live recording stopped, not scheduling new chunk'
-      );
-      return;
-    }
-
-    liveChunkCountRef.current++;
-    const chunkNum = liveChunkCountRef.current;
-    console.warn(`[STTScreen] Scheduling live chunk #${chunkNum}...`);
-
-    liveRecordingIntervalRef.current = setTimeout(async () => {
-      if (isLiveRecordingRef.current) {
-        await transcribeLiveChunk();
-      }
-    }, 3000);
-  };
-
-  /**
-   * Transcribe the accumulated live PCM buffer and schedule the next chunk.
-   */
-  const transcribeLiveChunk = async () => {
-    if (!isLiveRecordingRef.current) {
-      return;
-    }
-
+  const consumeLiveTranscription = async (
+    partials: AsyncIterable<STTPartialResult>
+  ) => {
+    const iterator = partials[Symbol.asyncIterator]();
     try {
-      console.warn('[STTScreen] Transcribing live chunk...');
-      setPartialTranscript('Processing...');
-
-      const chunks = drainCapturedChunks();
-      const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
-
-      // Skip very small chunks
-      if (totalBytes < MIN_PCM_BYTES) {
-        console.warn('[STTScreen] Chunk too small, skipping transcription');
-        setPartialTranscript('Listening...');
-        scheduleLiveChunk();
-        return;
-      }
-
-      const result = await transcribePcmChunks(chunks);
-      console.warn('[STTScreen] Live chunk transcription:', result.text);
-
-      // Append to accumulated transcript if we got text
-      if (result.text && result.text.trim() && result.text.trim() !== '') {
-        const newText = result.text.trim();
-        if (accumulatedTranscriptRef.current) {
-          accumulatedTranscriptRef.current += ' ' + newText;
-        } else {
-          accumulatedTranscriptRef.current = newText;
+      let step = await iterator.next();
+      while (!step.done) {
+        const partial = step.value;
+        const finalText = partial.finalOutput?.text?.trim();
+        const text = (finalText || partial.text || '').trim();
+        if (text) {
+          if (partial.isFinal || finalText) {
+            accumulatedTranscriptRef.current = text;
+            setTranscript(text);
+            setPartialTranscript('');
+            setConfidence(partial.finalOutput?.confidence ?? null);
+          } else {
+            setPartialTranscript(text);
+          }
         }
-        setTranscript(accumulatedTranscriptRef.current);
-        setConfidence(result.confidence || null);
+        step = await iterator.next();
       }
-
-      // Update partial transcript for next chunk
-      setPartialTranscript('Listening...');
-
-      // Schedule next chunk if still recording
-      scheduleLiveChunk();
     } catch (error) {
-      console.error('[STTScreen] Error transcribing live chunk:', error);
-      setPartialTranscript('Listening...');
-      // Try to continue with next chunk
-      scheduleLiveChunk();
+      console.error('[STTScreen] Live transcription stream error:', error);
+    } finally {
+      await iterator.return?.();
     }
   };
 
@@ -639,35 +656,15 @@ export const STTScreen: React.FC = () => {
     console.warn('[STTScreen] Stopping live transcription...');
     isLiveRecordingRef.current = false;
 
-    // Clear any pending interval
-    if (liveRecordingIntervalRef.current) {
-      clearTimeout(liveRecordingIntervalRef.current);
-      liveRecordingIntervalRef.current = null;
-    }
-
     try {
       setIsProcessing(true);
-      setPartialTranscript('Processing final chunk...');
+      setPartialTranscript('Finalizing...');
 
-      // Stop the SDK capture and drain the remaining audio
       getCaptureManager().stopRecording();
-      const chunks = drainCapturedChunks();
-      const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
-
-      if (totalBytes >= MIN_PCM_BYTES) {
-        console.warn('[STTScreen] Transcribing final live chunk...');
-        const result = await transcribePcmChunks(chunks);
-        if (result.text && result.text.trim()) {
-          const newText = result.text.trim();
-          if (accumulatedTranscriptRef.current) {
-            accumulatedTranscriptRef.current += ' ' + newText;
-          } else {
-            accumulatedTranscriptRef.current = newText;
-          }
-          setTranscript(accumulatedTranscriptRef.current);
-          setConfidence(result.confidence || null);
-        }
-      }
+      liveAudioStreamRef.current?.close();
+      await liveTranscriptionTaskRef.current;
+      liveAudioStreamRef.current = null;
+      liveTranscriptionTaskRef.current = null;
 
       console.warn('[STTScreen] Live transcription stopped');
       console.warn(

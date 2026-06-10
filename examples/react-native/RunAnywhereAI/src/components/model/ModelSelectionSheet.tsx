@@ -60,6 +60,7 @@ export enum ModelSelectionContext {
   STT = 'stt', // Speech-to-Text - show STT frameworks
   TTS = 'tts', // Text-to-Speech - show TTS frameworks
   Voice = 'voice', // Voice Assistant - show all voice-related
+  VAD = 'vad', // Voice Activity Detection
   VLM = 'vlm', // Vision - show VLM frameworks
   RagEmbedding = 'ragEmbedding', // RAG embedding - ONNX embedding models only
   RagLLM = 'ragLLM', // RAG generation - LlamaCpp language models only
@@ -78,6 +79,8 @@ const getContextTitle = (context: ModelSelectionContext): string => {
       return 'Select TTS Model';
     case ModelSelectionContext.Voice:
       return 'Select Model';
+    case ModelSelectionContext.VAD:
+      return 'Select VAD Model';
     case ModelSelectionContext.VLM:
       return 'Select Vision Model';
     case ModelSelectionContext.RagEmbedding:
@@ -104,6 +107,8 @@ const getCategoryForContext = (
       return ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
     case ModelSelectionContext.Voice:
       return null; // Show all
+    case ModelSelectionContext.VAD:
+      return ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
     case ModelSelectionContext.VLM:
       return ModelCategory.MODEL_CATEGORY_MULTIMODAL;
     case ModelSelectionContext.RagEmbedding:

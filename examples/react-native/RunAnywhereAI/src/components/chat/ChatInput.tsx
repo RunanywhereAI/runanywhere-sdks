@@ -33,6 +33,8 @@ interface ChatInputProps {
   onChangeText: (text: string) => void;
   /** Callback when send button pressed */
   onSend: () => void;
+  /** Callback when stop button pressed during generation */
+  onStop?: () => void;
   /** Whether input is disabled */
   disabled?: boolean;
   /** Placeholder text */
@@ -45,12 +47,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   value,
   onChangeText,
   onSend,
+  onStop,
   disabled = false,
   placeholder = 'Type a message...',
   isLoading = false,
 }) => {
   const [inputHeight, setInputHeight] = useState<number>(Layout.inputMinHeight);
   const canSend = value.trim().length > 0 && !disabled && !isLoading;
+  const canStop = isLoading && !!onStop;
+  const canPressAction = canSend || canStop;
 
   const handleContentSizeChange = (event: {
     nativeEvent: { contentSize: { height: number } };
@@ -65,7 +70,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   const handleSend = () => {
-    if (canSend) {
+    if (canStop) {
+      onStop?.();
+    } else if (canSend) {
       onSend();
     }
   };
@@ -96,16 +103,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           <TouchableOpacity
             style={[
               styles.sendButton,
-              canSend ? styles.sendButtonActive : styles.sendButtonInactive,
+              canPressAction
+                ? styles.sendButtonActive
+                : styles.sendButtonInactive,
             ]}
             onPress={handleSend}
-            disabled={!canSend}
+            disabled={!canPressAction}
             activeOpacity={0.7}
           >
             <Icon
               name={isLoading ? 'stop' : 'arrow-up'}
               size={20}
-              color={canSend ? Colors.textWhite : Colors.textTertiary}
+              color={canPressAction ? Colors.textWhite : Colors.textTertiary}
             />
           </TouchableOpacity>
         </View>
