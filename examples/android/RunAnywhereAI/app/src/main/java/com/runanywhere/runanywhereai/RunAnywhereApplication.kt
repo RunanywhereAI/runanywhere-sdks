@@ -43,7 +43,11 @@ class RunAnywhereApplication : Application() {
 
         //Starting Setup Work
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
-        RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
+        RunAnywhere.initialize(
+            apiKey = BuildConfig.RUNANYWHERE_API_KEY,
+            baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
+            environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        )
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()

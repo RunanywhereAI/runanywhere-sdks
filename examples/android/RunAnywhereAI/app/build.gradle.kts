@@ -1,8 +1,20 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// Backend config read from local.properties (gitignored) so the URL + api key
+// are never committed in source. Empty defaults keep the build working without
+// them (telemetry/auth simply stay disabled until provided).
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val runanywhereBaseUrl: String = (localProps.getProperty("runanywhere.baseUrl") ?: "").trim()
+val runanywhereApiKey: String = (localProps.getProperty("runanywhere.apiKey") ?: "").trim()
 
 android {
     namespace = "com.runanywhere.runanywhereai"
@@ -36,6 +48,9 @@ android {
         versionName = "0.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "RUNANYWHERE_BASE_URL", "\"$runanywhereBaseUrl\"")
+        buildConfigField("String", "RUNANYWHERE_API_KEY", "\"$runanywhereApiKey\"")
     }
 
     buildTypes {
@@ -57,19 +72,17 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            // The SDK + backend AARs each bundle the NDK runtime
-            // (libc++_shared.so) for every ABI, so the merge collides on the
-            // duplicate — take the first. (Backends currently ship as
-            // monolithic AARs; tracked as issues 002/005.)
-            pickFirsts += "**/libc++_shared.so"
         }
     }
 }
 
 dependencies {
-    implementation(files("../libs/runanywhere-sdk.aar"))
-    implementation(files("../libs/runanywhere-llamacpp.aar"))
-    implementation(files("../libs/runanywhere-onnx.aar"))
+    // RunAnywhere SDK + native engine backends, consumed from mavenLocal.
+    // Publish first: ./run example android publish (publishes all three to ~/.m2).
+    // Maven POMs bring each artifact's transitive runtime deps automatically.
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.1.5-SNAPSHOT")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.1.5-SNAPSHOT")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.1.5-SNAPSHOT")
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
 
