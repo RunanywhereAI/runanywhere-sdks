@@ -159,6 +159,63 @@ jobs:
           # publish gate (pass3-syn-007). A missing tarball blocks publish.
           if-no-files-found: error
 
+  native_rcli_macos:
+    needs: validate
+    # macos-14 pin: the rcli preset builds llama.cpp with GGML_METAL=ON, which
+    # Xcode 16's strict ARC rejects (same reason as pr-build macos jobs).
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install ninja protobuf
+      - name: Build rcli (macOS arm64, Metal)
+        run: |
+          cmake --preset rcli-macos-release
+          cmake --build --preset rcli-macos-release
+      - name: Package rcli tarball
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
+      - name: Upload rcli macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcli-macos
+          path: |
+            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz
+            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_rcli_linux:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: linux
+      - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: Sherpa-ONNX prebuilts
+        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+      - name: Build rcli (Linux x86_64)
+        run: |
+          cmake --preset rcli-linux-release
+          cmake --build --preset rcli-linux-release
+      - name: Package rcli tarball
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+      - name: Upload rcli Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcli-linux
+          path: |
+            sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz
+            sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
   native_windows:
     needs: validate
     runs-on: windows-latest
@@ -640,6 +697,8 @@ jobs:
       - native_ios
       - native_android
       - native_linux
+      - native_rcli_macos
+      - native_rcli_linux
       - native_windows
       - native_web
       - sdk_kotlin
@@ -655,6 +714,8 @@ jobs:
       needs.native_ios.result == 'success' &&
       needs.native_android.result == 'success' &&
       needs.native_linux.result == 'success' &&
+      needs.native_rcli_macos.result == 'success' &&
+      needs.native_rcli_linux.result == 'success' &&
       needs.native_windows.result == 'success' &&
       needs.native_web.result == 'success' &&
       needs.sdk_kotlin.result == 'success' &&
@@ -722,6 +783,8 @@ jobs:
           assert_present "iOS XCFramework zip"      "RACommons-ios-v*.zip"
           assert_present "Android per-ABI zip"      "RACommons-android-*-v*.zip"
           assert_present "Web WASM tar"             "RACommons-web-v*.tar.gz"
+          assert_present "rcli macOS tarball"       "rcli-macos-arm64-v*.tar.gz"
+          assert_present "rcli Linux tarball"       "rcli-linux-x86_64-v*.tar.gz"
           assert_present "Kotlin SDK AAR"           "*.aar"
           # Kotlin JVM JAR
           assert_present "Kotlin SDK JAR"           "*.jar"

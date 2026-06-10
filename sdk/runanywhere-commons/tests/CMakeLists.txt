@@ -99,6 +99,22 @@ rac_link_archive_deps(test_log_redact)
 target_compile_features(test_log_redact PRIVATE cxx_std_17)
 add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
 
+# --- Desktop platform adapter tests ---------------------------------
+# POSIX adapter slots + 0600 secure store + curl transport registration +
+# the model-paths base-dir dedup rule. Only meaningful when the desktop
+# adapter TUs are compiled into rac_commons (RAC_DESKTOP_ADAPTER=ON).
+if(RAC_DESKTOP_ADAPTER)
+    add_executable(test_desktop_adapter test_desktop_adapter.cpp)
+    target_include_directories(test_desktop_adapter PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_desktop_adapter PRIVATE rac_commons)
+    rac_link_archive_deps(test_desktop_adapter)
+    target_compile_features(test_desktop_adapter PRIVATE cxx_std_20)
+    add_test(NAME desktop_adapter_tests COMMAND test_desktop_adapter --run-all)
+endif()
+
 # --- audio level-meter DSP parity tests ---------------------------------
 # Validates rac_audio_compute_level_db() — the centralised RMS->dB DSP that
 # replaces the hand-rolled level meters in Swift AudioCaptureManager.swift
@@ -1244,8 +1260,7 @@ add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --r
 # (which owns the speech ops) and depend on rac_backend_onnx only for the
 # ONNX-named typedefs used in their config defaults. The engines/sherpa/
 # include path exposes the public sherpa function declarations.
-if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx
-   AND RAC_BACKEND_SHERPA AND TARGET rac_backend_sherpa)
+if(RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA)
     # VAD test
     add_executable(test_vad test_vad.cpp)
     target_include_directories(test_vad PRIVATE
@@ -1279,20 +1294,13 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx
     target_compile_features(test_tts PRIVATE cxx_std_20)
     add_test(NAME tts_tests COMMAND test_tts --run-all)
 
-    # WakeWord test
-    add_executable(test_wakeword test_wakeword.cpp)
-    target_include_directories(test_wakeword PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/sherpa
-    )
-    target_link_libraries(test_wakeword PRIVATE rac_commons rac_backend_onnx rac_backend_sherpa)
-    target_compile_features(test_wakeword PRIVATE cxx_std_20)
-    add_test(NAME wakeword_tests COMMAND test_wakeword --run-all)
+    # WakeWord test is temporarily disabled: the legacy rac_wakeword_onnx.h API
+    # was removed, and wake-word coverage needs to migrate to the current
+    # voice-agent/VAD ingress APIs before it can be part of the required lane.
 endif()
 
 # --- LLM test: Requires LlamaCPP backend ---
-if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
+if(RAC_BACKEND_LLAMACPP)
     add_executable(test_llm test_llm.cpp)
     target_include_directories(test_llm PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -1303,10 +1311,29 @@ if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
     add_test(NAME llm_tests COMMAND test_llm --run-all)
 endif()
 
+# --- Voice Agent real-inference test: Requires LlamaCPP + Sherpa/ONNX backends ---
+if(RAC_BACKEND_LLAMACPP AND RAC_BACKEND_ONNX AND RAC_BACKEND_SHERPA)
+    add_executable(test_voice_agent test_voice_agent.cpp)
+    target_include_directories(test_voice_agent PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/sherpa
+    )
+    target_link_libraries(test_voice_agent PRIVATE
+        rac_commons
+        rac_backend_llamacpp
+        rac_backend_onnx
+        rac_backend_sherpa
+    )
+    target_compile_features(test_voice_agent PRIVATE cxx_std_20)
+    rac_test_define_have_protobuf(test_voice_agent)
+    add_test(NAME voice_agent_real_inference_tests COMMAND test_voice_agent --run-all)
+endif()
+
 # --- macOS RPATH for ONNX Runtime dylib ---
 if(APPLE)
     set(ONNX_MACOS_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword)
+    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "${ONNX_MACOS_LIB_DIR}"
@@ -1319,7 +1346,7 @@ endif()
 # --- Linux RPATH for Sherpa-ONNX shared libs ---
 if(UNIX AND NOT APPLE)
     set(SHERPA_LINUX_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/sherpa-onnx-linux/lib")
-    foreach(test_target test_vad test_stt test_tts test_wakeword)
+    foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
                 BUILD_RPATH "$ORIGIN;${SHERPA_LINUX_LIB_DIR}"

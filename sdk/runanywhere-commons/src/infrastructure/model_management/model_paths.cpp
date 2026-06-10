@@ -99,6 +99,28 @@ static rac_result_t copy_string_to_buffer(const std::string& src, char* out_path
     return RAC_SUCCESS;
 }
 
+// Storage root under the configured base dir.
+//
+// Canonical layout is {base_dir}/RunAnywhere/... (Swift parity — every mobile
+// SDK passes a sandbox root like the app Documents dir). Desktop consumers
+// (rcli, Linux test rig, Playground tooling) standardize on a base dir that is
+// ALREADY named "runanywhere" (~/.local/share/runanywhere), so re-appending the
+// segment would double it ({...}/runanywhere/RunAnywhere/Models). When the last
+// path component of base_dir is already "runanywhere" (case-insensitive), the
+// base dir itself is the root. Mobile base dirs never end in "runanywhere", so
+// their layout is unchanged. Agreed deviation from the original Swift port —
+// see thoughts/shared/plans/rcli_desktop_cli.md.
+static std::string runanywhere_root_locked() {
+    const size_t sep = g_base_dir.find_last_of("/\\");
+    std::string last = (sep == std::string::npos) ? g_base_dir : g_base_dir.substr(sep + 1);
+    std::ranges::transform(last, last.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (last == "runanywhere") {
+        return g_base_dir;
+    }
+    return g_base_dir + "/RunAnywhere";
+}
+
 static std::vector<std::string> split_path(const std::string& path) {
     std::vector<std::string> components;
     size_t start = 0;
@@ -838,7 +860,7 @@ rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t path_size
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path = g_base_dir + "/RunAnywhere";
+    std::string path = runanywhere_root_locked();
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
@@ -852,7 +874,7 @@ rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t path_si
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path = g_base_dir + "/RunAnywhere/Models";
+    std::string path = runanywhere_root_locked() + "/Models";
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
@@ -871,7 +893,7 @@ rac_result_t rac_model_paths_get_framework_directory(rac_inference_framework_t f
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path = g_base_dir + "/RunAnywhere/Models/" + rac_framework_raw_value(framework);
+    std::string path = runanywhere_root_locked() + "/Models/" + rac_framework_raw_value(framework);
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
@@ -894,8 +916,8 @@ rac_result_t rac_model_paths_get_model_folder(const char* model_id,
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path =
-        g_base_dir + "/RunAnywhere/Models/" + rac_framework_raw_value(framework) + "/" + model_id;
+    std::string path = runanywhere_root_locked() + "/Models/" + rac_framework_raw_value(framework) +
+                       "/" + model_id;
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
@@ -931,12 +953,12 @@ rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
         RAC_LOG_WARNING("ModelPaths",
                         "Unknown model format (%d) for model '%s', returning folder path",
                         static_cast<int>(format), model_id);
-        std::string path = g_base_dir + "/RunAnywhere/Models/" +
+        std::string path = runanywhere_root_locked() + "/Models/" +
                            rac_framework_raw_value(framework) + "/" + model_id;
         return copy_string_to_buffer(path, out_path, path_size);
     }
 
-    std::string path = g_base_dir + "/RunAnywhere/Models/" + rac_framework_raw_value(framework) +
+    std::string path = runanywhere_root_locked() + "/Models/" + rac_framework_raw_value(framework) +
                        "/" + model_id + "/" + model_id + "." + extension;
     return copy_string_to_buffer(path, out_path, path_size);
 }
@@ -1234,7 +1256,7 @@ rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t path_siz
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path = g_base_dir + "/RunAnywhere/Cache";
+    std::string path = runanywhere_root_locked() + "/Cache";
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
@@ -1248,7 +1270,7 @@ rac_result_t rac_model_paths_get_temp_directory(char* out_path, size_t path_size
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path = g_base_dir + "/RunAnywhere/Temp";
+    std::string path = runanywhere_root_locked() + "/Temp";
     return copy_string_to_buffer(path, out_path, path_size);
 }
 
@@ -1262,7 +1284,7 @@ rac_result_t rac_model_paths_get_downloads_directory(char* out_path, size_t path
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    std::string path = g_base_dir + "/RunAnywhere/Downloads";
+    std::string path = runanywhere_root_locked() + "/Downloads";
     return copy_string_to_buffer(path, out_path, path_size);
 }
 

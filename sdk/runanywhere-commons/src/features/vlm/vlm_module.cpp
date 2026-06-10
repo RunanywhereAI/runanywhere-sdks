@@ -1508,6 +1508,31 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
         return out_result ? rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc)) : rc;
     }
 
+    // Terminal STREAM_COMPLETED envelope, mirroring the LLM streaming proto
+    // path (llm_module.cpp dispatch_terminal_once + publish_generation_event):
+    // published on the event bus AND delivered on the stream callback so
+    // direct consumers (Swift, Kotlin, JNI) observe a terminal event without
+    // synthesizing one from the aggregate result.
+    {
+        runanywhere::v1::SDKEvent terminal;
+        populate_envelope(&terminal, runanywhere::v1::ERROR_SEVERITY_INFO);
+        auto* generation = terminal.mutable_generation();
+        generation->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED);
+        generation->set_response(ctx->text);
+        generation->set_streaming_text(ctx->text);
+        generation->set_tokens_count(ctx->token_count);
+        if (have_lifecycle && lifecycle_ref.model_id)
+            generation->set_model_id(lifecycle_ref.model_id);
+        publish_event(terminal);
+        if (ctx->callback) {
+            std::vector<uint8_t> bytes;
+            if (serialize_event(terminal, &bytes)) {
+                (void)ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
+                                    ctx->user_data);
+            }
+        }
+    }
+
     if (out_result) {
         runanywhere::v1::VLMResult proto;
         proto.set_text(ctx->text);

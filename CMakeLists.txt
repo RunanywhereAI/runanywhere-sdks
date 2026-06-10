@@ -76,6 +76,8 @@ option(RAC_BUILD_SERVER       "Build the OpenAI-compatible HTTP server (runanywh
 option(RAC_BUILD_PLATFORM     "Build the platform backend (Apple Foundation Models, System TTS) on Apple hosts" ON)
 option(RAC_BUILD_JNI          "Build the JNI bridge for Android / JVM hosts" OFF)
 option(RAC_BUILD_PLUGIN_SMOKE "Build tools/plugin-loader-smoke" OFF)
+option(RAC_BUILD_CLI          "Build the rcli desktop CLI (sdk/runanywhere-cli)" OFF)
+option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
 
 # Plugin loading mode
 # RAC_STATIC_PLUGINS:
@@ -253,6 +255,12 @@ endif()
 if(RAC_BUILD_PLUGIN_SMOKE
    AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/plugin-loader-smoke/CMakeLists.txt")
     add_subdirectory(tools/plugin-loader-smoke)
+endif()
+
+# rcli desktop CLI. Added after engines/ because it links the
+# rac_backend_* targets that only exist once the engine subdirs configured.
+if(RAC_BUILD_CLI)
+    add_subdirectory(sdk/runanywhere-cli)
 endif()
 
 # Tests — wired through commons/tests for now. RAC_BUILD_TESTS is forwarded
@@ -444,5 +452,7 @@ message(STATUS "Server (HTTP)    : ${RAC_BUILD_SERVER}")
 message(STATUS "Platform backend : ${RAC_BUILD_PLATFORM}")
 message(STATUS "JNI bridge       : ${RAC_BUILD_JNI}")
 message(STATUS "Plugin smoke CLI : ${RAC_BUILD_PLUGIN_SMOKE}")
+message(STATUS "CLI (rcli)       : ${RAC_BUILD_CLI}")
+message(STATUS "Desktop adapter  : ${RAC_DESKTOP_ADAPTER}")
 message(STATUS "============================================")
 message(STATUS "")

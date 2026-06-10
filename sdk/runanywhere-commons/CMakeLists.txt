@@ -74,6 +74,12 @@ if(EMSCRIPTEN AND NOT RAC_BACKEND_ONNX AND NOT RAC_WASM_RAG_STANDALONE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
+# Desktop (macOS/Linux) platform adapter: POSIX file I/O + 0600-file secure
+# storage + libcurl HTTP transport. Consumed by desktop binaries that link
+# rac_commons directly (rcli, runanywhere-server, real-inference tests,
+# Playground apps). See include/rac/desktop/rac_desktop.h.
+option(RAC_DESKTOP_ADAPTER "Build desktop (macOS/Linux) platform adapter + libcurl HTTP transport" OFF)
+
 # Opt-in proto regeneration.
 #
 # The 23 `*.pb.cc` / `*.pb.h` pairs under `src/generated/proto/` are committed
@@ -958,6 +964,22 @@ set(RAC_FEATURES_SOURCES
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:src/features/result_free.cpp>
 )
 
+# Desktop platform adapter (POSIX + libcurl) — macOS/Linux binaries only
+if(RAC_DESKTOP_ADAPTER)
+    if(ANDROID OR EMSCRIPTEN OR WIN32 OR (APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin"))
+        message(FATAL_ERROR "RAC_DESKTOP_ADAPTER is only supported on desktop macOS/Linux builds "
+                            "(got CMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME})")
+    endif()
+    set(RAC_DESKTOP_SOURCES
+        src/desktop/desktop_adapter.cpp
+        src/desktop/desktop_secure_store.cpp
+        src/desktop/http_transport_curl.cpp
+    )
+    message(STATUS "Building desktop platform adapter (POSIX file I/O + libcurl HTTP transport)")
+else()
+    set(RAC_DESKTOP_SOURCES "")
+endif()
+
 # Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
 if(APPLE AND RAC_BUILD_PLATFORM)
     set(RAC_PLATFORM_SOURCES
@@ -994,6 +1016,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
     ${RAC_PLATFORM_SOURCES}
+    ${RAC_DESKTOP_SOURCES}
     ${RAC_SOLUTIONS_STUB_SOURCES}
 )
 
@@ -1205,6 +1228,16 @@ if(EMSCRIPTEN)
     # libarchive gzip filter reads tar.gz without spawning `gzip -d` (unavailable in WASM).
     target_compile_options(rac_commons PUBLIC "-sUSE_ZLIB=1")
     target_link_options(rac_commons PUBLIC "-sUSE_ZLIB=1")
+endif()
+
+# Desktop builds are the one exception to "libcurl deleted": the desktop
+# platform adapter registers a libcurl-backed transport vtable
+# (src/desktop/http_transport_curl.cpp). System libcurl ships on macOS and
+# every mainstream Linux distro; PUBLIC so static-lib consumers (rcli,
+# runanywhere-server) inherit the link dependency.
+if(RAC_DESKTOP_ADAPTER)
+    find_package(CURL REQUIRED)
+    target_link_libraries(rac_commons PUBLIC CURL::libcurl)
 endif()
 
 # =============================================================================

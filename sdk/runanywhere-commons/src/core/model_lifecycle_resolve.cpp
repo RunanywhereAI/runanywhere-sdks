@@ -16,7 +16,9 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_model_lifecycle.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
 
 namespace rac::core::model_lifecycle::detail {
 
@@ -584,3 +586,68 @@ preferred_category_for(const runanywhere::v1::ModelLoadRequest& request,
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace rac::core::model_lifecycle::detail
+
+// =============================================================================
+// PUBLIC C ABI — resolve artifact paths without loading an engine
+// =============================================================================
+
+extern "C" rac_result_t rac_model_lifecycle_resolve_paths_proto(
+    rac_model_registry_handle_t registry, const uint8_t* request_proto_bytes,
+    size_t request_proto_size, rac_proto_buffer_t* out_result) {
+#if defined(RAC_HAVE_PROTOBUF)
+    namespace detail = rac::core::model_lifecycle::detail;
+    using runanywhere::v1::ModelInfo;
+    using runanywhere::v1::ModelLoadRequest;
+    using runanywhere::v1::ModelLoadResult;
+
+    if (!registry) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NULL_POINTER,
+                                          "registry handle is required");
+    }
+    if (!detail::valid_bytes(request_proto_bytes, request_proto_size)) {
+        return detail::parse_error(out_result, "ModelLoadRequest bytes are empty or too large");
+    }
+
+    ModelLoadRequest request;
+    if (!request.ParseFromArray(detail::parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return detail::parse_error(out_result, "failed to parse ModelLoadRequest");
+    }
+    if (request.model_id().empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "ModelLoadRequest.model_id is required");
+    }
+
+    uint8_t* model_bytes = nullptr;
+    size_t model_size = 0;
+    if (rac_model_registry_get_proto(registry, request.model_id().c_str(), &model_bytes,
+                                     &model_size) != RAC_SUCCESS) {
+        const ModelLoadResult result = detail::make_load_result(
+            false, request.model_id(), runanywhere::v1::MODEL_CATEGORY_UNSPECIFIED,
+            runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED, "", {}, 0,
+            "model not found in registry");
+        return detail::copy_proto(result, out_result);
+    }
+    ModelInfo model;
+    const bool parsed_model = model.ParseFromArray(model_bytes, static_cast<int>(model_size));
+    rac_model_registry_proto_free(model_bytes);
+    if (!parsed_model) {
+        return detail::parse_error(out_result, "failed to parse registered ModelInfo");
+    }
+
+    const detail::ModelArtifactResolution resolution = detail::resolve_model_artifacts(model);
+    const bool resolved = !resolution.resolved_path.empty();
+    const ModelLoadResult result = detail::make_load_result(
+        resolved, request.model_id(), detail::preferred_category_for(request, model),
+        detail::preferred_framework_for(request, model), resolution.resolved_path,
+        resolution.artifacts, 0,
+        resolved ? "" : "model has no resolvable local artifacts (not downloaded?)");
+    return detail::copy_proto(result, out_result);
+#else
+    (void)registry;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                                      "protobuf runtime not available");
+#endif
+}

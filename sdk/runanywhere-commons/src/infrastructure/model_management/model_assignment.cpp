@@ -21,9 +21,14 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/network/rac_environment.h"
 
 #ifdef RAC_HAVE_PROTOBUF
 #include "model_types.pb.h"
@@ -295,6 +300,126 @@ static rac_result_t copy_models_to_output(const std::vector<rac_model_info_t*>& 
     }
 
     return RAC_SUCCESS;
+}
+
+// =============================================================================
+// DEFAULT HTTP TRANSPORT
+// =============================================================================
+// Used when the SDK did not register rac_assignment_callbacks_t.http_get but a
+// platform rac_http_transport_ops_t vtable is available. Explicit callbacks
+// always keep precedence (see assignment_http_get_locked).
+
+// Backing storage for the response handed back through
+// rac_assignment_http_response_t. Both public call sites hold g_mutex for the
+// whole fetch-and-parse sequence, so a single file-static slot is race-free.
+static std::string g_default_http_body;
+static std::string g_default_http_error;
+
+static rac_result_t assignment_default_http_failure(rac_assignment_http_response_t* out_response,
+                                                    rac_result_t code, const char* message) {
+    g_default_http_error =
+        (message != nullptr && message[0] != '\0') ? message : rac_error_message(code);
+    out_response->result = code;
+    out_response->error_message = g_default_http_error.c_str();
+    return code;
+}
+
+// Routes the assignment fetch through the registered HTTP transport, mirroring
+// the phase2 control-plane pattern in sdk_init.cpp (default headers +
+// X-Platform + apikey) plus the bearer token the per-SDK callbacks attach on
+// the requires_auth path.
+static rac_result_t assignment_default_http_get(const char* endpoint, rac_bool_t requires_auth,
+                                                rac_assignment_http_response_t* out_response) {
+    if (!endpoint || !out_response) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    std::memset(out_response, 0, sizeof(*out_response));
+
+    const char* base_url = rac_state_get_base_url();
+    if (!base_url || base_url[0] == '\0') {
+        return assignment_default_http_failure(out_response, RAC_ERROR_INVALID_CONFIGURATION,
+                                               "model assignment base URL is not configured");
+    }
+
+    char url[2048] = {};
+    if (rac_build_url(base_url, endpoint, url, sizeof(url)) < 0) {
+        return assignment_default_http_failure(out_response, RAC_ERROR_INVALID_CONFIGURATION,
+                                               "failed to build model assignment URL");
+    }
+
+    const rac_http_header_kv_t* defaults = nullptr;
+    size_t default_count = 0;
+    std::vector<rac_http_header_kv_t> headers;
+    if (rac_http_default_headers(&defaults, &default_count) == RAC_SUCCESS && defaults != nullptr) {
+        headers.assign(defaults, defaults + default_count);
+    }
+    const rac_sdk_config_t* config = rac_sdk_get_config();
+    const char* platform =
+        (config != nullptr && config->platform != nullptr && config->platform[0] != '\0')
+            ? config->platform
+            : "unknown";
+    headers.push_back({"X-Platform", platform});
+    const char* api_key = rac_state_get_api_key();
+    if (api_key != nullptr && api_key[0] != '\0') {
+        headers.push_back({"apikey", api_key});
+    }
+    std::string bearer;
+    if (requires_auth == RAC_TRUE) {
+        const char* token = rac_auth_get_access_token();
+        if (token != nullptr && token[0] != '\0') {
+            bearer = std::string("Bearer ") + token;
+            headers.push_back({"Authorization", bearer.c_str()});
+        }
+    }
+
+    rac_http_client_t* client = nullptr;
+    rac_result_t rc = rac_http_client_create(&client);
+    if (rc != RAC_SUCCESS) {
+        return assignment_default_http_failure(out_response, rc, nullptr);
+    }
+
+    rac_http_request_t request = {};
+    request.method = "GET";
+    request.url = url;
+    request.headers = headers.empty() ? nullptr : headers.data();
+    request.header_count = headers.size();
+    request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
+    request.follow_redirects = RAC_TRUE;
+
+    rac_http_response_t response = {};
+    rc = rac_http_request_send(client, &request, &response);
+    rac_http_client_destroy(client);
+    if (rc != RAC_SUCCESS) {
+        rac_http_response_free(&response);
+        return assignment_default_http_failure(out_response, rc, nullptr);
+    }
+
+    if (response.body_bytes != nullptr && response.body_len > 0) {
+        g_default_http_body.assign(reinterpret_cast<const char*>(response.body_bytes),
+                                   response.body_len);
+    } else {
+        g_default_http_body.clear();
+    }
+    out_response->result = RAC_SUCCESS;
+    out_response->status_code = response.status;
+    out_response->response_body = g_default_http_body.c_str();
+    out_response->response_length = g_default_http_body.size();
+    rac_http_response_free(&response);
+    return RAC_SUCCESS;
+}
+
+// True when an assignment fetch can reach the backend: either via an explicit
+// per-SDK callback or via the built-in transport-backed default.
+static bool assignment_transport_available_locked() {
+    return g_callbacks.http_get != nullptr || rac_http_transport_is_registered() == RAC_TRUE;
+}
+
+static rac_result_t assignment_http_get_locked(const char* endpoint, rac_bool_t requires_auth,
+                                               rac_assignment_http_response_t* out_response) {
+    if (g_callbacks.http_get != nullptr) {
+        return g_callbacks.http_get(endpoint, requires_auth, out_response, g_callbacks.user_data);
+    }
+    return assignment_default_http_get(endpoint, requires_auth, out_response);
 }
 
 // Pure C-enum predicate: a model format "needs inference" when it is the
@@ -1272,9 +1397,10 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     }
 
     // Need to fetch from backend
-    if (!g_callbacks.http_get) {
-        RAC_LOG_WARNING(LOG_CAT,
-                        "HTTP callback not set - returning cached or empty assignment list");
+    if (!assignment_transport_available_locked()) {
+        RAC_LOG_WARNING(
+            LOG_CAT,
+            "No assignment callback or HTTP transport - returning cached or empty assignment list");
         if (!g_cached_models.empty()) {
             return copy_models_to_output(g_cached_models, out_models, out_count);
         }
@@ -1290,10 +1416,8 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     RAC_LOG_INFO(LOG_CAT, msg);
 
     // Make HTTP request
-    RAC_LOG_INFO(LOG_CAT, ">>> Calling http_get callback...");
     rac_assignment_http_response_t response = {};
-    rac_result_t result =
-        g_callbacks.http_get(endpoint, RAC_TRUE, &response, g_callbacks.user_data);
+    rac_result_t result = assignment_http_get_locked(endpoint, RAC_TRUE, &response);
 
     snprintf(msg, sizeof(msg),
              "<<< http_get returned: result=%d, response.result=%d, status=%d, body_len=%zu",
@@ -1450,7 +1574,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         return serialize_assignment_proto(result, out_result);
     }
 
-    if (!g_callbacks.http_get) {
+    if (!assignment_transport_available_locked()) {
         warnings.emplace_back(
             "model assignment transport is not configured; remote catalog was not fetched");
         models = cached_proto_models_locked();
@@ -1466,8 +1590,7 @@ rac_result_t rac_model_assignment_refresh_proto(const uint8_t* request_proto_byt
         catalog_uri.empty() ? rac_endpoint_model_assignments() : catalog_uri.c_str();
 
     rac_assignment_http_response_t response = {};
-    rac_result_t transport_rc =
-        g_callbacks.http_get(endpoint, RAC_TRUE, &response, g_callbacks.user_data);
+    rac_result_t transport_rc = assignment_http_get_locked(endpoint, RAC_TRUE, &response);
 
     if (transport_rc != RAC_SUCCESS || response.result != RAC_SUCCESS) {
         const rac_result_t error_code =

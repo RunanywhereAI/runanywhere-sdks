@@ -33,11 +33,22 @@ inline bool file_exists(const std::string& path) {
     return (stat(path.c_str(), &st) == 0);
 }
 
+inline bool require_real_artifacts() {
+    const char* env = std::getenv("RAC_TEST_REQUIRE_MODELS");
+    return env && env[0] != '\0' && std::string(env) != "0";
+}
+
+inline bool require_real_audio_artifacts() {
+    const char* env = std::getenv("RAC_TEST_REQUIRE_AUDIO");
+    return env && env[0] != '\0' && std::string(env) != "0";
+}
+
 inline bool require_model(const std::string& path, const std::string& name, TestResult& result) {
     if (!file_exists(path)) {
         result.test_name = name;
-        result.passed = true;  // SKIPPED counts as pass (not a failure)
-        result.details = "SKIPPED - model not found: " + path;
+        result.passed = !require_real_artifacts();
+        result.details = (result.passed ? "SKIPPED" : "REQUIRED MODEL MISSING");
+        result.details += " - model not found: " + path;
         return false;
     }
     return true;
@@ -227,9 +238,10 @@ inline bool require_audio_file(const std::string& path, const std::string& test_
                                TestResult& result) {
     if (path.empty() || !file_exists(path)) {
         result.test_name = test_name;
-        result.passed = true;
-        result.details = "SKIPPED - test audio not found: " +
-                         (path.empty() ? "(audio dir not configured)" : path);
+        result.passed = !require_real_audio_artifacts();
+        result.details = (result.passed ? "SKIPPED" : "REQUIRED AUDIO MISSING");
+        result.details += " - test audio not found: " +
+                          (path.empty() ? "(audio dir not configured)" : path);
         return false;
     }
     return true;

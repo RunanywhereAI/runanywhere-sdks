@@ -13,7 +13,7 @@
 #include <cstdio>
 #include <ctime>
 
-#include "rac/backends/rac_tts_onnx.h"
+#include "rac_tts_sherpa.h"
 #include "rac/backends/rac_vad_onnx.h"  // for RAC_VAD_ONNX_CONFIG_DEFAULT typedefs and rac_backend_onnx_register()
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -520,24 +520,24 @@ static TestResult test_vad_detects_tts_speech() {
     }
 
     // Synthesize speech via TTS
-    rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
+    rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle,
+    rc = rac_tts_sherpa_synthesize(tts_handle,
                                  "Hello world, this is a test of voice activity detection", nullptr,
                                  &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
-        rac_tts_onnx_destroy(tts_handle);
+        result.details = "rac_tts_sherpa_synthesize failed: " + std::to_string(rc);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -556,7 +556,7 @@ static TestResult test_vad_detects_tts_speech() {
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -576,7 +576,7 @@ static TestResult test_vad_detects_tts_speech() {
             rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data)
                 rac_free(tts_result.audio_data);
-            rac_tts_onnx_destroy(tts_handle);
+            rac_tts_sherpa_destroy(tts_handle);
             teardown();
             return result;
         }
@@ -604,7 +604,7 @@ static TestResult test_vad_detects_tts_speech() {
     rac_vad_sherpa_destroy(vad_handle);
     if (tts_result.audio_data)
         rac_free(tts_result.audio_data);
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
     teardown();
     return result;
 }
@@ -628,22 +628,22 @@ static TestResult test_vad_mixed_speech_silence() {
     }
 
     // Synthesize "Hello" via TTS
-    rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
+    rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle, "Hello", nullptr, &tts_result);
+    rc = rac_tts_sherpa_synthesize(tts_handle, "Hello", nullptr, &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
-        rac_tts_onnx_destroy(tts_handle);
+        result.details = "rac_tts_sherpa_synthesize failed: " + std::to_string(rc);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -673,7 +673,7 @@ static TestResult test_vad_mixed_speech_silence() {
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -692,7 +692,7 @@ static TestResult test_vad_mixed_speech_silence() {
             rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data)
                 rac_free(tts_result.audio_data);
-            rac_tts_onnx_destroy(tts_handle);
+            rac_tts_sherpa_destroy(tts_handle);
             teardown();
             return result;
         }
@@ -712,7 +712,7 @@ static TestResult test_vad_mixed_speech_silence() {
         rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -760,7 +760,7 @@ static TestResult test_vad_mixed_speech_silence() {
     rac_vad_sherpa_destroy(vad_handle);
     if (tts_result.audio_data)
         rac_free(tts_result.audio_data);
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
     teardown();
     return result;
 }
@@ -784,22 +784,22 @@ static TestResult test_vad_threshold_sensitivity() {
     }
 
     // Synthesize "Hello world" via TTS
-    rac_tts_onnx_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
+    rac_tts_sherpa_config_t tts_cfg = RAC_TTS_ONNX_CONFIG_DEFAULT;
     rac_handle_t tts_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
+    rac_result_t rc = rac_tts_sherpa_create(tts_model_path.c_str(), &tts_cfg, &tts_handle);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_create failed: " + std::to_string(rc);
+        result.details = "rac_tts_sherpa_create failed: " + std::to_string(rc);
         teardown();
         return result;
     }
 
     rac_tts_result_t tts_result = {};
-    rc = rac_tts_onnx_synthesize(tts_handle, "Hello world", nullptr, &tts_result);
+    rc = rac_tts_sherpa_synthesize(tts_handle, "Hello world", nullptr, &tts_result);
     if (rc != RAC_SUCCESS) {
         result.passed = false;
-        result.details = "rac_tts_onnx_synthesize failed: " + std::to_string(rc);
-        rac_tts_onnx_destroy(tts_handle);
+        result.details = "rac_tts_sherpa_synthesize failed: " + std::to_string(rc);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -818,7 +818,7 @@ static TestResult test_vad_threshold_sensitivity() {
         result.details = "rac_vad_sherpa_create failed: " + std::to_string(rc);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -833,7 +833,7 @@ static TestResult test_vad_threshold_sensitivity() {
         rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -849,7 +849,7 @@ static TestResult test_vad_threshold_sensitivity() {
             rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data)
                 rac_free(tts_result.audio_data);
-            rac_tts_onnx_destroy(tts_handle);
+            rac_tts_sherpa_destroy(tts_handle);
             teardown();
             return result;
         }
@@ -865,7 +865,7 @@ static TestResult test_vad_threshold_sensitivity() {
         rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -878,7 +878,7 @@ static TestResult test_vad_threshold_sensitivity() {
         rac_vad_sherpa_destroy(vad_handle);
         if (tts_result.audio_data)
             rac_free(tts_result.audio_data);
-        rac_tts_onnx_destroy(tts_handle);
+        rac_tts_sherpa_destroy(tts_handle);
         teardown();
         return result;
     }
@@ -894,7 +894,7 @@ static TestResult test_vad_threshold_sensitivity() {
             rac_vad_sherpa_destroy(vad_handle);
             if (tts_result.audio_data)
                 rac_free(tts_result.audio_data);
-            rac_tts_onnx_destroy(tts_handle);
+            rac_tts_sherpa_destroy(tts_handle);
             teardown();
             return result;
         }
@@ -916,7 +916,7 @@ static TestResult test_vad_threshold_sensitivity() {
     rac_vad_sherpa_destroy(vad_handle);
     if (tts_result.audio_data)
         rac_free(tts_result.audio_data);
-    rac_tts_onnx_destroy(tts_handle);
+    rac_tts_sherpa_destroy(tts_handle);
     teardown();
     return result;
 }

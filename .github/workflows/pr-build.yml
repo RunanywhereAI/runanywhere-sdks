@@ -127,6 +127,44 @@ jobs:
       # no longer hold (same as linux-debug + macos-debug above).
       - run: ctest --preset linux-asan -E "solution_runner_tests"
 
+  rcli-macos:
+    # rcli desktop CLI — full-backend release build + modelless smoke.
+    # macos-14 pin for the same llama.cpp Metal / Xcode 16 reason as
+    # macos-debug (the rcli preset enables GGML_METAL=ON).
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install ninja protobuf
+      - run: cmake --preset rcli-macos-release
+      - run: cmake --build --preset rcli-macos-release
+      - name: Smoke (modelless)
+        run: |
+          RCLI=build/rcli-macos-release/sdk/runanywhere-cli/rcli
+          "$RCLI" version
+          "$RCLI" backends
+          "$RCLI" list --all
+          "$RCLI" info --json
+
+  rcli-linux:
+    # rcli desktop CLI on Linux — release build, unit tests, modelless smoke.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libcurl4-openssl-dev
+      - name: Sherpa-ONNX prebuilts
+        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+      - run: cmake --preset rcli-linux-release -DRAC_BUILD_TESTS=ON
+      - run: cmake --build --preset rcli-linux-release
+      - name: Unit tests
+        run: ctest --test-dir build/rcli-linux-release -R "rcli_unit_tests|desktop_adapter_tests" --output-on-failure
+      - name: Smoke (modelless)
+        run: |
+          RCLI=build/rcli-linux-release/sdk/runanywhere-cli/rcli
+          "$RCLI" version
+          "$RCLI" backends
+          "$RCLI" list --all
+          "$RCLI" info --json
+
   wasm:
     runs-on: ubuntu-22.04
     steps:

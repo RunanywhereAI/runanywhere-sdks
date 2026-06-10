@@ -35,6 +35,27 @@ RAC_API rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t 
                                                     rac_proto_buffer_t* out_result);
 
 /**
+ * @brief Resolve on-disk artifact paths for a registered model WITHOUT loading
+ *        an engine (and without auto-download).
+ *
+ * Same request/response shapes as load: consumes serialized
+ * runanywhere.v1.ModelLoadRequest bytes (only model_id is used) and returns
+ * serialized runanywhere.v1.ModelLoadResult bytes where `resolved_path` is the
+ * primary artifact (e.g. the .gguf file inside the model folder, or the inner
+ * sherpa archive directory) and `resolved_artifacts` carries companions with
+ * roles (e.g. MODEL_FILE_ROLE_VISION_PROJECTOR for a VLM mmproj).
+ * `success=false` with error_message when the model is unknown or has no
+ * resolvable local artifacts (not downloaded).
+ *
+ * Consumers: desktop CLI speech commands and any SDK path that needs the
+ * canonical artifact resolution (the same logic the lifecycle loader uses)
+ * before driving a per-handle component directly.
+ */
+RAC_API rac_result_t rac_model_lifecycle_resolve_paths_proto(
+    rac_model_registry_handle_t registry, const uint8_t* request_proto_bytes,
+    size_t request_proto_size, rac_proto_buffer_t* out_result);
+
+/**
  * @brief Unload model(s) from serialized runanywhere.v1.ModelUnloadRequest bytes.
  *
  * Returns serialized runanywhere.v1.ModelUnloadResult bytes in out_result.

@@ -49,7 +49,10 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
          .default_framework = RAC_FRAMEWORK_UNKNOWN,
          .allow_null_model_id = true,
          .lookup_last_path_component = true,
-         .prefer_input_path_when_contains = nullptr},
+         .prefer_input_path_when_contains = "/"},  // explicit caller paths win over
+         // the registry row (LLM uses ".gguf" for the same rule) — required for
+         // archive models whose registry local_path is the outer extract folder
+         // while loaders need the resolved inner artifact dir
         &model_ref);
     if (result != RAC_SUCCESS) {
         return result;

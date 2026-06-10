@@ -409,24 +409,16 @@ static TestResult test_unload_reload() {
     ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_TRUE,
               "model should be loaded after create");
 
-    // Attempt unload - may fail on Metal GPU backends (known llama.cpp limitation)
+    // Direct unload is intentionally a no-op for the legacy llama.cpp handle:
+    // teardown is owned by destroy, while the commons component lifecycle handles
+    // model cleanup at the service layer.
     rc = rac_llm_llamacpp_unload_model(handle);
-    if (rc != RAC_SUCCESS) {
-        std::cout << "  NOTE: unload returned " << rc
-                  << " (known Metal GPU limitation) - skipping reload test\n";
-        rac_llm_llamacpp_destroy(handle);
-        teardown();
-        result.passed = true;
-        result.details = "SKIPPED - unload not supported with Metal GPU backend (error " +
-                         std::to_string(rc) + ")";
-        return result;
-    }
+    ASSERT_EQ(rc, RAC_SUCCESS, "legacy unload is a successful no-op");
+    ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_TRUE,
+              "legacy unload keeps the model loaded until destroy");
 
-    ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_FALSE,
-              "model should not be loaded after unload");
-
-    // Reload is not supported via a dedicated load_model API — LlamaCpp loads
-    // the model during create(). To reload, callers destroy and re-create.
+    // Reload is not supported via a dedicated load_model API here — LlamaCpp
+    // loads the model during create(). To reload, callers destroy and re-create.
     rac_llm_llamacpp_destroy(handle);
     teardown();
     return TEST_PASS();
