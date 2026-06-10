@@ -24,8 +24,11 @@ import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
 import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Documents
 import com.runanywhere.runanywhereai.ui.navigation.Settings
+import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
+import com.runanywhere.runanywhereai.ui.navigation.Tools
 import com.runanywhere.runanywhereai.ui.navigation.Tts
+import com.runanywhere.runanywhereai.ui.navigation.Vad
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -41,11 +44,14 @@ private data class MoreEntry(
 fun MoreScreen(onNavigate: (Any) -> Unit) {
     val dimens = LocalDimens.current
     val entries = listOf(
-        MoreEntry("Settings", "Generation, tools and storage", RACIcons.Outline.Settings, Settings),
+        MoreEntry("Settings", "Generation and storage", RACIcons.Outline.Settings, Settings),
+        MoreEntry("Tool Calling", "Let the LLM use registered tools", RACIcons.Outline.Tool, Tools),
         MoreEntry("Text to Speech", "Read text aloud", RACIcons.Outline.Robot, Tts),
         MoreEntry("Speech to Text", "Transcribe audio on-device", RACIcons.Outline.Microphone, Stt),
+        MoreEntry("Voice Detection", "Detect speech activity in real-time", RACIcons.Outline.Activity, Vad),
         MoreEntry("Vision", "Describe images with a VLM", RACIcons.Outline.Eye, Vision),
         MoreEntry("Documents", "Chat with your files (RAG)", RACIcons.Outline.Database, Documents),
+        MoreEntry("Solutions", "Run prepackaged pipelines from YAML", RACIcons.Outline.Stack, Solutions),
         MoreEntry("Cloud providers", "Register cloud STT backends", RACIcons.Outline.Cloud, CloudProviders),
         MoreEntry("Benchmarks", "Measure model performance", RACIcons.Outline.Cpu, Benchmarks),
     )

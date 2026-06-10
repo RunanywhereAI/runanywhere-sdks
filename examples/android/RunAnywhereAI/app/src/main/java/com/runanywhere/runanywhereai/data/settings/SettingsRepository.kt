@@ -12,6 +12,7 @@ object SettingsRepository {
     private const val KEY_MAX_TOKENS = "max_tokens"
     private const val KEY_SYSTEM_PROMPT = "system_prompt"
     private const val KEY_STREAMING = "streaming"
+    private const val KEY_TOOL_CALLING = "tool_calling_enabled"
 
     private var prefs: SharedPreferences? = null
 
@@ -27,6 +28,7 @@ object SettingsRepository {
             maxTokens = p.getInt(KEY_MAX_TOKENS, AppSettings().maxTokens),
             systemPrompt = p.getString(KEY_SYSTEM_PROMPT, "").orEmpty(),
             streaming = p.getBoolean(KEY_STREAMING, true),
+            toolCallingEnabled = p.getBoolean(KEY_TOOL_CALLING, false),
         )
     }
 
@@ -48,5 +50,10 @@ object SettingsRepository {
     fun setStreaming(value: Boolean) {
         settings = settings.copy(streaming = value)
         prefs?.edit()?.putBoolean(KEY_STREAMING, value)?.apply()
+    }
+
+    fun setToolCallingEnabled(value: Boolean) {
+        settings = settings.copy(toolCallingEnabled = value)
+        prefs?.edit()?.putBoolean(KEY_TOOL_CALLING, value)?.apply()
     }
 }

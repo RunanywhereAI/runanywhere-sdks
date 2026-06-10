@@ -13,7 +13,9 @@ import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Documents
 import com.runanywhere.runanywhereai.ui.navigation.More
 import com.runanywhere.runanywhereai.ui.navigation.Settings
+import com.runanywhere.runanywhereai.ui.navigation.Solutions
 import com.runanywhere.runanywhereai.ui.navigation.Stt
+import com.runanywhere.runanywhereai.ui.navigation.Tools
 import com.runanywhere.runanywhereai.ui.navigation.Tts
 import com.runanywhere.runanywhereai.ui.navigation.Vision
 import com.runanywhere.runanywhereai.ui.navigation.Voice
@@ -25,31 +27,39 @@ import com.runanywhere.sdk.public.types.RAModelInfo
 fun AppTopBar(
     destination: NavDestination?,
     model: RAModelInfo?,
+    conversationModelName: String?,
     generating: Boolean,
     loraActive: Boolean,
+    hasMessages: Boolean,
     onModelClick: () -> Unit,
     onNewChat: () -> Unit,
     onHistory: () -> Unit,
     onLora: () -> Unit,
+    onDetails: () -> Unit,
 ) {
     when {
         destination == null -> Unit
         destination.hasRoute<Chat>() -> ChatTopBar(
             model = model,
+            conversationModelName = conversationModelName,
             generating = generating,
             loraActive = loraActive,
+            hasMessages = hasMessages,
             onModelClick = onModelClick,
             onNewChat = onNewChat,
             onHistory = onHistory,
             onLora = onLora,
+            onDetails = onDetails,
         )
         destination.hasRoute<Voice>() -> StandardTopBar("Voice")
         destination.hasRoute<More>() -> StandardTopBar("More")
         destination.hasRoute<Settings>() -> StandardTopBar("Settings")
+        destination.hasRoute<Tools>() -> StandardTopBar("Tool Calling")
         destination.hasRoute<Tts>() -> StandardTopBar("Text to Speech")
         destination.hasRoute<Stt>() -> StandardTopBar("Speech to Text")
         destination.hasRoute<Vision>() -> StandardTopBar("Vision")
         destination.hasRoute<Documents>() -> StandardTopBar("Documents")
+        destination.hasRoute<Solutions>() -> StandardTopBar("Solutions")
         destination.hasRoute<CloudProviders>() -> StandardTopBar("Cloud providers")
         destination.hasRoute<Benchmarks>() -> StandardTopBar("Benchmarks")
         destination.hasRoute<BenchmarkDetail>() -> StandardTopBar("Run details")

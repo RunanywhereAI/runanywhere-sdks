@@ -65,6 +65,11 @@ final class LLMViewModel {
     var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    /// TTFT (ms) reported by the SDK event bus for the generation in flight.
+    /// The event carries an SDK-side generation id the app never sees on the
+    /// result, so the single-generation-at-a-time chat keeps the latest value
+    /// and merges it into the persisted `MessageAnalytics`.
+    private(set) var activeGenerationTTFTMs: Double?
     private var isViewModelInitialized = false
 
     // MARK: - Internal Accessors for Extensions
@@ -93,6 +98,7 @@ final class LLMViewModel {
 
     func recordFirstTokenLatency(generationId: String, latency: Double) {
         firstTokenLatencies[generationId] = latency
+        activeGenerationTTFTMs = latency
     }
 
     func getFirstTokenLatency(for generationId: String) -> Double? {
@@ -225,6 +231,7 @@ final class LLMViewModel {
         currentInput = ""
         isGenerating = true
         error = nil
+        activeGenerationTTFTMs = nil
 
         // Create conversation on first message
         if currentConversation == nil {
@@ -604,6 +611,11 @@ final class LLMViewModel {
         if let effectiveSystemPrompt {
             options.systemPrompt = effectiveSystemPrompt
         }
+        options.streamingEnabled = useStreaming
+        // Structured flag — commons applies the model's no-think directive;
+        // the app never injects control tokens into prompts. Same gate as the
+        // RAG path (RAGViewModel.askQuestion).
+        options.disableThinking = loadedModelSupportsThinking && !thinkingModeEnabled
         return options
     }
 

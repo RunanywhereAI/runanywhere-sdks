@@ -46,7 +46,7 @@ internal object ModelCatalog {
             "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
             LLAMA,
             LANGUAGE,
-            500_000_000
+            386_404_416
         ),
         SingleFileModel(
             "llama-2-7b-chat-q4_k_m",
@@ -221,7 +221,10 @@ internal object ModelCatalog {
             "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx",
             ONNX,
             ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-            5_000_000
+            // Actual silero_vad.onnx artifact size (verified Content-Length). This value
+            // doubles as download_size_bytes, which feeds the post-download size guard —
+            // an over-stated 5 MB tripped the guard on a valid ~2.3 MB download.
+            2_327_524
         ),
         MultiFileModel(
             "all-minilm-l6-v2",
@@ -235,7 +238,7 @@ internal object ModelCatalog {
                     "model.onnx"
                 ),
                 ModelFile(
-                    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/vocab.txt",
+                    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt",
                     "vocab.txt"
                 ),
             ),

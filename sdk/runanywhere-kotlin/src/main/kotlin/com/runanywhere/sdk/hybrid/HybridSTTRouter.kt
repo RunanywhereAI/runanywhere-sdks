@@ -16,7 +16,9 @@
  *   2. creates the two STT services through the registry-routed creation path
  *      and attaches them with their descriptors,
  *   3. registers any custom-filter predicates and installs the policy bytes,
- *   4. drives the router's transcribe and decodes the response.
+ *   4. drives the router's transcribe (normalising raw PCM16 input to a WAV
+ *      container so one payload serves both services) and decodes the
+ *      response.
  *
  * Mirrors Swift's HybridSTTRouter.swift (same member names + semantics);
  * Closeable is retained as the Kotlin lifetime idiom.
@@ -31,6 +33,8 @@ package com.runanywhere.sdk.hybrid
 
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.pcm16ToWav
 import java.io.Closeable
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
@@ -53,7 +57,7 @@ import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
  *         rank = HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
  *     ),
  * )
- * val result = router.transcribe(audio, HybridTranscribeOptions(audio_format = 1))
+ * val result = router.transcribe(pcm16Audio, HybridTranscribeOptions(sample_rate = 16000))
  * router.close()
  * ```
  *
@@ -176,10 +180,12 @@ class HybridSTTRouter : Closeable {
      * installed policy (filters → rank → invoke → fallback) in commons and
      * returns the chosen backend's result plus the routing decision.
      *
-     * @param audio   File-encoded audio (wav/mp3/flac/...) OR raw PCM bytes.
-     *                Each engine decodes per its own expectations: the cloud
-     *                provider sends the bytes as a multipart file part;
-     *                sherpa parses WAV inline.
+     * @param audio   Raw 16-bit mono PCM bytes (pass the capture rate via
+     *                [HybridTranscribeOptions.sample_rate]) OR file-encoded
+     *                audio (wav/mp3/flac/...). Raw PCM16 is wrapped in a WAV
+     *                container here — see [normalizeAudioPayload]; WAV input
+     *                (RIFF/WAVE magic) and declared compressed formats pass
+     *                through unchanged.
      * @param options Optional language / sample-rate / audio-format hints
      *                (proto-typed [HybridTranscribeOptions]).
      */
@@ -190,10 +196,11 @@ class HybridSTTRouter : Closeable {
     ): HybridTranscribeResult {
         val handle = requireOpen()
 
+        val (payload, payloadOptions) = normalizeAudioPayload(audio, options)
         val responseBytes =
             RunAnywhereBridge.racSttHybridRouterTranscribe(
                 routerHandle = handle,
-                requestProto = HybridSttRouterProto.request(audio, options),
+                requestProto = HybridSttRouterProto.request(payload, payloadOptions),
             ) ?: throw serviceError("racSttHybridRouterTranscribe returned no response")
 
         return HybridSttRouterProto.parseResponse(responseBytes)
@@ -231,6 +238,41 @@ class HybridSTTRouter : Closeable {
     }
 
     // Internals
+
+    /**
+     * Normalise the audio payload for the shared offline+online dispatch.
+     * Commons hands ONE payload to both services, and only a WAV container
+     * satisfies both: sherpa parses WAV inline (and falls back to raw PCM16),
+     * but cloud providers upload the bytes verbatim as an `audio/wav` file
+     * part and reject headerless PCM. Raw PCM16 is therefore wrapped via
+     * [RunAnywhere.pcm16ToWav] using the options' sample rate (16 kHz when
+     * unset, sherpa's own default). Input that is already a container — WAV
+     * by RIFF/WAVE magic, or a declared compressed format — passes through
+     * unchanged. Mirrors Swift's `normalizeAudioPayload`.
+     */
+    private fun normalizeAudioPayload(
+        audio: ByteArray,
+        options: HybridTranscribeOptions,
+    ): Pair<ByteArray, HybridTranscribeOptions> {
+        val isCompressed = options.audio_format > CloudAudioFormat.WAV.nativeValue
+        if (audio.isEmpty() || isCompressed || isWavContainer(audio)) {
+            return audio to options
+        }
+        val sampleRate = if (options.sample_rate > 0) options.sample_rate else DEFAULT_SAMPLE_RATE
+        return RunAnywhere.pcm16ToWav(audio, sampleRate) to
+            options.copy(sample_rate = sampleRate, audio_format = CloudAudioFormat.WAV.nativeValue)
+    }
+
+    private fun isWavContainer(audio: ByteArray): Boolean =
+        audio.size >= 12 &&
+            audio[0] == 'R'.code.toByte() &&
+            audio[1] == 'I'.code.toByte() &&
+            audio[2] == 'F'.code.toByte() &&
+            audio[3] == 'F'.code.toByte() &&
+            audio[8] == 'W'.code.toByte() &&
+            audio[9] == 'A'.code.toByte() &&
+            audio[10] == 'V'.code.toByte() &&
+            audio[11] == 'E'.code.toByte()
 
     /**
      * Clear both router slots, then destroy whatever services were attached.
@@ -280,4 +322,9 @@ class HybridSTTRouter : Closeable {
             code = ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE,
             message = message,
         )
+
+    private companion object {
+        /** Sherpa's raw-PCM fallback rate, used when the caller gave none. */
+        const val DEFAULT_SAMPLE_RATE = 16000
+    }
 }

@@ -477,6 +477,10 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     /// Stop the current voice conversation.
+    ///
+    /// Mirrors Android `VoiceViewModel.stop()`: cancel the event stream and
+    /// reset UI state first, then release the SDK's voice-agent resources.
+    /// `cleanupVoiceAgent()` never throws and is safe to call anytime.
     func stopConversation() async {
         logger.info("Stopping voice session...")
         eventTask?.cancel()
@@ -485,6 +489,7 @@ final class VoiceAgentViewModel: ObservableObject {
         currentStatus = "Ready"
         audioLevel = 0.0
         isSpeechDetected = false
+        await RunAnywhere.cleanupVoiceAgent()
         logger.info("Voice session stopped")
     }
 
@@ -588,6 +593,11 @@ final class VoiceAgentViewModel: ObservableObject {
         cancellables.removeAll()
         isViewModelInitialized = false
         hasSubscribedToSDKEvents = false
+        // VM teardown path (view's onDisappear) — Android's lifecycle
+        // equivalent (`onCleared()` → `stop()`) also releases the agent here.
+        Task {
+            await RunAnywhere.cleanupVoiceAgent()
+        }
         logger.info("VoiceAgentViewModel cleanup completed")
     }
 

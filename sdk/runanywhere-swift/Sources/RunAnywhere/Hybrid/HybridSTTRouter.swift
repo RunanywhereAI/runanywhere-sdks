@@ -16,7 +16,9 @@
 //       (rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint) → vt->stt_ops->create)
 //       and attaches them with their descriptors,
 //    3. registers any custom-filter predicates and installs the policy bytes,
-//    4. drives the router's transcribe and decodes the response.
+//    4. drives the router's transcribe (normalising raw PCM16 input to a WAV
+//       container so one payload serves both services) and decodes the
+//       response.
 //
 //  Mirrors the Kotlin RACRouter feature surface: both SDKs register the
 //  custom-filter predicate with commons (`rac_hybrid_register_custom_filter`)
@@ -49,7 +51,9 @@ import SwiftProtobuf
 ///     policy:  .init(hardFilters: [.network], cascade: .confidence(threshold: 0.5),
 ///                    rank: .preferLocalFirst)
 /// )
-/// let result = try router.transcribe(audio, options: .init(audioFormat: 1))
+/// var options = HybridTranscribeOptions()
+/// options.sampleRate = 16_000
+/// let result = try router.transcribe(pcm16Audio, options: options)
 /// router.close()
 /// ```
 ///
@@ -217,6 +221,15 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// Run one transcribe request through the router. The router applies the
     /// installed policy (filters → rank → invoke → fallback) in commons and
     /// returns the chosen backend's result plus the routing decision.
+    ///
+    /// - Parameters:
+    ///   - audio: Raw 16-bit mono PCM bytes (pass the capture rate via
+    ///     `HybridTranscribeOptions.sampleRate`) OR file-encoded audio
+    ///     (wav/mp3/flac/...). Raw PCM16 is wrapped in a WAV container here —
+    ///     see `normalizeAudioPayload`; WAV input (RIFF/WAVE magic) and
+    ///     declared compressed formats pass through unchanged.
+    ///   - options: Optional language / sample-rate / audio-format hints
+    ///     (proto-typed `HybridTranscribeOptions`).
     public func transcribe(
         _ audio: Data,
         options: HybridTranscribeOptions = .init()
@@ -225,7 +238,8 @@ public final class HybridSTTRouter: @unchecked Sendable {
             throw notOpen()
         }
 
-        let requestBytes = try encodeRequest(audio: audio, options: options)
+        let (payload, payloadOptions) = Self.normalizeAudioPayload(audio: audio, options: options)
+        let requestBytes = try encodeRequest(audio: payload, options: payloadOptions)
 
         var outBytes: UnsafeMutablePointer<UInt8>?
         var outSize: Int = 0
@@ -249,6 +263,42 @@ public final class HybridSTTRouter: @unchecked Sendable {
 
         let responseData = Data(bytes: outBytes, count: outSize)
         return try decodeResponse(responseData)
+    }
+
+    // MARK: - Audio payload normalisation
+
+    /// Sherpa's raw-PCM fallback rate, used when the caller gave none.
+    private static let defaultSampleRate: Int32 = 16000
+
+    /// Normalise the audio payload for the shared offline+online dispatch.
+    /// Commons hands ONE payload to both services, and only a WAV container
+    /// satisfies both: sherpa parses WAV inline (and falls back to raw
+    /// PCM16), but cloud providers upload the bytes verbatim as an
+    /// `audio/wav` file part and reject headerless PCM. Raw PCM16 is
+    /// therefore wrapped via `RunAnywhere.pcm16ToWav` using the options'
+    /// sample rate (16 kHz when unset, sherpa's own default). Input that is
+    /// already a container — WAV by RIFF/WAVE magic, or a declared
+    /// compressed format — passes through unchanged. Mirrors Kotlin's
+    /// `normalizeAudioPayload`.
+    private static func normalizeAudioPayload(
+        audio: Data,
+        options: HybridTranscribeOptions
+    ) -> (payload: Data, options: HybridTranscribeOptions) {
+        let isCompressed = options.audioFormat > CloudAudioFormat.wav.nativeValue
+        if audio.isEmpty || isCompressed || isWavContainer(audio) {
+            return (audio, options)
+        }
+        let sampleRate = options.sampleRate > 0 ? options.sampleRate : defaultSampleRate
+        var normalized = options
+        normalized.sampleRate = sampleRate
+        normalized.audioFormat = CloudAudioFormat.wav.nativeValue
+        return (RunAnywhere.pcm16ToWav(audio, sampleRate: Int(sampleRate)), normalized)
+    }
+
+    private static func isWavContainer(_ audio: Data) -> Bool {
+        guard audio.count >= 12 else { return false }
+        return audio.prefix(4).elementsEqual("RIFF".utf8)
+            && audio.dropFirst(8).prefix(4).elementsEqual("WAVE".utf8)
     }
 
     // MARK: - Request encode / response decode
