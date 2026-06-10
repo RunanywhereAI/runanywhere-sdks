@@ -1385,16 +1385,37 @@ if(RAC_ENABLE_PROTOBUF)
     # synthesized version string. Accept either so local dev on macOS works
     # without requiring a vendored FetchContent build.
     #
-    # Require Protobuf >= 5.0 in the fallback so a system protobuf 3.x
-    # install (Ubuntu 22.04 ships 3.12, 24.04 ships 3.21) is rejected and
-    # FetchContent fetches the centralized PROTOBUF_VERSION below. The
-    # checked-in generated headers under src/generated/proto/ are Protobuf
-    # C++ Version 7.34.1 and include `google/protobuf/runtime_version.h`,
-    # which only exists in the libprotobuf 4.x+ runtime. Linking against
-    # 3.x produces `fatal error: google/protobuf/runtime_version.h: No such
-    # file or directory`.
+    # Require the pinned PROTOBUF_VERSION as the fallback floor so a system
+    # protobuf older than the checked-in gencode (e.g. Arch ships 34.x,
+    # Ubuntu ships 3.x) is rejected and FetchContent fetches the centralized
+    # PROTOBUF_VERSION below. The generated headers under src/generated/proto/
+    # are emitted by protoc PROTOBUF_VERSION and their runtime_version.h guard
+    # hard-fails against any older libprotobuf, so accepting a lower system
+    # version here only defers the failure to a wall of compile errors.
     if(NOT Protobuf_FOUND)
-        find_package(Protobuf 5.0 QUIET)
+        # Module-mode FindProtobuf creates the protobuf::libprotobuf* IMPORTED
+        # targets as a side effect even when the requested version is NOT
+        # satisfied (e.g. Arch/Manjaro ship 34.x, Ubuntu ships 3.x against a
+        # 35.0 floor). Those leaked targets then collide with the vendored
+        # FetchContent build below as "add_library cannot create ALIAS target
+        # ... already exists". IMPORTED targets cannot be removed once created,
+        # so gate the probe: only run it when the installed protoc already
+        # meets the pinned floor (the only case where the result is usable —
+        # e.g. Homebrew protobuf >= 35 whose CONFIG reports ABI major 7 and so
+        # fails the EXACT check above). Otherwise skip straight to vendoring
+        # with a clean target namespace.
+        find_program(_RAC_SYSTEM_PROTOC NAMES protoc)
+        if(_RAC_SYSTEM_PROTOC)
+            execute_process(
+                COMMAND "${_RAC_SYSTEM_PROTOC}" --version
+                OUTPUT_VARIABLE _rac_protoc_version_out
+                ERROR_QUIET
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+            if(_rac_protoc_version_out MATCHES "([0-9]+\\.[0-9]+(\\.[0-9]+)?)"
+               AND NOT CMAKE_MATCH_1 VERSION_LESS PROTOBUF_VERSION)
+                find_package(Protobuf ${PROTOBUF_VERSION} QUIET)
+            endif()
+        endif()
     endif()
 
     if(NOT Protobuf_FOUND AND RAC_VENDOR_PROTOBUF)
@@ -1519,20 +1540,26 @@ if(RAC_ENABLE_PROTOBUF)
     # found". The probe below keeps the link line correct on every host
     # (Homebrew absl, Ubuntu 24.04 libabsl-dev, vendored protobuf).
     if(NOT DEFINED RAC_ABSL_LIBS)
-        find_package(absl QUIET CONFIG)
         set(RAC_ABSL_LIBS "")
-        if(absl_FOUND)
-            foreach(_rac_absl_component
-                    absl::log
-                    absl::log_internal_check_op
-                    absl::hash
-                    absl::strings
-                    absl::status)
-                if(TARGET ${_rac_absl_component})
-                    list(APPEND RAC_ABSL_LIBS ${_rac_absl_component})
-                endif()
-            endforeach()
+        # When protobuf was vendored via FetchContent (absl=module), the fetched
+        # Abseil already created the absl::* targets and libprotobuf links them
+        # transitively. Re-running find_package(absl) here loads the SYSTEM
+        # Abseil config, whose export set then aborts with "Some (but not all)
+        # targets in this export set were already defined". Only probe the
+        # system package when no absl target exists yet (system-protobuf path).
+        if(NOT TARGET absl::strings)
+            find_package(absl QUIET CONFIG)
         endif()
+        foreach(_rac_absl_component
+                absl::log
+                absl::log_internal_check_op
+                absl::hash
+                absl::strings
+                absl::status)
+            if(TARGET ${_rac_absl_component})
+                list(APPEND RAC_ABSL_LIBS ${_rac_absl_component})
+            endif()
+        endforeach()
     endif()
     if(RAC_ABSL_LIBS)
         target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
