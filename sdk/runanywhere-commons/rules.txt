@@ -1,0 +1,37 @@
+WORKING RULES
+
+Code style & commits
+- No ASCII art anywhere.
+- Minimal comments; strip/minimize comments in build files (gradle.kts, .toml, .properties) when touching them.
+- No author info in commits.
+- Commit messages: one short plain line. No Co-Authored-By, no email, no agent attribution.
+- PR bodies: no agent attribution.
+
+Versions
+- Never upgrade Gradle/AGP/Kotlin/library versions on my own. User approves every bump.
+
+Builds & testing
+- User drives ALL builds and device testing. Agent never builds, installs, screenshots, or runs on device unless explicitly asked.
+- RN SDK: must run build-react-native.sh --setup before building the RN app. Never hack native libs.
+
+Workflow
+- Discuss before writing. One file at a time. Let the user review. No surprise multi-file dumps.
+- Every write is reviewed externally; match the user's sketch verbatim. No unrequested additions, renames, or redesign. Default to less surface area.
+- Production code, not MVP: every edit ships-ready, correct, complete, edge/error handled. No stubs or TODOs.
+
+Commits/pushes
+- No unsolicited commits or pushes. Only when the user explicitly asks. Making edits is not authorization to commit.
+
+Scope
+- Work on SDK / library / native code only. Do not touch example apps for now (reading them for diagnosis/verification is fine).
+
+Response style
+- Short answers. No unsolicited suggestions. Re-read these rules after compaction.
+
+Project notes
+- Cloud STT: Sarvam is the only cloud STT we test. OpenRouter STT deferred until credits.
+- Android sherpa-onnx comes from the Siddhesh2377/sherpa-onnx-rac fork (whisper confidence).
+- RAG similarity threshold: default 0.7 too high for all-MiniLM (empty retrieval); lowered to 0.3 in Kotlin only.
+- App code conventions (DORMANT, app work paused): MVVM, no DI, theme tokens, compile-after-change.
+- Agent coordination: Haiku is main agent; delegate complex tasks to Opus/Sonnet.
+- READMEs: plain and clean, no ASCII art, template-like.
