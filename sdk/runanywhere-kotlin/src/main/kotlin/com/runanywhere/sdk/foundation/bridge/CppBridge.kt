@@ -29,6 +29,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.constants.SDKConstants
+import com.runanywhere.sdk.httptransport.OkHttpHttpTransport
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.infrastructure.logging.SentryDestination
@@ -352,45 +353,35 @@ object CppBridge {
      * Register the OkHttp platform HTTP transport with the C++ core.
      *
      * Installs `rac_http_transport_ops` so that every `rac_http_request_*`
-     * call routes through Kotlin's [com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP]
-     * instead of libcurl. Gives Android / JVM consumers the system trust
-     * store + NetworkSecurityConfig + proxy + HTTP/2 for free.
+     * call routes through Kotlin's [OkHttpHttpTransport]. Gives Android / JVM
+     * consumers the system trust store + NetworkSecurityConfig + proxy +
+     * HTTP/2 for free.
      *
-     * Guarded: skipped silently when the native library isn't loaded,
-     * since `RunAnywhereBridge.racHttpTransportRegisterOkHttp()` would
-     * throw UnsatisfiedLinkError in that case and the SDK should still
-     * boot (without inference) for non-networking use cases.
+     * Routed through [OkHttpHttpTransport.register] (not the raw JNI thunk)
+     * so the transport's registration state — and the in-flight stream
+     * registry it drains on [OkHttpHttpTransport.unregister] — stays in sync
+     * with what the C++ core sees.
+     *
+     * Guarded: skipped silently when the native library isn't loaded ([OkHttpHttpTransport.register]
+     * absorbs the UnsatisfiedLinkError) so the SDK can still boot (without
+     * inference) for non-networking use cases.
      */
     private fun registerOkHttpTransport() {
         if (!CppBridgeState.nativeLibraryLoaded) {
             logger.debug("Skipping OkHttp transport registration: native lib not loaded")
             return
         }
-        try {
-            val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
-            if (rc == 0) {
-                logger.info("OkHttp HTTP transport registered (system trust store + proxy)")
-            } else {
-                logger.warn("OkHttp HTTP transport registration returned rc=$rc; falling back to libcurl")
-            }
-        } catch (e: UnsatisfiedLinkError) {
-            logger.warn("OkHttp HTTP transport symbol missing in native lib: ${e.message}")
-        } catch (e: Throwable) {
-            logger.warn("OkHttp HTTP transport registration failed: ${e.message}")
-        }
+        OkHttpHttpTransport.register()
     }
 
     /**
-     * Unregister the OkHttp platform HTTP transport. Best-effort — any
-     * failure is logged but does not block shutdown.
+     * Unregister the OkHttp platform HTTP transport and cancel any in-flight
+     * streams. Best-effort — [OkHttpHttpTransport.unregister] logs failures
+     * without blocking shutdown.
      */
     private fun unregisterOkHttpTransport() {
         if (!CppBridgeState.nativeLibraryLoaded) return
-        try {
-            RunAnywhereBridge.racHttpTransportUnregisterOkHttp()
-        } catch (e: Throwable) {
-            logger.warn("OkHttp HTTP transport unregistration failed: ${e.message}")
-        }
+        OkHttpHttpTransport.unregister()
     }
 
     /**

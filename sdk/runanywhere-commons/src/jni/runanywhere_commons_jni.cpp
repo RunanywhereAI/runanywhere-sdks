@@ -1254,6 +1254,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racIsInitialized(JNIEnv
     return rac_is_initialized() ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkGetVersion(JNIEnv* env,
+                                                                          jclass clazz) {
+    (void)clazz;
+    return env->NewStringUTF(rac_sdk_get_version());
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(JNIEnv* env,
                                                                                jclass clazz,
@@ -1818,12 +1825,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racComponentLifecycleSn
 // =============================================================================
 // JNI FUNCTIONS - Model Assignment (rac_model_assignment.h)
 //
-// The legacy struct/JSON path (racModelAssignmentSetCallbacks,
-// racModelAssignmentFetch, model_assignment_http_get_callback,
-// g_model_assignment_state) was deleted. Kotlin
-// now uses `racModelRegistryFetchAssignmentsProto` which routes through
-// the canonical platform HTTP adapter registered via
-// `rac_http_transport_register`.
+// No JNI callback wiring is needed: when no per-SDK
+// rac_assignment_callbacks_t.http_get is registered, model_assignment.cpp
+// falls back to its built-in default that routes the fetch through the
+// platform HTTP transport registered via `rac_http_transport_register`
+// (OkHttp on Android). The racModelAssignment* thunks live further down in
+// this file.
 // =============================================================================
 
 // =============================================================================
@@ -5697,13 +5704,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
 // Single blocking entrypoint for buffered HTTP request/response. Wraps
 // rac_http_client_create + rac_http_request_send + rac_http_response_free
 // + rac_http_client_destroy into one call so Kotlin never touches the
-// curl handle lifecycle (matches Swift's URLSession-based parity layer).
-//
-// Replaces the HttpURLConnection paths in:
-//   - CppBridgeAuth.kt  (POST authenticate / refresh)
-//   - CppBridgeHTTP.kt  (generic GET/POST/PUT/DELETE)
-//   - CppBridgeTelemetry.kt (POST telemetry batches)
-//   - data/network/HttpClient.kt (deleted)
+// native client lifecycle (matches Swift's HTTPClientAdapter parity layer).
+// Requests are executed by the platform transport registered via
+// rac_http_transport_register (OkHttpHttpTransport on Android). Kotlin
+// callers: CppBridgeAuth.kt (authenticate / refresh) and
+// CppBridgeTelemetry.kt (telemetry batches).
 
 namespace {
 
@@ -6712,12 +6717,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointModelAssignm
 
 // ---------- Model assignment ------------------------------------------
 //
-// The full callback-struct wiring lives in the existing
-// nativeModelAssignment* / model_assignment_http_get_callback code path
-// elsewhere in the file. The thunks below provide the Swift-aligned
-// surface (racModelAssignment*) that the Kotlin bridge layer expects;
-// callbacks must be wired by the caller via the existing path before
-// invoking Fetch/GetBy*.
+// Kotlin registers no rac_assignment_callbacks_t: commons'
+// model_assignment.cpp default routes the fetch through the registered
+// platform HTTP transport (OkHttp) with control-plane auth headers, so
+// racModelAssignmentFetch works without per-SDK callback wiring.
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCallbacks(
@@ -6725,10 +6728,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCa
     (void)env;
     (void)clazz;
     (void)cb;
-    // Callback wiring is platform-specific (HTTP transport + device info) and
-    // is performed by the existing assignment-callbacks plumbing on the
-    // Kotlin side. This thunk reserves the symbol for future direct callback
-    // registration; today it is a no-op success.
+    // No-op success kept for ABI stability: assignment fetch uses the commons
+    // transport-backed default; there is no Kotlin-side callback plumbing.
     return RAC_SUCCESS;
 }
 

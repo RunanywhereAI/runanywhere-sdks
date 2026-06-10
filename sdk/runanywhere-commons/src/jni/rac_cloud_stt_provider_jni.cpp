@@ -186,8 +186,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCloudRegisterSttProv
     const std::string name_str(name_utf);
     env->ReleaseStringUTFChars(name, name_utf);
 
-    jclass clazz =
-        env->FindClass("com/runanywhere/sdk/public/hybrid/NativeCloudSttProvider");
+    jclass clazz = env->FindClass("com/runanywhere/sdk/hybrid/NativeCloudSttProvider");
     if (clazz == nullptr) {
         return static_cast<jint>(RAC_ERROR_INVALID_PARAMETER);
     }

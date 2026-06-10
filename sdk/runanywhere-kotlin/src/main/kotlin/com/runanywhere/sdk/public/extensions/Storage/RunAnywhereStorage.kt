@@ -7,7 +7,7 @@
  * Mirrors Swift `RunAnywhere+Storage.swift` exactly:
  *   - `registerModel(...)` URL / archive / multi-file overloads (Swift parity)
  *   - `importModel(request)` local-import entry point
- *   - `getStorageInfo()` (replaces the legacy `storageInfo()` accessor)
+ *   - `getStorageInfo(request)` (replaces the legacy `storageInfo()` accessor)
  *   - `deleteStorage(request)` executing or dry-running deletion
  *   - `clearCache()` / `cleanTempFiles()` forwarding to the FileManager bridge
  */
@@ -41,7 +41,6 @@ import com.runanywhere.sdk.public.extensions.Models.make
 import com.runanywhere.sdk.public.extensions.Models.setArchiveArtifact
 import com.runanywhere.sdk.public.extensions.Models.setMultiFileArtifact
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAStorageInfo
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - Model Registration
@@ -202,17 +201,6 @@ suspend fun RunAnywhere.importModel(request: ModelImportRequest): ModelImportRes
 }
 
 // MARK: - Storage Information
-
-suspend fun RunAnywhere.getStorageInfo(): RAStorageInfo {
-    requireStorageInitialized(this)
-    return getStorageInfo(
-        StorageInfoRequest(
-            include_device = true,
-            include_app = true,
-            include_models = true,
-        ),
-    ).info ?: throw SDKException.storage("Storage info result did not include info")
-}
 
 suspend fun RunAnywhere.getStorageInfo(request: StorageInfoRequest): StorageInfoResult {
     requireStorageInitialized(this)

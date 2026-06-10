@@ -1,26 +1,38 @@
 package com.runanywhere.sdk.foundation.constants
 
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+
 /**
  * SDK-wide constants (metadata only).
  *
  * Mirrors Swift's `SDKConstants` (canonical source of truth at
- * `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift`).
+ * `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift`,
+ * whose `version` reads `rac_sdk_get_version()` from commons).
  *
  * Capability-specific constants live in their respective capability packages
  * (e.g. LLM, Storage, Download, Lifecycle, Registry).
- *
- * The value of [VERSION] must track the canonical `sdk/runanywhere-commons/VERSION`
- * file — see `scripts/release/sync-versions.sh`.
- *
- * Platform discrimination is handled by KMP source sets (jvmMain / androidMain),
- * so no `platform` constant is exposed here — that's a Swift-only concern.
  */
 object SDKConstants {
-    /** Canonical SDK version; mirrors `sdk/runanywhere-commons/VERSION`. */
-    const val VERSION = "0.19.13"
+    /**
+     * Pre-load fallback for [VERSION]. Mirrors the canonical
+     * `sdk/runanywhere-commons/VERSION` file; the `const val VERSION` literal
+     * below is rewritten on every release by `scripts/release/sync-versions.sh`.
+     */
+    private object Fallback {
+        const val VERSION = "0.19.13"
+    }
+
+    /**
+     * Canonical SDK version. Resolved once, at first access, from commons
+     * (`rac_sdk_get_version()` via JNI) when the native library is loaded;
+     * falls back to the hardcoded [Fallback.VERSION] mirror otherwise (e.g.
+     * native library absent, or paired with an older `.so` that predates the
+     * `racSdkGetVersion` export).
+     */
+    val VERSION: String by lazy { nativeVersionOrNull() ?: Fallback.VERSION }
 
     /** Alias for [VERSION] to match the cross-SDK `sdkVersion` naming. */
-    const val SDK_VERSION = VERSION
+    val SDK_VERSION: String get() = VERSION
 
     /** SDK name. Matches Swift's `SDKConstants.name`. */
     const val SDK_NAME = "RunAnywhere SDK"
@@ -33,4 +45,16 @@ object SDKConstants {
 
     /** Platform identifier hoisted from formerly hardcoded sites in CppBridge/CppBridgeAuth/CppBridgeTelemetry/CppBridgeState. */
     const val SDK_PLATFORM: String = "android"
+
+    private fun nativeVersionOrNull(): String? =
+        try {
+            if (RunAnywhereBridge.isNativeLibraryLoaded()) {
+                RunAnywhereBridge.racSdkGetVersion()?.takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+        } catch (_: UnsatisfiedLinkError) {
+            // Older native binary without the racSdkGetVersion export.
+            null
+        }
 }

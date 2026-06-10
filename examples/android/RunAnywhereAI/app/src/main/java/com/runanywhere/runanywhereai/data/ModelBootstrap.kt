@@ -7,9 +7,9 @@ import com.runanywhere.sdk.features.TTS.System.SystemTTSModule
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.hybrid.Cloud
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
-import com.runanywhere.sdk.public.hybrid.BACKEND
 import kotlin.coroutines.cancellation.CancellationException
 
 // Seeds the native registry on launch (backends + curated catalog + LoRA). Without this the
@@ -37,11 +37,12 @@ object ModelBootstrap {
 
     private fun registerRemoteBackends() {
         try {
-            BACKEND.CLOUD.register(
+            Cloud.register()
+            Cloud.register(
                 id = "saaras",
+                provider = "sarvam",
                 model = "saaras:v3",
                 apiKey = "sk_4mtoxk81_7Eh1NNJXnJJguRc4M8EY9JSa",
-                provider = "sarvam",
             )
         } catch (e: Exception) {
             RACLog.e("remote backends failed", e)

@@ -20,7 +20,6 @@
  *
  * // Phase 2: Services init (async) - after HTTP is configured
  * await CppBridge.initializeServices()
- *   ├─ ModelAssignment.register()  ← Model assignment callbacks
  *   └─ Platform.register()         ← LLM/TTS service callbacks
  * ```
  *
@@ -35,7 +34,6 @@
  * - CppBridge+Auth.swift - Authentication flow
  * - CppBridge+ModelPaths.swift - Model path utilities
  * - CppBridge+ModelRegistry.swift - Model registry
- * - CppBridge+ModelAssignment.swift - Model assignment
  * - CppBridge+Download.swift - Download manager
  * - CppBridge+Platform.swift - Platform services (Foundation Models, System TTS)
  * - CppBridge+LLM/STT/TTS/VAD.swift - AI component bridges
@@ -140,9 +138,9 @@ public enum CppBridge {
         guard !snapshot.alreadyDone else { return }
         let currentEnv = snapshot.env
 
-        // Register model-assignment callbacks only. The fetch itself is owned
-        // by rac_sdk_init_phase2_proto so every SDK follows the same sequence.
-        ModelAssignment.register(autoFetch: false)
+        // Model assignment fetch needs no Swift callbacks: commons routes it
+        // through the registered URLSession HTTP transport, and the fetch
+        // itself is owned by rac_sdk_init_phase2_proto.
 
         // Platform services (Foundation Models, System TTS)
         Platform.register()
@@ -172,7 +170,7 @@ public enum CppBridge {
         await VLM.shared.destroy()
 
         // Shutdown in reverse order
-        // Note: ModelAssignment and Platform callbacks remain valid (static)
+        // Note: Platform callbacks remain valid (static)
 
         // Detach the router's telemetry sink BEFORE destroying the manager so
         // the C++ router never holds a dangling manager pointer.

@@ -15,11 +15,11 @@
 package com.runanywhere.sdk.native.bridge
 
 import ai.runanywhere.proto.v1.ErrorCode
+import com.runanywhere.sdk.hybrid.CustomFilterPredicate
+import com.runanywhere.sdk.hybrid.HybridDeviceStateProvider
+import com.runanywhere.sdk.hybrid.NativeCloudSttProvider
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
-import com.runanywhere.sdk.public.hybrid.CustomFilterPredicate
-import com.runanywhere.sdk.public.hybrid.DeviceStateProvider
-import com.runanywhere.sdk.public.hybrid.NativeCloudSttProvider
 
 /*
  * Transport DTOs/listeners used by native HTTP bindings live in
@@ -89,6 +89,14 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racIsInitialized(): Boolean
+
+    /**
+     * Canonical SDK version string from commons (`rac_sdk_get_version()`,
+     * sourced from sdk/runanywhere-commons/VERSION at build time). Null only
+     * on catastrophic JNI string allocation failure.
+     */
+    @JvmStatic
+    external fun racSdkGetVersion(): String?
 
     // PLATFORM ADAPTER (rac_platform_adapter.h)
 
@@ -1202,8 +1210,8 @@ object RunAnywhereBridge {
     //
     // Registers / unregisters the OkHttp-backed `rac_http_transport_ops`
     // adapter. When registered, every `rac_http_request_*` call from
-    // native code routes through Kotlin's `CppBridgeHTTP` instead of
-    // libcurl — so Android consumers get the system CA trust store,
+    // native code routes through Kotlin's `OkHttpHttpTransport` — so
+    // Android consumers get the system CA trust store,
     // NetworkSecurityConfig, user-CAs, and proxy support for free.
     //
     // The C++ side lives in `sdk/runanywhere-commons/src/jni/
@@ -1219,9 +1227,9 @@ object RunAnywhereBridge {
     //
     // Single blocking entrypoint that wraps
     // rac_http_client_create + rac_http_request_send + rac_http_response_free
-    // + rac_http_client_destroy. Used by CppBridgeHTTP, CppBridgeAuth, and
-    // CppBridgeTelemetry to replace per-SDK HttpURLConnection plumbing with
-    // the libcurl-backed C ABI shared across Swift / Dart / RN / Web.
+    // + rac_http_client_destroy. Used by CppBridgeAuth and CppBridgeTelemetry;
+    // requests execute through the platform transport registered via
+    // rac_http_transport_register (OkHttpHttpTransport on Android).
     //
     // Headers are passed as parallel String[] arrays (keys, values) to keep
     // the JNI signature flat. Return is a [NativeHttpResponse] or null only
@@ -1682,11 +1690,11 @@ object RunAnywhereBridge {
     // HYBRID ROUTER — DEVICE STATE (rac_hybrid_device_state.h)
 
     /**
-     * Register a Kotlin [DeviceStateProvider] as the cross-SDK device-state
-     * vtable in commons. The hybrid router calls back into the provider's
-     * three methods on every request to populate the routing context's
-     * `is_online`, `battery_percent`, and `thermal_throttled` fields used by
-     * the NETWORK / Battery filters.
+     * Register a Kotlin [HybridDeviceStateProvider] as the cross-SDK
+     * device-state vtable in commons. The hybrid router calls back into the
+     * provider's three methods on every request to populate the routing
+     * context's `is_online`, `battery_percent`, and `thermal_throttled`
+     * fields used by the Network / Battery filters.
      *
      * Passing `null` unsets the current provider and restores commons'
      * optimistic default vtable.
@@ -1694,14 +1702,14 @@ object RunAnywhereBridge {
      * @return RAC_SUCCESS (0) on success; negative error code otherwise.
      */
     @JvmStatic external fun racHybridSetDeviceState(
-        provider: DeviceStateProvider?,
+        provider: HybridDeviceStateProvider?,
     ): Int
 
     // Hybrid router — custom filter callbacks (rac_hybrid_custom_filter.h)
     //
-    // Registers a Kotlin CustomFilterPredicate (in com.runanywhere.sdk.public
-    // .hybrid) by NAME into the cross-SDK rac_hybrid_custom_filter table. The hybrid
-    // router resolves a `HybridFilter.custom` by its `CustomFilter.name` and
+    // Registers a Kotlin CustomFilterPredicate (in com.runanywhere.sdk.hybrid)
+    // by NAME into the cross-SDK rac_hybrid_custom_filter table. The hybrid
+    // router resolves a `HybridFilter.Custom` by its `CustomFilter.name` and
     // invokes the registered predicate DURING candidate filtering in commons —
     // so the eligibility decision lives in commons, not the Kotlin layer. The
     // JNI looks the predicate up by the exact signature

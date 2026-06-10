@@ -11,7 +11,6 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.VADAudioEncoding
 import ai.runanywhere.proto.v1.VADAudioSource
 import ai.runanywhere.proto.v1.VADProcessRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
@@ -30,8 +29,6 @@ import okio.ByteString.Companion.toByteString
 
 private val vadLogger = SDKLogger.vad
 
-private const val VAD_SAMPLE_RATE_HZ = 16_000
-
 suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
     options: RAVADOptions? = null,
@@ -46,15 +43,13 @@ suspend fun RunAnywhere.detectVoiceActivity(
 
     vadLogger.debug("Processing VAD frame: ${audioData.size} bytes")
 
+    // Like Swift's detectVoiceActivity, only the raw bytes are set — encoding
+    // and sample rate stay at their proto defaults so commons applies the
+    // same interpretation for both SDKs.
     val request =
         VADProcessRequest(
-            audio =
-                VADAudioSource(
-                    audio_data = audioData.toByteString(),
-                    encoding = VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
-                    sample_rate = VAD_SAMPLE_RATE_HZ,
-                ),
-            options = options ?: RAVADOptions(),
+            audio = VADAudioSource(audio_data = audioData.toByteString()),
+            options = options,
         )
 
     val result = CppBridgeVAD.processLifecycle(request)
@@ -66,8 +61,13 @@ suspend fun RunAnywhere.detectVoiceActivity(
     return result
 }
 
+/**
+ * Stream VAD results over a sequence of raw PCM audio chunks. Each chunk in
+ * [audio] is processed by [detectVoiceActivity]; the returned flow yields one
+ * [RAVADResult] per input chunk. Mirrors Swift's `streamVAD(audio:options:)`.
+ */
 fun RunAnywhere.streamVAD(
-    audioSamples: Flow<FloatArray>,
+    audio: Flow<ByteArray>,
     options: RAVADOptions? = null,
 ): Flow<RAVADResult> =
     channelFlow {
@@ -75,9 +75,8 @@ fun RunAnywhere.streamVAD(
             throw SDKException.notInitialized("SDK not initialized")
         }
 
-        audioSamples.collect { samples ->
-            val pcmBytes = samples.toPcm16LeBytes()
-            trySendBlocking(detectVoiceActivity(pcmBytes, options))
+        audio.collect { chunk ->
+            trySendBlocking(detectVoiceActivity(chunk, options))
         }
     }
 
@@ -86,21 +85,4 @@ suspend fun RunAnywhere.resetVAD() {
         throw SDKException.notInitialized("SDK not initialized")
     }
     CppBridgeVAD.resetLifecycle()
-}
-
-/**
- * Convert normalized Float PCM samples in `[-1.0, 1.0]` to little-endian
- * int16 PCM bytes for lifecycle VAD (`VAD_AUDIO_ENCODING_PCM_S16_LE`).
- */
-private fun FloatArray.toPcm16LeBytes(): ByteArray {
-    val bytes = ByteArray(size * 2)
-    var byteIndex = 0
-    for (sample in this) {
-        val clamped = sample.coerceIn(-1f, 1f)
-        val pcm = (clamped * Short.MAX_VALUE.toFloat()).toInt()
-        bytes[byteIndex] = (pcm and 0xFF).toByte()
-        bytes[byteIndex + 1] = ((pcm shr 8) and 0xFF).toByte()
-        byteIndex += 2
-    }
-    return bytes
 }

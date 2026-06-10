@@ -880,10 +880,10 @@ suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult
 /**
  * Stream VAD results from audio samples.
  *
- * @param audioSamples Flow of audio samples
+ * @param audio Flow of raw PCM audio chunks
  * @return Flow of VAD results
  */
-fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADResult>
+fun RunAnywhere.streamVAD(audio: Flow<ByteArray>, options: RAVADOptions? = null): Flow<RAVADResult>
 ```
 
 ### Configuration

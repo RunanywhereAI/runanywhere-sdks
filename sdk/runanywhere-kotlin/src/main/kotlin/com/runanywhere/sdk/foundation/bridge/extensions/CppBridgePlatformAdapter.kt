@@ -535,7 +535,7 @@ object CppBridgePlatformAdapter {
         return System.currentTimeMillis()
     }
 
-    // Platform HTTP byte execution is registered through CppBridgeHTTP.
+    // Platform HTTP byte execution is registered through OkHttpHttpTransport.
     // Download workflow planning/progress/state now flows through generated
     // Download* proto calls; direct HTTP callbacks here remain intentionally
     // absent from the platform adapter surface.

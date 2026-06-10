@@ -1,8 +1,8 @@
 package com.runanywhere.runanywhereai.data.cloud
 
 import com.runanywhere.runanywhereai.util.RACLog
-import com.runanywhere.sdk.public.hybrid.CloudSttRequest
-import com.runanywhere.sdk.public.hybrid.CloudSttResult
+import com.runanywhere.sdk.hybrid.CloudSttRequest
+import com.runanywhere.sdk.hybrid.CloudSttResult
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient

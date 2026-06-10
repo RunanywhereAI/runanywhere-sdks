@@ -187,6 +187,7 @@
 #include "rac_hybrid_types.h"
 #include "rac_hybrid_device_state.h"
 #include "rac_hybrid_custom_filter.h"
+#include "rac_cloud_stt_provider.h"
 #include "rac_stt_hybrid_router.h"
 #include "rac_stt_hybrid_router_proto.h"
 

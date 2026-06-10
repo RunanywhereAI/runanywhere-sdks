@@ -6,18 +6,18 @@
  *
  * The `cloud` engine ships static adapters for built-in providers (e.g.
  * "sarvam"). For any other vendor, register a [CloudSttProvider] by name via
- * [BACKEND.CLOUD.registerProvider] and tie a model to it with
- * [BACKEND.CLOUD.register] (same `provider` string). The cloud engine then
- * delegates the ENTIRE request — build, HTTP, and response parse — to the
- * callback, so a developer supports any cloud STT API (key, URL, request and
- * response shape) without a native adapter or a recompile.
+ * [Cloud.registerProvider] and tie a model to it with [Cloud.register] (same
+ * `provider` string). The cloud engine then delegates the ENTIRE request —
+ * build, HTTP, and response parse — to the callback, so a developer supports
+ * any cloud STT API (key, URL, request and response shape) without a native
+ * adapter or a recompile.
  *
  * The callback runs on the engine's request thread (off the main thread); it
  * may block on network. It must be thread-safe — the engine may invoke it
  * concurrently for distinct utterances.
  */
 
-package com.runanywhere.sdk.public.hybrid
+package com.runanywhere.sdk.hybrid
 
 import org.json.JSONObject
 
@@ -47,8 +47,8 @@ enum class CloudAudioFormat(
  * One cloud transcribe request handed to a [CloudSttProvider].
  *
  * @property provider     The provider name this entry was registered under.
- * @property model        The provider model id from [BACKEND.CLOUD.register].
- * @property apiKey        The API key from registration. Sensitive; never log.
+ * @property model        The provider model id from [Cloud.register].
+ * @property apiKey       The API key from registration. Sensitive; never log.
  * @property baseUrl      Optional base-URL override from registration, if set.
  * @property languageCode Optional BCP-47 language hint, if set.
  * @property audio        Audio bytes for this utterance.
@@ -97,7 +97,9 @@ fun interface CloudSttProvider {
  * Internal JNI bridge. The native cloud engine resolves this type by the exact
  * signature `invoke(Ljava/lang/String;[BI)Ljava/lang/String;` (see
  * `rac_cloud_stt_provider_jni.cpp`), so the class/method name and shape must not
- * drift. Not part of the public API surface.
+ * drift. Declared public only because the JNI declaration on
+ * [com.runanywhere.sdk.native.bridge.RunAnywhereBridge] references it; it is
+ * not part of the supported API surface.
  *
  * @suppress
  */
@@ -110,7 +112,11 @@ class NativeCloudSttProvider(
      * throws across the JNI boundary — failures are encoded as
      * `{"error_code": 1, "error_message": "…"}`.
      */
-    fun invoke(configJson: String, audio: ByteArray, audioFormat: Int): String {
+    fun invoke(
+        configJson: String,
+        audio: ByteArray,
+        audioFormat: Int,
+    ): String {
         return try {
             val config = JSONObject(configJson)
             val request =

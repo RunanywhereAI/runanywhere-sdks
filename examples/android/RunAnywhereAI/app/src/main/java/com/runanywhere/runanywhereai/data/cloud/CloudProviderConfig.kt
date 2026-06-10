@@ -17,7 +17,7 @@ enum class CloudPreset(
 }
 
 // A developer-registered cloud STT provider. Persisted by CloudProviderRepository
-// and registered with the SDK via BACKEND.CLOUD.registerProvider/register.
+// and registered with the SDK via Cloud.registerProvider/Cloud.register.
 @Serializable
 data class CloudProviderConfig(
     val id: String,

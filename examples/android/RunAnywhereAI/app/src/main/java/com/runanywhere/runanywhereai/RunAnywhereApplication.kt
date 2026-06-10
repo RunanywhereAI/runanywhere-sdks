@@ -10,11 +10,10 @@ import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.tools.BuiltInTools
 import com.runanywhere.runanywhereai.util.RACLog
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
+import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
+import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.hybrid.AndroidDeviceStateProvider
-import com.runanywhere.sdk.public.hybrid.RACRouter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,8 +44,7 @@ class RunAnywhereApplication : Application() {
         //Starting Setup Work
         AndroidPlatformContext.initialize(this@RunAnywhereApplication)
         RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
-        CppBridgeHTTP.register()
-        RACRouter.setDeviceStateProvider(AndroidDeviceStateProvider(applicationContext))
+        HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()
         BuiltInTools.register(applicationContext)

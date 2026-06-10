@@ -8,15 +8,18 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.sdk.hybrid.HybridCascade
+import com.runanywhere.sdk.hybrid.HybridFilter
+import com.runanywhere.sdk.hybrid.HybridModel
+import com.runanywhere.sdk.hybrid.HybridRank
+import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
+import com.runanywhere.sdk.hybrid.HybridRoutingPolicy
+import com.runanywhere.sdk.hybrid.HybridSTTRouter
+import com.runanywhere.sdk.hybrid.HybridTranscribeOptions
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.RASTTPartialResult
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
-import com.runanywhere.sdk.public.hybrid.BACKEND
-import com.runanywhere.sdk.public.hybrid.RACModel
-import com.runanywhere.sdk.public.hybrid.RACRouter
-import com.runanywhere.sdk.public.hybrid.ROUTER
-import com.runanywhere.sdk.public.hybrid.RoutedMetadata
 import com.runanywhere.sdk.public.types.RASTTOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,7 +53,7 @@ class SttViewModel : ViewModel() {
         private set
     var metrics by mutableStateOf<SttMetrics?>(null)
         private set
-    var routing by mutableStateOf<RoutedMetadata?>(null)
+    var routing by mutableStateOf<HybridRoutedMetadata?>(null)
         private set
     var error by mutableStateOf<String?>(null)
         private set
@@ -88,7 +91,7 @@ class SttViewModel : ViewModel() {
     private var committed = ""
     private var offlineModelId: String? = null
 
-    private var router: RACRouter? = null
+    private var router: HybridSTTRouter? = null
     private var routerOfflineId: String? = null
 
     fun selectMode(value: SttMode) {
@@ -219,15 +222,18 @@ class SttViewModel : ViewModel() {
             val wav = pcmToWav(audio, AudioRecorder.SAMPLE_RATE)
             val started = System.currentTimeMillis()
             val result = withContext(Dispatchers.IO) {
-                ensureRouter(offlineId).stt.transcribe(audioBytes = wav, audioFormat = WAV_FORMAT, sampleRate = AudioRecorder.SAMPLE_RATE)
+                ensureRouter(offlineId).transcribe(
+                    wav,
+                    HybridTranscribeOptions(sample_rate = AudioRecorder.SAMPLE_RATE, audio_format = WAV_FORMAT),
+                )
             }
             val elapsed = System.currentTimeMillis() - started
             val r = result.routing
             RACLog.i(
                 "hybrid result: text='${result.text}' lang=${result.detectedLanguage} " +
-                    "chosen=${r.chosenModelId} fallback=${r.wasFallback} conf=${r.confidence} " +
-                    "primaryConf=${r.primaryConfidence} attempts=${r.attemptCount} " +
-                    "primaryErr=${r.primaryErrorCode}/${r.primaryErrorMessage}",
+                    "chosen=${r.chosen_model_id} fallback=${r.was_fallback} conf=${r.confidence} " +
+                    "primaryConf=${r.primary_confidence} attempts=${r.attempt_count} " +
+                    "primaryErr=${r.primary_error_code}/${r.primary_error_message}",
             )
             transcript = result.text.trim()
             routing = result.routing
@@ -246,26 +252,31 @@ class SttViewModel : ViewModel() {
         }
     }
 
-    private fun ensureRouter(offlineId: String): RACRouter {
+    private fun ensureRouter(offlineId: String): HybridSTTRouter {
         router?.let { if (routerOfflineId == offlineId) return it else it.close() }
-        val created = RACRouter.stt.init(backendOffline = BACKEND.SHERPA.STT, backendOnline = BACKEND.CLOUD.STT)
+        val created = HybridSTTRouter()
         val filters = buildList {
-            if (requireNetwork) add(RACRouter.RoutingPolicy.NETWORK())
-            add(RACRouter.RoutingPolicy.Battery(minPercent = minBattery.toInt()))
+            if (requireNetwork) add(HybridFilter.Network)
+            add(HybridFilter.Battery(minPercent = minBattery.toInt()))
         }
-        created.stt.addPair(
-            model1 = RACModel(id = offlineId, modelType = ROUTER.OFFLINE),
-            model2 = RACModel(id = onlineProviderId, modelType = ROUTER.ONLINE),
-            routerPolicy = RACRouter.AdvanceRouterPolicy {
-                hardFilters = filters.toTypedArray()
-                cascadeConditions = RACRouter.RoutingPolicy.Confidence(confidenceThreshold)
-                rankSort = if (preferLocalFirst) {
-                    RACRouter.RoutingPolicy.PreferLocalFirst
-                } else {
-                    RACRouter.RoutingPolicy.PreferOnlineFirst
-                }
-            },
-        )
+        try {
+            created.setPair(
+                offline = HybridModel.offlineSherpa(offlineId),
+                online = HybridModel.onlineCloud(onlineProviderId),
+                policy = HybridRoutingPolicy(
+                    hardFilters = filters,
+                    cascade = HybridCascade.Confidence(confidenceThreshold),
+                    rank = if (preferLocalFirst) {
+                        HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST
+                    } else {
+                        HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST
+                    },
+                ),
+            )
+        } catch (t: Throwable) {
+            created.close()
+            throw t
+        }
         router = created
         routerOfflineId = offlineId
         return created

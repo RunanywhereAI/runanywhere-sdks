@@ -15,11 +15,9 @@
  * vtable; this adapter installs OkHttp on the JVM/Android side.
  *
  * The C++ side of the bridge lives in
- * `sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp`.
- * Until W2-8 wires the JNI class lookup over to this new package, the
- * shipping native bridge still resolves the older
- * `com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP`
- * symbol; both files exist side-by-side during the transition.
+ * `sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp` and
+ * resolves this class (`com/runanywhere/sdk/httptransport/OkHttpHttpTransport`)
+ * directly.
  *
  * R3 additions (parity with Swift):
  *   - `executeResumeRequest()` with `Range: bytes=N-` header
@@ -62,13 +60,6 @@ import java.util.concurrent.atomic.AtomicReference
  *   - [executeStreamingRequest] backs the `request_stream` slot
  *   - [executeResumeRequest] backs the `request_resume` slot (Range header)
  *   - [setHttpClient] lets hosts swap in a custom OkHttpClient
- *
- * Note: until W2-8 retargets the C++ JNI class lookup at this package,
- * the live transport registration still pulls
- * `com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP`.
- * That migration is intentional — keep both files compiling in parallel
- * so the cutover is a one-line C++ change rather than a coordinated
- * Kotlin + native rebuild.
  */
 object OkHttpHttpTransport {
     private val logger = SDKLogger("OkHttpHttpTransport")

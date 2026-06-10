@@ -852,11 +852,8 @@ Reads-then-conditionally-writes the lock in one atomic block (lines 90–95) to 
 
 Annotated `@MainActor`. Reads both `servicesInitialized` and `environment` in one lock call (lines 135–137) and returns early if already done. Otherwise:
 
-1. Computes `shouldAutoFetch = currentEnv != .development` (line 146).
-2. Calls `ModelAssignment.register(autoFetch: false)` (line 147) — registers callbacks without triggering an immediate HTTP call, which would deadlock the MainActor via the semaphore-backed HTTP callback.
-3. If `shouldAutoFetch`, spawns a `Task.detached` (lines 151–159) that calls `ModelAssignment.fetch(forceRefresh: true)` off the MainActor.
-4. Calls `Platform.register()` (line 162) — registers Foundation Models and System TTS platform service callbacks.
-5. Sets `servicesInitialized = true` under the lock (line 164).
+1. Calls `Platform.register()` — registers Foundation Models and System TTS platform service callbacks. (Model assignment needs no Swift callbacks: commons routes the fetch through the registered URLSession HTTP transport, and `rac_sdk_init_phase2_proto` owns the fetch itself.)
+2. Sets `servicesInitialized = true` under the lock.
 
 #### `shutdown()` (lines 176–202)
 
@@ -870,7 +867,7 @@ Then calls `Telemetry.shutdown()` (line 191) and `Events.unregister()` (line 192
 
 #### Subnamespaces declared in extension files
 
-The `CppBridge` enum is the single namespace; all sub-namespaces live in `Foundation/Bridge/Extensions/` (26 files listed in the header comment, lines 29–44). None are declared in `CppBridge.swift` itself — only the lifecycle methods and the shared-state lock are here. Extension files cover: `PlatformAdapter`, `Environment`, `DevConfig`, `Endpoints`, `Telemetry`, `Events`, `Device`, `State`, `HTTP`, `Auth`, `Services`, `ModelPaths`, `ModelRegistry`, `ModelAssignment`, `Download`, `Platform`, `LLM`, `STT`, `TTS`, `VAD`, `VoiceAgent`, `Storage`, `Strategy`, `FileManager`, `LoraRegistry`, `VLM`.
+The `CppBridge` enum is the single namespace; all sub-namespaces live in `Foundation/Bridge/Extensions/` (25 files listed in the header comment). None are declared in `CppBridge.swift` itself — only the lifecycle methods and the shared-state lock are here. Extension files cover: `PlatformAdapter`, `Environment`, `DevConfig`, `Endpoints`, `Telemetry`, `Events`, `Device`, `State`, `HTTP`, `Auth`, `Services`, `ModelPaths`, `ModelRegistry`, `Download`, `Platform`, `LLM`, `STT`, `TTS`, `VAD`, `VoiceAgent`, `Storage`, `Strategy`, `FileManager`, `LoraRegistry`, `VLM`.
 
 #### Cross-cutting helpers
 
@@ -1160,18 +1157,9 @@ Every member directly delegates to `HTTPClientAdapter.shared`. No C ABI symbols 
 |---|---|---|
 | `requireHandle()` throws | 40 | `rac_get_lora_registry` |
 
-#### §6.5.10 CppBridge+ModelAssignment.swift
+#### §6.5.10 CppBridge+ModelAssignment.swift (removed)
 
-**LOC:** 208 — `CppBridge.ModelAssignment` — `public enum`; one-time callback registration via `isRegistered: Bool`
-
-| Method | Line | C ABI |
-|---|---|---|
-| `register(autoFetch:)` (internal) | 29 | `rac_model_assignment_set_callbacks` |
-| `fetch(forceRefresh:)` async throws | 100 | `rac_model_assignment_fetch`, `rac_model_info_array_free` |
-| `getByFramework(_:)` | 134 | `rac_model_assignment_get_by_framework` |
-| `getByCategory(_:)` | 168 | `rac_model_assignment_get_by_category` |
-
-`register(autoFetch:)` fills a `rac_assignment_callbacks_t` with an `http_get` closure that bridges Swift async HTTP via a `DispatchSemaphore` with a 30-second timeout.
+Deleted: model assignment no longer needs Swift-side callbacks. Commons (`model_assignment.cpp`) routes the fetch through the registered `rac_http_transport_ops_t` (URLSession) with control-plane auth headers when no per-SDK `rac_assignment_callbacks_t.http_get` is registered.
 
 #### §6.5.11 CppBridge+ModelLifecycle.swift
 
@@ -2545,7 +2533,6 @@ Tests require the `Binaries/` XCFrameworks (built locally via `sdk/runanywhere-s
 | Foundation/Bridge/Extensions/CppBridge+Storage.swift | 226 |
 | Public/Extensions/LLM/RunAnywhere+LoRA.swift | 211 |
 | Foundation/Bridge/Extensions/CppBridge+Environment.swift | 210 |
-| Foundation/Bridge/Extensions/CppBridge+ModelAssignment.swift | 208 |
 | Foundation/Bridge/CppBridge.swift | 203 |
 | Foundation/Bridge/ComponentActor.swift | 203 |
 | Foundation/Bridge/Extensions/CppBridge+Download.swift | 192 |

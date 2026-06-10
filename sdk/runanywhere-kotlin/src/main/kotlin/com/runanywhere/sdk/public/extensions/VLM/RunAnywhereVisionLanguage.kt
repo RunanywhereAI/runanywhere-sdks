@@ -12,8 +12,6 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.GenerationEvent
-import ai.runanywhere.proto.v1.GenerationEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -107,22 +105,6 @@ fun RunAnywhere.processImageStream(
                             trySend(event)
                             true
                         }
-                    // rac_vlm_process_stream_proto delivers token SDKEvents on the
-                    // callback but no terminal STREAM_COMPLETED envelope; emit one
-                    // from the aggregate result so collectors/UI can finalize text.
-                    if (result.text.isNotBlank()) {
-                        trySend(
-                            SDKEvent(
-                                generation =
-                                    GenerationEvent(
-                                        kind = GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED,
-                                        response = result.text,
-                                        streaming_text = result.text,
-                                        tokens_count = result.completion_tokens,
-                                    ),
-                            ),
-                        )
-                    }
                     vlmLogger.info(
                         "VLM processing complete: ${result.completion_tokens} tokens in " +
                             "${result.processing_time_ms}ms " +

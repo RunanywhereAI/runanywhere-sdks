@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.ui.screens.settings
 
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
+import ai.runanywhere.proto.v1.StorageInfoRequest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -51,7 +52,11 @@ class SettingsViewModel : ViewModel() {
 
     fun refreshStorage() {
         viewModelScope.launch {
-            val info = runCatching { RunAnywhere.getStorageInfo() }.getOrNull()
+            val info = runCatching {
+                RunAnywhere.getStorageInfo(
+                    StorageInfoRequest(include_device = true, include_app = true, include_models = true),
+                ).info
+            }.getOrNull()
             val models = runCatching {
                 RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().filter { it.isDownloadedOnDisk }
             }.getOrDefault(emptyList())

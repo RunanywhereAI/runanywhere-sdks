@@ -106,7 +106,7 @@ The entry point is `RunAnywhere` (a Kotlin `object` singleton in `src/main/kotli
 | `LLM/RunAnywhereTextGeneration.kt` | `generate(prompt, RALLMGenerationOptions?) → RALLMGenerationResult`, `generateStream(...) → Flow<RALLMStreamEvent>`, `cancelGeneration()` |
 | `STT/RunAnywhereSTT.kt` | `transcribe(audio, RASTTOptions)`, `transcribeStream(Flow<ByteArray>, RASTTOptions?) → Flow<RASTTPartialResult>` |
 | `TTS/RunAnywhereTTS.kt` | `synthesize(text, RATTSOptions)`, `speak()`, `synthesizeStream() → Flow<RATTSOutput>`, `stopSpeaking()`, `stopSynthesis()` |
-| `VAD/RunAnywhereVAD.kt` | `detectVoiceActivity()`, `streamVAD(Flow<FloatArray>, RAVADOptions)`, `resetVAD()` |
+| `VAD/RunAnywhereVAD.kt` | `detectVoiceActivity()`, `streamVAD(Flow<ByteArray>, RAVADOptions?)`, `resetVAD()` |
 | `VLM/RunAnywhereVisionLanguage.kt` | `describeImage()`, `processImage()`, `processImageStream()` |
 | `VoiceAgent/RunAnywhereVoiceAgent.kt` | Full voice pipeline: `initializeVoiceAgent(VoiceAgentConfig)`, `streamVoiceAgent() → Flow<VoiceEvent>`, `processVoiceTurn()`, `cleanupVoiceAgent()` |
 | `Models/RunAnywhereModelLifecycle.kt` | `loadModel(RAModelLoadRequest)`, `unloadModel(ModelUnloadRequest)`, `currentModel(CurrentModelRequest)`, `componentLifecycleSnapshot()` |

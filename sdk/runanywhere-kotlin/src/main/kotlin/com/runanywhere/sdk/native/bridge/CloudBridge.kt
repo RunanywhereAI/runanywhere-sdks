@@ -29,9 +29,8 @@ package com.runanywhere.sdk.native.bridge
  * The quartet below maps to the symbols emitted by
  * `RAC_DEFINE_ENGINE_JNI_BRIDGE_NO_ONLOAD(com_runanywhere_sdk_native_bridge_CloudBridge,
  * rac_backend_cloud_register, …)` in
- * `engines/cloud/jni/rac_cloud_jni.cpp`. Public callers register cloud
- * provider credentials + fire this registration via
- * [com.runanywhere.sdk.public.hybrid.BACKEND.CLOUD.register].
+ * `engines/cloud/jni/rac_cloud_jni.cpp`. Public callers fire this
+ * registration via [com.runanywhere.sdk.hybrid.Cloud.register].
  */
 object CloudBridge {
     init {

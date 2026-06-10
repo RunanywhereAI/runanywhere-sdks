@@ -44,7 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runanywhere.sdk.public.hybrid.RoutedMetadata
+import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
@@ -289,9 +289,9 @@ private fun ModeSelector(mode: SttMode, enabled: Boolean, onSelect: (SttMode) ->
 }
 
 @Composable
-private fun RoutingRows(routing: RoutedMetadata) {
+private fun RoutingRows(routing: HybridRoutedMetadata) {
     val dimens = LocalDimens.current
-    val onCloud = routing.wasFallback
+    val onCloud = routing.was_fallback
     Column(verticalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(dimens.spacingSm)) {
             Box(
@@ -306,15 +306,15 @@ private fun RoutingRows(routing: RoutedMetadata) {
                     color = if (onCloud) MaterialTheme.colorScheme.tertiary else primaryGreen,
                 )
             }
-            Text(routing.chosenModelId, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(routing.chosen_model_id, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (!routing.confidence.isNaN()) {
             RoutingStat("Confidence", String.format(Locale.US, "%.0f%%", routing.confidence * 100))
         }
-        if (onCloud && !routing.primaryConfidence.isNaN()) {
-            RoutingStat("On-device score", String.format(Locale.US, "%.0f%%", routing.primaryConfidence * 100))
+        if (onCloud && !routing.primary_confidence.isNaN()) {
+            RoutingStat("On-device score", String.format(Locale.US, "%.0f%%", routing.primary_confidence * 100))
         }
-        if (routing.attemptCount > 1) RoutingStat("Attempts", routing.attemptCount.toString())
+        if (routing.attempt_count > 1) RoutingStat("Attempts", routing.attempt_count.toString())
     }
 }
 

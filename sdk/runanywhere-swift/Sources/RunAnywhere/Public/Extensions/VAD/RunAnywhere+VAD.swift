@@ -47,13 +47,13 @@ public extension RunAnywhere {
     /// error-marked `RAVADResult` (non-empty `errorMessage`, non-zero
     /// `errorCode`) and the stream finishes so callers do not silently keep
     /// pumping audio into a dead detector.
-    static func streamVAD(audio: AsyncStream<Data>) -> AsyncStream<RAVADResult> {
+    static func streamVAD(audio: AsyncStream<Data>, options: RAVADOptions? = nil) -> AsyncStream<RAVADResult> {
         AsyncStream<RAVADResult> { continuation in
             let task = Task {
                 for await chunk in audio {
                     guard !Task.isCancelled else { break }
                     do {
-                        let vadResult = try await detectVoiceActivity(chunk)
+                        let vadResult = try await detectVoiceActivity(chunk, options: options)
                         continuation.yield(vadResult)
                     } catch {
                         let sdkError = SDKException.from(error, category: .component)

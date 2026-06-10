@@ -134,7 +134,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRegisterCustom
     const std::string name_str(name_utf);
     env->ReleaseStringUTFChars(name, name_utf);
 
-    jclass clazz = env->FindClass("com/runanywhere/sdk/public/hybrid/CustomFilterPredicate");
+    jclass clazz = env->FindClass("com/runanywhere/sdk/hybrid/CustomFilterPredicate");
     if (clazz == nullptr) {
         return static_cast<jint>(RAC_ERROR_INVALID_PARAMETER);
     }

@@ -134,7 +134,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridSetDeviceState
         return static_cast<jint>(RAC_SUCCESS);
     }
 
-    jclass clazz = env->FindClass("com/runanywhere/sdk/public/hybrid/DeviceStateProvider");
+    jclass clazz = env->FindClass("com/runanywhere/sdk/hybrid/HybridDeviceStateProvider");
     if (clazz == nullptr) {
         return static_cast<jint>(RAC_ERROR_INVALID_PARAMETER);
     }

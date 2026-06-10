@@ -2,13 +2,13 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Android impl of [DeviceStateProvider]. Backed by ConnectivityManager
+ * Android impl of [HybridDeviceStateProvider]. Backed by ConnectivityManager
  * (validated internet), BatteryManager (capacity percent), and
  * PowerManager (thermal status on API 29+, isPowerSaveMode fallback).
  *
  * Register once at app startup, after SDK init:
  *
- *     RACRouter.setDeviceStateProvider(
+ *     HybridDeviceState.setProvider(
  *         AndroidDeviceStateProvider(applicationContext)
  *     )
  *
@@ -16,7 +16,7 @@
  * Without it, [isOnline] gracefully degrades to `true` instead of throwing.
  */
 
-package com.runanywhere.sdk.public.hybrid
+package com.runanywhere.sdk.hybrid
 
 import android.Manifest
 import android.content.Context
@@ -29,7 +29,7 @@ import androidx.annotation.RequiresPermission
 
 class AndroidDeviceStateProvider(
     context: Context,
-) : DeviceStateProvider {
+) : HybridDeviceStateProvider {
     private val appContext: Context = context.applicationContext
 
     private val connectivity: ConnectivityManager? =

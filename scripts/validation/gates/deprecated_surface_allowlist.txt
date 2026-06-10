@@ -20,7 +20,7 @@ sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/LLM
 sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/extensions/RAG/RAGProtoHelpers.kt
 # Hybrid STT router (PR #502): Sarvam STT config is marshalled as a JSON string
 # to SarvamBridge.racSttSarvamCreateFromJson; pending a proto-bytes config ABI.
-sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/public/hybrid/HybridRouterBridgeAdapter.kt
+sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/hybrid/HybridRouterBridgeAdapter.kt
 
 # ============================================================================
 # Swift SDK — hand-written *Types.swift DTO files
