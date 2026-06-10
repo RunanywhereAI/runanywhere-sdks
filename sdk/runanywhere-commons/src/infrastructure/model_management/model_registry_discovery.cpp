@@ -308,6 +308,11 @@ int32_t reconcile_registry_with_filesystem_locked(rac_model_registry_handle_t ha
             ++linked;
         }
     }
+    // Persist once after the sweep (not per-entry) so relinked download state
+    // survives a restart without N file writes.
+    if (linked > 0) {
+        persist_registry_locked(handle);
+    }
     return linked;
 }
 

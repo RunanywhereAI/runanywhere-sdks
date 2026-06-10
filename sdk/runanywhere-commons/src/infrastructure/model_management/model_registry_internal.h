@@ -266,6 +266,23 @@ rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter, c
                                         std::vector<rac_directory_entry_t>* out_entries);
 int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle);
 
+// -----------------------------------------------------------------------------
+// Disk persistence (defined in model_registry.cpp). The registry is otherwise
+// in-memory only, so download/registry state would not survive a process
+// restart. Both write and read the serialized ModelInfoList snapshot through the
+// platform adapter (never std::filesystem) so they work on native and Web/OPFS.
+// Callers must hold handle->mutex.
+// -----------------------------------------------------------------------------
+
+// Write the current registry snapshot to {models_dir}/.registry.pb. No-op when
+// base_dir is unset or the adapter has no file_write slot.
+void persist_registry_locked(rac_model_registry_handle_t handle);
+
+// Load persisted entries into the registry, skipping ids already present (never
+// clobbers a live in-memory entry). No-op when the file/adapter/base_dir is
+// absent. Does not itself persist.
+void load_registry_from_disk_locked(rac_model_registry_handle_t handle);
+
 #endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace rac::infra::model_registry::detail

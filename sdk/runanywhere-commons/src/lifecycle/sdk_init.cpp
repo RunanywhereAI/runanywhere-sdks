@@ -626,6 +626,19 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
         append_warning(&result, warning_from_code("device registration deferred", dev_rc));
     }
 
+    // Step 2b: Restore the persisted registry from disk before fetching remote
+    // assignments. The registry is in-memory only, so without this a previously
+    // downloaded model would show as not-downloaded after an app restart. Loading
+    // here (base_dir was configured in Phase 1) means persisted local_path values
+    // are present when the assignment merge runs — register_proto preserves an
+    // existing local_path, so the offline/local download state is never clobbered.
+    if (rac_model_registry_handle_t registry = rac_get_model_registry()) {
+        const rac_result_t load_rc = rac_model_registry_load_from_disk(registry);
+        if (load_rc != RAC_SUCCESS) {
+            append_warning(&result, warning_from_code("registry restore deferred", load_rc));
+        }
+    }
+
     // Step 3: Fetch model assignments (cached). When callbacks are not wired
     // this returns RAC_ERROR_FEATURE_NOT_AVAILABLE; we treat that as offline.
     rac_model_info_t** assigned_models = nullptr;
