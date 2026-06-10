@@ -1785,9 +1785,6 @@ object RunAnywhereBridge {
     /** Get the device-registration endpoint path for an environment. */
     @JvmStatic external fun racEndpointDeviceRegistration(env: Int): String?
 
-    /** Get the telemetry endpoint path for an environment. */
-    @JvmStatic external fun racEndpointTelemetry(env: Int): String?
-
     /** Get the model-assignments endpoint path (env-independent). */
     @JvmStatic external fun racEndpointModelAssignments(): String?
 

@@ -108,6 +108,7 @@ object CppBridgeEnvironment {
         // a breaking change.
         @Suppress("UNUSED_PARAMETER")
         val unused = env
+        RunAnywhereBridge.ensureNativeLibraryLoaded()
         return RunAnywhereBridge.racEnvValidateApiKey(key)
     }
 
@@ -119,6 +120,7 @@ object CppBridgeEnvironment {
     fun validateBaseURL(url: String, env: SDKEnvironment): Boolean {
         @Suppress("UNUSED_PARAMETER")
         val unused = env
+        RunAnywhereBridge.ensureNativeLibraryLoaded()
         return RunAnywhereBridge.racEnvValidateBaseUrl(url)
     }
 
@@ -135,8 +137,10 @@ object CppBridgeEnvironment {
      * folds the triple into a single helper that returns either the
      * message string or null when everything validates.
      */
-    fun validationErrorMessage(env: SDKEnvironment, key: String, url: String): String? =
-        RunAnywhereBridge.racEnvValidationErrorMessage(toC(env), key, url)
+    fun validationErrorMessage(env: SDKEnvironment, key: String, url: String): String? {
+        RunAnywhereBridge.ensureNativeLibraryLoaded()
+        return RunAnywhereBridge.racEnvValidationErrorMessage(toC(env), key, url)
+    }
 }
 
 /**
@@ -285,8 +289,6 @@ object CppBridgeEndpoints {
      *  Mirror the canonical values in `rac_endpoints.h`. */
     private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/devices"
     private const val FALLBACK_PROD_DEVICE_REGISTRATION: String = "/api/v1/devices"
-    private const val FALLBACK_DEV_TELEMETRY: String = "/rest/v1/telemetry_events"
-    private const val FALLBACK_PROD_TELEMETRY: String = "/api/v1/telemetry"
     private const val FALLBACK_MODEL_ASSIGNMENTS: String = "/api/v1/models/assignments"
 
     /** SDK authenticate endpoint. Mirrors Swift's `Endpoints.authenticate`. */
@@ -316,24 +318,6 @@ object CppBridgeEndpoints {
             }
         return jniOrFallback(fallback) {
             RunAnywhereBridge.racEndpointDeviceRegistration(CppBridgeEnvironment.toC(env))
-        }
-    }
-
-    /**
-     * Telemetry endpoint for [env]. Mirrors Swift's
-     * `Endpoints.telemetry(for:)` — delegates to
-     * `rac_endpoint_telemetry` via JNI.
-     */
-    fun telemetry(env: SDKEnvironment): String {
-        val fallback =
-            when (env) {
-                SDKEnvironment.SDK_ENVIRONMENT_STAGING,
-                SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-                -> FALLBACK_PROD_TELEMETRY
-                else -> FALLBACK_DEV_TELEMETRY
-            }
-        return jniOrFallback(fallback) {
-            RunAnywhereBridge.racEndpointTelemetry(CppBridgeEnvironment.toC(env))
         }
     }
 

@@ -238,16 +238,21 @@ object CppBridgeTelemetry {
         if ((env == null || env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) &&
             !CppBridgeDevConfig.hasUsableSupabaseConfig
         ) {
-            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Skipping telemetry: no usable dev config")
+            log(CppBridgePlatformAdapter.LogLevel.WARN, "Skipping telemetry $path: no usable dev config")
             return
         }
         if (!HTTPClientAdapter.hasUsableConfiguration || !HTTPClientAdapter.isConfigured) {
-            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Skipping telemetry: HTTPClientAdapter not configured")
+            log(
+                CppBridgePlatformAdapter.LogLevel.WARN,
+                "Skipping telemetry $path: HTTPClientAdapter not configured " +
+                    "(hasUsableConfiguration=${HTTPClientAdapter.hasUsableConfiguration}, " +
+                    "isConfigured=${HTTPClientAdapter.isConfigured})",
+            )
             return
         }
         try {
             HTTPClientAdapter.post(path, json, requiresAuth = requiresAuth)
-            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Telemetry sent to $path")
+            log(CppBridgePlatformAdapter.LogLevel.INFO, "Telemetry sent to $path")
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.ERROR, "Telemetry HTTP failed for $path: ${e.message}")
         }

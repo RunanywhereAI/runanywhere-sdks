@@ -25,7 +25,6 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -108,9 +107,7 @@ public object HTTPClientAdapter {
     public suspend fun configure(baseURL: String, apiKey: String) {
         val trimmedKey = apiKey.trim()
         stateMutex.withLock {
-            if (!CppBridgeDevConfig.isUsableHTTPURL(baseURL) ||
-                !CppBridgeDevConfig.isUsableCredential(trimmedKey)
-            ) {
+            if (!isUsableHTTPURL(baseURL) || !isUsableCredential(trimmedKey)) {
                 this.baseURL = null
                 this.apiKey = null
                 logger.info("HTTP adapter not configured: no usable external config")
@@ -133,7 +130,7 @@ public object HTTPClientAdapter {
     public val hasUsableConfiguration: Boolean
         get() {
             val url = baseURL ?: return false
-            return CppBridgeDevConfig.isUsableHTTPURL(url) && CppBridgeDevConfig.isUsableCredential(apiKey)
+            return isUsableHTTPURL(url) && isUsableCredential(apiKey)
         }
 
     // Public request surface
@@ -273,7 +270,9 @@ public object HTTPClientAdapter {
         }
         if (result.statusCode in 200..299) return result.body
 
-        logger.error("HTTP ${result.statusCode}: $method $url")
+        logger.error(
+            "HTTP ${result.statusCode}: $method $url — ${result.body.decodeToString().take(1000)}",
+        )
         throw mapAPIError(
             statusCode = result.statusCode,
             body = result.body,
@@ -387,12 +386,30 @@ public object HTTPClientAdapter {
         }
     }
 
+    // Local validators (mirror CppBridge.DevConfig in Swift)
+
+    private fun isUsableHTTPURL(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val trimmed = url.trim()
+        return (trimmed.startsWith("http://") || trimmed.startsWith("https://")) &&
+            trimmed.length > "https://".length
+    }
+
+    private fun isUsableCredential(credential: String?): Boolean {
+        if (credential.isNullOrBlank()) return false
+        return credential.trim().length >= MIN_CREDENTIAL_LENGTH
+    }
+
     /**
      * Platform header value. Shared with the Phase 1 init request via
      * [SDKConstants.SDK_PLATFORM] so auth/device/telemetry HTTP headers and
      * the commons SDK config report the same platform string.
      */
     private const val SDK_PLATFORM: String = SDKConstants.SDK_PLATFORM
+
+    /** Minimum credential length matching commons'
+     *  `RAC_MIN_CREDENTIAL_LEN` policy (8 bytes for an API key prefix). */
+    private const val MIN_CREDENTIAL_LENGTH: Int = 8
 }
 
 internal suspend fun platformExecuteHttp(

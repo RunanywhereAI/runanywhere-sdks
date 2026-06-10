@@ -340,10 +340,19 @@ object CppBridge {
                             HTTPClientAdapter.configure(baseUrl, apiKey)
                             true
                         } else {
+                            logger.warn(
+                                "HTTP adapter NOT configured: baseUrl present=${!baseUrl.isNullOrEmpty()}, " +
+                                    "apiKey present=${!apiKey.isNullOrEmpty()}",
+                            )
                             false
                         }
                     }
-                logger.debug("HTTP adapter configuration for callbacks: configured=$configured")
+                logger.info(
+                    "Phase 2 HTTP adapter configuration: configured=$configured " +
+                        "(isConfigured=${HTTPClientAdapter.isConfigured})",
+                )
+            } else {
+                logger.info("Phase 2 HTTP adapter already configured (isConfigured=true)")
             }
 
             SystemTTSModule.register()
