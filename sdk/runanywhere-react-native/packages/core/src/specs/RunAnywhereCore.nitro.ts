@@ -49,20 +49,21 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Complete deferred native service initialization.
-   * Resolves to the commons `has_completed_http_setup || http_configured`
-   * flag. A `false` result means Phase 2 finished in offline/deferred mode,
-   * not that native services failed.
+   * Resolves to the serialized `RASdkInitResult` proto bytes so TS can read
+   * `has_completed_http_setup` / `http_configured` / `http_applicable`. An
+   * empty buffer means the packaged native lacks the phase-2 symbol (Phase 2
+   * finished in offline/deferred mode), not that native services failed.
    * Matches Swift: RunAnywhere.completeServicesInitialization().
    */
-  completeServicesInitialization(): Promise<boolean>;
+  completeServicesInitialization(): Promise<ArrayBuffer>;
 
   /**
    * Retry HTTP/auth setup after an offline initialization via the commons
-   * `rac_sdk_retry_http_proto` idempotency guard. Returns the resulting
-   * `has_completed_http_setup || http_configured` flag.
+   * `rac_sdk_retry_http_proto` idempotency guard. Returns the serialized
+   * `RASdkInitResult` proto bytes (empty buffer when the symbol is missing).
    * Matches Swift: CppBridge.SdkInit.retryHTTP().
    */
-  retryHTTPSetupProto(): Promise<boolean>;
+  retryHTTPSetupProto(): Promise<ArrayBuffer>;
 
   /**
    * Destroy the SDK and clean up resources
@@ -73,6 +74,15 @@ export interface RunAnywhereCore extends HybridObject<{
    * Check if SDK is initialized
    */
   isInitialized(): Promise<boolean>;
+
+  /**
+   * Map a `rac_result_t` to serialized `runanywhere.v1.SDKError` bytes via
+   * the canonical commons ABI `rac_result_to_proto_error` — the single
+   * rac_result_t → proto-error translation shared by every SDK. Returns an
+   * empty buffer for `RAC_SUCCESS` (or when the symbol is unavailable).
+   * Mirrors Swift `RASDKError.from(rcResult:)` (RASDKError+Helpers.swift:52).
+   */
+  resultToProtoErrorProto(code: number): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Plugin Loader
@@ -622,6 +632,36 @@ export interface RunAnywhereCore extends HybridObject<{
    * @returns true on RAC_SUCCESS.
    */
   cloudUnregister(): Promise<boolean>;
+
+  /**
+   * Register (or replace) a developer-defined cloud STT provider handler
+   * (`rac_cloud_register_stt_provider`). The JS handler performs the whole
+   * request host-side (build + HTTP + parse) and resolves the provider's
+   * result JSON (`{"text", "language_code", "confidence", "error_code",
+   * "error_message"}`). Invoked on the router's request thread; the native
+   * side blocks on the returned promise like `toolRunLoopProto`'s executor.
+   * Mirrors Swift `Cloud.registerProvider(_:_:)` (CloudSttProvider.swift:145).
+   *
+   * @param name         Provider name (ties to `CloudSTT.registerModel`'s
+   *                     `provider` field). Built-in providers cannot be shadowed.
+   * @param onTranscribe (configJson, audioBytes, audioFormat) → result JSON.
+   * @returns true on RAC_SUCCESS.
+   */
+  cloudRegisterSttProvider(
+    name: string,
+    onTranscribe: (
+      configJson: string,
+      audioBytes: ArrayBuffer,
+      audioFormat: number
+    ) => Promise<string>
+  ): Promise<boolean>;
+
+  /**
+   * Remove a developer-defined provider previously registered via
+   * `cloudRegisterSttProvider` (`rac_cloud_unregister_stt_provider`).
+   * Idempotent for unknown names. Mirrors Swift `Cloud.unregisterProvider(_:)`.
+   */
+  cloudUnregisterSttProvider(name: string): Promise<void>;
 
   /**
    * Whether the "cloud" plugin is currently registered for TRANSCRIBE

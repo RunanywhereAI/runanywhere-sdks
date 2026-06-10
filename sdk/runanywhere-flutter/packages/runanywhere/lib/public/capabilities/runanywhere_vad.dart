@@ -6,7 +6,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
@@ -20,7 +19,6 @@ import 'package:runanywhere/generated/vad_options.pb.dart'
     show
         VADAudioEncoding,
         VADAudioSource,
-        VADConfiguration,
         VADOptions,
         VADProcessRequest,
         VADResult;
@@ -41,24 +39,7 @@ class RunAnywhereVAD {
 
   final _logger = SDKLogger('RunAnywhere.VAD');
 
-  /// Initialize VAD with a generated configuration.
-  Future<void> initializeVAD([VADConfiguration? config]) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    await _requireLoadedModelId();
-    final effective = _effectiveConfiguration(config);
-    DartBridgeVAD.shared.configureLifecycleProto(effective);
-  }
 
-  /// True once commons lifecycle has a ready VAD model.
-  bool get isReady => isModelLoaded;
-
-  /// Detect whether speech is present in [samples].
-  Future<bool> detectSpeech(Float32List samples) async {
-    final result = await detectVoiceActivityFloat(samples);
-    return result.isSpeech;
-  }
 
   /// Detect voice activity from PCM16 bytes.
   Future<VADResult> detectVoiceActivity(
@@ -75,42 +56,8 @@ class RunAnywhereVAD {
     );
   }
 
-  /// Detect voice activity from Float32 PCM samples.
-  Future<VADResult> detectVoiceActivityFloat(
-    Float32List audio, [
-    VADOptions? options,
-  ]) async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    final byteData = ByteData(audio.lengthInBytes);
-    for (var i = 0; i < audio.length; i++) {
-      byteData.setFloat32(i * 4, audio[i], Endian.little);
-    }
-    return _processAudioData(
-      byteData.buffer.asUint8List(),
-      options ?? VADOptions(),
-      VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
-    );
-  }
 
-  /// Start VAD processing.
-  Future<void> startVAD() async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    await _requireLoadedModelId();
-    DartBridgeVAD.shared.startLifecycleProto();
-  }
 
-  /// Stop VAD processing.
-  Future<void> stopVAD() async {
-    if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    await _requireLoadedModelId();
-    DartBridgeVAD.shared.stopLifecycleProto();
-  }
 
   /// Reset VAD state.
   void reset() {
@@ -124,10 +71,6 @@ class RunAnywhereVAD {
     DartBridgeVAD.shared.resetLifecycleProto();
   }
 
-  /// Tear down VAD state.
-  Future<void> cleanupVAD() async {
-    await unloadModel();
-  }
 
   /// Stream VAD results from a continuous audio byte stream.
   ///
@@ -232,11 +175,6 @@ class RunAnywhereVAD {
     }
   }
 
-  /// Internal: tear down all controllers. Used by `RunAnywhere.reset()`.
-  Future<void> dispose() async {
-    // No long-lived controllers held by RunAnywhereVAD itself; per-call
-    // streams are owned by `streamVAD(...)` callers.
-  }
 
   Future<VADResult> _processAudioData(
     Uint8List audio,
@@ -255,21 +193,6 @@ class RunAnywhereVAD {
       metadata: <String, String>{'model_id': modelId}.entries,
     );
     return DartBridgeVAD.shared.processLifecycleProto(request);
-  }
-
-  VADConfiguration _effectiveConfiguration(VADConfiguration? config) {
-    final effective = (config ?? VADConfiguration()).deepCopy();
-    if (!effective.hasSampleRate()) {
-      effective.sampleRate = 16000;
-    }
-    if (!effective.hasFrameLengthMs()) {
-      // Canonical IDL default from `idl/vad_options.proto`:
-      //   int32 frame_length_ms = 3 [(runanywhere.v1.rac_default) = "100"];
-      // Aligns with the convenience-generated `VADConfiguration.defaults()`
-      // (ra_convenience.dart) and matches Swift/Kotlin/RN/Web. (pass3-syn-164)
-      effective.frameLengthMs = 100;
-    }
-    return effective;
   }
 
   Future<String> _requireLoadedModelId() async {

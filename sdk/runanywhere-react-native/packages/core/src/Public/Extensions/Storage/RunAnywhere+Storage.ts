@@ -9,6 +9,7 @@
 
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import {
   StorageDeleteRequest,
   StorageDeleteResult as StorageDeleteResultCodec,
@@ -132,6 +133,8 @@ export async function clearCache(): Promise<void> {
   // Clear file caches via native module (C++ handles directory clearing)
   if (isNativeModuleAvailable()) {
     try {
+      // Swift parity: RunAnywhere+Storage.swift:309 gates on ensureServicesReady.
+      await ensureServicesReady();
       const native = requireNativeModule();
       await native.clearCache();
     } catch (error) {

@@ -19,6 +19,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("retryHTTPSetupProto", &HybridRunAnywhereCoreSpec::retryHTTPSetupProto);
       prototype.registerHybridMethod("destroy", &HybridRunAnywhereCoreSpec::destroy);
       prototype.registerHybridMethod("isInitialized", &HybridRunAnywhereCoreSpec::isInitialized);
+      prototype.registerHybridMethod("resultToProtoErrorProto", &HybridRunAnywhereCoreSpec::resultToProtoErrorProto);
       prototype.registerHybridMethod("pluginLoaderApiVersion", &HybridRunAnywhereCoreSpec::pluginLoaderApiVersion);
       prototype.registerHybridMethod("pluginLoaderRegisteredCount", &HybridRunAnywhereCoreSpec::pluginLoaderRegisteredCount);
       prototype.registerHybridMethod("pluginLoaderRegisteredNames", &HybridRunAnywhereCoreSpec::pluginLoaderRegisteredNames);
@@ -88,6 +89,8 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("hybridClearDeviceState", &HybridRunAnywhereCoreSpec::hybridClearDeviceState);
       prototype.registerHybridMethod("cloudRegister", &HybridRunAnywhereCoreSpec::cloudRegister);
       prototype.registerHybridMethod("cloudUnregister", &HybridRunAnywhereCoreSpec::cloudUnregister);
+      prototype.registerHybridMethod("cloudRegisterSttProvider", &HybridRunAnywhereCoreSpec::cloudRegisterSttProvider);
+      prototype.registerHybridMethod("cloudUnregisterSttProvider", &HybridRunAnywhereCoreSpec::cloudUnregisterSttProvider);
       prototype.registerHybridMethod("cloudIsRegistered", &HybridRunAnywhereCoreSpec::cloudIsRegistered);
       prototype.registerHybridMethod("isTTSModelLoaded", &HybridRunAnywhereCoreSpec::isTTSModelLoaded);
       prototype.registerHybridMethod("unloadTTSModel", &HybridRunAnywhereCoreSpec::unloadTTSModel);

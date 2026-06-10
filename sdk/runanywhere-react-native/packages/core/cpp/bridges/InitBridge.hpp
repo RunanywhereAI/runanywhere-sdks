@@ -101,10 +101,11 @@ public:
      * Registers native device callbacks and then drives commons Phase 2 through
      * rac_sdk_init_phase2_proto when bundled commons exposes it.
      *
-     * @param outHttpConfigured Set to has_completed_http_setup || http_configured.
+     * @param outResultBytes Serialized RASdkInitResult proto bytes; empty when
+     *        the bundled commons lacks the phase-2 symbol (deferred mode).
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t completeServicesInitialization(bool& outHttpConfigured);
+    rac_result_t completeServicesInitialization(std::vector<uint8_t>& outResultBytes);
 
     /**
      * @brief Retry HTTP/auth setup after an offline initialization.
@@ -113,10 +114,11 @@ public:
      * re-checks usable external config and reports whether HTTP is configured.
      * Mirrors Swift CppBridge.SdkInit.retryHTTP().
      *
-     * @param outHttpConfigured Set to has_completed_http_setup || http_configured.
+     * @param outResultBytes Serialized RASdkInitResult proto bytes; empty when
+     *        the bundled commons lacks the retry symbol.
      * @return RAC_SUCCESS (incl. the feature-unavailable downgrade) or error.
      */
-    rac_result_t retryHTTPSetup(bool& outHttpConfigured);
+    rac_result_t retryHTTPSetup(std::vector<uint8_t>& outResultBytes);
 
     /**
      * @brief Register device manager callbacks for commons services init

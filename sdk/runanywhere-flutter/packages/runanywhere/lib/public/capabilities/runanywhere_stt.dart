@@ -4,11 +4,8 @@
 // generated-proto transcription.
 
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'package:ffi/ffi.dart' show calloc;
-import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
@@ -22,7 +19,6 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
@@ -163,140 +159,6 @@ class RunAnywhereSTT {
     );
   }
 
-  /// Streaming transcription — lifecycle-owned proto.
-  ///
-  /// Invokes `rac_stt_transcribe_stream_lifecycle_proto` with the canonical
-  /// `STTTranscriptionRequest` and streams decoded `STTPartialResult`s from the
-  /// `STTStreamEvent` envelope returned by commons.
-  Stream<STTPartialResult> transcribeStream(
-    Uint8List audio, {
-    STTOptions? options,
-  }) {
-    if (!DartBridge.isInitialized) {
-      return Stream.error(SDKException.notInitialized());
-    }
-    final controller = StreamController<STTPartialResult>();
-    _isStreaming = true;
-
-    NativeCallable<RacSttStreamEventCallbackNative>? nativeCb;
-
-    controller
-      ..onListen = () async {
-        try {
-          final modelId = await _requireLoadedModelId();
-          final opts = _effectiveOptions(options ?? STTOptions());
-          final sourceEncoding = _encodingForOptions(opts);
-          final request = STTTranscriptionRequest(
-            audio: STTAudioSource(
-              audioData: audio,
-              encoding: sourceEncoding,
-              audioFormat: opts.audioFormat,
-              sampleRate: opts.sampleRate,
-              channels: 1,
-              bitsPerSample: _bitsPerSample(sourceEncoding),
-            ),
-            options: opts,
-            metadata: <String, String>{'model_id': modelId}.entries,
-          );
-
-          final fn =
-              RacNative.bindings.rac_stt_transcribe_stream_lifecycle_proto;
-          if (fn == null) {
-            controller.addError(SDKException.featureNotAvailable(
-                'rac_stt_transcribe_stream_lifecycle_proto is unavailable'));
-            unawaited(controller.close());
-            return;
-          }
-
-          var sawTerminalEvent = false;
-          // Use `isolateLocal` (not `.listener`) so the callback runs
-          // synchronously on the same thread that invokes
-          // `rac_stt_transcribe_stream_lifecycle_proto`. The commons
-          // emit_event lambda in rac_nonllm_lifecycle_proto_abi.cpp
-          // serialises into a function-local std::vector<uint8_t> and calls
-          // the callback while that vector is alive. With `.listener` the
-          // Dart task fires asynchronously after the lambda has returned and
-          // the vector has been freed — bytesPtr references freed heap (UAF).
-          // `isolateLocal` is safe because Sherpa-ONNX (the only
-          // commons-shipped STT backend) runs transcribe_stream entirely on
-          // the calling thread; the callback always fires on the isolate that
-          // created the NativeCallable.
-          nativeCb =
-              NativeCallable<RacSttStreamEventCallbackNative>.isolateLocal((
-            Pointer<Uint8> bytesPtr,
-            int bytesLen,
-            Pointer<Void> _,
-          ) {
-            if (bytesLen <= 0 || bytesPtr == nullptr) return;
-            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-            try {
-              final event = STTStreamEvent.fromBuffer(copy);
-              final partial = event.hasPartial()
-                  ? event.partial
-                  : STTPartialResult(
-                      isFinal: event.kind ==
-                          STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL,
-                    );
-              if (partial.isFinal ||
-                  event.kind == STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL ||
-                  event.kind == STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
-                sawTerminalEvent = true;
-              }
-              controller.add(partial);
-            } catch (e, st) {
-              controller.addError(e, st);
-            }
-          });
-
-          final bytes = request.writeToBuffer();
-          final reqPtr = DartBridgeProtoUtils.copyBytes(bytes);
-          try {
-            final code = fn(
-              reqPtr,
-              bytes.length,
-              nativeCb!.nativeFunction,
-              nullptr,
-            );
-            // With `isolateLocal` all callbacks fire synchronously during `fn`
-            // above — no drain loop needed. Close the controller if commons
-            // did not emit a terminal event (e.g. an older native binary that
-            // never sends STT_STREAM_EVENT_KIND_FINAL).
-            if (!sawTerminalEvent && !controller.isClosed) {
-              unawaited(controller.close());
-            }
-            if (code != 0) {
-              controller.addError(StateError(
-                'rac_stt_transcribe_stream_lifecycle_proto failed: code=$code',
-              ));
-            }
-          } finally {
-            calloc.free(reqPtr);
-          }
-        } catch (e, st) {
-          controller.addError(e, st);
-        } finally {
-          _isStreaming = false;
-          unawaited(controller.close());
-        }
-      }
-      ..onCancel = () {
-        _isStreaming = false;
-        // Drain in-flight STT partial dispatches before
-        // closing the NativeCallable. `rac_stt_transcribe_stream_lifecycle_proto`
-        // may post late partials from a worker thread that copies the
-        // user_data slot under commons' internal mutex and releases it BEFORE
-        // invoking the callback (see `rac/features/stt/rac_stt_stream.h`
-        // warning). Without `rac_stt_proto_quiesce()` the C side can invoke
-        // the trampoline backed by NativeCallable user_data after
-        // `nativeCb.close()` tore it down — UAF on the proto scratch buffer.
-        RacNative.bindings.rac_stt_proto_quiesce?.call();
-        nativeCb?.close();
-        nativeCb = null;
-      };
-
-    return controller.stream;
-  }
-
   /// Canonical chunk-feed stream-in / stream-out transcription.
   ///
   /// Consumes a `Stream<Uint8List>` of PCM audio chunks and yields
@@ -306,8 +168,9 @@ class RunAnywhereSTT {
   /// Bridge errors surface as a terminal partial with
   /// `text = "STT stream failed: ..."` and `isFinal = true`.
   ///
-  /// Mirrors Swift `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`.
-  Stream<STTPartialResult> transcribeStreamSession(
+  /// Mirrors Swift `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`
+  /// (RunAnywhere+STT.swift:50).
+  Stream<STTPartialResult> transcribeStream(
     Stream<Uint8List> audio, {
     STTOptions? options,
   }) {

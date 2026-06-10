@@ -238,6 +238,9 @@ typedef _RouterCreateDart = int Function(Pointer<RacHandle>);
 typedef _RouterDestroyNative = Void Function(RacHandle);
 typedef _RouterDestroyDart = void Function(RacHandle);
 
+typedef _RouterCancelNative = Int32 Function(RacHandle);
+typedef _RouterCancelDart = int Function(RacHandle);
+
 typedef _RouterSetServiceProtoNative = Int32 Function(
     RacHandle, Pointer<Void>, Pointer<Uint8>, Size);
 typedef _RouterSetServiceProtoDart = int Function(
@@ -315,6 +318,17 @@ class DartBridgeHybridStt {
       _lib.lookupFunction<_RouterDestroyNative, _RouterDestroyDart>(
           'rac_stt_hybrid_router_destroy');
 
+  // Best-effort cancel — same (handle) -> result shape; resolved lazily so
+  // older packaged commons without the symbol degrade to a no-op.
+  static final _RouterCancelDart? _routerCancel = (() {
+    try {
+      return _lib.lookupFunction<_RouterCancelNative, _RouterCancelDart>(
+          'rac_stt_hybrid_router_cancel');
+    } catch (_) {
+      return null;
+    }
+  })();
+
   static final _RouterSetServiceProtoDart _setOfflineServiceProto =
       _lib.lookupFunction<_RouterSetServiceProtoNative,
               _RouterSetServiceProtoDart>(
@@ -374,6 +388,18 @@ class DartBridgeHybridStt {
 
   /// Destroy a router handle. The wrapped services are NOT freed here — callers
   /// clear the slots + [destroyService] them first (see header UAF note).
+  /// Cancel an in-flight transcribe, if any. Best-effort: commons treats
+  /// this as a no-op until an STT engine exposes a cancel op (see
+  /// rac_stt_hybrid_router_cancel). Mirrors Swift HybridSTTRouter.cancel().
+  void cancelRouter(RacHandle handle) {
+    final cancelFn = _routerCancel;
+    if (cancelFn == null) {
+      _logger.debug('rac_stt_hybrid_router_cancel unavailable');
+      return;
+    }
+    cancelFn(handle);
+  }
+
   void destroyRouter(RacHandle handle) {
     if (handle == nullptr) {
       return;

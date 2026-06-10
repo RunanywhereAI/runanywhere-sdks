@@ -54,6 +54,11 @@ export class SDKLogger {
    * @param metadata - Optional metadata key-value pairs
    */
   public debug(message: string, metadata?: Record<string, unknown>): void {
+    // Swift parity: debug() is compiled out of release builds via `#if DEBUG`
+    // (SDKLogger.swift:319-320). RN's equivalent gate is the `__DEV__` global.
+    if (typeof __DEV__ !== 'undefined' && !__DEV__) {
+      return;
+    }
     LoggingManager.shared.log(LogLevel.LOG_LEVEL_DEBUG, this.category, message, metadata);
   }
 

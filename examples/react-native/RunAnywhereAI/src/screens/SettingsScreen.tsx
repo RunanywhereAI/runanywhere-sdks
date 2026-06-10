@@ -70,7 +70,7 @@ import {
 } from '../utils/runAnywhereLifecycle';
 
 // Canonical SDK methods (Swift parity).
-const downloadModelHelper = RunAnywhere.downloadModel;
+const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 const listModels = async (): Promise<ModelInfo[]> =>
   (await RunAnywhere.listModels()).models?.models ?? [];
 const listDownloadedModels = async (): Promise<ModelInfo[]> =>
@@ -605,7 +605,7 @@ export const SettingsScreen: React.FC = () => {
 
       try {
         // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
-        const dlIter = downloadModelHelper(model.id)[Symbol.asyncIterator]();
+        const dlIter = downloadModelStreamHelper(model)[Symbol.asyncIterator]();
         downloadIteratorsRef.current[model.id] = dlIter;
         let dlResult = await dlIter.next();
         while (!dlResult.done) {

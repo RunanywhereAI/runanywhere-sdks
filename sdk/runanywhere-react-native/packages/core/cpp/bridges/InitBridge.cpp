@@ -760,6 +760,9 @@ struct SdkInitResultSummary {
     bool success = false;
     bool httpConfigured = false;
     bool hasCompletedHttpSetup = false;
+    // Default true mirrors Swift SDKState.httpSetupApplicable: only an
+    // explicit http_applicable=false from commons disables HTTP retries.
+    bool httpApplicable = true;
     bool deviceRegistered = false;
     uint32_t linkedModelsCount = 0;
     std::string warning;
@@ -949,6 +952,9 @@ static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer)
                 case 10:
                     summary.hasCompletedHttpSetup = value != 0;
                     break;
+                case 11:
+                    summary.httpApplicable = value != 0;
+                    break;
                 default:
                     break;
             }
@@ -975,7 +981,8 @@ static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer)
 
 static rac_result_t callSdkInitProto(const char* symbolName,
                                      const std::vector<uint8_t>& requestBytes,
-                                     SdkInitResultSummary* outSummary) {
+                                     SdkInitResultSummary* outSummary,
+                                     std::vector<uint8_t>* outResultBytes = nullptr) {
 #if RN_HAS_RAC_SDK_INIT_HEADER
     SdkInitProtoFn fn = nullptr;
 #if defined(__APPLE__)
@@ -1022,6 +1029,9 @@ static rac_result_t callSdkInitProto(const char* symbolName,
         return status;
     }
 
+    if (outResultBytes && out.data && out.size > 0) {
+        outResultBytes->assign(out.data, out.data + out.size);
+    }
     freeProtoBuffer(&out);
     if (summary.hasSuccess && !summary.success) {
         LOGE("%s completed with success=false", symbolName);
@@ -1032,6 +1042,7 @@ static rac_result_t callSdkInitProto(const char* symbolName,
     (void)symbolName;
     (void)requestBytes;
     (void)outSummary;
+    (void)outResultBytes;
     LOGW("rac_sdk_init.h unavailable in bundled headers; using legacy RN init path");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
@@ -1040,7 +1051,8 @@ static rac_result_t callSdkInitProto(const char* symbolName,
 // rac_sdk_retry_http_proto takes no request bytes (output buffer only), so it
 // cannot reuse callSdkInitProto's request-bytes signature. Same buffer
 // lifecycle + feature-unavailable downgrade as the phase{1,2} path.
-static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary) {
+static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary,
+                                          std::vector<uint8_t>* outResultBytes = nullptr) {
 #if RN_HAS_RAC_SDK_INIT_HEADER
 #if defined(__APPLE__)
     SdkRetryHttpProtoFn fn = rac_sdk_retry_http_proto;
@@ -1070,10 +1082,14 @@ static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary) {
     }
 
     rac_result_t status = out.status;
+    if (status == RAC_SUCCESS && outResultBytes && out.data && out.size > 0) {
+        outResultBytes->assign(out.data, out.data + out.size);
+    }
     freeProtoBuffer(&out);
     return status;
 #else
     (void)outSummary;
+    (void)outResultBytes;
     LOGW("rac_sdk_init.h unavailable in bundled headers; skipping HTTP retry");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
@@ -1895,8 +1911,8 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     return DeviceBridge::shared().registerCallbacks();
 }
 
-rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured) {
-    outHttpConfigured = false;
+rac_result_t InitBridge::completeServicesInitialization(std::vector<uint8_t>& outResultBytes) {
+    outResultBytes.clear();
     if (!initialized_) {
         LOGE("completeServicesInitialization called before initialize");
         return RAC_ERROR_NOT_INITIALIZED;
@@ -1912,7 +1928,10 @@ rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured)
     rac_result_t phase2Result = callSdkInitProto(
         "rac_sdk_init_phase2_proto",
         phase2RequestBytes_,
-        &phase2Summary);
+        &phase2Summary,
+        &outResultBytes);
+    // Feature-unavailable on older packaged natives is non-fatal; the empty
+    // result bytes tell TS that Phase 2 finished in deferred mode.
     if (phase2Result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
         return RAC_SUCCESS;
     }
@@ -1923,23 +1942,25 @@ rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured)
     if (!phase2Summary.warning.empty()) {
         LOGI("SDK Phase 2 warning: %s", phase2Summary.warning.c_str());
     }
-    outHttpConfigured = phase2Summary.hasCompletedHttpSetup || phase2Summary.httpConfigured;
-    LOGI("SDK Phase 2 complete (http=%d, device=%d, linked=%u)",
-         outHttpConfigured ? 1 : 0,
+    const bool httpConfigured =
+        phase2Summary.hasCompletedHttpSetup || phase2Summary.httpConfigured;
+    LOGI("SDK Phase 2 complete (http=%d, applicable=%d, device=%d, linked=%u)",
+         httpConfigured ? 1 : 0,
+         phase2Summary.httpApplicable ? 1 : 0,
          phase2Summary.deviceRegistered ? 1 : 0,
          phase2Summary.linkedModelsCount);
     return RAC_SUCCESS;
 }
 
-rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
-    outHttpConfigured = false;
+rac_result_t InitBridge::retryHTTPSetup(std::vector<uint8_t>& outResultBytes) {
+    outResultBytes.clear();
     if (!initialized_) {
         LOGE("retryHTTPSetup called before initialize");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     SdkInitResultSummary summary;
-    rac_result_t result = callSdkRetryHttpProto(&summary);
+    rac_result_t result = callSdkRetryHttpProto(&summary, &outResultBytes);
     // Feature-unavailable on older packaged natives is non-fatal; callers will
     // leave HTTP setup marked incomplete.
     if (result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
@@ -1949,11 +1970,13 @@ rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
         return result;
     }
 
-    outHttpConfigured = summary.hasCompletedHttpSetup || summary.httpConfigured;
+    const bool httpConfigured = summary.hasCompletedHttpSetup || summary.httpConfigured;
     if (!summary.warning.empty()) {
         LOGI("HTTP retry warning: %s", summary.warning.c_str());
     }
-    LOGI("HTTP retry complete (http=%d)", outHttpConfigured ? 1 : 0);
+    LOGI("HTTP retry complete (http=%d, applicable=%d)",
+         httpConfigured ? 1 : 0,
+         summary.httpApplicable ? 1 : 0);
     return RAC_SUCCESS;
 }
 

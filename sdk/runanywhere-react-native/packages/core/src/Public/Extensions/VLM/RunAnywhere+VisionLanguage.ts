@@ -17,6 +17,7 @@ import {
   isNativeModuleAvailable,
 } from '../../../native';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import {
   VLMGenerationOptions as VLMGenerationOptionsMessage,
@@ -112,6 +113,8 @@ export async function processImage(
   legacyOptions?: Partial<VLMGenerationOptions>
 ): Promise<VLMResult> {
   const native = ensureNative();
+  // Swift parity: RunAnywhere+VisionLanguage.swift:31 gates on ensureServicesReady.
+  await ensureServicesReady();
   const resolvedOptions: Partial<VLMGenerationOptions> =
     typeof optionsOrPrompt === 'string'
       ? { ...legacyOptions, prompt: optionsOrPrompt }
@@ -138,6 +141,8 @@ export async function processImageStream(
   legacyOptions?: Partial<VLMGenerationOptions>
 ): Promise<AsyncIterable<VLMStreamEvent>> {
   const native = ensureNative();
+  // Swift parity: RunAnywhere+VisionLanguage.swift:59 gates on ensureServicesReady.
+  await ensureServicesReady();
   const resolvedOptions: Partial<VLMGenerationOptions> =
     typeof optionsOrPrompt === 'string'
       ? { ...legacyOptions, prompt: optionsOrPrompt }

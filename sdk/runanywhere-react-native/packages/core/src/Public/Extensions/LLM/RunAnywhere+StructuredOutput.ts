@@ -33,6 +33,7 @@ import {
   StructuredOutputStreamEventKind,
 } from '@runanywhere/proto-ts/structured_output';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { generate as generateText } from './RunAnywhere+TextGeneration';
 
@@ -183,6 +184,9 @@ export async function generateStructured<T = unknown>(
   options?: StructuredOutputOptions
 ): Promise<StructuredOutputResult> {
   logger.debug('Generating structured output...');
+  // Swift parity: structured generation rides the throwing generate path,
+  // which gates on ensureServicesReady (RunAnywhere+TextGeneration.swift:48).
+  await ensureServicesReady();
   const responseBytes = await callNativeProto(
     'structuredOutputGenerateProto',
     await encodeStructuredOutputRequest(prompt, schema, options),
@@ -253,6 +257,7 @@ export function generateStructuredStream(
     if (!isNativeModuleAvailable()) {
       throw SDKException.nativeModuleUnavailable();
     }
+    await ensureServicesReady();
     const native = requireNativeModule();
     const method = (native as unknown as Record<string, unknown>)
       .structuredOutputGenerateStreamProto;

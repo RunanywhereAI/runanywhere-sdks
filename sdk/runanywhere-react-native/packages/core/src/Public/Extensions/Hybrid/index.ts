@@ -9,11 +9,14 @@
  * `public/hybrid/*` (RACRouter / Backend / RACModel / RoutingPolicy / CloudSTT).
  */
 
-export { HybridSttRouter } from './HybridSttRouter';
+export { HybridSTTRouter } from './HybridSTTRouter';
 export {
   CloudSTT,
   type CloudModelEntry,
   type CloudRegisterOptions,
+  type CloudSttProviderHandler,
+  type CloudSttProviderRequest,
+  type CloudSttProviderResult,
 } from './CloudSTT';
 export {
   HybridDeviceState,

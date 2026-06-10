@@ -9,9 +9,17 @@
 //   markDownloadCompleted / adaptersForModel / allRegistered
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/download_service.pbenum.dart'
+    show DownloadState;
 import 'package:runanywhere/generated/lora_options.pb.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework, ModelCategory, ModelFileRole, ModelFormat,
+        ModelSource;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
+import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 
 /// LoRA (Low-Rank Adaptation) capability surface.
 ///
@@ -136,5 +144,152 @@ class RunAnywhereLoRACapability {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.getAll();
+  }
+
+  // --- SDK-owned artifact registration + download -------------------------
+  // Mirrors Swift RunAnywhere+LoRADownload.swift:97-160.
+
+  static const _loraArtifactModelIdPrefix = 'lora-adapter:';
+  static const _loraArtifactTag = 'lora-adapter';
+
+  /// Stable model-registry id used for an adapter's download artifact.
+  String _loraArtifactModelId(LoraAdapterCatalogEntry entry) =>
+      entry.id.startsWith(_loraArtifactModelIdPrefix)
+          ? entry.id
+          : '$_loraArtifactModelIdPrefix${entry.id}';
+
+  /// Convert a catalog entry into model-registry metadata used by the
+  /// generic download path. Catalog filtering and completion state remain
+  /// owned by the LoRA catalog ABI. Mirrors Swift
+  /// `RALoraAdapterCatalogEntry.toLoraArtifactModelInfo()`.
+  model_pb.ModelInfo _toLoraArtifactModelInfo(LoraAdapterCatalogEntry entry) {
+    final urlTail = entry.url.split('/').isNotEmpty
+        ? entry.url.split('/').last
+        : entry.url;
+    final artifactFilename = entry.filename.isNotEmpty
+        ? entry.filename
+        : urlTail.split('?').first;
+
+    final descriptor = model_pb.ModelFileDescriptor(
+      role: ModelFileRole.MODEL_FILE_ROLE_COMPANION,
+      url: entry.url,
+      filename: artifactFilename,
+      relativePath: artifactFilename,
+      isRequired: true,
+    );
+    if (entry.sizeBytes > 0) descriptor.sizeBytes = entry.sizeBytes;
+    if (entry.hasChecksumSha256() && entry.checksumSha256.isNotEmpty) {
+      descriptor.checksumSha256 = entry.checksumSha256;
+    }
+
+    final expectedFiles = model_pb.ExpectedModelFiles(
+      files: [descriptor],
+      requiredPatterns: [artifactFilename],
+      description: 'LoRA adapter artifact',
+    );
+
+    final seen = <String>{};
+    final tags = <String>[
+      _loraArtifactTag,
+      ...entry.compatibleModels.map((m) => 'base-model:$m'),
+      ...entry.tags,
+    ].where(seen.add).toList(growable: false);
+
+    final metadata = model_pb.ModelInfoMetadata(
+      description: entry.description,
+      tags: tags,
+    );
+    if (entry.hasAuthor()) metadata.author = entry.author;
+    if (entry.hasLicense()) metadata.license = entry.license;
+
+    final model = model_pb.ModelInfo(
+      id: _loraArtifactModelId(entry),
+      name: entry.name,
+      category: ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+      format: ModelFormat.MODEL_FORMAT_GGUF,
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+      downloadUrl: entry.url,
+      source: ModelSource.MODEL_SOURCE_REMOTE,
+      description: entry.description,
+      singleFile: model_pb.SingleFileArtifact(
+        requiredPatterns: [artifactFilename],
+        expectedFiles: expectedFiles,
+      ),
+      expectedFiles: expectedFiles,
+      metadata: metadata,
+      isAvailable: true,
+    );
+    if (entry.sizeBytes > 0) model.downloadSizeBytes = entry.sizeBytes;
+    if (entry.hasChecksumSha256() && entry.checksumSha256.isNotEmpty) {
+      model.checksumSha256 = entry.checksumSha256;
+    }
+    return model;
+  }
+
+  /// Register both the LoRA catalog entry and its downloadable artifact
+  /// record. Does not fetch bytes. Mirrors Swift `lora.registerArtifact(_:)`
+  /// (RunAnywhere+LoRADownload.swift:97).
+  Future<model_pb.ModelInfo> registerArtifact(
+    LoraAdapterCatalogEntry entry,
+  ) async {
+    final registered = await register(entry);
+    final artifact = _toLoraArtifactModelInfo(registered);
+    final saved =
+        await DartBridgeModelRegistry.instance.saveProtoModel(artifact);
+    if (!saved) {
+      throw SDKException.invalidConfiguration(
+        'Model registry rejected LoRA artifact ${artifact.id}',
+      );
+    }
+    return artifact;
+  }
+
+  /// Download a LoRA adapter through the canonical model-download pipeline.
+  ///
+  /// One call does everything: registers the catalog entry + artifact,
+  /// downloads with resume/checksum/progress via commons, records completion
+  /// in the LoRA catalog, and returns the stable local path of the adapter
+  /// file. Mirrors Swift `lora.download(_:onProgress:)`
+  /// (RunAnywhere+LoRADownload.swift:111).
+  Future<String> download(
+    LoraAdapterCatalogEntry entry, {
+    void Function(double progress)? onProgress,
+  }) async {
+    final artifact = await registerArtifact(entry);
+
+    String localPath = '';
+    await for (final progress
+        in RunAnywhereDownloads.shared.start(artifact.id)) {
+      onProgress?.call(progress.overallProgress);
+      if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
+        throw SDKException.invalidConfiguration(
+          progress.errorMessage.isNotEmpty
+              ? progress.errorMessage
+              : 'LoRA adapter download failed for ${entry.id}',
+        );
+      }
+      if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
+        localPath = progress.localPath;
+        break;
+      }
+    }
+
+    if (localPath.isEmpty) {
+      // The import step persisted the path on the registry record.
+      final lookup =
+          await DartBridgeModelRegistry.instance.getProtoModel(artifact.id);
+      localPath = lookup?.localPath ?? '';
+    }
+    if (localPath.isEmpty) {
+      throw SDKException.invalidConfiguration(
+        "LoRA adapter '${entry.id}' downloaded but no local path was recorded",
+      );
+    }
+
+    await markDownloadCompleted(LoraAdapterDownloadCompletedRequest(
+      adapterId: entry.id,
+      localPath: localPath,
+    ));
+    return localPath;
   }
 }

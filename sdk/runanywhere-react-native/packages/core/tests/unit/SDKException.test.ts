@@ -99,8 +99,18 @@ describe('SDKException', () => {
 
   describe('categoryForCode (via static factories)', () => {
     it('maps configuration codes (100-109) to CONFIGURATION', () => {
-      const exception = SDKException.notInitialized();
+      // notInitialized() deliberately overrides to COMPONENT (Swift parity),
+      // so exercise categoryForCode with a non-overridden 100-range code.
+      const exception = SDKException.of(
+        ErrorCode.ERROR_CODE_INVALID_API_KEY,
+        'bad key'
+      );
       expect(exception.category).toBe(ErrorCategory.ERROR_CATEGORY_CONFIGURATION);
+    });
+
+    it('notInitialized uses COMPONENT category (Swift parity)', () => {
+      const exception = SDKException.notInitialized();
+      expect(exception.category).toBe(ErrorCategory.ERROR_CATEGORY_COMPONENT);
     });
 
     it('maps model codes (110-129) to MODEL', () => {

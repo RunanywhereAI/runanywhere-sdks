@@ -25,11 +25,11 @@ import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/generated/voice_events.pb.dart'
     as voice_event_proto;
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 
 /// Voice Agent capability surface.
 ///
@@ -207,7 +207,10 @@ class RunAnywhereVoice {
     if (config.hasVadSampleRate() ||
         config.hasVadFrameLength() ||
         config.hasVadEnergyThreshold()) {
-      await RunAnywhereVAD.shared.initializeVAD(
+      // Configure the lifecycle-owned VAD directly through the bridge —
+      // the public VAD surface is trimmed to Swift parity
+      // (detectVoiceActivity / streamVAD / reset).
+      DartBridgeVAD.shared.configureLifecycleProto(
         VADConfiguration(
           sampleRate: config.hasVadSampleRate() ? config.vadSampleRate : 16000,
           frameLengthMs: config.hasVadFrameLength()
@@ -247,20 +250,8 @@ class RunAnywhereVoice {
   ) =>
       DartBridge.voiceAgent.processVoiceTurnProto(audioData);
 
-  /// Decomposed verb: transcribe via the voice agent. Mirrors Swift's
-  /// `voiceAgentTranscribe(_:)`.
-  Future<String> transcribe(Uint8List audioData) =>
-      DartBridge.voiceAgent.transcribe(audioData);
 
-  /// Decomposed verb: generate response via the voice agent. Mirrors
-  /// Swift's `voiceAgentGenerateResponse(_:)`.
-  Future<String> generateResponse(String prompt) =>
-      DartBridge.voiceAgent.generateResponse(prompt);
 
-  /// Decomposed verb: synthesize speech via the voice agent. Mirrors
-  /// Swift's `voiceAgentSynthesizeSpeech(_:)`.
-  Future<Float32List> synthesizeSpeech(String text) =>
-      DartBridge.voiceAgent.synthesizeSpeech(text);
 
   /// Subscribe to canonical voice-agent events.
   ///

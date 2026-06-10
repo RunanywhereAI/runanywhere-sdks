@@ -47,4 +47,50 @@ abstract final class RunAnywhereAudioConvert {
       (i) => view.getInt16(i * 2, Endian.little) / 32768.0,
     );
   }
+
+  /// Wrap raw 16-bit mono PCM samples in a canonical 44-byte WAV (RIFF)
+  /// container: `RIFF` + `fmt ` (16-byte PCM chunk, format tag 1, 1 channel)
+  /// + `data`. Matches Swift `RunAnywhere.pcm16ToWav(_:sampleRate:)`
+  /// (`RAAudioConvert.swift:67`).
+  ///
+  /// Use this when a consumer needs a self-describing audio container rather
+  /// than headerless PCM — e.g. cloud STT providers that upload the bytes as
+  /// an `audio/wav` file part.
+  ///
+  /// [int16Bytes] holds raw Int16 mono PCM samples (little-endian); the
+  /// sample bytes are copied verbatim after the header. [sampleRate] is the
+  /// capture sample rate in Hz (e.g. 16000).
+  static Uint8List pcm16ToWav(Uint8List int16Bytes, {required int sampleRate}) {
+    const pcmFormatTag = 1;
+    const channels = 1;
+    const bitsPerSample = 16;
+    const blockAlign = channels * bitsPerSample ~/ 8;
+    final byteRate = sampleRate * blockAlign;
+    const fmtChunkSize = 16;
+    final dataLength = int16Bytes.length;
+
+    final wav = Uint8List(44 + dataLength);
+    final view = ByteData.sublistView(wav);
+    void writeAscii(int offset, String text) {
+      for (var i = 0; i < text.length; i++) {
+        view.setUint8(offset + i, text.codeUnitAt(i));
+      }
+    }
+
+    writeAscii(0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, Endian.little);
+    writeAscii(8, 'WAVE');
+    writeAscii(12, 'fmt ');
+    view.setUint32(16, fmtChunkSize, Endian.little);
+    view.setUint16(20, pcmFormatTag, Endian.little);
+    view.setUint16(22, channels, Endian.little);
+    view.setUint32(24, sampleRate, Endian.little);
+    view.setUint32(28, byteRate, Endian.little);
+    view.setUint16(32, blockAlign, Endian.little);
+    view.setUint16(34, bitsPerSample, Endian.little);
+    writeAscii(36, 'data');
+    view.setUint32(40, dataLength, Endian.little);
+    wav.setAll(44, int16Bytes);
+    return wav;
+  }
 }

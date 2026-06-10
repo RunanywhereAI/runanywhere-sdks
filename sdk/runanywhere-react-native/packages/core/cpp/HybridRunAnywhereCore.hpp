@@ -65,8 +65,9 @@ public:
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> initialize(const std::string& configJson) override;
-  std::shared_ptr<Promise<bool>> completeServicesInitialization() override;
-  std::shared_ptr<Promise<bool>> retryHTTPSetupProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> completeServicesInitialization() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> resultToProtoErrorProto(double code) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> retryHTTPSetupProto() override;
   std::shared_ptr<Promise<void>> destroy() override;
   std::shared_ptr<Promise<bool>> isInitialized() override;
 
@@ -269,6 +270,13 @@ public:
   std::shared_ptr<Promise<bool>> hybridClearDeviceState() override;
   std::shared_ptr<Promise<bool>> cloudRegister() override;
   std::shared_ptr<Promise<bool>> cloudUnregister() override;
+  std::shared_ptr<Promise<bool>> cloudRegisterSttProvider(
+      const std::string& name,
+      const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::string>>>>(
+          const std::string& /* configJson */,
+          const std::shared_ptr<ArrayBuffer>& /* audioBytes */,
+          double /* audioFormat */)>& onTranscribe) override;
+  std::shared_ptr<Promise<void>> cloudUnregisterSttProvider(const std::string& name) override;
   std::shared_ptr<Promise<bool>> cloudIsRegistered() override;
 
   // ============================================================================

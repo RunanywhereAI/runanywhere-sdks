@@ -6,6 +6,10 @@
 library;
 
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
+export 'features/stt/services/audio_capture_manager.dart'
+    show AudioCaptureManager;
+export 'features/tts/services/audio_playback_manager.dart'
+    show AudioPlaybackManager, AudioPlaybackException;
 export 'foundation/constants/sdk_constants.dart';
 export 'foundation/errors/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';
@@ -40,7 +44,14 @@ export 'public/capabilities/runanywhere_vad.dart' show RunAnywhereVAD;
 export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
 export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
 export 'public/configuration/sdk_environment.dart';
-export 'public/events/event_bus.dart' show EventBus;
+export 'public/events/event_bus.dart'
+    show
+        EventBus,
+        ModelLifecycleChange,
+        ModelLifecycleChangeKind,
+        modelLifecycleChange;
+export 'public/extensions/audio/audio_convert.dart'
+    show RunAnywhereAudioConvert;
 export 'public/extensions/format_framework.dart' show formatFramework;
 export 'public/extensions/model_category_extensions.dart'
     show ModelCategoryDefaults;

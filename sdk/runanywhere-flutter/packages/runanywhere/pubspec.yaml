@@ -41,6 +41,12 @@ dependencies:
   shared_preferences: ^2.5.5
   path_provider: ^2.1.5
   flutter_secure_storage: ^10.2.0
+  # Audio capture (STT) + playback (TTS) — owned by the SDK per the repo
+  # layering rule (platform audio capture/playback belongs in the SDK, not
+  # example apps). Mirrors Swift Features/STT/AudioCaptureManager and
+  # Features/TTS/AudioPlaybackManager.
+  audioplayers: ^6.0.0
+  record: ^6.1.0
   # Device info — previous cap `<11.3.2` removed 2026-05-19 (dep bump).
   # The cap originated when 11.3.x introduced a transient ABI/Manifest issue;
   # 13.x is now the latest stable and the cap is no longer warranted.

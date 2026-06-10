@@ -25,6 +25,7 @@ import {
   type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
@@ -267,6 +268,8 @@ export async function generateWithTools(
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
+  // Swift parity: RunAnywhere+ToolCalling.swift:261 gates on ensureServicesReady.
+  await ensureServicesReady();
 
   const native = requireNativeModule();
   const bridge = native as unknown as {

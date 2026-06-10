@@ -114,27 +114,6 @@ class RunAnywhereVLM {
     DartBridge.vlm.cancel();
   }
 
-  /// Describe an image. Returns the generated text.
-  Future<String> describe(
-    VLMImage image, {
-    String prompt = "What's in this image?",
-    VLMGenerationOptions? options,
-  }) async {
-    final result = await processImage(image, prompt: prompt, options: options);
-    return result.text;
-  }
-
-  /// Ask a specific question about an image.
-  Future<String> askAbout(
-    String question, {
-    required VLMImage image,
-    VLMGenerationOptions? options,
-  }) async {
-    final result =
-        await processImage(image, prompt: question, options: options);
-    return result.text;
-  }
-
   /// Process an image with VLM (full result with metrics).
   Future<VLMResult> processImage(
     VLMImage image, {

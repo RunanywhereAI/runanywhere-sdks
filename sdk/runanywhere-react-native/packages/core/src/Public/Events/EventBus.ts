@@ -5,8 +5,22 @@
  * proto-byte SDKEvent subscription underneath.
  */
 
-import type { SDKEvent as SDKEventMessage } from '@runanywhere/proto-ts/sdk_events';
-import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import type {
+  SDKEvent as SDKEventMessage,
+  ComponentLifecycleEvent,
+  ModelRegistryEvent,
+  DownloadEvent,
+  SDKComponent,
+} from '@runanywhere/proto-ts/sdk_events';
+import {
+  GenerationEventKind,
+  ModelEventKind,
+} from '@runanywhere/proto-ts/sdk_events';
+import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
+import {
+  ComponentLifecycleState,
+  EventCategory,
+} from '@runanywhere/proto-ts/component_types';
 import {
   publishSDKEvent,
   subscribeSDKEvents,
@@ -129,6 +143,118 @@ export class EventBus {
     }
   }
 
+  // ==========================================================================
+  // Category shortcuts (Swift EventBus.swift:138-173)
+  // ==========================================================================
+
+  /** LLM events. Mirrors Swift `EventBus.llmEvents`. */
+  get llmEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_LLM);
+  }
+
+  /** STT events. Mirrors Swift `EventBus.sttEvents`. */
+  get sttEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_STT);
+  }
+
+  /** TTS events. Mirrors Swift `EventBus.ttsEvents`. */
+  get ttsEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_TTS);
+  }
+
+  /** Model events. Mirrors Swift `EventBus.modelEvents`. */
+  get modelEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_MODEL);
+  }
+
+  /** Error events. Mirrors Swift `EventBus.errorEvents`. */
+  get errorEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_ERROR);
+  }
+
+  /** SDK lifecycle events. Mirrors Swift `EventBus.sdkEvents`. */
+  get sdkEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_SDK);
+  }
+
+  /** RAG events. Mirrors Swift `EventBus.ragEvents`. */
+  get ragEvents(): AsyncIterable<SDKEventMessage> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_RAG);
+  }
+
+  // ==========================================================================
+  // Typed payload streams (Swift EventBus.swift:106-136)
+  // ==========================================================================
+
+  /** `RAVoiceEvent` payloads (voice-agent pipeline events). */
+  get voiceEventPayloads(): AsyncIterable<VoiceEvent> {
+    return this.payloadStream((event) => event.voicePipeline);
+  }
+
+  /** `RADownloadEvent` payloads (model download progress / lifecycle). */
+  get downloadEventPayloads(): AsyncIterable<DownloadEvent> {
+    return this.payloadStream((event) => event.download);
+  }
+
+  /** `RAComponentLifecycleEvent` payloads. */
+  get componentLifecycleEventPayloads(): AsyncIterable<ComponentLifecycleEvent> {
+    return this.payloadStream((event) => event.componentLifecycle);
+  }
+
+  /** `RAModelRegistryEvent` payloads. */
+  get modelRegistryEventPayloads(): AsyncIterable<ModelRegistryEvent> {
+    return this.payloadStream((event) => event.modelRegistry);
+  }
+
+  // ==========================================================================
+  // Unified model-lifecycle stream (Swift EventBus+ModelLifecycle.swift)
+  // ==========================================================================
+
+  /**
+   * Unified model load/unload stream across all native signal channels
+   * (component-lifecycle, model events, LLM generation events). Mirrors
+   * Swift `EventBus.modelLifecycle`.
+   */
+  get modelLifecycle(): AsyncIterable<ModelLifecycleChange> {
+    return this.payloadStream(modelLifecycleChange);
+  }
+
+  /** `modelLifecycle` filtered to load completions. */
+  get modelLoaded(): AsyncIterable<ModelLifecycleChange> {
+    return this.payloadStream((event) => {
+      const change = modelLifecycleChange(event);
+      return change?.kind === 'loaded' ? change : undefined;
+    });
+  }
+
+  /** `modelLifecycle` filtered to unloads. */
+  get modelUnloaded(): AsyncIterable<ModelLifecycleChange> {
+    return this.payloadStream((event) => {
+      const change = modelLifecycleChange(event);
+      return change?.kind === 'unloaded' ? change : undefined;
+    });
+  }
+
+  /**
+   * Extract a payload type from the proto envelope stream. Mirrors Swift's
+   * private `eventsOfPayload(_:)`.
+   */
+  private payloadStream<Payload>(
+    selector: (event: SDKEventMessage) => Payload | undefined
+  ): AsyncIterable<Payload> {
+    const source = this.stream();
+    return {
+      async *[Symbol.asyncIterator](): AsyncGenerator<Payload> {
+        for await (const event of source) {
+          const payload = selector(event);
+          if (payload !== undefined) {
+            yield payload;
+          }
+        }
+      },
+    };
+  }
+
   private stream(category?: EventCategory): AsyncIterable<SDKEventMessage> {
     return {
       [Symbol.asyncIterator]: (): AsyncIterator<SDKEventMessage> => {
@@ -190,4 +316,81 @@ export class EventBus {
       },
     };
   }
+}
+
+// ============================================================================
+// Typed model-lifecycle change (Swift EventBus+ModelLifecycle.swift)
+// ============================================================================
+
+/** One model load/unload transition, decoded from the raw event bus. */
+export interface ModelLifecycleChange {
+  /** Whether the model finished loading or was unloaded. */
+  kind: 'loaded' | 'unloaded';
+  /**
+   * Registry id of the affected model. May be empty when the native channel
+   * did not carry one (rare; treat as "current model").
+   */
+  modelId: string;
+  /** SDK component slot the change applies to (.llm, .stt, .tts, ...). */
+  component: SDKComponent;
+  /**
+   * The underlying raw event, for consumers that need extra payload fields
+   * (progress, framework, error, ...).
+   */
+  event: SDKEventMessage;
+}
+
+/**
+ * Decode a raw SDK event into a lifecycle change, or undefined when the event
+ * is not a load/unload transition. Exposed so consumers can reuse the exact
+ * same channel mapping. Mirrors Swift `EventBus.modelLifecycleChange(from:)`.
+ */
+export function modelLifecycleChange(
+  event: SDKEventMessage
+): ModelLifecycleChange | undefined {
+  // Channel 1: component-lifecycle (the canonical loadModel path).
+  if (event.category === EventCategory.EVENT_CATEGORY_COMPONENT) {
+    const lifecycle = event.componentLifecycle;
+    if (!lifecycle) return undefined;
+    switch (lifecycle.currentState) {
+      case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY:
+        return {
+          kind: 'loaded',
+          modelId: lifecycle.modelId,
+          component: lifecycle.component,
+          event,
+        };
+      case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED:
+      case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNLOADING:
+      case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN:
+      case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DELETING:
+        return {
+          kind: 'unloaded',
+          modelId: lifecycle.modelId,
+          component: lifecycle.component,
+          event,
+        };
+      default:
+        return undefined;
+    }
+  }
+
+  // Channels 2 + 3: model events and LLM generation events.
+  const modelId = event.model?.modelId || event.generation?.modelId || '';
+
+  if (
+    event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_LOAD_COMPLETED ||
+    event.generation?.kind ===
+      GenerationEventKind.GENERATION_EVENT_KIND_MODEL_LOADED
+  ) {
+    return { kind: 'loaded', modelId, component: event.component, event };
+  }
+  if (
+    event.model?.kind === ModelEventKind.MODEL_EVENT_KIND_UNLOAD_COMPLETED ||
+    event.generation?.kind ===
+      GenerationEventKind.GENERATION_EVENT_KIND_MODEL_UNLOADED
+  ) {
+    return { kind: 'unloaded', modelId, component: event.component, event };
+  }
+  return undefined;
 }

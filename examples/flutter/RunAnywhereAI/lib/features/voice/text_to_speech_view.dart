@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -7,7 +6,6 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
-import 'package:runanywhere_ai/core/services/audio_player_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -62,8 +60,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Error state
   String? _errorMessage;
 
-  // Audio player service
-  final AudioPlayerService _playerService = AudioPlayerService.instance;
+  // SDK-owned playback streams (RunAnywhere.speak plays internally).
   StreamSubscription<bool>? _playingSubscription;
   StreamSubscription<double>? _progressSubscription;
 
@@ -76,7 +73,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   @override
   void initState() {
     super.initState();
-    unawaited(_initializeAudioPlayer());
+    _subscribeToPlayback();
   }
 
   @override
@@ -87,20 +84,20 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     super.dispose();
   }
 
-  Future<void> _initializeAudioPlayer() async {
-    await _playerService.initialize();
-
-    // Subscribe to playing state
-    _playingSubscription = _playerService.playingStream.listen((isPlaying) {
+  void _subscribeToPlayback() {
+    // Subscribe to the SDK's speak() playback state.
+    _playingSubscription =
+        sdk.RunAnywhere.tts.playbackStateStream.listen((isPlaying) {
       if (mounted) {
         setState(() {
           _isPlaying = isPlaying;
+          if (isPlaying) _isGenerating = false;
         });
       }
     });
 
-    // Subscribe to progress updates
-    _progressSubscription = _playerService.progressStream.listen((progress) {
+    _progressSubscription =
+        sdk.RunAnywhere.tts.playbackProgressStream.listen((progress) {
       if (mounted) {
         setState(() {
           _playbackProgress = progress;
@@ -195,87 +192,29 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         volume: 1.0,
       );
 
-      // System TTS uses platform playback (iOS/Android parity: RunAnywhere.speak).
-      if (_isSystemTTS) {
-        final result = await sdk.RunAnywhere.speak(
-          _textController.text,
-          options,
-        );
-        debugPrint(
-            '✅ System TTS speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
-        debugPrint('Speech generation complete');
-        setState(() {
-          _isGenerating = false;
-          _duration = result.durationMs.toInt() / 1000.0;
-          _metadata = TTSMetadata(
-            durationMs: result.durationMs.toDouble(),
-            audioSize: 0,
-            sampleRate: result.sampleRate,
-          );
-        });
-        return;
-      }
-
-      final result = await sdk.RunAnywhere.tts.synthesize(
+      // One SDK entry point for every TTS path: speak() synthesizes AND
+      // plays (system voices and on-device models alike), mirroring iOS.
+      final result = await sdk.RunAnywhere.speak(
         _textController.text,
         options,
       );
-
-      // TTSOutput proto carries audioData as raw PCM bytes (Float32 PCM).
-      final samples =
-          Float32List.view(Uint8List.fromList(result.audioData).buffer);
       debugPrint(
-          '✅ TTS synthesis complete: ${samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
-      debugPrint('Speech generation complete');
+          '✅ Speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
 
       setState(() {
         _isGenerating = false;
         _duration = result.durationMs.toInt() / 1000.0;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),
-          audioSize: samples.length * 4, // 4 bytes per float sample
+          audioSize: result.audioSizeBytes.toInt(),
           sampleRate: result.sampleRate,
         );
       });
-
-      // Auto-play if audio was generated
-      if (samples.isNotEmpty) {
-        await _playFloatAudio(samples, result.sampleRate);
-      }
     } catch (e) {
       debugPrint('❌ Speech generation failed: $e');
       setState(() {
         _errorMessage = 'Speech generation failed: $e';
         _isGenerating = false;
-      });
-    }
-  }
-
-  /// Play audio from Float32List samples (TTS output)
-  Future<void> _playFloatAudio(Float32List samples, int sampleRate) async {
-    try {
-      // Convert Float32 PCM samples to Int16 PCM bytes
-      // TTS returns samples in range [-1.0, 1.0], we convert to Int16 range [-32768, 32767]
-      final pcmData = ByteData(samples.length * 2); // 2 bytes per Int16 sample
-      for (var i = 0; i < samples.length; i++) {
-        // Clamp and scale to Int16 range
-        final sample = (samples[i].clamp(-1.0, 1.0) * 32767).round();
-        pcmData.setInt16(i * 2, sample, Endian.little);
-      }
-
-      await _playerService.playFromBytes(
-        pcmData.buffer.asUint8List(),
-        volume: 1.0,
-        rate: 1.0, // Rate is already applied in TTS synthesis
-        sampleRate: sampleRate,
-        numChannels: 1, // Mono audio
-      );
-      debugPrint(
-          '🔊 Playing TTS audio: ${samples.length} samples at $sampleRate Hz');
-    } catch (e) {
-      debugPrint('❌ Failed to play TTS audio: $e');
-      setState(() {
-        _errorMessage = 'Failed to play audio: $e';
       });
     }
   }
@@ -287,7 +226,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   }
 
   Future<void> _stopPlayback() async {
-    await _playerService.stop();
+    await sdk.RunAnywhere.tts.stopSpeaking();
     debugPrint('⏹️ Playback stopped');
   }
 

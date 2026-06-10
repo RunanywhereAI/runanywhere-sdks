@@ -4,8 +4,10 @@
 // generated-proto synthesis.
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
+import 'package:runanywhere/features/tts/services/audio_playback_manager.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
@@ -17,6 +19,7 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_audio.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
@@ -32,6 +35,10 @@ class RunAnywhereTTS {
   static RunAnywhereTTS get shared => _instance;
 
   bool _isSpeaking = false;
+
+  /// SDK-owned playback for `speak()`. Mirrors Swift's private
+  /// `ttsAudioPlayback` (RunAnywhere+TTS.swift:141).
+  final AudioPlaybackManager _playback = AudioPlaybackManager();
 
   /// True when commons lifecycle has a ready TTS voice.
   bool get isLoaded {
@@ -187,11 +194,31 @@ class RunAnywhereTTS {
     _isSpeaking = false;
   }
 
-  /// Synthesize-and-play. Mirrors Swift's `RunAnywhere.speak(_:options:)`.
+  /// Speak text aloud through the device speakers.
+  ///
+  /// Synthesizes via the commons TTS ABI, converts the Float32 PCM to WAV via
+  /// `rac_audio_float32_to_wav`, then plays it through the SDK
+  /// [AudioPlaybackManager]. Mirrors Swift's `RunAnywhere.speak(_:options:)`
+  /// (RunAnywhere+TTS.swift:110-130) exactly: synthesize AND play.
   Future<TTSSpeakResult> speak(String text, [TTSOptions? options]) async {
     final output = await synthesize(text, options);
     _isSpeaking = true;
     try {
+      // Convert Float32 PCM to WAV using the commons C utility, with the
+      // same sample-rate fallback chain as Swift (output -> options -> 22050).
+      var sampleRate = output.sampleRate > 0 ? output.sampleRate : 0;
+      if (sampleRate <= 0 && options != null && options.sampleRate > 0) {
+        sampleRate = options.sampleRate;
+      }
+      final wavData = DartBridgeAudio.float32ToWav(
+        Uint8List.fromList(output.audioData),
+        sampleRate > 0 ? sampleRate : 22050,
+      );
+
+      if (wavData != null && wavData.isNotEmpty) {
+        await _playback.play(wavData);
+      }
+
       return TTSSpeakResult(
         audioFormat: output.audioFormat,
         sampleRate: output.sampleRate,
@@ -208,9 +235,18 @@ class RunAnywhereTTS {
   /// True while a `speak()` invocation is in flight.
   bool get isSpeaking => _isSpeaking;
 
-  /// Stop ongoing playback.
+  /// Playing-state changes of the SDK-owned `speak()` playback. The Dart
+  /// analogue of observing Swift `AudioPlaybackManager.isPlaying`.
+  Stream<bool> get playbackStateStream => _playback.playingStream;
+
+  /// Playback progress (0.0 to 1.0) of the SDK-owned `speak()` playback.
+  Stream<double> get playbackProgressStream => _playback.progressStream;
+
+  /// Stop ongoing playback. Mirrors Swift `stopSpeaking()`
+  /// (RunAnywhere+TTS.swift:133-136): stop the player, then the synthesis.
   Future<void> stopSpeaking() async {
     _isSpeaking = false;
+    await _playback.stop();
     await stopSynthesis();
   }
 

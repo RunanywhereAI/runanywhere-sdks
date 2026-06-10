@@ -21,6 +21,7 @@ import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import { bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
@@ -140,6 +141,8 @@ export type SolutionRunArgs =
  */
 async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
   const native = ensureNative();
+  // Swift parity: RunAnywhere+Solutions.swift:228 gates on ensureServicesReady.
+  await ensureServicesReady();
 
   if (args.yaml !== undefined) {
     const h = await native.solutionCreateFromYaml(args.yaml);

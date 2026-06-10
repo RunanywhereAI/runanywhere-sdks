@@ -6,7 +6,6 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
-import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
@@ -75,12 +74,12 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   String? _errorMessage;
 
   // Audio recording service
-  final AudioRecordingService _recordingService =
-      AudioRecordingService.instance;
+  // SDK-owned microphone capture (mirrors Swift AudioCaptureManager).
+  final sdk.AudioCaptureManager _capture = sdk.AudioCaptureManager();
   StreamSubscription<double>? _audioLevelSubscription;
 
   // Live mode: mic chunks are fed straight into the SDK's streaming
-  // transcription session (RunAnywhere.transcribeStreamSession), which owns
+  // transcription session (RunAnywhere.transcribeStream), which owns
   // endpointing/segmentation natively. No app-side silence detection.
   // Mirrors iOS STTViewModel.
   StreamSubscription<dynamic>? _liveSubscription;
@@ -98,8 +97,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   @override
   void dispose() {
     unawaited(_liveSubscription?.cancel());
-    unawaited(_recordingService.stopStreaming());
     unawaited(_audioLevelSubscription?.cancel());
+    unawaited(_capture.dispose());
     super.dispose();
   }
 
@@ -206,10 +205,9 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     }
 
     // Batch: record to a buffer, transcribe once on stop.
-    final recordingPath = await _recordingService.startRecording(
+    final recordingPath = await _capture.startRecordingToBuffer(
       sampleRate: 16000,
       numChannels: 1,
-      enableAudioLevels: true,
     );
 
     if (recordingPath == null) {
@@ -228,7 +226,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   /// session. Non-final partials preview the current utterance; finals
   /// commit it as a line (mirrors iOS STTViewModel.handleLivePartial).
   Future<void> _startLiveStreaming() async {
-    final chunks = await _recordingService.startStreaming(
+    final chunks = await _capture.startRecording(
       sampleRate: 16000,
       numChannels: 1,
     );
@@ -243,13 +241,13 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     _subscribeToAudioLevels();
 
     _liveSubscription =
-        sdk.RunAnywhere.transcribeStreamSession(chunks).listen(
+        sdk.RunAnywhere.transcribeStream(chunks).listen(
       (partial) {
         final text = partial.text.trim();
         setState(() {
           if (partial.isFinal) {
             // Stream errors surface as a terminal partial carrying the
-            // failure text (see RunAnywhere.transcribeStreamSession).
+            // failure text (see RunAnywhere.transcribeStream).
             if (text.startsWith('STT stream failed')) {
               _errorMessage = text;
               return;
@@ -284,7 +282,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   void _subscribeToAudioLevels() {
     _audioLevelSubscription =
-        _recordingService.audioLevelStream?.listen((level) {
+        _capture.audioLevelStream?.listen((level) {
       setState(() {
         _audioLevel = level;
       });
@@ -305,12 +303,12 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       // Closing the recorder ends the chunk stream, which lets the native
       // session flush its final result; the live subscription ends with it.
       setState(() => _isTranscribing = true);
-      await _recordingService.stopStreaming();
+      await _capture.stopRecording();
       return;
     }
 
     // Stop recording and get audio data
-    final (audioData, _) = await _recordingService.stopRecording();
+    final audioData = await _capture.stopRecording();
 
     if (audioData == null || audioData.isEmpty) {
       setState(() {

@@ -4,17 +4,11 @@
 // Mirrors Swift `RunAnywhere+Storage.swift`.
 
 import 'package:fixnum/fixnum.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
-import 'package:runanywhere/generated/download_service.pb.dart'
-    show DownloadProgress;
 import 'package:runanywhere/generated/model_types.pb.dart';
-import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
-import 'package:runanywhere/native/dart_bridge_storage.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 
 /// Static helpers for storage + low-level download + model registration.
 ///
@@ -234,100 +228,6 @@ class RunAnywhereStorage {
   // ===========================================================================
   // Storage availability (existing Flutter-specific helpers)
   // ===========================================================================
-
-  /// True if the device has enough free storage for [modelSize].
-  ///
-  /// [safetyMargin] pads the check by a fraction (default 10%). Returns
-  /// the rich [StorageAvailability] shape so callers can surface the
-  /// required/available bytes and any warning. Mirrors Swift's
-  /// `checkStorageAvailable(for:safetyMargin:) -> StorageAvailability`.
-  static Future<StorageAvailability> checkStorageAvailable({
-    required int modelSize,
-    double safetyMargin = 0.1,
-  }) async {
-    final result = await checkStorageAvailabilityResult(
-      StorageAvailabilityRequest(
-        requiredBytes: Int64(modelSize),
-        safetyMargin: safetyMargin,
-      ),
-    );
-    return result.hasAvailability()
-        ? result.availability
-        : StorageAvailability(
-            isAvailable: false,
-            requiredBytes: Int64(modelSize),
-            availableBytes: Int64.ZERO,
-            warningMessage: result.errorMessage,
-          );
-  }
-
-  /// Generated-proto storage availability surface.
-  static Future<StorageAvailabilityResult> checkStorageAvailabilityResult(
-    StorageAvailabilityRequest request,
-  ) =>
-      DartBridgeStorage.instance.availabilityProto(request);
-
-  // ===========================================================================
-  // Native key/value storage (Flutter-specific)
-  // ===========================================================================
-
-  /// Get a value from native storage.
-  static Future<String?> getStorageValue(String key) =>
-      DartBridgeStorage.instance.get(key);
-
-  /// Set a value in native storage.
-  static Future<bool> setStorageValue(String key, String value) =>
-      DartBridgeStorage.instance.set(key, value);
-
-  /// Delete a value from native storage.
-  static Future<bool> deleteStorageValue(String key) =>
-      DartBridgeStorage.instance.delete(key);
-
-  /// Check if a key exists in native storage.
-  static Future<bool> storageKeyExists(String key) =>
-      DartBridgeStorage.instance.exists(key);
-
-  /// Clear all native storage.
-  static Future<void> clearStorage() async {
-    await DartBridgeStorage.instance.clear();
-  }
-
-  /// Base directory for SDK files (`.../<documents>/runanywhere`).
-  static Future<String> getBaseDirectoryPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return '${directory.path}/runanywhere';
-  }
-
-  // ===========================================================================
-  // Download + storage info / deletion (Swift parity)
-  // ===========================================================================
-
-  /// Low-level download stream. Emits proto-generated `DownloadProgress`
-  /// events driven by the C++ `rac_download_start_proto` state machine.
-  /// Mirrors Swift's `downloadModel(_:onProgress:)`.
-  static Stream<DownloadProgress> downloadModel(String modelId) =>
-      RunAnywhereDownloads.shared.start(modelId);
-
-  /// Get storage information as the canonical generated proto result.
-  /// Mirrors Swift's `getStorageInfo(_:) -> RAStorageInfoResult`.
-  static Future<StorageInfoResult> getStorageInfo([
-    StorageInfoRequest? request,
-  ]) =>
-      DartBridgeStorage.instance.infoProto(request);
-
-  /// Execute or dry-run storage deletion as canonical generated proto data.
-  /// Mirrors Swift's `deleteStorage(_:) -> RAStorageDeleteResult`.
-  static Future<StorageDeleteResult> deleteStorage(
-    StorageDeleteRequest request,
-  ) =>
-      DartBridgeStorage.instance.deleteProto(request);
-
-  /// Clear the SDK's Cache directory. Mirrors Swift's `clearCache()`.
-  static Future<void> clearCache() async {
-    if (!DartBridgeFileManager.clearCache()) {
-      throw SDKException.storageError('Failed to clear cache');
-    }
-  }
 
   /// Clear the SDK's Temp directory. Mirrors Swift's `cleanTempFiles()`.
   static Future<void> cleanTempFiles() async {

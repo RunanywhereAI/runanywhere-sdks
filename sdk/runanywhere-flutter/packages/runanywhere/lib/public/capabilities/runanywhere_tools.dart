@@ -26,8 +26,6 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolCallingSessionStepWithResultRequest,
         ToolChoiceMode,
         ToolDefinition,
-        ToolParseRequest,
-        ToolPromptFormatRequest,
         ToolResult,
         ToolValue,
         ToolValueArray,
@@ -82,25 +80,6 @@ class RunAnywhereTools {
     _logger.info('Registered tool: ${definition.name}');
   }
 
-  /// Register a tool using generated [ToolValue] arguments and results.
-  ///
-  /// Mirrors Swift's `ToolExecutor = ([String: RAToolValue]) async throws ->
-  /// [String: RAToolValue]`. JSON conversion is delegated to commons via
-  /// `rac_tool_value_*_proto`.
-  void registerTypedTool(
-    ToolDefinition definition,
-    TypedToolExecutor executor,
-  ) {
-    registerTool(definition, (args) async {
-      final typedArgs = ToolValues.parseObjectJSON(jsonEncode(args));
-      final typedResult = await executor(typedArgs);
-      final resultJson = ToolValues.jsonStringFromObject(typedResult);
-      final decoded = jsonDecode(resultJson);
-      return decoded is Map<String, dynamic>
-          ? decoded
-          : <String, dynamic>{'value': decoded};
-    });
-  }
 
   /// Unregister a tool by name.
   ///
@@ -192,6 +171,7 @@ class RunAnywhereTools {
     ToolCallingOptions? options,
     ToolChoiceMode? toolChoice,
     String? forcedToolName,
+    bool? validateCalls,
   }) async {
     final opts = options ?? ToolCallingOptions();
     final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
@@ -219,7 +199,9 @@ class RunAnywhereTools {
       maxIterations: opts.hasMaxIterations() ? opts.maxIterations : 5,
       keepToolsAvailable:
           opts.hasKeepToolsAvailable() ? opts.keepToolsAvailable : false,
-      validateCalls: true,
+      // Optional override for the IDL validate_calls knob; defaults to true
+      // like Swift (RunAnywhere+ToolCalling.swift:256).
+      validateCalls: validateCalls ?? true,
       toolChoice: effectiveToolChoice,
       forcedToolName: effectiveForcedToolName,
       maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
@@ -348,51 +330,10 @@ class RunAnywhereTools {
     return DartBridgeToolCalling.shared.cancelSession(handle);
   }
 
-  /// Continue generation after manual tool execution (used when
-  /// `autoExecute: false`). The previous turn's session is already closed;
-  /// we let commons orchestrate a fresh session for the continuation.
-  Future<ToolCallingResult> continueWithToolResult(
-    String originalPrompt,
-    ToolResult toolResult, {
-    ToolCallingOptions? options,
-  }) async {
-    final opts = options ?? ToolCallingOptions();
-    final followup = DartBridgeToolCalling.shared.formatPrompt(
-      ToolPromptFormatRequest(
-        userPrompt: originalPrompt,
-        options: opts,
-        toolResults: [toolResult],
-      ),
-    );
-    return generateWithTools(
-      followup.formattedPrompt.isNotEmpty
-          ? followup.formattedPrompt
-          : originalPrompt,
-      options: opts,
-    );
-  }
 
   // -- helpers --------------------------------------------------------------
 
-  /// Format the registered tools into a system-prompt snippet using commons.
-  String formatToolsForPrompt([List<ToolDefinition>? tools]) {
-    final toolList = tools ?? getRegisteredTools();
-    if (toolList.isEmpty) return '';
-    final result = DartBridgeToolCalling.shared.formatPrompt(
-      ToolPromptFormatRequest(
-        options: ToolCallingOptions(tools: toolList),
-      ),
-    );
-    return result.formattedPrompt;
-  }
 
-  /// Parse a single tool call out of raw LLM output (no auto-execution).
-  ToolCall? parseToolCall(String llmOutput) {
-    final result =
-        DartBridgeToolCalling.shared.parse(ToolParseRequest(text: llmOutput));
-    if (!result.hasToolCall || result.toolCalls.isEmpty) return null;
-    return result.toolCalls.first;
-  }
 }
 
 Int64 _toFixnum(int value) => Int64(value);

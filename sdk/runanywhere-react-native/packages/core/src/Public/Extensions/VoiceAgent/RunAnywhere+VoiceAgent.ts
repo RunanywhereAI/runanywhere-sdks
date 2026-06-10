@@ -32,6 +32,7 @@ import {
 import { currentModel, loadModel } from '../Models/RunAnywhere+ModelLifecycle';
 import { VoiceAgentStreamAdapter } from '../../../Adapters/VoiceAgentStreamAdapter';
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
@@ -85,18 +86,23 @@ export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponen
 /** Initialize voice agent with the canonical proto compose config. Mirrors Swift's `initializeVoiceAgent(_ config:)`. */
 export async function initializeVoiceAgent(
   config: ReturnType<typeof VoiceAgentComposeConfig.create>
-): Promise<boolean> {
+): Promise<void> {
   const native = ensureNative();
+  // Swift parity: RunAnywhere+VoiceAgent.swift:29 gates on ensureServicesReady.
+  await ensureServicesReady();
   try {
     logger.info('Initializing voice agent...');
     const bytes = await native.voiceAgentInitializeProto(
       encodeProtoMessage(config, VoiceAgentComposeConfig)
     );
-    const result = arrayBufferToBytes(bytes).byteLength > 0;
-    if (result) {
-      logger.info('Voice agent initialized successfully');
+    // Swift parity: initializeVoiceAgent(_ config:) throws instead of
+    // returning a boolean (RunAnywhere+VoiceAgent.swift:24).
+    if (arrayBufferToBytes(bytes).byteLength === 0) {
+      throw SDKException.componentNotReady(
+        'Voice agent initialization returned an empty result'
+      );
     }
-    return result;
+    logger.info('Voice agent initialized successfully');
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to initialize voice agent: ${msg}`);
@@ -195,6 +201,8 @@ export async function initializeVoiceAgentWithLoadedModels(
   ensureVAD: boolean = true
 ): Promise<void> {
   const native = ensureNative();
+  // Swift parity: RunAnywhere+VoiceAgent.swift:122 gates on ensureServicesReady.
+  await ensureServicesReady();
   try {
     if (ensureVAD) {
       await ensureDefaultVAD();
@@ -253,6 +261,8 @@ export async function processVoiceTurn(
   audioData: ArrayBuffer | Uint8Array
 ): Promise<VoiceAgentResult> {
   const native = ensureNative();
+  // Swift parity: RunAnywhere+VoiceAgent.swift:182 gates on ensureServicesReady.
+  await ensureServicesReady();
   try {
     const resultBytes = await native.voiceAgentProcessTurnProto(
       audioToArrayBuffer(audioData)

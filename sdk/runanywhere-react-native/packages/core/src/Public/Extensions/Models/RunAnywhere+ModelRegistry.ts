@@ -8,18 +8,21 @@
  *   - registerModelProto              - register / registerMultiFile
  *   - getAvailableModelsProto         - listModels
  *   - getDownloadedModelsProto        - downloadedModels
- *   - downloadPlanProto               - downloadModel (plan)
- *   - downloadStartProto              - downloadModel (start)
- *   - setDownloadProgressCallbackProto - downloadModel (stream)
+ *   - downloadPlanProto               - downloadModelStream (plan)
+ *   - downloadStartProto              - downloadModelStream (start)
+ *   - setDownloadProgressCallbackProto - downloadModelStream (progress)
  *
  * Hermes constraint: download streaming returns an `AsyncIterable<DownloadProgress>`
  * that callers MUST drive with manual `iterator.next()` loops (see CLAUDE.md).
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
-import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { ensureServicesReady, ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
+  ArchiveArtifact,
+  ArchiveStructure,
+  ArchiveType,
   ModelArtifactType,
   ModelCategory,
   ModelFileRole,
@@ -201,13 +204,110 @@ export async function registerModelFromUrl(
 }
 
 /**
+ * Archive registration shorthand. Mirrors Swift's
+ * `RunAnywhere.registerModel(archive:structure:id:name:framework:...)`
+ * (`RunAnywhere+Storage.swift:72`).
+ */
+export interface RegisterArchiveModelInput {
+  /** Archive download URL (tar.gz / tar.bz2 / tar.xz / zip). */
+  url: string;
+  /** On-disk layout the URL alone cannot infer (directoryBased, nested, …). */
+  structure: ArchiveStructure;
+  id?: string;
+  name: string;
+  framework: InferenceFramework;
+  modality?: ModelCategory;
+  /** Caller override; inferred from the URL extension when omitted. */
+  archiveType?: ArchiveType;
+  memoryRequirement?: number;
+  supportsThinking?: boolean;
+  supportsLora?: boolean;
+}
+
+/** Infer the archive type from a URL extension. Mirrors Swift `ArchiveType.from(url:)`. */
+function inferArchiveType(url: string): ArchiveType {
+  const lower = url.split('?')[0]?.toLowerCase() ?? '';
+  if (lower.endsWith('.zip')) return ArchiveType.ARCHIVE_TYPE_ZIP;
+  if (lower.endsWith('.tar.bz2') || lower.endsWith('.tbz2')) {
+    return ArchiveType.ARCHIVE_TYPE_TAR_BZ2;
+  }
+  if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) {
+    return ArchiveType.ARCHIVE_TYPE_TAR_GZ;
+  }
+  if (lower.endsWith('.tar.xz') || lower.endsWith('.txz')) {
+    return ArchiveType.ARCHIVE_TYPE_TAR_XZ;
+  }
+  return ArchiveType.ARCHIVE_TYPE_UNSPECIFIED;
+}
+
+/**
+ * Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip) where
+ * the caller needs to specify the on-disk layout the URL-form `registerModel`
+ * cannot infer.
+ *
+ * Matches Swift: `RunAnywhere.registerModel(archive:structure:...)` — builds
+ * the archive artifact (type + caller-specified structure) inline, layers on
+ * the caller-supplied capability fields, and persists through the registry's
+ * proto save path in a single call.
+ */
+export async function registerArchiveModel(
+  input: RegisterArchiveModelInput,
+): Promise<ModelInfo> {
+  if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
+  const native = requireNativeModule();
+  const modality = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
+  const memoryHint =
+    input.memoryRequirement !== undefined && input.memoryRequirement > 0
+      ? input.memoryRequirement
+      : undefined;
+
+  const archive = ArchiveArtifact.fromPartial({
+    type: input.archiveType ?? inferArchiveType(input.url),
+    structure: input.structure,
+  });
+
+  const model = ModelInfoCodec.fromPartial({
+    id: input.id ?? deriveModelIdFromUrl(input.url, input.name),
+    name: input.name,
+    category: modality,
+    framework: input.framework,
+    preferredFramework: input.framework,
+    format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
+    downloadUrl: input.url,
+    source: ModelSource.MODEL_SOURCE_REMOTE,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE,
+    archive,
+    supportsThinking: input.supportsThinking ?? false,
+    supportsLora: input.supportsLora ?? false,
+    ...(memoryHint !== undefined
+      ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
+      : {}),
+    ...(input.supportsThinking
+      ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
+      : {}),
+  });
+
+  const accepted = await native.registerModelProto(
+    encodeProtoMessage(model, ModelInfoCodec),
+  );
+  if (!accepted) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_INVALID_STATE,
+      `Model registry rejected archive model '${model.id}'.`,
+      { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
+    );
+  }
+  return model;
+}
+
+/**
  * Register a multi-file model where the runtime needs more than one
  * artifact (e.g. VLM main + projector, embedding model + vocab).
  */
 export async function registerMultiFileModel(
   input: RegisterMultiFileModelInput
-): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
+): Promise<ModelInfo> {
+  if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
   const message = ModelInfoCodec.fromPartial({
     id: input.id,
@@ -233,7 +333,16 @@ export async function registerMultiFileModel(
     },
   });
   const bytes = encodeProtoMessage(message, ModelInfoCodec);
-  return native.registerModelProto(bytes);
+  const accepted = await native.registerModelProto(bytes);
+  if (!accepted) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_INVALID_STATE,
+      `Model registry rejected multi-file model '${message.id}'.`,
+      { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
+    );
+  }
+  // Swift parity: registerModel(multiFile:) returns the registered RAModelInfo.
+  return message;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +363,8 @@ export async function listModels(
       errorMessage: 'Native module not available',
     });
   }
+  // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:17).
+  await ensureServicesReadyOrIgnore();
   const native = requireNativeModule();
   const buffer = await native.getAvailableModelsProto();
   const bytes = arrayBufferToBytes(buffer);
@@ -300,6 +411,8 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
       errorMessage: 'Native module not available',
     });
   }
+  // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:34).
+  await ensureServicesReadyOrIgnore();
   const native = requireNativeModule();
   const buffer = await native.getModelInfoProto(request.modelId);
   const bytes = arrayBufferToBytes(buffer);
@@ -588,12 +701,16 @@ async function persistDownloadCompletion(
 }
 
 /**
- * Streaming download of a registered model identifier. Yields proto-canonical
+ * Streaming download of a registered model. Yields proto-canonical
  * `DownloadProgress` events from the native download service.
+ *
+ * Matches Swift: `RunAnywhere.downloadModelStream(_ model:) ->
+ * AsyncThrowingStream<RADownloadProgress, Error>`.
  *
  * Hermes-safe: callers MUST iterate via `iterator.next()` (see CLAUDE.md).
  */
-export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> {
+export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadProgress> {
+  const modelId = model.id;
   if (!isNativeModuleAvailable()) {
     return {
       [Symbol.asyncIterator](): AsyncIterator<DownloadProgress> {
@@ -788,7 +905,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
 }
 
 /**
- * Flat alias for `downloadModel` that matches Swift's canonical shape:
+ * Awaitable download that matches Swift's canonical shape:
  * `RunAnywhere.downloadModel(_ model, onProgress:) async throws -> DownloadProgress`.
  *
  * Drives the underlying `AsyncIterable<DownloadProgress>` internally and calls
@@ -796,14 +913,14 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
  * on success or throwing on failure/cancellation — mirroring
  * `RunAnywhere+Storage.swift:177-263`.
  *
- * Callers that prefer the streaming iterable can still use `downloadModel(id)`
- * directly; both shapes are supported.
+ * Callers that prefer the streaming iterable can use
+ * `downloadModelStream(model)` directly; both shapes are supported.
  */
-export async function downloadModelWithProgress(
+export async function downloadModel(
   model: ModelInfo,
   onProgress?: (progress: DownloadProgress) => void,
 ): Promise<DownloadProgress> {
-  const iterable = downloadModel(model.id);
+  const iterable = downloadModelStream(model);
   const iterator = iterable[Symbol.asyncIterator]();
   let last: DownloadProgress | undefined;
   while (true) {
@@ -822,6 +939,41 @@ export async function downloadModelWithProgress(
     );
   }
   return last;
+}
+
+/**
+ * Re-sync the native model registry with on-disk state and (optionally) the
+ * remote catalog.
+ *
+ * Matches Swift: `RunAnywhere.refreshModelRegistry(rescanLocal:includeRemoteCatalog:pruneOrphans:)`
+ * (`RunAnywhere+ModelRegistry.swift`). Non-throwing like Swift — a failed
+ * refresh leaves the current registry contents in place.
+ */
+export async function refreshModelRegistry(
+  options: {
+    rescanLocal?: boolean;
+    includeRemoteCatalog?: boolean;
+    pruneOrphans?: boolean;
+  } = {}
+): Promise<void> {
+  if (!isNativeModuleAvailable()) return;
+  const {
+    rescanLocal = true,
+    includeRemoteCatalog = false,
+    pruneOrphans = false,
+  } = options;
+  const native = requireNativeModule();
+  try {
+    await ensureServicesReady();
+    await native.refreshModelRegistry(
+      includeRemoteCatalog,
+      rescanLocal,
+      pruneOrphans
+    );
+  } catch {
+    // Mirrors Swift: refresh is best-effort; the registry keeps its
+    // current contents when the native refresh cannot complete.
+  }
 }
 
 /**

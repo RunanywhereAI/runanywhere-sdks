@@ -17,7 +17,7 @@ export { RunAnywhere } from './Public/RunAnywhere';
 // commons hybrid router — commons owns all routing. Mirrors Swift `Hybrid/*`
 // and Kotlin `public/hybrid/*` (RACRouter / CloudSTT / RoutingPolicy).
 export {
-  HybridSttRouter,
+  HybridSTTRouter,
   CloudSTT,
   HybridDeviceState,
   HybridBackendKind,
@@ -41,6 +41,9 @@ export type {
   CustomFilterCheck,
   CloudModelEntry,
   CloudRegisterOptions,
+  CloudSttProviderHandler,
+  CloudSttProviderRequest,
+  CloudSttProviderResult,
   HybridDeviceStateProvider,
 } from './Public/Extensions/Hybrid';
 
@@ -53,13 +56,17 @@ export {
   SDKException,
   isSDKException,
   asSDKException,
+  isExpectedErrorCode,
+  sdkExceptionFromRcResult,
+  throwIfRcError,
 } from './Foundation/Errors';
 export type { ErrorContext } from './Foundation/Errors';
 
-export { EventBus } from './Public/Events/EventBus';
+export { EventBus, modelLifecycleChange } from './Public/Events/EventBus';
 export type {
   EventBusCancellable,
   SDKEventHandler,
+  ModelLifecycleChange,
 } from './Public/Events/EventBus';
 
 export type {

@@ -1,5 +1,5 @@
 /**
- * HybridSttRouter.ts
+ * HybridSTTRouter.ts
  *
  * THIN React Native binding over the commons STT hybrid router
  * (rac_stt_hybrid_router + its proto-byte ABI), reached through the Nitro
@@ -67,10 +67,10 @@ interface AttachedService {
  * Usage:
  * ```typescript
  * await CloudSTT.register();
- * await CloudSTT.register_model({ id: 'saaras', provider: 'sarvam',
+ * await CloudSTT.registerModel({ id: 'saaras', provider: 'sarvam',
  *   model: 'saaras:v2.5', apiKey: '…' });
  *
- * const router = await HybridSttRouter.create();
+ * const router = await HybridSTTRouter.create();
  * await router.setPair(
  *   offlineSherpa('sherpa-onnx-whisper-tiny.en'),
  *   onlineCloud('saaras'),
@@ -81,7 +81,7 @@ interface AttachedService {
  * await router.close();
  * ```
  */
-export class HybridSttRouter {
+export class HybridSTTRouter {
   private handle: number;
   private offline: AttachedService | null = null;
   private online: AttachedService | null = null;
@@ -92,7 +92,7 @@ export class HybridSttRouter {
   }
 
   /** Create the native router handle (`rac_stt_hybrid_router_create`). */
-  static async create(): Promise<HybridSttRouter> {
+  static async create(): Promise<HybridSTTRouter> {
     if (!isNativeModuleAvailable()) {
       throw SDKException.nativeModuleUnavailable();
     }
@@ -101,7 +101,7 @@ export class HybridSttRouter {
     if (!handle) {
       throw SDKException.componentNotReady('rac_stt_hybrid_router_create returned 0');
     }
-    return new HybridSttRouter(handle);
+    return new HybridSTTRouter(handle);
   }
 
   /**
@@ -265,7 +265,7 @@ export class HybridSttRouter {
 
   private ensureOpen(): void {
     if (!this.handle) {
-      throw SDKException.componentNotReady('HybridSttRouter is closed');
+      throw SDKException.componentNotReady('HybridSTTRouter is closed');
     }
   }
 

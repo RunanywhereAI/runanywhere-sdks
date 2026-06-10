@@ -53,10 +53,11 @@ namespace margelo::nitro::runanywhere {
     public:
       // Methods
       virtual std::shared_ptr<Promise<bool>> initialize(const std::string& configJson) = 0;
-      virtual std::shared_ptr<Promise<bool>> completeServicesInitialization() = 0;
-      virtual std::shared_ptr<Promise<bool>> retryHTTPSetupProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> completeServicesInitialization() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> retryHTTPSetupProto() = 0;
       virtual std::shared_ptr<Promise<void>> destroy() = 0;
       virtual std::shared_ptr<Promise<bool>> isInitialized() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> resultToProtoErrorProto(double code) = 0;
       virtual std::shared_ptr<Promise<double>> pluginLoaderApiVersion() = 0;
       virtual std::shared_ptr<Promise<double>> pluginLoaderRegisteredCount() = 0;
       virtual std::shared_ptr<Promise<std::string>> pluginLoaderRegisteredNames() = 0;
@@ -126,6 +127,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> hybridClearDeviceState() = 0;
       virtual std::shared_ptr<Promise<bool>> cloudRegister() = 0;
       virtual std::shared_ptr<Promise<bool>> cloudUnregister() = 0;
+      virtual std::shared_ptr<Promise<bool>> cloudRegisterSttProvider(const std::string& name, const std::function<std::shared_ptr<Promise<std::shared_ptr<Promise<std::string>>>>(const std::string& /* configJson */, const std::shared_ptr<ArrayBuffer>& /* audioBytes */, double /* audioFormat */)>& onTranscribe) = 0;
+      virtual std::shared_ptr<Promise<void>> cloudUnregisterSttProvider(const std::string& name) = 0;
       virtual std::shared_ptr<Promise<bool>> cloudIsRegistered() = 0;
       virtual std::shared_ptr<Promise<bool>> isTTSModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadTTSModel() = 0;

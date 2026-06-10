@@ -193,6 +193,14 @@ class HybridSttRouter {
     return _decodeResponse(responseBytes);
   }
 
+  /// Cancel an in-flight transcribe, if any. Best-effort: no STT engine
+  /// exposes a cancel op today, so commons treats this as a no-op until one
+  /// does. Mirrors Swift `HybridSTTRouter.cancel()` (HybridSTTRouter.swift:348).
+  void cancel() {
+    if (_closed) return;
+    _bridge.cancelRouter(_handle);
+  }
+
   /// Detach + destroy both services, unregister custom filters, and destroy the
   /// router handle. Idempotent.
   void close() {

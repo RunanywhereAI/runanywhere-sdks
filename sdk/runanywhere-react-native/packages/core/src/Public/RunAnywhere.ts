@@ -21,6 +21,7 @@ import {
   SdkInitEnvironment,
   SdkInitPhase1Request,
   SdkInitPhase2Request,
+  SdkInitResult,
 } from '@runanywhere/proto-ts/sdk_init';
 import type {
   SdkInitPhase1Request as SdkInitPhase1RequestMessage,
@@ -33,7 +34,7 @@ import {
   markCoreInitialized,
   markServicesInitializing,
   markServicesInitialized,
-  markHTTPSetupCompleted,
+  markHTTPSetupResult,
   markInitializationFailed,
   resetState,
 } from '../Foundation/Initialization/InitializationState';
@@ -65,6 +66,8 @@ import * as RAG from './Extensions/RAG/RunAnywhere+RAG';
 import * as VLM from './Extensions/VLM/RunAnywhere+VisionLanguage';
 import { lora as LoRACapability } from './Extensions/LLM/RunAnywhere+LoRA';
 import { solutions as SolutionsCapability } from './Extensions/Solutions/RunAnywhere+Solutions';
+import { embeddings as EmbeddingsCapability } from './Extensions/Embeddings/RunAnywhere+Embeddings';
+import { AudioConvert } from './Extensions/Audio/RunAnywhere+AudioConvert';
 import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
 import { formatFramework } from './Helpers/formatFramework';
 import { EventBus } from './Events/EventBus';
@@ -85,6 +88,35 @@ let initializingPromise: Promise<void> | null = null;
 type NativePhase2Module = {
   completeServicesInitialization?: () => Promise<unknown>;
 };
+
+/**
+ * Decode the serialized `RASdkInitResult` returned by the native phase-2 /
+ * HTTP-retry bridge. Mirrors Swift, which reads `hasCompletedHttpSetup ||
+ * httpConfigured` and `httpApplicable` from the same proto.
+ *
+ * Returns `null` for the offline/deferred outcomes: an empty buffer (the
+ * packaged commons lacks the symbol) or an unrecognized payload. A literal
+ * `true` from a stale packaged native still resolving the legacy boolean is
+ * preserved as fully-configured.
+ */
+function decodeSdkInitResultPayload(
+  payload: unknown
+): { httpConfigured: boolean; httpApplicable: boolean } | null {
+  if (payload instanceof ArrayBuffer) {
+    if (payload.byteLength === 0) {
+      return null;
+    }
+    const decoded = SdkInitResult.decode(new Uint8Array(payload));
+    return {
+      httpConfigured: decoded.hasCompletedHttpSetup || decoded.httpConfigured,
+      httpApplicable: decoded.httpApplicable,
+    };
+  }
+  if (payload === true) {
+    return { httpConfigured: true, httpApplicable: true };
+  }
+  return null;
+}
 
 function mapSdkInitEnvironment(environment: SDKEnvironment): SdkInitEnvironment {
   switch (environment) {
@@ -355,11 +387,15 @@ export const RunAnywhere = {
         }
         logger.debug('Native phase 2 bridge not available; core native init is already complete.');
       }
-      const httpConfigured = phase2Result === true;
+      const decoded = decodeSdkInitResultPayload(phase2Result);
+      const httpConfigured = decoded?.httpConfigured ?? false;
+      const httpApplicable = decoded?.httpApplicable ?? true;
 
-      initState = markServicesInitialized(initState, httpConfigured);
+      initState = markServicesInitialized(initState, httpConfigured, httpApplicable);
       if (httpConfigured) {
         logger.info('Services initialisation completed.');
+      } else if (!httpApplicable) {
+        logger.info('Services initialisation completed (HTTP setup not applicable for this configuration).');
       } else {
         logger.info('Services initialisation completed (HTTP/auth deferred — will retry on next online call).');
       }
@@ -604,7 +640,9 @@ export const RunAnywhere = {
   ragQuery: RAG.ragQuery,
   ragClearDocuments: RAG.ragClearDocuments,
   ragGetDocumentCount: RAG.ragGetDocumentCount,
+  ragDocumentCount: RAG.ragDocumentCount,
   ragGetStatistics: RAG.ragGetStatistics,
+  ragResolvedConfiguration: RAG.ragResolvedConfiguration,
 
   // ============================================================================
   // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
@@ -616,19 +654,37 @@ export const RunAnywhere = {
   solutions: SolutionsCapability,
 
   // ============================================================================
+  // Embeddings — canonical `RunAnywhere.embeddings.*` namespace
+  // Matches Swift: RunAnywhere+Embeddings.swift
+  // ============================================================================
+
+  embeddings: EmbeddingsCapability,
+
+  // ============================================================================
+  // Audio conversion helpers (PCM16 → Float32 / WAV)
+  // Matches Swift: RAAudioConvert.swift
+  // ============================================================================
+
+  pcm16ToFloat32: AudioConvert.pcm16ToFloat32,
+  pcm16ToFloat32Samples: AudioConvert.pcm16ToFloat32Samples,
+  pcm16ToWav: AudioConvert.pcm16ToWav,
+
+  // ============================================================================
   // Model Management (Delegated to Extension) — Swift parity
   // ============================================================================
 
   registerModel: ModelManagement.registerModel,
   registerModelFromUrl: ModelManagement.registerModelFromUrl,
   registerMultiFileModel: ModelManagement.registerMultiFileModel,
+  registerArchiveModel: ModelManagement.registerArchiveModel,
   listModels: ModelManagement.listModels,
   queryModels: ModelManagement.queryModels,
   getModel: ModelManagement.getModel,
   downloadedModels: ModelManagement.downloadedModels,
   importModel: ModelManagement.importModel,
   downloadModel: ModelManagement.downloadModel,
-  downloadModelWithProgress: ModelManagement.downloadModelWithProgress,
+  downloadModelStream: ModelManagement.downloadModelStream,
+  refreshModelRegistry: ModelManagement.refreshModelRegistry,
   getDefaultFramework: ModelManagement.getDefaultFramework,
 
   // ============================================================================
@@ -680,10 +736,19 @@ async function retryHTTPSetupInternal(): Promise<void> {
   const native = requireNativeModule();
   logger.debug('Retrying HTTP/auth setup...');
   try {
-    const httpConfigured = await native.retryHTTPSetupProto();
-    if (httpConfigured) {
-      initState = markHTTPSetupCompleted(initState);
-      logger.info('HTTP/Auth setup succeeded on retry.');
+    const retryResult: unknown = await native.retryHTTPSetupProto();
+    const decoded = decodeSdkInitResultPayload(retryResult);
+    if (decoded) {
+      initState = markHTTPSetupResult(
+        initState,
+        decoded.httpConfigured,
+        decoded.httpApplicable
+      );
+      if (decoded.httpConfigured) {
+        logger.info('HTTP/Auth setup succeeded on retry.');
+      } else if (!decoded.httpApplicable) {
+        logger.info('HTTP setup not applicable for this configuration; retries stopped.');
+      }
       return;
     }
     logger.debug('HTTP/Auth retry did not complete; commons reported deferred setup.');
@@ -697,10 +762,13 @@ async function retryHTTPSetupInternal(): Promise<void> {
 }
 
 async function ensureServicesReadyInternal(): Promise<void> {
-  if (initState.hasCompletedServicesInit && initState.hasCompletedHTTPSetup) {
+  const services = initState.hasCompletedServicesInit;
+  const http = initState.hasCompletedHTTPSetup;
+  const applicable = initState.httpSetupApplicable;
+  if (services && (http || !applicable)) {
     return;
   }
-  if (initState.hasCompletedServicesInit && !initState.hasCompletedHTTPSetup) {
+  if (services && !http && applicable) {
     await retryHTTPSetupInternal();
     return;
   }
