@@ -33,6 +33,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -555,6 +556,38 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             }
         }
     }
+    // Snapshot the Content-Range total ("bytes */<total>" on a 416) before
+    // freeing the response. When a resume requests a range at/after EOF the
+    // server reports the resource's true length here. It is the authoritative
+    // size to validate an already-complete file against — the caller's
+    // expected byte count may only be a catalog estimate, and many GGUF
+    // mirrors omit a checksum entirely.
+    int64_t content_range_total = -1;
+    if (rc == RAC_SUCCESS && resp_meta.headers != nullptr) {
+        for (size_t i = 0; i < resp_meta.header_count; ++i) {
+            const auto& kv = resp_meta.headers[i];
+            if (kv.name == nullptr || kv.value == nullptr) {
+                continue;
+            }
+            if (iequals(kv.name, "Content-Range")) {
+                std::string value(kv.value);
+                size_t slash = value.rfind('/');
+                if (slash != std::string::npos && slash + 1 < value.size()) {
+                    std::string total = value.substr(slash + 1);
+                    size_t b = total.find_first_not_of(" \t");
+                    size_t e = total.find_last_not_of(" \t");
+                    if (b != std::string::npos) {
+                        total = total.substr(b, e - b + 1);
+                        if (total != "*" &&
+                            total.find_first_not_of("0123456789") == std::string::npos) {
+                            content_range_total = std::strtoll(total.c_str(), nullptr, 10);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
     rac_http_response_free(&resp_meta);
 
     out.flush();
@@ -638,6 +671,68 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             // stub that the next iteration's promote-to-resume sniff will
             // catch via the `looks_like_stub` heuristic.
             (void)rm_ec;
+        }
+
+        // A 416 on ANY resume (promoted from a fresh request that found a
+        // complete file, OR an explicit resume_from_byte) means the server has
+        // nothing at/after our offset — the on-disk file already holds the
+        // entire resource. A genuine partial would have received a 206 with the
+        // remaining bytes, never a 416, so resuming from our own EOF and being
+        // told "range unsatisfiable" is a positive completeness signal. Report
+        // success (after verifying the checksum when provided) instead of a
+        // retryable network error, so an already-downloaded model whose size
+        // was only estimated — or has no checksum — isn't stuck re-failing.
+        const bool resumed_to_eof = (effective_resume_from > 0);
+        if (resumed_to_eof) {
+            // If the server reported its true length and the on-disk file
+            // overshot it (trailing garbage from an earlier interrupted write),
+            // trim to the exact size before trusting or hashing the file.
+            if (content_range_total > 0 &&
+                static_cast<int64_t>(effective_resume_from) > content_range_total) {
+                std::error_code trim_ec;
+                fs::resize_file(dest, static_cast<uintmax_t>(content_range_total), trim_ec);
+                if (trim_ec) {
+                    RAC_LOG_ERROR(kTag, "trim-to-content-range-total failed: %s",
+                                  trim_ec.message().c_str());
+                    return RAC_HTTP_DL_FILE_ERROR;
+                }
+                effective_resume_from = static_cast<uint64_t>(content_range_total);
+            }
+            if (do_hash) {
+                // The streamed hasher consumed the rolled-back stub bytes, so
+                // recompute the digest over the on-disk file before trusting it.
+                sha256_init(&hasher);
+                std::ifstream rehash(dest, std::ios::binary);
+                if (!rehash.is_open()) {
+                    return RAC_HTTP_DL_FILE_ERROR;
+                }
+                std::vector<uint8_t> hbuf(static_cast<size_t>(64) * 1024);
+                while (rehash.good()) {
+                    rehash.read(reinterpret_cast<char*>(hbuf.data()),
+                                static_cast<std::streamsize>(hbuf.size()));
+                    std::streamsize n = rehash.gcount();
+                    if (n <= 0)
+                        break;
+                    sha256_update(&hasher, hbuf.data(), static_cast<size_t>(n));
+                }
+                uint8_t digest[32];
+                sha256_final(&hasher, digest);
+                std::string actual = bytes_to_hex(digest, 32);
+                if (!iequals(actual, req->expected_sha256_hex)) {
+                    RAC_LOG_WARNING(kTag,
+                                    "HTTP 416 on already-on-disk file but checksum mismatch: "
+                                    "expected=%s actual=%s",
+                                    req->expected_sha256_hex, actual.c_str());
+                    return RAC_HTTP_DL_CHECKSUM_FAILED;
+                }
+            }
+            RAC_LOG_WARNING(kTag,
+                            "HTTP 416 on resume — destination already complete (%llu bytes)",
+                            static_cast<unsigned long long>(effective_resume_from));
+            if (progress_cb) {
+                progress_cb(effective_resume_from, effective_resume_from, progress_user_data);
+            }
+            return RAC_HTTP_DL_OK;
         }
         return RAC_HTTP_DL_NETWORK_ERROR;
     }
