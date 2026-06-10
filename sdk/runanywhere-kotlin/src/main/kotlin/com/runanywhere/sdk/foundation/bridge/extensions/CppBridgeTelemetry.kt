@@ -18,25 +18,16 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import ai.runanywhere.proto.v1.ErrorSeverity
-import ai.runanywhere.proto.v1.EventCategory
-import ai.runanywhere.proto.v1.EventDestination
-import ai.runanywhere.proto.v1.InitializationEvent
-import ai.runanywhere.proto.v1.InitializationStage
-import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.foundation.constants.SDKConstants
-import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.cEnvironment
 import com.runanywhere.sdk.public.configuration.description
-import com.runanywhere.sdk.public.events.SDKEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.util.UUID
 
 /**
  * Telemetry bridge — owns the native `rac_telemetry_manager_*` handle
@@ -75,15 +66,6 @@ object CppBridgeTelemetry {
 
     // Lifecycle (parity with Swift `CppBridge.Events.register/unregister`
     // and `CppBridge.Telemetry.initialize/shutdown`)
-
-    /** Register the telemetry bridge. Idempotent. */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) return
-            log(CppBridgePlatformAdapter.LogLevel.DEBUG, "Registering telemetry…")
-            isRegistered = true
-        }
-    }
 
     /**
      * Create the native telemetry manager and wire the HTTP callback.
@@ -148,6 +130,7 @@ object CppBridgeTelemetry {
                 )
             }
 
+            isRegistered = true
             log(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 "Telemetry manager initialized (handle=$telemetryManagerHandle, env=${environment.description})",
@@ -251,87 +234,6 @@ object CppBridgeTelemetry {
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.ERROR, "Telemetry HTTP failed for $path: ${e.message}")
         }
-    }
-
-    // SDK lifecycle event emission helpers (parity with Swift's
-    // `CppBridge.Events.emitSDKInit*` / `emitSDKModelsLoaded`).
-    //
-    // Each builds an [InitializationEvent] + wraps it in an [SDKEvent]
-    // and publishes it through the canonical SDKEvent proto stream via
-    // [CppBridgeSDKEventStream.publish] — C++ owns fan-out + routing.
-
-    /** Emit "SDK init started" through the canonical SDKEvent proto stream. */
-    fun emitSDKInitStarted() {
-        publishInitialization(stage = InitializationStage.INITIALIZATION_STAGE_STARTED)
-    }
-
-    /** Emit "SDK init completed" carrying init duration in milliseconds. */
-    fun emitSDKInitCompleted(durationMs: Double) {
-        publishInitialization(
-            stage = InitializationStage.INITIALIZATION_STAGE_COMPLETED,
-            properties = mapOf("duration_ms" to durationMs.toString()),
-        )
-    }
-
-    /**
-     * Emit "SDK init failed". Mirrors Swift's `emitSDKInitFailed(error:)`.
-     * A `null` [error] still produces a FAILED event with an empty message so
-     * downstream consumers see the failure stage.
-     */
-    fun emitSDKInitFailed(error: SDKException?) {
-        publishInitialization(
-            stage = InitializationStage.INITIALIZATION_STAGE_FAILED,
-            errorMessage = error?.message ?: "",
-        )
-    }
-
-    /**
-     * Emit "SDK models loaded". Swift sends a `model_count`; Kotlin SDK callers
-     * already have the full id list at the call site, so we send both the
-     * count and a comma-joined id list for richer downstream attribution.
-     */
-    fun emitSDKModelsLoaded(modelIds: List<String>) {
-        publishInitialization(
-            stage = InitializationStage.INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED,
-            properties =
-                mapOf(
-                    "model_count" to modelIds.size.toString(),
-                    "model_ids" to modelIds.joinToString(","),
-                ),
-        )
-    }
-
-    private fun publishInitialization(
-        stage: InitializationStage,
-        errorMessage: String = "",
-        properties: Map<String, String> = emptyMap(),
-    ) {
-        val severity =
-            if (stage == InitializationStage.INITIALIZATION_STAGE_FAILED) {
-                ErrorSeverity.ERROR_SEVERITY_ERROR
-            } else {
-                ErrorSeverity.ERROR_SEVERITY_INFO
-            }
-
-        val event =
-            SDKEvent(
-                id = UUID.randomUUID().toString(),
-                timestamp_ms = System.currentTimeMillis(),
-                severity = severity,
-                category = EventCategory.EVENT_CATEGORY_INITIALIZATION,
-                component = SDKComponent.SDK_COMPONENT_UNSPECIFIED,
-                destination = EventDestination.EVENT_DESTINATION_ALL,
-                source = "kotlin",
-                properties = properties,
-                initialization =
-                    InitializationEvent(
-                        stage = stage,
-                        error = errorMessage,
-                        version = SDKConstants.VERSION,
-                    ),
-            )
-
-        CppBridgeSDKEventStream.publish(event)
     }
 
     private fun log(level: Int, message: String) {

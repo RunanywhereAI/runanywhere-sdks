@@ -2,8 +2,6 @@ package com.runanywhere.runanywhereai.ui.screens.tts
 
 import ai.runanywhere.proto.v1.InferenceFramework
 import android.app.Application
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -17,13 +15,8 @@ import com.runanywhere.sdk.public.extensions.stopSpeaking
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RATTSOptions
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
-import java.util.Locale
 import kotlin.coroutines.cancellation.CancellationException
 
 data class TtsMetrics(
@@ -50,7 +43,6 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     private var job: Job? = null
-    private var systemTts: TextToSpeech? = null
 
     fun onTextChange(value: String) {
         text = value
@@ -101,16 +93,16 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         job = viewModelScope.launch {
             val start = System.currentTimeMillis()
             try {
-                if (isSystem(voice)) {
-                    speakSystem(content)
-                    val elapsed = System.currentTimeMillis() - start
-                    metrics = TtsMetrics(
-                        durationSec = elapsed / 1000.0,
-                        charsPerSec = if (elapsed > 0) content.length * 1000.0 / elapsed else null,
-                    )
-                } else {
-                    RunAnywhere.speak(content, options())
-                }
+                val result = RunAnywhere.speak(content, options())
+                val elapsed = System.currentTimeMillis() - start
+                metrics = TtsMetrics(
+                    durationSec = result.duration_ms.takeIf { it > 0 }?.let { it / 1000.0 }
+                        ?: (elapsed / 1000.0),
+                    processingMs = elapsed,
+                    charsPerSec = if (elapsed > 0) content.length * 1000.0 / elapsed else null,
+                    sizeBytes = result.audio_size_bytes.takeIf { it > 0 },
+                    sampleRate = result.sample_rate.takeIf { it > 0 },
+                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -124,7 +116,6 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stop() {
         job?.cancel()
-        systemTts?.stop()
         viewModelScope.launch { runCatching { RunAnywhere.stopSpeaking() } }
         isSpeaking = false
         isGenerating = false
@@ -134,52 +125,6 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun isSystem(voice: RAModelInfo): Boolean =
         voice.id == "system-tts" || voice.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
-
-    private suspend fun speakSystem(value: String) {
-        val tts = ensureSystemTts()
-        withContext(Dispatchers.Main) {
-            tts.language = Locale.getDefault()
-            tts.setSpeechRate(speed)
-        }
-        suspendCancellableCoroutine { cont ->
-            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                override fun onStart(utteranceId: String?) = Unit
-                override fun onDone(utteranceId: String?) {
-                    if (cont.isActive) cont.resumeWith(Result.success(Unit))
-                }
-
-                override fun onError(utteranceId: String?, errorCode: Int) {
-                    if (cont.isActive) cont.resumeWith(Result.failure(IllegalStateException("System TTS error $errorCode")))
-                }
-
-                @Deprecated("Deprecated in Java")
-                override fun onError(utteranceId: String?) {
-                    if (cont.isActive) cont.resumeWith(Result.failure(IllegalStateException("System TTS error")))
-                }
-            })
-            tts.speak(value, TextToSpeech.QUEUE_FLUSH, null, "rac-tts")
-            cont.invokeOnCancellation { tts.stop() }
-        }
-    }
-
-    private suspend fun ensureSystemTts(): TextToSpeech {
-        systemTts?.let { return it }
-        val ready = CompletableDeferred<Boolean>()
-        val tts = TextToSpeech(getApplication()) { status ->
-            ready.complete(status == TextToSpeech.SUCCESS)
-        }
-        if (!ready.await()) {
-            tts.shutdown()
-            throw IllegalStateException("System TTS unavailable")
-        }
-        systemTts = tts
-        return tts
-    }
-
-    override fun onCleared() {
-        systemTts?.shutdown()
-        systemTts = null
-    }
 
     private companion object {
         val SAMPLES = listOf(

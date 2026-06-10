@@ -79,8 +79,30 @@ suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadRes
         )
 }
 
-suspend fun RunAnywhere.currentModel(request: CurrentModelRequest): CurrentModelResult =
+suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModelRequest()): CurrentModelResult =
     CppBridgeModelLifecycle.currentModel(request) ?: CurrentModelResult()
+
+internal suspend fun RunAnywhere.loadedModelSnapshot(
+    category: ModelCategory,
+    includeModelMetadata: Boolean = false,
+): CurrentModelResult =
+    currentModel(
+        CurrentModelRequest(
+            category = category,
+            include_model_metadata = includeModelMetadata,
+        ),
+    )
+
+internal suspend fun RunAnywhere.firstLoadedModelSnapshot(
+    categories: List<ModelCategory>,
+    includeModelMetadata: Boolean = false,
+): CurrentModelResult? {
+    for (category in categories) {
+        val result = loadedModelSnapshot(category = category, includeModelMetadata = includeModelMetadata)
+        if (result.found) return result
+    }
+    return null
+}
 
 /**
  * Full [ModelInfo] for the model currently loaded under [category], or `null`
@@ -91,10 +113,7 @@ suspend fun RunAnywhere.currentModel(request: CurrentModelRequest): CurrentModel
  * populated proto instead of reconstructing a stand-in.
  */
 suspend fun RunAnywhere.modelInfoForCategory(category: ModelCategory): ModelInfo? {
-    val result =
-        currentModel(
-            CurrentModelRequest(category = category, include_model_metadata = true),
-        )
+    val result = loadedModelSnapshot(category = category, includeModelMetadata = true)
     return if (result.found) result.model else null
 }
 

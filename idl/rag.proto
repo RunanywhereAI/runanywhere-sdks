@@ -90,7 +90,10 @@ message RAGConfiguration {
 
     // Number of top chunks to retrieve per query.
     // Optional so callers can distinguish "unset" from an explicit value.
-    optional int32 top_k                 = 4 [(runanywhere.v1.rac_default) = "5"];
+    optional int32 top_k                 = 4 [
+        (runanywhere.v1.rac_default) = "5",
+        (runanywhere.v1.rac_min) = 1
+    ];
 
     // Minimum cosine similarity threshold (0.0–1.0). Chunks below this
     // score are discarded before being passed to the LLM as context.
@@ -99,7 +102,7 @@ message RAGConfiguration {
     // Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
     // cosine similarities that rarely exceed ~0.5 even for relevant chunks,
     // so a 0.7 floor filters out every match and retrieval returns nothing
-    // (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
+    // (validated by generated SDK helpers and commons session creation).
     optional float similarity_threshold  = 5 [
         (runanywhere.v1.rac_default) = "0.3",
         (runanywhere.v1.rac_min_float) = 0.0,
@@ -108,12 +111,18 @@ message RAGConfiguration {
 
     // Tokens per chunk when splitting documents during ingestion.
     // Optional so callers can distinguish "unset" from an explicit value.
-    optional int32 chunk_size            = 6 [(runanywhere.v1.rac_default) = "512"];
+    optional int32 chunk_size            = 6 [
+        (runanywhere.v1.rac_default) = "512",
+        (runanywhere.v1.rac_min) = 1
+    ];
 
     // Overlap tokens between consecutive chunks. Must be < chunk_size.
     // Optional so callers can explicitly request zero overlap (no overlap)
     // without it being silently replaced by the canonical default of 64.
-    optional int32 chunk_overlap         = 7 [(runanywhere.v1.rac_default) = "64"];
+    optional int32 chunk_overlap         = 7 [
+        (runanywhere.v1.rac_default) = "64",
+        (runanywhere.v1.rac_min) = 0
+    ];
 
     // Maximum tokens of retrieved context passed to the LLM.
     // Optional so callers can distinguish "unset" from an explicit value.

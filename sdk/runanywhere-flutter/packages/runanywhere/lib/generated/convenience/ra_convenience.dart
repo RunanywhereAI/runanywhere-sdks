@@ -377,10 +377,28 @@ extension RAGConfigurationConvenience on RAGConfiguration {
 
 extension RAGConfigurationValidate on RAGConfiguration {
   void validate() {
+    if (topK < 1) {
+      throw SDKException.validationFailed(
+        'top_k must be in >= 1 (got $topK)',
+        fieldPath: 'RAGConfiguration.top_k',
+      );
+    }
     if (similarityThreshold < 0.0 || similarityThreshold > 1.0) {
       throw SDKException.validationFailed(
         'similarity_threshold must be in 0.0...1.0 (got $similarityThreshold)',
         fieldPath: 'RAGConfiguration.similarity_threshold',
+      );
+    }
+    if (chunkSize < 1) {
+      throw SDKException.validationFailed(
+        'chunk_size must be in >= 1 (got $chunkSize)',
+        fieldPath: 'RAGConfiguration.chunk_size',
+      );
+    }
+    if (chunkOverlap < 0) {
+      throw SDKException.validationFailed(
+        'chunk_overlap must be in >= 0 (got $chunkOverlap)',
+        fieldPath: 'RAGConfiguration.chunk_overlap',
       );
     }
   }

@@ -16,6 +16,7 @@ import ai.runanywhere.proto.v1.InitializationEvent
 import ai.runanywhere.proto.v1.InitializationStage
 import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.constants.SDKConstants
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.events.SDKEvent
 import java.util.UUID
 
@@ -54,6 +55,28 @@ object CppBridgeSDKEvents {
         )
     }
 
+    fun emitSDKInitFailed(error: SDKException?) {
+        publishInitialization(
+            stage = InitializationStage.INITIALIZATION_STAGE_FAILED,
+            severity = ErrorSeverity.ERROR_SEVERITY_ERROR,
+            operationId = "sdk.init",
+            error = error?.message ?: "",
+        )
+    }
+
+    fun emitSDKModelsLoaded(modelIds: List<String>) {
+        publishInitialization(
+            stage = InitializationStage.INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED,
+            severity = ErrorSeverity.ERROR_SEVERITY_INFO,
+            operationId = "sdk.models_loaded",
+            properties =
+                mapOf(
+                    "model_count" to modelIds.size.toString(),
+                    "model_ids" to modelIds.joinToString(","),
+                ),
+        )
+    }
+
     fun emitDeviceRegistered(deviceId: String) {
         publishDevice(
             kind = DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTERED,
@@ -77,6 +100,7 @@ object CppBridgeSDKEvents {
         severity: ErrorSeverity,
         operationId: String,
         properties: Map<String, String> = emptyMap(),
+        error: String = "",
     ) {
         publish(
             SDKEvent(
@@ -92,6 +116,7 @@ object CppBridgeSDKEvents {
                 initialization =
                     InitializationEvent(
                         stage = stage,
+                        error = error,
                         version = SDKConstants.VERSION,
                     ),
             ),

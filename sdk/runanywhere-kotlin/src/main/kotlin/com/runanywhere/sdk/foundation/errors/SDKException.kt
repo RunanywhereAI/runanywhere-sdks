@@ -48,6 +48,51 @@ class SDKException(
     /** Optional underlying error message captured at wrap time. */
     val nestedMessage: String? get() = error.nested_message
 
+    /** Stack trace captured by [Exception] at construction time. */
+    val stackTraceSnapshot: List<String> = stackTrace.map { it.toString() }
+
+    /** LocalizedError-style description parity with Swift. */
+    val errorDescription: String? get() = error.message.ifBlank { null }
+
+    /** One-line failure-reason summary suitable for logs and UI diagnostics. */
+    val failureReason: String
+        get() = "[${category.name}] ${code.name}"
+
+    /** Recovery guidance for common actionable errors. */
+    val recoverySuggestion: String?
+        get() =
+            when (code) {
+                ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED ->
+                    "Initialize the component before using it."
+                ProtoErrorCode.ERROR_CODE_MODEL_NOT_FOUND ->
+                    "Ensure the model is downloaded and the path is correct."
+                ProtoErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE ->
+                    "Check your internet connection and try again."
+                ProtoErrorCode.ERROR_CODE_INSUFFICIENT_STORAGE ->
+                    "Free up storage space and try again."
+                ProtoErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY ->
+                    "Close other applications to free up memory."
+                ProtoErrorCode.ERROR_CODE_MICROPHONE_PERMISSION_DENIED ->
+                    "Grant microphone permission in Settings."
+                ProtoErrorCode.ERROR_CODE_TIMEOUT ->
+                    "Try again or check your connection."
+                ProtoErrorCode.ERROR_CODE_INVALID_API_KEY ->
+                    "Verify your API key is correct."
+                ProtoErrorCode.ERROR_CODE_CANCELLED ->
+                    null
+                else ->
+                    null
+            }
+
+    /** Telemetry-only properties (lightweight, safe to ship). */
+    val telemetryProperties: Map<String, String>
+        get() =
+            mapOf(
+                "error_code" to code.name,
+                "error_category" to category.name,
+                "error_message" to error.message,
+            )
+
     /**
      * Dot-separated path to the field that triggered a validation failure
      * (e.g. `"STTOptions.sample_rate"`). Populated by the generated
@@ -508,13 +553,6 @@ val ProtoErrorCode.isExpected: Boolean
         }
 
 // SDKException convenience extensions (Swift parity)
-
-/**
- * One-line failure-reason summary suitable for log metadata. Mirrors the
- * Swift `failureReason` property.
- */
-private val SDKException.failureReason: String
-    get() = "[${this.category.name}] ${this.code.name}"
 
 /**
  * Log this exception to the central [Logging] service.

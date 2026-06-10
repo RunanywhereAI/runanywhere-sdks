@@ -1,10 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.GenerationEventKind
-import ai.runanywhere.proto.v1.LLMStreamFinalResult
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.ThinkingTagPattern
-import ai.runanywhere.proto.v1.TokenKind
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +23,7 @@ import com.runanywhere.sdk.public.events.EventCategory
 import com.runanywhere.sdk.public.events.SDKEvent
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
+import com.runanywhere.sdk.public.extensions.aggregateStream
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
@@ -205,48 +204,38 @@ class ChatViewModel : ViewModel() {
 
     private suspend fun streamReply(prompt: String, index: Int) {
         val options = generationOptions()
-        val answer = StringBuilder()
-        val thinking = StringBuilder()
-        var finalResult: LLMStreamFinalResult? = null
-        var streamError: String? = null
-        val startTime = System.currentTimeMillis()
-        var firstTokenTime: Long? = null
-
-        RunAnywhere.generateStream(prompt, options).collect { event ->
-            if (event.is_final) {
-                finalResult = event.result
-                if (event.error_message.isNotEmpty()) streamError = event.error_message
-                return@collect
+        val events = RunAnywhere.generateStream(prompt, options)
+        val result =
+            RunAnywhere.aggregateStream(prompt, events) { accumulated ->
+                messages[index] = messages[index].copy(text = accumulated)
             }
-            if (event.token.isNotEmpty()) {
-                if (firstTokenTime == null) firstTokenTime = System.currentTimeMillis()
-                when (event.kind) {
-                    TokenKind.TOKEN_KIND_THOUGHT -> thinking.append(event.token)
-                    else -> answer.append(event.token)
-                }
-                messages[index] = messages[index].copy(
-                    text = answer.toString(),
-                    thinking = thinking.toString().takeIf { it.isNotBlank() },
-                )
-            }
-        }
 
-        if (streamError != null) {
-            messages[index] = messages[index].copy(text = "Error: $streamError", thinking = null)
+        if (!result.error_message.isNullOrBlank()) {
+            messages[index] = messages[index].copy(text = "Error: ${result.error_message}", thinking = null)
             return
         }
 
-        val finalThinking = finalResult?.thinking_content?.takeIf { it.isNotBlank() }
-            ?: thinking.toString().takeIf { it.isNotBlank() }
+        val sdkMetrics = activeGenerationMetrics
+        val totalMs = result.generation_time_ms.toLong()
+        val tokens = result.tokens_generated.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
+        val tps = result.tokens_per_second.takeIf { it > 0 }
+            ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
+            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
         messages[index] = messages[index].copy(
-            text = finalResult?.text?.takeIf { it.isNotBlank() } ?: answer.toString(),
-            thinking = finalThinking,
-            stats = buildStats(
-                result = finalResult,
-                startTime = startTime,
-                firstTokenTime = firstTokenTime,
-                eventTTFTMs = activeGenerationTTFTMs,
-                eventMetrics = activeGenerationMetrics,
+            text = result.text,
+            thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+            stats = GenerationStats(
+                tokens = tokens,
+                tokensPerSecond = tps,
+                timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
+                    ?: activeGenerationTTFTMs
+                    ?: sdkMetrics?.timeToFirstTokenMs,
+                totalTimeMs = totalMs,
+                inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
+                modelName = GlobalState.model.loaded?.name,
+                framework = result.framework?.takeIf { it.isNotBlank() }
+                    ?: GlobalState.model.loaded?.framework?.analyticsKey,
+                mode = GenerationMode.STREAMING,
             ),
         )
     }
@@ -420,39 +409,6 @@ private fun StoredMessage.toUi() = ChatMessage(
         )
     },
 )
-
-// Final-result fields stay primary; SDK event-bus metrics fill the gaps the
-// way iOS merges activeGenerationTTFTMs, with the local wall-clock measures as
-// the last resort.
-private fun buildStats(
-    result: LLMStreamFinalResult?,
-    startTime: Long,
-    firstTokenTime: Long?,
-    eventTTFTMs: Long?,
-    eventMetrics: SdkGenerationMetrics?,
-): GenerationStats {
-    val now = System.currentTimeMillis()
-    val tokens = result?.completion_tokens?.takeIf { it > 0 } ?: eventMetrics?.outputTokens ?: 0
-    val totalTimeMs = result?.total_time_ms?.takeIf { it > 0 }
-        ?: eventMetrics?.durationMs?.takeIf { it > 0 }
-        ?: (now - startTime)
-    val ttft = result?.time_to_first_token_ms?.takeIf { it > 0 }
-        ?: eventTTFTMs?.takeIf { it > 0 }
-        ?: firstTokenTime?.let { it - startTime }?.takeIf { it > 0 }
-    val tps = result?.tokens_per_second?.toDouble()?.takeIf { it > 0 }
-        ?: eventMetrics?.tokensPerSecond?.takeIf { it > 0 }
-        ?: if (totalTimeMs > 0 && tokens > 0) tokens * 1000.0 / totalTimeMs else 0.0
-    return GenerationStats(
-        tokens = tokens,
-        tokensPerSecond = tps,
-        timeToFirstTokenMs = ttft,
-        totalTimeMs = totalTimeMs,
-        inputTokens = result?.prompt_tokens?.takeIf { it > 0 } ?: eventMetrics?.inputTokens ?: 0,
-        modelName = GlobalState.model.loaded?.name,
-        framework = GlobalState.model.loaded?.framework?.analyticsKey,
-        mode = GenerationMode.STREAMING,
-    )
-}
 
 private fun prettyJson(raw: String): String = runCatching {
     val trimmed = raw.trim()

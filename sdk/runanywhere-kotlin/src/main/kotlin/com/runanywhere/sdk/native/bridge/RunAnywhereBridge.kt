@@ -568,6 +568,17 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racArtifactInferFromUrlProto(requestBytes: ByteArray): ByteArray?
 
+    /**
+     * Build a fully-populated ModelInfo through the canonical commons factory.
+     *
+     * Input is serialized runanywhere.v1.ModelInfoMakeRequest bytes; output is
+     * serialized runanywhere.v1.ModelInfo bytes. Mirrors Swift's
+     * `rac_model_info_make_proto` path so Kotlin does not duplicate id/name,
+     * artifact, availability, or defaulting logic.
+     */
+    @JvmStatic
+    external fun racModelInfoMakeProto(requestBytes: ByteArray): ByteArray?
+
     // MODEL LIFECYCLE PROTO ABI (rac_model_lifecycle.h)
 
     @JvmStatic
@@ -1457,17 +1468,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racStructuredOutputSchemaToJsonProto(schemaProto: ByteArray): ByteArray?
 
-    /**
-     * Stream structured generation. Emits serialized `StructuredOutputStreamEvent`
-     * payloads through [listener]. Returns `RAC_SUCCESS` when the generation
-     * transport completed successfully.
-     */
-    @JvmStatic
-    external fun racStructuredOutputGenerateStreamProto(
-        requestProto: ByteArray,
-        listener: NativeProtoProgressListener?,
-    ): Int
-
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
     //
     // ENGINE ROUTER — CAPABILITY QUERIES
@@ -1576,8 +1576,6 @@ object RunAnywhereBridge {
     /** Generate structured output (JSON-schema constrained) given serialized
      *  StructuredOutputRequest bytes. Returns serialized StructuredOutputResult bytes.
      *  Handle is reserved for forward compatibility — current C ABI is handle-less. */
-    @JvmStatic external fun racStructuredOutputGenerateProto(handle: Long, req: ByteArray): ByteArray?
-
     // SDK STATE ACCESSORS (Swift-alignment)
     //
     // Mirrors Swift's CppBridge+State.swift. Reads the global SDK state

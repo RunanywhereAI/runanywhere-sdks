@@ -29,7 +29,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
@@ -46,6 +45,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.net.URL
 
 /**
  * The RunAnywhere SDK - Single entry point for on-device AI
@@ -270,6 +270,20 @@ object RunAnywhere {
     }
 
     /**
+     * Initialize the RunAnywhere SDK using a typed [URL] for the backend base URL.
+     *
+     * Mirrors Swift's URL-typed overload while preserving the string-backed
+     * [SDKInitParams] contract used by the Android bridge.
+     */
+    fun initialize(
+        apiKey: String,
+        baseURL: URL,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+    ) {
+        initialize(apiKey = apiKey, baseURL = baseURL.toString(), environment = environment)
+    }
+
+    /**
      * Initialize the RunAnywhere SDK with an Android [Context] (Android-specific
      * convenience overload). Absorbs the previously example-side
      * `AndroidPlatformContext.initialize(context)` call so callers do not need
@@ -296,6 +310,19 @@ object RunAnywhere {
         apiKey: String? = null,
         baseURL: String? = null,
         environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+    ) {
+        AndroidPlatformContext.initialize(context)
+        initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
+    }
+
+    /**
+     * Android [Context] convenience paired with the URL-typed backend overload.
+     */
+    fun initialize(
+        context: Context,
+        apiKey: String,
+        baseURL: URL,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
     ) {
         AndroidPlatformContext.initialize(context)
         initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
@@ -396,7 +423,7 @@ object RunAnywhere {
                 }
             } catch (error: Throwable) {
                 logger.error("Initialization failed: ${error.message}")
-                CppBridgeTelemetry.emitSDKInitFailed(SDKException.from(error))
+                CppBridgeSDKEvents.emitSDKInitFailed(SDKException.from(error))
                 // Roll back state on failure so a corrected retry can succeed.
                 _initParams = null
                 _currentEnvironment = null

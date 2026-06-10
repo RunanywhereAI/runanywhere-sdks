@@ -116,6 +116,10 @@ public enum CppBridge {
         // Step 3: Attach the telemetry manager as the C++ router's telemetry sink.
         Events.register()
 
+        // Step 3.5: Start the EventBus native subscription so lifecycle/model/
+        // error events flow into `EventBus.shared.events` (see EventBus.start()).
+        EventBus.shared.start()
+
         // Step 4: Device registration callbacks
         Device.register()
 
@@ -171,6 +175,10 @@ public enum CppBridge {
 
         // Shutdown in reverse order
         // Note: Platform callbacks remain valid (static)
+
+        // Stop the EventBus native subscription while the native ABI surface
+        // is still alive (see EventBus.stop()).
+        EventBus.shared.stop()
 
         // Detach the router's telemetry sink BEFORE destroying the manager so
         // the C++ router never holds a dangling manager pointer.

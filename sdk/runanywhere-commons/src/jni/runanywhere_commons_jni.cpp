@@ -2076,6 +2076,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArtifactInferFromUrl
                              "racArtifactInferFromUrlProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelInfoMakeProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
+    return callProtoBufferFn(env, requestBytes, rac_model_info_make_proto, "racModelInfoMakeProto");
+}
+
 // =============================================================================
 // JNI FUNCTIONS - Model Lifecycle Proto ABI (rac_model_lifecycle.h)
 // =============================================================================

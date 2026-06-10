@@ -1,11 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.lora
 
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
-import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
@@ -14,9 +13,7 @@ import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
 import com.runanywhere.sdk.public.types.RALoRAApplyRequest
 import com.runanywhere.sdk.public.types.RALoRARemoveRequest
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 
 data class LoraUiState(
@@ -28,7 +25,7 @@ data class LoraUiState(
     val error: String? = null,
 )
 
-class LoraViewModel(application: Application) : AndroidViewModel(application) {
+class LoraViewModel : ViewModel() {
 
     var state by mutableStateOf(LoraUiState())
         private set
@@ -46,19 +43,16 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             state = state.copy(busyId = entry.id, progressPercent = 0, error = null)
             try {
-                val existing = findAdapterFile(entry)
-                val path = if (existing != null) {
-                    existing.absolutePath
-                } else {
-                    RunAnywhere.lora.download(entry) { progress ->
-                        val pct = if (progress.total_bytes > 0) {
-                            (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
-                        } else {
-                            (progress.stage_progress.coerceIn(0f, 1f) * 100).toInt()
-                        }
+                val path =
+                    adapterLocalPath(entry) ?: RunAnywhere.lora.download(entry) { progress ->
+                        val pct =
+                            if (progress.total_bytes > 0) {
+                                (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
+                            } else {
+                                (progress.stage_progress.coerceIn(0f, 1f) * 100).toInt()
+                            }
                         state = state.copy(progressPercent = pct)
                     }
-                }
 
                 if (path.isNotBlank()) {
                     downloadedPaths[entry.id] = path
@@ -75,7 +69,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun apply(entry: LoraAdapterCatalogEntry) {
-        val path = downloadedPaths[entry.id] ?: findAdapterFile(entry)?.absolutePath
+        val path = adapterLocalPath(entry)
         if (path.isNullOrBlank()) {
             state = state.copy(error = "Adapter not downloaded yet")
             return
@@ -130,17 +124,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean =
-        downloadedPaths.containsKey(entry.id) || findAdapterFile(entry) != null
+        adapterLocalPath(entry) != null || entry.is_downloaded == true
 
-    private fun adapterFilename(entry: LoraAdapterCatalogEntry): String =
-        entry.filename.ifBlank { entry.url.substringAfterLast('/').substringBefore('?') }
-
-    private fun findAdapterFile(entry: LoraAdapterCatalogEntry): File? {
-        val name = adapterFilename(entry).ifBlank { return null }
-        return getApplication<Application>().filesDir
-            .walkTopDown()
-            .firstOrNull { it.isFile && it.name == name && it.length() > 0 }
-    }
+    private fun adapterLocalPath(entry: LoraAdapterCatalogEntry): String? =
+        downloadedPaths[entry.id]
+            ?: entry.local_path?.takeIf { it.isNotBlank() }
 
     private suspend fun reload() {
         val modelId = GlobalState.model.loaded?.id
@@ -151,7 +139,9 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val adapters = RunAnywhere.lora.adaptersForModel(modelId)
             adapters.forEach { entry ->
-                findAdapterFile(entry)?.let { downloadedPaths[entry.id] = it.absolutePath }
+                entry.local_path?.takeIf { it.isNotBlank() }?.let { path ->
+                    downloadedPaths[entry.id] = path
+                }
             }
             val active = RunAnywhere.lora.state().loaded_adapters
                 .firstOrNull { it.applied }?.adapter_id?.takeIf { it.isNotEmpty() }

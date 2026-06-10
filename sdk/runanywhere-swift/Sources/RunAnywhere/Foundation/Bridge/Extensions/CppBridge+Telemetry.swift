@@ -232,6 +232,17 @@ extension CppBridge.Events {
         publishInitialization(stage: .servicesBootstrapped, properties: ["model_count": String(count)])
     }
 
+    /// Emit SDK models loaded with model IDs for richer attribution.
+    public static func emitSDKModelsLoaded(modelIds: [String]) {
+        publishInitialization(
+            stage: .servicesBootstrapped,
+            properties: [
+                "model_count": String(modelIds.count),
+                "model_ids": modelIds.joined(separator: ",")
+            ]
+        )
+    }
+
     private static func publishInitialization(
         stage: RAInitializationStage,
         error: String = "",

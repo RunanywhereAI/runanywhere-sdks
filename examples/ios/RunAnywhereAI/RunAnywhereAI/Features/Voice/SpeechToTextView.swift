@@ -33,83 +33,19 @@ struct SpeechToTextView: View {
                         // Mode selection - Modern pill button style
                         if hasModelSelected {
                         HStack(spacing: 8) {
-                            // Batch mode button
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.selectedMode = .batch
-                                }
-                            } label: {
-                                VStack(spacing: 4) {
-                                    Text("Batch")
-                                        .font(.system(size: 13, weight: .medium))
-                                    Text("Record then transcribe")
-                                        .font(.system(size: 10))
-                                        .opacity(0.7)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    viewModel.selectedMode == .batch
-                                        ? AppColors.primaryAccent.opacity(0.15)
-                                        : Color.clear
-                                )
-                                .foregroundColor(
-                                    viewModel.selectedMode == .batch
-                                        ? AppColors.primaryAccent
-                                        : .secondary
-                                )
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(
-                                            viewModel.selectedMode == .batch
-                                                ? AppColors.primaryAccent.opacity(0.3)
-                                                : Color.gray.opacity(0.2),
-                                            lineWidth: 1
-                                        )
-                                )
-                            }
-
-                            // Live mode button
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.selectedMode = .live
-                                }
-                            } label: {
-                                VStack(spacing: 4) {
-                                    Text("Live")
-                                        .font(.system(size: 13, weight: .medium))
-                                    Text("Real-time transcription")
-                                        .font(.system(size: 10))
-                                        .opacity(0.7)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    viewModel.selectedMode == .live
-                                        ? AppColors.primaryAccent.opacity(0.15)
-                                        : Color.clear
-                                )
-                                .foregroundColor(
-                                    viewModel.selectedMode == .live
-                                        ? AppColors.primaryAccent
-                                        : .secondary
-                                )
-                                .cornerRadius(12)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(
-                                            viewModel.selectedMode == .live
-                                                ? AppColors.primaryAccent.opacity(0.3)
-                                                : Color.gray.opacity(0.2),
-                                            lineWidth: 1
-                                        )
-                                )
-                            }
+                            modeButton(.batch, title: "Batch", subtitle: "Record")
+                            modeButton(.live, title: "Live", subtitle: "Stream")
+                            modeButton(.hybrid, title: "Hybrid", subtitle: "Cloud")
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
                         .padding(.bottom, 8)
+
+                        if viewModel.selectedMode == .hybrid {
+                            hybridConfigurationSection
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 8)
+                        }
                         }
 
                         // Main content - only enabled when model is selected
@@ -150,9 +86,7 @@ struct SpeechToTextView: View {
                                             .font(.system(size: 24, weight: .semibold, design: .rounded))
                                             .foregroundColor(.primary)
 
-                                        Text(viewModel.selectedMode == .batch
-                                             ? "Record first, then transcribe"
-                                             : "Real-time transcription")
+                                        Text(readyModeDescription)
                                             .font(.system(size: 15, weight: .regular))
                                             .foregroundColor(.secondary)
                                     }
@@ -230,6 +164,10 @@ struct SpeechToTextView: View {
                                             .background(Color(NSColor.controlBackgroundColor))
                                             #endif
                                             .cornerRadius(12)
+
+                                        if let routing = viewModel.hybridRouting {
+                                            hybridRoutingSummary(routing)
+                                        }
                                 }
                                 .padding()
                             }
@@ -343,6 +281,106 @@ struct SpeechToTextView: View {
     }
 
     // MARK: - View Components
+
+    private var readyModeDescription: String {
+        switch viewModel.selectedMode {
+        case .batch:
+            return "Record first, then transcribe"
+        case .live:
+            return "Real-time transcription"
+        case .hybrid:
+            return "On-device first with cloud fallback"
+        }
+    }
+
+    private func modeButton(_ mode: STTMode, title: String, subtitle: String) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.selectedMode = mode
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .opacity(0.7)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                viewModel.selectedMode == mode
+                    ? AppColors.primaryAccent.opacity(0.15)
+                    : Color.clear
+            )
+            .foregroundColor(
+                viewModel.selectedMode == mode
+                    ? AppColors.primaryAccent
+                    : .secondary
+            )
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        viewModel.selectedMode == mode
+                            ? AppColors.primaryAccent.opacity(0.3)
+                            : Color.gray.opacity(0.2),
+                        lineWidth: 1
+                    )
+            )
+        }
+    }
+
+    private var hybridConfigurationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                TextField("provider", text: $viewModel.cloudProvider)
+                TextField("model", text: $viewModel.cloudModel)
+            }
+            TextField("cloud registry id", text: $viewModel.cloudProviderId)
+            SecureField("cloud API key", text: $viewModel.cloudAPIKey)
+            TextField("language", text: $viewModel.cloudLanguageCode)
+            Toggle("Prefer online", isOn: $viewModel.hybridPreferOnline)
+            Toggle("Require network", isOn: $viewModel.hybridRequireNetwork)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Fallback threshold \(viewModel.hybridConfidenceThreshold, specifier: "%.2f")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Slider(value: $viewModel.hybridConfidenceThreshold, in: 0.0...1.0, step: 0.05)
+            }
+        }
+        .textFieldStyle(.roundedBorder)
+        .font(.caption)
+        .padding(12)
+        #if os(iOS)
+        .background(Color(.secondarySystemBackground))
+        #else
+        .background(Color(NSColor.controlBackgroundColor))
+        #endif
+        .cornerRadius(12)
+    }
+
+    private func hybridRoutingSummary(_ routing: HybridRoutedMetadata) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Routing")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Text("Chosen: \(routing.chosenModelID.isEmpty ? "unknown" : routing.chosenModelID)")
+            Text("Fallback: \(routing.wasFallback ? "yes" : "no")")
+            if !routing.primaryErrorMessage.isEmpty {
+                Text("Primary: \(routing.primaryErrorMessage)")
+            }
+        }
+        .font(.caption)
+        .foregroundColor(.secondary)
+        .padding(12)
+        #if os(iOS)
+        .background(Color(.tertiarySystemBackground))
+        #else
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.8))
+        #endif
+        .cornerRadius(10)
+    }
 
     private var modelButton: some View {
         Button {

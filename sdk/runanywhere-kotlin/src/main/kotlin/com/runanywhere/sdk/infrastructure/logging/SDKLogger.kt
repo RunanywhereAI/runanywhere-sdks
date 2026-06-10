@@ -240,13 +240,14 @@ object Logging {
         // Create log entry. Proto LogEntry uses scalar defaults ("" / 0) for
         // unset fields rather than nullables.
         val includeSource = config.include_source_location
+        val entryMetadata = enrichedMetadata(metadata, config.include_device_metadata)
         val entry =
             LogEntry(
                 timestamp_unix_ms = getCurrentTimeMillis(),
                 level = level,
                 category = category,
                 message = message,
-                metadata = sanitizeMetadata(metadata) ?: emptyMap(),
+                metadata = entryMetadata,
                 file_ = if (includeSource) file.orEmpty() else "",
                 line = if (includeSource) (line ?: 0) else 0,
                 function = if (includeSource) function.orEmpty() else "",
@@ -379,6 +380,10 @@ object Logging {
     // log_redact.cpp` (kSensitiveSubstrings) and Swift `SDKLogger.swift`.
     private val sensitivePatterns = listOf("key", "secret", "password", "token", "auth", "credential")
 
+    private const val DEVICE_MODEL_KEY = "device_model"
+    private const val OS_VERSION_KEY = "os_version"
+    private const val PLATFORM_KEY = "platform"
+
     /**
      * Determines whether a metadata key should be redacted. Delegates to the
      * canonical C++ policy via [shouldRedactPolicy] when set; otherwise falls
@@ -413,6 +418,37 @@ object Logging {
             }
         }
     }
+
+    private fun enrichedMetadata(
+        metadata: Map<String, Any?>?,
+        includeDeviceMetadata: Boolean,
+    ): Map<String, String> {
+        val sanitized = sanitizeMetadata(metadata).orEmpty()
+        if (!includeDeviceMetadata) return sanitized
+        return sanitized + deviceMetadata()
+    }
+
+    private fun deviceMetadata(): Map<String, String> =
+        mapOf(
+            DEVICE_MODEL_KEY to reflectedAndroidString("android.os.Build", "MODEL", "unknown"),
+            OS_VERSION_KEY to reflectedAndroidString("android.os.Build\$VERSION", "RELEASE", "unknown"),
+            PLATFORM_KEY to "android",
+        )
+
+    private fun reflectedAndroidString(
+        className: String,
+        fieldName: String,
+        fallback: String,
+    ): String =
+        try {
+            Class.forName(className).getField(fieldName).get(null) as? String ?: fallback
+        } catch (_: Throwable) {
+            when (fieldName) {
+                "MODEL" -> System.getProperty("os.name") ?: fallback
+                "RELEASE" -> System.getProperty("os.version") ?: fallback
+                else -> fallback
+            }
+        }
 }
 
 // SDK logger (convenience wrapper)

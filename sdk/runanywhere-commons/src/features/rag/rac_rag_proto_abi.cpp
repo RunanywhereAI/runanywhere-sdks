@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -202,6 +203,56 @@ RAGBackendConfig build_backend_config(const runanywhere::v1::RAGConfiguration& p
     return bc;
 }
 
+bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
+                                std::string* out_message) {
+    const RAGBackendConfig defaults;
+
+    const int64_t top_k =
+        proto.has_top_k() ? static_cast<int64_t>(proto.top_k())
+                          : static_cast<int64_t>(defaults.top_k);
+    if (top_k < 1) {
+        if (out_message)
+            *out_message = "RAGConfiguration.top_k must be >= 1";
+        return false;
+    }
+
+    const float similarity_threshold =
+        proto.has_similarity_threshold() ? proto.similarity_threshold()
+                                         : defaults.similarity_threshold;
+    if (!std::isfinite(similarity_threshold) || similarity_threshold < 0.0f ||
+        similarity_threshold > 1.0f) {
+        if (out_message)
+            *out_message = "RAGConfiguration.similarity_threshold must be in 0.0...1.0";
+        return false;
+    }
+
+    const int64_t chunk_size =
+        proto.has_chunk_size() ? static_cast<int64_t>(proto.chunk_size())
+                               : static_cast<int64_t>(defaults.chunk_size);
+    if (chunk_size < 1) {
+        if (out_message)
+            *out_message = "RAGConfiguration.chunk_size must be >= 1";
+        return false;
+    }
+
+    const int64_t chunk_overlap =
+        proto.has_chunk_overlap() ? static_cast<int64_t>(proto.chunk_overlap())
+                                  : static_cast<int64_t>(defaults.chunk_overlap);
+    if (chunk_overlap < 0) {
+        if (out_message)
+            *out_message = "RAGConfiguration.chunk_overlap must be >= 0";
+        return false;
+    }
+    if (chunk_overlap >= chunk_size) {
+        if (out_message) {
+            *out_message = "RAGConfiguration.chunk_overlap must be < chunk_size";
+        }
+        return false;
+    }
+
+    return true;
+}
+
 runanywhere::v1::RAGStatistics make_stats(RAGBackend& backend) {
     runanywhere::v1::RAGStatistics out;
     const int64_t chunks = static_cast<int64_t>(backend.document_count());
@@ -277,6 +328,13 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     if (embedding_model_id.empty()) {
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate",
                         "RAGConfiguration.embedding_model_id is required");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::string validation_message;
+    if (!validate_rag_configuration(proto, &validation_message)) {
+        publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate",
+                        validation_message.c_str());
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 

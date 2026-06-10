@@ -93,6 +93,7 @@ struct RunAnywhereAIApp: App {
 
             let startTime = Date()
             try runSDKInitialize()
+            _ = HybridDeviceState.setProvider(AppleDeviceStateProvider())
 
             await ModelCatalogBootstrap.registerAll()
             await refreshSDKCatalogs()
