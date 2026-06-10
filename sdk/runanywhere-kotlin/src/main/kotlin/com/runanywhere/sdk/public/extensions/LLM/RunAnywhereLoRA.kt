@@ -12,6 +12,8 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.ErrorCategory
+import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.ExpectedModelFiles
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoRAApplyResult
@@ -134,8 +136,11 @@ interface LoRA {
     suspend fun adaptersForModel(modelId: String): List<LoraAdapterCatalogEntry> {
         val result = queryCatalog(LoraAdapterCatalogQuery(model_id = modelId))
         if (!result.success) {
-            throw SDKException.validationFailed(
-                result.error_message.ifBlank { "LoRA catalog query failed" },
+            throw SDKException.make(
+                code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
+                message = result.error_message.ifBlank { "LoRA catalog query failed" },
+                category = ErrorCategory.ERROR_CATEGORY_INTERNAL,
+                shouldLog = false,
             )
         }
         return result.entries
@@ -148,8 +153,11 @@ interface LoRA {
     suspend fun allRegistered(): List<LoraAdapterCatalogEntry> {
         val result = listCatalog()
         if (!result.success) {
-            throw SDKException.validationFailed(
-                result.error_message.ifBlank { "LoRA catalog list failed" },
+            throw SDKException.make(
+                code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
+                message = result.error_message.ifBlank { "LoRA catalog list failed" },
+                category = ErrorCategory.ERROR_CATEGORY_INTERNAL,
+                shouldLog = false,
             )
         }
         return result.entries
@@ -277,19 +285,18 @@ internal object AndroidLoRA : LoRA {
         }
     }
 
-    override suspend fun checkCompatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult {
-        ensureLoraReady()
-        return withContext(Dispatchers.IO) {
-            try {
+    override suspend fun checkCompatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult =
+        try {
+            ensureLoraReady()
+            withContext(Dispatchers.IO) {
                 CppBridgeLoraRegistry.compatibility(config)
-            } catch (e: Exception) {
-                LoraCompatibilityResult(
-                    is_compatible = false,
-                    error_message = e.message.orEmpty(),
-                )
             }
+        } catch (e: Exception) {
+            LoraCompatibilityResult(
+                is_compatible = false,
+                error_message = e.message.orEmpty(),
+            )
         }
-    }
 
     override suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry {
         ensureLoraReady()

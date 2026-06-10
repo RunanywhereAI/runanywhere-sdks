@@ -360,6 +360,16 @@ object RunAnywhere {
                     )
                 logger.debug("SDK config initialized: linkedModels=${phase1Result.linked_models_count}")
 
+                // SDK config (rac_sdk_init). Idempotent state re-init is
+                // harmless; this call also wires up version/platform metadata
+                // that the Phase 1 proto does not touch.
+                CppBridgeState.initialize(
+                    environment = params.environment,
+                    apiKey = params.apiKey,
+                    baseURL = params.baseURL,
+                    deviceId = CppBridgeDevice.getDeviceIdCallback(),
+                )
+
                 _isInitialized = true
 
                 val initDurationMs = System.currentTimeMillis() - initStartTime
@@ -592,8 +602,10 @@ object RunAnywhere {
             servicesInitJob?.cancel()
             servicesInitJob = null
 
-            // Shutdown CppBridge
+            // Shutdown CppBridge, then clear persisted C++ state + auth.
+            // Mirrors Swift reset(): CppBridge.shutdown() → CppBridge.State.shutdown().
             shutdownPlatformBridge()
+            CppBridgeState.shutdown()
 
             _isInitialized = false
             _areServicesReady = false

@@ -21,11 +21,13 @@
 package com.runanywhere.sdk.public.extensions.LLM
 
 import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
+import com.runanywhere.sdk.foundation.bridge.extensions.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeRunLoopHandleListener
 import com.runanywhere.sdk.native.bridge.NativeToolExecuteListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -204,28 +206,37 @@ internal object ToolCallingOrchestrator {
     suspend fun generateWithTools(
         prompt: String,
         options: ToolCallingOptions? = null,
+        llmOptions: RALLMGenerationOptions? = null,
         validateCalls: Boolean? = null,
     ): ToolCallingResult =
         coroutineScope {
             require(RunAnywhere.isInitialized) { "SDK not initialized" }
 
             val opts = options ?: ToolCallingOptions()
+            val llmOpts = llmOptions ?: RALLMGenerationOptions.defaults()
             val registeredTools = ToolRegistry.getAll()
             val tools = opts.tools.ifEmpty { registeredTools }
             val effectiveOpts = opts.copy(tools = tools)
 
+            // Swift parity (`makeRunLoopRequest`): tool options override the
+            // base LLM generation options field-by-field; unset tool knobs
+            // fall back to the caller's generation options.
             val request =
                 ToolCallingSessionCreateRequest(
                     prompt = prompt,
-                    max_tokens = effectiveOpts.max_tokens ?: 0,
-                    temperature = effectiveOpts.temperature ?: 0f,
-                    top_p = 0f,
-                    system_prompt = effectiveOpts.system_prompt ?: "",
+                    max_tokens = effectiveOpts.max_tokens?.takeIf { it > 0 } ?: llmOpts.max_tokens,
+                    temperature = effectiveOpts.temperature ?: llmOpts.temperature,
+                    top_p = llmOpts.top_p,
+                    system_prompt =
+                        effectiveOpts.system_prompt?.takeIf { it.isNotEmpty() }
+                            ?: llmOpts.system_prompt?.takeIf { it.isNotEmpty() }
+                            ?: "",
                     format_hint = effectiveOpts.effectiveToolFormatHint(),
                     max_iterations = effectiveOpts.effectiveMaxIterations(),
                     keep_tools_available = effectiveOpts.keep_tools_available ?: false,
-                    // Suppress thinking when requested (commons prepends the no-think directive).
-                    disable_thinking = effectiveOpts.disable_thinking ?: false,
+                    // Suppress thinking when either options surface asks for it
+                    // (commons prepends the no-think directive).
+                    disable_thinking = (effectiveOpts.disable_thinking ?: false) || llmOpts.disable_thinking,
                     // Swift parity (`makeRunLoopRequest`):
                     // `validate_calls` is `optional bool` on the proto. When the
                     // caller did not supply a value leave it unset (null) so

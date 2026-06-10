@@ -36,6 +36,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
+import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
 /**
  * Outcome of a single platform HTTP request. Carries either:
@@ -298,12 +300,16 @@ public object HTTPClientAdapter {
             parsed?.message?.takeIf { it.isNotEmpty() }
                 ?: "HTTP error $statusCode"
 
-        return when (statusCode) {
-            401 -> SDKException.authenticationFailed(reason = message)
-            403 -> SDKException.unauthorized(resource = url)
-            in 500..599 -> SDKException.networkError(message)
-            else -> SDKException.networkError(message)
-        }
+        val (code, category) =
+            when (statusCode) {
+                401 -> ProtoErrorCode.ERROR_CODE_AUTHENTICATION_FAILED to ProtoErrorCategory.ERROR_CATEGORY_AUTH
+                403 -> ProtoErrorCode.ERROR_CODE_FORBIDDEN to ProtoErrorCategory.ERROR_CATEGORY_AUTH
+                in 500..599 -> ProtoErrorCode.ERROR_CODE_SERVER_ERROR to ProtoErrorCategory.ERROR_CATEGORY_NETWORK
+                else -> ProtoErrorCode.ERROR_CODE_HTTP_ERROR to ProtoErrorCategory.ERROR_CATEGORY_NETWORK
+            }
+        // Swift constructs the exception via the plain SDKException init,
+        // which never auto-logs (the caller already logged the HTTP status).
+        return SDKException.make(code = code, message = message, category = category, shouldLog = false)
     }
 
     // Header / URL construction
@@ -468,17 +474,23 @@ internal fun platformDefaultHeaders(): List<Pair<String, String>>? {
     }
 }
 
-@Suppress("FunctionOnlyReturningConstant")
 internal fun platformParseAPIError(
-    @Suppress("UNUSED_PARAMETER") statusCode: Int,
-    @Suppress("UNUSED_PARAMETER") body: String,
-    @Suppress("UNUSED_PARAMETER") url: String,
+    statusCode: Int,
+    body: String,
+    url: String,
 ): ApiErrorInfo? {
-    // `rac_api_error_from_response` is internal-only in commons (non-RAC_API
-    // and not exported in RACommons.exports), so there is no JNI thunk to
-    // call. Returning null hands control back to the caller, which formats
-    // a generic `"HTTP {status}"` message.
-    return null
+    return try {
+        val parsed = RunAnywhereBridge.racApiErrorFromResponse(statusCode, body, url) ?: return null
+        ApiErrorInfo(
+            message = parsed.getOrNull(0).orEmpty(),
+            code = parsed.getOrNull(1).orEmpty(),
+            requestUrl = parsed.getOrNull(2).orEmpty(),
+        )
+    } catch (_: UnsatisfiedLinkError) {
+        // JNI thunk not yet bound (older prebuilt .so) — caller falls back
+        // to a generic `"HTTP {status}"` message.
+        null
+    }
 }
 
 internal suspend fun platformResolveAuthToken(): String? =

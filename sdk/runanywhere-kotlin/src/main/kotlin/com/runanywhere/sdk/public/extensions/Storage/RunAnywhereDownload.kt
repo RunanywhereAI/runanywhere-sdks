@@ -14,9 +14,12 @@ import ai.runanywhere.proto.v1.DownloadFailureReason
 import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.DownloadSubscribeRequest
+import ai.runanywhere.proto.v1.ErrorCategory
+import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.ModelGetRequest
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelListRequest
@@ -64,12 +67,15 @@ suspend fun RunAnywhere.downloadModel(
             verify_checksums = !resolvedModel.checksum_sha256.isNullOrBlank(),
         )
 
-    val plan =
-        planDownload(planRequest)
-            ?: throw SDKException.operation("Unable to create a download plan for ${resolvedModel.id}")
-    if (!plan.can_start) {
-        throw SDKException.operation(
-            "Download plan rejected for ${resolvedModel.id}: ${plan.error_message.ifBlank { "plan not startable" }}",
+    val plan = planDownload(planRequest)
+    if (plan == null || !plan.can_start) {
+        val message = plan?.error_message.orEmpty().ifBlank { "Unable to create a download plan" }
+        downloadLogger.error("Download plan rejected for ${resolvedModel.id}: $message")
+        throw SDKException.make(
+            code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+            message = message,
+            category = ErrorCategory.ERROR_CATEGORY_NETWORK,
+            shouldLog = false,
         )
     }
 
@@ -85,12 +91,15 @@ suspend fun RunAnywhere.downloadModel(
             update_registry_on_completion = false,
         )
 
-    val startResult =
-        CppBridgeDownload.start(startRequest)
-            ?: throw SDKException.operation("Download start returned null for ${resolvedModel.id}")
-    if (!startResult.accepted) {
-        throw SDKException.operation(
-            "Download could not be started for ${resolvedModel.id}: ${startResult.error_message.ifBlank { "rejected" }}",
+    val startResult = CppBridgeDownload.start(startRequest)
+    if (startResult == null || !startResult.accepted) {
+        val message = startResult?.error_message.orEmpty().ifBlank { "The download could not be started" }
+        downloadLogger.error("Download start rejected for ${resolvedModel.id}: $message")
+        throw SDKException.make(
+            code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+            message = message,
+            category = ErrorCategory.ERROR_CATEGORY_NETWORK,
+            shouldLog = false,
         )
     }
 
@@ -218,12 +227,19 @@ private suspend fun reportDownloadProgress(
     return when (progress.state) {
         DownloadState.DOWNLOAD_STATE_COMPLETED -> true
         DownloadState.DOWNLOAD_STATE_FAILED ->
-            throw SDKException.operation(
-                "Download failed: ${progress.error_message.ifBlank { "unknown error" }}",
+            throw SDKException.make(
+                code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+                message = progress.error_message.ifBlank { "Download failed" },
+                category = ErrorCategory.ERROR_CATEGORY_NETWORK,
+                shouldLog = false,
             )
         DownloadState.DOWNLOAD_STATE_CANCELLED ->
-            throw SDKException.invalidArgument("Download cancelled")
-        else -> false
+            throw SDKException.make(
+                code = ErrorCode.ERROR_CODE_CANCELLED,
+                message = "Download cancelled",
+                category = ErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+        else -> progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED
     }
 }
 
@@ -245,10 +261,12 @@ private fun persistDownloadCompletion(model: RAModelInfo, progress: DownloadProg
             model.local_path
         }
     if (localPath.isBlank()) {
-        downloadLogger.warn(
-            "Download completed without a local_path for ${model.id}; skipping registry import",
+        throw SDKException.make(
+            code = ErrorCode.ERROR_CODE_INVALID_STATE,
+            message = "Download completed without a local_path; cannot import completion into the model registry",
+            category = ErrorCategory.ERROR_CATEGORY_NETWORK,
+            shouldLog = false,
         )
-        return progress
     }
     val nowMs = System.currentTimeMillis()
     val importedModel =
@@ -267,17 +285,14 @@ private fun persistDownloadCompletion(model: RAModelInfo, progress: DownloadProg
             validate_before_register = false,
             files = importedModel.multi_file?.files.orEmpty(),
         )
-    try {
-        val result = CppBridgeModelRegistry.importModel(request)
-        if (!result.success) {
-            downloadLogger.warn(
-                "Registry import failed for ${model.id}: ${result.error_message.ifBlank { "unknown" }}",
-            )
-        } else {
-            downloadLogger.info("Registered downloaded model ${model.id} at $localPath")
-        }
-    } catch (e: Exception) {
-        downloadLogger.error("Registry import threw for ${model.id}: ${e.message}")
+    val result = CppBridgeModelRegistry.importModel(request)
+    if (!result.success) {
+        throw SDKException.make(
+            code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+            message = result.error_message.ifBlank { "Downloaded model could not be imported into the registry" },
+            category = ErrorCategory.ERROR_CATEGORY_NETWORK,
+            shouldLog = false,
+        )
     }
     return progress
 }

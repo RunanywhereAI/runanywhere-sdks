@@ -36,6 +36,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.archiveArtifact
 import com.runanywhere.sdk.public.extensions.Models.make
@@ -63,15 +64,15 @@ private fun requireStorageInitialized(sdk: RunAnywhere) {
 // MARK: - Model Registration
 
 suspend fun RunAnywhere.registerModel(
-    id: String?,
+    id: String? = null,
     name: String,
     url: String,
     framework: InferenceFramework,
-    modality: ModelCategory,
-    artifactType: ModelArtifactType?,
-    memoryRequirement: Long?,
-    supportsThinking: Boolean,
-    supportsLora: Boolean,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    artifactType: ModelArtifactType? = null,
+    memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -83,7 +84,7 @@ suspend fun RunAnywhere.registerModel(
     // …), so no from-url-then-patch-then-resave round trip is needed.
     var model =
         ModelInfo.make(
-            id = id ?: deriveModelIdFromUrl(url, name),
+            id = id ?: generatedModelId(url, name),
             name = name,
             category = modality,
             format = ModelFormat.MODEL_FORMAT_UNSPECIFIED,
@@ -238,16 +239,11 @@ suspend fun RunAnywhere.cleanTempFiles() {
 // MARK: - Helpers
 
 /**
- * Derive a stable model id from a download URL when the caller has not
- * supplied one. Mirrors the Swift / commons fallback: take the URL's last
- * path component (sans extension), or the human-readable name slug if the
- * URL contributes nothing usable.
+ * Derive a stable model id from a download URL via commons'
+ * `rac_model_id_from_url` (the same extension-stripping logic Swift's
+ * `generatedModelID(from:name:)` delegates to). Falls back to the
+ * human-readable name when the URL yields nothing usable or the native
+ * library is unavailable.
  */
-private fun deriveModelIdFromUrl(url: String, name: String): String {
-    val tail = url.substringAfterLast('/').substringBefore('?').trim()
-    if (tail.isNotEmpty()) {
-        val withoutExtension = tail.substringBefore('.')
-        if (withoutExtension.isNotEmpty()) return withoutExtension
-    }
-    return name.replace(Regex("\\s+"), "-").lowercase().ifEmpty { "model-${getCurrentTimeMillis()}" }
-}
+private fun generatedModelId(url: String, name: String): String =
+    runCatching { RunAnywhereBridge.racModelIdFromUrl(url) }.getOrNull() ?: name

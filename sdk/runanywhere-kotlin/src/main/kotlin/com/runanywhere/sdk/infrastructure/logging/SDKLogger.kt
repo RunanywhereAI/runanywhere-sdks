@@ -3,6 +3,7 @@ package com.runanywhere.sdk.infrastructure.logging
 import ai.runanywhere.proto.v1.LogEntry
 import ai.runanywhere.proto.v1.LogLevel
 import ai.runanywhere.proto.v1.LoggingConfiguration
+import com.runanywhere.sdk.kotlin.BuildConfig
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
@@ -27,37 +28,31 @@ import kotlinx.coroutines.sync.withLock
 // production factories live here.
 
 internal object LoggingConfigurationPresets {
-    /** Development: debug logging + detailed source location. */
+    /** Development: console + debug level, Sentry on, no device metadata. */
     val development =
         LoggingConfiguration(
             enable_local_logging = true,
             min_log_level = LogLevel.LOG_LEVEL_DEBUG,
-            include_source_location = true,
-            enable_remote_logging = false,
-            enable_sentry_logging = false,
-            include_device_metadata = true,
+            include_device_metadata = false,
+            enable_sentry_logging = true,
         )
 
-    /** Staging: info level with source location for debugging. */
+    /** Staging: console + info level, device metadata on, Sentry off. */
     val staging =
         LoggingConfiguration(
             enable_local_logging = true,
             min_log_level = LogLevel.LOG_LEVEL_INFO,
-            include_source_location = true,
-            enable_remote_logging = false,
-            enable_sentry_logging = false,
             include_device_metadata = true,
+            enable_sentry_logging = false,
         )
 
-    /** Production: warning+ only; Sentry opt-in is controlled separately. */
+    /** Production: warning+ only, console off, device metadata on, Sentry off. */
     val production =
         LoggingConfiguration(
             enable_local_logging = false,
             min_log_level = LogLevel.LOG_LEVEL_WARNING,
-            include_source_location = false,
-            enable_remote_logging = false,
-            enable_sentry_logging = false,
             include_device_metadata = true,
+            enable_sentry_logging = false,
         )
 
     fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
@@ -124,10 +119,18 @@ object Logging {
     // Configuration
 
     /**
-     * Configure the logging system.
+     * Configure the logging system. Sentry enable/disable transitions trigger
+     * the platform setup/teardown hooks, mirroring Swift `Logging.configure`.
      */
     fun configure(config: LoggingConfiguration) {
+        val oldConfig = _configuration
         _configuration = config
+
+        if (config.enable_sentry_logging && !oldConfig.enable_sentry_logging) {
+            sentrySetupHook?.invoke()
+        } else if (!config.enable_sentry_logging && oldConfig.enable_sentry_logging) {
+            sentryTeardownHook?.invoke()
+        }
     }
 
     /**
@@ -168,19 +171,9 @@ object Logging {
     /**
      * Set whether Sentry logging is enabled.
      * When enabled, warning+ logs are sent to Sentry for error tracking.
-     *
-     * Note: Call setupSentry() after enabling to initialize the Sentry SDK.
      */
     fun setSentryLoggingEnabled(enabled: Boolean) {
-        val oldConfig = _configuration
-        _configuration = _configuration.copy(enable_sentry_logging = enabled)
-
-        // Handle Sentry state changes via the platform-specific hook
-        if (enabled && !oldConfig.enable_sentry_logging) {
-            sentrySetupHook?.invoke()
-        } else if (!enabled && oldConfig.enable_sentry_logging) {
-            sentryTeardownHook?.invoke()
-        }
+        configure(_configuration.copy(enable_sentry_logging = enabled))
     }
 
     /**
@@ -435,12 +428,14 @@ class SDKLogger(
 
     /**
      * Log a trace-level message (proto LOG_LEVEL_TRACE — the most verbose
-     * severity, below DEBUG).
+     * severity, below DEBUG). No-op in release builds of the SDK, gated the
+     * same way as [debug].
      */
     fun trace(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
+        if (!BuildConfig.DEBUG) return
         Logging.log(
             level = LogLevel.LOG_LEVEL_TRACE,
             category = category,
@@ -450,12 +445,14 @@ class SDKLogger(
     }
 
     /**
-     * Log a debug-level message.
+     * Log a debug-level message. No-op in release builds of the SDK,
+     * mirroring Swift's `#if DEBUG` gate.
      */
     fun debug(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
+        if (!BuildConfig.DEBUG) return
         Logging.log(
             level = LogLevel.LOG_LEVEL_DEBUG,
             category = category,

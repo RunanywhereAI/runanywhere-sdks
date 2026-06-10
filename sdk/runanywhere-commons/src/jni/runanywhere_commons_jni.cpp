@@ -108,6 +108,7 @@
 #include "rac/infrastructure/events/rac_sdk_emit.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/lifecycle/rac_sdk_init.h"
+#include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -6390,6 +6391,52 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDefaultHeaders(J
     return result;
 }
 
+// Thunk for `rac_api_error_from_response` (rac_api_types.h). Parses a
+// structured API error out of a 4xx/5xx response body — the same commons
+// helper Swift's HTTPClientAdapter.mapAPIError consumes. Returns a 3-element
+// String[]: [message, code, request_url] (any element may be null when the
+// body carried no such field), or null when commons could not parse the
+// response at all. The rac_api_error_t buffers are freed here via
+// rac_api_error_free before returning.
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racApiErrorFromResponse(
+    JNIEnv* env, jclass /*clazz*/, jint statusCode, jstring body, jstring url) {
+    std::string bodyStr = getCString(env, body);
+    std::string urlStr = getCString(env, url);
+
+    rac_api_error_t apiError;
+    if (rac_api_error_from_response(static_cast<int>(statusCode), bodyStr.c_str(), urlStr.c_str(),
+                                    &apiError) != 0) {
+        return nullptr;
+    }
+
+    jclass strCls = env->FindClass("java/lang/String");
+    if (strCls == nullptr) {
+        rac_api_error_free(&apiError);
+        return nullptr;
+    }
+    jobjectArray arr = env->NewObjectArray(3, strCls, nullptr);
+    env->DeleteLocalRef(strCls);
+    if (arr == nullptr) {
+        rac_api_error_free(&apiError);
+        return nullptr;
+    }
+
+    const char* fields[3] = {apiError.message, apiError.code, apiError.request_url};
+    for (jsize i = 0; i < 3; ++i) {
+        if (fields[i] == nullptr) {
+            continue;
+        }
+        jstring jField = env->NewStringUTF(fields[i]);
+        if (jField != nullptr) {
+            env->SetObjectArrayElement(arr, i, jField);
+            env->DeleteLocalRef(jField);
+        }
+    }
+    rac_api_error_free(&apiError);
+    return arr;
+}
+
 // =============================================================================
 // JNI FUNCTIONS - Engine Router Capabilities
 //
@@ -6944,6 +6991,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racInferModelFileRole(J
     int32_t role = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
     rac_infer_model_file_role(name.c_str(), static_cast<int32_t>(modalityProto), &role);
     return static_cast<jint>(role);
+}
+
+// Canonical model-id derivation from a download URL. Delegates to
+// rac_model_id_from_url — the commons port of Swift's generatedModelID(from:name:)
+// — using the same 256-byte buffer Swift passes. Returns null on failure or when
+// the URL yields an empty id so Kotlin can fall back to the human-readable name.
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelIdFromUrl(JNIEnv* env,
+                                                                           jclass clazz,
+                                                                           jstring url) {
+    (void)clazz;
+    std::string u = getCString(env, url);
+    char buf[256] = {0};
+    if (rac_model_id_from_url(u.c_str(), buf, sizeof(buf)) != RAC_SUCCESS || buf[0] == '\0') {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
 }
 
 // ---------- File manager (Swift-aligned aliases) ----------------------

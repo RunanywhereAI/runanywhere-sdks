@@ -151,9 +151,8 @@ suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
     }
 }
 
+/** Destroy the RAG pipeline and release all resources. */
 suspend fun RunAnywhere.ragDestroyPipeline() {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    ensureServicesReady()
     withContext(Dispatchers.IO) {
         CppBridgeRAG.destroy()
     }
@@ -184,11 +183,22 @@ suspend fun RunAnywhere.ragClearDocuments() {
     }
 }
 
+/**
+ * Get the number of indexed document chunks in the pipeline as a function call.
+ *
+ * @return Number of indexed chunks in the pipeline, or 0 if not initialized.
+ */
 suspend fun RunAnywhere.ragGetDocumentCount(): Int =
     withContext(Dispatchers.IO) {
-        ensureServicesReady()
-        CppBridgeRAG.stats().indexed_chunks.toInt()
+        try {
+            CppBridgeRAG.stats().indexed_chunks.toInt()
+        } catch (_: Exception) {
+            0
+        }
     }
+
+/** The current number of indexed document chunks in the pipeline. */
+suspend fun RunAnywhere.ragDocumentCount(): Int = ragGetDocumentCount()
 
 suspend fun RunAnywhere.ragQuery(
     question: String,
@@ -196,8 +206,12 @@ suspend fun RunAnywhere.ragQuery(
 ): RAGResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
+    val queryOptions =
+        (options ?: RAGQueryOptions.defaults(question)).let {
+            if (it.question.isEmpty()) it.copy(question = question) else it
+        }
     return withContext(Dispatchers.IO) {
-        CppBridgeRAG.query((options ?: RAGQueryOptions.defaults(question)).copy(question = question))
+        CppBridgeRAG.query(queryOptions)
     }
 }
 
@@ -206,8 +220,8 @@ suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
 
 suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    ensureServicesReady()
     if (documents.isEmpty()) return
+    ensureServicesReady()
     withContext(Dispatchers.IO) {
         documents.forEach { document ->
             CppBridgeRAG.ingest(document)

@@ -1339,17 +1339,16 @@ object RunAnywhereBridge {
         followRedirects: Boolean,
     ): NativeHttpResponse?
 
-    // CANONICAL DEFAULT HEADERS (Swift parity)
+    // CANONICAL HTTP POLICY HELPERS (Swift parity)
     //
-    // Thunk wrapping commons' shared HTTP policy helper. Used by
+    // Thunks wrapping commons' shared HTTP policy helpers. Used by
     // `HTTPClientAdapter` to converge on the same canonical SDK header
-    // list Swift emits, instead of inlining the policy on the Kotlin
-    // side.
+    // list and structured API-error parsing Swift consumes, instead of
+    // inlining the policy on the Kotlin side.
     //
-    // Upsert and structured error parsing are implemented Kotlin-side in
-    // `HTTPClientAdapter.jvmAndroid.kt` — commons does not expose an
-    // upsert-mode HTTP variant, and `rac_api_error_from_response` is
-    // internal-only (non-RAC_API, not exported in `RACommons.exports`).
+    // Upsert is implemented Kotlin-side in `HTTPClientAdapter.kt` —
+    // commons does not expose an upsert-mode HTTP variant through the
+    // flat JNI request signature.
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical
@@ -1370,6 +1369,20 @@ object RunAnywhereBridge {
      * JNI marshalling path); callers fall back to inlined headers.
      */
     @JvmStatic external fun racHttpDefaultHeaders(): Array<String>?
+
+    /**
+     * Wrapper for `rac_api_error_from_response` — the commons parser
+     * Swift's `HTTPClientAdapter.mapAPIError` consumes for structured
+     * 4xx/5xx backend error bodies. Returns String[3] =
+     * `[message, code, request_url]` (elements may be null when the body
+     * carried no such field), or null when commons could not parse the
+     * response; callers fall back to a generic `"HTTP {status}"` message.
+     */
+    @JvmStatic external fun racApiErrorFromResponse(
+        statusCode: Int,
+        body: String,
+        url: String,
+    ): Array<String?>?
 
     // AUTH MANAGER (rac_auth_manager.h)
     //
@@ -1634,6 +1647,14 @@ object RunAnywhereBridge {
      * `ModelCategory.value`; returns a `ModelFileRole.value`.
      */
     @JvmStatic external fun racInferModelFileRole(filename: String, modalityProto: Int): Int
+
+    /**
+     * Derive the canonical model id from a download URL. Delegates to commons'
+     * `rac_model_id_from_url` (the same derivation Swift's
+     * `generatedModelID(from:name:)` calls). Null on failure or when the URL
+     * yields no usable id.
+     */
+    @JvmStatic external fun racModelIdFromUrl(url: String): String?
 
     // INFERENCE FRAMEWORK display / analytics / raw tables
     //

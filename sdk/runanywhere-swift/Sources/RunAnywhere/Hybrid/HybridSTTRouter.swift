@@ -338,6 +338,10 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// `vt->stt_ops->create(model_id, config_json, &impl)` builds the backend
     /// instance — the same path every commons STT consumer uses.
     private func createService(for model: HybridModel) throws -> AttachedService {
+        if model.backend == .hybridBackendSherpa {
+            try requireSherpaRegistered()
+        }
+
         let engineName = pinnedEngineName(for: model.backend)
 
         // Pin the named engine (offline "sherpa" vs cloud "cloud") — simple
@@ -405,6 +409,31 @@ public final class HybridSTTRouter: @unchecked Sendable {
         ))
 
         return AttachedService(servicePtr: servicePtr, ops: sttOps, modelIdCStr: modelIdCStr)
+    }
+
+    /// Fail early with an actionable message when the on-device sherpa plugin
+    /// isn't in the native plugin registry yet. Without this guard the offline
+    /// service create bottoms out in an opaque vtable lookup
+    /// (`rac_plugin_find_for_engine` returning NULL) that gives no hint about
+    /// the missing prerequisite. Mirrors Kotlin's
+    /// `HybridRouterBridgeAdapter.requireSherpaRegistered()`.
+    ///
+    /// The sherpa engine registers under the name "sherpa" when the ONNX
+    /// backend module is folded in (`ONNX.register()` →
+    /// `rac_backend_sherpa_register`), which must run before
+    /// `HybridSTTRouter().setPair(...)`.
+    private func requireSherpaRegistered() throws {
+        let names = RunAnywhere.pluginLoader.registeredNames()
+        guard names.contains(where: { $0.caseInsensitiveCompare("sherpa") == .orderedSame }) else {
+            throw SDKException(
+                code: .serviceNotAvailable,
+                message: "sherpa STT backend is not registered. Load the on-device backend first "
+                    + "(ONNX.register() for sherpa, Cloud.register() for cloud) before "
+                    + "HybridSTTRouter().setPair(...). "
+                    + "Registered plugins: \(names.isEmpty ? "(none)" : names.joined(separator: ", "))",
+                category: .component
+            )
+        }
     }
 
     /// Map a backend kind to the plugin name `rac_plugin_route` pins on.
