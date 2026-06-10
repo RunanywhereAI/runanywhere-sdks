@@ -19,6 +19,11 @@
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
+#if defined(RAC_HAVE_PROTOBUF)
+#include "component_types.pb.h"
+#include "sdk_events.pb.h"
+#endif
+
 // =============================================================================
 // INTERNAL STRUCTURES
 // =============================================================================
@@ -92,223 +97,61 @@ char* dup_string(const char* s) {
     return copy;
 }
 
-// Convert analytics event type to modality
-const char* event_type_to_modality(rac_event_type_t type) {
-    if (type >= RAC_EVENT_LLM_MODEL_LOAD_STARTED && type <= RAC_EVENT_LLM_STREAMING_UPDATE) {
-        return "llm";
+#if defined(RAC_HAVE_PROTOBUF)
+
+// Convert a proto InferenceFramework enum int to the same telemetry strings as
+// framework_to_string (which keys on the distinct rac_inference_framework_t C
+// enum). The two enums have different integer values, so this maps explicitly.
+const char* framework_proto_to_string(int32_t framework) {
+    switch (static_cast<runanywhere::v1::InferenceFramework>(framework)) {
+        case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
+            return "onnx";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP:
+            return "llamacpp";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+            return "foundation_models";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_SYSTEM_TTS:
+            return "system_tts";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_FLUID_AUDIO:
+            return "fluid_audio";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_BUILT_IN:
+            return "builtin";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_NONE:
+            return "none";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_COREML:
+            return "coreml";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_MLX:
+            return "mlx";
+        case runanywhere::v1::INFERENCE_FRAMEWORK_GENIE:
+            return "genie";
+        default:
+            return "unknown";
     }
-    if (type >= RAC_EVENT_STT_MODEL_LOAD_STARTED && type <= RAC_EVENT_STT_PARTIAL_TRANSCRIPT) {
-        return "stt";
-    }
-    if (type >= RAC_EVENT_TTS_VOICE_LOAD_STARTED && type <= RAC_EVENT_TTS_SYNTHESIS_CHUNK) {
-        return "tts";
-    }
-    if (type >= RAC_EVENT_VAD_STARTED && type <= RAC_EVENT_VAD_RESUMED) {
-        return "system";  // VAD goes to system
-    }
-    // Model download/extraction/deletion events go to "model" modality (V2 base table only)
-    if (type >= RAC_EVENT_MODEL_DOWNLOAD_STARTED && type <= RAC_EVENT_MODEL_DELETED) {
+}
+
+// Component → modality string for the V2 telemetry table grouping. Mirrors the
+// legacy event_type_to_modality: LLM→"llm", STT→"stt", TTS→"tts", model events
+// →"model", everything else →"system". (VLM also routes to "llm".)
+const char* component_to_modality(runanywhere::v1::SDKComponent component, bool is_model_event) {
+    if (is_model_event) {
         return "model";
     }
-    // SDK lifecycle, storage, device, network events go to system (V1 table)
-    return "system";
-}
-
-// Check if event type is a completion/failure event that should flush immediately
-bool is_completion_event(rac_event_type_t type) {
-    switch (type) {
-        case RAC_EVENT_LLM_GENERATION_COMPLETED:
-        case RAC_EVENT_LLM_GENERATION_FAILED:
-        case RAC_EVENT_STT_TRANSCRIPTION_COMPLETED:
-        case RAC_EVENT_STT_TRANSCRIPTION_FAILED:
-        case RAC_EVENT_TTS_SYNTHESIS_COMPLETED:
-        case RAC_EVENT_TTS_SYNTHESIS_FAILED:
-            return true;
+    switch (component) {
+        case runanywhere::v1::SDK_COMPONENT_LLM:
+        case runanywhere::v1::SDK_COMPONENT_VLM:
+            return "llm";
+        case runanywhere::v1::SDK_COMPONENT_STT:
+            return "stt";
+        case runanywhere::v1::SDK_COMPONENT_TTS:
+            return "tts";
         default:
-            return false;
+            return "system";
     }
 }
 
-// Convert analytics event type to event type string
-const char* event_type_to_string(rac_event_type_t type) {
-    switch (type) {
-        // LLM
-        case RAC_EVENT_LLM_MODEL_LOAD_STARTED:
-            return "llm.model.load.started";
-        case RAC_EVENT_LLM_MODEL_LOAD_COMPLETED:
-            return "llm.model.load.completed";
-        case RAC_EVENT_LLM_MODEL_LOAD_FAILED:
-            return "llm.model.load.failed";
-        case RAC_EVENT_LLM_MODEL_UNLOADED:
-            return "llm.model.unloaded";
-        case RAC_EVENT_LLM_GENERATION_STARTED:
-            return "llm.generation.started";
-        case RAC_EVENT_LLM_GENERATION_COMPLETED:
-            return "llm.generation.completed";
-        case RAC_EVENT_LLM_GENERATION_FAILED:
-            return "llm.generation.failed";
-        case RAC_EVENT_LLM_FIRST_TOKEN:
-            return "llm.generation.first_token";
-        case RAC_EVENT_LLM_STREAMING_UPDATE:
-            return "llm.generation.streaming";
-
-        // STT
-        case RAC_EVENT_STT_MODEL_LOAD_STARTED:
-            return "stt.model.load.started";
-        case RAC_EVENT_STT_MODEL_LOAD_COMPLETED:
-            return "stt.model.load.completed";
-        case RAC_EVENT_STT_MODEL_LOAD_FAILED:
-            return "stt.model.load.failed";
-        case RAC_EVENT_STT_MODEL_UNLOADED:
-            return "stt.model.unloaded";
-        case RAC_EVENT_STT_TRANSCRIPTION_STARTED:
-            return "stt.transcription.started";
-        case RAC_EVENT_STT_TRANSCRIPTION_COMPLETED:
-            return "stt.transcription.completed";
-        case RAC_EVENT_STT_TRANSCRIPTION_FAILED:
-            return "stt.transcription.failed";
-        case RAC_EVENT_STT_PARTIAL_TRANSCRIPT:
-            return "stt.transcription.partial";
-
-        // TTS
-        case RAC_EVENT_TTS_VOICE_LOAD_STARTED:
-            return "tts.voice.load.started";
-        case RAC_EVENT_TTS_VOICE_LOAD_COMPLETED:
-            return "tts.voice.load.completed";
-        case RAC_EVENT_TTS_VOICE_LOAD_FAILED:
-            return "tts.voice.load.failed";
-        case RAC_EVENT_TTS_VOICE_UNLOADED:
-            return "tts.voice.unloaded";
-        case RAC_EVENT_TTS_SYNTHESIS_STARTED:
-            return "tts.synthesis.started";
-        case RAC_EVENT_TTS_SYNTHESIS_COMPLETED:
-            return "tts.synthesis.completed";
-        case RAC_EVENT_TTS_SYNTHESIS_FAILED:
-            return "tts.synthesis.failed";
-        case RAC_EVENT_TTS_SYNTHESIS_CHUNK:
-            return "tts.synthesis.chunk";
-
-        // VAD
-        case RAC_EVENT_VAD_STARTED:
-            return "vad.started";
-        case RAC_EVENT_VAD_STOPPED:
-            return "vad.stopped";
-        case RAC_EVENT_VAD_SPEECH_STARTED:
-            return "vad.speech.started";
-        case RAC_EVENT_VAD_SPEECH_ENDED:
-            return "vad.speech.ended";
-        case RAC_EVENT_VAD_PAUSED:
-            return "vad.paused";
-        case RAC_EVENT_VAD_RESUMED:
-            return "vad.resumed";
-
-        // VoiceAgent
-        case RAC_EVENT_VOICE_AGENT_TURN_STARTED:
-            return "voice_agent.turn.started";
-        case RAC_EVENT_VOICE_AGENT_TURN_COMPLETED:
-            return "voice_agent.turn.completed";
-        case RAC_EVENT_VOICE_AGENT_TURN_FAILED:
-            return "voice_agent.turn.failed";
-
-        // SDK Lifecycle Events (600-699)
-        case RAC_EVENT_SDK_INIT_STARTED:
-            return "sdk.init.started";
-        case RAC_EVENT_SDK_INIT_COMPLETED:
-            return "sdk.init.completed";
-        case RAC_EVENT_SDK_INIT_FAILED:
-            return "sdk.init.failed";
-        case RAC_EVENT_SDK_MODELS_LOADED:
-            return "sdk.models.loaded";
-
-        // Model Download Events (700-719)
-        case RAC_EVENT_MODEL_DOWNLOAD_STARTED:
-            return "model.download.started";
-        case RAC_EVENT_MODEL_DOWNLOAD_PROGRESS:
-            return "model.download.progress";
-        case RAC_EVENT_MODEL_DOWNLOAD_COMPLETED:
-            return "model.download.completed";
-        case RAC_EVENT_MODEL_DOWNLOAD_FAILED:
-            return "model.download.failed";
-        case RAC_EVENT_MODEL_DOWNLOAD_CANCELLED:
-            return "model.download.cancelled";
-
-        // Model Extraction Events (710-719)
-        case RAC_EVENT_MODEL_EXTRACTION_STARTED:
-            return "model.extraction.started";
-        case RAC_EVENT_MODEL_EXTRACTION_PROGRESS:
-            return "model.extraction.progress";
-        case RAC_EVENT_MODEL_EXTRACTION_COMPLETED:
-            return "model.extraction.completed";
-        case RAC_EVENT_MODEL_EXTRACTION_FAILED:
-            return "model.extraction.failed";
-
-        // Model Deletion Events (720-729)
-        case RAC_EVENT_MODEL_DELETED:
-            return "model.deleted";
-
-        // Storage Events (800-899)
-        case RAC_EVENT_STORAGE_CACHE_CLEARED:
-            return "storage.cache.cleared";
-        case RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED:
-            return "storage.cache.clear_failed";
-        case RAC_EVENT_STORAGE_TEMP_CLEANED:
-            return "storage.temp.cleaned";
-
-        // Device Events (900-999)
-        case RAC_EVENT_DEVICE_REGISTERED:
-            return "device.registered";
-        case RAC_EVENT_DEVICE_REGISTRATION_FAILED:
-            return "device.registration.failed";
-
-        // Network Events (1000-1099)
-        case RAC_EVENT_NETWORK_CONNECTIVITY_CHANGED:
-            return "network.connectivity.changed";
-
-        // Error Events (1100-1199)
-        case RAC_EVENT_SDK_ERROR:
-            return "sdk.error";
-
-        // Framework Events (1200-1299)
-        case RAC_EVENT_FRAMEWORK_MODELS_REQUESTED:
-            return "framework.models.requested";
-        case RAC_EVENT_FRAMEWORK_MODELS_RETRIEVED:
-            return "framework.models.retrieved";
-
-        default:
-            return "unknown";
-    }
-}
-
-// Convert framework enum to string
-const char* framework_to_string(rac_inference_framework_t framework) {
-    switch (framework) {
-        case RAC_FRAMEWORK_ONNX:
-            return "onnx";
-        case RAC_FRAMEWORK_LLAMACPP:
-            return "llamacpp";
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:
-            return "foundation_models";
-        case RAC_FRAMEWORK_SYSTEM_TTS:
-            return "system_tts";
-        case RAC_FRAMEWORK_FLUID_AUDIO:
-            return "fluid_audio";
-        case RAC_FRAMEWORK_BUILTIN:
-            return "builtin";
-        case RAC_FRAMEWORK_NONE:
-            return "none";
-        case RAC_FRAMEWORK_COREML:
-            return "coreml";
-        case RAC_FRAMEWORK_MLX:
-            return "mlx";
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-            return "whisperkit_coreml";
-        case RAC_FRAMEWORK_GENIE:
-            return "genie";
-        case RAC_FRAMEWORK_UNKNOWN:
-        default:
-            return "unknown";
-    }
-}
+#endif  // RAC_HAVE_PROTOBUF
 
 }  // namespace
 
@@ -331,7 +174,7 @@ rac_telemetry_manager_t* rac_telemetry_manager_create(rac_environment_t env, con
     manager->http_user_data = nullptr;
     manager->last_flush_time_ms = 0;  // Initialize to 0 (will be set on first flush)
 
-    log_debug("Telemetry", "Telemetry manager created for environment %d", env);
+    RAC_LOG_DEBUG("Telemetry", "Telemetry manager created for environment %d", env);
 
     return manager;
 }
@@ -344,7 +187,7 @@ void rac_telemetry_manager_destroy(rac_telemetry_manager_t* manager) {
     rac_telemetry_manager_flush(manager);
 
     delete manager;
-    log_debug("Telemetry", "Telemetry manager destroyed");
+    RAC_LOG_DEBUG("Telemetry", "Telemetry manager destroyed");
 }
 
 void rac_telemetry_manager_set_device_info(rac_telemetry_manager_t* manager,
@@ -402,11 +245,11 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     }
 
     // Use WARN level for production visibility (INFO is filtered in production)
-    log_debug("Telemetry", "Telemetry event queued: %s", payload->event_type);
+    RAC_LOG_DEBUG("Telemetry", "Telemetry event queued: %s", payload->event_type);
 
     // Auto-flush logic
     if (!manager->http_callback) {
-        log_debug("Telemetry", "HTTP callback not set, skipping auto-flush");
+        RAC_LOG_DEBUG("Telemetry", "HTTP callback not set, skipping auto-flush");
         return RAC_SUCCESS;
     }
 
@@ -422,34 +265,34 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     if (manager->environment == RAC_ENV_DEVELOPMENT) {
         // Development: Immediate flush for real-time debugging
         should_flush = true;
-        log_debug("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
-                  queue_size);
+        RAC_LOG_DEBUG("Telemetry", "Development mode: auto-flushing immediately (queue size: %zu)",
+                      queue_size);
     } else {
         // Production: Flush based on batch size or timeout
-        // (completion events are handled in rac_telemetry_manager_track_analytics)
+        // (completion events trigger an immediate flush in rac_telemetry_manager_track_proto)
         // Flush if queue reaches batch size
-        if (queue_size >= manager->BATCH_SIZE_PRODUCTION) {
+        if (queue_size >= rac_telemetry_manager::BATCH_SIZE_PRODUCTION) {
             should_flush = true;
-            log_debug("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
-                      queue_size, manager->BATCH_SIZE_PRODUCTION);
+            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: queue size (%zu) >= batch size (%zu)",
+                          queue_size, rac_telemetry_manager::BATCH_SIZE_PRODUCTION);
         }
         // Flush if timeout reached (5 seconds since last flush)
-        else if (manager->last_flush_time_ms > 0 &&
-                 (current_time - manager->last_flush_time_ms) >= manager->BATCH_TIMEOUT_MS) {
+        else if (manager->last_flush_time_ms > 0 && (current_time - manager->last_flush_time_ms) >=
+                                                        rac_telemetry_manager::BATCH_TIMEOUT_MS) {
             should_flush = true;
-            log_debug("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
-                      current_time - manager->last_flush_time_ms);
+            RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
+                          current_time - manager->last_flush_time_ms);
         }
         // First flush: start the timer by flushing immediately if we have events
         else if (manager->last_flush_time_ms == 0 && queue_size > 0) {
             should_flush = true;
-            log_debug("Telemetry", "Production: first flush to start timer (queue size: %zu)",
-                      queue_size);
+            RAC_LOG_DEBUG("Telemetry", "Production: first flush to start timer (queue size: %zu)",
+                          queue_size);
         }
     }
 
     if (should_flush) {
-        log_debug("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);
+        RAC_LOG_DEBUG("Telemetry", "Triggering auto-flush (queue size: %zu)", queue_size);
         rac_telemetry_manager_flush(manager);
         // Note: last_flush_time_ms is updated inside flush()
     }
@@ -457,230 +300,368 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* manager,
-                                                   rac_event_type_t event_type,
-                                                   const rac_analytics_event_data_t* data) {
+#if defined(RAC_HAVE_PROTOBUF)
+
+namespace {
+
+using runanywhere::v1::SDKEvent;
+
+// Derive the dotted event-type string + completion flag from the SDKEvent
+// (oneof case + kind enum). Reproduces the legacy event_type_to_string table
+// exactly for the events telemetry consumes. `out_is_completion` flags terminal
+// generation/transcription/synthesis events that trigger an immediate flush.
+std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion) {
+    out_is_completion = false;
+    switch (ev.event_case()) {
+        case SDKEvent::kGeneration: {
+            switch (ev.generation().kind()) {
+                case runanywhere::v1::GENERATION_EVENT_KIND_STARTED:
+                    return "llm.generation.started";
+                case runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED:
+                    return "llm.generation.first_token";
+                case runanywhere::v1::GENERATION_EVENT_KIND_STREAMING_UPDATE:
+                    return "llm.generation.streaming";
+                case runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED:
+                    out_is_completion = true;
+                    return "llm.generation.completed";
+                case runanywhere::v1::GENERATION_EVENT_KIND_FAILED:
+                    out_is_completion = true;
+                    return "llm.generation.failed";
+                case runanywhere::v1::GENERATION_EVENT_KIND_MODEL_UNLOADED:
+                    return "llm.model.unloaded";
+                default:
+                    return "llm.generation";
+            }
+        }
+        case SDKEvent::kModel: {
+            const bool is_stt = ev.component() == runanywhere::v1::SDK_COMPONENT_STT;
+            const bool is_tts = ev.component() == runanywhere::v1::SDK_COMPONENT_TTS;
+            const char* dom = is_stt ? "stt.model" : (is_tts ? "tts.voice" : "llm.model");
+            switch (ev.model().kind()) {
+                case runanywhere::v1::MODEL_EVENT_KIND_LOAD_STARTED:
+                    return std::string(dom) + ".load.started";
+                case runanywhere::v1::MODEL_EVENT_KIND_LOAD_COMPLETED:
+                    return std::string(dom) + ".load.completed";
+                case runanywhere::v1::MODEL_EVENT_KIND_LOAD_FAILED:
+                    return std::string(dom) + ".load.failed";
+                case runanywhere::v1::MODEL_EVENT_KIND_UNLOAD_COMPLETED:
+                    return is_stt ? "stt.model.unloaded"
+                                  : (is_tts ? "tts.voice.unloaded" : "llm.model.unloaded");
+                case runanywhere::v1::MODEL_EVENT_KIND_DOWNLOAD_STARTED:
+                    return "model.download.started";
+                case runanywhere::v1::MODEL_EVENT_KIND_DOWNLOAD_PROGRESS:
+                    return "model.download.progress";
+                case runanywhere::v1::MODEL_EVENT_KIND_DOWNLOAD_COMPLETED:
+                    return "model.download.completed";
+                case runanywhere::v1::MODEL_EVENT_KIND_DOWNLOAD_FAILED:
+                    return "model.download.failed";
+                case runanywhere::v1::MODEL_EVENT_KIND_DOWNLOAD_CANCELLED:
+                    return "model.download.cancelled";
+                case runanywhere::v1::MODEL_EVENT_KIND_EXTRACTION_STARTED:
+                    return "model.extraction.started";
+                case runanywhere::v1::MODEL_EVENT_KIND_EXTRACTION_PROGRESS:
+                    return "model.extraction.progress";
+                case runanywhere::v1::MODEL_EVENT_KIND_EXTRACTION_COMPLETED:
+                    return "model.extraction.completed";
+                case runanywhere::v1::MODEL_EVENT_KIND_EXTRACTION_FAILED:
+                    return "model.extraction.failed";
+                case runanywhere::v1::MODEL_EVENT_KIND_DELETE_COMPLETED:
+                    return "model.deleted";
+                default:
+                    return "model";
+            }
+        }
+        case SDKEvent::kVoice: {
+            switch (ev.voice().kind()) {
+                case runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED:
+                    return "stt.transcription.started";
+                case runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED:
+                    out_is_completion = true;
+                    return "stt.transcription.completed";
+                case runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED:
+                    out_is_completion = true;
+                    return "stt.transcription.failed";
+                case runanywhere::v1::VOICE_EVENT_KIND_STT_PARTIAL_RESULT:
+                    return "stt.transcription.partial";
+                case runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_STARTED:
+                    return "tts.synthesis.started";
+                case runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED:
+                    out_is_completion = true;
+                    return "tts.synthesis.completed";
+                case runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_FAILED:
+                    out_is_completion = true;
+                    return "tts.synthesis.failed";
+                case runanywhere::v1::VOICE_EVENT_KIND_AUDIO_GENERATED:
+                    return "tts.synthesis.chunk";
+                case runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED:
+                    return "vad.started";
+                case runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED:
+                    return "vad.stopped";
+                case runanywhere::v1::VOICE_EVENT_KIND_SPEECH_STARTED:
+                    return "vad.speech.started";
+                case runanywhere::v1::VOICE_EVENT_KIND_SPEECH_ENDED:
+                    return "vad.speech.ended";
+                case runanywhere::v1::VOICE_EVENT_KIND_VAD_PAUSED:
+                    return "vad.paused";
+                case runanywhere::v1::VOICE_EVENT_KIND_VAD_RESUMED:
+                    return "vad.resumed";
+                default:
+                    return "voice";
+            }
+        }
+        case SDKEvent::kInitialization: {
+            switch (ev.initialization().stage()) {
+                case runanywhere::v1::INITIALIZATION_STAGE_STARTED:
+                    return "sdk.init.started";
+                case runanywhere::v1::INITIALIZATION_STAGE_COMPLETED:
+                    return "sdk.init.completed";
+                case runanywhere::v1::INITIALIZATION_STAGE_FAILED:
+                    return "sdk.init.failed";
+                case runanywhere::v1::INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED:
+                    return "sdk.models.loaded";
+                default:
+                    return "sdk.init";
+            }
+        }
+        case SDKEvent::kStorage: {
+            switch (ev.storage().kind()) {
+                case runanywhere::v1::STORAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED:
+                    return "storage.cache.cleared";
+                case runanywhere::v1::STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED:
+                    return "storage.cache.clear_failed";
+                case runanywhere::v1::STORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED:
+                    return "storage.temp.cleaned";
+                default:
+                    return "storage";
+            }
+        }
+        case SDKEvent::kDevice: {
+            switch (ev.device().kind()) {
+                case runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED:
+                    return "device.registered";
+                case runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED:
+                    return "device.registration.failed";
+                default:
+                    return "device";
+            }
+        }
+        case SDKEvent::kNetwork:
+            return "network.connectivity.changed";
+        case SDKEvent::kFailure:
+            return "sdk.error";
+        default:
+            return "unknown";
+    }
+}
+
+}  // namespace
+
+rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
+                                               const uint8_t* sdk_event_bytes, size_t len) {
     if (!manager) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    SDKEvent ev;
+    if (sdk_event_bytes != nullptr && len > 0 &&
+        !ev.ParseFromArray(sdk_event_bytes, static_cast<int>(len))) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
     rac_telemetry_payload_t payload = rac_telemetry_payload_default();
 
-    // Generate ID and timestamps
     std::string uuid = generate_uuid();
     payload.id = uuid.c_str();
     payload.timestamp_ms = get_current_timestamp_ms();
     payload.created_at_ms = payload.timestamp_ms;
 
-    // Set event type and modality
-    payload.event_type = event_type_to_string(event_type);
-    payload.modality = event_type_to_modality(event_type);
+    bool is_completion = false;
+    std::string event_type = proto_event_type_string(ev, is_completion);
+    payload.event_type = event_type.c_str();
 
-    // Fill in data based on event type
-    if (data) {
-        switch (event_type) {
-            // LLM Generation events
-            case RAC_EVENT_LLM_GENERATION_STARTED:
-            case RAC_EVENT_LLM_GENERATION_COMPLETED:
-            case RAC_EVENT_LLM_GENERATION_FAILED:
-            case RAC_EVENT_LLM_FIRST_TOKEN:
-            case RAC_EVENT_LLM_STREAMING_UPDATE: {
-                const auto& llm = data->data.llm_generation;
-                // model_id and model_name come directly from the event (set by component from
-                // lifecycle)
-                payload.model_id = llm.model_id;
-                payload.model_name = llm.model_name ? llm.model_name : llm.model_id;
-                payload.session_id = llm.generation_id;
-                payload.input_tokens = llm.input_tokens;
-                payload.output_tokens = llm.output_tokens;
-                payload.total_tokens = llm.input_tokens + llm.output_tokens;
-                payload.processing_time_ms = llm.duration_ms;
-                payload.generation_time_ms =
-                    llm.duration_ms;  // Also set generation_time_ms for LLM events
-                payload.tokens_per_second = llm.tokens_per_second;
-                payload.time_to_first_token_ms = llm.time_to_first_token_ms;
-                payload.is_streaming = llm.is_streaming;
-                payload.has_is_streaming = RAC_TRUE;
-                payload.framework = framework_to_string(llm.framework);
-                payload.temperature = llm.temperature;
-                payload.max_tokens = llm.max_tokens;
-                payload.context_length = llm.context_length;
-                if (llm.error_code != RAC_SUCCESS) {
-                    payload.success = RAC_FALSE;
-                    payload.has_success = RAC_TRUE;
-                    payload.error_message = llm.error_message;
-                } else if (event_type == RAC_EVENT_LLM_GENERATION_COMPLETED) {
-                    payload.success = RAC_TRUE;
-                    payload.has_success = RAC_TRUE;
-                }
-                break;
+    const bool is_model_event = ev.event_case() == SDKEvent::kModel;
+    payload.modality = component_to_modality(ev.component(), is_model_event);
+
+    // Common: session id from the envelope.
+    if (!ev.session_id().empty()) {
+        payload.session_id = ev.session_id().c_str();
+    }
+
+    // Error → success=false + error_message. Read the envelope SDKError first,
+    // falling back to the per-payload `error` string so failed events that only
+    // populate the payload error field are still recorded as failures (parity
+    // with the legacy union path, which carried error on the per-event struct).
+    const std::string* payload_error = nullptr;
+    switch (ev.event_case()) {
+        case SDKEvent::kGeneration:
+            payload_error = &ev.generation().error();
+            break;
+        case SDKEvent::kModel:
+            payload_error = &ev.model().error();
+            break;
+        case SDKEvent::kVoice:
+            payload_error = &ev.voice().error();
+            break;
+        case SDKEvent::kStorage:
+            payload_error = &ev.storage().error();
+            break;
+        default:
+            break;
+    }
+    if (ev.has_error() && !ev.error().message().empty()) {
+        payload.success = RAC_FALSE;
+        payload.has_success = RAC_TRUE;
+        payload.error_message = ev.error().message().c_str();
+    } else if (payload_error != nullptr && !payload_error->empty()) {
+        payload.success = RAC_FALSE;
+        payload.has_success = RAC_TRUE;
+        payload.error_message = payload_error->c_str();
+    }
+
+    // Strings referenced by the payload must outlive the track() copy below; keep
+    // them in locals in this scope (track() deep-copies before returning).
+    std::string framework_str;
+
+    switch (ev.event_case()) {
+        case SDKEvent::kGeneration: {
+            const auto& g = ev.generation();
+            if (!g.model_id().empty())
+                payload.model_id = g.model_id().c_str();
+            payload.model_name = !g.model_name().empty()
+                                     ? g.model_name().c_str()
+                                     : (!g.model_id().empty() ? g.model_id().c_str() : nullptr);
+            payload.input_tokens = g.input_tokens();
+            payload.output_tokens =
+                g.tokens_used() != 0 ? g.tokens_used() : g.tokens_count();
+            payload.total_tokens = payload.input_tokens + payload.output_tokens;
+            const double dur =
+                g.duration_ms() != 0.0 ? g.duration_ms() : static_cast<double>(g.latency_ms());
+            payload.processing_time_ms = dur;
+            payload.generation_time_ms = dur;
+            payload.tokens_per_second = g.tokens_per_second();
+            payload.time_to_first_token_ms =
+                g.time_to_first_token_ms() != 0
+                    ? static_cast<double>(g.time_to_first_token_ms())
+                    : static_cast<double>(g.first_token_latency_ms());
+            payload.is_streaming = g.is_streaming() ? RAC_TRUE : RAC_FALSE;
+            payload.has_is_streaming = RAC_TRUE;
+            framework_str = framework_proto_to_string(g.framework());
+            payload.framework = framework_str.c_str();
+            payload.temperature = g.temperature();
+            payload.max_tokens = g.max_tokens();
+            payload.context_length = g.context_length();
+            if (ev.generation().kind() == runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED &&
+                !ev.has_error()) {
+                payload.success = RAC_TRUE;
+                payload.has_success = RAC_TRUE;
             }
-
-            // LLM Model events
-            case RAC_EVENT_LLM_MODEL_LOAD_STARTED:
-            case RAC_EVENT_LLM_MODEL_LOAD_COMPLETED:
-            case RAC_EVENT_LLM_MODEL_LOAD_FAILED:
-            case RAC_EVENT_LLM_MODEL_UNLOADED: {
-                const auto& model = data->data.llm_model;
-                // model_id and model_name come directly from the event
-                payload.model_id = model.model_id;
-                payload.model_name = model.model_name ? model.model_name : model.model_id;
-                payload.model_size_bytes = model.model_size_bytes;
-                payload.processing_time_ms = model.duration_ms;
-                payload.framework = framework_to_string(model.framework);
-                if (model.error_code != RAC_SUCCESS) {
-                    payload.success = RAC_FALSE;
-                    payload.has_success = RAC_TRUE;
-                    payload.error_message = model.error_message;
-                } else if (event_type == RAC_EVENT_LLM_MODEL_LOAD_COMPLETED) {
-                    payload.success = RAC_TRUE;
-                    payload.has_success = RAC_TRUE;
-                }
-                break;
-            }
-
-            // STT Model load events
-            case RAC_EVENT_STT_MODEL_LOAD_STARTED:
-            case RAC_EVENT_STT_MODEL_LOAD_COMPLETED:
-            case RAC_EVENT_STT_MODEL_LOAD_FAILED:
-            case RAC_EVENT_STT_MODEL_UNLOADED: {
-                const auto& model = data->data.llm_model;
-                payload.model_id = model.model_id;
-                payload.model_name = model.model_name ? model.model_name : model.model_id;
-                payload.model_size_bytes = model.model_size_bytes;
-                payload.processing_time_ms = model.duration_ms;
-                payload.framework = framework_to_string(model.framework);
-                if (model.error_code != RAC_SUCCESS) {
-                    payload.success = RAC_FALSE;
-                    payload.has_success = RAC_TRUE;
-                    payload.error_message = model.error_message;
-                } else if (event_type == RAC_EVENT_STT_MODEL_LOAD_COMPLETED) {
-                    payload.success = RAC_TRUE;
-                    payload.has_success = RAC_TRUE;
-                }
-                break;
-            }
-
-            // STT Transcription events
-            case RAC_EVENT_STT_TRANSCRIPTION_STARTED:
-            case RAC_EVENT_STT_TRANSCRIPTION_COMPLETED:
-            case RAC_EVENT_STT_TRANSCRIPTION_FAILED:
-            case RAC_EVENT_STT_PARTIAL_TRANSCRIPT: {
-                const auto& stt = data->data.stt_transcription;
-                // model_id and model_name come directly from the event
-                payload.model_id = stt.model_id;
-                payload.model_name = stt.model_name ? stt.model_name : stt.model_id;
-                payload.session_id = stt.transcription_id;
-                payload.processing_time_ms = stt.duration_ms;
-                payload.audio_duration_ms = stt.audio_length_ms;
-                payload.audio_size_bytes = stt.audio_size_bytes;
-                payload.word_count = stt.word_count;
-                payload.real_time_factor = stt.real_time_factor;
-                payload.confidence = stt.confidence;
-                payload.language = stt.language;
-                payload.sample_rate = stt.sample_rate;
-                payload.is_streaming = stt.is_streaming;
-                payload.has_is_streaming = RAC_TRUE;
-                payload.framework = framework_to_string(stt.framework);
-                if (stt.error_code != RAC_SUCCESS) {
-                    payload.success = RAC_FALSE;
-                    payload.has_success = RAC_TRUE;
-                    payload.error_message = stt.error_message;
-                } else if (event_type == RAC_EVENT_STT_TRANSCRIPTION_COMPLETED) {
-                    payload.success = RAC_TRUE;
-                    payload.has_success = RAC_TRUE;
-                }
-                break;
-            }
-
-            // TTS Voice load events
-            case RAC_EVENT_TTS_VOICE_LOAD_STARTED:
-            case RAC_EVENT_TTS_VOICE_LOAD_COMPLETED:
-            case RAC_EVENT_TTS_VOICE_LOAD_FAILED:
-            case RAC_EVENT_TTS_VOICE_UNLOADED: {
-                const auto& model = data->data.llm_model;
-                payload.model_id = model.model_id;
-                payload.model_name = model.model_name ? model.model_name : model.model_id;
-                payload.model_size_bytes = model.model_size_bytes;
-                payload.processing_time_ms = model.duration_ms;
-                payload.framework = framework_to_string(model.framework);
-                if (model.error_code != RAC_SUCCESS) {
-                    payload.success = RAC_FALSE;
-                    payload.has_success = RAC_TRUE;
-                    payload.error_message = model.error_message;
-                } else if (event_type == RAC_EVENT_TTS_VOICE_LOAD_COMPLETED) {
-                    payload.success = RAC_TRUE;
-                    payload.has_success = RAC_TRUE;
-                }
-                break;
-            }
-
-            // TTS Synthesis events
-            case RAC_EVENT_TTS_SYNTHESIS_STARTED:
-            case RAC_EVENT_TTS_SYNTHESIS_COMPLETED:
-            case RAC_EVENT_TTS_SYNTHESIS_FAILED:
-            case RAC_EVENT_TTS_SYNTHESIS_CHUNK: {
-                const auto& tts = data->data.tts_synthesis;
-                // model_id and model_name come directly from the event
-                payload.model_id = tts.model_id;
-                payload.model_name = tts.model_name ? tts.model_name : tts.model_id;
-                payload.voice = tts.model_id;  // Voice is the same as model_id for TTS
-                payload.session_id = tts.synthesis_id;
-                payload.character_count = tts.character_count;
-                payload.output_duration_ms = tts.audio_duration_ms;
-                payload.audio_size_bytes = tts.audio_size_bytes;
-                payload.processing_time_ms = tts.processing_duration_ms;
-                payload.characters_per_second = tts.characters_per_second;
-                payload.sample_rate = tts.sample_rate;
-                payload.framework = framework_to_string(tts.framework);
-                if (tts.error_code != RAC_SUCCESS) {
-                    payload.success = RAC_FALSE;
-                    payload.has_success = RAC_TRUE;
-                    payload.error_message = tts.error_message;
-                } else if (event_type == RAC_EVENT_TTS_SYNTHESIS_COMPLETED) {
-                    payload.success = RAC_TRUE;
-                    payload.has_success = RAC_TRUE;
-                }
-                // Debug: Log if voice/model_id is null
-                if (!payload.voice || !payload.model_id) {
-                    log_debug(
-                        "Telemetry",
-                        "TTS event has null voice/model_id (voice_id from lifecycle may be null)");
-                } else {
-                    log_debug("Telemetry", "TTS event voice: %s", payload.voice);
-                }
-                break;
-            }
-
-            // VAD events
-            case RAC_EVENT_VAD_STARTED:
-            case RAC_EVENT_VAD_STOPPED:
-            case RAC_EVENT_VAD_SPEECH_STARTED:
-            case RAC_EVENT_VAD_SPEECH_ENDED:
-            case RAC_EVENT_VAD_PAUSED:
-            case RAC_EVENT_VAD_RESUMED: {
-                const auto& vad = data->data.vad;
-                payload.speech_duration_ms = vad.speech_duration_ms;
-                break;
-            }
-
-            default:
-                break;
+            break;
         }
+        case SDKEvent::kModel: {
+            const auto& m = ev.model();
+            if (!m.model_id().empty())
+                payload.model_id = m.model_id().c_str();
+            payload.model_name = !m.model_name().empty()
+                                     ? m.model_name().c_str()
+                                     : (!m.model_id().empty() ? m.model_id().c_str() : nullptr);
+            payload.model_size_bytes = m.model_size_bytes();
+            payload.processing_time_ms = static_cast<double>(m.duration_ms());
+            framework_str = framework_proto_to_string(m.framework());
+            payload.framework = framework_str.c_str();
+            if (m.kind() == runanywhere::v1::MODEL_EVENT_KIND_LOAD_COMPLETED && !ev.has_error()) {
+                payload.success = RAC_TRUE;
+                payload.has_success = RAC_TRUE;
+            }
+            break;
+        }
+        case SDKEvent::kVoice: {
+            const auto& v = ev.voice();
+            const bool is_tts = ev.component() == runanywhere::v1::SDK_COMPONENT_TTS;
+            const bool is_stt = ev.component() == runanywhere::v1::SDK_COMPONENT_STT;
+            if (is_stt) {
+                if (!v.model_id().empty())
+                    payload.model_id = v.model_id().c_str();
+                payload.model_name =
+                    !v.model_name().empty()
+                        ? v.model_name().c_str()
+                        : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
+                payload.processing_time_ms = static_cast<double>(v.duration_ms());
+                payload.audio_duration_ms = static_cast<double>(v.audio_length_ms());
+                payload.audio_size_bytes = v.audio_size_bytes();
+                payload.word_count = v.word_count();
+                payload.real_time_factor = v.real_time_factor();
+                payload.confidence = v.confidence();
+                if (!v.language().empty())
+                    payload.language = v.language().c_str();
+                payload.sample_rate = v.sample_rate();
+                payload.is_streaming = v.is_streaming() ? RAC_TRUE : RAC_FALSE;
+                payload.has_is_streaming = RAC_TRUE;
+                framework_str = framework_proto_to_string(v.framework());
+                payload.framework = framework_str.c_str();
+                if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED && !ev.has_error()) {
+                    payload.success = RAC_TRUE;
+                    payload.has_success = RAC_TRUE;
+                }
+            } else if (is_tts) {
+                if (!v.model_id().empty()) {
+                    payload.model_id = v.model_id().c_str();
+                    payload.voice = v.model_id().c_str();  // voice == model_id for TTS
+                }
+                payload.model_name =
+                    !v.model_name().empty()
+                        ? v.model_name().c_str()
+                        : (!v.model_id().empty() ? v.model_id().c_str() : nullptr);
+                payload.character_count = v.character_count();
+                payload.output_duration_ms = static_cast<double>(v.audio_duration_ms());
+                payload.audio_size_bytes = v.audio_size_bytes_tts();
+                payload.processing_time_ms = static_cast<double>(v.processing_duration_ms());
+                payload.characters_per_second = v.characters_per_second();
+                payload.sample_rate = v.sample_rate();
+                framework_str = framework_proto_to_string(v.framework());
+                payload.framework = framework_str.c_str();
+                if (v.kind() == runanywhere::v1::VOICE_EVENT_KIND_SYNTHESIS_COMPLETED &&
+                    !ev.has_error()) {
+                    payload.success = RAC_TRUE;
+                    payload.has_success = RAC_TRUE;
+                }
+            } else {
+                // VAD — telemetry reads only speech_duration_ms (= duration_ms(7)).
+                payload.speech_duration_ms = static_cast<double>(v.duration_ms());
+            }
+            break;
+        }
+        case SDKEvent::kStorage: {
+            payload.freed_bytes = ev.storage().freed_bytes();
+            break;
+        }
+        case SDKEvent::kNetwork: {
+            payload.is_online = ev.network().is_online() ? RAC_TRUE : RAC_FALSE;
+            payload.has_is_online = RAC_TRUE;
+            break;
+        }
+        default:
+            break;
     }
 
     rac_result_t result = rac_telemetry_manager_track(manager, &payload);
 
-    // For completion/failure events in production, trigger immediate flush
-    // This ensures important terminal events are captured before app exits
-    if (result == RAC_SUCCESS && manager->environment != RAC_ENV_DEVELOPMENT &&
-        is_completion_event(event_type) && manager->http_callback) {
-        log_debug("Telemetry", "Completion event detected, triggering immediate flush");
+    if (result == RAC_SUCCESS && manager->environment != RAC_ENV_DEVELOPMENT && is_completion &&
+        manager->http_callback) {
+        RAC_LOG_DEBUG("Telemetry", "Completion event detected, triggering immediate flush");
         rac_telemetry_manager_flush(manager);
     }
 
     return result;
 }
+
+#else  // !RAC_HAVE_PROTOBUF
+
+rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
+                                               const uint8_t* /*sdk_event_bytes*/, size_t /*len*/) {
+    return manager ? RAC_SUCCESS : RAC_ERROR_INVALID_ARGUMENT;
+}
+
+#endif  // RAC_HAVE_PROTOBUF
 
 // =============================================================================
 // FLUSH
@@ -692,7 +673,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     }
 
     if (!manager->http_callback) {
-        log_debug("Telemetry", "No HTTP callback registered, cannot flush telemetry");
+        RAC_LOG_DEBUG("Telemetry", "No HTTP callback registered, cannot flush telemetry");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -708,7 +689,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         return RAC_SUCCESS;
     }
 
-    log_debug("Telemetry", "Flushing %zu telemetry events", events.size());
+    RAC_LOG_DEBUG("Telemetry", "Flushing %zu telemetry events", events.size());
 
     // Update last flush time
     manager->last_flush_time_ms = get_current_timestamp_ms();
@@ -767,9 +748,9 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 
             if (result == RAC_SUCCESS && json) {
                 // WARN: Log production telemetry payload for debugging (first 500 chars)
-                log_debug("Telemetry",
-                          "Sending production telemetry (modality=%s, %zu bytes): %.500s",
-                          modality.c_str(), json_len, json);
+                RAC_LOG_DEBUG("Telemetry",
+                              "Sending production telemetry (modality=%s, %zu bytes): %.500s",
+                              modality.c_str(), json_len, json);
                 manager->http_callback(manager->http_user_data, endpoint, json, json_len,
                                        RAC_TRUE  // Production always requires auth
                 );
@@ -807,11 +788,11 @@ void rac_telemetry_manager_http_complete(rac_telemetry_manager_t* manager, rac_b
     if (!manager)
         return;
 
-    if (success) {
-        log_debug("Telemetry", "Telemetry HTTP request completed successfully");
+    if (success == RAC_TRUE) {
+        RAC_LOG_DEBUG("Telemetry", "Telemetry HTTP request completed successfully");
     } else {
-        log_warning("Telemetry", "Telemetry HTTP request failed: %s",
-                    error_message ? error_message : "unknown");
+        RAC_LOG_WARNING("Telemetry", "Telemetry HTTP request failed: %s",
+                        error_message ? error_message : "unknown");
     }
 
     // Could parse response and handle retries here if needed

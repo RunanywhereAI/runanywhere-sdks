@@ -1,47 +1,18 @@
 /**
- * SDK-wide constants (metadata only)
+ * SDK-wide constants.
  *
- * Centralized constants to ensure consistency across the SDK.
- * Matches pattern: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift
+ * Mirrors `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift`.
  */
 
-import { Platform } from 'react-native';
-
-/**
- * SDK Constants
- *
- * All SDK-wide constants should be defined here to avoid hardcoded values
- * scattered throughout the codebase.
- */
 export const SDKConstants = {
   /**
-   * SDK version - must match the VERSION file in the repository root
-   * Update this when bumping the SDK version
+   * SDK version - must stay in sync with package.json `version`.
+   * Native commons receives this through the Phase 1 init payload.
    */
-  version: '0.2.0',
+  version: '0.19.13',
 
   /**
-   * SDK name
+   * SDK platform identifier used by backend auth/device metadata.
    */
-  name: 'RunAnywhere SDK',
-
-  /**
-   * User agent string
-   */
-  get userAgent(): string {
-    return `${this.name}/${this.version} (React Native)`;
-  },
-
-  /**
-   * Platform identifier (ios/android)
-   */
-  get platform(): string {
-    return Platform.OS === 'ios' ? 'ios' : 'android';
-  },
-
-  /**
-   * Minimum log level in production
-   */
-  productionLogLevel: 'error',
+  platform: 'react_native',
 } as const;
-

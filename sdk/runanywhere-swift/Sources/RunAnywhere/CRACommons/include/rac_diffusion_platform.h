@@ -216,8 +216,8 @@ typedef struct rac_platform_diffusion_callbacks {
  * @param callbacks Callback functions (copied internally)
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_platform_diffusion_set_callbacks(
-    const rac_platform_diffusion_callbacks_t* callbacks);
+RAC_API rac_result_t
+rac_platform_diffusion_set_callbacks(const rac_platform_diffusion_callbacks_t* callbacks);
 
 /**
  * Gets the current Swift callbacks.

@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 package-lock.json
+.yarn/cache/
+.yarn/install-state.gz
 
 # Build output
 packages/core/dist/
@@ -30,3 +32,10 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Test build output
+packages/core/dist-test/
+
+# Playwright browser E2E
+test-results/
+playwright-report/

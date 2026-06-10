@@ -4,6 +4,23 @@
  *
  * Streaming extraction with constant memory usage regardless of archive size.
  * Supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ with auto-detection via magic bytes.
+ *
+ * Edge cases handled:
+ *   - Magic-byte auto-detect with size guards (zip/gzip/bzip2/xz/ustar),
+ *     detect_archive_kind_from_bytes; a detected-vs-hint mismatch →
+ *     RAC_ERROR_UNSUPPORTED_ARCHIVE.
+ *   - Zip-slip: is_path_safe rejects absolute / .. / UNC / drive-letter entry
+ *     paths.
+ *   - macOS resource forks: should_skip_entry skips __MACOSX/ and ._* entries.
+ *   - Symlinks: skipped when skip_symlinks, else rejected if the target is
+ *     absolute or contains ".."; hardlinks rewritten under the destination with
+ *     the same safety check.
+ *   - No-subprocess filters: only built-in zlib/bzip2/xz are registered (NOT
+ *     support_filter_all) so iOS/WASM sandboxes never fork+exec /usr/bin/gzip.
+ *   - Streaming, constant memory regardless of archive size; per-entry
+ *     header/data errors are logged and skipped or aborted.
+ *   - Missing archive / null args → RAC_ERROR_FILE_NOT_FOUND /
+ *     RAC_ERROR_NULL_POINTER.
  */
 
 #include "rac/infrastructure/extraction/rac_extraction.h"
@@ -16,7 +33,7 @@
 #include <cstring>
 #include <string>
 
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir
@@ -29,6 +46,142 @@ static const char* kLogTag = "Extraction";
 // =============================================================================
 // INTERNAL HELPERS
 // =============================================================================
+
+enum class archive_kind {
+    unknown,
+    zip,
+    tar,
+    tar_gz,
+    tar_bz2,
+    tar_xz,
+};
+
+static archive_kind kind_from_archive_type(rac_archive_type_t type) {
+    switch (type) {
+        case RAC_ARCHIVE_TYPE_ZIP:
+            return archive_kind::zip;
+        case RAC_ARCHIVE_TYPE_TAR_BZ2:
+            return archive_kind::tar_bz2;
+        case RAC_ARCHIVE_TYPE_TAR_GZ:
+            return archive_kind::tar_gz;
+        case RAC_ARCHIVE_TYPE_TAR_XZ:
+            return archive_kind::tar_xz;
+        case RAC_ARCHIVE_TYPE_NONE:
+        default:
+            return archive_kind::unknown;
+    }
+}
+
+static bool archive_kind_to_archive_type(archive_kind kind, rac_archive_type_t* out_type) {
+    if (!out_type) {
+        return false;
+    }
+    switch (kind) {
+        case archive_kind::zip:
+            *out_type = RAC_ARCHIVE_TYPE_ZIP;
+            return true;
+        case archive_kind::tar_bz2:
+            *out_type = RAC_ARCHIVE_TYPE_TAR_BZ2;
+            return true;
+        case archive_kind::tar_gz:
+            *out_type = RAC_ARCHIVE_TYPE_TAR_GZ;
+            return true;
+        case archive_kind::tar_xz:
+            *out_type = RAC_ARCHIVE_TYPE_TAR_XZ;
+            return true;
+        case archive_kind::tar:
+        case archive_kind::unknown:
+        default:
+            return false;
+    }
+}
+
+static const char* archive_kind_name(archive_kind kind) {
+    switch (kind) {
+        case archive_kind::zip:
+            return "zip";
+        case archive_kind::tar:
+            return "tar";
+        case archive_kind::tar_gz:
+            return "tar.gz";
+        case archive_kind::tar_bz2:
+            return "tar.bz2";
+        case archive_kind::tar_xz:
+            return "tar.xz";
+        case archive_kind::unknown:
+        default:
+            return "unknown";
+    }
+}
+
+static archive_kind detect_archive_kind_from_bytes(const unsigned char* bytes, size_t size) {
+    if (!bytes || size < 2) {
+        return archive_kind::unknown;
+    }
+
+    // ZIP: local file header, empty archive end-of-central-directory, or
+    // spanned/split archive marker.
+    if (size >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B &&
+        ((bytes[2] == 0x03 && bytes[3] == 0x04) || (bytes[2] == 0x05 && bytes[3] == 0x06) ||
+         (bytes[2] == 0x07 && bytes[3] == 0x08))) {
+        return archive_kind::zip;
+    }
+
+    // GZIP (tar.gz): \x1f\x8b
+    if (bytes[0] == 0x1F && bytes[1] == 0x8B) {
+        return archive_kind::tar_gz;
+    }
+
+    // BZIP2 (tar.bz2): BZh
+    if (size >= 3 && bytes[0] == 0x42 && bytes[1] == 0x5A && bytes[2] == 0x68) {
+        return archive_kind::tar_bz2;
+    }
+
+    // XZ (tar.xz): \xFD7zXZ\x00
+    if (size >= 6 && bytes[0] == 0xFD && bytes[1] == 0x37 && bytes[2] == 0x7A && bytes[3] == 0x58 &&
+        bytes[4] == 0x5A && bytes[5] == 0x00) {
+        return archive_kind::tar_xz;
+    }
+
+    // POSIX tar: "ustar" at offset 257.
+    if (size >= 262 && memcmp(bytes + 257, "ustar", 5) == 0) {
+        return archive_kind::tar;
+    }
+
+    return archive_kind::unknown;
+}
+
+// Probe the first <=512 bytes for an archive magic signature.
+//
+// Intentionally uses stdio FILE here rather than the platform adapter's
+// file_read slot: rac_platform_adapter_t::file_read (and the file_manager
+// rac_file_callbacks_t) are WHOLE-FILE only — they have no bounded/offset
+// read. Routing a 512-byte magic probe through file_read would allocate and
+// copy the entire archive (multi-GB GGUF/ONNX bundles) into memory just to
+// read the header, an OOM risk and a clear pessimization. Adding a bounded
+// read slot would be an ABI change across all 5 SDK populators + pinned
+// headers + the WASM offset table, which is not justified for a header probe.
+// This is native/host-side extraction code anyway: libarchive itself opens
+// the archive with raw FILE I/O immediately below (archive_read_open_filename),
+// so the fopen here matches the surrounding code. fread is hard-bounded to
+// sizeof(bytes) and detect_archive_kind_from_bytes re-validates size before
+// every offset access, so this path is memory-safe.
+static archive_kind detect_archive_kind_from_file(const char* file_path) {
+    if (!file_path) {
+        return archive_kind::unknown;
+    }
+
+    FILE* f = fopen(file_path, "rb");
+    if (!f) {
+        return archive_kind::unknown;
+    }
+
+    unsigned char bytes[512] = {0};
+    size_t bytes_read = fread(bytes, 1, sizeof(bytes), f);
+    fclose(f);
+
+    return detect_archive_kind_from_bytes(bytes, bytes_read);
+}
 
 /**
  * Security: Check for path traversal (zip-slip attack).
@@ -55,7 +208,7 @@ static bool is_path_safe(const char* pathname) {
 
     // Normalize and check for ".." components (handle both / and \ separators)
     const char* p = pathname;
-    while (*p) {
+    while (*p != '\0') {
         if (p[0] == '.' && p[1] == '.') {
             bool at_start = (p == pathname || *(p - 1) == '/' || *(p - 1) == '\\');
             bool at_end = (p[2] == '/' || p[2] == '\\' || p[2] == '\0');
@@ -75,7 +228,7 @@ static bool should_skip_entry(const char* pathname, rac_bool_t skip_macos) {
     if (!pathname || pathname[0] == '\0')
         return true;
 
-    if (skip_macos) {
+    if (skip_macos == RAC_TRUE) {
         // Skip __MACOSX/ directory and its contents
         if (strstr(pathname, "__MACOSX") != nullptr)
             return true;
@@ -151,6 +304,16 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
     // Use defaults if no options provided
     rac_extraction_options_t opts = options ? *options : RAC_EXTRACTION_OPTIONS_DEFAULT;
 
+    archive_kind detected_kind = detect_archive_kind_from_file(archive_path);
+    archive_kind explicit_hint_kind = kind_from_archive_type(opts.archive_type_hint);
+    if (detected_kind != archive_kind::unknown && explicit_hint_kind != archive_kind::unknown &&
+        detected_kind != explicit_hint_kind) {
+        RAC_LOG_ERROR(kLogTag, "Archive type mismatch for %s: detected %s, expected %s",
+                      archive_path, archive_kind_name(detected_kind),
+                      archive_kind_name(explicit_hint_kind));
+        return RAC_ERROR_UNSUPPORTED_ARCHIVE;
+    }
+
     // Create destination directory
     rac_result_t dir_result = create_directories(destination_dir);
     if (RAC_FAILED(dir_result)) {
@@ -169,9 +332,26 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
         return RAC_ERROR_EXTRACTION_FAILED;
     }
 
-    // Enable all supported formats and filters for auto-detection
+    // Enable all supported formats for auto-detection.
     archive_read_support_format_all(a);
-    archive_read_support_filter_all(a);
+    // Register ONLY the built-in
+    // decompression filters that link against statically-bundled libraries
+    // (zlib, bzip2, xz). DO NOT call archive_read_support_filter_all() — that
+    // registers libarchive's `program("gzip -d" / "bzip2 -d" / "xz -d")`
+    // external-program fallbacks whenever the matching built-in symbol is
+    // missing at link time. iOS (Swift + Flutter) sandboxes block
+    // `fork+exec(/usr/bin/gzip)`, so any tar.gz extraction (Sherpa Whisper Tiny,
+    // SmolVLM, Piper TTS) silently failed with an obscure errno=1 from the
+    // child shell. Emscripten / WASM likewise has no subprocess primitive.
+    //
+    // Keeping the registration explicit also makes the failure mode loud and
+    // testable: if zlib is somehow not linked, archive_read_open_filename will
+    // surface a clear "gzip: unsupported compression" error instead of trying
+    // (and failing) to fork a non-existent /usr/bin/gzip.
+    archive_read_support_filter_none(a);
+    archive_read_support_filter_gzip(a);
+    archive_read_support_filter_bzip2(a);
+    archive_read_support_filter_xz(a);
 
     // Open the archive file with 10KB block size (streaming)
     int r = archive_read_open_filename(a, archive_path, 10240);
@@ -237,7 +417,7 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
         // Handle symbolic links
         unsigned int entry_type = archive_entry_filetype(entry);
         if (entry_type == AE_IFLNK) {
-            if (opts.skip_symlinks) {
+            if (opts.skip_symlinks == RAC_TRUE) {
                 result.entries_skipped++;
                 archive_read_data_skip(a);
                 continue;
@@ -350,6 +530,48 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
     return status;
 }
 
+rac_result_t rac_extract_model_archive_native(const char* archive_path, const char* destination_dir,
+                                              const rac_model_info_t* model_info,
+                                              const char* expected_primary_sha256,
+                                              const rac_extraction_options_t* options,
+                                              rac_extraction_progress_fn progress_callback,
+                                              void* user_data,
+                                              rac_model_extraction_result_t* out_result) {
+    if (!archive_path || !destination_dir || !model_info || !out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    memset(out_result, 0, sizeof(*out_result));
+    out_result->archive_type = RAC_ARCHIVE_TYPE_NONE;
+    rac_archive_type_t detected_type = RAC_ARCHIVE_TYPE_NONE;
+    archive_kind detected_kind = detect_archive_kind_from_file(archive_path);
+    if (archive_kind_to_archive_type(detected_kind, &detected_type)) {
+        out_result->archive_type = detected_type;
+    } else if (options && options->archive_type_hint != RAC_ARCHIVE_TYPE_NONE) {
+        out_result->archive_type = options->archive_type_hint;
+    } else if (model_info->artifact_info.kind == RAC_ARTIFACT_KIND_ARCHIVE) {
+        out_result->archive_type = model_info->artifact_info.archive_type;
+    }
+
+    rac_result_t rc =
+        rac_extract_archive_native(archive_path, destination_dir, options, progress_callback,
+                                   user_data, &out_result->extraction);
+    if (RAC_FAILED(rc)) {
+        return rc;
+    }
+
+    return rac_model_paths_resolve_artifact(model_info, destination_dir, expected_primary_sha256,
+                                            &out_result->resolution);
+}
+
+void rac_model_extraction_result_free(rac_model_extraction_result_t* result) {
+    if (!result)
+        return;
+    rac_model_path_resolution_free(&result->resolution);
+    memset(&result->extraction, 0, sizeof(result->extraction));
+    result->archive_type = RAC_ARCHIVE_TYPE_NONE;
+}
+
 // =============================================================================
 // PUBLIC API - rac_detect_archive_type
 // =============================================================================
@@ -358,42 +580,7 @@ rac_bool_t rac_detect_archive_type(const char* file_path, rac_archive_type_t* ou
     if (!file_path || !out_type)
         return RAC_FALSE;
 
-    FILE* f = fopen(file_path, "rb");
-    if (!f)
-        return RAC_FALSE;
-
-    unsigned char magic[6] = {0};
-    size_t bytes_read = fread(magic, 1, sizeof(magic), f);
-    fclose(f);
-
-    if (bytes_read < 2)
-        return RAC_FALSE;
-
-    // ZIP: PK\x03\x04
-    if (bytes_read >= 4 && magic[0] == 0x50 && magic[1] == 0x4B && magic[2] == 0x03 &&
-        magic[3] == 0x04) {
-        *out_type = RAC_ARCHIVE_TYPE_ZIP;
-        return RAC_TRUE;
-    }
-
-    // GZIP (tar.gz): \x1f\x8b
-    if (magic[0] == 0x1F && magic[1] == 0x8B) {
-        *out_type = RAC_ARCHIVE_TYPE_TAR_GZ;
-        return RAC_TRUE;
-    }
-
-    // BZIP2 (tar.bz2): BZh
-    if (bytes_read >= 3 && magic[0] == 0x42 && magic[1] == 0x5A && magic[2] == 0x68) {
-        *out_type = RAC_ARCHIVE_TYPE_TAR_BZ2;
-        return RAC_TRUE;
-    }
-
-    // XZ (tar.xz): \xFD7zXZ\x00
-    if (bytes_read >= 6 && magic[0] == 0xFD && magic[1] == 0x37 && magic[2] == 0x7A &&
-        magic[3] == 0x58 && magic[4] == 0x5A && magic[5] == 0x00) {
-        *out_type = RAC_ARCHIVE_TYPE_TAR_XZ;
-        return RAC_TRUE;
-    }
-
-    return RAC_FALSE;
+    return archive_kind_to_archive_type(detect_archive_kind_from_file(file_path), out_type)
+               ? RAC_TRUE
+               : RAC_FALSE;
 }

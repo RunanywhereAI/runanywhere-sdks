@@ -14,7 +14,9 @@
 #include "TelemetryBridge.hpp"
 #include "InitBridge.hpp"
 #include "AuthBridge.hpp"
+#include "ExternalConfigGuard.hpp"
 #include "rac_dev_config.h"
+#include "rac_sdk_event_stream.h"  // rac_events_set_telemetry_sink
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -41,12 +43,6 @@ static void telemetryHttpCallback(
     const char* jsonBody,
     size_t jsonLength,
     rac_bool_t requiresAuth
-);
-
-static void analyticsEventCallback(
-    rac_event_type_t type,
-    const rac_analytics_event_data_t* data,
-    void* userData
 );
 
 // ============================================================================
@@ -115,9 +111,10 @@ void TelemetryBridge::initialize(
 void TelemetryBridge::shutdown() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Unregister events callback first
+    // Detach the telemetry sink first so the C++ router stops feeding events
+    // into a manager we are about to destroy.
     if (eventsCallbackRegistered_) {
-        rac_analytics_events_set_callback(nullptr, nullptr);
+        rac_events_set_telemetry_sink(nullptr);
         eventsCallbackRegistered_ = false;
     }
 
@@ -144,25 +141,6 @@ bool TelemetryBridge::isInitialized() const {
 // Event Tracking
 // ============================================================================
 
-void TelemetryBridge::trackAnalyticsEvent(
-    rac_event_type_t eventType,
-    const rac_analytics_event_data_t* data
-) {
-    std::lock_guard<std::mutex> lock(mutex_);
-
-    if (!manager_) {
-        LOGD("Telemetry not initialized, skipping event");
-        return;
-    }
-
-    // Route to C++ telemetry manager
-    // Matches Swift: rac_telemetry_manager_track_analytics(mgr, type, data)
-    rac_result_t result = rac_telemetry_manager_track_analytics(manager_, eventType, data);
-    if (result != RAC_SUCCESS) {
-        LOGE("Failed to track analytics event: %d", result);
-    }
-}
-
 void TelemetryBridge::flush() {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -185,16 +163,20 @@ void TelemetryBridge::registerEventsCallback() {
         return;
     }
 
-    // Register analytics callback - routes events to telemetry manager
-    // Matches Swift: rac_analytics_events_set_callback(analyticsEventCallback, nil)
-    rac_result_t result = rac_analytics_events_set_callback(analyticsEventCallback, this);
-    if (result != RAC_SUCCESS) {
-        LOGE("Failed to register analytics events callback: %d", result);
+    if (!manager_) {
+        LOGW("Telemetry manager not initialized; skipping telemetry sink registration");
         return;
     }
 
+    // Attach the telemetry manager as the C++ event router's telemetry sink.
+    // The router (rac::events::route) feeds every TELEMETRY-bit event into the
+    // manager via rac_telemetry_manager_track_proto and does the per-event
+    // translation internally — no analytics callback needed.
+    // Matches Swift: rac_events_set_telemetry_sink(mgr.ptr)
+    rac_events_set_telemetry_sink(manager_);
+
     eventsCallbackRegistered_ = true;
-    LOGI("Analytics events callback registered");
+    LOGI("Telemetry sink registered");
 }
 
 void TelemetryBridge::unregisterEventsCallback() {
@@ -204,9 +186,9 @@ void TelemetryBridge::unregisterEventsCallback() {
         return;
     }
 
-    rac_analytics_events_set_callback(nullptr, nullptr);
+    rac_events_set_telemetry_sink(nullptr);
     eventsCallbackRegistered_ = false;
-    LOGI("Analytics events callback unregistered");
+    LOGI("Telemetry sink unregistered");
 }
 
 // ============================================================================
@@ -257,47 +239,60 @@ static void telemetryHttpCallback(
     if (env == RAC_ENV_DEVELOPMENT) {
         // Development: Use Supabase from C++ dev config (development_config.cpp)
         // NO FALLBACK - credentials must come from C++ config only
-        const char* devUrl = rac_dev_config_get_supabase_url();
-        const char* devKey = rac_dev_config_get_supabase_key();
+        auto supabaseConfig = config::makeEndpointConfig(
+            rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url() : "",
+            rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key() : "");
 
-        baseURL = devUrl ? devUrl : "";
-        apiKey = devKey ? devKey : "";
-
-        if (baseURL.empty()) {
-            LOGW("Development mode but Supabase URL not configured in C++ dev_config");
-        } else {
-            LOGD("Telemetry using Supabase: %s", baseURL.c_str());
+        if (!supabaseConfig.usable) {
+            LOGI("Skipping telemetry/device registration: no usable config");
+            rac_telemetry_manager_http_complete(
+                bridge->getHandle(),
+                RAC_TRUE,
+                "{}",
+                nullptr
+            );
+            return;
         }
+
+        baseURL = supabaseConfig.baseURL;
+        apiKey = supabaseConfig.token;
+        LOGD("Telemetry using configured development Supabase endpoint");
     } else {
         // Production/Staging: Use configured Railway URL
         // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
-        baseURL = InitBridge::shared().getBaseURL();
-        
+        baseURL = config::trim(InitBridge::shared().getBaseURL());
+
         // For production mode, prefer JWT access token (from authentication)
         // over raw API key. This matches Swift/Kotlin behavior.
         std::string accessToken = AuthBridge::shared().getAccessToken();
-        if (!accessToken.empty()) {
+        if (config::isUsableSecret(accessToken)) {
             apiKey = accessToken;  // Use JWT for Authorization header
             LOGD("Telemetry using JWT access token");
         } else {
             // Fallback to API key if not authenticated yet
-            apiKey = InitBridge::shared().getApiKey();
+            apiKey = config::trim(InitBridge::shared().getApiKey());
             LOGD("Telemetry using API key (not authenticated)");
         }
-        
-        // Fallback to default if not configured
-        if (baseURL.empty()) {
-            baseURL = "https://api.runanywhere.ai";
+
+        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
+            LOGI("Skipping telemetry/device registration: no usable config");
+            rac_telemetry_manager_http_complete(
+                bridge->getHandle(),
+                RAC_TRUE,
+                "{}",
+                nullptr
+            );
+            return;
         }
-        
-        LOGD("Telemetry using production: %s", baseURL.c_str());
+
+        LOGD("Telemetry using configured production/staging endpoint");
     }
 
-    std::string fullURL = baseURL + path;
+    std::string fullURL = config::appendEndpointPath(baseURL, path);
 
     LOGI("Telemetry POST to: %s", fullURL.c_str());
 
-    // Use platform-native HTTP (same as device registration)
+    // Use shared native C++ HTTP transport (same as device registration).
     auto [success, statusCode, responseBody, errorMessage] =
         InitBridge::shared().httpPostSync(fullURL, json, apiKey);
 
@@ -322,36 +317,6 @@ static void telemetryHttpCallback(
             errorMessage.c_str()
         );
     }
-}
-
-// ============================================================================
-// Analytics Events Callback
-// ============================================================================
-
-/**
- * Analytics callback - receives events from C++ analytics system.
- *
- * Routes events to telemetry manager for batching and sending.
- *
- * Matches Swift's analyticsEventCallback in CppBridge+Telemetry.swift
- */
-static void analyticsEventCallback(
-    rac_event_type_t type,
-    const rac_analytics_event_data_t* data,
-    void* userData
-) {
-    if (!data) {
-        return;
-    }
-
-    auto* bridge = static_cast<TelemetryBridge*>(userData);
-    if (!bridge) {
-        return;
-    }
-
-    // Forward to telemetry manager
-    // C++ handles JSON building, batching, etc.
-    bridge->trackAnalyticsEvent(type, data);
 }
 
 } // namespace bridges

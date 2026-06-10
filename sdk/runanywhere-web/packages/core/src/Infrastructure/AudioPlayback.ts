@@ -14,7 +14,7 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { EventBus } from '../Foundation/EventBus';
-import { SDKEventType } from '../types/enums';
+import { EventCategory } from '@runanywhere/proto-ts/component_types';
 
 const logger = new SDKLogger('AudioPlayback');
 
@@ -92,14 +92,14 @@ export class AudioPlayback {
       source.onended = () => {
         this._isPlaying = false;
         this.currentSource = null;
-        EventBus.shared.emit('playback.completed', SDKEventType.Voice, { durationMs });
+        EventBus.shared.emit('playback.completed', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs });
         resolve();
       };
 
       this.currentSource = source;
       this._isPlaying = true;
 
-      EventBus.shared.emit('playback.started', SDKEventType.Voice, { durationMs, sampleRate: rate });
+      EventBus.shared.emit('playback.started', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs, sampleRate: rate });
       source.start();
     });
   }

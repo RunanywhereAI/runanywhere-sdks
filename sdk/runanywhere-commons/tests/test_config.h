@@ -4,7 +4,8 @@
 #include <climits>
 #include <cstdlib>
 #include <string>
-#include "rac/core/rac_platform_compat.h"
+
+#include "core/internal/platform_compat.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -32,12 +33,22 @@ inline bool file_exists(const std::string& path) {
     return (stat(path.c_str(), &st) == 0);
 }
 
-inline bool require_model(const std::string& path, const std::string& name,
-                           TestResult& result) {
+inline bool require_real_artifacts() {
+    const char* env = std::getenv("RAC_TEST_REQUIRE_MODELS");
+    return env && env[0] != '\0' && std::string(env) != "0";
+}
+
+inline bool require_real_audio_artifacts() {
+    const char* env = std::getenv("RAC_TEST_REQUIRE_AUDIO");
+    return env && env[0] != '\0' && std::string(env) != "0";
+}
+
+inline bool require_model(const std::string& path, const std::string& name, TestResult& result) {
     if (!file_exists(path)) {
         result.test_name = name;
-        result.passed = true; // SKIPPED counts as pass (not a failure)
-        result.details = "SKIPPED - model not found: " + path;
+        result.passed = !require_real_artifacts();
+        result.details = (result.passed ? "SKIPPED" : "REQUIRED MODEL MISSING");
+        result.details += " - model not found: " + path;
         return false;
     }
     return true;
@@ -49,13 +60,15 @@ inline bool require_model(const std::string& path, const std::string& name,
 
 inline std::string get_home_dir() {
     const char* home = std::getenv("HOME");
-    if (home) return std::string(home);
+    if (home)
+        return std::string(home);
     return "";
 }
 
 inline std::string get_model_dir() {
     const char* env = std::getenv("RAC_TEST_MODEL_DIR");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
     return get_home_dir() + "/.local/share/runanywhere/Models";
 }
 
@@ -65,7 +78,8 @@ inline std::string get_model_dir() {
 
 inline std::string get_vad_model_path() {
     const char* env = std::getenv("RAC_TEST_VAD_MODEL");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
     return get_model_dir() + "/ONNX/silero-vad/silero_vad.onnx";
 }
 
@@ -75,7 +89,8 @@ inline std::string get_vad_model_path() {
 
 inline std::string get_stt_model_path() {
     const char* env = std::getenv("RAC_TEST_STT_MODEL");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
     return get_model_dir() + "/ONNX/whisper-tiny-en";
 }
 
@@ -85,7 +100,8 @@ inline std::string get_stt_model_path() {
 
 inline std::string get_tts_model_path() {
     const char* env = std::getenv("RAC_TEST_TTS_MODEL");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
     return get_model_dir() + "/ONNX/vits-piper-en_US-lessac-medium";
 }
 
@@ -95,7 +111,8 @@ inline std::string get_tts_model_path() {
 
 inline std::string get_llm_model_path() {
     const char* env = std::getenv("RAC_TEST_LLM_MODEL");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
     return get_model_dir() + "/LlamaCpp/qwen3-0.6b/Qwen3-0.6B-Q8_0.gguf";
 }
 
@@ -108,8 +125,10 @@ inline std::string resolve_wakeword_dir() {
     std::string dir1 = get_model_dir() + "/ONNX/openwakeword";
     std::string dir2 = get_model_dir() + "/ONNX/openwakeword-embedding";
 
-    if (file_exists(dir1)) return dir1;
-    if (file_exists(dir2)) return dir2;
+    if (file_exists(dir1))
+        return dir1;
+    if (file_exists(dir2))
+        return dir2;
 
     // Default to the primary name; require_model will handle the skip
     return dir1;
@@ -123,8 +142,10 @@ inline std::string get_wakeword_embedding_path() {
     std::string path1 = dir1 + "/embedding_model.onnx";
     std::string path2 = dir2 + "/embedding_model.onnx";
 
-    if (file_exists(path1)) return path1;
-    if (file_exists(path2)) return path2;
+    if (file_exists(path1))
+        return path1;
+    if (file_exists(path2))
+        return path2;
 
     // Return primary path as default
     return path1;
@@ -138,8 +159,10 @@ inline std::string get_wakeword_melspec_path() {
     std::string path1 = dir1 + "/melspectrogram.onnx";
     std::string path2 = dir2 + "/melspectrogram.onnx";
 
-    if (file_exists(path1)) return path1;
-    if (file_exists(path2)) return path2;
+    if (file_exists(path1))
+        return path1;
+    if (file_exists(path2))
+        return path2;
 
     // Return primary path as default
     return path1;
@@ -147,7 +170,8 @@ inline std::string get_wakeword_melspec_path() {
 
 inline std::string get_wakeword_model_path() {
     const char* env = std::getenv("RAC_TEST_WAKEWORD_MODEL");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
     return get_model_dir() + "/ONNX/hey-jarvis/hey_jarvis_v0.1.onnx";
 }
 
@@ -162,7 +186,8 @@ inline std::string get_wakeword_model_path() {
  */
 inline std::string get_test_audio_dir() {
     const char* env = std::getenv("RAC_TEST_AUDIO_DIR");
-    if (env && env[0] != '\0') return std::string(env);
+    if (env && env[0] != '\0')
+        return std::string(env);
 
     // Auto-detect: walk up from current directory looking for the Playground audio dir
     // We're typically running from sdk/runanywhere-commons/build/test/tests/
@@ -182,7 +207,7 @@ inline std::string get_test_audio_dir() {
                 if (realpath(candidate.c_str(), resolved)) {
                     return std::string(resolved);
                 }
-                return candidate; // fallback to relative
+                return candidate;  // fallback to relative
             }
         }
         base += "/..";
@@ -194,31 +219,34 @@ inline std::string get_test_audio_dir() {
 /** Get full path to a test audio file. Returns empty string if audio dir not found. */
 inline std::string get_test_audio_file(const std::string& filename) {
     std::string dir = get_test_audio_dir();
-    if (dir.empty()) return "";
+    if (dir.empty())
+        return "";
     return dir + "/" + filename;
 }
 
 /** Check if test audio directory is available with WAV files. */
 inline bool has_test_audio() {
     std::string dir = get_test_audio_dir();
-    if (dir.empty()) return false;
+    if (dir.empty())
+        return false;
     // Check for at least one known file
     return file_exists(dir + "/hey-jarvis-real.wav");
 }
 
 /** Require a test audio file, mark as SKIPPED if not found. */
 inline bool require_audio_file(const std::string& path, const std::string& test_name,
-                                TestResult& result) {
+                               TestResult& result) {
     if (path.empty() || !file_exists(path)) {
         result.test_name = test_name;
-        result.passed = true;
-        result.details = "SKIPPED - test audio not found: " +
-                         (path.empty() ? "(audio dir not configured)" : path);
+        result.passed = !require_real_audio_artifacts();
+        result.details = (result.passed ? "SKIPPED" : "REQUIRED AUDIO MISSING");
+        result.details += " - test audio not found: " +
+                          (path.empty() ? "(audio dir not configured)" : path);
         return false;
     }
     return true;
 }
 
-} // namespace test_config
+}  // namespace test_config
 
-#endif // TEST_CONFIG_H
+#endif  // TEST_CONFIG_H

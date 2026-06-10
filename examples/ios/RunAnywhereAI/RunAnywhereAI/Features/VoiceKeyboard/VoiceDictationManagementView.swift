@@ -28,7 +28,7 @@ struct VoiceDictationManagementView: View {
             }
         }
         .navigationTitle("Voice Keyboard")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayModeCompat(.large)
         .sheet(isPresented: $viewModel.showModelPicker) {
             ModelSelectionSheet(context: .stt) { model in
                 await viewModel.loadModel(model)

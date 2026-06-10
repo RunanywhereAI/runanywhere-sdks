@@ -1,0 +1,171 @@
+/**
+ * @file rac_plugin_entry_sherpa.cpp
+ * @brief Unified-ABI entry point for the Sherpa-ONNX backend.
+ *
+ * The sherpa engine owns Sherpa-ONNX-backed STT / TTS / VAD primitives.
+ * It only advertises those primitives when both the Sherpa-ONNX prebuilt and
+ * the real RAC speech ops are compiled into this target.
+ *
+ * Declarative manifest publishes package ownership, availability and
+ * the served primitive set alongside the routing metadata. The manifest mirrors
+ * the conditional ops slots so registry validation accepts both routable and
+ * stub builds.
+ */
+
+#include "rac/core/rac_error.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/vad/rac_vad_service.h"
+#include "rac/plugin/rac_engine_manifest.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+
+#if defined(SHERPA_ONNX_AVAILABLE) && SHERPA_ONNX_AVAILABLE && \
+    defined(RAC_SHERPA_SPEECH_OPS_AVAILABLE) && RAC_SHERPA_SPEECH_OPS_AVAILABLE
+#define RAC_SHERPA_ROUTABLE 1
+#else
+#define RAC_SHERPA_ROUTABLE 0
+#endif
+
+extern "C" {
+
+#if RAC_SHERPA_ROUTABLE
+extern const rac_stt_service_ops_t g_sherpa_stt_ops;
+extern const rac_tts_service_ops_t g_sherpa_tts_ops;
+extern const rac_vad_service_ops_t g_sherpa_vad_ops;
+#endif
+
+static rac_result_t sherpa_capability_check(void) {
+#if RAC_SHERPA_ROUTABLE
+    return RAC_SUCCESS;
+#else
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
+#endif
+}
+
+#if RAC_SHERPA_ROUTABLE
+static const rac_runtime_id_t k_sherpa_runtimes[] = {
+    RAC_RUNTIME_CPU,
+};
+
+static const uint32_t k_sherpa_formats[] = {
+    RAC_MODEL_FORMAT_ID_ONNX,
+};
+
+static const rac_primitive_t k_sherpa_primitives[] = {
+    RAC_PRIMITIVE_TRANSCRIBE,
+    RAC_PRIMITIVE_SYNTHESIZE,
+    RAC_PRIMITIVE_DETECT_VOICE,
+};
+#endif
+
+static const rac_engine_manifest_t k_sherpa_manifest = {
+    .name = "sherpa",
+    .display_name = "Sherpa-ONNX",
+    .version = nullptr,
+    .package_owner = "runanywhere",
+    .package_name = "runanywhere_sherpa",
+    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority =
+#if RAC_SHERPA_ROUTABLE
+        90,
+#else
+        0,
+#endif
+    .capability_flags = 0,
+    .primitives =
+#if RAC_SHERPA_ROUTABLE
+        k_sherpa_primitives,
+#else
+        nullptr,
+#endif
+    .primitives_count =
+#if RAC_SHERPA_ROUTABLE
+        sizeof(k_sherpa_primitives) / sizeof(k_sherpa_primitives[0]),
+#else
+        0,
+#endif
+    .runtimes =
+#if RAC_SHERPA_ROUTABLE
+        k_sherpa_runtimes,
+#else
+        nullptr,
+#endif
+    .runtimes_count =
+#if RAC_SHERPA_ROUTABLE
+        sizeof(k_sherpa_runtimes) / sizeof(k_sherpa_runtimes[0]),
+#else
+        0,
+#endif
+    .formats =
+#if RAC_SHERPA_ROUTABLE
+        k_sherpa_formats,
+#else
+        nullptr,
+#endif
+    .formats_count =
+#if RAC_SHERPA_ROUTABLE
+        sizeof(k_sherpa_formats) / sizeof(k_sherpa_formats[0]),
+#else
+        0,
+#endif
+    .reserved_0 = 0,
+    .reserved_1 = 0,
+};
+
+static const rac_engine_vtable_t g_sherpa_engine_vtable = {
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_sherpa_manifest),
+    /* capability_check */ sherpa_capability_check,
+    /* on_unload        */ nullptr,
+
+    /* llm_ops          */ nullptr,
+/* stt_ops          */
+#if RAC_SHERPA_ROUTABLE
+    &g_sherpa_stt_ops,
+#else
+    nullptr,
+#endif
+/* tts_ops          */
+#if RAC_SHERPA_ROUTABLE
+    &g_sherpa_tts_ops,
+#else
+    nullptr,
+#endif
+/* vad_ops          */
+#if RAC_SHERPA_ROUTABLE
+    &g_sherpa_vad_ops,
+#else
+    nullptr,
+#endif
+    /* embedding_ops    */ nullptr,
+    /* vlm_ops          */ nullptr,
+    /* diffusion_ops    */ nullptr,
+
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+};
+
+RAC_PLUGIN_ENTRY_DEF(sherpa) {
+    return rac_engine_entry_with_manifest(&k_sherpa_manifest, &g_sherpa_engine_vtable);
+}
+
+}  // extern "C"
+
+// The legacy `__attribute__((constructor))` auto-register
+// block previously lived here. It has been removed so all three active
+// backends use the same explicit-register + static-shim pattern:
+//   * dynamic-linkage hosts (Android / Linux / macOS dev) call
+//     `rac_backend_sherpa_register()` explicitly from the SDK bridge, same
+//     as `rac_backend_onnx_register()` and `rac_backend_llamacpp_register()`.
+//   * static-linkage hosts (iOS / WASM, `RAC_STATIC_PLUGINS=ON`) pull in
+//     `rac_static_register_sherpa.cpp` which expands
+//     `RAC_STATIC_PLUGIN_REGISTER(sherpa)` and runs a file-scope ctor
+//     before main(). See `engines/sherpa/rac_static_register_sherpa.cpp`.

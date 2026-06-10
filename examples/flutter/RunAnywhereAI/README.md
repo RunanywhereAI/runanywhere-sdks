@@ -6,8 +6,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-iOS%2013.0%2B%20%7C%20Android%207.0%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="iOS 13.0+ | Android 7.0+" />
-  <img src="https://img.shields.io/badge/Flutter-3.10%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.10+" />
-  <img src="https://img.shields.io/badge/Dart-3.0%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.0+" />
+  <img src="https://img.shields.io/badge/Flutter-3.24%2B-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter 3.24+" />
+  <img src="https://img.shields.io/badge/Dart-3.5%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart 3.5+" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square" alt="License" />
 </p>
 
@@ -15,34 +15,43 @@
 
 ---
 
-## 🚀 Running This App (Local Development)
+## Running This App (Local Development)
 
-> **Important:** This sample app consumes the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/) as local path dependencies. Before opening this project, you must first build the SDK's native libraries.
+> **Important:** This sample app consumes the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/) through local path dependencies. A clean clone needs Flutter packages plus the Android JNI libraries and iOS XCFrameworks staged into the Flutter plugin packages.
 
-### First-Time Setup
+### Clean-Clone Bring-Up
+
+Prerequisites:
+
+- Flutter 3.24+ and Dart 3.5+ on `PATH`.
+- Android Studio with Android SDK 24+, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+- Xcode 15+ and CocoaPods for iOS simulator builds.
+- JDK 17 and enough disk for native artifacts and downloaded AI models.
+
+From a fresh checkout:
 
 ```bash
-# 1. Navigate to the Flutter SDK directory
-cd runanywhere-sdks/sdk/runanywhere-flutter
-
-# 2. Run the setup script (~10-20 minutes on first run)
-#    This builds the native C++ frameworks/libraries and enables local mode
-./scripts/build-flutter.sh --setup
-
-# 3. Navigate to this sample app
-cd ../../examples/flutter/RunAnywhereAI
-
-# 4. Install dependencies
+cd examples/flutter/RunAnywhereAI
 flutter pub get
 
-# 5. For iOS: Install pods
-cd ios && pod install && cd ..
+# Build or refresh local native artifacts when the checkout has no staged binaries.
+cd ../../..
+./scripts/build/build-core-android.sh arm64-v8a
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+cd examples/flutter/RunAnywhereAI
 
-# 6. Run the app
-flutter run
-
-# Or open in Android Studio / VS Code and run from there
+flutter analyze
+flutter build apk --debug
+flutter build ios --simulator --debug
 ```
+
+Notes:
+
+- `scripts/build/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
+- `sdk/runanywhere-swift/scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
+- `runanywhere_genie` is Android/Snapdragon-only; iOS builds do not expect a Genie XCFramework.
+- If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
+- `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
 
 ### How It Works
 
@@ -51,25 +60,25 @@ This sample app's `pubspec.yaml` uses path dependencies to reference the local F
 ```
 This Sample App → Local Flutter SDK packages (sdk/runanywhere-flutter/packages/)
                           ↓
-              Local XCFrameworks/JNI libs (in each package's ios/Frameworks/ and android/jniLibs/)
+              Local XCFrameworks/JNI libs (in each package's ios/Frameworks/ and android/src/main/jniLibs/)
                           ↑
-           Built by: ./scripts/build-flutter.sh --setup
+           Built by: ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh + ./scripts/build/build-core-android.sh
 ```
 
-The `build-flutter.sh --setup` script:
-1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
-2. Builds the native C++ libraries from `runanywhere-commons`
-3. Copies XCFrameworks to `packages/*/ios/Frameworks/`
-4. Copies JNI `.so` files to `packages/*/android/src/main/jniLibs/`
-5. Creates `.testlocal` marker files (enables local library consumption)
+Repo-root native build scripts (called from project root):
+1. `./sdk/runanywhere-swift/scripts/build-core-xcframework.sh` — builds iOS XCFrameworks and stages them into `sdk/runanywhere-flutter/packages/*/ios/Frameworks/`.
+2. `./scripts/build/build-core-android.sh <ABI>` — builds Android `.so` libraries and stages them into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/<ABI>/`.
+
+Local consumption is enabled by the `runanywhere.useLocalNatives=true` Gradle property (default for development checkouts).
 
 ### After Modifying the SDK
 
-- **Dart SDK code changes**: Run `flutter run` again (hot reload works for most changes)
+- **Dart SDK code changes**: Run `flutter run` again (hot reload works for most changes).
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
-  cd sdk/runanywhere-flutter
-  ./scripts/build-flutter.sh --local --rebuild-commons
+  # From repo root
+  ./scripts/build/build-core-android.sh arm64-v8a
+  ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
   ```
 
 ---
@@ -103,14 +112,14 @@ This sample app demonstrates the full power of the RunAnywhere Flutter SDK:
 
 | Feature | Description | SDK Integration |
 |---------|-------------|-----------------|
-| **AI Chat** | Interactive LLM conversations with streaming responses | `RunAnywhere.generateStream()` |
+| **AI Chat** | Interactive LLM conversations with streaming responses | `RunAnywhere.llm.generateStream()` |
 | **Thinking Mode** | Support for models with `<think>...</think>` reasoning | Thinking tag parsing |
 | **Real-time Analytics** | Token speed, generation time, inference metrics | `MessageAnalytics` |
-| **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.transcribe()` |
-| **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.synthesize()` |
-| **Voice Assistant** | Full STT to LLM to TTS pipeline with auto-detection | `VoiceSession` API |
-| **Model Management** | Download, load, and manage multiple AI models | `ModelManager` |
-| **Storage Management** | View storage usage and delete models | `RunAnywhere.getStorageInfo()` |
+| **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.stt.transcribe()` |
+| **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.tts.synthesize()` |
+| **Voice Assistant** | Full STT to LLM to TTS pipeline with auto-detection | `RunAnywhere.voice` |
+| **Model Management** | Download, load, and manage multiple AI models | `RunAnywhere.models` / `RunAnywhere.downloads` |
+| **Storage Management** | View storage usage and delete models | `RunAnywhere.downloads.getStorageInfo()` |
 | **Offline Support** | All features work without internet | On-device inference |
 
 ---
@@ -129,8 +138,8 @@ The app follows Flutter best practices with a clean architecture pattern:
 ├───────┼────────────┼────────────┼────────────┼─────────────┼────────┤
 │       ▼            ▼            ▼            ▼             ▼        │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                   Provider State Management                   │   │
-│  │                   (ModelManager, Services)                    │   │
+│  │                 Feature ViewModels + UI State                 │   │
+│  │           (SDK facades, Services, ListenableBuilder)          │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
@@ -152,9 +161,9 @@ The app follows Flutter best practices with a clean architecture pattern:
 
 ### Key Architecture Decisions
 
-- **Provider Pattern** — `ChangeNotifier` + `Provider` for state management
+- **Feature-Local State** — Screens keep ephemeral UI state local and call SDK facades directly
 - **Feature-First Structure** — Each feature is self-contained with its own views and logic
-- **Shared Core Services** — `ModelManager`, `AudioRecordingService`, `AudioPlayerService`
+- **Shared Core Services** — `AudioRecordingService`, `AudioPlayerService`, persistence and device helpers
 - **Design System** — Consistent `AppColors`, `AppTypography`, `AppSpacing` tokens
 - **SDK Integration** — Direct SDK calls with async/await and Stream support
 
@@ -181,7 +190,6 @@ RunAnywhereAI/
 │   │   │   └── app_types.dart         # Shared type definitions
 │   │   │
 │   │   ├── services/
-│   │   │   ├── model_manager.dart     # SDK model management wrapper
 │   │   │   ├── audio_recording_service.dart  # Microphone capture
 │   │   │   ├── audio_player_service.dart     # TTS playback
 │   │   │   ├── permission_service.dart       # Permission handling
@@ -287,20 +295,22 @@ await RunAnywhere.initialize();
 
 // 2. Register LlamaCpp module for LLM models (GGUF)
 await LlamaCpp.register();
-LlamaCpp.addModel(
+RunAnywhere.models.register(
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
-  url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+  url: Uri.parse('https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf'),
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
   memoryRequirement: 500000000,
 );
 
 // 3. Register ONNX module for STT/TTS models
 await Onnx.register();
-Onnx.addModel(
+RunAnywhere.models.register(
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-  modality: ModelCategory.speechRecognition,
+  url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   memoryRequirement: 75000000,
 );
 ```
@@ -308,31 +318,36 @@ Onnx.addModel(
 ### Download & Load a Model
 
 ```dart
-// Download with progress tracking (via ModelManager)
-await ModelManager.shared.downloadModel(modelInfo);
+// Download with progress tracking
+final progressStream = RunAnywhere.downloads.start('smollm2-360m-q8_0');
+await for (final p in progressStream) {
+  if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
+}
 
 // Load LLM model
-await sdk.RunAnywhere.loadLLMModel('smollm2-360m-q8_0');
+await RunAnywhere.llm.load('smollm2-360m-q8_0');
 
 // Check if model is loaded
-final isLoaded = sdk.RunAnywhere.isModelLoaded;
+final isLoaded = RunAnywhere.isLLMModelLoaded;
 ```
 
 ### Stream Text Generation
 
 ```dart
 // Generate with streaming (real-time tokens)
-final streamResult = await RunAnywhere.generateStream(prompt, options: options);
+final stream = RunAnywhere.llm.generateStream(prompt, options);
 
-await for (final token in streamResult.stream) {
-  // Display each token as it arrives
-  setState(() {
-    _responseText += token;
-  });
+await for (final event in stream) {
+  if (event.isFinal) break;
+  if (event.token.isNotEmpty) {
+    setState(() {
+      _responseText += event.token;
+    });
+  }
 }
 
 // Or non-streaming
-final result = await RunAnywhere.generate(prompt, options: options);
+final result = await RunAnywhere.llm.generate(prompt, options);
 print('Response: ${result.text}');
 print('Speed: ${result.tokensPerSecond} tok/s');
 ```
@@ -341,52 +356,46 @@ print('Speed: ${result.tokensPerSecond} tok/s');
 
 ```dart
 // Load STT model
-await RunAnywhere.loadSTTModel('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.stt.load('sherpa-onnx-whisper-tiny.en');
 
 // Transcribe audio bytes
-final transcription = await RunAnywhere.transcribe(audioBytes);
-print('Transcription: $transcription');
+final result = await RunAnywhere.stt.transcribe(audioBytes);
+print('Transcription: ${result.text}');
 ```
 
 ### Text-to-Speech
 
 ```dart
 // Load TTS voice
-await RunAnywhere.loadTTSVoice('vits-piper-en_US-lessac-medium');
+await RunAnywhere.tts.loadVoice('vits-piper-en_US-lessac-medium');
 
 // Synthesize speech with options
-final result = await RunAnywhere.synthesize(
+final result = await RunAnywhere.tts.synthesize(
   text,
-  rate: 1.0,
-  pitch: 1.0,
-  volume: 1.0,
+  TTSOptions(rate: 1.0, pitch: 1.0, volume: 1.0),
 );
 
-// Play audio (result.samples is Float32List)
-await audioPlayer.play(result.samples, result.sampleRate);
+// Play audio (result.audio is Uint8List PCM16)
+await audioPlayer.play(result.audio, result.sampleRate);
 ```
 
 ### Voice Assistant Pipeline (STT to LLM to TTS)
 
 ```dart
-// Start voice session
-final session = await RunAnywhere.startVoiceSession(
-  config: VoiceSessionConfig(),
-);
-
-// Listen to session events
-session.events.listen((event) {
-  if (event is VoiceSessionTranscribed) {
-    print('User said: ${event.text}');
-  } else if (event is VoiceSessionResponded) {
-    print('AI response: ${event.text}');
-  } else if (event is VoiceSessionSpeaking) {
-    // Audio is being played
+// Subscribe to the voice agent event stream
+final sub = RunAnywhere.voice.eventStream().listen((event) {
+  if (event.hasUserSaid()) {
+    print('User said: ${event.userSaid.text}');
+  } else if (event.hasAssistantToken()) {
+    print('Token: ${event.assistantToken.text}');
   }
 });
 
-// Stop session
-session.stop();
+// Initialize pipeline with loaded models
+await RunAnywhere.voice.initializeWithLoadedModels();
+
+// Cancel when done
+await sub.cancel();
 ```
 
 ---
@@ -403,9 +412,9 @@ session.stop();
 - Model selection bottom sheet integration
 
 **Key SDK APIs:**
-- `RunAnywhere.generateStream()` — Streaming generation
-- `RunAnywhere.generate()` — Non-streaming generation
-- `RunAnywhere.currentLLMModel()` — Get loaded model info
+- `RunAnywhere.llm.generateStream()` — Streaming generation
+- `RunAnywhere.llm.generate()` — Non-streaming generation
+- `RunAnywhere.currentLLMModel` — Get loaded model info
 
 ### 2. Speech-to-Text Screen (`speech_to_text_view.dart`)
 
@@ -416,8 +425,8 @@ session.stop();
 - Mode selection (batch vs. live)
 
 **Key SDK APIs:**
-- `RunAnywhere.loadSTTModel()` — Load Whisper model
-- `RunAnywhere.transcribe()` — Batch transcription
+- `RunAnywhere.stt.load()` — Load Whisper model
+- `RunAnywhere.stt.transcribe()` — Batch transcription
 - `RunAnywhere.isSTTModelLoaded` — Check model status
 
 ### 3. Text-to-Speech Screen (`text_to_speech_view.dart`)
@@ -429,8 +438,8 @@ session.stop();
 - Audio metadata display (duration, sample rate, size)
 
 **Key SDK APIs:**
-- `RunAnywhere.loadTTSVoice()` — Load TTS model
-- `RunAnywhere.synthesize()` — Generate speech audio
+- `RunAnywhere.tts.loadVoice()` — Load TTS model
+- `RunAnywhere.tts.synthesize()` — Generate speech audio
 - `RunAnywhere.isTTSVoiceLoaded` — Check voice status
 
 ### 4. Voice Assistant Screen (`voice_assistant_view.dart`)
@@ -443,9 +452,9 @@ session.stop();
 - Session state machine (connecting, listening, processing, speaking)
 
 **Key SDK APIs:**
-- `RunAnywhere.startVoiceSession()` — Start voice session
-- `RunAnywhere.isVoiceAgentReady` — Check all components loaded
-- `VoiceSessionEvent` — Session event stream
+- `RunAnywhere.voice.eventStream()` — Voice agent event stream
+- `RunAnywhere.voice.initializeWithLoadedModels()` — Initialize pipeline
+- `VoiceEvent` — Proto-typed voice session events
 
 ### 5. Settings Screen (`combined_settings_view.dart`)
 
@@ -456,9 +465,9 @@ session.stop();
 - Analytics logging toggle
 
 **Key SDK APIs:**
-- `RunAnywhere.getStorageInfo()` — Get storage details
-- `RunAnywhere.getDownloadedModelsWithInfo()` — List models
-- `RunAnywhere.deleteStoredModel()` — Remove model
+- `RunAnywhere.downloads.getStorageInfo()` — Get storage details
+- `RunAnywhere.downloads.list()` — List models
+- `RunAnywhere.downloads.delete()` — Remove model
 
 ---
 
@@ -570,7 +579,7 @@ else {
   await RunAnywhere.initialize(
     apiKey: 'your-api-key',
     baseURL: 'https://api.runanywhere.ai',
-    environment: SDKEnvironment.production,
+    environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
   );
 }
 ```
@@ -592,7 +601,7 @@ User preferences are stored via `SharedPreferences`:
 - **ARM64 Recommended** — Native libraries optimized for arm64 (x86 emulators may be slow)
 - **Memory Usage** — Large models (7B+) require devices with 6GB+ RAM
 - **First Load** — Initial model loading takes 1-3 seconds (cached afterward)
-- **Live STT** — Requires WhisperKit-compatible models (limited in ONNX)
+- **Live STT** — Best with Sherpa-ONNX streaming models (limited in plain ONNX)
 - **Platform Channels** — Some SDK features use FFI/platform channels
 
 ---

@@ -1,148 +1,36 @@
 /**
- * RunAnywhere Web SDK - Data Models
+ * RunAnywhere Web SDK - Model and environment types.
  *
- * Mirrored from: sdk/runanywhere-react-native/packages/core/src/types/models.ts
- * Source of truth: sdk/runanywhere-swift/Sources/RunAnywhere/
+ * Proto-aligned types live in `@runanywhere/proto-ts/*` and are
+ * re-exported from `types/index.ts`. Generated model/storage shapes are
+ * aliases here; browser-only environment and storage summary types remain
+ * Web-local.
  */
 
 import type {
-  AccelerationPreference,
-  ConfigurationSource,
-  ExecutionTarget,
-  HardwareAcceleration,
-  LLMFramework,
-  ModelCategory,
-  ModelFormat,
+  ModelInfo as ProtoModelInfo,
+  ModelInfoMetadata as ProtoModelInfoMetadata,
   SDKEnvironment,
-} from './enums';
+} from '@runanywhere/proto-ts/model_types';
+import type { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
+import type {
+  StorageInfo as ProtoStorageInfo,
+  StoredModel as ProtoStoredModel,
+} from '@runanywhere/proto-ts/storage_types';
+import type { ThinkingTagPattern as ProtoThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 
-export interface ThinkingTagPattern {
-  openTag: string;
-  closeTag: string;
-}
+export type ThinkingTagPattern = ProtoThinkingTagPattern;
+export type ModelInfoMetadata = ProtoModelInfoMetadata;
 
-export interface ModelInfoMetadata {
-  description?: string;
-  author?: string;
-  license?: string;
-  tags?: string[];
-  version?: string;
-}
+export type ModelInfo = ProtoModelInfo;
 
-export interface ModelInfo {
-  id: string;
-  name: string;
-  category: ModelCategory;
-  format: ModelFormat;
-  downloadURL?: string;
-  localPath?: string;
-  downloadSize?: number;
-  memoryRequired?: number;
-  compatibleFrameworks: LLMFramework[];
-  preferredFramework?: LLMFramework;
-  contextLength?: number;
-  supportsThinking: boolean;
-  thinkingPattern?: ThinkingTagPattern;
-  metadata?: ModelInfoMetadata;
-  source: ConfigurationSource;
-  createdAt: string;
-  updatedAt: string;
-  syncPending: boolean;
-  lastUsed?: string;
-  usageCount: number;
-  isDownloaded: boolean;
-  isAvailable: boolean;
-}
-
-export interface PerformanceMetrics {
-  timeToFirstTokenMs?: number;
-  tokensPerSecond?: number;
-  inferenceTimeMs: number;
-}
-
-export interface GenerationResult {
-  text: string;
-  thinkingContent?: string;
-  tokensUsed: number;
-  modelUsed: string;
-  latencyMs: number;
-  executionTarget: ExecutionTarget;
-  savedAmount: number;
-  framework?: LLMFramework;
-  hardwareUsed: HardwareAcceleration;
-  memoryUsed: number;
-  performanceMetrics: PerformanceMetrics;
-  thinkingTokens?: number;
-  responseTokens: number;
-}
-
-export interface GenerationOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  stopSequences?: string[];
-  streamingEnabled?: boolean;
-  preferredExecutionTarget?: ExecutionTarget;
-  preferredFramework?: LLMFramework;
-  systemPrompt?: string;
-}
-
-export interface STTOptions {
-  language?: string;
-  punctuation?: boolean;
-  diarization?: boolean;
-  wordTimestamps?: boolean;
-  sampleRate?: number;
-}
-
-export interface STTResult {
-  text: string;
-  segments: STTSegment[];
-  language?: string;
-  confidence: number;
-  duration: number;
-  alternatives: STTAlternative[];
-  [key: string]: unknown;
-}
-
-export interface STTSegment {
-  text: string;
-  startTime: number;
-  endTime: number;
-  speakerId?: string;
-  confidence: number;
-}
-
-export interface STTAlternative {
-  text: string;
-  confidence: number;
-}
-
-export interface TTSConfiguration {
-  voice?: string;
-  rate?: number;
-  pitch?: number;
-  volume?: number;
-}
-
-export interface TTSResult {
-  audio: string;
-  sampleRate: number;
-  numSamples: number;
-  duration: number;
-}
-
-export interface VADConfiguration {
-  energyThreshold?: number;
-  sampleRate?: number;
-  frameLength?: number;
-  autoCalibration?: boolean;
-}
 
 export interface SDKInitOptions {
   apiKey?: string;
   baseURL?: string;
   environment?: SDKEnvironment;
+  /** Optional development-mode device registration build token. */
+  buildToken?: string;
   debug?: boolean;
   /** Hardware acceleration preference for LLM/VLM inference. */
   acceleration?: AccelerationPreference;
@@ -153,29 +41,5 @@ export interface SDKInitOptions {
   webgpuWasmUrl?: string;
 }
 
-export interface StorageInfo {
-  totalSpace: number;
-  usedSpace: number;
-  freeSpace: number;
-  modelsPath: string;
-}
-
-export interface StoredModel {
-  id: string;
-  name: string;
-  sizeOnDisk: number;
-  downloadedAt: string;
-  lastUsed?: string;
-}
-
-export interface DeviceInfoData {
-  model: string;
-  name: string;
-  osVersion: string;
-  totalMemory: number;
-  architecture: string;
-  /** Whether WebGPU is available */
-  hasWebGPU: boolean;
-  /** Whether SharedArrayBuffer is available (pthreads) */
-  hasSharedArrayBuffer: boolean;
-}
+export type StorageInfo = ProtoStorageInfo;
+export type StoredModel = ProtoStoredModel;

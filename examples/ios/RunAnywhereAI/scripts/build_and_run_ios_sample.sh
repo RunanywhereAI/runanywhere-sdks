@@ -8,10 +8,12 @@
 # PROJECT STRUCTURE:
 # ─────────────────────────────────────────────────────────────────────────────
 # runanywhere-commons/                 Unified C++ library with backends
-#   scripts/build-all-ios.sh           Build everything for iOS
+#   scripts/build-ios.sh               Build commons C++ libraries for iOS
 #
-# runanywhere-swift/                   Swift SDK wrapper
-#   scripts/build-swift.sh             Build Swift SDK
+# sdk/runanywhere-swift/scripts/build-core-xcframework.sh    Build / package native xcframeworks
+#   (RACommons, RABackendONNX, RABackendLLAMACPP, RABackendSherpa) into
+#   sdk/runanywhere-swift/Binaries/. The Swift SDK itself is compiled by
+#   Xcode/SwiftPM directly and no longer has a per-SDK orchestrator script.
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # USAGE:
@@ -23,9 +25,11 @@
 #   mac                      Build and run on macOS
 #
 # BUILD OPTIONS:
-#   --build-commons   Build runanywhere-commons (all frameworks)
-#   --build-sdk       Build runanywhere-swift (Swift SDK)
-#   --build-all       Build everything (commons + sdk)
+#   --build-commons   Build runanywhere-commons C++ libraries (iOS)
+#   --build-sdk       Build native xcframeworks (RACommons + RABackend*) into
+#                     sdk/runanywhere-swift/Binaries/ via the consolidated
+#                     sdk/runanywhere-swift/scripts/build-core-xcframework.sh
+#   --build-all       Build everything (commons C++ + native xcframeworks)
 #   --skip-app        Only build SDK components, skip Xcode app build
 #   --local           Use local builds
 #   --clean           Clean build artifacts
@@ -50,8 +54,11 @@ SWIFT_SDK_DIR="$WORKSPACE_ROOT/sdk/runanywhere-swift"
 APP_DIR="$SCRIPT_DIR/.."
 
 # Build scripts
+# Per-SDK Swift orchestrator was removed; the canonical native build
+# entrypoint is the repo-root sdk/runanywhere-swift/scripts/build-core-xcframework.sh which builds
+# / packages all xcframeworks into sdk/runanywhere-swift/Binaries/.
 COMMONS_BUILD_SCRIPT="$COMMONS_DIR/scripts/build-ios.sh"
-SWIFT_BUILD_SCRIPT="$SWIFT_SDK_DIR/scripts/build-swift.sh"
+SWIFT_BUILD_SCRIPT="$WORKSPACE_ROOT/sdk/runanywhere-swift/scripts/build-core-xcframework.sh"
 
 # Colors
 RED='\033[0;31m'
@@ -165,23 +172,22 @@ build_commons() {
 }
 
 build_swift_sdk() {
-    log_header "Building runanywhere-swift"
+    log_header "Building Swift native xcframeworks"
     local start_time=$(date +%s)
 
     if [[ ! -x "$SWIFT_BUILD_SCRIPT" ]]; then
-        log_error "Swift build script not found: $SWIFT_BUILD_SCRIPT"
+        log_error "Native xcframework build script not found: $SWIFT_BUILD_SCRIPT"
         exit 1
     fi
 
     local FLAGS=""
-    $LOCAL_MODE && FLAGS="$FLAGS --local"
     $CLEAN_BUILD && FLAGS="$FLAGS --clean"
 
-    log_step "Running: build-swift.sh $FLAGS"
+    log_step "Running: build-core-xcframework.sh $FLAGS"
     "$SWIFT_BUILD_SCRIPT" $FLAGS
 
     TIME_SWIFT=$(($(date +%s) - start_time))
-    log_time "Swift SDK build time: $(format_duration $TIME_SWIFT)"
+    log_time "Swift native build time: $(format_duration $TIME_SWIFT)"
 }
 
 # =============================================================================

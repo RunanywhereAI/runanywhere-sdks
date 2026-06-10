@@ -33,20 +33,6 @@ struct RAGMessage: Identifiable {
         self.thinkingContent = thinkingContent
     }
 
-    // MARK: - Think Tag Helpers
-    //
-    // Thin pass-throughs to the SDK's canonical `ThinkingContentParser` so the
-    // app has a single source of truth for `<think>` tag handling.
-
-    /// Extract the content inside `<think>...</think>` tags.
-    static func extractThinkingContent(from text: String) -> String? {
-        ThinkingContentParser.extract(from: text).thinking
-    }
-
-    /// Strip all `<think>...</think>` blocks and trailing incomplete `<think>` tags.
-    static func stripThinkTags(from text: String) -> String {
-        ThinkingContentParser.strip(from: text)
-    }
 }
 
 // MARK: - RAG View Model
@@ -89,8 +75,13 @@ final class RAGViewModel {
     ///
     /// - Parameters:
     ///   - url: Security-scoped URL of the document (PDF or JSON).
-    ///   - config: RAG pipeline configuration with model paths and tuning parameters.
-    func loadDocument(url: URL, config: RAGConfiguration) async {
+    ///   - embeddingModel: Registry model selected for embeddings.
+    ///   - llmModel: Registry model selected for answer generation.
+    func loadDocument(
+        url: URL,
+        embeddingModel: RAModelInfo,
+        llmModel: RAModelInfo
+    ) async {
         isLoadingDocument = true
         error = nil
 
@@ -103,7 +94,13 @@ final class RAGViewModel {
             let extractedText = try DocumentService.extractText(from: url)
 
             logger.info("Creating RAG pipeline")
-            try await RunAnywhere.ragCreatePipeline(config: config)
+            // Canonical defaults do the right thing: commons derives the
+            // embedding dimension from the loaded embedding model, and the
+            // retrieval/chunking values come from idl/rag.proto rac_defaults.
+            try await RunAnywhere.ragCreatePipeline(
+                embeddingModel: embeddingModel,
+                llmModel: llmModel
+            )
 
             logger.info("Ingesting document text (\(extractedText.count) chars)")
             try await RunAnywhere.ragIngest(text: extractedText)
@@ -137,19 +134,20 @@ final class RAGViewModel {
 
         do {
             let settings = SettingsViewModel.shared
-            let effectiveQuestion: String
-            if settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled {
-                effectiveQuestion = "/no_think\n\(question)"
-            } else {
-                effectiveQuestion = question
-            }
+            var options = RARAGQueryOptions.defaults(question: question)
+            // Structured flag — commons applies the model's no-think
+            // directive; the app never injects control tokens into prompts.
+            options.disableThinking =
+                settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled
 
             logger.info("Querying RAG pipeline: \(question)")
-            let result = try await RunAnywhere.ragQuery(question: effectiveQuestion)
-            let thinkingContent = RAGMessage.extractThinkingContent(from: result.answer)
-            let displayText = RAGMessage.stripThinkTags(from: result.answer)
-            messages.append(RAGMessage(role: .assistant, text: displayText, thinkingContent: thinkingContent))
-            logger.info("Query complete (\(result.totalTimeMs, format: .fixed(precision: 0))ms)")
+            let result = try await RunAnywhere.ragQuery(options)
+            messages.append(RAGMessage(
+                role: .assistant,
+                text: result.answer,
+                thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil
+            ))
+            logger.info("Query complete (\(Double(result.totalTimeMs), format: .fixed(precision: 0))ms)")
         } catch {
             self.error = error
             messages.append(RAGMessage(role: .assistant, text: "Error: \(error.localizedDescription)"))

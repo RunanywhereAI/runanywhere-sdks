@@ -7,7 +7,6 @@
 //
 
 import CRACommons
-import Foundation
 import ONNXBackend
 import RunAnywhere
 
@@ -39,7 +38,7 @@ import RunAnywhere
 /// // TTS via public API
 /// try await RunAnywhere.speak("Hello")
 /// ```
-public enum ONNX: RunAnywhereModule {
+public enum ONNX {
     private static let logger = SDKLogger(category: "ONNX")
 
     // MARK: - Module Info
@@ -50,31 +49,25 @@ public enum ONNX: RunAnywhereModule {
     /// ONNX Runtime library version (underlying C library)
     public static let onnxRuntimeVersion = "1.23.2"
 
-    // MARK: - RunAnywhereModule Conformance
-
-    public static let moduleId = "onnx"
-    public static let moduleName = "ONNX Runtime"
-    public static let capabilities: Set<SDKComponent> = [.stt, .tts, .vad]
-    public static let defaultPriority: Int = 100
-
-    /// ONNX uses the ONNX Runtime inference framework
-    public static let inferenceFramework: InferenceFramework = .onnx
-
     // MARK: - Registration State
 
     private static var isRegistered = false
+    private static var isSherpaRegistered = false
 
     // MARK: - Registration
 
     /// Register ONNX backend with the C++ service registry.
     ///
-    /// This calls `rac_backend_onnx_register()` to register all ONNX
-    /// service providers (STT, TTS, VAD) with the C++ commons layer.
+    /// This calls `rac_backend_onnx_register()` to register the generic ONNX
+    /// module (embeddings + Silero VAD), and then registers the Sherpa-ONNX
+    /// engine plugin so STT (Whisper/Zipformer) and TTS (Piper/VITS) models
+    /// where `framework == .sherpa` can resolve through the unified plugin
+    /// router. The two plugins are peers: "onnx" owns embeddings, "sherpa"
+    /// owns speech primitives.
     ///
     /// Safe to call multiple times - subsequent calls are no-ops.
     ///
     /// - Parameter priority: Ignored (C++ uses its own priority system)
-    /// - Throws: SDKError if registration fails
     @MainActor
     public static func register(priority _: Int = 100) {
         guard !isRegistered else {
@@ -95,11 +88,71 @@ public enum ONNX: RunAnywhereModule {
         }
 
         isRegistered = true
-        logger.info("ONNX backend registered successfully (STT + TTS + VAD)")
+        logger.info("ONNX backend registered successfully (embeddings + plugin)")
+
+        // Register the Sherpa-ONNX engine plugin for STT / TTS / VAD. The
+        // `rac_backend_sherpa_register` wrapper is not exported from the
+        // shipped RABackendSherpa.xcframework, so we call the plugin
+        // registry directly with the entry symbol that IS exported.
+        registerSherpaPlugin()
+    }
+
+    /// Register the Sherpa-ONNX unified-ABI engine plugin so the commons
+    /// plugin router can resolve `framework == .sherpa` models (STT:
+    /// Whisper / Zipformer / Paraformer; TTS: Piper / VITS; VAD: Silero).
+    @MainActor
+    private static func registerSherpaPlugin() {
+        guard !isSherpaRegistered else { return }
+
+        guard let vtable = rac_plugin_entry_sherpa() else {
+            // warning level so this surfaces even when the logger is still
+            // on its production default (.warning) during early-boot backend
+            // registration (before Logging.shared.applyEnvironmentConfiguration
+            // drops the filter to .debug in Phase 1).
+            logger.warning("Sherpa plugin entry returned null — Sherpa STT/TTS/VAD will not route")
+            return
+        }
+
+        let registerResult = vtable.withMemoryRebound(
+            to: rac_engine_vtable_t.self, capacity: 1
+        ) { typedPointer -> rac_result_t in
+            return rac_plugin_register(typedPointer)
+        }
+
+        if registerResult == RAC_SUCCESS ||
+           registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
+            isSherpaRegistered = true
+            logger.warning("Sherpa engine plugin registered (STT + TTS + VAD via Sherpa-ONNX)")
+        } else {
+            let errorMsg = String(cString: rac_error_message(registerResult))
+            // The shipped RABackendSherpa.xcframework is known to be compiled
+            // with `RAC_SHERPA_ROUTABLE=0` (the speech-ops #define was OFF at
+            // build time), so `sherpa_capability_check()` returns
+            // RAC_ERROR_BACKEND_UNAVAILABLE which the plugin registry maps to
+            // RAC_ERROR_CAPABILITY_UNSUPPORTED here. Rebuilding the xcframework
+            // with RAC_BACKEND_SHERPA=ON + SHERPA_ONNX_AVAILABLE=1 unblocks
+            // this; until then STT / TTS via `framework == .sherpa` will fail
+            // at loadModel() time with the same message.
+            logger.error("Sherpa plugin registration failed: \(errorMsg)")
+        }
     }
 
     /// Unregister the ONNX backend from C++ registry.
+    ///
+    /// `@MainActor` so the `isRegistered` / `isSherpaRegistered` static flags
+    /// stay in the same isolation domain as `register(priority:)` and the
+    /// `autoRegister` Task hop. Without this annotation, a teardown call on
+    /// a background thread would race the registration path and could leave
+    /// the C registry in an inconsistent state (double-unregister or skipped
+    /// unregister, see comment record `mlt-003`).
+    @MainActor
     public static func unregister() {
+        if isSherpaRegistered {
+            _ = rac_plugin_unregister("sherpa")
+            isSherpaRegistered = false
+            logger.info("Sherpa engine plugin unregistered")
+        }
+
         guard isRegistered else { return }
 
         _ = rac_backend_onnx_unregister()
@@ -107,30 +160,6 @@ public enum ONNX: RunAnywhereModule {
         logger.info("ONNX backend unregistered")
     }
 
-    // MARK: - Model Handling
-
-    /// Check if ONNX can handle a given model for STT
-    /// Uses model name pattern matching - actual framework info is in C++ registry
-    public static func canHandleSTT(modelId: String?) -> Bool {
-        guard let modelId = modelId else { return false }
-        let lowercased = modelId.lowercased()
-        return lowercased.contains("whisper") ||
-               lowercased.contains("zipformer") ||
-               lowercased.contains("paraformer")
-    }
-
-    /// Check if ONNX can handle a given model for TTS
-    /// Uses model name pattern matching - actual framework info is in C++ registry
-    public static func canHandleTTS(modelId: String?) -> Bool {
-        guard let modelId = modelId else { return false }
-        let lowercased = modelId.lowercased()
-        return lowercased.contains("piper") || lowercased.contains("vits")
-    }
-
-    /// Check if ONNX can handle VAD (always true for Silero VAD)
-    public static func canHandleVAD(modelId _: String?) -> Bool {
-        return true  // ONNX Silero VAD is the default
-    }
 }
 
 // MARK: - Auto-Registration

@@ -1,410 +1,171 @@
 //
-//  ToolCallingTypes.swift
-//  RunAnywhere SDK
+//  ToolCallingTypes.swift — Swift-side helpers for generated tool-calling protos.
 //
-//  Type definitions for Tool Calling functionality.
-//  Allows LLMs to request external actions (API calls, device functions, etc.)
+//  Keep: closures (`ToolExecutor`, `RegisteredTool`), JSON bridge for
+//  `argumentsJson` / `resultJson` (oneof tree), and tight RA*
+//  convenience inits/getters consumed by the example app or SDK internals.
 //
-//  Mirrors sdk/runanywhere-react-native ToolCallingTypes.ts
+//  The recursive ToolValue <-> JSON walk now lives in commons behind
+//  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`. Swift
+//  no longer hand-rolls it. Public API shape is preserved.
 //
 
+import CRACommons
 import Foundation
 
-// MARK: - Tool Value (Type-safe JSON representation)
+// MARK: - Tool Executor Types
 
-/// A type-safe representation of JSON values for tool arguments and results.
-/// Avoids using `Any` while supporting all JSON types.
-public enum ToolValue: Sendable, Codable, Equatable, CustomStringConvertible {
-    case string(String)
-    case number(Double)
-    case bool(Bool)
-    case array([ToolValue])
-    case object([String: ToolValue])
-    case null
+/// Function type for Swift-native tool executors.
+public typealias ToolExecutor = @Sendable ([String: RAToolValue]) async throws -> [String: RAToolValue]
 
-    // MARK: - Convenience Initializers
+/// A registered tool with its generated proto definition and Swift executor.
+internal struct RegisteredTool: Sendable {
+    let definition: RAToolDefinition
+    let executor: ToolExecutor
+}
 
-    /// Create from any supported Swift type
-    public init(_ value: String) { self = .string(value) }
-    public init(_ value: Int) { self = .number(Double(value)) }
-    public init(_ value: Double) { self = .number(value) }
-    public init(_ value: Bool) { self = .bool(value) }
+// MARK: - ToolValue JSON ABI symbols
 
-    // MARK: - Value Extraction
+private enum ToolValueJSONABI {
+    static let toJSONName = "rac_tool_value_to_json_proto"
+    static let fromJSONName = "rac_tool_value_from_json_proto"
 
-    public var stringValue: String? {
-        if case .string(let val) = self { return val }
-        return nil
+    static let toJSON = NativeProtoABI.load(toJSONName, as: NativeProtoABI.ProtoRequest.self)
+    static let fromJSON = NativeProtoABI.load(fromJSONName, as: NativeProtoABI.ProtoRequest.self)
+}
+
+// MARK: - RAToolValue Helpers
+
+public extension RAToolValue {
+    init(_ value: String) { self.init(); self.stringValue = value }
+    init(_ value: Int) { self.init(); self.numberValue = Double(value) }
+    init(_ value: Double) { self.init(); self.numberValue = value }
+    init(_ value: Bool) { self.init(); self.boolValue = value }
+
+    static func array(_ values: [RAToolValue]) -> RAToolValue {
+        var arr = RAToolValueArray(); arr.values = values
+        var value = RAToolValue(); value.arrayValue = arr; return value
     }
 
-    public var numberValue: Double? {
-        if case .number(let val) = self { return val }
-        return nil
+    static func object(_ fields: [String: RAToolValue]) -> RAToolValue {
+        var obj = RAToolValueObject(); obj.fields = fields
+        var value = RAToolValue(); value.objectValue = obj; return value
     }
 
-    public var intValue: Int? {
-        if case .number(let val) = self { return Int(val) }
-        return nil
-    }
+    var string: String? { if case .stringValue(let value)? = kind { return value }; return nil }
+    var number: Double? { if case .numberValue(let value)? = kind { return value }; return nil }
+    var int: Int? { number.map(Int.init) }
+    var bool: Bool? { if case .boolValue(let value)? = kind { return value }; return nil }
+    var array: [RAToolValue]? { if case .arrayValue(let value)? = kind { return value.values }; return nil }
+    var object: [String: RAToolValue]? { if case .objectValue(let value)? = kind { return value.fields }; return nil }
 
-    public var boolValue: Bool? {
-        if case .bool(let val) = self { return val }
-        return nil
-    }
+    // JSON bridge — required by `argumentsJson` / `resultJson`.
+    // Swift consumers see `[String: RAToolValue]`; the wire shape is JSON.
+    // The recursive walk lives in commons; Swift only marshals bytes.
 
-    public var arrayValue: [ToolValue]? {
-        if case .array(let val) = self { return val }
-        return nil
-    }
-
-    public var objectValue: [String: ToolValue]? {
-        if case .object(let val) = self { return val }
-        return nil
-    }
-
-    public var isNull: Bool {
-        if case .null = self { return true }
-        return false
-    }
-
-    // MARK: - Codable
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-
-        if container.decodeNil() {
-            self = .null
-        } else if let bool = try? container.decode(Bool.self) {
-            self = .bool(bool)
-        } else if let int = try? container.decode(Int.self) {
-            self = .number(Double(int))
-        } else if let double = try? container.decode(Double.self) {
-            self = .number(double)
-        } else if let string = try? container.decode(String.self) {
-            self = .string(string)
-        } else if let array = try? container.decode([ToolValue].self) {
-            self = .array(array)
-        } else if let object = try? container.decode([String: ToolValue].self) {
-            self = .object(object)
-        } else {
-            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid JSON value")
+    func toJSONString(pretty: Bool = false) -> String? {
+        guard let wrapper: RAToolValueJSON = try? NativeProtoABI.invoke(
+            self,
+            symbol: ToolValueJSONABI.toJSON,
+            symbolName: ToolValueJSONABI.toJSONName,
+            responseType: RAToolValueJSON.self
+        ) else { return nil }
+        guard pretty else { return wrapper.json }
+        // Pretty-print is a presentation concern; let Foundation render the
+        // already-canonical JSON text to preserve the legacy public API.
+        guard let data = wrapper.json.data(using: .utf8),
+              let parsed = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(
+                  withJSONObject: parsed,
+                  options: [.prettyPrinted, .sortedKeys]) else {
+            return wrapper.json
         }
+        return String(data: pretty, encoding: .utf8) ?? wrapper.json
     }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .string(let val): try container.encode(val)
-        case .number(let val): try container.encode(val)
-        case .bool(let val): try container.encode(val)
-        case .array(let val): try container.encode(val)
-        case .object(let val): try container.encode(val)
-        case .null: try container.encodeNil()
+    /// Parse a JSON object string into a `[String: RAToolValue]` map.
+    ///
+    /// Throws an `SDKException` (category `.internal`) when the input is not
+    /// valid JSON, the commons bridge cannot decode the payload, or the JSON
+    /// root is not an object (e.g. an array or scalar). Callers that
+    /// previously relied on the silent-empty-dict fallback must now translate
+    /// the thrown error into their own failure surface (e.g.
+    /// `RAToolResult.success = false`).
+    static func parseObjectJSON(_ json: String) throws -> [String: RAToolValue] {
+        var wrapper = RAToolValueJSON(); wrapper.json = json
+        let value: RAToolValue = try NativeProtoABI.invoke(
+            wrapper,
+            symbol: ToolValueJSONABI.fromJSON,
+            symbolName: ToolValueJSONABI.fromJSONName,
+            responseType: RAToolValue.self
+        )
+        guard case .objectValue(let obj)? = value.kind else {
+            throw SDKException(
+                code: .invalidInput,
+                message: "ToolCall.argumentsJson must decode to a JSON object, got \(String(describing: value.kind))",
+                category: .internal
+            )
         }
+        return obj.fields
     }
 
-    // MARK: - CustomStringConvertible
-
-    public var description: String {
-        switch self {
-        case .string(let val): return "\"\(val)\""
-        case .number(let val): return val.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(val))" : "\(val)"
-        case .bool(let val): return val ? "true" : "false"
-        case .array(let val): return "[\(val.map(\.description).joined(separator: ", "))]"
-        case .object(let val):
-            let pairs = val.map { "\"\($0.key)\": \($0.value.description)" }
-            return "{\(pairs.joined(separator: ", "))}"
-        case .null: return "null"
-        }
-    }
-
-    // MARK: - JSON Conversion
-
-    /// Convert to JSON string
-    public func toJSONString(pretty: Bool = false) -> String? {
-        let encoder = JSONEncoder()
-        if pretty { encoder.outputFormatting = .prettyPrinted }
-        guard let data = try? encoder.encode(self) else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
-
-    /// Parse from JSON string
-    public static func fromJSONString(_ json: String) -> ToolValue? {
-        guard let data = json.data(using: .utf8) else { return nil }
-        return try? JSONDecoder().decode(ToolValue.self, from: data)
+    static func jsonString(from object: [String: RAToolValue]) -> String {
+        return RAToolValue.object(object).toJSONString() ?? "{}"
     }
 }
 
-// MARK: - Parameter Types
+// MARK: - Tool Definition Helpers
 
-/// Supported parameter types for tool arguments
-public enum ToolParameterType: String, Codable, Sendable {
-    case string
-    case number
-    case boolean
-    case object
-    case array
-}
-
-/// A single parameter definition for a tool
-public struct ToolParameter: Sendable {
-
-    /// Parameter name
-    public let name: String
-
-    /// Data type of the parameter
-    public let type: ToolParameterType
-
-    /// Human-readable description
-    public let description: String
-
-    /// Whether this parameter is required
-    public let required: Bool
-
-    /// Allowed values (for enum-like parameters)
-    public let enumValues: [String]?
-
-    public init(
+public extension RAToolParameter {
+    init(
         name: String,
-        type: ToolParameterType,
+        type: RAToolParameterType,
         description: String,
         required: Bool = true,
-        enumValues: [String]? = nil
+        enumValues: [String] = []
     ) {
+        self.init()
         self.name = name
         self.type = type
-        self.description = description
+        self.description_p = description
         self.required = required
         self.enumValues = enumValues
     }
 }
 
-// MARK: - Tool Definition Types
-
-/// Definition of a tool that the LLM can use
-public struct ToolDefinition: Sendable {
-
-    /// Unique name of the tool (e.g., "get_weather")
-    public let name: String
-
-    /// Human-readable description of what the tool does
-    public let description: String
-
-    /// Parameters the tool accepts
-    public let parameters: [ToolParameter]
-
-    /// Category for organizing tools (optional)
-    public let category: String?
-
-    public init(
-        name: String,
-        description: String,
-        parameters: [ToolParameter],
-        category: String? = nil
-    ) {
+public extension RAToolDefinition {
+    init(name: String, description: String, parameters: [RAToolParameter], category: String? = nil) {
+        self.init()
         self.name = name
-        self.description = description
+        self.description_p = description
         self.parameters = parameters
-        self.category = category
+        if let category { self.category = category }
     }
 }
 
-// MARK: - Tool Call Types (LLM requesting to use a tool)
+// MARK: - Tool Calling Options Helpers
 
-/// A request from the LLM to execute a tool
-public struct ToolCall: Sendable, Codable {
-
-    /// Name of the tool to execute
-    public let toolName: String
-
-    /// Arguments to pass to the tool
-    public let arguments: [String: ToolValue]
-
-    /// Unique ID for this tool call (for tracking)
-    public let callId: String?
-
-    public init(
-        toolName: String,
-        arguments: [String: ToolValue],
-        callId: String? = nil
-    ) {
-        self.toolName = toolName
-        self.arguments = arguments
-        self.callId = callId
-    }
-
-    /// Get a string argument by name
-    public func getString(_ key: String) -> String? {
-        arguments[key]?.stringValue
-    }
-
-    /// Get a number argument by name
-    public func getNumber(_ key: String) -> Double? {
-        arguments[key]?.numberValue
-    }
-
-    /// Get a bool argument by name
-    public func getBool(_ key: String) -> Bool? {
-        arguments[key]?.boolValue
+public extension RAToolCallingOptions {
+    static func defaults() -> RAToolCallingOptions {
+        var output = RAToolCallingOptions()
+        output.maxIterations = 5; output.maxToolCalls = 5; output.autoExecute = true
+        output.format = .json; output.formatHint = "default"
+        return output
     }
 }
 
-// MARK: - Tool Result Types (Result after execution)
-
-/// Result of executing a tool
-public struct ToolResult: Sendable, Codable {
-
-    /// Name of the tool that was executed
-    public let toolName: String
-
-    /// Whether execution was successful
-    public let success: Bool
-
-    /// Result data (if successful)
-    public let result: [String: ToolValue]?
-
-    /// Error message (if failed)
-    public let error: String?
-
-    /// The original call ID (for tracking)
-    public let callId: String?
-
-    public init(
-        toolName: String,
-        success: Bool,
-        result: [String: ToolValue]? = nil,
-        error: String? = nil,
-        callId: String? = nil
-    ) {
-        self.toolName = toolName
-        self.success = success
-        self.result = result
-        self.error = error
-        self.callId = callId
+extension RAToolCallingOptions {
+    var maxToolCallCount: Int {
+        let explicit = hasMaxToolCalls ? maxToolCalls : maxIterations
+        return Int(explicit > 0 ? explicit : 5)
     }
-}
 
-// MARK: - Tool Executor Types
-
-/// Function type for tool executors.
-/// Takes arguments as strongly-typed ToolValue dictionary, returns result dictionary.
-public typealias ToolExecutor = @Sendable ([String: ToolValue]) async throws -> [String: ToolValue]
-
-/// A registered tool with its definition and executor
-internal struct RegisteredTool: Sendable {
-    let definition: ToolDefinition
-    let executor: ToolExecutor
-}
-
-// MARK: - Tool Call Format
-
-/// Format names for tool calling output.
-/// Different LLM models expect different formats for tool calls.
-///
-/// The format logic is handled in C++ commons (single source of truth).
-public enum ToolCallFormatName {
-    /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
-    /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
-    public static let `default` = "default"
-    
-    /// Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
-    /// Use for LFM2-Tool models
-    public static let lfm2 = "lfm2"
-}
-
-// MARK: - Tool Calling Options
-
-/// Options for tool-enabled generation
-public struct ToolCallingOptions: Sendable {
-
-    /// Available tools for this generation (if not provided, uses registered tools)
-    public let tools: [ToolDefinition]?
-
-    /// Maximum number of tool calls allowed in one conversation turn (default: 5)
-    public let maxToolCalls: Int
-
-    /// Whether to automatically execute tools or return them for manual execution (default: true)
-    public let autoExecute: Bool
-
-    /// Temperature for generation
-    public let temperature: Float?
-
-    /// Maximum tokens to generate
-    public let maxTokens: Int?
-
-    /// System prompt to use (will be merged with tool instructions by default)
-    public let systemPrompt: String?
-
-    /// If true, replaces the system prompt entirely instead of appending tool instructions.
-    /// Use this if your system prompt already includes tool-calling instructions.
-    /// Default: false (tool instructions are appended to systemPrompt)
-    public let replaceSystemPrompt: Bool
-
-    /// If true, keeps tool definitions available after the first tool call.
-    /// This allows the LLM to make multiple sequential tool calls if needed.
-    /// Default: false (tool definitions are removed after first call to encourage natural response)
-    public let keepToolsAvailable: Bool
-    
-    /// Format for tool calls. Use "lfm2" for LFM2-Tool models (Liquid AI).
-    /// Default: "default" which uses JSON-based format suitable for most models.
-    /// Valid values: "auto", "default", "lfm2", "openai"
-    /// See `ToolCallFormatName` for constants.
-    public let format: String
-
-    public init(
-        tools: [ToolDefinition]? = nil,
-        maxToolCalls: Int = 5,
-        autoExecute: Bool = true,
-        temperature: Float? = nil,
-        maxTokens: Int? = nil,
-        systemPrompt: String? = nil,
-        replaceSystemPrompt: Bool = false,
-        keepToolsAvailable: Bool = false,
-        format: String = ToolCallFormatName.default
-    ) {
-        self.tools = tools
-        self.maxToolCalls = maxToolCalls
-        self.autoExecute = autoExecute
-        self.temperature = temperature
-        self.maxTokens = maxTokens
-        self.systemPrompt = systemPrompt
-        self.replaceSystemPrompt = replaceSystemPrompt
-        self.keepToolsAvailable = keepToolsAvailable
-        self.format = format
-    }
-}
-
-// MARK: - Tool Calling Result Types
-
-/// Result of a generation that may include tool calls
-public struct ToolCallingResult: @unchecked Sendable {
-
-    /// The final text response
-    public let text: String
-
-    /// Any tool calls the LLM made
-    public let toolCalls: [ToolCall]
-
-    /// Results of executed tools (if autoExecute was true)
-    public let toolResults: [ToolResult]
-
-    /// Whether the response is complete or waiting for tool results
-    public let isComplete: Bool
-
-    /// Conversation ID for continuing with tool results
-    public let conversationId: String?
-
-    public init(
-        text: String,
-        toolCalls: [ToolCall],
-        toolResults: [ToolResult],
-        isComplete: Bool,
-        conversationId: String? = nil
-    ) {
-        self.text = text
-        self.toolCalls = toolCalls
-        self.toolResults = toolResults
-        self.isComplete = isComplete
-        self.conversationId = conversationId
+    var resolvedFormatName: String {
+        // Delegate the proto-enum -> hint-string mapping to commons so every SDK
+        // shares one source of truth (rac_tool_call_format_hint_from_format_name).
+        if hasFormat {
+            return String(cString: rac_tool_call_format_hint_from_format_name(Int32(format.rawValue)))
+        }
+        return formatHint.isEmpty ? "default" : formatHint
     }
 }

@@ -13,8 +13,8 @@
  *
  * Architecture:
  * - Uses native audio recording (AudioService)
- * - Model loading via RunAnywhere.loadSTTModel()
- * - Transcription via RunAnywhere.transcribeAudio()
+ * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
+ * - Transcription via RunAnywhere.transcribe() with proto-canonical STT options
  * - Supports ONNX-based Whisper models
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
@@ -25,7 +25,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -33,8 +32,13 @@ import {
   Animated,
   PermissionsAndroid,
   Linking,
+  NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -46,15 +50,73 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
-import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework } from '../types/model';
 import { STTMode } from '../types/voice';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { RunAnywhere } from '@runanywhere/core';
+import {
+  AudioFormat,
+  InferenceFramework,
+  ModelCategory,
+  ModelLoadRequest,
+  type ModelInfo as SDKModelInfo,
+} from '@runanywhere/proto-ts/model_types';
+import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
+import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
-// STT Model IDs (kept for reference, uses SDK model registry)
-const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
+type NativeAudioRecordingResult = {
+  path?: string;
+  uri?: string;
+  fileSize?: number;
+};
+
+type NativeAudioModuleType = {
+  startRecording?: () => Promise<NativeAudioRecordingResult>;
+  stopRecording?: () => Promise<NativeAudioRecordingResult>;
+  cancelRecording?: () => Promise<unknown>;
+};
+
+const NativeAudioModule = NativeModules.NativeAudioModule as
+  | NativeAudioModuleType
+  | undefined;
+
+const AudioRecorder = {
+  async startRecording(): Promise<string> {
+    if (!NativeAudioModule?.startRecording) {
+      throw new Error('NativeAudioModule.startRecording is not available');
+    }
+    const result = await NativeAudioModule.startRecording();
+    const path = result.path ?? result.uri;
+    if (!path) throw new Error('NativeAudioModule did not return a path');
+    return path;
+  },
+  async stopRecording(): Promise<{ uri: string }> {
+    if (!NativeAudioModule?.stopRecording) {
+      throw new Error('NativeAudioModule.stopRecording is not available');
+    }
+    const result = await NativeAudioModule.stopRecording();
+    const path = result.path ?? result.uri;
+    if (!path) throw new Error('NativeAudioModule did not return a path');
+    return { uri: path };
+  },
+  async cleanup(): Promise<void> {
+    await NativeAudioModule?.cancelRecording?.();
+  },
+};
+
+async function transcribeAudioFile(path: string) {
+  const audioBase64 = await RNFS.readFile(path, 'base64');
+  return RunAnywhere.transcribe(audioBase64, {
+    language: STTLanguage.STT_LANGUAGE_EN,
+    audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
+    sampleRate: 16000,
+  });
+}
+
+// Canonical SDK methods (Swift parity).
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
+const loadModelWithRequest = RunAnywhere.loadModel;
 
 export const STTScreen: React.FC = () => {
   // State
@@ -64,12 +126,15 @@ export const STTScreen: React.FC = () => {
   const [transcript, setTranscript] = useState('');
   const [partialTranscript, setPartialTranscript] = useState(''); // For live mode - current chunk
   const [confidence, setConfidence] = useState<number | null>(null);
-  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showModelSelection, setShowModelSelection] = useState(false);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Audio recording path ref (for batch mode only)
   const recordingPath = useRef<string | null>(null);
@@ -118,13 +183,8 @@ export const STTScreen: React.FC = () => {
         clearTimeout(liveRecordingIntervalRef.current);
         liveRecordingIntervalRef.current = null;
       }
-      // Stop SDK streaming if active (method may not be exposed on public API)
-      const sdk = RunAnywhere as unknown as Record<string, unknown>;
-      if (typeof sdk.stopStreamingSTT === 'function') {
-        (sdk.stopStreamingSTT as () => Promise<boolean>)().catch(() => {});
-      }
       // Stop batch mode recorder
-      RunAnywhere.Audio.cleanup().catch(() => {});
+      AudioRecorder.cleanup().catch(() => {});
       // Clean up temp audio file
       if (recordingPath.current) {
         RNFS.unlink(recordingPath.current).catch(() => {});
@@ -139,10 +199,11 @@ export const STTScreen: React.FC = () => {
   const loadModels = useCallback(async () => {
     try {
       // Get available STT models from catalog
-      const allModels = await RunAnywhere.getAvailableModels();
+      const allModels = await listModels();
       // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === 'speech-recognition'
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
       );
       setAvailableModels(sttModels);
 
@@ -157,32 +218,14 @@ export const STTScreen: React.FC = () => {
         downloadedModels.map((m) => m.id)
       );
 
-      // Check if model is already loaded
-      const isLoaded = await RunAnywhere.isSTTModelLoaded();
-      console.warn('[STTScreen] isSTTModelLoaded:', isLoaded);
-      if (isLoaded && !currentModel) {
-        // Try to find which model is loaded from downloaded models
-        const downloadedStt = sttModels.filter((m) => m.isDownloaded);
-        if (downloadedStt.length > 0) {
-          const firstModel = downloadedStt[0];
-          if (firstModel) {
-            setCurrentModel({
-              id: firstModel.id,
-              name: firstModel.name,
-              preferredFramework: LLMFramework.ONNX,
-            } as ModelInfo);
-            console.warn(
-              '[STTScreen] Set currentModel from downloaded:',
-              firstModel.name
-            );
-          }
-        } else {
-          setCurrentModel({
-            id: 'stt-model',
-            name: 'STT Model (Loaded)',
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
-          console.warn('[STTScreen] Set currentModel as generic STT Model');
+      // Ask the SDK for the loaded STT model directly.
+      if (!currentModel) {
+        const loaded = await RunAnywhere.modelInfoForCategory(
+          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+        );
+        if (loaded) {
+          setCurrentModel(loaded);
+          console.warn('[STTScreen] Loaded STT model:', loaded.name);
         }
       }
     } catch (error) {
@@ -217,50 +260,58 @@ export const STTScreen: React.FC = () => {
   }, []);
 
   /**
-   * Load a model from its info
+   * Load a model from its info via the canonical lifecycle ABI.
+   *
+   * Path-first loading was removed in V2 — model ID is the canonical handle
+   * and the native registry resolves the artifact path internally.
    */
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
       console.warn(
-        `[STTScreen] Loading model: ${model.id} from ${model.localPath}`
+        `[STTScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.localPath) {
+      if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
-          'Model path not found. Please re-download the model.'
+          'Model has not been downloaded. Open the model picker to download it first.'
         );
         return;
       }
 
-      // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
-      // and finding the correct nested model folder
-      const success = await RunAnywhere.loadSTTModel(
-        model.localPath,
-        model.category || 'whisper'
+      const result = await loadModelWithRequest(
+        ModelLoadRequest.fromPartial({
+          modelId: model.id,
+          category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+          forceReload: false,
+          validateAvailability: true,
+        })
       );
 
-      if (success) {
-        const isLoaded = await RunAnywhere.isSTTModelLoaded();
+      if (result.success) {
+        const isLoaded = await isModelLoadedForCategory(
+          ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+        );
         if (isLoaded) {
           // Set model with framework so ModelStatusBanner shows it properly
           // Use ONNX since STT uses Sherpa-ONNX (ONNX Runtime)
           setCurrentModel({
-            id: model.id,
-            name: model.name,
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
+            ...model,
+            preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          });
           console.warn(
             `[STTScreen] Model ${model.name} loaded successfully, currentModel set`
           );
         } else {
           console.warn(
-            `[STTScreen] Model reported success but isSTTModelLoaded() returned false`
+            '[STTScreen] Model reported success but lifecycle currentModel() returned no STT model'
           );
         }
       } else {
-        const error = await RunAnywhere.getLastError();
+        const error =
+          result.errorMessage ||
+          'Native model lifecycle returned an unsuccessful load result';
         Alert.alert(
           'Error',
           `Failed to load model: ${error || 'Unknown error'}`
@@ -356,16 +407,7 @@ export const STTScreen: React.FC = () => {
 
       // Start recording using expo-av
       console.warn('[STTScreen] Starting recorder...');
-      const uri = await RunAnywhere.Audio.startRecording({
-        onProgress: (currentPositionMs, metering) => {
-          setRecordingDuration(currentPositionMs);
-          // Convert metering level to 0-1 range (metering is typically negative dB)
-          const level = metering
-            ? Math.max(0, Math.min(1, (metering + 60) / 60))
-            : 0;
-          setAudioLevel(level);
-        },
-      });
+      const uri = await AudioRecorder.startRecording();
 
       // Store the returned URI as the recording path
       recordingPath.current = uri;
@@ -389,7 +431,7 @@ export const STTScreen: React.FC = () => {
       console.warn('[STTScreen] Stopping recording...');
 
       // Stop recording
-      const { uri } = await RunAnywhere.Audio.stopRecording();
+      const { uri } = await AudioRecorder.stopRecording();
       setIsRecording(false);
       setIsProcessing(true);
 
@@ -421,7 +463,9 @@ export const STTScreen: React.FC = () => {
       }
 
       // Check if model is loaded
-      const isLoaded = await RunAnywhere.isSTTModelLoaded();
+      const isLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+      );
       if (!isLoaded) {
         throw new Error('STT model not loaded');
       }
@@ -429,9 +473,7 @@ export const STTScreen: React.FC = () => {
       // Transcribe the audio file - native module handles format conversion
       // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
       console.warn('[STTScreen] Starting transcription...');
-      const result = await RunAnywhere.transcribeFile(normalizedPath, {
-        language: 'en',
-      });
+      const result = await transcribeAudioFile(normalizedPath);
 
       console.warn('[STTScreen] Transcription result:', result);
 
@@ -479,7 +521,9 @@ export const STTScreen: React.FC = () => {
       }
 
       // Check if model is loaded
-      const isLoaded = await RunAnywhere.isSTTModelLoaded();
+      const isLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+      );
       if (!isLoaded) {
         Alert.alert('Model Not Loaded', 'Please load an STT model first.');
         return;
@@ -526,17 +570,7 @@ export const STTScreen: React.FC = () => {
       console.warn(`[STTScreen] Starting live chunk #${chunkNum}...`);
 
       // Record with expo-av
-      const path = await RunAnywhere.Audio.startRecording({
-        onProgress: (currentPositionMs, metering) => {
-          const duration = Math.floor(currentPositionMs / 1000);
-          setRecordingDuration(duration);
-          // Update audio level from metering
-          if (metering !== undefined) {
-            const normalized = Math.max(0, Math.min(1, (metering + 60) / 60));
-            setAudioLevel(normalized);
-          }
-        },
-      });
+      const path = await AudioRecorder.startRecording();
       recordingPath.current = path;
       console.warn(`[STTScreen] Live chunk #${chunkNum} recording at:`, path);
 
@@ -565,7 +599,7 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('Processing...');
 
       // Stop current recording
-      const { uri: resultPath } = await RunAnywhere.Audio.stopRecording();
+      const { uri: resultPath } = await AudioRecorder.stopRecording();
 
       // Get the path
       let audioPath = resultPath;
@@ -596,9 +630,7 @@ export const STTScreen: React.FC = () => {
       }
 
       // Transcribe using native module (handles audio decoding)
-      const result = await RunAnywhere.transcribeFile(audioPath, {
-        language: 'en',
-      });
+      const result = await transcribeAudioFile(audioPath);
       console.warn('[STTScreen] Live chunk transcription:', result.text);
 
       // Append to accumulated transcript if we got text
@@ -652,7 +684,7 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('Processing final chunk...');
 
       // Stop current recording
-      const { uri: resultPath } = await RunAnywhere.Audio.stopRecording().catch(
+      const { uri: resultPath } = await AudioRecorder.stopRecording().catch(
         () => ({ uri: '', durationMs: 0 })
       );
 
@@ -669,9 +701,7 @@ export const STTScreen: React.FC = () => {
           if (stat.size >= 5000) {
             console.warn('[STTScreen] Transcribing final live chunk...');
             // Transcribe using native module (handles audio decoding)
-            const result = await RunAnywhere.transcribeFile(audioPath, {
-              language: 'en',
-            });
+            const result = await transcribeAudioFile(audioPath);
             if (result.text && result.text.trim()) {
               const newText = result.text.trim();
               if (accumulatedTranscriptRef.current) {
@@ -806,7 +836,9 @@ export const STTScreen: React.FC = () => {
    * Render header
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View
+      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
+    >
       <Text style={styles.title}>Speech to Text</Text>
       {transcript && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -845,7 +877,7 @@ export const STTScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         {renderHeader()}
         <ModelRequiredOverlay
-          modality={ModelModality.STT}
+          modality="stt"
           onSelectModel={handleSelectModel}
         />
         {/* Model Selection Sheet */}
@@ -994,7 +1026,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

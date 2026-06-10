@@ -1,0 +1,97 @@
+syntax = "proto3";
+package runanywhere.v1;
+
+import "storage_types.proto"; // NPUChip enum
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "HardwareProfileProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+message HardwareProfile {
+  string chip = 1;
+  bool has_neural_engine = 2;
+  string acceleration_mode = 3; // "ane", "gpu", "cpu"
+  uint64 total_memory_bytes = 4;
+  uint32 core_count = 5;
+  uint32 performance_cores = 6;
+  uint32 efficiency_cores = 7;
+  string architecture = 8; // "arm64", "x86_64"
+  string platform = 9; // "ios", "android", "web", "macos", "linux", "windows"
+  NPUChip npu_chip = 10; // resolved NPU vendor family (commons-classified)
+}
+
+// ---------------------------------------------------------------------------
+// Hardware acceleration preference for inference. Canonical single enum —
+// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
+// file and `AccelerationPreference` in model_types.proto. Consolidated here
+// because it is a pure hardware concept and
+// hardware_profile.proto has no imports (model_types.proto already imports
+// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
+//   Web    enums.ts:165   (Auto / WebGPU / CPU)
+//   Swift  extensions     (CPU / GPU / NPU / Metal)
+//   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+// Canonicalized union below.
+// ---------------------------------------------------------------------------
+enum AccelerationPreference {
+  ACCELERATION_PREFERENCE_UNSPECIFIED = 0;
+  ACCELERATION_PREFERENCE_AUTO        = 1;
+  ACCELERATION_PREFERENCE_CPU         = 2;
+  ACCELERATION_PREFERENCE_GPU         = 3;
+  ACCELERATION_PREFERENCE_NPU         = 4;
+  ACCELERATION_PREFERENCE_WEBGPU      = 5;
+  ACCELERATION_PREFERENCE_METAL       = 6;
+  ACCELERATION_PREFERENCE_VULKAN      = 7;
+}
+
+message AcceleratorInfo {
+  string name = 1;
+  AccelerationPreference type = 2;
+  bool available = 3;
+}
+
+message HardwareProfileResult {
+  HardwareProfile profile = 1;
+  repeated AcceleratorInfo accelerators = 2;
+}
+
+// Empty request for the cached hardware profile. The native probe is owned by
+// platform adapters; this request carries no portable parameters today.
+message HardwareProfileRequest {
+}
+
+// Empty request for the accelerator list. Mirrors HardwareProfileRequest:
+// platform probes own all OS-level acceleration discovery.
+message HardwareAcceleratorsRequest {
+}
+
+// Result-shaped response for SetAcceleratorPreference so the service contract
+// stays consistent (every rpc returns a non-empty message).
+message HardwareAcceleratorPreferenceRequest {
+  AccelerationPreference preference = 1;
+}
+
+message HardwareAcceleratorPreferenceResult {
+  bool   success       = 1;
+  string error_message = 2;
+}
+
+// Logical hardware service contract. Mirrors the C ABI in
+// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
+//   - rac_hardware_profile_get → GetProfile
+//   - rac_hardware_get_accelerators → GetAccelerators
+//   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
+//
+// Native device probes (chip detection, neural engine queries, GPU
+// discovery, memory/cores) remain platform-adapter owned. C++ caches and
+// serves the normalized HardwareProfile/AcceleratorInfo messages.
+service Hardware {
+  rpc GetProfile(HardwareProfileRequest) returns (HardwareProfileResult);
+  rpc GetAccelerators(HardwareAcceleratorsRequest) returns (HardwareProfileResult);
+  rpc SetAcceleratorPreference(HardwareAcceleratorPreferenceRequest)
+      returns (HardwareAcceleratorPreferenceResult);
+}

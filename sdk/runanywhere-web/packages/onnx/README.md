@@ -1,10 +1,10 @@
 # @runanywhere/web-onnx
 
-Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web) — powered by [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) compiled to WebAssembly.
+Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) backend for the [RunAnywhere Web SDK](https://www.npmjs.com/package/@runanywhere/web).
 
-> **Note:** This package uses [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (not generic ONNX Runtime). Sherpa-onnx is a speech-focused inference engine that runs ONNX models optimized for STT (Whisper, Zipformer, Paraformer), TTS (Piper), and VAD (Silero).
+> **Backend availability:** Real STT/TTS/VAD runtime support requires ONNX Runtime and Sherpa-ONNX WASM static archives to be present under `sdk/runanywhere-commons/third_party/*-wasm` when the `racommons-onnx-sherpa.wasm` artifact this package ships is built. Until `_rac_backend_onnx_register` and `_rac_backend_sherpa_register` exist in that artifact, `ONNX.register()` reports `BackendNotAvailable` and STT/TTS/VAD calls stay unavailable.
 
-> **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.1.0-beta.0`
+> **Peer dependency:** Requires [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) `>=0.19.13 <1`. This package does not depend on `@runanywhere/web-llamacpp` — it owns its own dedicated `racommons-onnx-sherpa.{js,wasm}` artifact.
 
 ## Installation
 
@@ -12,11 +12,13 @@ Speech-to-Text (STT), Text-to-Speech (TTS), and Voice Activity Detection (VAD) b
 npm install @runanywhere/web @runanywhere/web-onnx
 ```
 
+This package ships its own `racommons-onnx-sherpa.{js,wasm}` artifact under `wasm/`. There is no shared WASM module between backends; each per-package WASM is a self-contained Emscripten module.
+
 ## Quick Start
 
 ```typescript
 import { RunAnywhere } from '@runanywhere/web';
-import { ONNX, STT, STTModelType, TTS, VAD, SpeechActivity } from '@runanywhere/web-onnx';
+import { ONNX } from '@runanywhere/web-onnx';
 
 // 1. Initialize core SDK
 await RunAnywhere.initialize({ environment: 'development' });
@@ -24,64 +26,45 @@ await RunAnywhere.initialize({ environment: 'development' });
 // 2. Register the ONNX backend
 await ONNX.register();
 
-// 3. Speech-to-Text
-await STT.loadModel({
+// 3. Speech-to-Text through the Swift-shaped core facade
+const transcript = await RunAnywhere.transcribe(audioFloat32Array, {
+  modelPath: '/models/whisper-tiny.onnx',
   modelId: 'whisper-tiny',
-  type: STTModelType.Whisper,
-  modelFiles: { encoder: '/models/encoder.onnx', decoder: '/models/decoder.onnx', tokens: '/models/tokens.txt' },
-  sampleRate: 16000,
 });
-const result = await STT.transcribe(audioFloat32Array);
-console.log(result.text);
+console.log(transcript.text);
 
 // 4. Text-to-Speech
-await TTS.loadVoice({
+const speech = await RunAnywhere.synthesize('Hello from RunAnywhere!', {
+  voicePath: '/models/piper-en.onnx',
   voiceId: 'piper-en',
-  modelPath: '/models/piper-en.onnx',
-  tokensPath: '/models/tokens.txt',
-  dataDir: '/models/espeak-ng-data',
 });
-const speech = await TTS.synthesize('Hello from RunAnywhere!');
 // speech.audioData is Float32Array, speech.sampleRate is the sample rate
 
 // 5. Voice Activity Detection
-await VAD.initialize({ modelPath: '/models/silero_vad.onnx' });
-VAD.onSpeechActivity((activity) => {
-  if (activity === SpeechActivity.Ended) {
-    const segment = VAD.popSpeechSegment();
-    if (segment) console.log(`Speech: ${segment.samples.length} samples`);
-  }
+const vad = await RunAnywhere.detectVoiceActivity(audioFloat32Array, {
+  modelPath: '/models/silero_vad.onnx',
 });
+console.log(vad);
 ```
 
 ## Capabilities
 
 | Feature | Class | Description |
 |---------|-------|-------------|
-| **Speech-to-Text** | `STT` | Offline recognition via Whisper, Zipformer, and Paraformer architectures |
-| **Text-to-Speech** | `TTS` | Neural voice synthesis via Piper TTS with multiple voice models |
-| **Voice Activity Detection** | `VAD` | Real-time speech/silence detection with Silero VAD |
-| **Audio Capture** | `AudioCapture` | Microphone input via Web Audio API |
-| **Audio Playback** | `AudioPlayback` | Audio output via Web Audio API |
-| **Audio File Loader** | `AudioFileLoader` | Load and decode audio files for transcription |
+| **Speech-to-Text** | `RunAnywhere.transcribe` | Offline recognition through the RACommons STT proto ABI once ONNX/Sherpa exports exist |
+| **Text-to-Speech** | `RunAnywhere.synthesize` | Neural voice synthesis through the RACommons TTS proto ABI once ONNX/Sherpa/Piper exports exist |
+| **Voice Activity Detection** | `RunAnywhere.detectVoiceActivity` | Model-backed speech/silence detection through the RACommons VAD proto ABI once ONNX/Sherpa exports exist |
 
 ## WASM Files
 
-This package includes pre-built sherpa-onnx WASM binaries:
+This package publishes its own dedicated `wasm/racommons-onnx-sherpa.{js,wasm}` artifact. Build it from the web SDK root:
 
-| File | Description |
-|------|-------------|
-| `wasm/sherpa/sherpa-onnx.wasm` | Sherpa-ONNX runtime (~12 MB) |
-| `wasm/sherpa/sherpa-onnx-asr.js` | ASR (speech recognition) helper |
-| `wasm/sherpa/sherpa-onnx-tts.js` | TTS (synthesis) helper |
-| `wasm/sherpa/sherpa-onnx-vad.js` | VAD (voice activity) helper |
-| `wasm/sherpa/sherpa-onnx-glue.js` | Emscripten glue code |
+```bash
+cd sdk/runanywhere-web
+npm run build:wasm -- --onnx
+```
 
-The sherpa-onnx WASM is loaded lazily — only when STT, TTS, or VAD is first used.
-
-Configure your bundler to serve these as static assets — see the [main SDK README](https://www.npmjs.com/package/@runanywhere/web) for Vite/Webpack examples.
-
-> **Warning (Vite):** You must add `@runanywhere/web-onnx` to [`optimizeDeps.exclude`](https://vite.dev/config/dep-optimization-options#optimizedeps-exclude) in your `vite.config.ts`. Vite's pre-bundling breaks the `import.meta.url` paths the SDK uses to locate WASM files. See the [main SDK README](https://www.npmjs.com/package/@runanywhere/web#serve-wasm-files--cross-origin-isolation) for the full Vite config.
+The artifact is loaded by `SherpaONNXBridge` via `import.meta.url` from this package's own `wasm/` directory; configure your bundler to serve `wasm/racommons-onnx-sherpa.{js,wasm}` as static assets. See the [main SDK README](https://www.npmjs.com/package/@runanywhere/web) for Vite/Webpack examples.
 
 ## Cross-Origin Isolation
 

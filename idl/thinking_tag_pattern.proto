@@ -1,0 +1,36 @@
+// RunAnywhere IDL — thinking tag pattern shared across LLM generation options
+// and model catalog metadata.
+//
+// Historically duplicated as `ThinkingTagPattern` (llm_options.proto, with
+// `opening_tag`/`closing_tag` fields) and `ModelThinkingTagPattern`
+// (model_types.proto, with `open_tag`/`close_tag` fields). This file
+// collapses both into this single canonical message. Extracted into its own
+// file so it can be shared between llm_options.proto and model_types.proto
+// without introducing a proto import cycle.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "ThinkingTagPatternProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Pattern used to extract a model's "thinking" / reasoning block from its
+// raw output. Used by Qwen3 and LFM2 family models that emit
+// <think>...</think> wrappers. Shared by LLM generation options (per-call
+// override) and ModelInfo catalog metadata (default pattern for a model).
+// ---------------------------------------------------------------------------
+message ThinkingTagPattern {
+    // Opening tag string. Default if empty: "<think>".
+    string open_tag  = 1;
+
+    // Closing tag string. Default if empty: "</think>".
+    string close_tag = 2;
+}

@@ -7,6 +7,19 @@
  * results, and streaming callbacks.
  *
  * For the service interface, see rac_vlm_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_vlm_config_t, rac_vlm_options_t,
+ *     rac_vlm_image_t, rac_vlm_result_t, rac_vlm_info_t,
+ *     rac_vlm_token_event_t, rac_vlm_stream_callback_fn,
+ *     rac_vlm_token_event_callback_fn, rac_vlm_component_*_callback_fn):
+ *     `delete after SDK migration`. Replaced by serialized
+ *     runanywhere.v1.VLMImage / VLMGenerationOptions / VLMResult /
+ *     VLMStreamEvent bytes via rac_vlm_*_proto APIs.
+ *   - Chat-template/family helpers (rac_vlm_chat_template_t,
+ *     rac_vlm_model_family_t, rac_vlm_image_format_t,
+ *     rac_vlm_get_builtin_template): `internal` portable helpers used
+ *     by commons; not part of the public SDK contract.
  */
 
 #ifndef RAC_VLM_TYPES_H
@@ -192,6 +205,49 @@ typedef struct rac_vlm_options {
      * Useful when the default marker doesn't match your model's expectations.
      */
     const char* image_marker_override;
+
+    // ── Extended Sampling Parameters (mirrors VLMGenerationOptions proto) ──
+    //
+    // Appended at the END of the struct so existing callers that only set the
+    // historical fields continue to compile and run unchanged. Defaults are
+    // chosen so a zero-initialized struct behaves like the previous engine
+    // built-ins (no behavioral regression).
+
+    /**
+     * Top-k sampling: keep only the k highest-probability tokens at each step.
+     * 0 = engine default (no top-k filter). 40 is llama.cpp's typical default.
+     */
+    int32_t top_k;
+
+    /**
+     * Seed for the sampler RNG distribution.
+     * 0 = engine default (LLAMA_DEFAULT_SEED).
+     * Negative = pick a fresh random seed per call.
+     */
+    int64_t seed;
+
+    /**
+     * Token-level repetition penalty applied to the recent context window.
+     * 1.0 = disabled (no penalty). 1.1 is llama.cpp's typical default; larger
+     * values penalize repeats more aggressively. Pre-IDL the VLM engine
+     * hard-coded 1.3 — callers may now override.
+     */
+    float repetition_penalty;
+
+    /**
+     * Min-p sampling cutoff: discard tokens whose probability is below
+     * `min_p * top_token_probability`.
+     * 0.0 = disabled. 0.05 is llama.cpp's typical default; pre-IDL the VLM
+     * engine hard-coded 0.1.
+     */
+    float min_p;
+
+    /**
+     * When RAC_TRUE, the backend may surface image-embedding tensors on the
+     * streaming event channel (currently a contract toggle for future
+     * proto-event surfaces; no llama.cpp mtmd hook produces them today).
+     */
+    rac_bool_t emit_image_embeddings;
 } rac_vlm_options_t;
 
 /**
@@ -210,7 +266,12 @@ typedef struct rac_vlm_options {
      .use_gpu = RAC_TRUE,                       \
      .model_family = RAC_VLM_MODEL_FAMILY_AUTO, \
      .custom_chat_template = RAC_NULL,          \
-     .image_marker_override = RAC_NULL}
+     .image_marker_override = RAC_NULL,         \
+     .top_k = 0,                                \
+     .seed = 0,                                 \
+     .repetition_penalty = 1.0f,                \
+     .min_p = 0.0f,                             \
+     .emit_image_embeddings = RAC_FALSE}
 
 // =============================================================================
 // CONFIGURATION - VLM Component Configuration

@@ -9,8 +9,7 @@
 #include <cctype>
 #include <string_view>
 
-namespace runanywhere {
-namespace rag {
+namespace runanywhere::rag {
 
 namespace {
 
@@ -230,5 +229,4 @@ std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string&
     return boundaries;
 }
 
-}  // namespace rag
-}  // namespace runanywhere
+}  // namespace runanywhere::rag

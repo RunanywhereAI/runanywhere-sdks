@@ -96,12 +96,12 @@ typedef struct {
  * @brief Initialize auth manager
  * @param storage Secure storage callbacks (can be NULL for in-memory only)
  */
-void rac_auth_init(const rac_secure_storage_t* storage);
+RAC_API void rac_auth_init(const rac_secure_storage_t* storage);
 
 /**
  * @brief Reset auth manager state
  */
-void rac_auth_reset(void);
+RAC_API void rac_auth_reset(void);
 
 // =============================================================================
 // Token State
@@ -111,7 +111,7 @@ void rac_auth_reset(void);
  * @brief Check if currently authenticated
  * @return true if valid access token exists
  */
-bool rac_auth_is_authenticated(void);
+RAC_API bool rac_auth_is_authenticated(void);
 
 /**
  * @brief Check if token needs refresh
@@ -120,31 +120,43 @@ bool rac_auth_is_authenticated(void);
  *
  * @return true if token should be refreshed
  */
-bool rac_auth_needs_refresh(void);
+RAC_API bool rac_auth_needs_refresh(void);
 
 /**
  * @brief Get current access token
  * @return Access token string, or NULL if not authenticated
  */
-const char* rac_auth_get_access_token(void);
+RAC_API const char* rac_auth_get_access_token(void);
+
+/**
+ * @brief Get current refresh token
+ * @return Refresh token string, or NULL if not set
+ */
+RAC_API const char* rac_auth_get_refresh_token(void);
+
+/**
+ * @brief Get token expiry timestamp
+ * @return Unix timestamp (seconds) when token expires, or 0 if not set
+ */
+RAC_API int64_t rac_auth_get_token_expires_at(void);
 
 /**
  * @brief Get current device ID
  * @return Device ID string, or NULL if not set
  */
-const char* rac_auth_get_device_id(void);
+RAC_API const char* rac_auth_get_device_id(void);
 
 /**
  * @brief Get current user ID
  * @return User ID string, or NULL if not set
  */
-const char* rac_auth_get_user_id(void);
+RAC_API const char* rac_auth_get_user_id(void);
 
 /**
  * @brief Get current organization ID
  * @return Organization ID string, or NULL if not set
  */
-const char* rac_auth_get_organization_id(void);
+RAC_API const char* rac_auth_get_organization_id(void);
 
 // =============================================================================
 // Request Building
@@ -158,7 +170,7 @@ const char* rac_auth_get_organization_id(void);
  * @param config SDK configuration with credentials
  * @return JSON string (caller must free), or NULL on error
  */
-char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config);
+RAC_API char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config);
 
 /**
  * @brief Build token refresh request JSON
@@ -167,7 +179,7 @@ char* rac_auth_build_authenticate_request(const rac_sdk_config_t* config);
  *
  * @return JSON string (caller must free), or NULL if no refresh token
  */
-char* rac_auth_build_refresh_request(void);
+RAC_API char* rac_auth_build_refresh_request(void);
 
 // =============================================================================
 // Response Handling
@@ -181,7 +193,7 @@ char* rac_auth_build_refresh_request(void);
  * @param json JSON response body
  * @return 0 on success, -1 on parse error
  */
-int rac_auth_handle_authenticate_response(const char* json);
+RAC_API int rac_auth_handle_authenticate_response(const char* json);
 
 /**
  * @brief Parse and store refresh response
@@ -191,7 +203,7 @@ int rac_auth_handle_authenticate_response(const char* json);
  * @param json JSON response body
  * @return 0 on success, -1 on parse error
  */
-int rac_auth_handle_refresh_response(const char* json);
+RAC_API int rac_auth_handle_refresh_response(const char* json);
 
 // =============================================================================
 // Token Management
@@ -214,14 +226,14 @@ int rac_auth_handle_refresh_response(const char* json);
  * @param out_needs_refresh Set to true if refresh HTTP call is needed
  * @return 0 on success (token valid), 1 if refresh needed, -1 on error
  */
-int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh);
+RAC_API int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh);
 
 /**
  * @brief Clear all authentication state
  *
  * Clears in-memory state and secure storage.
  */
-void rac_auth_clear(void);
+RAC_API void rac_auth_clear(void);
 
 // =============================================================================
 // Persistence
@@ -234,7 +246,7 @@ void rac_auth_clear(void);
  *
  * @return 0 on success (tokens loaded), -1 if not found or error
  */
-int rac_auth_load_stored_tokens(void);
+RAC_API int rac_auth_load_stored_tokens(void);
 
 /**
  * @brief Save current tokens to secure storage
@@ -243,7 +255,7 @@ int rac_auth_load_stored_tokens(void);
  *
  * @return 0 on success, -1 on error
  */
-int rac_auth_save_tokens(void);
+RAC_API int rac_auth_save_tokens(void);
 
 #ifdef __cplusplus
 }

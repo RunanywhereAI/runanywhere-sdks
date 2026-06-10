@@ -1,22 +1,22 @@
 /**
  * @file chunker_test.cpp
  * @brief Unit tests for DocumentChunker
- * 
+ *
  * Tests document chunking functionality with various text inputs,
  * configurations, and edge cases.
  */
+
+#include "rag_chunker.h"
 
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "rag_chunker.h"
-
 namespace runanywhere::rag {
 
 class ChunkerTest : public ::testing::Test {
-protected:
+   protected:
     ChunkerTest() : chunker_(ChunkerConfig{}) {}
 
     DocumentChunker chunker_;
@@ -87,7 +87,7 @@ TEST_F(ChunkerTest, TokenEstimationEmptyText) {
 TEST_F(ChunkerTest, TokenEstimationProportionalToLength) {
     std::string short_text = "Short.";
     std::string long_text = "This is a much longer text that contains many words. " +
-                           std::string(200, 'a') + ". More text here.";
+                            std::string(200, 'a') + ". More text here.";
 
     size_t short_tokens = chunker_.estimate_tokens(short_text);
     size_t long_tokens = chunker_.estimate_tokens(long_text);
@@ -101,7 +101,7 @@ TEST_F(ChunkerTest, TokenEstimationProportionalToLength) {
 
 TEST_F(ChunkerTest, CustomChunkSize) {
     ChunkerConfig config;
-    config.chunk_size = 256;      // Half default size
+    config.chunk_size = 256;  // Half default size
     config.chars_per_token = 4;
     DocumentChunker small_chunker(config);
 
@@ -235,8 +235,7 @@ TEST_F(ChunkerTest, MoveSemanticForLargeChunks) {
     // Ensure large chunk text is efficiently moved
     std::string large_text;
     for (int i = 0; i < 100; ++i) {
-        large_text +=
-            "This is a comprehensive sentence with lots of words. ";
+        large_text += "This is a comprehensive sentence with lots of words. ";
     }
 
     auto chunks = chunker_.chunk_document(large_text);
@@ -300,4 +299,4 @@ TEST_F(ChunkerTest, ConstMethodsDoNotModifyState) {
     EXPECT_EQ(chunks1.size(), chunks2.size());
 }
 
-} // namespace runanywhere::rag
+}  // namespace runanywhere::rag

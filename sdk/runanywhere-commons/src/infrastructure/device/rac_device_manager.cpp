@@ -12,10 +12,10 @@
 #include <mutex>
 #include <string>
 
-#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
@@ -40,25 +40,15 @@ DeviceManagerState& get_state() {
 // Logging category
 static const char* LOG_CAT = "DeviceManager";
 
-// Helper to emit device registered event
+// Helper to emit device registered event (canonical proto stream; the
+// destination router forwards it to telemetry).
 void emit_device_registered(const char* device_id) {
-    rac_analytics_event_data_t event = {};
-    event.type = RAC_EVENT_DEVICE_REGISTERED;
-    event.data.device = RAC_ANALYTICS_DEVICE_DEFAULT;
-    event.data.device.device_id = device_id;
-
-    rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTERED, &event);
+    rac::events::publish_device_registered(device_id);
 }
 
-// Helper to emit device registration failed event
+// Helper to emit device registration failed event.
 void emit_device_registration_failed(rac_result_t error_code, const char* error_message) {
-    rac_analytics_event_data_t event = {};
-    event.type = RAC_EVENT_DEVICE_REGISTRATION_FAILED;
-    event.data.device = RAC_ANALYTICS_DEVICE_DEFAULT;
-    event.data.device.error_code = error_code;
-    event.data.device.error_message = error_message;
-
-    rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTRATION_FAILED, &event);
+    rac::events::publish_device_registration_failed(error_code, error_message);
 }
 
 }  // namespace
@@ -91,19 +81,26 @@ rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* call
     return RAC_SUCCESS;
 }
 
+rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks) {
+    return rac_device_manager_set_callbacks(callbacks);
+}
+
 rac_result_t rac_device_manager_register_if_needed(rac_environment_t env, const char* build_token) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
 
     if (!state.callbacks_set) {
-        RAC_LOG_ERROR(LOG_CAT, "Device manager callbacks not set");
+        // Benign during early init: the platform adapter may bind callbacks
+        // after the first register-attempt (Web SDK ordering). Caller surfaces
+        // a typed RAC_ERROR_NOT_INITIALIZED for retry logic.
+        RAC_LOG_DEBUG(LOG_CAT, "Device manager callbacks not set yet — deferring registration");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     // Step 1: Check if already registered
     // Production behavior: Skip if already registered (performance, network efficiency)
     // Development behavior: Always update via UPSERT (track active devices, update last_seen_at)
-    rac_bool_t was_registered =
+    const bool was_registered =
         state.callbacks.is_registered(state.callbacks.user_data) == RAC_TRUE;
     if (was_registered && env != RAC_ENV_DEVELOPMENT) {
         RAC_LOG_DEBUG(LOG_CAT, "Device already registered, skipping (production mode)");

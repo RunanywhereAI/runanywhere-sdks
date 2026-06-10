@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${REPO_ROOT}"
+
+KOTLIN_SDK_DIR="sdk/runanywhere-kotlin"
+ANDROID_EXAMPLE_DIR="examples/android/RunAnywhereAI"
+
+if [ -t 1 ] && [ "${NO_COLOR:-}" = "" ]; then
+    C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_CMD=$'\033[36m'
+else
+    C_RESET=''; C_BOLD=''; C_DIM=''; C_CMD=''
+fi
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+show_help() {
+    cat <<EOF
+
+${C_BOLD}RunAnywhere SDK${C_RESET}
+
+  Build, lint, and run any of the SDKs and example apps in this monorepo.
+
+${C_BOLD}USAGE${C_RESET}
+  ./run <group> [subcommand] [args]
+
+${C_BOLD}DOCTOR & SETUP${C_RESET}
+  ${C_CMD}doctor${C_RESET}                       Scan host toolchains and show what can be built
+  ${C_CMD}setup${C_RESET} ${C_DIM}[target]${C_RESET}                Provision env (local.properties, deps). Default: every host-buildable target
+                                ${C_DIM}target = android | flutter | rn | ios | web${C_RESET}
+
+${C_BOLD}SDK${C_RESET}
+  ${C_CMD}sdk commons build-android${C_RESET}    Build C++ commons for all Android ABIs + stage .so into consumers
+  ${C_CMD}sdk commons build-ios${C_RESET}        Build C++ commons xcframework ${C_DIM}(macOS only)${C_RESET}
+  ${C_CMD}sdk commons build-wasm${C_RESET}       Build C++ commons for WebAssembly
+  ${C_CMD}sdk commons build-linux${C_RESET}      Build C++ commons for the Linux host
+  ${C_CMD}sdk commons clean${C_RESET}            Wipe C++ commons build outputs
+  ${C_CMD}sdk kotlin build${C_RESET}             Build Kotlin SDK debug AAR
+  ${C_CMD}sdk kotlin release${C_RESET}           Build Kotlin SDK release AAR
+  ${C_CMD}sdk kotlin publish${C_RESET}           Publish Kotlin SDK to ~/.m2 (Maven Local)
+  ${C_CMD}sdk kotlin test${C_RESET}              Run Kotlin SDK unit tests
+  ${C_CMD}sdk kotlin lint${C_RESET}              ktlint + detekt on the Kotlin SDK
+  ${C_CMD}sdk kotlin format${C_RESET}            Auto-format Kotlin SDK with ktlint
+  ${C_CMD}sdk kotlin clean${C_RESET}             Clean Kotlin SDK build outputs
+  ${C_CMD}sdk flutter${C_RESET} {build|lint|clean}
+  ${C_CMD}sdk rn${C_RESET}      {build|clean}
+  ${C_CMD}sdk ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
+  ${C_CMD}sdk web${C_RESET}     {build|clean}
+
+${C_BOLD}EXAMPLE APPS${C_RESET}
+  ${C_CMD}example android stage${C_RESET}        Build SDK release AARs + copy into examples/android/.../libs/
+  ${C_CMD}example android build${C_RESET}        Stage AARs + assembleDebug the example app
+  ${C_CMD}example android install${C_RESET}      Stage + build + install + launch on device
+  ${C_CMD}example android lint${C_RESET}         ktlint + detekt for the example app
+  ${C_CMD}example android clean${C_RESET}        Clean Android example build outputs
+  ${C_CMD}example flutter${C_RESET} {build|clean}
+  ${C_CMD}example ios${C_RESET}     {build|clean}   ${C_DIM}(macOS only)${C_RESET}
+  ${C_CMD}example web${C_RESET}     {dev|build|clean}
+
+${C_BOLD}UTILITIES${C_RESET}
+  ${C_CMD}clean${C_RESET}                        Clean every SDK + native + cache
+  ${C_CMD}lint${C_RESET}                         Run linters across all SDKs
+  ${C_CMD}format${C_RESET}                       Run formatters across all SDKs
+  ${C_CMD}codegen${C_RESET}                      Generate code from idl/
+  ${C_CMD}sync-versions${C_RESET}                Propagate version pins via scripts/release/sync-versions.sh
+  ${C_CMD}help${C_RESET}                         Show this help
+
+${C_BOLD}EXAMPLES${C_RESET}
+  ${C_DIM}\$${C_RESET} ./run doctor
+  ${C_DIM}\$${C_RESET} ./run setup
+  ${C_DIM}\$${C_RESET} ./run sdk kotlin publish
+  ${C_DIM}\$${C_RESET} ./run example android install
+
+${C_BOLD}LEARN MORE${C_RESET}
+  See AGENTS.md for architecture; sdk/<name>/AGENTS.md for per-SDK detail.
+
+EOF
+}
+
+die() { echo "error: $*" >&2; exit 2; }
+
+bad_subcommand() {
+    echo "error: unknown '$1' subcommand: ${2:-<none>}" >&2
+    echo "run './run help' for the full command list" >&2
+    exit 2
+}
+
+require_macos() {
+    [ "$(uname -s)" = "Darwin" ] || die "this target requires macOS"
+}
+
+cmd_sdk_commons() {
+    case "${1:-}" in
+        build-android) bash scripts/build/build-core-android.sh ;;
+        build-ios)     require_macos; bash sdk/runanywhere-swift/scripts/build-core-xcframework.sh ;;
+        build-wasm)    bash sdk/runanywhere-web/scripts/build-core-wasm.sh ;;
+        build-linux)   cmake --preset=linux-release && cmake --build --preset=linux-release ;;
+        clean)         rm -rf build/android-* build/ios-* build/wasm-* build/linux-* ;;
+        *)             bad_subcommand "sdk commons" "${1:-}" ;;
+    esac
+}
+
+cmd_sdk_kotlin() {
+    case "${1:-}" in
+        build)    (cd "${KOTLIN_SDK_DIR}" && ./gradlew assembleDebug) ;;
+        release)  (cd "${KOTLIN_SDK_DIR}" && ./gradlew assembleRelease) ;;
+        publish)  (cd "${KOTLIN_SDK_DIR}" && ./gradlew publishToMavenLocal) ;;
+        test)     (cd "${KOTLIN_SDK_DIR}" && ./gradlew test) ;;
+        lint)     (cd "${KOTLIN_SDK_DIR}" && ./gradlew ktlintCheck detekt) ;;
+        format)   (cd "${KOTLIN_SDK_DIR}" && ./gradlew ktlintFormat) ;;
+        clean)    (cd "${KOTLIN_SDK_DIR}" && ./gradlew clean) ;;
+        *)        bad_subcommand "sdk kotlin" "${1:-}" ;;
+    esac
+}
+
+cmd_sdk_flutter() {
+    case "${1:-}" in
+        build)  (cd sdk/runanywhere-flutter/packages/runanywhere && flutter pub get && flutter analyze --no-fatal-infos lib) ;;
+        lint)   (cd sdk/runanywhere-flutter/packages/runanywhere && flutter analyze) ;;
+        clean)  (cd sdk/runanywhere-flutter/packages/runanywhere && flutter clean) ;;
+        *)      bad_subcommand "sdk flutter" "${1:-}" ;;
+    esac
+}
+
+cmd_sdk_rn() {
+    case "${1:-}" in
+        build)  (cd sdk/runanywhere-react-native && ./scripts/build-react-native.sh --setup) ;;
+        clean)  (cd sdk/runanywhere-react-native && yarn clean 2>/dev/null || npm run clean 2>/dev/null || true) ;;
+        *)      bad_subcommand "sdk rn" "${1:-}" ;;
+    esac
+}
+
+cmd_sdk_ios() {
+    require_macos
+    case "${1:-}" in
+        build)  (cd sdk/runanywhere-swift && swift build) ;;
+        clean)  (cd sdk/runanywhere-swift && swift package clean) ;;
+        *)      bad_subcommand "sdk ios" "${1:-}" ;;
+    esac
+}
+
+cmd_sdk_web() {
+    case "${1:-}" in
+        build)  (cd sdk/runanywhere-web && (yarn build 2>/dev/null || npm run build)) ;;
+        clean)  (cd sdk/runanywhere-web && (yarn clean 2>/dev/null || npm run clean 2>/dev/null || true)) ;;
+        *)      bad_subcommand "sdk web" "${1:-}" ;;
+    esac
+}
+
+cmd_sdk() {
+    case "${1:-}" in
+        commons) shift; cmd_sdk_commons "$@" ;;
+        kotlin)  shift; cmd_sdk_kotlin  "$@" ;;
+        flutter) shift; cmd_sdk_flutter "$@" ;;
+        rn)      shift; cmd_sdk_rn      "$@" ;;
+        ios)     shift; cmd_sdk_ios     "$@" ;;
+        web)     shift; cmd_sdk_web     "$@" ;;
+        *)       bad_subcommand "sdk" "${1:-}" ;;
+    esac
+}
+
+cmd_example_android() {
+    local stage="${ANDROID_EXAMPLE_DIR}/scripts/stage-sdk-aars.sh"
+    case "${1:-}" in
+        stage)    bash "${stage}" release ;;
+        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:assembleDebug) ;;
+        install)  bash "${stage}" release \
+                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:installDebug) \
+                    && adb shell am start -n com.runanywhere.runanywhereai.debug/com.runanywhere.runanywhereai.MainActivity ;;
+        lint)     (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:ktlintCheck :app:detekt) ;;
+        clean)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew clean) ;;
+        *)        bad_subcommand "example android" "${1:-}" ;;
+    esac
+}
+
+cmd_example_flutter() {
+    local ex_dir="${EX:-examples/flutter/RunAnywhereAI}"
+    case "${1:-}" in
+        build)  (cd "${ex_dir}" && flutter build apk) ;;
+        clean)  (cd "${ex_dir}" && flutter clean) ;;
+        *)      bad_subcommand "example flutter" "${1:-}" ;;
+    esac
+}
+
+cmd_example_ios() {
+    require_macos
+    local scheme="${SCHEME:-RunAnywhereAI}"
+    case "${1:-}" in
+        build)  (cd examples/ios/RunAnywhereAI && xcodebuild -scheme "${scheme}" build) ;;
+        clean)  (cd examples/ios/RunAnywhereAI && xcodebuild clean) ;;
+        *)      bad_subcommand "example ios" "${1:-}" ;;
+    esac
+}
+
+cmd_example_web() {
+    local ex_dir="${EX:-examples/web/RunAnywhereAI}"
+    case "${1:-}" in
+        dev)    (cd "${ex_dir}" && (yarn dev 2>/dev/null || npm run dev)) ;;
+        build)  (cd "${ex_dir}" && (yarn build 2>/dev/null || npm run build)) ;;
+        clean)  rm -rf "${ex_dir}/dist" "${ex_dir}/.vite" ;;
+        *)      bad_subcommand "example web" "${1:-}" ;;
+    esac
+}
+
+cmd_example() {
+    case "${1:-}" in
+        android) shift; cmd_example_android "$@" ;;
+        flutter) shift; cmd_example_flutter "$@" ;;
+        ios)     shift; cmd_example_ios     "$@" ;;
+        web)     shift; cmd_example_web     "$@" ;;
+        *)       bad_subcommand "example" "${1:-}" ;;
+    esac
+}
+
+cmd_clean() {
+    cmd_sdk_kotlin clean   || true
+    cmd_example_android clean || true
+    cmd_sdk_commons clean  || true
+    rm -rf .gradle build/reports
+}
+
+cmd_lint() {
+    cmd_sdk_kotlin lint || true
+    have dart && (cd sdk/runanywhere-flutter/packages/runanywhere && flutter analyze) || true
+}
+
+cmd_format() {
+    cmd_sdk_kotlin format || true
+    have swiftformat && swiftformat sdk/runanywhere-swift || true
+    have dart && dart format sdk/runanywhere-flutter || true
+}
+
+case "${1:-help}" in
+    help|-h|--help)     show_help ;;
+    doctor)             shift; bash scripts/setup/doctor.sh "$@" ;;
+    setup)              shift; bash scripts/setup/setup.sh "$@" ;;
+    sdk)                shift; cmd_sdk "$@" ;;
+    example)            shift; cmd_example "$@" ;;
+    clean)              cmd_clean ;;
+    lint)               cmd_lint ;;
+    format)             cmd_format ;;
+    codegen)            bash idl/codegen/generate_kotlin.sh ;;
+    sync-versions)      bash scripts/release/sync-versions.sh ;;
+    *)
+        echo "error: unknown command: $1" >&2
+        echo "run './run help' for usage" >&2
+        exit 2
+        ;;
+esac

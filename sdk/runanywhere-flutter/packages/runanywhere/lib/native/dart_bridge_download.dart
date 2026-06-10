@@ -1,245 +1,350 @@
-import 'dart:async';
 // ignore_for_file: avoid_classes_with_only_static_members
 
+import 'dart:async';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
+import 'package:protobuf/protobuf.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/generated/download_service.pb.dart' as download_pb;
+import 'package:runanywhere/native/types/basic_types.dart';
 
-/// Download bridge for C++ download operations.
-/// Matches Swift's `CppBridge+Download.swift`.
+/// Download bridge for the stable generated-proto download ABI.
+///
+/// Commons owns download planning, state, progress, cancel/resume semantics,
+/// archive policy, and registry update decisions. Flutter only serializes
+/// generated request protos and decodes generated result/progress protos.
 class DartBridgeDownload {
   DartBridgeDownload._();
 
   static final _logger = SDKLogger('DartBridge.Download');
   static final DartBridgeDownload instance = DartBridgeDownload._();
 
-  /// Active download tasks
-  final Map<String, _DownloadTask> _activeTasks = {};
+  /// Process-wide broadcast stream of `DownloadProgress` events emitted by
+  /// commons via `rac_download_set_progress_proto_callback`. The stream is
+  /// lazily registered the first time a subscriber asks for it. Events are
+  /// shared across all consumers; per-model filtering happens in the
+  /// capability layer.
+  static final StreamController<download_pb.DownloadProgress>
+      _progressController =
+      StreamController<download_pb.DownloadProgress>.broadcast();
+  // Kept alive for the process lifetime — the native callback holds a raw
+  // pointer to this `NativeCallable` for the duration of the SDK process.
+  // ignore: unused_field
+  static NativeCallable<RacDownloadProtoProgressCallbackNative>? _callback;
+  static bool _registered = false;
 
-  /// Start a download via C++
-  Future<String?> startDownload({
-    required String url,
-    required String destinationPath,
-    void Function(int downloaded, int total)? onProgress,
-    void Function(int result, String? path)? onComplete,
+  // commons-081: active downloads tracked by (task_id, model_id) so the
+  // wake-up listener (_onNativeProgress) can drain authoritative state via
+  // rac_download_progress_poll_proto without trusting the racing ring-slot
+  // pointer it was handed. Updated by startProto/resumeProto (insert) and
+  // cancelProto + terminal-state observation (remove).
+  static final Map<String, _ActiveDownload> _activeDownloads =
+      <String, _ActiveDownload>{};
+
+  Stream<download_pb.DownloadProgress> get progressStream {
+    _ensureProgressCallbackRegistered();
+    return _progressController.stream;
+  }
+
+  static void _ensureProgressCallbackRegistered() {
+    if (_registered) return;
+
+    final setCallback =
+        RacNative.bindings.rac_download_set_progress_proto_callback;
+    if (setCallback == null) {
+      _logger.debug(
+        'rac_download_set_progress_proto_callback is unavailable; '
+        'falling back to caller-driven polling.',
+      );
+      _registered = true;
+      return;
+    }
+
+    try {
+      final callable =
+          NativeCallable<RacDownloadProtoProgressCallbackNative>.listener(
+        _onNativeProgress,
+      );
+      final code = setCallback(callable.nativeFunction, nullptr);
+      if (code != RacResultCode.success) {
+        _logger.debug(
+          'rac_download_set_progress_proto_callback returned $code',
+        );
+        callable.close();
+      } else {
+        _callback = callable;
+      }
+    } catch (e) {
+      _logger.debug('Failed to register download progress callback: $e');
+    } finally {
+      _registered = true;
+    }
+  }
+
+  // commons-081: the commons callback hands us a pointer into a 32-slot
+  // serialization ring that may have rotated by the time this listener
+  // dispatches on the Dart isolate (NativeCallable.listener is async). Under
+  // bursty multi-file downloads the bytes may already represent a different
+  // emission or be partially overwritten — producing 'invalid tag (zero)'
+  // decode errors and silently-dropped progress events. Same shape as the
+  // SDKEvent wake-up race documented in dart_bridge_events.dart:193-209.
+  //
+  // Flutter-only mitigation: treat the pointer args as a wake-up signal and
+  // drain the canonical per-task progress via rac_download_progress_poll_proto
+  // for every download we are currently tracking. The poll API copies progress
+  // out under task->mutex, so the bytes we ultimately emit are race-free
+  // regardless of ring slot rotation. Tracked tasks are populated by
+  // startProto/resumeProto and pruned on cancel + observed terminal states.
+  // A cross-SDK queue ABI (rac_download_progress_poll mirroring
+  // rac_sdk_event_poll) would let us drain without per-task bookkeeping but
+  // requires a commons change outside this cluster's scope.
+  static void _onNativeProgress(
+    Pointer<Uint8> bytesPtr,
+    int bytesLen,
+    Pointer<Void> _,
+  ) {
+    if (_progressController.isClosed) {
+      return;
+    }
+    // Pointer args intentionally unused — they reference a ring slot that
+    // may already be stale. Keep params bound for the typedef-compatible
+    // signature.
+    if (bytesPtr == nullptr && bytesLen < 0) {
+      return; // Unreachable; satisfies analyzer.
+    }
+    _drainActiveProgress();
+  }
+
+  static void _drainActiveProgress() {
+    final poll = RacNative.bindings.rac_download_progress_poll_proto;
+    if (poll == null) {
+      return;
+    }
+    final snapshot = _activeDownloads.values.toList(growable: false);
+    for (final entry in snapshot) {
+      final progress = _pollProgress(entry, poll);
+      if (progress == null) {
+        continue;
+      }
+      _progressController.add(progress);
+      final state = progress.state;
+      if (state == download_pb.DownloadState.DOWNLOAD_STATE_COMPLETED ||
+          state == download_pb.DownloadState.DOWNLOAD_STATE_FAILED ||
+          state == download_pb.DownloadState.DOWNLOAD_STATE_CANCELLED) {
+        _activeDownloads.remove(entry.key);
+      }
+    }
+  }
+
+  static download_pb.DownloadProgress? _pollProgress(
+    _ActiveDownload entry,
+    RacDownloadProtoDart poll,
+  ) {
+    final request = download_pb.DownloadSubscribeRequest(
+      modelId: entry.modelId,
+      taskId: entry.taskId,
+    );
+    final bytes = request.writeToBuffer();
+    final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      if (bytes.isNotEmpty) {
+        requestPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = poll(requestPtr, bytes.length, out);
+      if (code != RacResultCode.success ||
+          out.ref.status != RacResultCode.success) {
+        if (code == RacResultCode.errorNotFound) {
+          // Task already purged in commons (e.g. cleanup_terminal_tasks ran)
+          // — drop our tracking entry so we stop polling for it.
+          _activeDownloads.remove(entry.key);
+        }
+        return null;
+      }
+      if (out.ref.data == nullptr || out.ref.size == 0) {
+        return null;
+      }
+      final resultBytes =
+          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      return download_pb.DownloadProgress.fromBuffer(resultBytes);
+    } catch (e) {
+      _logger.debug('rac_download_progress_poll_proto drain error: $e');
+      return null;
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(requestPtr);
+      calloc.free(out);
+    }
+  }
+
+  static String _activeKey(String taskId, String modelId) =>
+      '$taskId $modelId';
+
+  static void _trackActive(String taskId, String modelId) {
+    if (taskId.isEmpty && modelId.isEmpty) {
+      return;
+    }
+    final key = _activeKey(taskId, modelId);
+    _activeDownloads[key] = _ActiveDownload(key, taskId, modelId);
+  }
+
+  static void _untrackActive(String taskId, String modelId) {
+    if (taskId.isEmpty && modelId.isEmpty) {
+      return;
+    }
+    _activeDownloads.remove(_activeKey(taskId, modelId));
+  }
+
+  Future<download_pb.DownloadPlanResult> planProto(
+    download_pb.DownloadPlanRequest request,
+  ) async {
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_plan_proto,
+      download_pb.DownloadPlanResult.fromBuffer,
+      'rac_download_plan_proto',
+    );
+    return result ??
+        download_pb.DownloadPlanResult(
+          canStart: false,
+          errorMessage: 'Download plan proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadStartResult> startProto(
+    download_pb.DownloadStartRequest request,
+  ) async {
+    // commons-081: subscribe before commons starts emitting so the wake-up
+    // listener never misses the first burst of a freshly-started download.
+    _ensureProgressCallbackRegistered();
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_start_proto,
+      download_pb.DownloadStartResult.fromBuffer,
+      'rac_download_start_proto',
+    );
+    if (result != null && result.accepted) {
+      _trackActive(result.taskId, result.modelId);
+    }
+    return result ??
+        download_pb.DownloadStartResult(
+          accepted: false,
+          modelId: request.modelId,
+          errorMessage: 'Download start proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadCancelResult> cancelProto(
+    download_pb.DownloadCancelRequest request,
+  ) async {
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_cancel_proto,
+      download_pb.DownloadCancelResult.fromBuffer,
+      'rac_download_cancel_proto',
+    );
+    // commons-081: stop polling the cancelled task even if commons still has
+    // residual progress events queued — capability layer relies on the
+    // terminal-state emission, which the per-task poll also serves.
+    _untrackActive(request.taskId, request.modelId);
+    return result ??
+        download_pb.DownloadCancelResult(
+          success: false,
+          taskId: request.taskId,
+          modelId: request.modelId,
+          errorMessage: 'Download cancel proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadResumeResult> resumeProto(
+    download_pb.DownloadResumeRequest request,
+  ) async {
+    _ensureProgressCallbackRegistered();
+    final result = await _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_resume_proto,
+      download_pb.DownloadResumeResult.fromBuffer,
+      'rac_download_resume_proto',
+    );
+    if (result != null && result.accepted) {
+      _trackActive(result.taskId, result.modelId);
+    }
+    return result ??
+        download_pb.DownloadResumeResult(
+          accepted: false,
+          taskId: request.taskId,
+          modelId: request.modelId,
+          errorMessage: 'Download resume proto API is unavailable',
+        );
+  }
+
+  Future<download_pb.DownloadProgress?> pollProgressProto(
+    download_pb.DownloadSubscribeRequest request,
+  ) {
+    return _callDownloadProto(
+      request,
+      RacNative.bindings.rac_download_progress_poll_proto,
+      download_pb.DownloadProgress.fromBuffer,
+      'rac_download_progress_poll_proto',
+      logNotFound: false,
+    );
+  }
+
+  Future<T?> _callDownloadProto<T extends GeneratedMessage>(
+    GeneratedMessage request,
+    RacDownloadProtoDart? fn,
+    T Function(List<int>) decode,
+    String symbol, {
+    bool logNotFound = true,
   }) async {
+    if (fn == null) return null;
+
+    final bytes = request.writeToBuffer();
+    final requestPtr = calloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
     try {
-      final lib = PlatformLoader.load();
-      final startFn = lib.lookupFunction<
-          Int32 Function(
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<NativeFunction<Void Function(Int64, Int64, Pointer<Void>)>>,
-            Pointer<NativeFunction<Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
-            Pointer<Void>,
-            Pointer<Pointer<Utf8>>,
-          ),
-          int Function(
-            Pointer<Utf8>,
-            Pointer<Utf8>,
-            Pointer<NativeFunction<Void Function(Int64, Int64, Pointer<Void>)>>,
-            Pointer<NativeFunction<Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
-            Pointer<Void>,
-            Pointer<Pointer<Utf8>>,
-          )>('rac_http_download');
-
-      final urlPtr = url.toNativeUtf8();
-      final destPtr = destinationPath.toNativeUtf8();
-      final taskIdPtr = calloc<Pointer<Utf8>>();
-
-      try {
-        final result = startFn(
-          urlPtr,
-          destPtr,
-          nullptr, // Progress callback (implement if needed)
-          nullptr, // Complete callback (implement if needed)
-          nullptr, // User data
-          taskIdPtr,
-        );
-
-        if (result != RacResultCode.success) {
-          _logger.warning('Download start failed', metadata: {'code': result});
-          return null;
+      if (bytes.isNotEmpty) {
+        requestPtr.asTypedList(bytes.length).setAll(0, bytes);
+      }
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(requestPtr, bytes.length, out);
+      if (code != RacResultCode.success ||
+          out.ref.status != RacResultCode.success) {
+        if (logNotFound || code != RacResultCode.errorNotFound) {
+          final message = out.ref.errorMessage == nullptr
+              ? 'code=$code status=${out.ref.status}'
+              : out.ref.errorMessage.toDartString();
+          _logger.debug('$symbol failed: $message');
         }
-
-        final taskId = taskIdPtr.value != nullptr
-            ? taskIdPtr.value.toDartString()
-            : null;
-
-        if (taskId != null) {
-          _activeTasks[taskId] = _DownloadTask(
-            url: url,
-            destinationPath: destinationPath,
-            onProgress: onProgress,
-            onComplete: onComplete,
-          );
-        }
-
-        return taskId;
-      } finally {
-        calloc.free(urlPtr);
-        calloc.free(destPtr);
-        calloc.free(taskIdPtr);
+        return null;
       }
+      if (out.ref.data == nullptr || out.ref.size == 0) {
+        return decode(const <int>[]);
+      }
+      final resultBytes =
+          out.ref.data.asTypedList(out.ref.size).toList(growable: false);
+      return decode(resultBytes);
     } catch (e) {
-      _logger.debug('rac_http_download not available: $e');
+      _logger.debug('$symbol error: $e');
       return null;
-    }
-  }
-
-  /// Cancel a download
-  Future<bool> cancelDownload(String taskId) async {
-    try {
-      final lib = PlatformLoader.load();
-      final cancelFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>),
-          int Function(Pointer<Utf8>)>('rac_http_download_cancel');
-
-      final taskIdPtr = taskId.toNativeUtf8();
-      try {
-        final result = cancelFn(taskIdPtr);
-        _activeTasks.remove(taskId);
-        return result == RacResultCode.success;
-      } finally {
-        calloc.free(taskIdPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_http_download_cancel not available: $e');
-      return false;
-    }
-  }
-
-  /// Get active download count
-  int get activeDownloadCount => _activeTasks.length;
-
-  // ===========================================================================
-  // Download Orchestrator Utilities (from rac_download_orchestrator.h)
-  // ===========================================================================
-
-  /// Find the actual model path after extraction.
-  ///
-  /// Consolidates duplicated Dart logic for scanning extracted directories.
-  /// Uses C++ `rac_find_model_path_after_extraction()` which handles:
-  /// - Finding .gguf, .onnx, .ort, .bin files
-  /// - Nested directories (e.g., sherpa-onnx archives)
-  /// - Single-file-nested pattern
-  /// - Directory-based models (ONNX)
-  ///
-  /// [structure]: C++ archive structure constant (99 = unknown/auto-detect)
-  /// [framework]: C++ inference framework constant (from RacInferenceFramework)
-  /// [format]: C++ model format constant (from RacModelFormat)
-  static String? findModelPathAfterExtraction({
-    required String extractedDir,
-    required int structure,
-    required int framework,
-    required int format,
-  }) {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<
-          Int32 Function(
-              Pointer<Utf8>, Int32, Int32, Int32, Pointer<Utf8>, IntPtr),
-          int Function(Pointer<Utf8>, int, int, int, Pointer<Utf8>,
-              int)>('rac_find_model_path_after_extraction');
-
-      final dirPtr = extractedDir.toNativeUtf8();
-      final outPath = calloc<Uint8>(4096);
-
-      try {
-        final result = fn(
-            dirPtr, structure, framework, format, outPath.cast<Utf8>(), 4096);
-        if (result != RacResultCode.success) return null;
-        return outPath.cast<Utf8>().toDartString();
-      } finally {
-        calloc.free(dirPtr);
-        calloc.free(outPath);
-      }
-    } catch (e) {
-      _logger.debug('rac_find_model_path_after_extraction not available: $e');
-      return null;
-    }
-  }
-
-  /// Check if a download URL requires extraction.
-  ///
-  /// Wraps C++ `rac_download_requires_extraction()` which checks URL suffix
-  /// for archive extensions (.tar.gz, .tar.bz2, .tar.xz, .zip).
-  static bool downloadRequiresExtraction(String url) {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
-          int Function(Pointer<Utf8>)>('rac_download_requires_extraction');
-
-      final urlPtr = url.toNativeUtf8();
-      try {
-        return fn(urlPtr) == RAC_TRUE;
-      } finally {
-        calloc.free(urlPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_download_requires_extraction not available: $e');
-      return false;
-    }
-  }
-
-  /// Compute the download destination path for a model.
-  ///
-  /// Wraps C++ `rac_download_compute_destination()`.
-  /// Returns the destination path and whether extraction is needed,
-  /// or null if the computation fails.
-  static ({String path, bool needsExtraction})? computeDownloadDestination({
-    required String modelId,
-    required String downloadUrl,
-    required int framework,
-    required int format,
-  }) {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32, Int32,
-              Pointer<Utf8>, IntPtr, Pointer<Int32>),
-          int Function(Pointer<Utf8>, Pointer<Utf8>, int, int, Pointer<Utf8>,
-              int, Pointer<Int32>)>('rac_download_compute_destination');
-
-      final modelIdPtr = modelId.toNativeUtf8();
-      final urlPtr = downloadUrl.toNativeUtf8();
-      final outPath = calloc<Uint8>(4096);
-      final outNeedsExtraction = calloc<Int32>();
-
-      try {
-        final result = fn(modelIdPtr, urlPtr, framework, format,
-            outPath.cast<Utf8>(), 4096, outNeedsExtraction);
-        if (result != RacResultCode.success) return null;
-        return (
-          path: outPath.cast<Utf8>().toDartString(),
-          needsExtraction: outNeedsExtraction.value == RAC_TRUE,
-        );
-      } finally {
-        calloc.free(modelIdPtr);
-        calloc.free(urlPtr);
-        calloc.free(outPath);
-        calloc.free(outNeedsExtraction);
-      }
-    } catch (e) {
-      _logger.debug('rac_download_compute_destination not available: $e');
-      return null;
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(requestPtr);
+      calloc.free(out);
     }
   }
 }
 
-class _DownloadTask {
-  final String url;
-  final String destinationPath;
-  final void Function(int downloaded, int total)? onProgress;
-  final void Function(int result, String? path)? onComplete;
-
-  _DownloadTask({
-    required this.url,
-    required this.destinationPath,
-    this.onProgress,
-    this.onComplete,
-  });
+class _ActiveDownload {
+  const _ActiveDownload(this.key, this.taskId, this.modelId);
+  final String key;
+  final String taskId;
+  final String modelId;
 }

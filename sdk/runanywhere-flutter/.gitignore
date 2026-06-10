@@ -82,3 +82,12 @@ packages/*/pubspec_overrides.yaml
 # macOS
 # =============================================================================
 .DS_Store
+
+# =============================================================================
+# FVM (Flutter Version Manager) - locally-managed SDK cache
+# Only fvm_config.json (the version pin) should be committed; never the cache.
+# =============================================================================
+.fvm/flutter_sdk
+.fvm/versions/
+.fvm/release
+.fvm/version

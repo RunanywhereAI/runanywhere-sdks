@@ -9,20 +9,20 @@
 #include "test_common.h"
 #include "test_config.h"
 
-#include "rac/core/rac_core.h"
-#include "rac/core/rac_platform_adapter.h"
-#include "rac/backends/rac_llm_llamacpp.h"
-
 #include <atomic>
 #include <cstring>
 #include <string>
+
+#include "rac/backends/rac_llm_llamacpp.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
 // Minimal test platform adapter
 // =============================================================================
 
 static void test_log_callback(rac_log_level_t /*level*/, const char* /*category*/,
-                               const char* /*message*/, void* /*ctx*/) {
+                              const char* /*message*/, void* /*ctx*/) {
     // silent during tests
 }
 
@@ -32,23 +32,48 @@ static int64_t test_now_ms(void* /*ctx*/) {
         .count();
 }
 
-static const rac_platform_adapter_t test_adapter = {
-    /* file_exists       */ nullptr,
-    /* file_read         */ nullptr,
-    /* file_write        */ nullptr,
-    /* file_delete       */ nullptr,
-    /* secure_get        */ nullptr,
-    /* secure_set        */ nullptr,
-    /* secure_delete     */ nullptr,
-    /* log               */ test_log_callback,
-    /* track_error       */ nullptr,
-    /* now_ms            */ test_now_ms,
-    /* get_memory_info   */ nullptr,
-    /* http_download     */ nullptr,
-    /* http_download_cancel */ nullptr,
-    /* extract_archive   */ nullptr,
-    /* user_data         */ nullptr,
-};
+// No-op mandatory-slot stubs. rac_init fail-fasts on any NULL mandatory slot.
+static rac_bool_t test_file_exists(const char* /*path*/, void* /*ctx*/) {
+    return RAC_FALSE;
+}
+static rac_result_t test_file_read(const char* /*path*/, void** /*out_data*/, size_t* /*out_size*/,
+                                   void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_file_write(const char* /*path*/, const void* /*data*/, size_t /*size*/,
+                                    void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_file_delete(const char* /*path*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_get(const char* /*key*/, char** /*out_value*/, void* /*ctx*/) {
+    return RAC_ERROR_FILE_NOT_FOUND;
+}
+static rac_result_t test_secure_set(const char* /*key*/, const char* /*value*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+static rac_result_t test_secure_delete(const char* /*key*/, void* /*ctx*/) {
+    return RAC_SUCCESS;
+}
+
+static rac_platform_adapter_t make_test_adapter() {
+    rac_platform_adapter_t adapter = {};
+    adapter.abi_version = RAC_PLATFORM_ADAPTER_ABI_VERSION;
+    adapter.struct_size = static_cast<uint32_t>(sizeof(rac_platform_adapter_t));
+    adapter.file_exists = test_file_exists;
+    adapter.file_read = test_file_read;
+    adapter.file_write = test_file_write;
+    adapter.file_delete = test_file_delete;
+    adapter.secure_get = test_secure_get;
+    adapter.secure_set = test_secure_set;
+    adapter.secure_delete = test_secure_delete;
+    adapter.log = test_log_callback;
+    adapter.now_ms = test_now_ms;
+    return adapter;
+}
+
+static const rac_platform_adapter_t test_adapter = make_test_adapter();
 
 static rac_config_t make_test_config() {
     rac_config_t config = {};
@@ -65,12 +90,15 @@ static rac_config_t make_test_config() {
 
 static bool setup() {
     rac_config_t config = make_test_config();
-    if (rac_init(&config) != RAC_SUCCESS) return false;
+    if (rac_init(&config) != RAC_SUCCESS)
+        return false;
     rac_backend_llamacpp_register();
     return true;
 }
 
-static void teardown() { rac_shutdown(); }
+static void teardown() {
+    rac_shutdown();
+}
 
 // =============================================================================
 // Test: create and destroy with valid model path
@@ -222,7 +250,7 @@ static rac_bool_t stream_callback(const char* token, rac_bool_t is_final, void* 
     if (is_final == RAC_TRUE) {
         data->got_final = true;
     }
-    return RAC_TRUE; // continue
+    return RAC_TRUE;  // continue
 }
 
 static TestResult test_generate_stream() {
@@ -251,7 +279,7 @@ static TestResult test_generate_stream() {
     {
         ScopedTimer timer("llm_generate_stream");
         rc = rac_llm_llamacpp_generate_stream(handle, "What is 2+2? Answer briefly.", &opts,
-                                               stream_callback, &cb_data);
+                                              stream_callback, &cb_data);
     }
     ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_generate_stream should succeed");
     ASSERT_TRUE(cb_data.token_count > 0, "should have received at least one token");
@@ -272,13 +300,12 @@ struct CancelCallbackData {
     int token_count = 0;
 };
 
-static rac_bool_t cancel_callback(const char* /*token*/, rac_bool_t /*is_final*/,
-                                   void* user_data) {
+static rac_bool_t cancel_callback(const char* /*token*/, rac_bool_t /*is_final*/, void* user_data) {
     auto* data = static_cast<CancelCallbackData*>(user_data);
     data->token_count++;
     // Stop after 3 tokens
     if (data->token_count >= 3) {
-        return RAC_FALSE; // request cancellation
+        return RAC_FALSE;  // request cancellation
     }
     return RAC_TRUE;
 }
@@ -307,7 +334,7 @@ static TestResult test_cancel_generation() {
 
     CancelCallbackData cb_data;
     rc = rac_llm_llamacpp_generate_stream(handle, "Write a long story about space exploration.",
-                                           &opts, cancel_callback, &cb_data);
+                                          &opts, cancel_callback, &cb_data);
     // The return code may be RAC_SUCCESS or RAC_ERROR_CANCELLED depending on implementation
     ASSERT_TRUE(cb_data.token_count >= 1, "callback should have been called at least once");
 
@@ -382,28 +409,16 @@ static TestResult test_unload_reload() {
     ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_TRUE,
               "model should be loaded after create");
 
-    // Attempt unload - may fail on Metal GPU backends (known llama.cpp limitation)
+    // Direct unload is intentionally a no-op for the legacy llama.cpp handle:
+    // teardown is owned by destroy, while the commons component lifecycle handles
+    // model cleanup at the service layer.
     rc = rac_llm_llamacpp_unload_model(handle);
-    if (rc != RAC_SUCCESS) {
-        std::cout << "  NOTE: unload returned " << rc
-                  << " (known Metal GPU limitation) - skipping reload test\n";
-        rac_llm_llamacpp_destroy(handle);
-        teardown();
-        result.passed = true;
-        result.details = "SKIPPED - unload not supported with Metal GPU backend (error " +
-                         std::to_string(rc) + ")";
-        return result;
-    }
-
-    ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_FALSE,
-              "model should not be loaded after unload");
-
-    // Reload
-    rc = rac_llm_llamacpp_load_model(handle, model_path.c_str(), nullptr);
-    ASSERT_EQ(rc, RAC_SUCCESS, "rac_llm_llamacpp_load_model should succeed");
+    ASSERT_EQ(rc, RAC_SUCCESS, "legacy unload is a successful no-op");
     ASSERT_EQ(rac_llm_llamacpp_is_model_loaded(handle), RAC_TRUE,
-              "model should be loaded after reload");
+              "legacy unload keeps the model loaded until destroy");
 
+    // Reload is not supported via a dedicated load_model API here — LlamaCpp
+    // loads the model during create(). To reload, callers destroy and re-create.
     rac_llm_llamacpp_destroy(handle);
     teardown();
     return TEST_PASS();

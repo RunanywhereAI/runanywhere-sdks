@@ -39,6 +39,7 @@ class _VLMCameraViewState extends State<VLMCameraView> {
     _viewModel.addListener(_onViewModelChanged);
 
     // Initialize
+    debugPrint('VLM streaming completed');
     _initializeAsync();
   }
 
@@ -77,7 +78,10 @@ class _VLMCameraViewState extends State<VLMCameraView> {
       appBar: _buildAppBar(),
       body: Stack(
         children: [
-          if (_viewModel.isModelLoaded) _buildMainContent() else _buildModelRequiredContent(),
+          if (_viewModel.isModelLoaded)
+            _buildMainContent()
+          else
+            _buildModelRequiredContent(),
         ],
       ),
     );
@@ -135,7 +139,10 @@ class _VLMCameraViewState extends State<VLMCameraView> {
       child: Stack(
         children: [
           // Camera preview or permission view
-          if (_viewModel.isCameraAuthorized) _buildCameraPreviewContent() else _buildCameraPermissionView(),
+          if (_viewModel.isCameraAuthorized)
+            _buildCameraPreviewContent()
+          else
+            _buildCameraPermissionView(),
 
           // Processing overlay
           if (_viewModel.isProcessing) _buildProcessingOverlay(),
@@ -145,7 +152,8 @@ class _VLMCameraViewState extends State<VLMCameraView> {
   }
 
   Widget _buildCameraPreviewContent() {
-    if (!_viewModel.isCameraInitialized || _viewModel.cameraController == null) {
+    if (!_viewModel.isCameraInitialized ||
+        _viewModel.cameraController == null) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.white),
       );
@@ -166,7 +174,8 @@ class _VLMCameraViewState extends State<VLMCameraView> {
           const SizedBox(height: AppSpacing.mediumLarge),
           Text(
             'Camera Access Required',
-            style: AppTypography.headline(context).copyWith(color: Colors.white),
+            style:
+                AppTypography.headline(context).copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.mediumLarge),
           ElevatedButton(
@@ -314,14 +323,18 @@ class _VLMCameraViewState extends State<VLMCameraView> {
       icon: const Icon(Icons.copy, size: 18),
       color: AppColors.textSecondary(context),
       onPressed: () {
-        unawaited(Clipboard.setData(ClipboardData(text: _viewModel.currentDescription)));
+        unawaited(Clipboard.setData(
+            ClipboardData(text: _viewModel.currentDescription)));
         unawaited(
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Description copied to clipboard'),
-              duration: Duration(seconds: 2),
-            ),
-          ).closed.then((_) => null),
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
+                const SnackBar(
+                  content: Text('Description copied to clipboard'),
+                  duration: Duration(seconds: 2),
+                ),
+              )
+              .closed
+              .then((_) => null),
         );
       },
     );
@@ -479,7 +492,8 @@ class _VLMCameraViewState extends State<VLMCameraView> {
         onModelSelected: (model) async {
           await _viewModel.onModelSelected(model.id, model.name, this.context);
           // Initialize camera if authorized after model is loaded
-          if (_viewModel.isCameraAuthorized && !_viewModel.isCameraInitialized) {
+          if (_viewModel.isCameraAuthorized &&
+              !_viewModel.isCameraInitialized) {
             unawaited(_viewModel.initializeCamera());
           }
         },

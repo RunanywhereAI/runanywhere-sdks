@@ -32,7 +32,6 @@
 /// - **STT (Speech-to-Text)**: Streaming and batch transcription
 /// - **TTS (Text-to-Speech)**: Neural voice synthesis
 /// - **VAD (Voice Activity Detection)**: Real-time speech detection
-library runanywhere_onnx;
+library;
 
 export 'onnx.dart';
-export 'onnx_download_strategy.dart';

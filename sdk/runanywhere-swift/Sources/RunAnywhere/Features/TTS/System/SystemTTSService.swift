@@ -6,21 +6,22 @@
 //  Fully isolated from Swift async context to avoid AVFoundation conflicts
 //
 
-import AVFoundation
-import Foundation
+// AVSpeechSynthesizer/AVAudioSession come from AVFoundation submodules; swiftlint-analyze does not trace this.
+import AVFoundation // swiftlint:disable:this unused_import
 
 // MARK: - System TTS Service
 
-/// System TTS Service implementation using AVSpeechSynthesizer
+/// System TTS Service implementation using AVSpeechSynthesizer.
 ///
-/// This is the default TTS service that uses Apple's built-in speech synthesis.
-/// It supports all iOS/macOS system voices and provides real-time speech playback.
+/// Apple's `AVSpeechSynthesizer` synthesizes and plays directly through the
+/// system audio output; it does not expose a way to obtain raw PCM for
+/// arbitrary text. Because of that, this service intentionally only supports
+/// playback via `speak(...)` — consumers that need raw audio samples should
+/// use the ONNX Piper TTS service instead.
 ///
-/// **Note:** System TTS plays audio directly through speakers. The returned `Data`
-/// is a placeholder - use ONNX Piper TTS if you need actual audio data for custom playback.
-///
-/// **Concurrency:** This service uses `Task.detached` to completely isolate AVFoundation
-/// operations from Swift's async runtime, avoiding "unsafeForcedSync" warnings.
+/// **Concurrency:** This service uses `Task.detached` to completely isolate
+/// AVFoundation operations from Swift's async runtime, avoiding
+/// "unsafeForcedSync" warnings.
 @MainActor
 public final class SystemTTSService: NSObject {
 
@@ -30,11 +31,16 @@ public final class SystemTTSService: NSObject {
 
     // MARK: - Properties
 
-    private let synthesizer = AVSpeechSynthesizer()
+    // `AVSpeechSynthesizer` is inherently single-threaded — it maintains no
+    // mutable Swift state we touch from multiple actors, and its read-only
+    // properties (isSpeaking) are documented as thread-safe. Marking it
+    // nonisolated(unsafe) lets `nonisolated` accessors such as
+    // `isSynthesizing` read it directly without hopping to MainActor.
+    private nonisolated(unsafe) let synthesizer = AVSpeechSynthesizer()
     private let logger = SDKLogger(category: "SystemTTS")
 
     /// Completion handler for current speech operation
-    private var speechCompletion: ((Result<Data, Error>) -> Void)?
+    private var speechCompletion: ((Result<Void, Error>) -> Void)?
 
     // MARK: - Initialization
 
@@ -51,10 +57,13 @@ public final class SystemTTSService: NSObject {
         }
     }
 
-    public nonisolated func synthesize(text: String, options: TTSOptions) async throws -> Data {
+    /// Speak `text` through the system audio output and return when playback
+    /// finishes. Throws `CancellationError` if playback is cancelled via
+    /// `stop()`.
+    public nonisolated func speak(text: String, options: RATTSOptions) async throws {
         // Use Task.detached to completely break out of any async context
         // This prevents AVFoundation's internal sync operations from conflicting with Swift concurrency
-        return try await Task.detached { @MainActor [self] in
+        try await Task.detached { @MainActor [self] in
             logger.info("Speaking: '\(text.prefix(50))...'")
 
             // The audio session may still be in .record mode from the Voice Agent's
@@ -68,34 +77,19 @@ public final class SystemTTSService: NSObject {
 
             let utterance = createUtterance(text: text, options: options)
 
-            return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 // We're already on MainActor, so this is safe
                 speechCompletion = { result in
-                    switch result {
-                    case .success(let data):
-                        continuation.resume(returning: data)
-                    case .failure(let error):
-                        continuation.resume(throwing: error)
-                    }
+                    continuation.resume(with: result)
                 }
                 synthesizer.speak(utterance)
             }
         }.value
     }
 
-    public nonisolated func synthesizeStream(
-        text: String,
-        options: TTSOptions,
-        onChunk: @escaping (Data) -> Void
-    ) async throws {
-        // System TTS doesn't support streaming - synthesize and signal completion
-        _ = try await synthesize(text: text, options: options)
-        onChunk(Data())
-    }
-
     public func stop() {
         synthesizer.stopSpeaking(at: .immediate)
-        speechCompletion?(.success(Data()))
+        speechCompletion?(.success(()))
         speechCompletion = nil
     }
 
@@ -116,31 +110,34 @@ public final class SystemTTSService: NSObject {
 
     // MARK: - Private Helpers
 
-    private func createUtterance(text: String, options: TTSOptions) -> AVSpeechUtterance {
+    private func createUtterance(text: String, options: RATTSOptions) -> AVSpeechUtterance {
         let utterance = AVSpeechUtterance(string: text)
 
         // Configure voice
         utterance.voice = resolveVoice(options: options)
 
         // Configure speech parameters
-        utterance.rate = options.rate * AVSpeechUtteranceDefaultSpeechRate
-        utterance.pitchMultiplier = options.pitch
-        utterance.volume = options.volume
+        let speakingRate = options.speakingRate > 0 ? options.speakingRate : 1.0
+        utterance.rate = speakingRate * AVSpeechUtteranceDefaultSpeechRate
+        utterance.pitchMultiplier = options.pitch > 0 ? options.pitch : 1.0
+        utterance.volume = options.volume > 0 ? options.volume : 1.0
         utterance.preUtteranceDelay = 0.0
         utterance.postUtteranceDelay = 0.0
 
         return utterance
     }
 
-    private func resolveVoice(options: TTSOptions) -> AVSpeechSynthesisVoice? {
-        guard let voiceId = options.voice,
-              voiceId != "system" && voiceId != "system-tts" else {
-            return AVSpeechSynthesisVoice(language: options.language)
+    private func resolveVoice(options: RATTSOptions) -> AVSpeechSynthesisVoice? {
+        guard !options.voice.isEmpty,
+              options.voice != "system",
+              options.voice != "system-tts" else {
+            return AVSpeechSynthesisVoice(language: options.languageCode.isEmpty ? "en-US" : options.languageCode)
         }
 
+        let voiceId = options.voice
         return AVSpeechSynthesisVoice(identifier: voiceId)
             ?? AVSpeechSynthesisVoice(language: voiceId)
-            ?? AVSpeechSynthesisVoice(language: options.language)
+            ?? AVSpeechSynthesisVoice(language: options.languageCode.isEmpty ? "en-US" : options.languageCode)
     }
 }
 
@@ -154,7 +151,7 @@ extension SystemTTSService: AVSpeechSynthesizerDelegate {
     ) {
         Task { @MainActor in
             logger.info("Speech playback completed")
-            speechCompletion?(.success(Data()))
+            speechCompletion?(.success(()))
             speechCompletion = nil
         }
     }

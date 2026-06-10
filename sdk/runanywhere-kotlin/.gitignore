@@ -19,7 +19,7 @@ build/
 # JNI Libraries (should NOT be committed)
 # =============================================================================
 # Local builds: ./scripts/build-local.sh copies libs here
-src/androidMain/jniLibs/
+src/main/jniLibs/
 
 # Remote downloads: ./gradlew downloadJniLibs downloads libs here
 build/jniLibs/
@@ -28,7 +28,7 @@ build/jniLibs/
 # How JNI libs work:
 # =============================================================================
 # testLocal=true  → Build locally: ./scripts/build-local.sh
-#                   Libs go to: src/androidMain/jniLibs/
+#                   Libs go to: src/main/jniLibs/
 #
 # testLocal=false → Download from GitHub releases (default)
 #                   Libs go to: build/jniLibs/

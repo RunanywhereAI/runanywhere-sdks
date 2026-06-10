@@ -2,7 +2,24 @@
 //  CppBridge+VLM.swift
 //  RunAnywhere SDK
 //
-//  VLM component bridge - manages C++ VLM component lifecycle
+//  VLM component bridge - manages C++ VLM component lifecycle.
+//
+//  Generic scaffolding (handle creation, destroy) lives in
+//  `CppBridge.ComponentActor`. The VLM actor exists only to host a
+//  per-process handle that `process()`/`processStream()` pass to the
+//  proto ABI to satisfy the C signature — the canonical model state
+//  is owned by the C++ lifecycle (`rac_model_lifecycle_load_proto`),
+//  and `rac_vlm_process[_stream]_proto` route through the lifecycle
+//  whenever it is loaded. All VLM-specific load helpers have been
+//  removed in favour of that single source of truth.
+//
+//  VLM-specific surfaces kept here:
+//   - `cancel()` — calls `rac_vlm_cancel_lifecycle_proto`.
+//     No handle is threaded; the cancel acquires the lifecycle service
+//     internally, mirroring the LLM cancel-proto path.
+//   - `supportsStreaming` and `state` introspection on the legacy
+//     per-handle component (still exposed for parity with sibling
+//     modalities; not consulted by SDK consumers).
 //
 
 import CRACommons
@@ -19,10 +36,12 @@ extension CppBridge {
         /// Shared VLM component instance
         public static let shared = VLM()
 
-        private var handle: rac_handle_t?
-        private var loadedModelId: String?
-        private var loadedModelPath: String?
-        private var loadedMmprojPath: String?
+        /// Generic scaffold (handle / destroy). The level-3 handle is never
+        /// loaded with a model in V2 — `rac_vlm_process_proto` falls back to
+        /// the lifecycle-owned VLM service. The handle survives only to
+        /// satisfy the proto ABI's `rac_handle_t` parameter.
+        private let inner = ComponentActor(vtable: .vlm)
+
         private let logger = SDKLogger(category: "CppBridge.VLM")
 
         private init() {}
@@ -30,167 +49,53 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the VLM component handle
-        public func getHandle() throws -> rac_handle_t {
-            if let handle = handle {
-                return handle
-            }
-
-            var newHandle: rac_handle_t?
-            let result = rac_vlm_component_create(&newHandle)
-            guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKError.vlm(.notInitialized, "Failed to create VLM component: \(result)")
-            }
-
-            self.handle = handle
-            logger.debug("VLM component created")
-            return handle
+        public func getHandle() async throws -> rac_handle_t {
+            try await inner.getHandle()
         }
-
-        // MARK: - State
-
-        /// Check if a model is loaded
-        public var isLoaded: Bool {
-            guard let handle = handle else { return false }
-            return rac_vlm_component_is_loaded(handle) == RAC_TRUE
-        }
-
-        /// Get the currently loaded model ID
-        public var currentModelId: String? { loadedModelId }
-
-        /// Get the currently loaded model path
-        public var currentModelPath: String? { loadedModelPath }
-
-        /// Get the currently loaded mmproj path
-        public var currentMmprojPath: String? { loadedMmprojPath }
 
         // MARK: - Model Lifecycle
 
-        /// Load a VLM model
-        /// - Parameters:
-        ///   - modelPath: Path to the main model file (GGUF)
-        ///   - mmprojPath: Path to the vision projector file (required for llama.cpp VLM)
-        ///   - modelId: Model identifier for telemetry
-        ///   - modelName: Human-readable model name
-        public func loadModel(
-            _ modelPath: String,
-            mmprojPath: String?,
-            modelId: String,
-            modelName: String
-        ) throws {
-            let handle = try getHandle()
-
-            let result: rac_result_t
-            if let mmprojPath = mmprojPath {
-                result = modelPath.withCString { pathPtr in
-                    mmprojPath.withCString { mmprojPtr in
-                        modelId.withCString { idPtr in
-                            modelName.withCString { namePtr in
-                                rac_vlm_component_load_model(handle, pathPtr, mmprojPtr, idPtr, namePtr)
-                            }
-                        }
-                    }
-                }
-            } else {
-                result = modelPath.withCString { pathPtr in
-                    modelId.withCString { idPtr in
-                        modelName.withCString { namePtr in
-                            rac_vlm_component_load_model(handle, pathPtr, nil, idPtr, namePtr)
-                        }
-                    }
-                }
-            }
-
-            guard result == RAC_SUCCESS else {
-                throw SDKError.vlm(.modelLoadFailed, "Failed to load VLM model: \(result)")
-            }
-
-            loadedModelId = modelId
-            loadedModelPath = modelPath
-            loadedMmprojPath = mmprojPath
-            logger.info("VLM model loaded: \(modelId)")
-        }
-
-        /// Load a VLM model by ID using the C++ model registry for path resolution.
-        /// The C++ layer handles finding the main model and mmproj files automatically.
+        /// Cancel ongoing generation via the lifecycle cancel proto.
         ///
-        /// - Parameter modelId: Model identifier (must be registered in the global model registry)
-        public func loadModelById(_ modelId: String) throws {
-            let handle = try getHandle()
-
-            let result = modelId.withCString { idPtr in
-                rac_vlm_component_load_model_by_id(handle, idPtr)
+        /// Replaces the legacy handle-based `rac_vlm_component_cancel` path.
+        /// The lifecycle ABI acquires the lifecycle-owned
+        /// VLM service internally, dispatches `cancel` on its vtable, and
+        /// emits canonical `CANCELLATION_EVENT_KIND_*` SDKEvents — keeping
+        /// the cancel path consistent with LLM cancellation semantics.
+        public func cancel() async {
+            do {
+                _ = try cancelLifecycle()
+            } catch let error as SDKException {
+                // No lifecycle VLM loaded is a no-op; surface anything else
+                // at warning level (parity with LLM cancel — failures here
+                // are not fatal to the caller).
+                logger.warning("VLM cancel skipped: \(error.message)")
+            } catch {
+                logger.warning("VLM cancel skipped: \(error.localizedDescription)")
             }
-
-            guard result == RAC_SUCCESS else {
-                throw SDKError.vlm(.modelLoadFailed, "Failed to load VLM model by ID: \(modelId) (error: \(result))")
-            }
-
-            loadedModelId = modelId
-            // Clear path properties since C++ layer owns path resolution for loadModelById
-            loadedModelPath = nil
-            loadedMmprojPath = nil
-            logger.info("VLM model loaded by ID: \(modelId)")
-        }
-
-        /// Unload the current model
-        public func unload() {
-            guard let handle = handle else { return }
-            rac_vlm_component_cleanup(handle)
-            loadedModelId = nil
-            loadedModelPath = nil
-            loadedMmprojPath = nil
-            logger.info("VLM model unloaded")
-        }
-
-        /// Cancel ongoing generation
-        public func cancel() {
-            guard let handle = handle else { return }
-            _ = rac_vlm_component_cancel(handle)
         }
 
         /// Check if streaming is supported
         public var supportsStreaming: Bool {
-            guard let handle = handle else { return false }
-            return rac_vlm_component_supports_streaming(handle) == RAC_TRUE
+            get async {
+                guard let handle = await inner.existingHandle() else { return false }
+                return rac_vlm_component_supports_streaming(handle) == RAC_TRUE
+            }
         }
 
         /// Get lifecycle state
         public var state: rac_lifecycle_state_t {
-            guard let handle = handle else { return RAC_LIFECYCLE_STATE_IDLE }
-            return rac_vlm_component_get_state(handle)
+            get async {
+                guard let handle = await inner.existingHandle() else { return RAC_LIFECYCLE_STATE_IDLE }
+                return rac_vlm_component_get_state(handle)
+            }
         }
 
         // MARK: - Cleanup
 
         /// Destroy the component
-        public func destroy() {
-            if let handle = handle {
-                rac_vlm_component_destroy(handle)
-                self.handle = nil
-                loadedModelId = nil
-                loadedModelPath = nil
-                loadedMmprojPath = nil
-                logger.debug("VLM component destroyed")
-            }
+        public func destroy() async {
+            await inner.destroy()
         }
-    }
-}
-
-// MARK: - SDKError VLM Extension
-
-extension SDKError {
-
-    /// VLM-specific error codes
-    public enum VLMErrorCode: Int, Sendable {
-        case notInitialized = 1
-        case modelLoadFailed = 2
-        case processingFailed = 3
-        case invalidImage = 4
-        case cancelled = 5
-    }
-
-    /// Create a VLM error
-    public static func vlm(_ code: VLMErrorCode, _ message: String) -> SDKError {
-        return SDKError.general(.unknown, "VLM[\(code.rawValue)]: \(message)")
     }
 }

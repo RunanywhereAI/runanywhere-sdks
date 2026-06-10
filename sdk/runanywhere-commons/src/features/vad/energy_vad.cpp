@@ -14,6 +14,7 @@
 #include <cstring>
 #include <mutex>
 #include <new>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -51,6 +52,11 @@ struct rac_energy_vad {
     int32_t tts_voice_end_threshold;
 
     // === Group 2: Debug ring buffer (written every frame, separate cache line) ===
+    // Intentionally NOT rac::graph::RingBuffer: this is a single-threaded debug
+    // overwrite-log (newest energy clobbers oldest slot) mutated only under this
+    // struct's mutex on the process path, whereas rac::graph::RingBuffer is a
+    // lock-free SPSC FIFO for cross-thread audio-frame fan-out — different
+    // semantics (overwrite-log vs. wait-free producer/consumer queue).
     alignas(CACHE_LINE_SIZE) size_t ring_buffer_write_index;
     size_t ring_buffer_count;
     std::vector<float> recent_energy_values;
@@ -209,7 +215,7 @@ static void handle_calibration_frame(rac_energy_vad* vad, const float energy) {
 
         // Calculate statistics (mirrors Swift logic)
         std::vector<float> sorted_samples = vad->calibration_samples;
-        std::sort(sorted_samples.begin(), sorted_samples.end());
+        std::ranges::sort(sorted_samples);
 
         const size_t count = sorted_samples.size();
         const float percentile_90 =

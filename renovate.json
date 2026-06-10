@@ -1,0 +1,133 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Centralized JS/TS dep registry — only the `pinned` block in dependencies/versions.json is the source of truth. The outer matchString anchors on the `\"pinned\": { ... }` JSON object so doc fields ($schema, _comment, _notes) at the top level cannot produce bogus PRs. The inner matchString extracts each `\"depName\": \"version\"` pair. `npx syncpack fix-mismatches` propagates each bump to every package.json.",
+      "fileMatch": ["^dependencies/versions\\.json$"],
+      "matchStrings": [
+        "\"pinned\"\\s*:\\s*\\{(?<pinnedBlock>[\\s\\S]*?)\\}",
+        "\"(?<depName>(?:@[a-zA-Z0-9][-a-zA-Z0-9._]*\\/)?[a-zA-Z][-a-zA-Z0-9._]*)\"\\s*:\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "matchStringsStrategy": "recursive"
+    },
+    {
+      "customType": "regex",
+      "description": "Native-toolchain pins in sdk/runanywhere-commons/VERSIONS (shell KEY=VALUE) — GitHub-tag-sourced C/C++ deps. Keyed on concrete KEY names rather than the previous `# renovate:` annotation gate (no such annotations exist in the file, which made the manager match zero entries). LLAMACPP_VERSION → ggerganov/llama.cpp.",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^LLAMACPP_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "ggerganov/llama.cpp",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "USEARCH_VERSION → unum-cloud/usearch (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^USEARCH_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "unum-cloud/usearch",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "CPPHTTPLIB_VERSION → yhirose/cpp-httplib (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^CPPHTTPLIB_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "yhirose/cpp-httplib",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "ZLIB_VERSION → madler/zlib (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^ZLIB_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "madler/zlib",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "GOOGLETEST_VERSION → google/googletest (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^GOOGLETEST_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "google/googletest",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "TS_PROTO_VERSION → ts-proto (npm) — Renovate publishes PRs to bump the centralized pin, and idl-drift-check verifies generated bindings still match.",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^TS_PROTO_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "ts-proto",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "NLOHMANN_JSON_VERSION → nlohmann/json (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^NLOHMANN_JSON_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "nlohmann/json",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "PROTOBUF_VERSION → protocolbuffers/protobuf (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^PROTOBUF_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "protocolbuffers/protobuf",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "customType": "regex",
+      "description": "LIBARCHIVE_VERSION → libarchive/libarchive (GitHub tag).",
+      "fileMatch": ["^sdk/runanywhere-commons/VERSIONS$"],
+      "matchStrings": [
+        "^LIBARCHIVE_VERSION=(?<currentValue>\\S+)"
+      ],
+      "matchStringsStrategy": "any",
+      "depNameTemplate": "libarchive/libarchive",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    }
+  ]
+}

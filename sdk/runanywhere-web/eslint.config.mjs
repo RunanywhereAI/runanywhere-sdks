@@ -19,6 +19,7 @@ export default tseslint.config(
       '**/emsdk/**',
       '**/a.out.js',
       '**/*.d.ts',
+      '**/*.test-d.ts',
       '**/__tests__/**',
       // Bundler-facing JS proxy files (re-export TS sources for worker URLs).
       'packages/llamacpp/src/workers/*.js',
@@ -29,9 +30,19 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        // Use the TS-ESLint project service so each package's tsconfig.json
-        // is resolved automatically across the workspace packages.
-        projectService: true,
+        // Use per-package tsconfigs (one for sources, one for tests) so
+        // tests participate in typed-lint without invoking the typescript-
+        // eslint project service's `allowDefaultProject` slow path. The
+        // explicit project list is finite and bounded — adding a new test
+        // file under any covered package's `tests/**` requires no eslint
+        // config edit because each tsconfig.test.json `include` already
+        // covers `tests/**/*.ts`.
+        project: [
+          './packages/core/tsconfig.json',
+          './packages/core/tsconfig.test.json',
+          './packages/llamacpp/tsconfig.json',
+          './packages/onnx/tsconfig.json',
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },

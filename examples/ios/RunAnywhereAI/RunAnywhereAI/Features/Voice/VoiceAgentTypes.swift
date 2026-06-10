@@ -75,11 +75,3 @@ enum MicButtonColor {
     }
 }
 
-// MARK: - Model Type
-
-/// Enum for identifying model types in VoiceAgentViewModel
-enum ModelTypeEnum {
-    case stt
-    case llm
-    case tts
-}

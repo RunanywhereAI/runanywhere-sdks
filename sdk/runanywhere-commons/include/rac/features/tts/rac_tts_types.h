@@ -10,6 +10,17 @@
  *
  * This header defines data structures only. For the service interface,
  * see rac_tts_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_tts_config_t, rac_tts_options_t,
+ *     rac_tts_input_t, rac_tts_output_t, rac_tts_result_t,
+ *     rac_tts_speak_result_t, rac_tts_info_t, rac_tts_phoneme_timestamp_t,
+ *     rac_tts_synthesis_metadata_t, rac_tts_stream_callback_t):
+ *     `delete after SDK migration`. Replaced by serialized
+ *     runanywhere.v1.TTSOptions / TTSOutput / TTSVoiceInfo bytes via
+ *     rac_tts_component_synthesize_proto and the proto-byte chunk and
+ *     voice callbacks.
+ *   - RAC_TTS_* numeric constants are `internal` shared audio plumbing.
  */
 
 #ifndef RAC_TTS_TYPES_H

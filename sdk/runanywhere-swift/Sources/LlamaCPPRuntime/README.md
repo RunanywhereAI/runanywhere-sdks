@@ -29,7 +29,7 @@ The LlamaCPPRuntime module is included in the RunAnywhere SDK. Add it to your ta
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
 ],
 targets: [
     .target(
@@ -81,52 +81,49 @@ struct MyApp: App {
 ### Loading a Model
 
 ```swift
-// Load a GGUF model by ID
-try await RunAnywhere.loadModel("llama-3.2-1b-instruct-q4")
-
-// Check if model is loaded
-let isLoaded = await RunAnywhere.isModelLoaded
+// Load a GGUF model via the canonical proto request
+var req = RAModelLoadRequest()
+req.modelID = "llama-3.2-1b-instruct-q4"
+req.category = .language
+req.framework = .llamaCpp
+let loaded = await RunAnywhere.loadModel(req)
+print("Loaded: \(loaded.resolvedPath)")
 ```
 
 ### Text Generation
 
 ```swift
-// Simple chat
-let response = try await RunAnywhere.chat("What is the capital of France?")
-print(response)
+// Simple generation
+var req = RALLMGenerateRequest()
+req.prompt = "What is the capital of France?"
+let result = try await RunAnywhere.generate(req)
+print(result.text)
 
 // Generation with options and metrics
-let result = try await RunAnywhere.generate(
-    "Explain quantum computing in simple terms",
-    options: LLMGenerationOptions(
-        maxTokens: 200,
-        temperature: 0.7,
-        systemPrompt: "You are a helpful assistant."
-    )
-)
+var detailed = RALLMGenerateRequest()
+detailed.prompt = "Explain quantum computing in simple terms"
+detailed.options.maxTokens = 200
+detailed.options.temperature = 0.7
+detailed.options.systemPrompt = "You are a helpful assistant."
 
-print("Response: \(result.text)")
-print("Tokens used: \(result.tokensUsed)")
-print("Speed: \(result.tokensPerSecond) tok/s")
+let output = try await RunAnywhere.generate(detailed)
+print("Response: \(output.text)")
+print("Tokens used: \(output.outputTokens)")
+print("Speed: \(output.tokensPerSecond) tok/s")
 ```
 
 ### Streaming Generation
 
 ```swift
-let result = try await RunAnywhere.generateStream(
-    "Write a short poem about technology",
-    options: LLMGenerationOptions(maxTokens: 150)
-)
+var req = RALLMGenerateRequest()
+req.prompt = "Write a short poem about technology"
+req.options.maxTokens = 150
 
-// Display tokens in real-time
-for try await token in result.stream {
-    print(token, terminator: "")
+for try await event in try await RunAnywhere.generateStream(req) {
+    if event.eventKind == .token {
+        print(event.token, terminator: "")
+    }
 }
-
-// Get complete metrics after streaming finishes
-let metrics = try await result.result.value
-print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
-print("Total tokens: \(metrics.tokensUsed)")
 ```
 
 ### Structured Output
@@ -161,7 +158,10 @@ let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
 ### Unloading
 
 ```swift
-try await RunAnywhere.unloadModel()
+var unload = RAModelUnloadRequest()
+unload.modelID = "llama-3.2-1b-instruct-q4"
+unload.category = .language
+_ = await RunAnywhere.unloadModel(unload)
 ```
 
 ## API Reference
@@ -169,39 +169,28 @@ try await RunAnywhere.unloadModel()
 ### LlamaCPP Module
 
 ```swift
-public enum LlamaCPP: RunAnywhereModule {
-    /// Module identifier
-    public static let moduleId = "llamacpp"
-
-    /// Human-readable module name
-    public static let moduleName = "LlamaCPP"
-
-    /// Capabilities provided by this module
-    public static let capabilities: Set<SDKComponent> = [.llm]
-
-    /// Default registration priority
-    public static let defaultPriority: Int = 100
-
-    /// Inference framework used
-    public static let inferenceFramework: InferenceFramework = .llamaCpp
-
+public enum LlamaCPP {
     /// Module version
     public static let version = "2.0.0"
 
     /// Underlying llama.cpp library version
     public static let llamaCppVersion = "b7199"
 
-    /// Register the module with the service registry
+    /// Register the module with the C++ service registry.
+    /// The unified llama.cpp plugin publishes a single vtable that fills
+    /// both LLM and VLM slots, so this single call covers both modalities.
     @MainActor
     public static func register(priority: Int = 100)
 
     /// Unregister the module
     public static func unregister()
 
-    /// Check if the module can handle a given model
-    public static func canHandle(modelId: String?) -> Bool
+    /// Trigger registration via property access (auto-registration helper)
+    public static let autoRegister: Void
 }
 ```
+
+`LlamaCPP` is a thin `public enum` namespace. Routing between models and the LlamaCPP backend is done by the C++ plugin router (`rac_router_*`) using the proto-typed `RAInferenceFramework` / `RAModelCategory` tables — there is no Swift-side `canHandle(modelId:)` or `capabilities` set.
 
 ### Model Compatibility
 
@@ -259,7 +248,7 @@ Performance varies based on model size, quantization, context length, and device
 
 ### Model Load Fails
 
-1. Ensure the model is downloaded: check `ModelInfo.isDownloaded`
+1. Ensure the model is downloaded: check `RAModelInfo.isDownloaded`
 2. Verify the model format is GGUF
 3. Check available memory (large models require significant RAM)
 

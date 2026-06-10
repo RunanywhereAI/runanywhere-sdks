@@ -33,7 +33,7 @@ struct VLMCameraView: View {
         }
         .navigationTitle("Vision AI")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayModeCompat(.inline)
         #endif
         .toolbar { toolbarContent }
         #if os(iOS)
@@ -50,21 +50,24 @@ struct VLMCameraView: View {
         .onChange(of: selectedPhoto) { _, item in
             Task { await handlePhoto(item) }
         }
+        .task(id: viewModel.isAutoStreamingEnabled) {
+            guard viewModel.isAutoStreamingEnabled else { return }
+            await viewModel.runAutoStreamLoop()
+        }
         .onAppear { setupCameraIfNeeded() }
         .onDisappear {
-            viewModel.stopAutoStreaming()
+            viewModel.isAutoStreamingEnabled = false
             viewModel.stopCamera()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background || newPhase == .inactive {
                 shouldResumeAutoStreaming = viewModel.isAutoStreamingEnabled
-                viewModel.stopAutoStreaming()
+                viewModel.isAutoStreamingEnabled = false
                 viewModel.stopCamera()
             } else if newPhase == .active {
                 setupCameraIfNeeded()
                 if shouldResumeAutoStreaming {
                     viewModel.isAutoStreamingEnabled = true
-                    viewModel.startAutoStreaming()
                     shouldResumeAutoStreaming = false
                 }
             }
@@ -209,7 +212,7 @@ struct VLMCameraView: View {
             // Main action button - tap for single, or shows streaming state
             Button {
                 if viewModel.isAutoStreamingEnabled {
-                    viewModel.stopAutoStreaming()
+                    viewModel.isAutoStreamingEnabled = false
                 } else {
                     Task { await viewModel.describeCurrentFrame() }
                 }

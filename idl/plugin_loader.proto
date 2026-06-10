@@ -1,0 +1,31 @@
+// RunAnywhere IDL — plugin loader descriptors.
+//
+// Swift/Kotlin/RN/Web each hand-declare an identical `PluginInfo { name, path }`
+// and the plugin-list bridge calls return a JSON string the SDK parses into
+// `PluginInfo[]` / `string[]`. This is the shared wire shape for those.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "PluginLoaderProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// A loaded/registered plugin. `path` is empty for plugins the native registry
+// reports by name only (it does not persist load paths) — proto3 string
+// default "" matches the current `path: ""` placeholder.
+message PluginInfo {
+    string name = 1;
+    string path = 2;
+}
+
+// Result of the plugin-list bridge calls (registeredNames / listLoaded).
+message PluginInfoList {
+    repeated PluginInfo plugins = 1;
+}

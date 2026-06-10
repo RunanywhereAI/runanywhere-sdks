@@ -5,7 +5,6 @@
 //  Extension for configuring logging
 //
 
-import Foundation
 
 extension RunAnywhere {
 
@@ -13,7 +12,7 @@ extension RunAnywhere {
 
     /// Configure logging with a predefined configuration
     /// - Parameter config: The logging configuration to apply
-    public static func configureLogging(_ config: LoggingConfiguration) {
+    public static func configureLogging(_ config: RALoggingConfiguration) {
         Logging.shared.configure(config)
     }
 
@@ -25,7 +24,7 @@ extension RunAnywhere {
 
     /// Set minimum log level for SDK logging
     /// - Parameter level: Minimum log level to capture
-    public static func setLogLevel(_ level: LogLevel) {
+    public static func setLogLevel(_ level: RALogLevel) {
         Logging.shared.setMinLogLevel(level)
     }
 

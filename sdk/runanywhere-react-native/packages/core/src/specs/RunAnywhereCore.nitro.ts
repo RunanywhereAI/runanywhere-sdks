@@ -31,11 +31,10 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * - @runanywhere/llamacpp for text generation (LLM)
  * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
-export interface RunAnywhereCore
-  extends HybridObject<{
-    ios: 'c++';
-    android: 'c++';
-  }> {
+export interface RunAnywhereCore extends HybridObject<{
+  ios: 'c++';
+  android: 'c++';
+}> {
   // ============================================================================
   // SDK Lifecycle
   // Matches Swift: CppBridge+Init.swift
@@ -49,6 +48,23 @@ export interface RunAnywhereCore
   initialize(configJson: string): Promise<boolean>;
 
   /**
+   * Complete deferred native service initialization.
+   * Resolves to the commons `has_completed_http_setup || http_configured`
+   * flag. A `false` result means Phase 2 finished in offline/deferred mode,
+   * not that native services failed.
+   * Matches Swift: RunAnywhere.completeServicesInitialization().
+   */
+  completeServicesInitialization(): Promise<boolean>;
+
+  /**
+   * Retry HTTP/auth setup after an offline initialization via the commons
+   * `rac_sdk_retry_http_proto` idempotency guard. Returns the resulting
+   * `has_completed_http_setup || http_configured` flag.
+   * Matches Swift: CppBridge.SdkInit.retryHTTP().
+   */
+  retryHTTPSetupProto(): Promise<boolean>;
+
+  /**
    * Destroy the SDK and clean up resources
    */
   destroy(): Promise<void>;
@@ -58,22 +74,22 @@ export interface RunAnywhereCore
    */
   isInitialized(): Promise<boolean>;
 
-  /**
-   * Get backend info as JSON string
-   */
-  getBackendInfo(): Promise<string>;
+  // ============================================================================
+  // Plugin Loader
+  // Matches Swift: RunAnywhere.pluginLoader backed by rac_registry_*.
+  // ============================================================================
+
+  pluginLoaderApiVersion(): Promise<number>;
+  pluginLoaderRegisteredCount(): Promise<number>;
+  pluginLoaderRegisteredNames(): Promise<string>;
+  pluginLoaderListLoaded(): Promise<string>;
+  pluginLoaderLoad(path: string): Promise<string>;
+  pluginLoaderUnload(name: string): Promise<void>;
 
   // ============================================================================
   // Authentication
   // Matches Swift: CppBridge+Auth.swift
   // ============================================================================
-
-  /**
-   * Authenticate with API key
-   * @param apiKey API key
-   * @returns true if authenticated successfully
-   */
-  authenticate(apiKey: string): Promise<boolean>;
 
   /**
    * Check if currently authenticated
@@ -92,36 +108,15 @@ export interface RunAnywhereCore
    */
   getOrganizationId(): Promise<string>;
 
-  /**
-   * Set authentication tokens directly (after JS-side authentication)
-   * This stores the tokens in C++ AuthBridge for use by telemetry/device registration
-   * @param authResponseJson JSON string with access_token, refresh_token, expires_in, etc.
-   * @returns true if tokens were set successfully
-   */
-  setAuthTokens(authResponseJson: string): Promise<boolean>;
-
   // ============================================================================
   // Device Registration
   // Matches Swift: CppBridge+Device.swift
   // ============================================================================
 
   /**
-   * Register device with backend
-   * @param environmentJson Environment configuration JSON
-   * @returns true if registered successfully
-   */
-  registerDevice(environmentJson: string): Promise<boolean>;
-
-  /**
    * Check if device is registered
    */
   isDeviceRegistered(): Promise<boolean>;
-
-  /**
-   * Clear device registration flag (for testing)
-   * Forces re-registration on next SDK init
-   */
-  clearDeviceRegistration(): Promise<boolean>;
 
   /**
    * Get the device ID
@@ -135,89 +130,135 @@ export interface RunAnywhereCore
   // ============================================================================
 
   /**
-   * Get list of available models
-   * @returns JSON array of model info
+   * Get all registered models as serialized runanywhere.v1.ModelInfoList bytes.
    */
-  getAvailableModels(): Promise<string>;
+  getAvailableModelsProto(): Promise<ArrayBuffer>;
 
   /**
-   * Get info for a specific model
-   * @param modelId Model identifier
-   * @returns JSON with model info
+   * Get one registered model as serialized runanywhere.v1.ModelInfo bytes.
+   * Returns an empty buffer when the model does not exist.
    */
-  getModelInfo(modelId: string): Promise<string>;
+  getModelInfoProto(modelId: string): Promise<ArrayBuffer>;
 
   /**
-   * Check if a model is downloaded
-   * @param modelId Model identifier
-   * @returns true if model exists locally
+   * Register a model from serialized runanywhere.v1.ModelInfo bytes.
    */
-  isModelDownloaded(modelId: string): Promise<boolean>;
+  registerModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
 
   /**
-   * Get local path for a model
-   * @param modelId Model identifier
-   * @returns Local file path or empty if not downloaded
+   * Canonical single-call URL -> saved ModelInfo registration.
+   *
+   * Routes a serialized runanywhere.v1.RegisterModelFromUrlRequest through the
+   * commons `rac_register_model_from_url_proto` C ABI, which owns
+   * framework-aware defaulting, artifact-type-from-extension inference, and
+   * stable id-from-URL derivation, then persists through the registry's proto
+   * save path. Returns the saved runanywhere.v1.ModelInfo bytes (empty buffer
+   * when the ABI is unavailable on the staged native artifact). Mirrors Swift
+   * `RunAnywhere.registerModelFromUrl` and Kotlin
+   * `CppBridgeModelRegistry.registerModelFromUrl`.
    */
-  getModelPath(modelId: string): Promise<string>;
+  registerModelFromUrlProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Register a custom model with the registry
-   * @param modelJson JSON with model definition
-   * @returns true if registered successfully
+   * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
    */
-  registerModel(modelJson: string): Promise<boolean>;
+  updateModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;
 
   /**
-   * Check if a model is compatible with the current device
-   * Compares model RAM/storage requirements against device capabilities
-   * @param modelId Model identifier
-   * @returns JSON with isCompatible, canRun, canFit, and resource details
+   * Remove a model registry entry by ID through the proto-byte C ABI.
    */
-  checkCompatibility(modelId: string): Promise<string>;
+  removeModelProto(modelId: string): Promise<boolean>;
+
+  /**
+   * Query registered models from serialized runanywhere.v1.ModelQuery bytes.
+   * Returns serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  queryModelsProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Get downloaded registered models as serialized runanywhere.v1.ModelInfoList bytes.
+   */
+  getDownloadedModelsProto(): Promise<ArrayBuffer>;
+
+  /**
+   * Import a platform-normalized local model path into the registry.
+   * Takes serialized runanywhere.v1.ModelImportRequest bytes and returns
+   * serialized runanywhere.v1.ModelImportResult bytes.
+   */
+  importModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Refresh the model registry — unified cross-SDK surface.
+   *
+   * Routes to `rac_model_registry_refresh_proto` in commons (the flags are
+   * encoded into a ModelRegistryRefreshRequest proto by the C++ bridge). Each
+   * flag is independent and interpreted by the native registry implementation.
+   *
+   * @param includeRemoteCatalog Fetch the backend model assignment catalog.
+   * @param rescanLocal Request a local filesystem rescan in native commons.
+   * @param pruneOrphans Request orphan pruning in native commons.
+   * @returns `true` if the refresh returned `RAC_SUCCESS`.
+   */
+  refreshModelRegistry(
+    includeRemoteCatalog: boolean,
+    rescanLocal: boolean,
+    pruneOrphans: boolean
+  ): Promise<boolean>;
 
   // ============================================================================
   // Download Service
-  // Matches Swift: CppBridge+Download.swift
+  // Backed by `rac_download_*_proto` (commons) which routes through the
+  // platform HTTP transport registered by the RN core (OkHttp on Android,
+  // URLSession on iOS). Requests, results, progress, cancellation, and resume
+  // state are serialized `runanywhere.v1.*` proto bytes.
   // ============================================================================
 
   /**
-   * Download a model
-   * @param modelId Model identifier
-   * @param url Download URL
-   * @param destPath Destination path
-   * @returns true if download started successfully
+   * Plan a download from serialized runanywhere.v1.DownloadPlanRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadPlanResult bytes.
    */
-  downloadModel(
-    modelId: string,
-    url: string,
-    destPath: string
+  downloadPlanProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Start a native download from serialized runanywhere.v1.DownloadStartRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadStartResult bytes.
+   */
+  downloadStartProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Cancel a native download from serialized runanywhere.v1.DownloadCancelRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadCancelResult bytes.
+   */
+  downloadCancelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Resume a native download from serialized runanywhere.v1.DownloadResumeRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadResumeResult bytes.
+   */
+  downloadResumeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Poll native download progress from serialized runanywhere.v1.DownloadSubscribeRequest bytes.
+   * Returns serialized runanywhere.v1.DownloadProgress bytes, or an empty buffer if no task exists.
+   */
+  downloadProgressPollProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Register a process-wide native DownloadProgress proto callback.
+   */
+  setDownloadProgressCallbackProto(
+    onProgressBytes: (progressBytes: ArrayBuffer) => void
   ): Promise<boolean>;
 
   /**
-   * Cancel an ongoing download
-   * @param modelId Model identifier
-   * @returns true if cancelled
+   * Clear the process-wide native DownloadProgress proto callback.
    */
-  cancelDownload(modelId: string): Promise<boolean>;
-
-  /**
-   * Get download progress
-   * @param modelId Model identifier
-   * @returns JSON with progress info (bytes, total, percentage)
-   */
-  getDownloadProgress(modelId: string): Promise<string>;
+  clearDownloadProgressCallbackProto(): Promise<boolean>;
 
   // ============================================================================
   // Storage
   // Matches Swift: RunAnywhere+Storage.swift
   // ============================================================================
-
-  /**
-   * Get storage info (disk usage, available space)
-   * @returns JSON with storage info
-   */
-  getStorageInfo(): Promise<string>;
 
   /**
    * Clear model cache
@@ -226,11 +267,28 @@ export interface RunAnywhereCore
   clearCache(): Promise<boolean>;
 
   /**
-   * Delete a specific model
-   * @param modelId Model identifier
-   * @returns true if deleted successfully
+   * Analyze storage from serialized runanywhere.v1.StorageInfoRequest bytes.
+   * Returns serialized runanywhere.v1.StorageInfoResult bytes.
    */
-  deleteModel(modelId: string): Promise<boolean>;
+  storageInfoProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Check storage availability from serialized runanywhere.v1.StorageAvailabilityRequest bytes.
+   * Returns serialized runanywhere.v1.StorageAvailabilityResult bytes.
+   */
+  storageAvailabilityProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Build a delete plan from serialized runanywhere.v1.StorageDeletePlanRequest bytes.
+   * Returns serialized runanywhere.v1.StorageDeletePlan bytes.
+   */
+  storageDeletePlanProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Execute or dry-run delete from serialized runanywhere.v1.StorageDeleteRequest bytes.
+   * Returns serialized runanywhere.v1.StorageDeleteResult bytes.
+   */
+  storageDeleteProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Events
@@ -238,86 +296,99 @@ export interface RunAnywhereCore
   // ============================================================================
 
   /**
-   * Emit an event to the native event system
-   * @param eventJson Event JSON with type, category, data
+   * Subscribe to serialized runanywhere.v1.SDKEvent bytes.
+   * Returns a native subscription id.
    */
-  emitEvent(eventJson: string): Promise<void>;
+  subscribeSDKEventsProto(
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<number>;
 
   /**
-   * Poll for pending events from native
-   * @returns JSON array of events
+   * Unsubscribe from a native SDKEvent proto stream.
    */
-  pollEvents(): Promise<string>;
+  unsubscribeSDKEventsProto(subscriptionId: number): Promise<void>;
+
+  /**
+   * Publish serialized runanywhere.v1.SDKEvent bytes.
+   */
+  publishSDKEventProto(eventBytes: ArrayBuffer): Promise<boolean>;
+
+  /**
+   * Poll the next queued serialized runanywhere.v1.SDKEvent bytes.
+   * Returns an empty buffer when no event is queued.
+   */
+  pollSDKEventProto(): Promise<ArrayBuffer>;
+
+  /**
+   * Publish a canonical failure SDKEvent through native commons.
+   */
+  publishSDKFailureProto(
+    errorCode: number,
+    message: string,
+    component: string,
+    operation: string,
+    recoverable: boolean
+  ): Promise<boolean>;
 
   // ============================================================================
-  // HTTP Client
-  // Matches Swift: CppBridge+HTTP.swift
-  // ============================================================================
-
-  /**
-   * Configure HTTP client
-   * @param baseUrl Base URL for API
-   * @param apiKey API key for authentication
-   * @returns true if configured successfully
-   */
-  configureHttp(baseUrl: string, apiKey: string): Promise<boolean>;
-
-  /**
-   * Make HTTP POST request
-   * @param path API path
-   * @param bodyJson Request body JSON
-   * @returns Response JSON
-   */
-  httpPost(path: string, bodyJson: string): Promise<string>;
-
-  /**
-   * Make HTTP GET request
-   * @param path API path
-   * @returns Response JSON
-   */
-  httpGet(path: string): Promise<string>;
-
-  // ============================================================================
-  // Utility Functions
+  // Model Lifecycle
   // ============================================================================
 
   /**
-   * Get the last error message
+   * Load a model from serialized runanywhere.v1.ModelLoadRequest bytes.
+   * Returns serialized runanywhere.v1.ModelLoadResult bytes.
    */
-  getLastError(): Promise<string>;
+  modelLifecycleLoadProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Extract an archive (tar.bz2, tar.gz, zip)
-   * @param archivePath Path to the archive
-   * @param destPath Destination directory
+   * Unload model(s) from serialized runanywhere.v1.ModelUnloadRequest bytes.
+   * Returns serialized runanywhere.v1.ModelUnloadResult bytes.
    */
-  extractArchive(archivePath: string, destPath: string): Promise<boolean>;
+  modelLifecycleUnloadProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Get device capabilities
-   * @returns JSON string with device info
+   * Query current model from serialized runanywhere.v1.CurrentModelRequest bytes.
+   * Returns serialized runanywhere.v1.CurrentModelResult bytes.
    */
-  getDeviceCapabilities(): Promise<string>;
+  currentModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Get memory usage
-   * @returns Current memory usage in bytes
+   * Snapshot one component lifecycle state.
+   * Returns serialized runanywhere.v1.ComponentLifecycleSnapshot bytes.
    */
-  getMemoryUsage(): Promise<number>;
+  componentLifecycleSnapshotProto(component: number): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // HTTP Client (libcurl-backed — rac_http_client_*)
+  // Matches Swift: HTTPClientAdapter.swift / Kotlin: CppBridgeHTTP.kt
+  // ============================================================================
+
+  /**
+   * Perform a synchronous HTTP request via the native curl-backed client.
+   * Returns a JSON string `{"status": number, "body": string, "headersJson":
+   * string}` on any HTTP response (including 4xx/5xx). Rejects the promise
+   * only on transport-level failures (DNS / TLS / timeout / cancellation).
+   *
+   * @param method HTTP method (uppercase: GET / POST / PUT / DELETE / PATCH / HEAD)
+   * @param url Absolute URL (http:// or https://)
+   * @param headersJson Request headers serialized as `{"Name": "Value", ...}`
+   *        (empty string or `{}` for none)
+   * @param bodyJson Request body as string (ignored for GET/HEAD)
+   * @param timeoutMs Request timeout in ms (0 = no timeout)
+   */
+  httpRequest(
+    method: string,
+    url: string,
+    headersJson: string,
+    bodyJson: string,
+    timeoutMs: number
+  ): Promise<string>;
 
   // ============================================================================
   // LLM Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+LLM.swift - calls rac_llm_component_* APIs
   // Requires a backend (e.g., @runanywhere/llamacpp) to be registered
   // ============================================================================
-
-  /**
-   * Load a text generation model
-   * @param modelPath Path to the model file
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadTextModel(modelPath: string, configJson?: string): Promise<boolean>;
 
   /**
    * Check if a text model is loaded
@@ -330,62 +401,33 @@ export interface RunAnywhereCore
   unloadTextModel(): Promise<boolean>;
 
   /**
-   * Generate text from a prompt
-   * @param prompt Input prompt
-   * @param optionsJson Generation options JSON
-   * @returns Generated text result as JSON
+   * Get the native LLM-component handle as a JS number. Pass to
+   * `LLM.subscribeProtoEvents(handle, ...)` to subscribe to streaming
+   * events. Mirrors `getVoiceAgentHandle()` — exposes the underlying
+   * `rac_llm_handle_t` so streaming consumers (e.g.
+   * `RunAnywhere.generateStream`) can wire proto-byte callbacks directly.
+   *
+   * @returns handle as number (0 if LLM component not yet allocated).
    */
-  generate(prompt: string, optionsJson?: string): Promise<string>;
-
-  /**
-   * Generate text with streaming (callback-based)
-   * @param prompt Input prompt
-   * @param optionsJson Generation options JSON
-   * @param callback Token callback (token: string, isComplete: boolean) => void
-   * @returns Final result as JSON
-   */
-  generateStream(
-    prompt: string,
-    optionsJson: string,
-    callback: (token: string, isComplete: boolean) => void
-  ): Promise<string>;
+  getLLMHandle(): Promise<number>;
 
   /**
    * Cancel ongoing text generation
    */
   cancelGeneration(): Promise<boolean>;
 
-  /**
-   * Generate structured output (JSON) from a prompt
-   * @param prompt Input prompt
-   * @param schema JSON schema for output
-   * @param optionsJson Generation options JSON
-   * @returns Structured output as JSON
-   */
-  generateStructured(
-    prompt: string,
-    schema: string,
-    optionsJson?: string
-  ): Promise<string>;
+  llmGenerateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  llmGenerateStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  llmCancelProto(): Promise<ArrayBuffer>;
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)
-  // Matches Swift: CppBridge+STT.swift - calls rac_stt_component_* APIs
-  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // Matches Swift: CppBridge+STT.swift - calls lifecycle proto APIs.
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered.
   // ============================================================================
-
-  /**
-   * Load a speech-to-text model
-   * @param modelPath Path to the model file
-   * @param modelType Model type identifier
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadSTTModel(
-    modelPath: string,
-    modelType: string,
-    configJson?: string
-  ): Promise<boolean>;
 
   /**
    * Check if an STT model is loaded
@@ -397,45 +439,201 @@ export interface RunAnywhereCore
    */
   unloadSTTModel(): Promise<boolean>;
 
-  /**
-   * Transcribe audio data
-   * @param audioBase64 Base64 encoded audio data
-   * @param sampleRate Audio sample rate
-   * @param language Language code (optional)
-   * @returns Transcription result as JSON
-   */
-  transcribe(
-    audioBase64: string,
-    sampleRate: number,
-    language?: string
-  ): Promise<string>;
+  sttTranscribeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  sttTranscribeStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+
+  // ============================================================================
+  // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)
+  //
+  // THIN proto-byte / handle surface over the commons STT hybrid router
+  // (rac_stt_hybrid_router_proto.h + rac_hybrid_device_state.h +
+  // rac_hybrid_custom_filter.h). Mirrors the Kotlin RunAnywhereBridge JNI
+  // quartet and the Swift CRACommons calls: commons owns the entire routing
+  // decision (filter -> rank -> invoke -> fallback); these methods only create
+  // the router + the two registry-routed STT services, marshal the policy
+  // bytes, install the device-state + custom-filter callbacks, and drive
+  // transcribe.
+  //
+  // Handles (router + per-side service) are opaque commons pointers surfaced to
+  // JS as doubles (same packing the Solutions / VoiceAgent handles use).
+  // ============================================================================
 
   /**
-   * Transcribe an audio file
-   * @param filePath Path to the audio file
-   * @param language Language code (optional)
-   * @returns Transcription result as JSON
+   * Allocate a native STT hybrid router (`rac_stt_hybrid_router_create`).
+   * @returns router handle as a double (0 on failure).
    */
-  transcribeFile(filePath: string, language?: string): Promise<string>;
+  hybridSttRouterCreate(): Promise<number>;
+
+  /**
+   * Destroy a router handle (`rac_stt_hybrid_router_destroy`). The wrapped
+   * services are NOT destroyed — release those via
+   * `hybridSttRouterDestroyService` first. Idempotent / 0-safe.
+   */
+  hybridSttRouterDestroy(routerHandle: number): Promise<void>;
+
+  /**
+   * Create one registry-routed `rac_stt_service_t` for the offline or online
+   * side. Replicates the commons JNI `create_stt_service_via_registry` recipe:
+   * `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, engine)` ->
+   * `stt_ops->create` -> heap-wrap. The cloud provider (default "sarvam") rides
+   * in `configJson`.
+   *
+   * @param engineHint    "sherpa" | "cloud" — pinned as preferred engine.
+   * @param modelIdOrPath On-device model path for sherpa, "" for cloud.
+   * @param configJson    Cloud `{provider,api_key,model,…}` JSON, "" for sherpa.
+   * @returns service handle as a double (0 on failure).
+   */
+  hybridSttRouterCreateService(
+    engineHint: string,
+    modelIdOrPath: string,
+    configJson: string
+  ): Promise<number>;
+
+  /**
+   * Release a service handle from `hybridSttRouterCreateService` through
+   * `rac_stt_destroy`. Idempotent / 0-safe.
+   */
+  hybridSttRouterDestroyService(serviceHandle: number): Promise<void>;
+
+  /**
+   * Attach (or clear when serviceHandle == 0) the offline-side service +
+   * its serialized runanywhere.v1.HybridModelDescriptor bytes
+   * (`rac_stt_hybrid_router_set_offline_service_proto`).
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridSttRouterSetOfflineService(
+    routerHandle: number,
+    serviceHandle: number,
+    descriptorBytes: ArrayBuffer
+  ): Promise<number>;
+
+  /**
+   * Symmetric to `hybridSttRouterSetOfflineService` for the online side
+   * (`rac_stt_hybrid_router_set_online_service_proto`).
+   */
+  hybridSttRouterSetOnlineService(
+    routerHandle: number,
+    serviceHandle: number,
+    descriptorBytes: ArrayBuffer
+  ): Promise<number>;
+
+  /**
+   * Install / replace the routing policy from serialized
+   * runanywhere.v1.HybridRoutingPolicy bytes
+   * (`rac_stt_hybrid_router_set_policy_proto`).
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridSttRouterSetPolicy(
+    routerHandle: number,
+    policyBytes: ArrayBuffer
+  ): Promise<number>;
+
+  /**
+   * Dispatch one transcribe request through the router
+   * (`rac_stt_hybrid_router_transcribe_proto`). Input is serialized
+   * runanywhere.v1.HybridSttTranscribeRequest; output is serialized
+   * runanywhere.v1.HybridSttTranscribeResponse (empty buffer on native rc!=0).
+   * Commons reads the device-state snapshot + custom-filter predicates while
+   * routing.
+   */
+  hybridSttRouterTranscribe(
+    routerHandle: number,
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Best-effort cancel of an in-flight transcribe
+   * (`rac_stt_hybrid_router_cancel`). No STT engine exposes a cancel op today,
+   * so commons treats this as a no-op until one does.
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridSttRouterCancel(routerHandle: number): Promise<number>;
+
+  /**
+   * Register (or replace) a named custom-filter predicate with the cross-SDK
+   * commons callback table (`rac_hybrid_register_custom_filter`). Commons
+   * resolves it by name and invokes it once per candidate during the router's
+   * filter phase — the predicate logic stays host-side, the decision stays in
+   * commons. The native side blocks the (background) routing thread on the JS
+   * promise, mirroring the synchronous JS-executor pattern used by
+   * `toolRunLoopProto`.
+   *
+   * @param name      Wire identity (`CustomFilter.name`); non-empty, unique.
+   * @param predicate `(candidateModelId) => Promise<boolean>` — true keeps the
+   *                  candidate eligible.
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridRegisterCustomFilter(
+    name: string,
+    predicate: (candidateModelId: string) => Promise<boolean>
+  ): Promise<number>;
+
+  /**
+   * Remove a named custom-filter predicate
+   * (`rac_hybrid_unregister_custom_filter`). No-op when not registered.
+   * @returns native rac_result_t as a number (0 == RAC_SUCCESS).
+   */
+  hybridUnregisterCustomFilter(name: string): Promise<number>;
+
+  /**
+   * Push a host device-state snapshot into the commons device-state vtable
+   * (`rac_hybrid_set_device_state`) so the router's NETWORK / Battery hard
+   * filters see live values on the next transcribe.
+   *
+   * RN cannot call JS synchronously from the commons routing thread (unlike the
+   * Kotlin/Swift bindings, which install live `@convention(c)` / JNI callbacks),
+   * so the binding pushes a snapshot of cached values instead; the installed
+   * native vtable returns those cached values to commons. Call before
+   * transcribe and whenever connectivity / battery changes.
+   *
+   * @returns true on RAC_SUCCESS.
+   */
+  hybridSetDeviceState(
+    isOnline: boolean,
+    batteryPercent: number,
+    thermalThrottled: boolean
+  ): Promise<boolean>;
+
+  /**
+   * Detach the host device-state vtable and restore the commons optimistic
+   * default (always-online, 100% battery, not-throttled) via
+   * `rac_hybrid_set_device_state(NULL)`.
+   * @returns true on RAC_SUCCESS.
+   */
+  hybridClearDeviceState(): Promise<boolean>;
+
+  /**
+   * Register the generic "cloud" engine plugin with the commons registry
+   * (`rac_backend_cloud_register`) so the hybrid router can route the
+   * online side (hint "cloud"). Mirrors `ONNX.register()` /
+   * `LlamaCPP.register()` and the Kotlin `CloudBridge.nativeRegister`.
+   * Tolerant of already-registered. The concrete HTTP provider is data carried
+   * per-service in the create config, not a distinct plugin.
+   * @returns true on RAC_SUCCESS (or already-registered).
+   */
+  cloudRegister(): Promise<boolean>;
+
+  /**
+   * Unregister the "cloud" engine plugin
+   * (`rac_backend_cloud_unregister`).
+   * @returns true on RAC_SUCCESS.
+   */
+  cloudUnregister(): Promise<boolean>;
+
+  /**
+   * Whether the "cloud" plugin is currently registered for TRANSCRIBE
+   * (`rac_backend_cloud_is_registered`).
+   */
+  cloudIsRegistered(): Promise<boolean>;
 
   // ============================================================================
   // TTS Capability (Backend-Agnostic)
-  // Matches Swift: CppBridge+TTS.swift - calls rac_tts_component_* APIs
-  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // Matches Swift: CppBridge+TTS.swift - calls lifecycle proto APIs.
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered.
   // ============================================================================
-
-  /**
-   * Load a text-to-speech model/voice
-   * @param modelPath Path to the model file
-   * @param modelType Model type identifier
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadTTSModel(
-    modelPath: string,
-    modelType: string,
-    configJson?: string
-  ): Promise<boolean>;
 
   /**
    * Check if a TTS model is loaded
@@ -447,45 +645,19 @@ export interface RunAnywhereCore
    */
   unloadTTSModel(): Promise<boolean>;
 
-  /**
-   * Synthesize speech from text
-   * @param text Text to synthesize
-   * @param voiceId Voice ID to use
-   * @param speedRate Speech speed rate (1.0 = normal)
-   * @param pitchShift Pitch shift (-1.0 to 1.0)
-   * @returns Synthesized audio as base64 encoded JSON
-   */
-  synthesize(
-    text: string,
-    voiceId: string,
-    speedRate: number,
-    pitchShift: number
-  ): Promise<string>;
-
-  /**
-   * Get available TTS voices
-   * @returns JSON array of voice info
-   */
-  getTTSVoices(): Promise<string>;
-
-  /**
-   * Cancel ongoing TTS synthesis
-   */
-  cancelTTS(): Promise<boolean>;
+  ttsListVoicesProto(): Promise<ArrayBuffer>;
+  ttsSynthesizeProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ttsSynthesizeStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  ttsStopProto(): Promise<ArrayBuffer>;
 
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
-  // Matches Swift: CppBridge+VAD.swift - calls rac_vad_component_* APIs
-  // Requires a backend (e.g., @runanywhere/onnx) to be registered
+  // Matches Swift: CppBridge+VAD.swift - calls lifecycle proto APIs.
+  // Requires a backend (e.g., @runanywhere/onnx) to be registered.
   // ============================================================================
-
-  /**
-   * Load a voice activity detection model
-   * @param modelPath Path to the model file
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadVADModel(modelPath: string, configJson?: string): Promise<boolean>;
 
   /**
    * Check if a VAD model is loaded
@@ -498,70 +670,46 @@ export interface RunAnywhereCore
   unloadVADModel(): Promise<boolean>;
 
   /**
-   * Process audio for voice activity detection
-   * @param audioBase64 Base64 encoded audio data
-   * @param optionsJson VAD options JSON
-   * @returns VAD result as JSON
-   */
-  processVAD(audioBase64: string, optionsJson?: string): Promise<string>;
-
-  /**
    * Reset VAD state
    */
   resetVAD(): Promise<void>;
 
+  vadConfigureProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  vadProcessProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  vadGetStatisticsProto(): Promise<ArrayBuffer>;
+  vadSetActivityCallbackProto(
+    onActivityBytes: (activityBytes: ArrayBuffer) => void
+  ): Promise<boolean>;
+
   // ============================================================================
-  // Secure Storage
-  // Matches Swift: KeychainManager.swift
-  // Uses platform secure storage (Keychain on iOS, Keystore on Android)
+  // VLM Capability (Backend-Agnostic)
+  // Uses commons VLM service lifecycle plus rac_vlm_*_proto request/result ABI.
+  // Backend packages register providers only; core owns public VLM calls.
   // ============================================================================
 
   /**
-   * Store a string value securely
-   * @param key Storage key (e.g., "com.runanywhere.sdk.apiKey")
-   * @param value String value to store
-   * @returns true if stored successfully
+   * Process one image from serialized runanywhere.v1.VLMGenerationRequest
+   * bytes. Returns serialized runanywhere.v1.VLMResult bytes.
    */
-  secureStorageSet(key: string, value: string): Promise<boolean>;
+  vlmProcessProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Retrieve a string value from secure storage
-   * @param key Storage key
-   * @returns Stored value or null if not found
+   * Stream VLMStreamEvent proto bytes from serialized
+   * runanywhere.v1.VLMGenerationRequest bytes.
    */
-  secureStorageGet(key: string): Promise<string | null>;
+  vlmProcessStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
 
   /**
-   * Delete a value from secure storage
-   * @param key Storage key
-   * @returns true if deleted successfully
+   * Cancel ongoing VLM generation through commons cancellation ABI.
    */
-  secureStorageDelete(key: string): Promise<boolean>;
+  vlmCancelProto(): Promise<ArrayBuffer>;
 
   /**
-   * Check if a key exists in secure storage
-   * @param key Storage key
-   * @returns true if key exists
-   */
-  secureStorageExists(key: string): Promise<boolean>;
-
-  /**
-   * Store a string value securely (semantic alias for secureStorageSet)
-   * @param key Storage key
-   * @param value String value to store
-   */
-  secureStorageStore(key: string, value: string): Promise<void>;
-
-  /**
-   * Retrieve a string value from secure storage (semantic alias for secureStorageGet)
-   * @param key Storage key
-   * @returns Stored value or null if not found
-   */
-  secureStorageRetrieve(key: string): Promise<string | null>;
-
-  /**
-   * Get persistent device UUID
-   * This UUID survives app reinstalls (stored in Keychain/Keystore)
+   * Get persistent device UUID.
+   * Survives app reinstalls (stored in Keychain/Keystore).
    * Matches Swift: DeviceIdentity.persistentUUID
    * @returns Persistent device UUID
    */
@@ -591,17 +739,20 @@ export interface RunAnywhereCore
   // ============================================================================
 
   /**
-   * Initialize voice agent with configuration
-   * @param configJson Configuration JSON
-   * @returns true if initialized successfully
-   */
-  initializeVoiceAgent(configJson: string): Promise<boolean>;
-
-  /**
    * Initialize voice agent using already loaded models
    * @returns true if initialized successfully
    */
   initializeVoiceAgentWithLoadedModels(): Promise<boolean>;
+
+  /**
+   * Get the native voice-agent handle as a JS number. Pass to
+   * `VoiceAgent.subscribeProtoEvents(handle, ...)` to subscribe to
+   * streaming events. Exposes the underlying
+   * `rac_voice_agent_handle_t` so the adapter pattern works.
+   *
+   * @returns handle as number (0 if voice agent not yet initialized).
+   */
+  getVoiceAgentHandle(): Promise<number>;
 
   /**
    * Check if voice agent is ready
@@ -609,158 +760,282 @@ export interface RunAnywhereCore
   isVoiceAgentReady(): Promise<boolean>;
 
   /**
-   * Get voice agent component states
-   * @returns JSON with component states
+   * Transcribe audio using the voice-agent STT component via the commons
+   * `rac_voice_agent_transcribe_proto` ABI. Input is a serialized
+   * `runanywhere.v1.VoiceAgentTranscribeProtoRequest`; the output is a
+   * serialized `runanywhere.v1.STTOutput`.
    */
-  getVoiceAgentComponentStates(): Promise<string>;
+  voiceAgentTranscribeProto(
+    audioBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
 
   /**
-   * Process a voice turn (STT -> LLM -> TTS)
-   * @param audioBase64 Base64 encoded audio input
-   * @returns Voice agent result as JSON
+   * Synthesize speech using the voice-agent TTS component via the commons
+   * `rac_voice_agent_synthesize_speech_proto` ABI. Input is a UTF-8 text
+   * string; the output is a serialized `runanywhere.v1.TTSOutput`.
    */
-  processVoiceTurn(audioBase64: string): Promise<string>;
-
-  /**
-   * Transcribe audio using voice agent
-   * @param audioBase64 Base64 encoded audio data
-   * @returns Transcription text
-   */
-  voiceAgentTranscribe(audioBase64: string): Promise<string>;
-
-  /**
-   * Generate response using voice agent
-   * @param prompt Text prompt
-   * @returns Generated response text
-   */
-  voiceAgentGenerateResponse(prompt: string): Promise<string>;
-
-  /**
-   * Synthesize speech using voice agent
-   * @param text Text to synthesize
-   * @returns Synthesized audio as base64
-   */
-  voiceAgentSynthesizeSpeech(text: string): Promise<string>;
+  voiceAgentSynthesizeSpeechProto(text: string): Promise<ArrayBuffer>;
 
   /**
    * Cleanup voice agent resources
    */
   cleanupVoiceAgent(): Promise<void>;
 
+  voiceAgentInitializeProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  voiceAgentComponentStatesProto(): Promise<ArrayBuffer>;
+  voiceAgentProcessTurnProto(audioBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
   // ============================================================================
   // Tool Calling Capability
   //
   // ARCHITECTURE:
-  // - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
-  //   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+  // - C++ commons C ABI: Parses <tool_call> tags from
+  //   LLM output and formats prompts. This is the SINGLE SOURCE OF TRUTH for
+  //   portable parsing and prompt text semantics.
   //
   // - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
-  //   storage, prompt formatting, and orchestration. Executors MUST stay in
+  //   storage and orchestration. Executors MUST stay in
   //   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
   //
-  // C++ (ToolCallingBridge) implements: parseToolCallFromOutput, formatToolsPrompt,
-  // buildInitialPrompt, buildFollowupPrompt. TypeScript handles: tool registry,
-  // executor storage (needs JS APIs like fetch), orchestration.
+  // C++ implements: toolParseProto, toolFormatPromptProto, and
+  // toolValidateProto. TypeScript handles: tool registry, executor storage
+  // (needs JS APIs like fetch), orchestration.
   // ============================================================================
 
   /**
-   * Parse LLM output for tool call (IMPLEMENTED in C++ ToolCallingBridge)
+   * Parse LLM output for tool calls from serialized runanywhere.v1.ToolParseRequest bytes.
    *
-   * This is the single source of truth for parsing <tool_call> tags from LLM output.
-   * Ensures consistent parsing behavior across all platforms.
+   * Returns serialized runanywhere.v1.ToolParseResult bytes. JS owns generated
+   * proto-ts encode/decode only; parsing semantics stay in native C++ commons.
    *
-   * @param llmOutput Raw LLM output text that may contain <tool_call> tags
-   * @returns JSON with {hasToolCall, cleanText, toolName, argumentsJson, callId}
-   *          TypeScript layer converts this to {text, toolCall} format
+   * @param requestBytes Serialized ToolParseRequest bytes
+   * @returns Serialized ToolParseResult bytes
    */
-  parseToolCallFromOutput(llmOutput: string): Promise<string>;
+  toolParseProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Format tool definitions for LLM prompt (IMPLEMENTED in C++ ToolCallingBridge)
+   * Format tool prompts from serialized runanywhere.v1.ToolPromptFormatRequest bytes.
    *
-   * Creates a system prompt describing available tools with format-specific instructions.
-   * Uses C++ single source of truth for consistent formatting across all platforms.
+   * Returns serialized runanywhere.v1.ToolPromptFormatResult bytes. JS owns
+   * generated proto-ts encode/decode only; prompt semantics stay in native
+   * C++ commons. Host tool execution remains in JS/app code.
    *
-   * @param toolsJson JSON array of tool definitions
-   * @param format Tool calling format: 'default' or 'lfm2'
-   * @returns Formatted prompt string with tool instructions
+   * @param requestBytes Serialized ToolPromptFormatRequest bytes
+   * @returns Serialized ToolPromptFormatResult bytes
    */
-  formatToolsForPrompt(toolsJson: string, format: string): Promise<string>;
+  toolFormatPromptProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Build initial prompt with tools (IMPLEMENTED in C++ ToolCallingBridge)
+   * Validate a tool call from serialized
+   * runanywhere.v1.ToolCallValidationRequest bytes.
    *
-   * Combines user prompt with tool definitions and system instructions.
-   *
-   * @param userPrompt The user's question/request
-   * @param toolsJson JSON array of tool definitions
-   * @param optionsJson JSON with options (maxToolCalls, temperature, etc.)
-   * @returns Complete formatted prompt ready for LLM
+   * Returns serialized runanywhere.v1.ToolCallValidationResult bytes.
    */
-  buildInitialPrompt(userPrompt: string, toolsJson: string, optionsJson: string): Promise<string>;
+  toolValidateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Build follow-up prompt after tool execution (IMPLEMENTED in C++ ToolCallingBridge)
+   * Run the complete native tool-calling loop from serialized
+   * runanywhere.v1.ToolCallingSessionCreateRequest bytes.
    *
-   * Creates continuation prompt with tool result for next LLM generation.
+   * The callback receives serialized runanywhere.v1.ToolCall bytes and must
+   * return serialized runanywhere.v1.ToolResult bytes. C++ owns prompt
+   * formatting, generation, parsing, validation, follow-up prompts, and loop
+   * termination; React Native owns only the JS executor registry.
    *
-   * @param originalPrompt The original user prompt
-   * @param toolsPrompt Tool definitions (if keepToolsAvailable) or empty
-   * @param toolName Name of the executed tool
-   * @param resultJson JSON result from tool execution
-   * @param keepToolsAvailable Whether to include tools in follow-up
-   * @returns Follow-up prompt string
+   * Implemented by HybridRunAnywhereCore+Tools.cpp with
+   * rac_tool_calling_run_loop_proto. The native bridge waits on the Nitro
+   * promise returned by the JS executor callback so commons can keep the
+   * canonical synchronous run-loop ABI.
    */
-  buildFollowupPrompt(
-    originalPrompt: string,
-    toolsPrompt: string,
-    toolName: string,
-    resultJson: string,
-    keepToolsAvailable: boolean
-  ): Promise<string>;
+  toolRunLoopProto(
+    requestBytes: ArrayBuffer,
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Cancellation-aware variant of toolRunLoopProto.
+   *
+   * Backed by `rac_tool_calling_run_loop_with_handle_proto`. Commons publishes
+   * an opaque `run_loop_handle` synchronously, before the iteration loop
+   * begins; the bridge surfaces it to JS via `onHandle(handle)` so a fan-out
+   * `AbortSignal.abort()` can call `toolRunLoopCancelProto(handle)` to
+   * interrupt the in-flight loop from another thread.
+   *
+   * The handle is owned by commons and reclaimed when this Promise resolves;
+   * callers MUST NOT use it past resolution. A handle of `0` indicates the
+   * with-handle ABI is unavailable on this commons build.
+   *
+   * Mirrors Swift `generateWithToolsCancellable` in
+   * `RunAnywhere+ToolCalling.swift`.
+   */
+  toolRunLoopProtoWithHandle(
+    requestBytes: ArrayBuffer,
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+    onHandle: (runLoopHandle: number) => void
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Cancel an in-flight tool-calling run loop started via
+   * `toolRunLoopProtoWithHandle`.
+   *
+   * Backed by `rac_tool_calling_run_loop_cancel_proto`. Idempotent: safe to
+   * call after the loop has already returned (the handle will be stale and
+   * commons treats this as a no-op).
+   */
+  toolRunLoopCancelProto(runLoopHandle: number): Promise<boolean>;
+
+  /**
+   * Parse/extract structured output from serialized
+   * runanywhere.v1.StructuredOutputParseRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.StructuredOutputResult bytes.
+   */
+  structuredOutputParseProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Prepare a structured-output prompt from serialized
+   * runanywhere.v1.StructuredOutputRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.StructuredOutputPromptResult bytes.
+   */
+  structuredOutputPreparePromptProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Validate structured output from serialized
+   * runanywhere.v1.StructuredOutputValidationRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.StructuredOutputValidation bytes.
+   */
+  structuredOutputValidateProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  structuredOutputGenerateProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  structuredOutputGenerateStreamProto(
+    requestBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<void>;
+  structuredOutputSchemaToJsonProto(
+    schemaBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
 
   // ===========================================================================
   // RAG Pipeline (Retrieval-Augmented Generation)
   // ===========================================================================
 
+  ragCreatePipelineProto(configBytes: ArrayBuffer): Promise<boolean>;
+  ragDestroyPipelineProto(): Promise<boolean>;
+  ragIngestProto(documentBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  ragClearProto(): Promise<ArrayBuffer>;
+  ragStatsProto(): Promise<ArrayBuffer>;
+
+  embeddingsCreateProto(modelId: string, configJson?: string): Promise<number>;
+  embeddingsEmbedBatchProto(
+    handle: number,
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+  embeddingsDestroyProto(handle: number): Promise<void>;
+
+  loraApplyProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraRemoveProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraListProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraStateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraCompatibilityProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
   /**
-   * Create a RAG pipeline with the given configuration.
-   * @param configJson JSON with: embeddingModelPath, llmModelPath, embeddingDimension, topK, similarityThreshold, maxContextTokens, chunkSize, chunkOverlap, promptTemplate
+   * Register a LoRA catalog entry from serialized
+   * runanywhere.v1.LoraAdapterCatalogEntry bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogEntry bytes on
+   * success. Catalog metadata/state semantics are owned by commons; native
+   * platform layers still own byte downloads and file permission handling.
    */
-  ragCreatePipeline(configJson: string): Promise<boolean>;
-
-  /** Destroy the RAG pipeline and release resources. */
-  ragDestroyPipeline(): Promise<boolean>;
-
-  /**
-   * Add a document to the RAG pipeline for chunking, embedding, and indexing.
-   * @param text Document text
-   * @param metadataJson Optional JSON metadata
-   */
-  ragAddDocument(text: string, metadataJson: string): Promise<boolean>;
-
-  /**
-   * Add multiple documents in batch.
-   * @param documentsJson JSON array of {text, metadataJson} objects
-   */
-  ragAddDocumentsBatch(documentsJson: string): Promise<boolean>;
-
-  /**
-   * Query the RAG pipeline.
-   * @param queryJson JSON with: question, systemPrompt, maxTokens, temperature, topP, topK
-   * @returns JSON with: answer, retrievedChunks[], contextUsed, retrievalTimeMs, generationTimeMs, totalTimeMs
-   */
-  ragQuery(queryJson: string): Promise<string>;
-
-  /** Clear all documents from the pipeline. */
-  ragClearDocuments(): Promise<boolean>;
-
-  /** Get the number of indexed document chunks. */
-  ragGetDocumentCount(): Promise<number>;
+  loraRegisterCatalogEntryProto(entryBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Get pipeline statistics.
-   * @returns JSON with stats
+   * List LoRA catalog entries from serialized
+   * runanywhere.v1.LoraAdapterCatalogListRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogListResult bytes.
    */
-  ragGetStatistics(): Promise<string>;
+  loraCatalogListProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Query LoRA catalog entries from serialized
+   * runanywhere.v1.LoraAdapterCatalogQuery bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogListResult bytes.
+   */
+  loraCatalogQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Fetch one LoRA catalog entry from serialized
+   * runanywhere.v1.LoraAdapterCatalogGetRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogGetResult bytes.
+   */
+  loraCatalogGetProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Persist platform-reported LoRA artifact completion state from serialized
+   * runanywhere.v1.LoraAdapterDownloadCompletedRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterDownloadCompletedResult bytes.
+   */
+  loraCatalogMarkDownloadCompletedProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  // ===========================================================================
+  // Solutions Runtime (rac/solutions/rac_solution.h)
+  //
+  // Proto-byte / YAML driven L5 solution runtime. Callers pass a serialized
+  // `runanywhere.v1.SolutionConfig` (or PipelineSpec) protobuf or a YAML
+  // document and receive an opaque handle that maps to the same
+  // `rac_solution_handle_t` used by every other SDK.
+  //
+  // The handle is exposed to JS as a `double` — we pack the C pointer
+  // into a 64-bit double (same trick the VoiceAgent / LLM capabilities
+  // use for their native handles). Lifecycle verbs (start/stop/cancel/
+  // feed/closeInput/destroy) take that handle back.
+  // ===========================================================================
+
+  /**
+   * Construct a solution from a serialized `runanywhere.v1.SolutionConfig`
+   * (or PipelineSpec) protobuf. The handle is returned in the **created**
+   * state — call `solutionStart(handle)` to launch worker threads.
+   *
+   * @param configBytes Serialized SolutionConfig / PipelineSpec proto bytes.
+   * @returns Native solution handle as a double (0 on failure).
+   */
+  solutionCreateFromProto(configBytes: ArrayBuffer): Promise<number>;
+
+  /**
+   * Construct a solution from a YAML document (SolutionConfig-shape or
+   * PipelineSpec-shape — loader auto-disambiguates on `operators:`).
+   *
+   * @returns Native solution handle as a double (0 on failure).
+   */
+  solutionCreateFromYaml(yamlText: string): Promise<number>;
+
+  /** Start the underlying scheduler (non-blocking). */
+  solutionStart(handle: number): Promise<boolean>;
+
+  /** Request a graceful shutdown (non-blocking). */
+  solutionStop(handle: number): Promise<boolean>;
+
+  /** Force-cancel the graph; returns once workers observe cancellation. */
+  solutionCancel(handle: number): Promise<boolean>;
+
+  /** Feed one UTF-8 item into the root input edge. */
+  solutionFeed(handle: number, item: string): Promise<boolean>;
+
+  /** Signal end-of-stream on the root input edge. */
+  solutionCloseInput(handle: number): Promise<boolean>;
+
+  /** Cancel, join, and release native resources. Idempotent. */
+  solutionDestroy(handle: number): Promise<void>;
 }

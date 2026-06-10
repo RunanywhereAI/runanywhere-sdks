@@ -162,6 +162,119 @@ RAC_API rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* mode
                                                     char* out_path, size_t path_size);
 
 // =============================================================================
+// MODEL ARTIFACT RESOLUTION
+// =============================================================================
+
+/**
+ * @brief Role assigned to a resolved on-disk model file.
+ */
+typedef enum rac_resolved_model_file_role {
+    RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN = 0,
+    RAC_RESOLVED_MODEL_FILE_ROLE_PRIMARY = 1,
+    RAC_RESOLVED_MODEL_FILE_ROLE_COMPANION = 2,
+    RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR = 3,
+    RAC_RESOLVED_MODEL_FILE_ROLE_MMPROJ = RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR,
+    RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER = 4,
+    RAC_RESOLVED_MODEL_FILE_ROLE_CONFIG = 5,
+    RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY = 6,
+    RAC_RESOLVED_MODEL_FILE_ROLE_MERGES = 7,
+    RAC_RESOLVED_MODEL_FILE_ROLE_LABELS = 8
+} rac_resolved_model_file_role_t;
+
+/**
+ * @brief One resolved file inside a model artifact.
+ *
+ * Strings are owned by the containing rac_model_path_resolution_t and released
+ * by rac_model_path_resolution_free().
+ */
+typedef struct rac_resolved_model_file {
+    char* relative_path;
+    char* path;
+    rac_resolved_model_file_role_t role;
+    rac_bool_t is_required;
+    rac_bool_t exists;
+} rac_resolved_model_file_t;
+
+/**
+ * @brief Centralized model artifact resolution result.
+ *
+ * This is the C++ source of truth for archive/multi-file/single-file model
+ * selection. SDKs should pass stable roots/files and consume these resolved
+ * paths instead of inferring filenames or companion files locally.
+ */
+typedef struct rac_model_path_resolution {
+    char* root_path;
+    char* primary_model_path;
+    char* mmproj_path;
+    char* tokenizer_path;
+    char* config_path;
+
+    rac_resolved_model_file_t* files;
+    size_t file_count;
+
+    char** missing_required_files;
+    size_t missing_required_file_count;
+
+    rac_bool_t is_directory_based;
+    rac_bool_t is_complete;
+    rac_bool_t checksum_validated;
+    rac_bool_t checksum_matched;
+} rac_model_path_resolution_t;
+
+/**
+ * @brief Resolve final model paths and companion files from a file or directory.
+ *
+ * @param model_info Model metadata including framework/format/artifact metadata
+ * @param artifact_root File or directory to inspect after download/extraction
+ * @param expected_primary_sha256 Optional lowercase/uppercase SHA-256 for the
+ *        selected primary file. NULL or empty skips checksum validation.
+ * @param out_resolution Output resolution. Must be freed with
+ *        rac_model_path_resolution_free().
+ * @return RAC_SUCCESS when all required files are present and checksum matches;
+ *         RAC_ERROR_MODEL_VALIDATION_FAILED for missing required files or
+ *         checksum mismatch; RAC_ERROR_NOT_FOUND when no primary model can be
+ *         selected.
+ */
+RAC_API rac_result_t rac_model_paths_resolve_artifact(const rac_model_info_t* model_info,
+                                                      const char* artifact_root,
+                                                      const char* expected_primary_sha256,
+                                                      rac_model_path_resolution_t* out_resolution);
+
+/**
+ * @brief Release memory owned by a model path resolution result.
+ */
+RAC_API void rac_model_path_resolution_free(rac_model_path_resolution_t* resolution);
+
+/**
+ * @brief Infer the canonical descriptor role for a single sidecar filename.
+ *
+ * Source-of-truth port of Swift's
+ * `RAModelFileRole+Inference.swift::inferModelFileRole(filename:modality:)`.
+ * Every platform SDK delegates here so the mmproj / tokenizer / vocab / merges
+ * / config classification used when composing multi-file model descriptors
+ * stays byte-identical across SDKs (no per-SDK hand-rolled heuristic to drift).
+ *
+ * The vision-projector (`mmproj`) branch only matches when @p modality_proto
+ * is the multimodal category; every other modality skips it.
+ *
+ * @param filename Sidecar filename. Matching is case-insensitive and any
+ *        directory components are ignored.
+ * @param modality_proto The model's category as a `runanywhere.v1.ModelCategory`
+ *        proto value (i.e. the generated `ModelCategory` raw value each SDK
+ *        already holds). Unrecognized values are treated as a non-multimodal
+ *        category.
+ * @param out_role_proto Output: the matching role as a
+ *        `runanywhere.v1.ModelFileRole` proto value (identical to the
+ *        `rac_model_file_role_t` ordinal). Set to
+ *        `MODEL_FILE_ROLE_PRIMARY_MODEL` when the filename matches none of the
+ *        documented sidecar conventions.
+ * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER if @p filename or
+ *         @p out_role_proto is NULL.
+ */
+RAC_API rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_proto,
+                                               int32_t* out_role_proto);
+
+// =============================================================================
 // OTHER DIRECTORIES - Mirrors ModelPathUtils other directory methods
 // =============================================================================
 

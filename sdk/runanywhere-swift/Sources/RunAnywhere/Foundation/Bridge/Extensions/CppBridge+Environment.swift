@@ -19,9 +19,10 @@ extension CppBridge {
         /// Convert Swift environment to C++ type
         public static func toC(_ env: SDKEnvironment) -> rac_environment_t {
             switch env {
-            case .development: return RAC_ENV_DEVELOPMENT
-            case .staging: return RAC_ENV_STAGING
-            case .production: return RAC_ENV_PRODUCTION
+            case .development:   return RAC_ENV_DEVELOPMENT
+            case .staging:       return RAC_ENV_STAGING
+            case .production:    return RAC_ENV_PRODUCTION
+            default:             return RAC_ENV_DEVELOPMENT
             }
         }
 
@@ -90,30 +91,69 @@ extension CppBridge {
             return String(cString: ptr)
         }
 
+        /// True when the development Supabase config is present and not a template placeholder.
+        public static var hasUsableSupabaseConfig: Bool {
+            guard let urlString = supabaseURL,
+                  let apiKey = supabaseKey,
+                  isUsableHTTPURL(urlString),
+                  isUsableCredential(apiKey) else {
+                return false
+            }
+            return true
+        }
+
+        /// True when development device registration has all required values.
+        public static var hasUsableDevelopmentRegistrationConfig: Bool {
+            hasUsableSupabaseConfig && hasUsableBuildToken
+        }
+
         /// Get build token for development mode
         public static var buildToken: String? {
             guard rac_dev_config_has_build_token() else { return nil }
             guard let ptr = rac_dev_config_get_build_token() else { return nil }
-            return String(cString: ptr)
+            let token = String(cString: ptr)
+            return isUsableCredential(token) ? token : nil
         }
 
-        /// Get Sentry DSN for crash reporting (optional)
-        public static var sentryDSN: String? {
-            guard let ptr = rac_dev_config_get_sentry_dsn() else { return nil }
-            return String(cString: ptr)
+        /// True when the development build token is present and not a placeholder.
+        public static var hasUsableBuildToken: Bool {
+            buildToken != nil
         }
 
         /// Configure CppBridge.HTTP for development mode using C++ config
         /// - Returns: true if configured successfully, false if config not available
         @discardableResult
         public static func configureHTTP() async -> Bool {
-            guard let urlString = supabaseURL,
-                  let url = URL(string: urlString),
-                  let apiKey = supabaseKey else {
+            guard hasUsableSupabaseConfig,
+                  let rawURLString = supabaseURL,
+                  let rawAPIKey = supabaseKey else {
+                return false
+            }
+
+            let urlString = rawURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+            let apiKey = rawAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard let url = URL(string: urlString) else {
                 return false
             }
             await CppBridge.HTTP.shared.configure(baseURL: url, apiKey: apiKey)
             return true
+        }
+
+        /// Whether a baked-in credential is usable: non-empty and not a
+        /// scaffolding placeholder. Delegates to the canonical commons rule
+        /// (`rac_dev_config_is_usable_credential`) so every SDK agrees instead
+        /// of each re-implementing the placeholder regex.
+        static func isUsableCredential(_ value: String?) -> Bool {
+            guard let value else { return false }
+            return value.withCString { rac_dev_config_is_usable_credential($0) }
+        }
+
+        /// Whether a string is a usable absolute http(s) URL. Delegates to the
+        /// canonical commons rule (`rac_dev_config_is_usable_http_url`).
+        static func isUsableHTTPURL(_ value: String?) -> Bool {
+            guard let value else { return false }
+            return value.withCString { rac_dev_config_is_usable_http_url($0) }
         }
     }
 }

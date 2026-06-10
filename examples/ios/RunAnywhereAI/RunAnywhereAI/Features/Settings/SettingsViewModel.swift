@@ -36,7 +36,7 @@ class SettingsViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [StoredModel] = []
+    @Published var storedModels: [RAStoredModel] = []
 
     // UI State
     @Published var showApiKeyEntry: Bool = false
@@ -101,36 +101,33 @@ class SettingsViewModel: ObservableObject {
     }
 
     private func subscribeToModelNotifications() {
-        // Subscribe to SDK events directly so any LLM model load
-        // (from chat, voice agent, or RAG) updates the thinking mode flag.
-        RunAnywhere.events.events
+        // The SDK's typed lifecycle stream covers every LLM load source
+        // (chat, voice agent, RAG) with one subscription.
+        RunAnywhere.events.modelLifecycle
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
+            .sink { [weak self] change in
                 Task { @MainActor in
-                    self?.handleSDKEvent(event)
+                    self?.handleModelLifecycle(change)
                 }
             }
             .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        guard event.category == .llm else { return }
+    private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        guard change.component == .llm || change.event.category == .llm else { return }
 
-        switch event.type {
-        case "llm_model_load_completed":
-            let modelId = event.properties["model_id"] ?? ""
-            if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+        switch change.kind {
+        case .loaded:
+            if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == change.modelID }) {
                 loadedModelSupportsThinking = model.supportsThinking
-                logger.info("LLM loaded (\(modelId)), supportsThinking: \(model.supportsThinking)")
+                logger.info("LLM loaded (\(change.modelID)), supportsThinking: \(model.supportsThinking)")
             } else {
                 loadedModelSupportsThinking = false
-                logger.warning("LLM loaded (\(modelId)), but it was not found in the registry")
+                logger.warning("LLM loaded (\(change.modelID)), but it was not found in the registry")
             }
-        case "llm_model_unloaded":
+        case .unloaded:
             loadedModelSupportsThinking = false
             logger.info("LLM unloaded, thinking mode disabled")
-        default:
-            break
         }
     }
 
@@ -385,22 +382,23 @@ class SettingsViewModel: ObservableObject {
 
     // MARK: - Storage Management
 
+    // Storage state and SDK storage calls live in StorageViewModel.shared
+    // (single owner); the Settings section just projects its state.
+
     /// Load storage information
     func loadStorageData() async {
         isLoadingStorage = true
         errorMessage = nil
 
-        do {
-            let storageInfo = await RunAnywhere.getStorageInfo()
-
-            totalStorageSize = storageInfo.appStorage.totalSize
-            availableSpace = storageInfo.deviceStorage.freeSpace
-            modelStorageSize = storageInfo.totalModelsSize
-            storedModels = storageInfo.storedModels
-
-            print("Settings: Loaded storage data - Total: \(totalStorageSize), Available: \(availableSpace)")
-        } catch {
-            errorMessage = "Failed to load storage data: \(error.localizedDescription)"
+        let storage = StorageViewModel.shared
+        await storage.loadData()
+        if let storageError = storage.errorMessage {
+            errorMessage = storageError
+        } else {
+            totalStorageSize = storage.totalStorageSize
+            availableSpace = storage.availableSpace
+            modelStorageSize = storage.modelStorageSize
+            storedModels = storage.storedModels
         }
 
         isLoadingStorage = false
@@ -413,40 +411,20 @@ class SettingsViewModel: ObservableObject {
 
     /// Clear cache
     func clearCache() async {
-        do {
-            try await RunAnywhere.clearCache()
-            await refreshStorageData()
-            print("Settings: Cache cleared successfully")
-        } catch {
-            errorMessage = "Failed to clear cache: \(error.localizedDescription)"
-        }
+        await StorageViewModel.shared.clearCache()
+        await loadStorageData()
     }
 
     /// Clean temporary files
     func cleanTempFiles() async {
-        do {
-            try await RunAnywhere.cleanTempFiles()
-            await refreshStorageData()
-            print("Settings: Temporary files cleaned successfully")
-        } catch {
-            errorMessage = "Failed to clean temporary files: \(error.localizedDescription)"
-        }
+        await StorageViewModel.shared.cleanTempFiles()
+        await loadStorageData()
     }
 
     /// Delete a stored model
-    func deleteModel(_ model: StoredModel) async {
-        guard let framework = model.framework else {
-            errorMessage = "Cannot delete model: unknown framework"
-            return
-        }
-
-        do {
-            try await RunAnywhere.deleteStoredModel(model.id, framework: framework)
-            await refreshStorageData()
-            print("Settings: Model \(model.name) deleted successfully")
-        } catch {
-            errorMessage = "Failed to delete model: \(error.localizedDescription)"
-        }
+    func deleteModel(_ model: RAStoredModel) async {
+        await StorageViewModel.shared.deleteModel(model)
+        await loadStorageData()
     }
 
     // MARK: - Helper Methods

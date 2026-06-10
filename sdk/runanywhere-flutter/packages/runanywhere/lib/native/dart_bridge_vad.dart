@@ -1,31 +1,28 @@
 /// DartBridge+VAD
 ///
-/// VAD component bridge - manages C++ VAD component lifecycle.
-/// Mirrors Swift's CppBridge+VAD.swift pattern.
-library dart_bridge_vad;
+/// VAD component bridge - the public VAD capability routes through
+/// commons model lifecycle, so this bridge only exposes the
+/// lifecycle-owned generated-proto one-shot processing entry point
+/// plus a minimal handle accessor used by state-query getters.
+library;
 
-import 'dart:async';
 import 'dart:ffi';
-import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// VAD component bridge for C++ interop.
 ///
-/// Provides thread-safe access to the C++ VAD component.
-/// Handles voice activity detection with configurable thresholds.
-///
-/// Usage:
-/// ```dart
-/// final vad = DartBridgeVAD.shared;
-/// vad.initialize();
-/// vad.start();
-/// final isSpeech = vad.process(audioSamples);
-/// ```
+/// The live entry point is [processLifecycleProto]; the remaining
+/// getters expose handle state for diagnostics. All other VAD
+/// lifecycle (configure / start / stop / reset / statistics) is owned
+/// by commons model lifecycle and surfaced through `RunAnywhereVAD`.
 class DartBridgeVAD {
   // MARK: - Singleton
 
@@ -38,12 +35,14 @@ class DartBridgeVAD {
 
   RacHandle? _handle;
   final _logger = SDKLogger('DartBridge.VAD');
+  static vad_pb.VADResult Function(vad_pb.VADProcessRequest)?
+      _processLifecycleProtoForTesting;
 
-  /// Stream controller for speech activity events
-  final _activityController = StreamController<VADActivityEvent>.broadcast();
-
-  /// Stream of speech activity events
-  Stream<VADActivityEvent> get activityStream => _activityController.stream;
+  static void setProcessLifecycleProtoForTesting(
+    vad_pb.VADResult Function(vad_pb.VADProcessRequest)? override,
+  ) {
+    _processLifecycleProtoForTesting = override;
+  }
 
   // MARK: - Handle Management
 
@@ -123,209 +122,124 @@ class DartBridgeVAD {
     }
   }
 
-  // MARK: - Lifecycle
-
-  /// Initialize VAD.
-  ///
-  /// Throws on failure.
-  Future<void> initialize() async {
-    final handle = getHandle();
-
-    try {
-      final result = NativeFunctions.vadInitialize(handle);
-
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to initialize VAD: ${RacResultCode.getMessage(result)}',
-        );
-      }
-
-      _logger.info('VAD initialized');
-    } catch (e) {
-      _logger.error('Failed to initialize VAD: $e');
-      rethrow;
-    }
-  }
-
-  /// Start VAD processing.
-  void start() {
-    if (_handle == null) return;
-
-    try {
-      final result = NativeFunctions.vadStart(_handle!);
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to start VAD: ${RacResultCode.getMessage(result)}',
-        );
-      }
-
-      _logger.debug('VAD started');
-    } catch (e) {
-      _logger.error('Failed to start VAD: $e');
-    }
-  }
-
-  /// Stop VAD processing.
-  void stop() {
-    if (_handle == null) return;
-
-    try {
-      NativeFunctions.vadStop(_handle!);
-      _logger.debug('VAD stopped');
-    } catch (e) {
-      _logger.error('Failed to stop VAD: $e');
-    }
-  }
-
-  /// Reset VAD state.
-  void reset() {
-    if (_handle == null) return;
-
-    try {
-      NativeFunctions.vadReset(_handle!);
-      _logger.debug('VAD reset');
-    } catch (e) {
-      _logger.error('Failed to reset VAD: $e');
-    }
-  }
-
-  /// Cleanup VAD.
-  void cleanup() {
-    if (_handle == null) return;
-
-    try {
-      NativeFunctions.vadCleanup(_handle!);
-      _logger.info('VAD cleaned up');
-    } catch (e) {
-      _logger.error('Failed to cleanup VAD: $e');
-    }
-  }
-
   // MARK: - Processing
 
-  /// Process audio samples for voice activity.
-  ///
-  /// [samples] - Float32 audio samples.
-  ///
-  /// Returns VAD result with speech/non-speech determination.
-  VADResult process(Float32List samples) {
-    final handle = getHandle();
+  /// Process one VAD frame through the lifecycle-owned generated-proto ABI.
+  vad_pb.VADResult processLifecycleProto(vad_pb.VADProcessRequest request) {
+    _validateLifecycleRequest(request);
 
-    if (!isInitialized) {
-      throw StateError('VAD not initialized. Call initialize() first.');
+    final override = _processLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
     }
 
-    // Allocate native memory for samples
-    final samplesPtr = calloc<Float>(samples.length);
-    final resultPtr = calloc<RacVadResultStruct>();
-
-    try {
-      // Copy samples to native memory
-      for (var i = 0; i < samples.length; i++) {
-        samplesPtr[i] = samples[i];
-      }
-
-      final status = NativeFunctions.vadProcess(
-        handle,
-        samplesPtr,
-        samples.length,
-        resultPtr,
+    final fn = RacNative.bindings.rac_vad_process_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_vad_process_lifecycle_proto is unavailable',
       );
+    }
 
-      if (status != RAC_SUCCESS) {
-        throw StateError(
-          'VAD processing failed: ${RacResultCode.getMessage(status)}',
+    return DartBridgeProtoUtils.callRequest<vad_pb.VADResult>(
+      request: request,
+      invoke: fn,
+      decode: vad_pb.VADResult.fromBuffer,
+      symbol: 'rac_vad_process_lifecycle_proto',
+    );
+  }
+
+  /// Configure the lifecycle-loaded VAD with a VADConfiguration proto.
+  vad_pb.VADServiceState configureLifecycleProto(
+    vad_pb.VADConfiguration config,
+  ) {
+    final fn = RacNative.bindings.rac_vad_configure_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_vad_configure_lifecycle_proto is unavailable',
+      );
+    }
+    return DartBridgeProtoUtils.callRequest<vad_pb.VADServiceState>(
+      request: config,
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_configure_lifecycle_proto',
+    );
+  }
+
+  /// Start the lifecycle-loaded VAD. Returns post-start service state.
+  vad_pb.VADServiceState startLifecycleProto() {
+    final fn = RacNative.bindings.rac_vad_start_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vad_start_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<vad_pb.VADServiceState>(
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_start_lifecycle_proto',
+    );
+  }
+
+  /// Stop the lifecycle-loaded VAD. Returns post-stop service state.
+  vad_pb.VADServiceState stopLifecycleProto() {
+    final fn = RacNative.bindings.rac_vad_stop_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vad_stop_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<vad_pb.VADServiceState>(
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_stop_lifecycle_proto',
+    );
+  }
+
+  /// Reset internal state on the lifecycle-loaded VAD.
+  vad_pb.VADServiceState resetLifecycleProto() {
+    final fn = RacNative.bindings.rac_vad_reset_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vad_reset_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<vad_pb.VADServiceState>(
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_reset_lifecycle_proto',
+    );
+  }
+
+  void _validateLifecycleRequest(vad_pb.VADProcessRequest request) {
+    if (!request.hasAudio()) {
+      throw ArgumentError(
+        'VADProcessRequest.audio is required for lifecycle VAD',
+      );
+    }
+    switch (request.audio.whichSource()) {
+      case vad_pb.VADAudioSource_Source.audioData:
+        if (request.audio.audioData.isEmpty) {
+          throw ArgumentError('VADProcessRequest.audio.audio_data is required');
+        }
+        return;
+      case vad_pb.VADAudioSource_Source.adapterHandle:
+        throw UnsupportedError(
+          'VAD audio adapter_handle requires a platform adapter',
         );
-      }
-
-      final result = resultPtr.ref;
-      final vadResult = VADResult(
-        isSpeech: result.isSpeech == RAC_TRUE,
-        energy: result.energy,
-        speechProbability: result.speechProbability,
-      );
-
-      // Emit activity event
-      if (vadResult.isSpeech) {
-        _activityController.add(VADActivityEvent.speechStarted(
-          energy: vadResult.energy,
-          probability: vadResult.speechProbability,
-        ));
-      } else {
-        _activityController.add(VADActivityEvent.speechEnded(
-          energy: vadResult.energy,
-        ));
-      }
-
-      return vadResult;
-    } finally {
-      calloc.free(samplesPtr);
-      calloc.free(resultPtr);
+      case vad_pb.VADAudioSource_Source.notSet:
+        throw ArgumentError('VADProcessRequest.audio.audio_data is required');
     }
   }
 
   // MARK: - Cleanup
 
-  /// Destroy the component and release resources.
+  /// Destroy the VAD component handle and release commons-side resources.
+  /// Mirrors Swift `CppBridge+VAD.destroy()` semantics so
+  /// `DartBridge.shutdown()` releases the same per-modality C++ state Swift
+  /// does (see `sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift:184`).
   void destroy() {
-    if (_handle != null) {
-      try {
-        NativeFunctions.vadDestroy(_handle!);
-        _handle = null;
-        _logger.debug('VAD component destroyed');
-      } catch (e) {
-        _logger.error('Failed to destroy VAD component: $e');
-      }
+    if (_handle == null) return;
+    try {
+      NativeFunctions.vadDestroy(_handle!);
+      _handle = null;
+      _logger.debug('VAD component destroyed');
+    } catch (e) {
+      _logger.error('Failed to destroy VAD component: $e');
     }
   }
-
-  /// Dispose resources.
-  void dispose() {
-    destroy();
-    unawaited(_activityController.close());
-  }
-}
-
-/// Result from VAD processing.
-class VADResult {
-  final bool isSpeech;
-  final double energy;
-  final double speechProbability;
-
-  const VADResult({
-    required this.isSpeech,
-    required this.energy,
-    required this.speechProbability,
-  });
-}
-
-/// VAD activity event.
-sealed class VADActivityEvent {
-  const VADActivityEvent();
-
-  factory VADActivityEvent.speechStarted({
-    required double energy,
-    required double probability,
-  }) = VADSpeechStartedEvent;
-
-  factory VADActivityEvent.speechEnded({required double energy}) =
-      VADSpeechEndedEvent;
-}
-
-/// Speech started event.
-class VADSpeechStartedEvent extends VADActivityEvent {
-  final double energy;
-  final double probability;
-
-  const VADSpeechStartedEvent({
-    required this.energy,
-    required this.probability,
-  });
-}
-
-/// Speech ended event.
-class VADSpeechEndedEvent extends VADActivityEvent {
-  final double energy;
-
-  const VADSpeechEndedEvent({required this.energy});
 }

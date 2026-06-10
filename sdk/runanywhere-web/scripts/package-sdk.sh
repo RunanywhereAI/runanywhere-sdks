@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 WEB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-source "${REPO_ROOT}/scripts/detect-mode.sh"
+source "${REPO_ROOT}/scripts/setup/detect-mode.sh"
 
 NATIVES_FROM=""
 
@@ -65,16 +65,16 @@ npm install
 echo ">> npm run build:ts"
 npm run build:ts
 
-echo ">> npm run typecheck"
-npm run typecheck
+# Packaging emits the npm tarballs only. Typecheck is pr-build.yml's gate —
+# running it here is redundant and not part of producing the artifact.
 
 DIST_DIR="${WEB_ROOT}/dist/sdk-web"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-for pkg in core llamacpp onnx; do
-    echo ">> npm pack packages/$pkg"
-    (cd "packages/$pkg" && npm pack --pack-destination "$DIST_DIR" >/dev/null)
+for pkg in ../shared/proto-ts packages/core packages/llamacpp packages/onnx; do
+    echo ">> npm pack $pkg"
+    (cd "$pkg" && npm pack --pack-destination "$DIST_DIR" >/dev/null)
 done
 
 echo ""
@@ -89,7 +89,7 @@ for f in "$DIST_DIR"/*.tgz; do
     echo "  $(basename "$f")"
 done
 
-if [ -x "${REPO_ROOT}/scripts/validate-artifact.sh" ]; then
+if [ -x "${REPO_ROOT}/scripts/release/validate-artifact.sh" ]; then
     echo ""
-    "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.tgz 2>/dev/null || true
+    "${REPO_ROOT}/scripts/release/validate-artifact.sh" "$DIST_DIR"/*.tgz
 fi

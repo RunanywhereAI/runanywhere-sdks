@@ -1,0 +1,977 @@
+// RunAnywhere IDL — model / framework / audio / environment / artifact types.
+//
+// Every enum below is the *union* of cases currently declared by hand across
+// Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL drift table
+// is what motivated
+// this schema. Every SDK consumes generated output; nothing is hand-written.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "hardware_profile.proto";
+import "rac_options.proto";
+import "thinking_tag_pattern.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "ModelTypesProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Audio format — union of all cases currently defined across SDKs.
+// Sources pre-IDL:
+//   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
+//   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
+//   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
+//   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
+//   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
+// ---------------------------------------------------------------------------
+enum AudioFormat {
+    AUDIO_FORMAT_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    AUDIO_FORMAT_PCM         = 1  [(runanywhere.v1.rac_wire_string) = "pcm"];
+    AUDIO_FORMAT_WAV         = 2  [(runanywhere.v1.rac_wire_string) = "wav"];
+    AUDIO_FORMAT_MP3         = 3  [(runanywhere.v1.rac_wire_string) = "mp3"];
+    AUDIO_FORMAT_OPUS        = 4  [(runanywhere.v1.rac_wire_string) = "opus"];
+    AUDIO_FORMAT_AAC         = 5  [(runanywhere.v1.rac_wire_string) = "aac"];
+    AUDIO_FORMAT_FLAC        = 6  [(runanywhere.v1.rac_wire_string) = "flac"];
+    AUDIO_FORMAT_OGG         = 7  [(runanywhere.v1.rac_wire_string) = "ogg"];
+    AUDIO_FORMAT_M4A         = 8  [(runanywhere.v1.rac_wire_string) = "m4a"];        // iOS / Dart, container of AAC
+    AUDIO_FORMAT_PCM_S16LE   = 9  [(runanywhere.v1.rac_wire_string) = "pcm_s16le"];   // Android "pcm_16bit" — signed 16-bit LE PCM
+}
+
+// ---------------------------------------------------------------------------
+// Model file format — union across all SDKs.
+// Sources pre-IDL:
+//   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
+//   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
+//   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
+//   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
+//                                       SafeTensors, Zip, Folder, Proprietary)
+//   Web    enums.ts:56                (copy of RN)
+// ---------------------------------------------------------------------------
+enum ModelFormat {
+    MODEL_FORMAT_UNSPECIFIED = 0;
+    MODEL_FORMAT_GGUF        = 1;
+    MODEL_FORMAT_GGML        = 2;
+    MODEL_FORMAT_ONNX        = 3;
+    MODEL_FORMAT_ORT         = 4;
+    MODEL_FORMAT_BIN         = 5;
+    MODEL_FORMAT_COREML      = 6;   // Apple platforms only
+    MODEL_FORMAT_MLMODEL     = 7;   // Apple platforms only
+    MODEL_FORMAT_MLPACKAGE   = 8;   // Apple platforms only
+    MODEL_FORMAT_TFLITE      = 9;
+    MODEL_FORMAT_SAFETENSORS = 10;
+    MODEL_FORMAT_QNN_CONTEXT = 11;  // Qualcomm Genie
+    MODEL_FORMAT_ZIP         = 12;  // Archive wrapping one of the above
+    MODEL_FORMAT_FOLDER      = 13;
+    MODEL_FORMAT_PROPRIETARY = 14;  // Built-in system models
+    MODEL_FORMAT_UNKNOWN     = 15;
+}
+
+// ---------------------------------------------------------------------------
+// Inference framework / runtime. Same name used across all SDKs (RN names it
+// LLMFramework; we canonicalize on InferenceFramework).
+// Sources pre-IDL:
+//   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML,
+//                                       metalrt)
+//   Kotlin ComponentTypes.kt:122      (9 cases incl. GENIE; no coreml / mlx / whisperKit /
+//                                       metalrt)
+//   Dart   model_types.dart:106       (9 cases, matches Kotlin)
+//   RN     enums.ts:30 (LLMFramework) (16 cases)
+//   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
+// ---------------------------------------------------------------------------
+enum InferenceFramework {
+    INFERENCE_FRAMEWORK_UNSPECIFIED        = 0;
+    INFERENCE_FRAMEWORK_ONNX               = 1;
+    INFERENCE_FRAMEWORK_LLAMA_CPP          = 2;
+    INFERENCE_FRAMEWORK_FOUNDATION_MODELS  = 3;   // Apple on-device LLM
+    INFERENCE_FRAMEWORK_SYSTEM_TTS         = 4;
+    INFERENCE_FRAMEWORK_FLUID_AUDIO        = 5;
+    INFERENCE_FRAMEWORK_COREML             = 6;   // Apple
+    INFERENCE_FRAMEWORK_MLX                = 7;   // Apple Silicon
+    INFERENCE_FRAMEWORK_METALRT            = 9;   // Apple
+    INFERENCE_FRAMEWORK_GENIE              = 10;  // Qualcomm
+    INFERENCE_FRAMEWORK_TFLITE             = 11;
+    INFERENCE_FRAMEWORK_EXECUTORCH         = 12;
+    INFERENCE_FRAMEWORK_MEDIAPIPE          = 13;
+    INFERENCE_FRAMEWORK_MLC                = 14;
+    INFERENCE_FRAMEWORK_PICO_LLM           = 15;
+    INFERENCE_FRAMEWORK_PIPER_TTS          = 16;
+    INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS = 19;
+    INFERENCE_FRAMEWORK_BUILT_IN           = 20;  // rule-based, no model
+    INFERENCE_FRAMEWORK_NONE               = 21;
+    INFERENCE_FRAMEWORK_UNKNOWN            = 22;
+    INFERENCE_FRAMEWORK_SHERPA             = 23;  // Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword)
+
+    reserved 8, 17, 18;
+    reserved "INFERENCE_FRAMEWORK_WHISPERKIT_COREML", "INFERENCE_FRAMEWORK_WHISPERKIT", "INFERENCE_FRAMEWORK_OPENAI_WHISPER";
+}
+
+// ---------------------------------------------------------------------------
+// Model category / modality class. Sources pre-IDL:
+//   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
+//   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
+//   Dart  model_types.dart:55         (8 cases, no VAD)
+//   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
+//   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
+// ---------------------------------------------------------------------------
+enum ModelCategory {
+    MODEL_CATEGORY_UNSPECIFIED              = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    MODEL_CATEGORY_LANGUAGE                 = 1  [(runanywhere.v1.rac_wire_string) = "language"];
+    MODEL_CATEGORY_SPEECH_RECOGNITION       = 2  [(runanywhere.v1.rac_wire_string) = "speech-recognition"];
+    MODEL_CATEGORY_SPEECH_SYNTHESIS         = 3  [(runanywhere.v1.rac_wire_string) = "speech-synthesis"];
+    MODEL_CATEGORY_VISION                   = 4  [(runanywhere.v1.rac_wire_string) = "vision"];
+    MODEL_CATEGORY_IMAGE_GENERATION         = 5  [(runanywhere.v1.rac_wire_string) = "image-generation"];
+    MODEL_CATEGORY_MULTIMODAL               = 6  [(runanywhere.v1.rac_wire_string) = "multimodal"];
+    MODEL_CATEGORY_AUDIO                    = 7  [(runanywhere.v1.rac_wire_string) = "audio"];
+    MODEL_CATEGORY_EMBEDDING                = 8  [(runanywhere.v1.rac_wire_string) = "embedding"];
+    MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9  [(runanywhere.v1.rac_wire_string) = "voice-activity-detection"];  // present in Swift only pre-IDL
+}
+
+// ---------------------------------------------------------------------------
+// SDK environment. Sources pre-IDL:
+//   Swift  SDKEnvironment.swift:5     (development, staging, production)
+//   Kotlin RunAnywhere.kt:47          (DEVELOPMENT, STAGING, PRODUCTION, cEnvironment)
+//   Kotlin SDKLogger.kt:159           (DEVELOPMENT, STAGING, PRODUCTION) ← duplicate
+//   Dart   sdk_environment.dart:5     (development, staging, production)
+//   RN     enums.ts:11                (Development, Staging, Production)
+//   Web    enums.ts:9                 (Development, Staging, Production)
+// ---------------------------------------------------------------------------
+enum SDKEnvironment {
+    SDK_ENVIRONMENT_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    SDK_ENVIRONMENT_DEVELOPMENT = 1  [(runanywhere.v1.rac_wire_string) = "development"];
+    SDK_ENVIRONMENT_STAGING     = 2  [(runanywhere.v1.rac_wire_string) = "staging"];
+    SDK_ENVIRONMENT_PRODUCTION  = 3  [(runanywhere.v1.rac_wire_string) = "production"];
+}
+
+// ---------------------------------------------------------------------------
+// Model source — where the catalog entry came from.
+// ---------------------------------------------------------------------------
+enum ModelSource {
+    MODEL_SOURCE_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    MODEL_SOURCE_REMOTE      = 1  [(runanywhere.v1.rac_wire_string) = "remote"];     // Downloaded from a URL
+    MODEL_SOURCE_LOCAL       = 2  [(runanywhere.v1.rac_wire_string) = "local"];      // Bundled or user-imported
+    MODEL_SOURCE_BUILT_IN    = 3  [(runanywhere.v1.rac_wire_string) = "built-in"];   // Platform/system model with no portable download artifact
+}
+
+// ---------------------------------------------------------------------------
+// Archive types for multi-file model packages. Sources pre-IDL:
+//   Swift  ModelTypes.swift:195       (zip, tarBz2, tarGz, tarXz)
+//   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
+//   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
+// ---------------------------------------------------------------------------
+enum ArchiveType {
+    ARCHIVE_TYPE_UNSPECIFIED = 0;
+    ARCHIVE_TYPE_ZIP         = 1;
+    ARCHIVE_TYPE_TAR_BZ2     = 2;
+    ARCHIVE_TYPE_TAR_GZ      = 3;
+    ARCHIVE_TYPE_TAR_XZ      = 4;
+}
+
+enum ArchiveStructure {
+    ARCHIVE_STRUCTURE_UNSPECIFIED        = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED = 1  [(runanywhere.v1.rac_wire_string) = "singleFileNested"];
+    ARCHIVE_STRUCTURE_DIRECTORY_BASED    = 2  [(runanywhere.v1.rac_wire_string) = "directoryBased"];
+    ARCHIVE_STRUCTURE_NESTED_DIRECTORY   = 3  [(runanywhere.v1.rac_wire_string) = "nestedDirectory"];
+    ARCHIVE_STRUCTURE_UNKNOWN            = 4  [(runanywhere.v1.rac_wire_string) = "unknown"];
+}
+
+// ---------------------------------------------------------------------------
+// High-level artifact classification — what KIND of bundle a model ships as.
+// Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
+// compression flavor). Sources pre-IDL:
+//   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
+//   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
+//   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
+// ---------------------------------------------------------------------------
+enum ModelArtifactType {
+    MODEL_ARTIFACT_TYPE_UNSPECIFIED   = 0;
+    MODEL_ARTIFACT_TYPE_SINGLE_FILE   = 1;
+    MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE = 2;
+    MODEL_ARTIFACT_TYPE_DIRECTORY     = 3;
+    MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE   = 4;
+    MODEL_ARTIFACT_TYPE_CUSTOM        = 5;
+    MODEL_ARTIFACT_TYPE_ARCHIVE       = 6;
+    MODEL_ARTIFACT_TYPE_MULTI_FILE    = 7;
+    MODEL_ARTIFACT_TYPE_BUILT_IN      = 8;
+    MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE = 9;
+    MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE  = 10;
+}
+
+// ---------------------------------------------------------------------------
+// Model registry lifecycle state. This is durable/catalog state, not a live
+// transfer progress stream. Per-download byte counters and transient progress
+// events stay in download_service.proto.
+// Sources pre-IDL:
+//   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
+//   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
+// ---------------------------------------------------------------------------
+enum ModelRegistryStatus {
+    MODEL_REGISTRY_STATUS_UNSPECIFIED = 0;
+    MODEL_REGISTRY_STATUS_REGISTERED  = 1;
+    MODEL_REGISTRY_STATUS_DOWNLOADING = 2;
+    MODEL_REGISTRY_STATUS_DOWNLOADED  = 3;
+    MODEL_REGISTRY_STATUS_LOADING     = 4;
+    MODEL_REGISTRY_STATUS_LOADED      = 5;
+    MODEL_REGISTRY_STATUS_ERROR       = 6;
+}
+
+enum ModelQuerySortField {
+    MODEL_QUERY_SORT_FIELD_UNSPECIFIED         = 0;
+    MODEL_QUERY_SORT_FIELD_NAME                = 1;
+    MODEL_QUERY_SORT_FIELD_CREATED_AT_UNIX_MS  = 2;
+    MODEL_QUERY_SORT_FIELD_UPDATED_AT_UNIX_MS  = 3;
+    MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES = 4;
+    MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS = 5;
+    MODEL_QUERY_SORT_FIELD_USAGE_COUNT         = 6;
+}
+
+enum ModelQuerySortOrder {
+    MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0;
+    MODEL_QUERY_SORT_ORDER_ASCENDING   = 1;
+    MODEL_QUERY_SORT_ORDER_DESCENDING  = 2;
+}
+
+// Role of a file inside a single/multi-file artifact. The generic COMPANION
+// role covers arbitrary sidecars; specific roles document common public
+// catalog files such as VLM mmproj files and tokenizer/config assets.
+enum ModelFileRole {
+    MODEL_FILE_ROLE_UNSPECIFIED      = 0;
+    MODEL_FILE_ROLE_PRIMARY_MODEL    = 1;
+    MODEL_FILE_ROLE_COMPANION        = 2;
+    MODEL_FILE_ROLE_VISION_PROJECTOR = 3;  // llama.cpp VLM mmproj*.gguf
+    MODEL_FILE_ROLE_TOKENIZER        = 4;  // tokenizer model/data files
+    MODEL_FILE_ROLE_CONFIG           = 5;  // config.json or framework config
+    MODEL_FILE_ROLE_VOCABULARY       = 6;  // vocab.txt / vocab.json
+    MODEL_FILE_ROLE_MERGES           = 7;  // merges.txt
+    MODEL_FILE_ROLE_LABELS           = 8;
+}
+
+// ---------------------------------------------------------------------------
+// AccelerationPreference enum moved to hardware_profile.proto.
+// Hardware preference is a pure hardware concern; consolidating it
+// there avoids cyclic proto imports and collapses the prior duplicate
+// AcceleratorPreference (ANE/GPU/CPU/AUTO) with the richer AccelerationPreference
+// (AUTO/CPU/GPU/NPU/WEBGPU/METAL/VULKAN) into a single enum. Messages in this
+// file reference it via the existing `import "hardware_profile.proto";`.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
+//   Web    enums.ts (RoutingPolicy)
+//          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
+//          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
+//   Swift  extensions (RoutingPolicy)
+// Canonical short-form below; specific PreferLocal/PreferCloud cover the
+// "preferred" cases, MANUAL covers explicit user override.
+// ---------------------------------------------------------------------------
+enum RoutingPolicy {
+    ROUTING_POLICY_UNSPECIFIED       = 0;
+    ROUTING_POLICY_PREFER_LOCAL      = 1;
+    ROUTING_POLICY_PREFER_CLOUD      = 2;
+    ROUTING_POLICY_COST_OPTIMIZED    = 3;
+    ROUTING_POLICY_LATENCY_OPTIMIZED = 4;
+    ROUTING_POLICY_MANUAL            = 5;
+}
+
+// Model-level thinking tag metadata uses the canonical ThinkingTagPattern from
+// thinking_tag_pattern.proto. Previously this file declared
+// a separate ModelThinkingTagPattern because llm_options.proto owned a distinct
+// ThinkingTagPattern with different field names; that duplicate has been
+// collapsed into the single shared message.
+
+message ModelInfoMetadata {
+    string          description = 1;
+    string          author      = 2;
+    string          license     = 3;
+    repeated string tags        = 4;
+    string          version     = 5;
+}
+
+message ModelRuntimeCompatibility {
+    repeated InferenceFramework compatible_frameworks = 1;
+    repeated ModelFormat        compatible_formats    = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Core metadata for a model entry.
+// Sources pre-IDL:
+//   Swift  ModelTypes.swift:393       (16 fields)
+//   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
+//   Dart   model_types.dart:335       (similar shape, nullable divergences)
+//   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
+// ---------------------------------------------------------------------------
+message ModelInfo {
+    string             id                  = 1;
+    string             name                = 2;
+    ModelCategory      category            = 3;
+    ModelFormat        format              = 4;
+    InferenceFramework framework           = 5;
+
+    // Portable URL/URI string for catalog metadata and download planning.
+    // SDK/platform adapters own native HTTP execution, authentication/session
+    // state, browser fetch handles, URLSession/background-transfer objects,
+    // and permission prompts.
+    string             download_url        = 6;
+
+    // Stable path or URI string after platform adapters have normalized native
+    // file handles. Do not place Android SAF/content URI permissions, iOS
+    // security-scoped bookmarks, browser FileSystemHandle objects, or other
+    // OS-governed capabilities in this C++-owned metadata field.
+    string             local_path          = 7;
+    int64              download_size_bytes = 8;
+
+    int32              context_length      = 9;
+    bool               supports_thinking   = 10;
+    bool               supports_lora       = 11;
+    string             description         = 12;
+
+    ModelSource        source              = 13;
+    int64              created_at_unix_ms  = 14;
+    int64              updated_at_unix_ms  = 15;
+
+    // Separate from download_size_bytes: this is the estimated runtime RAM
+    // requirement used by compatibility checks and model selection UIs.
+    optional int64 memory_required_bytes = 16;
+
+    // Lowercase hex SHA-256 checksum for the primary artifact. Per-file
+    // checksums for multi-file artifacts live on ModelFileDescriptor.
+    optional string checksum_sha256 = 17;
+
+    // Thinking/reasoning metadata. `supports_thinking` remains the boolean
+    // capability flag; this optional pattern declares model-specific tags.
+    optional ThinkingTagPattern thinking_pattern = 18;
+
+    // Structured public catalog metadata. `description` (field 12) is kept for
+    // backward compatibility and should mirror metadata.description when both
+    // are populated.
+    optional ModelInfoMetadata metadata = 19;
+
+    oneof artifact {
+        SingleFileArtifact single_file        = 20;
+        ArchiveArtifact    archive            = 21;
+        MultiFileArtifact  multi_file         = 22;
+        string             custom_strategy_id = 23;
+        bool               built_in           = 24;
+    }
+
+    // High-level artifact classification, complementary to the `artifact`
+    // oneof above. Allows catalog entries to carry a coarse type tag without
+    // resolving the full strategy variant.
+    optional ModelArtifactType      artifact_type           = 25;
+
+    // Manifest of files that are expected on disk after fetch/extraction.
+    optional ExpectedModelFiles     expected_files          = 26;
+
+    // Preferred hardware acceleration backend for this model.
+    optional AccelerationPreference acceleration_preference = 27;
+
+    // Hybrid (on-device vs cloud) routing policy for this entry.
+    optional RoutingPolicy          routing_policy          = 28;
+
+    // Framework/format compatibility declarations. `framework` (field 5) is
+    // the canonical/preferred runtime when no explicit preferred_framework is set.
+    optional ModelRuntimeCompatibility compatibility = 29;
+    optional InferenceFramework        preferred_framework = 30;
+
+    // Durable registry state. Live byte progress belongs to
+    // download_service.DownloadProgress, not ModelInfo.
+    optional ModelRegistryStatus registry_status = 31;
+    optional bool                is_downloaded   = 32;
+    optional bool                is_available    = 33;
+    optional int64               last_used_at_unix_ms = 34;
+    optional int32               usage_count          = 35;
+    optional bool                sync_pending         = 36;
+    optional string              status_message       = 37;
+}
+
+// Repeated model registry responses use this wrapper because protobuf cannot
+// serialize a bare repeated field as a top-level message.
+message ModelInfoList {
+    repeated ModelInfo models = 1;
+}
+
+message SingleFileArtifact {
+    repeated string required_patterns = 1;
+    repeated string optional_patterns = 2;
+
+    // Full manifest form for SDK-local wrappers that attach expected files to
+    // a single-file artifact. The pattern fields above remain for existing
+    // generated consumers.
+    optional ExpectedModelFiles expected_files = 3;
+}
+
+message ArchiveArtifact {
+    ArchiveType      type              = 1;
+    ArchiveStructure structure         = 2;
+    repeated string  required_patterns = 3;
+    repeated string  optional_patterns = 4;
+
+    // Full manifest form for archive artifacts after extraction. Archive
+    // extraction policy is portable; native filesystem permissions and handles
+    // remain adapter-owned.
+    optional ExpectedModelFiles expected_files = 5;
+}
+
+message ModelFileDescriptor {
+    string url         = 1;
+    string filename    = 2;
+    bool   is_required = 3;
+
+    // Extended descriptor fields (Flutter model_types.dart:~350,
+    // Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
+    // canonical "required" flag — the documented `required` boolean from
+    // newer SDK sources maps onto it (default true, mirrored in Swift).
+    optional int64  size_bytes = 4;
+
+    // Tag 5 reserved — previously `optional string checksum` (legacy).
+    // Deleted in favour of the typed `checksum_sha256` field below.
+    reserved 5;
+    reserved "checksum";
+
+    // Path fields used by SDK-local wrappers/catalogs. `filename` is the
+    // storage name for simple cases; relative_path/destination_path preserve
+    // directory layouts for archive and multi-file artifacts.
+    optional string        relative_path    = 6;
+    optional string        destination_path = 7;
+    optional ModelFileRole role             = 8;
+    optional string        local_path       = 9;
+    optional string        checksum_sha256  = 10;
+}
+
+message MultiFileArtifact {
+    repeated ModelFileDescriptor files = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Declarative manifest of files a multi-file / directory model is expected
+// to contain on disk after download/extraction. Used for verification before
+// hand-off to the inference framework. Sources pre-IDL:
+//   Flutter core/types/model_types.dart:420
+//   Swift   ModelTypes.swift:~300
+// ---------------------------------------------------------------------------
+message ExpectedModelFiles {
+    repeated ModelFileDescriptor files          = 1;
+    optional string              root_directory = 2;
+    repeated string              required_patterns = 3;
+    repeated string              optional_patterns = 4;
+    optional string              description = 5;
+}
+
+// Registry/query filters shared by SDK model-management APIs. UI-only
+// presentation state and platform filesystem handles are intentionally not
+// represented here.
+message ModelQuery {
+    optional InferenceFramework framework       = 1;
+    optional ModelCategory      category        = 2;
+    optional ModelFormat        format          = 3;
+    optional bool               downloaded_only = 4;
+    optional bool               available_only  = 5;
+    optional int64              max_size_bytes  = 6;
+    string                      search_query    = 7;
+    optional ModelSource        source          = 8;
+    optional ModelQuerySortField sort_field     = 9;
+    optional ModelQuerySortOrder sort_order     = 10;
+    optional ModelRegistryStatus registry_status = 11;
+}
+
+// ---------------------------------------------------------------------------
+// Registry and model-lifecycle operation contracts.
+//
+// These messages describe C++-owned workflow decisions and results that SDKs
+// can expose directly as generated public API types. Platform-owned inputs
+// such as Android content URIs, iOS security-scoped bookmarks, browser
+// FileSystemHandle objects, auth/session cookies, and HTTP client handles
+// remain outside this schema. Platform adapters normalize those handles into
+// paths, URLs, manifests, or callbacks before invoking the C++ workflow.
+// ---------------------------------------------------------------------------
+
+message ModelRegistryRefreshRequest {
+    // Fetch or merge a remote catalog through the platform/network adapter.
+    bool include_remote_catalog = 1;
+
+    // Scan managed model directories and link valid on-disk artifacts.
+    bool rescan_local = 2;
+
+    // Clear downloaded/available state for registry rows whose files vanished.
+    bool prune_orphans = 3;
+
+    // Optional post-refresh filter for the returned model list.
+    optional ModelQuery query = 4;
+
+    // Portable catalog selector. Auth state, cookies, native HTTP clients, and
+    // background transfer handles are supplied by platform adapters.
+    string catalog_uri = 5;
+
+    // Ignore cached catalog metadata and force a fresh adapter-backed refresh.
+    bool force_refresh = 6;
+
+    // Include local downloaded/available state reconciliation in the refresh.
+    bool include_downloaded_state = 7;
+}
+
+message ModelRegistryRefreshResult {
+    bool          success             = 1;
+    ModelInfoList models              = 2;
+    int32         registered_count    = 3;
+    int32         updated_count       = 4;
+    int32         discovered_count    = 5;
+    int32         pruned_count        = 6;
+    int64         refreshed_at_unix_ms = 7;
+    repeated string warnings          = 8;
+    string        error_message       = 9;
+    int32         downloaded_count    = 10;
+    int32         available_count     = 11;
+    int32         error_count         = 12;
+}
+
+message ModelListRequest {
+    // Set query.downloaded_only for downloaded-only lists.
+    optional ModelQuery query = 1;
+
+    // Include denormalized counts in ModelListResult.
+    bool include_counts = 2;
+}
+
+message ModelListResult {
+    bool          success       = 1;
+    ModelInfoList models        = 2;
+    string        error_message = 3;
+    int32         total_count   = 4;
+    int32         downloaded_count = 5;
+    int32         available_count  = 6;
+    int32         filtered_count   = 7;
+}
+
+message ModelGetRequest {
+    string model_id = 1;
+}
+
+message ModelGetResult {
+    bool      found         = 1;
+    ModelInfo model         = 2;
+    string    error_message = 3;
+}
+
+message ModelImportRequest {
+    // Catalog metadata to register or merge. If absent, discovery may infer a
+    // minimal ModelInfo from the file name and detected format.
+    optional ModelInfo model = 1;
+
+    // Normalized path under platform control. Do not place transient OS file
+    // picker handles in this field; adapters should first copy/link/authorize
+    // them and provide a stable path visible to the C++ workflow.
+    string source_path = 2;
+
+    bool copy_into_managed_storage = 3;
+    bool overwrite_existing        = 4;
+    repeated ModelFileDescriptor files = 5;
+
+    // Validate format, expected files, and checksums before registry mutation.
+    bool validate_before_register = 6;
+}
+
+message ModelImportResult {
+    bool      success          = 1;
+    ModelInfo model            = 2;
+    string    local_path       = 3;
+    int64     imported_bytes   = 4;
+    repeated string warnings   = 5;
+    string    error_message    = 6;
+    bool      registered       = 7;
+    bool      copied_into_managed_storage = 8;
+}
+
+message ModelDiscoveryRequest {
+    // Platform adapters own permission and sandbox traversal. These are stable
+    // roots that C++ may inspect using registered filesystem callbacks.
+    repeated string search_roots = 1;
+    bool            recursive    = 2;
+    bool            link_downloaded = 3;
+    bool            purge_invalid   = 4;
+    optional ModelQuery query     = 5;
+    bool            include_built_in = 6;
+    bool            include_user_imports = 7;
+}
+
+message DiscoveredModel {
+    string    model_id         = 1;
+    string    local_path       = 2;
+    bool      matched_registry = 3;
+    ModelInfo model            = 4;
+    int64     size_bytes       = 5;
+    repeated string warnings   = 6;
+}
+
+message ModelDiscoveryResult {
+    bool                  success           = 1;
+    repeated DiscoveredModel discovered_models = 2;
+    int32                 linked_count      = 3;
+    int32                 purged_count      = 4;
+    repeated string       warnings          = 5;
+    string                error_message     = 6;
+    int32                 scanned_count     = 7;
+    int32                 imported_count    = 8;
+}
+
+message ModelLoadRequest {
+    string             model_id         = 1;
+    optional ModelCategory category     = 2;
+    optional InferenceFramework framework = 3;
+    bool               force_reload     = 4;
+    bool               validate_availability = 5;
+}
+
+message ModelLoadResult {
+    bool               success          = 1;
+    string             model_id         = 2;
+    ModelCategory      category         = 3;
+    InferenceFramework framework        = 4;
+    string             resolved_path    = 5;
+    int64              loaded_at_unix_ms = 6;
+    string             error_message    = 7;
+    repeated string    warnings         = 8;
+    bool               already_loaded   = 9;
+
+    // Concrete artifacts selected by C++ model path resolution. The primary
+    // model entry mirrors resolved_path; companion entries carry explicit
+    // ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
+    repeated ModelFileDescriptor resolved_artifacts = 10;
+}
+
+message ModelUnloadRequest {
+    string             model_id     = 1;
+    optional ModelCategory category = 2;
+    bool               unload_all   = 3;
+    optional InferenceFramework framework = 4;
+}
+
+message ModelUnloadResult {
+    bool            success            = 1;
+    repeated string unloaded_model_ids = 2;
+    string          error_message      = 3;
+    int64           unloaded_at_unix_ms = 4;
+    repeated string warnings           = 5;
+}
+
+message CurrentModelRequest {
+    optional ModelCategory      category  = 1;
+    optional InferenceFramework framework = 2;
+    bool include_model_metadata = 3;
+}
+
+message CurrentModelResult {
+    reserved 1;
+    reserved "has_model";
+    string    model_id          = 2;
+    ModelInfo model             = 3;
+    int64     loaded_at_unix_ms = 4;
+    bool      found             = 5;
+    string    error_message     = 6;
+    ModelCategory category      = 7;
+    InferenceFramework framework = 8;
+    string    resolved_path     = 9;
+    repeated ModelFileDescriptor resolved_artifacts = 10;
+}
+
+message ModelDeleteRequest {
+    string model_id         = 1;
+    bool   delete_files     = 2;
+    bool   unregister       = 3;
+    bool   unload_if_loaded = 4;
+}
+
+message ModelDeleteResult {
+    bool   success          = 1;
+    string model_id         = 2;
+    int64  deleted_bytes    = 3;
+    bool   files_deleted    = 4;
+    bool   registry_updated = 5;
+    bool   was_loaded       = 6;
+    string error_message    = 7;
+    repeated string warnings = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Compatibility check request/result. Mirrors the public SDK
+// `checkCompatibility(modelId)` calls (RN CompatibilityBridge,
+// Kotlin compat path, Web ModelManager). The platform adapter supplies
+// available_ram_bytes / available_storage_bytes; commons looks up the
+// registry entry, computes the compatibility verdict (canRun / canFit),
+// and returns reasons / suggested alternative model ids.
+// ---------------------------------------------------------------------------
+message ModelCompatibilityRequest {
+    // Required. Model identifier to evaluate.
+    string model_id = 1;
+
+    // Optional cached hardware profile from the platform adapter. If
+    // unset, commons will read whatever it has cached internally; the
+    // RAM/storage values below remain authoritative for the verdict.
+    optional HardwareProfile hardware_profile = 2;
+
+    // Available RAM in bytes (from device probe). 0 = unknown — commons
+    // will treat the requirement as satisfied.
+    int64 available_ram_bytes = 3;
+
+    // Available storage in bytes (from filesystem probe). 0 = unknown.
+    int64 available_storage_bytes = 4;
+
+    // Optional caller preferences (acceleration, framework). Reserved for
+    // future use; today's verdict is based on memory/storage alone.
+    optional AccelerationPreference accelerator_preference = 5;
+    optional InferenceFramework preferred_framework = 6;
+}
+
+message ModelCompatibilityResult {
+    // Mirrors the existing struct fields so SDKs can keep using the same
+    // field names; populated from rac_model_compatibility_result_t.
+    bool  is_compatible          = 1;
+    bool  can_run                = 2;
+    bool  can_fit                = 3;
+    int64 required_memory_bytes  = 4;
+    int64 available_memory_bytes = 5;
+    int64 required_storage_bytes = 6;
+    int64 available_storage_bytes = 7;
+
+    // Human-readable reasons populated when the verdict is negative
+    // (e.g. "insufficient RAM: requires X, available Y").
+    repeated string reasons      = 8;
+
+    // Optional suggested alternative model ids that *would* be compatible.
+    // The current implementation leaves this empty; reserved for future
+    // compatibility-aware suggestions.
+    repeated string suggested_alternatives = 9;
+
+    // Echo of the looked-up model id so callers can correlate batched
+    // checks with their request id.
+    string model_id              = 10;
+
+    // Negative on failure; mirrors rac_result_t. Empty error_message on
+    // success.
+    int32  error_code            = 11;
+    string error_message         = 12;
+}
+
+// ---------------------------------------------------------------------------
+// URL → ModelFormat inference request/result. Moves the Dart/Kotlin-side
+// URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
+// inner format, ...) into commons so every SDK uses one implementation.
+// ---------------------------------------------------------------------------
+message ModelFormatFromUrlRequest {
+    // Portable URL or file path string. Only the trailing file-extension
+    // suffix is inspected; query strings and fragments are ignored.
+    string url = 1;
+}
+
+message ModelFormatFromUrlResult {
+    // Primary detected format. For archive URLs this is the archive-wrapper
+    // format (for example MODEL_FORMAT_ZIP); the extracted model format is
+    // in inner_format below.
+    ModelFormat format = 1;
+
+    // For archive URLs, the format of the primary file inside the archive
+    // when it can be inferred from the URL (for example
+    // "whisper-base.en.tar.gz" → inner_format = MODEL_FORMAT_ONNX). When the
+    // archive content is unknown this is MODEL_FORMAT_UNSPECIFIED.
+    ModelFormat inner_format = 2;
+}
+
+// ---------------------------------------------------------------------------
+// URL → ModelArtifactType inference request/result. Replaces Dart
+// withInferredArtifact and Kotlin inferArtifactFields with a single commons
+// call.
+// ---------------------------------------------------------------------------
+message ArtifactInferFromUrlRequest {
+    // Portable URL or file path string.
+    string url = 1;
+
+    // Optional model identifier. Commons does not consult the registry with
+    // this value today; it is carried for logging and telemetry only.
+    string model_id = 2;
+}
+
+message ArtifactInferFromUrlResult {
+    // Inferred artifact-type classification.
+    ModelArtifactType artifact_type = 1;
+
+    // For archive artifacts, the concrete archive format (ZIP, TAR_GZ, ...).
+    // For single-file or directory artifacts this is
+    // ARCHIVE_TYPE_UNSPECIFIED.
+    ArchiveType archive_type = 2;
+
+    // For archive artifacts the known or inferred internal structure after
+    // extraction. Defaults to ARCHIVE_STRUCTURE_UNKNOWN.
+    ArchiveStructure archive_structure = 3;
+
+    // When the URL suggests an archive wrapping a known primary file (for
+    // example a Whisper model bundle containing encoder.onnx), this field
+    // carries the relative path inside the archive when it can be inferred.
+    // Empty otherwise.
+    string primary_relpath = 4;
+
+    // Inner file format for archive artifacts. MODEL_FORMAT_UNSPECIFIED when
+    // the archive contents are unknown.
+    ModelFormat inner_format = 5;
+}
+
+// ---------------------------------------------------------------------------
+// FetchAssignments request/result. Replaces the JSON shim
+// racModelRegistryFetchAssignments and the Web SDK's offline-friendly
+// fetchModelAssignments() entry point. The platform adapter owns HTTP
+// transport; commons consumes the cached / fetched entries and returns a
+// canonical proto byte payload.
+// ---------------------------------------------------------------------------
+message ModelRegistryFetchAssignmentsRequest {
+    // Optional device identifier (forwarded to the platform adapter for
+    // any auth headers it needs). May be empty when callers rely on
+    // adapter-side auth state alone.
+    string device_id = 1;
+
+    // Optional environment selector; commons does not branch on this
+    // value today, but it is preserved for adapter routing and telemetry.
+    optional SDKEnvironment environment = 2;
+
+    // Bypass the assignment cache and force a fresh fetch.
+    bool force_refresh = 3;
+}
+
+message ModelRegistryFetchAssignmentsResult {
+    bool          success         = 1;
+    ModelInfoList models          = 2;
+    int32         model_count     = 3;
+    int64         fetched_at_unix_ms = 4;
+    int32         error_code      = 5;
+    string        error_message   = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Inputs for the canonical RAModelInfo factory. Replaces Swift's
+// `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
+// logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
+// (id, name, category/format/framework defaults, context-length defaults,
+// thinking gating + default pattern, artifact inference, source mark,
+// timestamps, and is_downloaded probe).
+// ---------------------------------------------------------------------------
+message ModelInfoMakeRequest {
+    // Required. Download URL or file path. Used both as the metadata field
+    // and as input to artifact-type inference (zip/tar.gz/tgz/... → archive,
+    // anything else → single_file).
+    string url = 1;
+
+    // Optional human-readable name. When empty commons derives it from the
+    // URL via rac_model_generate_name() (replaces underscores/dashes with
+    // spaces).
+    string name = 2;
+
+    // Optional inference framework. UNSPECIFIED triggers detection from the
+    // URL extension; commons looks up the format and maps to a default
+    // framework via rac_model_detect_framework_from_format().
+    optional InferenceFramework framework = 3;
+
+    // Optional category. UNSPECIFIED falls back to the framework default
+    // (rac_model_category_from_framework()).
+    optional ModelCategory category = 4;
+
+    // Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+    optional ModelSource source = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Inputs for the canonical "register a model from a URL" entry point.
+// Composes ModelInfoMakeRequest with the existing registry save path
+// so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
+// Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
+// shape).
+// ---------------------------------------------------------------------------
+message RegisterModelFromUrlRequest {
+    // Required. Download URL or file path. Routed straight into
+    // ModelInfoMakeRequest.url; format/artifact inference and id/name
+    // generation reuse the same factory semantics.
+    string url = 1;
+
+    // Optional human-readable name. Empty → derived from URL.
+    string name = 2;
+
+    // Optional inference framework. UNSPECIFIED triggers detection from the
+    // URL extension (rac_model_detect_framework_from_format).
+    optional InferenceFramework framework = 3;
+
+    // Optional category. UNSPECIFIED falls back to the framework default.
+    optional ModelCategory category = 4;
+
+    // Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+    optional ModelSource source = 5;
+
+    // Caller-supplied capability fields. When set, the register-from-url C++
+    // path honors them on the saved ModelInfo instead of its inference
+    // defaults (which hardcode supports_lora=false, download_size=0, infer
+    // artifact_type from the URL). This lets every SDK drop the post-register
+    // "patch + resave" pass. Tags 6-13 are free (1-5 stay wire-compatible with
+    // ModelInfoMakeRequest).
+    optional int64             memory_required_bytes = 6;
+    optional bool              supports_thinking     = 7;
+    optional bool              supports_lora         = 8;
+    optional ModelArtifactType artifact_type         = 9;
+    optional int32             context_length        = 10;
+    optional string            description           = 11;
+    optional int64             download_size_bytes   = 12;
+    // Explicit id override. Empty -> derived from URL/name.
+    optional string            id                    = 13;
+}
+
+// ---------------------------------------------------------------------------
+// Inputs for registering a multi-file model (each file carries its own URL,
+// so there is no model-level URL). Replaces the hand-built MultiFileArtifact
+// ModelInfo every SDK assembles today. Produces the saved ModelInfo.
+// ---------------------------------------------------------------------------
+message RegisterMultiFileModelRequest {
+    string                       id                    = 1;
+    string                       name                  = 2;
+    InferenceFramework           framework             = 3;
+    repeated ModelFileDescriptor files                 = 4;
+    optional ModelCategory       category              = 5;
+    optional ModelFormat         format                = 6;
+    optional int64               memory_required_bytes = 7;
+    optional int64               download_size_bytes   = 8;
+    optional int32               context_length        = 9;
+    optional bool                supports_thinking     = 10;
+    optional bool                supports_lora         = 11;
+    optional string              description           = 12;
+    optional ModelSource         source                = 13;
+}
+
+// Logical ModelRegistry service contract. Platform adapters remain
+// responsible for native file handles, sandbox permissions, HTTP execution,
+// and destructive filesystem operations. This service carries only the
+// portable registry metadata and workflow messages owned by the IDL/C++ layer.
+service ModelRegistry {
+    // Register new model metadata and return the normalized saved entry.
+    rpc Register(ModelInfo) returns (ModelInfo);
+
+    // Update an existing model metadata entry and return the normalized entry.
+    rpc Update(ModelInfo) returns (ModelInfo);
+
+    // Fetch a single registry entry by id.
+    rpc Get(ModelGetRequest) returns (ModelGetResult);
+
+    // List entries, optionally filtered by ModelListRequest.query.
+    rpc List(ModelListRequest) returns (ModelListResult);
+
+    // Remove a registry entry. File deletion/unload work remains platform or
+    // lifecycle owned even when ModelDeleteRequest flags are populated.
+    rpc Remove(ModelDeleteRequest) returns (ModelDeleteResult);
+
+    // Import stable, platform-normalized local metadata into the registry.
+    rpc Import(ModelImportRequest) returns (ModelImportResult);
+
+    // Discover models from normalized roots supplied by platform adapters.
+    rpc Discover(ModelDiscoveryRequest) returns (ModelDiscoveryResult);
+
+    // Refresh registry state from assignment/cache/local reconciliation inputs.
+    rpc Refresh(ModelRegistryRefreshRequest) returns (ModelRegistryRefreshResult);
+}

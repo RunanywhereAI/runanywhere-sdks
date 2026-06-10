@@ -15,6 +15,7 @@
 //   5. ESM default export appended           (for dynamic import() in browser)
 //   6. instantiateWasm Promise → addRunDependency (fix async WASM init race)
 //   7. HEAP views exported on Module (HEAP32/HEAPF32 needed for audio sample copy)
+//   8. require("node:*") stub block        (top-level destructured node: requires)
 //
 // Usage:
 //   node patch-sherpa-glue.js <path-to-sherpa-onnx-glue.js>
@@ -138,21 +139,50 @@ if (noderawfsThrow.test(src)) {
 // ---------------------------------------------------------------------------
 // Patch 4: Skip NODERAWFS FS patching
 // ---------------------------------------------------------------------------
-// Emscripten generates:
+// Older Emscripten generated:
 //   var VFS={...FS};for(var _key in NODERAWFS){FS[_key]=_wrapNodeError(NODERAWFS[_key])}
+// Emscripten 5.x generates:
+//   for(const[key,value]of Object.entries(NODERAWFS)){FS[key]=_wrapNodeError(value)}
+//   for(const[key,value]of Object.entries(NODERAWFS_stream_funcs)){
+//       FS[key]=_wrapNodeStreamFunc(value,...)}
 //
-// This overwrites FS methods with NODERAWFS (Node.js filesystem) wrappers.
-// In the browser we want to keep the standard MEMFS-based FS methods.
+// Either form overwrites MEMFS-backed FS methods with NODERAWFS (Node.js
+// `fs.*`) wrappers, which then crash in the browser with
+// `Cannot read properties of undefined (reading 'writeFileSync')` because
+// `var fs=require("node:fs")` is guarded behind `if(ENVIRONMENT_IS_NODE)`
+// (which we patched to false).
 
-const noderawfsFS =
+const noderawfsLegacy =
   /var VFS=\{\.\.\.FS\};for\(var _key in NODERAWFS\)\{FS\[_key\]=_wrapNodeError\(NODERAWFS\[_key\]\)\}/;
+const noderawfs5x =
+  /for\(const\[key,value\]of Object\.entries\(NODERAWFS\)\)\{FS\[key\]=_wrapNodeError\(value\)\}/g;
+const noderawfs5xStreamFuncs =
+  /for\(const\[key,value\]of Object\.entries\(NODERAWFS_stream_funcs\)\)\{FS\[key\]=_wrapNodeStreamFunc\(value,[^}]*\)\}/g;
 
-if (noderawfsFS.test(src)) {
+let patch4Applied = false;
+if (noderawfsLegacy.test(src)) {
   src = src.replace(
-    noderawfsFS,
-    '/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
+    noderawfsLegacy,
+    '/* PATCHED: legacy NODERAWFS FS patching skipped for browser (using MEMFS) */',
   );
-  console.log('  ✓ Patch 4: NODERAWFS FS patching → skipped (MEMFS preserved)');
+  console.log('  ✓ Patch 4a: legacy NODERAWFS FS patching → skipped');
+  patch4Applied = true;
+}
+if (noderawfs5x.test(src)) {
+  src = src.replace(noderawfs5x, '/* PATCHED: 5.x NODERAWFS FS patching skipped for browser */');
+  console.log('  ✓ Patch 4b: Emscripten 5.x NODERAWFS FS patching → skipped');
+  patch4Applied = true;
+}
+if (noderawfs5xStreamFuncs.test(src)) {
+  src = src.replace(
+    noderawfs5xStreamFuncs,
+    '/* PATCHED: 5.x NODERAWFS_stream_funcs patching skipped for browser */',
+  );
+  console.log('  ✓ Patch 4c: Emscripten 5.x NODERAWFS_stream_funcs patching → skipped');
+  patch4Applied = true;
+}
+
+if (patch4Applied) {
   patchCount++;
 } else {
   console.log('  ⚠ Patch 4: NODERAWFS FS patching not found (may not exist in this version)');
@@ -250,6 +280,31 @@ if (src.includes('Module["HEAP32"]=HEAP32')) {
 }
 
 // ---------------------------------------------------------------------------
+// Patch 8: Stub remaining unguarded `require("node:*")` calls
+// ---------------------------------------------------------------------------
+// After Patch 3 strips the `if(!ENVIRONMENT_IS_NODE) throw ...` guard, the
+// surviving `var nodeTTY=require("node:tty")` (and any peer top-level
+// `require("node:*")` declarations Emscripten emits) still execute on every
+// module load. In the browser there is no `require`, so module instantiation
+// throws `ReferenceError: require is not defined`. Replace each top-level
+// `require("node:<mod>")` with a guarded expression that returns `null` in
+// the browser and only calls `require` when running under Node.
+
+const nodeRequirePattern = /require\("node:([a-z]+)"\)/g;
+let nodeRequireMatches = 0;
+src = src.replace(nodeRequirePattern, (_match, mod) => {
+  nodeRequireMatches += 1;
+  return `(typeof ENVIRONMENT_IS_NODE!=="undefined"&&ENVIRONMENT_IS_NODE?require("node:${mod}"):null)`;
+});
+
+if (nodeRequireMatches > 0) {
+  console.log(`  ✓ Patch 8: guarded ${nodeRequireMatches} top-level require("node:*") call(s)`);
+  patchCount++;
+} else {
+  console.log('  ⚠ Patch 8: no remaining require("node:*") calls (already stubbed)');
+}
+
+// ---------------------------------------------------------------------------
 // Write patched file
 // ---------------------------------------------------------------------------
 
@@ -258,7 +313,7 @@ const newSize = src.length;
 const delta = newSize - originalSize;
 
 console.log('');
-console.log(`  ${patchCount}/7 patches applied`);
+console.log(`  ${patchCount}/8 patches applied`);
 console.log(`  File size: ${originalSize} → ${newSize} bytes (${delta >= 0 ? '+' : ''}${delta})`);
 
 if (patchCount < 3) {

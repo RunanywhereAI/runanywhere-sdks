@@ -190,25 +190,12 @@ RAC_LLAMACPP_VLM_API void rac_vlm_llamacpp_destroy(rac_handle_t handle);
 // =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
-
-/**
- * Registers the LlamaCPP VLM backend with the commons module and service registries.
- *
- * Should be called once during SDK initialization.
- * This registers:
- * - Module: "llamacpp_vlm" with VISION_LANGUAGE capability
- * - Service provider: LlamaCPP VLM provider (priority 100)
- *
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_VLM_API rac_result_t rac_backend_llamacpp_vlm_register(void);
-
-/**
- * Unregisters the LlamaCPP VLM backend.
- *
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_VLM_API rac_result_t rac_backend_llamacpp_vlm_unregister(void);
+//
+// VLM is registered as part of the unified llama.cpp plugin via
+// rac_backend_llamacpp_register() (declared in rac_llm_llamacpp.h). There
+// is no longer a separate VLM register function -- llama.cpp is one engine
+// that publishes a single plugin vtable with both llm_ops and vlm_ops slots
+// filled.
 
 #ifdef __cplusplus
 }

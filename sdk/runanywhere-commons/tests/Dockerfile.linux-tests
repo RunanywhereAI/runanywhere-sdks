@@ -2,34 +2,45 @@
 # Dockerfile.linux-tests - Build environment for runanywhere-commons tests
 # =============================================================================
 # Usage:
-#   docker build -f tests/Dockerfile.linux-tests -t rac-linux-tests .
+#   docker build -f sdk/runanywhere-commons/tests/Dockerfile.linux-tests -t rac-linux-tests .
 #   docker run -v ~/.local/share/runanywhere/Models:/models rac-linux-tests
 # =============================================================================
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake curl git bzip2 ca-certificates \
+    libcurl4-openssl-dev python3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 COPY . /src
 
 # Download Sherpa-ONNX Linux prebuilts (needed for ONNX backend)
-RUN ./scripts/linux/download-sherpa-onnx.sh
+RUN ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
 
-# Build with tests enabled
+# Build from the monorepo root so engine targets are available.
+# RAC_BUILD_CLI + RAC_DESKTOP_ADAPTER add the rcli binary (CLI e2e suite);
+# RAC_BUILD_SERVER backs `rcli serve`.
 RUN cmake -B /build -S /src \
     -DRAC_BUILD_TESTS=ON \
     -DRAC_BUILD_BACKENDS=ON \
+    -DRAC_BACKEND_RAG=OFF \
     -DRAC_BUILD_PLATFORM=OFF \
     -DRAC_BUILD_SHARED=OFF \
+    -DRAC_BUILD_CLI=ON \
+    -DRAC_DESKTOP_ADAPTER=ON \
+    -DRAC_BUILD_SERVER=ON \
+    -DRAC_RUNTIME_ONNXRT=ON \
+    -DRAC_BACKEND_SHERPA=ON \
+    -DRAC_BACKEND_ONNX=ON \
     -DCMAKE_BUILD_TYPE=Debug \
-    && cmake --build /build -j$(nproc)
+    && cmake --build /build -j 2
 
 # Default: run all tests (models mounted at /models)
 ENV RAC_TEST_MODEL_DIR=/models
-WORKDIR /build/tests
+ENV RAC_TEST_REQUIRE_MODELS=0
+WORKDIR /build/sdk/runanywhere-commons/tests
 CMD ["bash", "-c", "for t in test_*; do [ -x \"$t\" ] && ./$t --run-all; done"]

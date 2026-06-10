@@ -1,5 +1,24 @@
+# =============================================================================
+# COUPLING NOTE: This file references librac_commons.so + RAC headers from the
+# sibling @runanywhere/core npm package via a hard-coded relative path:
+#   ../../core/android/src/main/jniLibs/${ANDROID_ABI}/librac_commons.so
+#   ../../core/android/src/main/jniLibs/include/
+# (computed via RN_NODE_MODULES → @runanywhere/core/android/src/main/jniLibs/).
+#
+# This is a known fragility — if the package directory structure changes,
+# update the path here. Future improvement: migrate to Android Prefab module
+# consumption (build.gradle: `prefab { commons { ... } }`) so the dependency
+# is declared at the Gradle layer rather than the CMake layer.
+#
+# Prefab adoption was attempted but deferred because librac_commons.so is a
+# pre-built binary downloaded by core's Gradle task (not produced by core's
+# externalNativeBuild), so AGP's `prefabPublishing` publisher cannot
+# auto-export it without additional manifest wiring. The relative-path
+# coupling is therefore documented and intentionally preserved.
+# =============================================================================
 project(runanywherellama)
-cmake_minimum_required(VERSION 3.9.0)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 
 set(PACKAGE_NAME runanywherellama)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -9,7 +28,7 @@ set(CMAKE_CXX_STANDARD 20)
 # 16KB Page Alignment for Android 15+ (API 35) Compliance
 # Required starting November 1, 2025 for Google Play submissions
 # =============================================================================
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384")
 
 # Path to pre-built native libraries (downloaded from runanywhere-binaries)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
@@ -19,12 +38,8 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_llamacpp.so")
-    message(WARNING "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
-                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_llamacpp:downloadNativeLibs\n"
-                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
-    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
-    return()
+    message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
+                        "Run ./scripts/build/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_llamacpp SHARED IMPORTED)
@@ -34,15 +49,9 @@ set_target_properties(rac_backend_llamacpp PROPERTIES
 )
 message(STATUS "[RunAnywhereLlama] Found RABackendLlamaCPP at ${JNILIB_DIR}/librac_backend_llamacpp.so")
 
-# =============================================================================
-# Source files - Llama bridges
-# =============================================================================
-file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
     ../cpp/HybridRunAnywhereLlama.cpp
-    ${BRIDGE_SOURCES}
 )
 
 # =============================================================================
@@ -75,8 +84,14 @@ set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLi
 
 include_directories(
     "src/main/cpp"
+    # Package-local hybrid headers (HybridRunAnywhereLlama.hpp etc.) — needed by the
+    # nitrogen-generated OnLoad + cpp-adapter. The forked rac_llm_llamacpp.h that used
+    # to live here was deleted (canonical commons header resolves via CORE_INCLUDE_DIR).
     "../cpp"
-    "../cpp/bridges"
+    # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
+    # Sharing avoids re-fetching the dependency and keeps both packages on the
+    # same JSON version.
+    "${CMAKE_SOURCE_DIR}/../../core/cpp/third_party"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from core package (flat access for all subdirectories)
     "${CORE_INCLUDE_DIR}"
@@ -126,12 +141,12 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
     rac_commons
     rac_backend_llamacpp
 )
 
-# HAS_LLAMACPP and HAS_RACOMMONS are always defined since backends are required
-target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_LLAMACPP=1 HAS_RACOMMONS=1)
-
 # 16KB page alignment - MUST be on target for Android 15+ compliance
-target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)
+target_link_options(${PACKAGE_NAME} PRIVATE
+    -Wl,-z,max-page-size=16384
+    -Wl,-z,common-page-size=16384)

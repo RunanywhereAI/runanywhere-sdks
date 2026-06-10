@@ -1,74 +1,219 @@
 /**
- * Model Selection Sheet - Modal with device info + model list
- * Matches iOS ModelSelectionSheet.
+ * Model Selection — minimal in-toolbar model picker + bottom-sheet list.
+ *
+ * This component satisfies two probe targets read by `main.ts:probeAppShell`:
+ *
+ *   1. `#chat-toolbar-model` — a pill-button shown on top of the chat panel
+ *      listing the currently loaded model (or "Select Model"). It is
+ *      actionable whenever at least one catalog entry has been registered.
+ *   2. `#chat-model-overlay` + `#chat-get-started-btn` — a "Get Started"
+ *      overlay shown before any model is chosen. The readiness probe accepts
+ *      either one so the chat tab is considered interactive as soon as the
+ *      user has a clear path to a model.
+ *
+ * Model actions flow through the proto-byte bridges:
+ *
+ *   - `RunAnywhere.modelRegistry.*`    — catalog list / get
+ *   - `RunAnywhere.downloadModel(...)` — download with progress callback
+ *   - `RunAnywhere.loadModel(...)`     — load through the C++ lifecycle ABI
+ *
+ * No legacy app-side registries or extension-point routing.
  */
 
-import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
-import { showToast, showEvictionDialog } from './dialogs';
-
-let modalEl: HTMLElement | null = null;
+import type { ModelInfo } from '@runanywhere/web';
+import {
+  RunAnywhere,
+  ModelCategory,
+} from '@runanywhere/web';
+import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
+import {
+  DownloadState,
+} from '@runanywhere/proto-ts/download_service';
+import {
+  getCatalog,
+  registerModelCatalog,
+} from '../services/model-catalog';
+import { escapeHtml } from '../services/escape-html';
+import { formatError } from '../services/format-error';
+import {
+  formatBytes,
+  formatFramework,
+  modalityEmoji,
+} from '../services/model-display';
+import { showToast } from './dialogs';
 
 // ---------------------------------------------------------------------------
-// Show Modal
+// State (module-scope, one selection sheet per app)
+// ---------------------------------------------------------------------------
+
+type RowStatus =
+  | 'registered'       // not downloaded yet
+  | 'downloading'
+  | 'downloaded'       // on disk but not loaded
+  | 'loading'
+  | 'loaded'
+  | 'error';
+
+interface RowState {
+  status: RowStatus;
+  progress?: number;   // 0..1
+  error?: string;
+}
+
+const rowStates = new Map<string, RowState>();
+
+let modalEl: HTMLElement | null = null;
+let toolbarBtn: HTMLElement | null = null;
+let toolbarText: HTMLElement | null = null;
+let getStartedOverlay: HTMLElement | null = null;
+let getStartedBtn: HTMLButtonElement | null = null;
+let catalogRegistered = false;
+const listeners: Array<() => void> = [];
+
+/**
+ * Sheet open options — used by tabs that want to restrict the visible catalog
+ * to a single modality (Vision → MULTIMODAL, Transcribe → SPEECH_RECOGNITION,
+ * Speak → SPEECH_SYNTHESIS). When omitted, the whole catalog is shown.
+ */
+export interface OpenSheetOptions {
+  filterCategories?: readonly ModelCategory[];
+  title?: string;
+}
+
+let activeSheetOptions: OpenSheetOptions = {};
+
+// ---------------------------------------------------------------------------
+// Public API — wiring into the chat view
 // ---------------------------------------------------------------------------
 
 /**
- * Options for the model selection sheet.
+ * Ensures the catalog is registered with the proto-byte model registry.
+ * Safe to call repeatedly; only the first successful call registers entries.
  */
-export interface ModelSelectionSheetOptions {
-  /**
-   * When true, loading a model only unloads models of the same category
-   * (swap) rather than all loaded models. Use for multi-model pipelines
-   * like Voice (STT + LLM + TTS).
-   */
-  coexist?: boolean;
+export function ensureCatalogRegistered(): boolean {
+  if (catalogRegistered) return true;
+  const count = registerModelCatalog();
+  catalogRegistered = count > 0;
+  if (catalogRegistered) {
+    hydrateRowStatesFromRegistry();
+  }
+  return catalogRegistered;
 }
 
-/** Captured options for the current open sheet. */
-let sheetOptions: ModelSelectionSheetOptions = {};
+/**
+ * Mount the `#chat-toolbar-model` pill into the chat toolbar. Returns the
+ * element so the caller can place it wherever the toolbar layout expects.
+ */
+export function buildToolbarModelButton(): HTMLElement {
+  const btn = document.createElement('button');
+  btn.id = 'chat-toolbar-model';
+  btn.className = 'toolbar-model-btn';
+  btn.type = 'button';
+  btn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="model-icon">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 3c2.5 3 2.5 15 0 18M3 12h18"/>
+    </svg>
+    <span id="chat-toolbar-model-text">Select Model</span>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="chevron">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  `;
+  btn.addEventListener('click', () => openSheet());
 
-export function showModelSelectionSheet(modality?: ModelCategory, options?: ModelSelectionSheetOptions): void {
-  if (modalEl) return; // Already open
-  sheetOptions = options ?? {};
+  toolbarBtn = btn;
+  toolbarText = btn.querySelector('#chat-toolbar-model-text') as HTMLElement;
+  refreshToolbarLabel();
+  return btn;
+}
 
-  const models = modality
-    ? ModelManager.getModels().filter((m) => m.modality === modality)
-    : ModelManager.getModels();
+/**
+ * Mount the `#chat-model-overlay` "Get Started" overlay into the panel host.
+ * The overlay is hidden automatically as soon as a model is loaded.
+ */
+export function buildGetStartedOverlay(): HTMLElement {
+  const overlay = document.createElement('div');
+  overlay.id = 'chat-model-overlay';
+  overlay.className = 'chat-model-overlay';
+  overlay.innerHTML = `
+    <div class="chat-model-overlay-card">
+      <h3 class="chat-model-overlay-title">Get started</h3>
+      <p class="chat-model-overlay-description">
+        Pick a model to download and load. Models run fully on-device via
+        WebAssembly &mdash; no server round-trips.
+      </p>
+      <button type="button" id="chat-get-started-btn" class="btn btn-primary btn-lg">
+        Choose a Model
+      </button>
+    </div>
+  `;
 
-  // Device info
-  const memory = (navigator as any).deviceMemory ?? '--';
-  const cores = navigator.hardwareConcurrency ?? '--';
-  const browser = detectBrowser();
+  getStartedOverlay = overlay;
+  getStartedBtn = overlay.querySelector('#chat-get-started-btn') as HTMLButtonElement;
+  getStartedBtn.addEventListener('click', () => openSheet());
 
+  refreshOverlayVisibility();
+  return overlay;
+}
+
+/**
+ * Subscribe to state changes for re-rendering consumers (chat toolbar, etc.).
+ * Returns an unsubscribe function.
+ */
+export function onModelStateChange(listener: () => void): () => void {
+  listeners.push(listener);
+  return () => {
+    const idx = listeners.indexOf(listener);
+    if (idx >= 0) listeners.splice(idx, 1);
+  };
+}
+
+/**
+ * Find the loaded model for a specific category, or `null` if none. Used by
+ * the Transcribe/Speak tabs to surface a "Pick an STT/TTS model" toolbar pill
+ * matching the Chat tab's pattern.
+ */
+export function findLoadedModelForCategory(category: ModelCategory): ModelInfo | null {
+  try {
+    const current = RunAnywhere.currentModel();
+    if (!current?.modelId) return null;
+    const info = RunAnywhere.getModel(current.modelId);
+    if (info?.category === category) return info;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Open the model selection bottom sheet programmatically. */
+export function openSheet(options: OpenSheetOptions = {}): void {
+  if (modalEl) return;
+  activeSheetOptions = options;
+  ensureCatalogRegistered();
+  renderSheet();
+}
+
+// ---------------------------------------------------------------------------
+// Rendering — bottom sheet
+// ---------------------------------------------------------------------------
+
+function renderSheet(): void {
+  const title = escapeHtml(activeSheetOptions.title ?? 'Select Model');
   modalEl = document.createElement('div');
   modalEl.className = 'modal-backdrop';
   modalEl.innerHTML = `
-    <div class="modal-sheet">
+    <div class="modal-sheet" role="dialog" aria-modal="true">
       <div class="modal-handle"></div>
       <div class="modal-header">
-        <h3 class="text-md font-semibold">Select Model</h3>
-        <button class="btn-ghost" id="model-sheet-close">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <h3 class="text-md font-semibold">${title}</h3>
+        <button type="button" class="btn-ghost" id="model-sheet-close" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
         </button>
       </div>
       <div class="modal-body">
-        <!-- Device Info -->
-        <div class="device-info">
-          <div class="device-info-item">
-            <div class="value">${browser}</div>
-            <div class="label">Browser</div>
-          </div>
-          <div class="device-info-item">
-            <div class="value">${memory} GB</div>
-            <div class="label">Memory</div>
-          </div>
-          <div class="device-info-item">
-            <div class="value">${cores}</div>
-            <div class="label">CPU Cores</div>
-          </div>
-        </div>
-
-        <!-- Model List -->
         <div id="model-sheet-list"></div>
       </div>
     </div>
@@ -76,188 +221,270 @@ export function showModelSelectionSheet(modality?: ModelCategory, options?: Mode
 
   document.body.appendChild(modalEl);
 
-  // Close handlers
   modalEl.querySelector('#model-sheet-close')!.addEventListener('click', closeSheet);
-  modalEl.addEventListener('click', (e) => {
-    if (e.target === modalEl) closeSheet();
+  modalEl.addEventListener('click', (event) => {
+    if (event.target === modalEl) closeSheet();
   });
 
-  // Render model list
-  renderModelList(models);
-
-  // Subscribe to updates
-  const unsub = ModelManager.onChange(() => {
-    const updated = modality
-      ? ModelManager.getModels().filter((m) => m.modality === modality)
-      : ModelManager.getModels();
-    renderModelList(updated);
-  });
-
-  // Store unsub for cleanup
-  (modalEl as any).__unsub = unsub;
+  renderRows();
 }
-
-// ---------------------------------------------------------------------------
-// Close Modal
-// ---------------------------------------------------------------------------
 
 function closeSheet(): void {
   if (!modalEl) return;
-  const unsub = (modalEl as any).__unsub;
-  if (typeof unsub === 'function') unsub();
   modalEl.remove();
   modalEl = null;
-  sheetOptions = {};
+  activeSheetOptions = {};
 }
 
-// ---------------------------------------------------------------------------
-// Render Model List
-// ---------------------------------------------------------------------------
+function renderRows(): void {
+  const host = document.getElementById('model-sheet-list');
+  if (!host) return;
 
-function renderModelList(models: ModelInfo[]): void {
-  const listEl = document.getElementById('model-sheet-list');
-  if (!listEl) return;
+  const allEntries = getCatalog();
+  // Filter by category when the caller scoped the picker to a modality
+  // (e.g. Vision shows only VLM, Transcribe shows only STT). Without
+  // filtering, a user opening the picker from Vision could load an LLM
+  // and the modality call would then fail (BackendNotAvailable from the
+  // VLM provider).
+  const filterCats = activeSheetOptions.filterCategories;
+  const entries = filterCats && filterCats.length > 0
+    ? allEntries.filter((entry) => filterCats.includes(entry.category))
+    : allEntries;
+  if (!entries.length) {
+    host.innerHTML = '<p class="text-secondary">No models registered.</p>';
+    return;
+  }
 
-  listEl.innerHTML = models
-    .map((m) => {
-      const actionBtn = getActionButton(m);
-      const progressBar = m.status === 'downloading'
-        ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${(m.downloadProgress ?? 0) * 100}%;"></div></div>`
-        : '';
-
-      return `
-        <div class="model-row" data-model-id="${m.id}">
-          <div class="model-logo">${getModelEmoji(m)}</div>
-          <div class="model-info">
-            <div class="model-name">${m.name}</div>
-            <div class="model-meta">
-              <span class="model-framework-badge">${m.framework}</span>
-              ${m.memoryRequirement ? `<span class="model-size">${formatMB(m.memoryRequirement)}</span>` : ''}
-            </div>
-            ${progressBar}
+  host.innerHTML = entries.map((entry) => {
+    const state = rowStates.get(entry.id) ?? { status: 'registered' as RowStatus };
+    const progressBar = state.status === 'downloading'
+      ? `<div class="progress-bar mt-sm"><div class="progress-fill" style="width:${Math.round((state.progress ?? 0) * 100)}%"></div></div>`
+      : '';
+    const errorBar = state.error
+      ? `<div class="model-row-error error">${escapeHtml(state.error)}</div>`
+      : '';
+    return `
+      <div class="model-row" data-model-id="${entry.id}">
+        <div class="model-logo">${modalityEmoji(entry.category)}</div>
+        <div class="model-info">
+          <div class="model-name">${escapeHtml(entry.name)}</div>
+          <div class="model-meta">
+            <span class="model-framework-badge">${formatFramework(entry.framework)}</span>
+            <span class="model-size">${formatBytes(entry.memoryRequiredBytes)}</span>
           </div>
-          ${actionBtn}
+          ${progressBar}
+          ${errorBar}
         </div>
-      `;
-    })
-    .join('');
+        ${actionButton(entry.id, state)}
+      </div>
+    `;
+  }).join('');
 
-  // Attach action handlers
-  listEl.querySelectorAll('[data-action]').forEach((btn) => {
-    const action = (btn as HTMLElement).dataset.action!;
-    const modelId = (btn as HTMLElement).dataset.modelId!;
-
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (action === 'download') {
-        await handleDownload(modelId);
-      } else if (action === 'load') {
-        const success = await ModelManager.loadModel(modelId, { coexist: sheetOptions.coexist });
-        if (success) {
-          showToast(`${ModelManager.getModels().find((m) => m.id === modelId)?.name ?? 'Model'} Ready`);
-          closeSheet();
-        }
-      }
+  host.querySelectorAll('[data-action]').forEach((el) => {
+    const btn = el as HTMLButtonElement;
+    const action = btn.dataset.action as 'download' | 'load' | 'unload';
+    const modelId = btn.dataset.modelId!;
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      void handleAction(action, modelId);
     });
   });
 }
 
-// ---------------------------------------------------------------------------
-// Download with Quota Check + Eviction Dialog
-// ---------------------------------------------------------------------------
-
-async function handleDownload(modelId: string): Promise<void> {
-  const check = await ModelManager.checkDownloadFit(modelId);
-
-  if (check.fits) {
-    // Enough space — download directly
-    await ModelManager.downloadModel(modelId);
-    return;
-  }
-
-  // Not enough space — show eviction dialog
-  const model = ModelManager.getModels().find((m) => m.id === modelId);
-  if (!model) return;
-
-  if (check.evictionCandidates.length === 0) {
-    // No candidates to evict — inform user
-    showToast('Not enough storage and no models to remove', 'warning');
-    return;
-  }
-
-  const selectedIds = await showEvictionDialog(
-    model.name,
-    check.neededBytes,
-    check.availableBytes,
-    check.evictionCandidates.map((c) => ({
-      id: c.id,
-      name: c.name,
-      sizeBytes: c.sizeBytes,
-    })),
-  );
-
-  if (!selectedIds || selectedIds.length === 0) {
-    showToast('Download cancelled', 'info');
-    return;
-  }
-
-  // Delete selected models, then download
-  for (const id of selectedIds) {
-    await ModelManager.deleteModel(id);
-  }
-
-  showToast(`Freed storage, downloading ${model.name}...`, 'info');
-  await ModelManager.downloadModel(modelId);
-}
-
-// ---------------------------------------------------------------------------
-// Action Button
-// ---------------------------------------------------------------------------
-
-function getActionButton(model: ModelInfo): string {
-  switch (model.status) {
+function actionButton(modelId: string, state: RowState): string {
+  switch (state.status) {
     case 'registered':
-      return `<button class="model-action-btn download" data-action="download" data-model-id="${model.id}">Download</button>`;
+      return `<button type="button" class="model-action-btn download" data-action="download" data-model-id="${modelId}">Download</button>`;
     case 'downloading':
-      return `<button class="model-action-btn" disabled>${Math.round((model.downloadProgress ?? 0) * 100)}%</button>`;
+      return `<button type="button" class="model-action-btn" disabled>${Math.round((state.progress ?? 0) * 100)}%</button>`;
     case 'downloaded':
-      return `<button class="model-action-btn load" data-action="load" data-model-id="${model.id}">Load</button>`;
+      return `<button type="button" class="model-action-btn load" data-action="load" data-model-id="${modelId}">Load</button>`;
     case 'loading':
-      return `<button class="model-action-btn" disabled>Loading...</button>`;
+      return `<button type="button" class="model-action-btn" disabled>Loading...</button>`;
     case 'loaded':
-      return `<button class="model-action-btn loaded">Loaded</button>`;
+      return `<button type="button" class="model-action-btn loaded" data-action="unload" data-model-id="${modelId}">Loaded</button>`;
     case 'error':
-      return `<button class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${model.id}">Retry</button>`;
-    default:
-      return '';
+      return `<button type="button" class="model-action-btn model-action-btn--retry" data-action="download" data-model-id="${modelId}">Retry</button>`;
   }
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Actions — download / load / unload
 // ---------------------------------------------------------------------------
 
-function getModelEmoji(model: ModelInfo): string {
-  switch (model.modality) {
-    case ModelCategory.Language: return '&#129302;';
-    case ModelCategory.Multimodal: return '&#128065;';
-    case ModelCategory.SpeechRecognition: return '&#127908;';
-    case ModelCategory.SpeechSynthesis: return '&#128266;';
-    case ModelCategory.ImageGeneration: return '&#127912;';
-    default: return '&#129302;';
+async function handleAction(action: 'download' | 'load' | 'unload', modelId: string): Promise<void> {
+  if (action === 'download') await startDownload(modelId);
+  else if (action === 'load') await loadModel(modelId);
+  else if (action === 'unload') await unloadModel(modelId);
+}
+
+async function startDownload(modelId: string): Promise<void> {
+  setRow(modelId, { status: 'downloading', progress: 0 });
+
+  try {
+    const model = RunAnywhere.getModel(modelId);
+    if (!model) {
+      throw new Error(`Model ${modelId} not found in registry`);
+    }
+
+    const progress = await RunAnywhere.downloadModel({
+      modelId,
+      model,
+      allowMeteredNetwork: true,
+      resumeExisting: false,
+      verifyChecksums: false,
+      validateExistingBytes: false,
+      updateRegistryOnCompletion: true,
+      storageNamespace: '',
+      availableStorageBytes: 0,
+      requiredFreeBytesAfterDownload: 0,
+      pollIntervalMs: 500,
+      onProgress: (next) => applyProgress(modelId, next),
+    });
+    applyProgress(modelId, progress);
+  } catch (err) {
+    const message = formatError(err);
+    setRow(modelId, { status: 'error', error: message });
+    showToast(`Download failed: ${message}`, 'warning');
   }
 }
 
-function formatMB(bytes: number): string {
-  if (bytes >= 1_000_000_000) return (bytes / 1_000_000_000).toFixed(1) + ' GB';
-  return (bytes / 1_000_000).toFixed(0) + ' MB';
+async function loadModel(modelId: string): Promise<void> {
+  setRow(modelId, { status: 'loading' });
+  try {
+    const result = await RunAnywhere.loadModel({
+      modelId,
+      forceReload: false,
+      validateAvailability: true,
+    });
+    if (!result || !result.success) {
+      throw new Error(result?.errorMessage || 'Model load failed');
+    }
+    setRow(modelId, { status: 'loaded' });
+    showToast(`Loaded ${modelId}`, 'success');
+    closeSheet();
+  } catch (err) {
+    const message = formatError(err);
+    setRow(modelId, { status: 'error', error: message });
+    showToast(`Load failed: ${message}`, 'warning');
+  }
 }
 
-function detectBrowser(): string {
-  const ua = navigator.userAgent;
-  if (ua.includes('Chrome')) return 'Chrome';
-  if (ua.includes('Firefox')) return 'Firefox';
-  if (ua.includes('Safari')) return 'Safari';
-  if (ua.includes('Edge')) return 'Edge';
-  return 'Browser';
+async function unloadModel(modelId: string): Promise<void> {
+  try {
+    const result = await RunAnywhere.unloadModel({
+      modelId,
+      unloadAll: false,
+    });
+    if (!result || !result.success) {
+      throw new Error(result?.errorMessage || 'Unload failed');
+    }
+    setRow(modelId, { status: 'downloaded' });
+    showToast(`Unloaded ${modelId}`, 'info');
+  } catch (err) {
+    const message = formatError(err);
+    showToast(`Unload failed: ${message}`, 'warning');
+  }
+}
+
+function applyProgress(modelId: string, progress: DownloadProgress): void {
+  const fraction = Math.max(0, Math.min(1, progress.overallProgress));
+  if (progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED) {
+    setRow(modelId, { status: 'downloaded', progress: 1 });
+    return;
+  }
+  if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
+    setRow(modelId, { status: 'error', error: progress.errorMessage || 'Download failed' });
+    return;
+  }
+  if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
+    setRow(modelId, { status: 'registered' });
+    return;
+  }
+  setRow(modelId, {
+    status: 'downloading',
+    progress: fraction,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// State + toolbar updates
+// ---------------------------------------------------------------------------
+
+function setRow(modelId: string, patch: Partial<RowState>): void {
+  const previous = rowStates.get(modelId) ?? { status: 'registered' as RowStatus };
+  rowStates.set(modelId, { ...previous, ...patch });
+  if (modalEl) renderRows();
+  refreshToolbarLabel();
+  refreshOverlayVisibility();
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.warn('[model-selection] listener threw', err);
+    }
+  }
+}
+
+function refreshToolbarLabel(): void {
+  if (!toolbarBtn || !toolbarText) return;
+
+  const loaded = findLoadedModelId();
+  if (loaded) {
+    const info = lookupModelInfo(loaded);
+    toolbarText.textContent = info?.name ?? loaded;
+  } else {
+    toolbarText.textContent = catalogRegistered ? 'Select Model' : 'Loading...';
+  }
+}
+
+function refreshOverlayVisibility(): void {
+  if (!getStartedOverlay) return;
+  const shouldShow = !findLoadedModelId();
+  getStartedOverlay.classList.toggle('hidden', !shouldShow);
+  if (getStartedBtn) {
+    getStartedBtn.disabled = !catalogRegistered;
+    if (!getStartedBtn.textContent?.trim()) {
+      getStartedBtn.textContent = 'Choose a Model';
+    }
+  }
+}
+
+function findLoadedModelId(): string | null {
+  for (const [id, state] of rowStates.entries()) {
+    if (state.status === 'loaded') return id;
+  }
+  return null;
+}
+
+function lookupModelInfo(modelId: string): ModelInfo | null {
+  try {
+    return RunAnywhere.getModel(modelId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * On first catalog registration, query the registry for already-downloaded
+ * and currently-loaded models so the UI reflects their real state.
+ */
+function hydrateRowStatesFromRegistry(): void {
+  try {
+    const downloaded = RunAnywhere.downloadedModels();
+    for (const model of downloaded?.models ?? []) {
+      rowStates.set(model.id, { status: 'downloaded' });
+    }
+  } catch {
+    // ignore — listDownloaded may be unavailable in some WASM builds
+  }
+
+  try {
+    const current = RunAnywhere.currentModel();
+    if (current?.modelId) {
+      rowStates.set(current.modelId, { status: 'loaded' });
+    }
+  } catch {
+    // ignore — lifecycle may be unavailable
+  }
 }

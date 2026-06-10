@@ -14,8 +14,9 @@
  * Architecture:
  * - Uses ConversationStore for state management (matches iOS)
  * - Separates UI from business logic (View + ViewModel pattern)
- * - Model loading via RunAnywhere.loadModel()
- * - Text generation via RunAnywhere.generate()
+ * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
+ * - Text generation via RunAnywhere.generate(prompt, options?)
+ *   and RunAnywhere.generateStream(prompt, options?) (proto-canonical signatures)
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */
@@ -26,13 +27,16 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
   Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
@@ -45,178 +49,44 @@ import {
 } from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
-import type { Message, Conversation, ToolCallInfo } from '../types/chat';
+import type { Message, Conversation } from '../types/chat';
 import { MessageRole } from '../types/chat';
-import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 import { useConversationStore } from '../stores/conversationStore';
 import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
 import { GENERATION_SETTINGS_KEYS } from '../types/settings';
+import {
+  getFrameworkDisplayName,
+  getPrimaryFramework,
+} from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere } from '@runanywhere/core';
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
-  RunAnywhere,
+  InferenceFramework,
+  ModelCategory,
+  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
-  type GenerationOptions,
-} from '@runanywhere/core';
-import { safeEvaluateExpression } from '../utils/mathParser';
+} from '@runanywhere/proto-ts/model_types';
+import { logDiagnostic } from '../utils/diagnostics';
+import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
+
+// Canonical SDK methods (Swift parity).
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
+const loadModelWithRequest = RunAnywhere.loadModel;
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
-// =============================================================================
-// TOOL CALLING SETUP - Weather API Example
-// =============================================================================
-
-/**
- * Register tools for the chat. This enables the LLM to call external APIs.
- * Users just chat normally - tool calls happen transparently.
- */
-const registerChatTools = () => {
-  // Clear any existing tools
-  RunAnywhere.clearTools();
-
-  // Weather tool - Real API (wttr.in - no key needed)
-  RunAnywhere.registerTool(
-    {
-      name: 'get_weather',
-      description: 'Gets the current weather for a city or location',
-      parameters: [
-        {
-          name: 'location',
-          type: 'string',
-          description:
-            'City name or location (e.g., "Tokyo", "New York", "London")',
-          required: true,
-        },
-      ],
-    },
-    async (args) => {
-      // Handle both 'location' and 'city' parameter names (models vary)
-      const location = (args.location || args.city) as string;
-      // eslint-disable-next-line no-console -- demo tool call diagnostic
-      console.log('[Tool] get_weather called for:', location);
-
-      try {
-        const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          return { error: `Weather API error: ${response.status}` };
-        }
-
-        const data = await response.json();
-        const current = data.current_condition[0];
-        const area = data.nearest_area?.[0];
-
-        return {
-          location: area?.areaName?.[0]?.value || location,
-          country: area?.country?.[0]?.value || '',
-          temperature_f: parseInt(current.temp_F, 10),
-          temperature_c: parseInt(current.temp_C, 10),
-          condition: current.weatherDesc[0].value,
-          humidity: `${current.humidity}%`,
-          wind_mph: `${current.windspeedMiles} mph`,
-          feels_like_f: parseInt(current.FeelsLikeF, 10),
-        };
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error('[Tool] Weather fetch failed:', msg);
-        return { error: msg };
-      }
-    }
-  );
-
-  // Current time tool
-  RunAnywhere.registerTool(
-    {
-      name: 'get_current_time',
-      description: 'Gets the current date and time',
-      parameters: [],
-    },
-    async () => {
-      // eslint-disable-next-line no-console -- demo tool call diagnostic
-      console.log('[Tool] get_current_time called');
-      const now = new Date();
-      return {
-        date: now.toLocaleDateString(),
-        time: now.toLocaleTimeString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      };
-    }
-  );
-
-  // Calculator tool - Math evaluation
-  RunAnywhere.registerTool(
-    {
-      name: 'calculate',
-      description:
-        'Performs math calculations. Supports +, -, *, /, and parentheses',
-      parameters: [
-        {
-          name: 'expression',
-          type: 'string',
-          description: 'Math expression (e.g., "2 + 2 * 3", "(10 + 5) / 3")',
-          required: true,
-        },
-      ],
-    },
-    async (args) => {
-      const expression = (args.expression || args.input) as string;
-      // eslint-disable-next-line no-console -- demo tool call diagnostic
-      console.log('[Tool] calculate called for:', expression);
-      try {
-        // Safe math evaluation using recursive descent parser
-        const result = safeEvaluateExpression(expression);
-        return {
-          expression: expression,
-          result: result,
-        };
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return { error: `Failed to calculate: ${msg}` };
-      }
-    }
-  );
-
-  // eslint-disable-next-line no-console -- demo setup diagnostic
-  console.log(
-    '[ChatScreen] Tools registered: get_weather, get_current_time, calculate'
-  );
-};
-
-/**
- * Detect tool call format based on model ID and name
- * LFM2-Tool models use Pythonic format, others use JSON format
- * * Matches iOS: LLMViewModel+ToolCalling.swift detectToolCallFormat()
- * Checks both ID and name since model might be identified by either
- */
-const detectToolCallFormat = (
-  modelId: string | undefined,
-  modelName: string | undefined
-): string => {
-  // Check model ID first (more reliable - e.g., "lfm2-1.2b-tool-q4_k_m")
-  if (modelId) {
-    const id = modelId.toLowerCase();
-    if (id.includes('lfm2') && id.includes('tool')) {
-      return 'lfm2';
-    }
-  }
-
-  // Also check model name (e.g., "LiquidAI LFM2 1.2B Tool Q4_K_M")
-  if (modelName) {
-    const name = modelName.toLowerCase();
-    if (name.includes('lfm2') && name.includes('tool')) {
-      return 'lfm2';
-    }
-  }
-
-  // Default JSON format for general-purpose models
-  return 'default';
-};
+interface GenerationSettings {
+  temperature: number;
+  maxTokens: number;
+  systemPrompt?: string;
+}
 
 export const ChatScreen: React.FC = () => {
   // Conversation store
@@ -228,13 +98,14 @@ export const ChatScreen: React.FC = () => {
     setCurrentConversation,
     addMessage,
     updateMessage,
+    updateConversation,
   } = useConversationStore();
 
   // Local state
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
-  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showConversationList, setShowConversationList] = useState(false);
@@ -244,6 +115,9 @@ export const ChatScreen: React.FC = () => {
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -278,6 +152,10 @@ export const ChatScreen: React.FC = () => {
   useEffect(() => {
     checkModelStatus();
     loadAvailableModels();
+    // Reflect whatever tools Settings has already registered (badge only).
+    RunAnywhere.getRegisteredTools().then((tools) =>
+      setRegisteredToolCount(tools.length)
+    );
   }, []);
 
   // Messages from current conversation
@@ -287,7 +165,7 @@ export const ChatScreen: React.FC = () => {
    * Get generation options from AsyncStorage
    * Reads user-configured temperature, maxTokens, and systemPrompt
    */
-  const getGenerationOptions = async (): Promise<GenerationOptions> => {
+  const getGenerationOptions = async (): Promise<GenerationSettings> => {
     const tempStr = await AsyncStorage.getItem(
       GENERATION_SETTINGS_KEYS.TEMPERATURE
     );
@@ -318,16 +196,17 @@ export const ChatScreen: React.FC = () => {
    */
   const loadAvailableModels = async () => {
     try {
-      const allModels = await RunAnywhere.getAvailableModels();
+      const allModels = await listModels();
       const llmModels = allModels.filter(
-        (m: SDKModelInfo) => m.category === ModelCategory.Language
+        (m: SDKModelInfo) =>
+          m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
       setAvailableModels(llmModels);
-      console.warn(
+      logDiagnostic(
         '[ChatScreen] Available LLM models:',
         llmModels.map(
           (m: SDKModelInfo) =>
-            `${m.id} (${m.isDownloaded ? 'downloaded' : 'not downloaded'})`
+            `${m.id} (${m.isDownloaded || m.localPath ? 'downloaded' : 'not downloaded'})`
         )
       );
     } catch (error) {
@@ -336,35 +215,19 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Check if a model is loaded
-   * Note: If a model is already loaded from a previous session, we set a placeholder.
-   * For proper tool calling format detection, the user should select a model through the UI.
+   * Check if a model is loaded from a previous session.
+   *
+   * The SDK can confirm a model is loaded but doesn't expose which one, so we
+   * intentionally leave `currentModel` as null and let the model-required empty
+   * state prompt the user to pick one (required anyway for tool-call format
+   * detection). No stand-in model entry is inserted.
    */
   const checkModelStatus = async () => {
     try {
-      const isLoaded = await RunAnywhere.isModelLoaded();
-      console.warn('[ChatScreen] Text model loaded:', isLoaded);
-      if (isLoaded) {
-        // Model is loaded but we don't know which one - set placeholder
-        // User should select a model through UI for proper format detection
-        setCurrentModel({
-          id: 'loaded-model',
-          name: 'Loaded Model (select model for tool calling)',
-          category: ModelCategory.Language,
-          compatibleFrameworks: [LLMFramework.LlamaCpp],
-          preferredFramework: LLMFramework.LlamaCpp,
-          isDownloaded: true,
-          isAvailable: true,
-          supportsThinking: false,
-        });
-        // Register tools if model already loaded
-        registerChatTools();
-        const tools = RunAnywhere.getRegisteredTools();
-        setRegisteredToolCount(tools.length);
-        console.warn(
-          '[ChatScreen] Model loaded from previous session. For LFM2 tool calling, please select the model again.'
-        );
-      }
+      const isLoaded = await isModelLoadedForCategory(
+        ModelCategory.MODEL_CATEGORY_LANGUAGE
+      );
+      logDiagnostic('[ChatScreen] Text model loaded:', isLoaded);
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
     }
@@ -389,55 +252,58 @@ export const ChatScreen: React.FC = () => {
 
   /**
    * Load a model using the SDK
+   *
+   * Path-first loading was removed in V2 — model ID is the canonical handle
+   * and the native registry resolves the artifact path internally.
    */
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.warn(
-        `[ChatScreen] Loading model: ${model.id} from ${model.localPath}`
+      logDiagnostic(
+        `[ChatScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.localPath) {
+      if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
-          'Model path not found. Please re-download the model.'
+          'Model has not been downloaded. Open the model picker to download it first.'
         );
         return;
       }
 
-      const success = await RunAnywhere.loadModel(model.localPath);
+      const result = await loadModelWithRequest(
+        ModelLoadRequest.fromPartial({
+          modelId: model.id,
+          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          forceReload: false,
+          validateAvailability: true,
+        })
+      );
 
-      if (success) {
+      if (result.success) {
         // Set the model info preserving the actual framework from the SDK model
-        const fw =
-          (model.preferredFramework as unknown as LLMFramework) ??
-          LLMFramework.LlamaCpp;
-        const modelInfo = {
-          id: model.id,
-          name: model.name,
-          category: ModelCategory.Language,
-          compatibleFrameworks:
-            (model.compatibleFrameworks as unknown as LLMFramework[]) ?? [fw],
+        const fw = getPrimaryFramework(
+          model,
+          InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+        );
+        const modelInfo: SDKModelInfo = {
+          ...model,
+          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          framework: model.framework || fw,
           preferredFramework: fw,
           isDownloaded: true,
           isAvailable: true,
-          supportsThinking: false,
+          supportsThinking: model.supportsThinking ?? false,
         };
         setCurrentModel(modelInfo);
 
-        // Log model info for format detection debugging
-        const format = detectToolCallFormat(model.id, model.name);
-        console.warn(
-          `[ChatScreen] Model loaded: id="${model.id}", name="${model.name}", detected format="${format}"`
-        );
-
-        // Register tools when model loads
-        registerChatTools();
-        const tools = RunAnywhere.getRegisteredTools();
+        // Reflect the tool count that Settings has registered (read-only here).
+        const tools = await RunAnywhere.getRegisteredTools();
         setRegisteredToolCount(tools.length);
-        console.warn('[ChatScreen] Tools registered:', tools.length, 'tools');
       } else {
-        const lastError = await RunAnywhere.getLastError();
+        const lastError =
+          result.errorMessage ||
+          'Native model lifecycle returned an unsuccessful load result';
         Alert.alert(
           'Error',
           `Failed to load model: ${lastError || 'Unknown error'}`
@@ -452,11 +318,11 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Send a message using the real SDK with tool calling support
-   * Uses RunAnywhere.generateWithTools() for AI that can take actions
+   * Send a message and stream the response token-by-token.
+   * Uses RunAnywhere.generateStream() for real-time streaming UI.
    *
-   * Example: "What's the weather in Tokyo?"
-   * → LLM calls get_weather tool → Real API call → Final response
+   * generateWithTools() is still available on RunAnywhere for callers
+   * that genuinely need the batch tool-calling form.
    */
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !currentConversation) return;
@@ -474,106 +340,132 @@ export const ChatScreen: React.FC = () => {
     setInputText('');
     setIsLoading(true);
 
-    // Create placeholder assistant message
     const assistantMessageId = generateId();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: MessageRole.Assistant,
-      content: 'Thinking...',
-      timestamp: new Date(),
-    };
-    await addMessage(assistantMessage, currentConversation.id);
 
-    // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
     try {
-      // Detect tool call format based on loaded model (matches iOS LLMViewModel+ToolCalling.swift)
-      const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
-      // eslint-disable-next-line no-console -- demo generation diagnostic
-      console.log(
-        '[ChatScreen] Starting generation with tools for:',
-        prompt,
-        'model:',
-        currentModel?.id,
-        'format:',
-        format
-      );
-
       // Get user-configured generation options
       const options = await getGenerationOptions();
 
-      // Use tool-enabled generation
-      // If the LLM needs to call a tool (like weather API), it happens automatically
-      const result = await RunAnywhere.generateWithTools(prompt, {
-        autoExecute: true,
-        maxToolCalls: 3,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
+      // eslint-disable-next-line no-console -- demo generation diagnostic
+      console.log(
+        '[ChatScreen] Starting streaming generation for:',
+        prompt,
+        'model:',
+        currentModel?.id
+      );
+
+      let accumulatedText = '';
+
+      const genOptions = LLMGenerationOptions.fromPartial({
+        maxTokens: options.maxTokens ?? 512,
+        temperature: options.temperature ?? 0.7,
+        topP: 1.0,
+        topK: 0,
+        repetitionPenalty: 1.0,
+        stopSequences: [],
+        streamingEnabled: true,
+        preferredFramework:
+          currentModel?.preferredFramework ??
+          currentModel?.framework ??
+          InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
         systemPrompt: options.systemPrompt,
-        format: format,
+        enableRealTimeTracking: false,
+        seed: 0,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        repeatLastN: 0,
+        minP: 0,
+        echoPrompt: false,
+        nThreads: 0,
       });
 
-      // Log tool usage for debugging
-      if (result.toolCalls.length > 0) {
-        /* eslint-disable no-console -- demo tool-use diagnostic */
-        console.log(
-          '[ChatScreen] Tools used:',
-          result.toolCalls.map((t) => t.toolName)
-        );
-        console.log('[ChatScreen] Tool results:', result.toolResults);
-        /* eslint-enable no-console */
-      }
+      const frameworkName = getFrameworkDisplayName(
+        currentModel?.preferredFramework ?? currentModel?.framework
+      );
 
-      // Build final message content
-      const finalContent = result.text || '(No response generated)';
+      // Insert the initial empty assistant message once (matches iOS two-phase pattern).
+      const initialAssistantMessage: Message = {
+        id: assistantMessageId,
+        role: MessageRole.Assistant,
+        content: '',
+        timestamp: new Date(),
+        modelInfo: {
+          modelId: currentModel?.id || 'unknown',
+          modelName: currentModel?.name || 'Unknown Model',
+          framework: frameworkName,
+          frameworkDisplayName: frameworkName,
+        },
+      };
+      await addMessage(initialAssistantMessage, currentConversation.id);
 
-      // Extract tool call info from result (matching iOS implementation)
-      let toolCallInfo: ToolCallInfo | undefined;
-      if (result.toolCalls.length > 0) {
-        const lastToolCall = result.toolCalls[result.toolCalls.length - 1];
-        const lastToolResult =
-          result.toolResults[result.toolResults.length - 1];
+      // Stream tokens as they arrive — canonical cross-SDK path. We drive
+      // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
+      // like iOS LLMViewModel+Generation.swift: it consumes the
+      // `generateStream` AsyncIterable, accumulates the transcript, and
+      // invokes `onToken` with the full text so far for live UI updates.
+      //
+      // `updateMessage` is a synchronous in-memory store write (no per-token
+      // disk write). Because the whole stream resolves on the microtask
+      // queue, we must hand a macrotask back to React inside `onToken`
+      // (`setTimeout(0)`) so it can paint each token into the assistant
+      // bubble — otherwise the synchronous-update loop runs to completion
+      // before React ever re-renders and the bubble appears empty mid-stream.
+      const eventStream = RunAnywhere.generateStream(prompt, genOptions);
+      const result = await RunAnywhere.aggregateStream(
+        prompt,
+        eventStream,
+        async (transcript) => {
+          accumulatedText = transcript;
+          updateMessage(
+            {
+              id: assistantMessageId,
+              role: MessageRole.Assistant,
+              content: accumulatedText,
+              timestamp: new Date(),
+              modelInfo: {
+                modelId: currentModel?.id || 'unknown',
+                modelName: currentModel?.name || 'Unknown Model',
+                framework: frameworkName,
+                frameworkDisplayName: frameworkName,
+              },
+            },
+            currentConversation.id
+          );
+          flatListRef.current?.scrollToEnd({ animated: false });
+          // Yield a macrotask so React flushes this token to the screen.
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+      );
 
-        toolCallInfo = {
-          toolName: lastToolCall.toolName,
-          arguments: JSON.stringify(lastToolCall.arguments, null, 2),
-          result: lastToolResult?.success
-            ? JSON.stringify(lastToolResult.result, null, 2)
-            : undefined,
-          success: lastToolResult?.success ?? false,
-          error: lastToolResult?.error,
-        };
+      const finalContent =
+        result.text || accumulatedText || '(No response generated)';
 
-        // eslint-disable-next-line no-console -- demo tool-use diagnostic
-        console.log(
-          '[ChatScreen] Created toolCallInfo:',
-          toolCallInfo.toolName,
-          'success:',
-          toolCallInfo.success
-        );
-      }
-
-      // Update with final message
+      // Build the final message with analytics and persist to disk once
+      // (mirrors iOS finalizeGeneration / updateConversation).
       const finalMessage: Message = {
         id: assistantMessageId,
         role: MessageRole.Assistant,
         content: finalContent,
         timestamp: new Date(),
-        toolCallInfo, // Attach tool call info to message
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',
-          framework: currentModel?.preferredFramework || 'unknown',
-          frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
+          framework: frameworkName,
+          frameworkDisplayName: frameworkName,
         },
         analytics: {
-          totalGenerationTime: 0,
-          inputTokens: Math.ceil(prompt.length / 4),
-          outputTokens: Math.ceil(finalContent.length / 4),
-          averageTokensPerSecond: 0,
+          performance: {
+            latencyMs: result.generationTimeMs,
+            memoryBytes: 0,
+            throughputTokensPerSec: result.tokensPerSecond,
+            promptTokens: result.inputTokens,
+            completionTokens: result.tokensGenerated,
+          },
+          timeToFirstToken: result.ttftMs,
           completionStatus: 'completed',
           wasThinkingMode: false,
           wasInterrupted: false,
@@ -581,7 +473,14 @@ export const ChatScreen: React.FC = () => {
         },
       };
 
+      // Apply analytics fields in-memory first, then persist once.
       updateMessage(finalMessage, currentConversation.id);
+      const latestConversation = useConversationStore
+        .getState()
+        .conversations.find((c) => c.id === currentConversation.id);
+      if (latestConversation) {
+        await updateConversation(latestConversation);
+      }
 
       // Final scroll to bottom
       setTimeout(() => {
@@ -590,8 +489,7 @@ export const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      // Update the placeholder message with error
-      updateMessage(
+      await addMessage(
         {
           id: assistantMessageId,
           role: MessageRole.Assistant,
@@ -603,7 +501,7 @@ export const ChatScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentConversation, currentModel, addMessage, updateMessage]);
+  }, [inputText, currentConversation, currentModel, addMessage, updateMessage, updateConversation]);
 
   /**
    * Create a new conversation (clears current chat)
@@ -611,6 +509,16 @@ export const ChatScreen: React.FC = () => {
   const handleNewChat = useCallback(async () => {
     await createConversation();
   }, [createConversation]);
+
+  // Expose test helpers for E2E automation via Hermes debugger
+  useEffect(() => {
+    if (__DEV__) {
+      const g = globalThis as unknown as Record<string, unknown>;
+      g.__testNewChat = handleNewChat;
+      g.__testSend = handleSend;
+      g.__testSetInput = setInputText;
+    }
+  }, [handleNewChat, handleSend]);
 
   /**
    * Handle selecting a conversation from the list
@@ -659,7 +567,9 @@ export const ChatScreen: React.FC = () => {
    * Render header with actions
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View
+      style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}
+    >
       {/* Conversations list button */}
       <TouchableOpacity
         style={styles.headerButton}
@@ -711,7 +621,7 @@ export const ChatScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         {renderHeader()}
         <ModelRequiredOverlay
-          modality={ModelModality.LLM}
+          modality="llm"
           onSelectModel={handleSelectModel}
         />
 
@@ -834,7 +744,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

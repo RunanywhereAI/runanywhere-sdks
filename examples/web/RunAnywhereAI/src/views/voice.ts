@@ -1,575 +1,651 @@
 /**
- * Voice Tab - Voice Assistant with pipeline setup and particle animation
- * Matches iOS VoiceAssistantView.
+ * Voice Tab — V2 canonical voice agent.
  *
- * Pipeline flow:  Mic → STT → LLM (streaming) → TTS → Speaker
+ * Mirrors the iOS `VoiceAgentViewModel` pattern (Swift source-of-truth):
+ *
+ *   1. The user loads three models from the other tabs (Chat for LLM,
+ *      Transcribe for STT, Speak for TTS — backed by the same model registry
+ *      and `RunAnywhere.loadModel(...)` lifecycle).
+ *   2. We probe `RunAnywhere.componentLifecycleSnapshot(SDK_COMPONENT_*)` for
+ *      LLM / STT / TTS readiness. When all three are READY, the Start
+ *      button enables.
+ *   3. Start: capture mic at 16 kHz mono Float32 through `AudioCapture`,
+ *      register backend models via
+ *      `RunAnywhere.initializeVoiceAgentWithLoadedModels()`, and consume
+ *      `RunAnywhere.streamVoiceAgent()` as `AsyncIterable<VoiceEvent>`.
+ *   4. Each VoiceEvent oneof arm drives a UI region:
+ *        - `state`              → pipeline status pill (idle / listening / ...)
+ *        - `vad`                → speech-detected indicator
+ *        - `userSaid`           → live transcript area
+ *        - `assistantToken`     → streamed assistant response
+ *        - `audio`              → push PCM bytes to `AudioPlayback`
+ *        - `error`              → inline error banner
+ *   5. Stop: cancel the event-consumer task, stop capture, dispose playback,
+ *      and call `RunAnywhere.cleanupVoiceAgent()`.
+ *
+ * The voice agent itself owns audio pacing (the energy-VAD inside the C++
+ * agent runs against the mic samples once registered). When the ONNX/Sherpa
+ * backend isn't available, `initializeVoiceAgentWithLoadedModels()` raises
+ * `BackendNotAvailable` and the view surfaces that as an inline error.
  */
 
 import type { TabLifecycle } from '../app';
-import { showModelSelectionSheet } from '../components/model-selection';
-import { ModelManager, ModelCategory, ensureVADLoaded } from '../services/model-manager';
-import { VoicePipeline, PipelineState, AudioCapture, AudioPlayback, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
+import {
+  RunAnywhere,
+  AudioEncoding,
+  SDKComponent,
+  TokenKind,
+  isSDKException,
+  VoiceEventPipelineState,
+  type AssistantTokenEvent,
+  type AudioFrameEvent,
+  type ErrorEvent,
+  type StateChangeEvent,
+  type UserSaidEvent,
+  type VADEvent,
+  type VoiceEvent,
+} from '@runanywhere/web';
+import {
+  AudioCapture,
+  AudioPlayback,
+} from '@runanywhere/web/browser';
+import { ONNX } from '@runanywhere/web-onnx';
+import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
+import { escapeHtml } from '../services/escape-html';
+import { formatError } from '../services/format-error';
 
-/** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
-const micCapture = new AudioCapture();
-
-/** SDK VoicePipeline: orchestrates STT -> LLM (streaming) -> TTS. */
-const pipeline = new VoicePipeline();
-
-// ---------------------------------------------------------------------------
-// Pipeline step definitions
-// ---------------------------------------------------------------------------
-
-interface PipelineStep {
-  modality: ModelCategory;
-  elementId: string;
-  title: string;
-  defaultStatus: string;
+// `@runanywhere/web-llamacpp` is loaded lazily so the voice tab can be code-
+// split. `main.ts` already pulls the package via dynamic `import(...)` for
+// initial registration, so importing it statically here would prevent vite
+// from sharing the chunk. We eagerly resolve the module on first render so
+// `LlamaCPP.isRegistered` is available synchronously after that.
+type LlamaCPPApi = typeof import('@runanywhere/web-llamacpp')['LlamaCPP'];
+let _llamaCppCache: LlamaCPPApi | null = null;
+async function llamaCpp(): Promise<LlamaCPPApi> {
+  if (_llamaCppCache) return _llamaCppCache;
+  const mod = await import('@runanywhere/web-llamacpp');
+  _llamaCppCache = mod.LlamaCPP;
+  return _llamaCppCache;
 }
-
-const PIPELINE_STEPS: PipelineStep[] = [
-  { modality: ModelCategory.SpeechRecognition, elementId: 'voice-setup-stt', title: 'Speech-to-Text', defaultStatus: 'Select STT model' },
-  { modality: ModelCategory.Language, elementId: 'voice-setup-llm', title: 'Language Model', defaultStatus: 'Select LLM model' },
-  { modality: ModelCategory.SpeechSynthesis, elementId: 'voice-setup-tts', title: 'Text-to-Speech', defaultStatus: 'Select TTS model' },
-];
-
-// Minimum audio segment (samples at 16kHz) to process — ~0.5s
-const MIN_AUDIO_SAMPLES = 8000;
+function llamaCppSync(): LlamaCPPApi | null {
+  return _llamaCppCache;
+}
+// Kick off the import as soon as the module loads so the cached reference
+// is available synchronously by the time the user reaches the Voice tab.
+void llamaCpp().catch(() => {
+  /* Silently ignored — `main.ts` reports backend registration errors. */
+});
 
 // ---------------------------------------------------------------------------
-// State
+// View state
 // ---------------------------------------------------------------------------
 
-type VoiceState = 'setup' | 'idle' | 'listening' | 'processing' | 'speaking';
+type SessionState =
+  | 'idle'
+  | 'starting'
+  | 'listening'
+  | 'speech-detected'
+  | 'processing'
+  | 'speaking'
+  | 'stopped'
+  | 'error';
+
+interface ComponentReadiness {
+  llmReady: boolean;
+  sttReady: boolean;
+  ttsReady: boolean;
+  llmModelId: string;
+  sttModelId: string;
+  ttsModelId: string;
+}
 
 let container: HTMLElement;
-let state: VoiceState = 'setup';
-let canvas: HTMLCanvasElement;
-let animationFrame: number | null = null;
-let particles: Particle[] = [];
+let unmounted = false;
 
-/** Whether the continuous conversation session is active */
-let sessionActive = false;
-/** Whether SDK VAD is actively monitoring audio. */
-let vadActive = false;
-/** Unsubscribe function for VAD speech activity callback. */
-let unsubscribeVAD: (() => void) | null = null;
-
-interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;
-  radius: number;
-  color: string;
-  alpha: number;
-  phase: number;
-}
+let audioCapture: AudioCapture | null = null;
+let audioPlayback: AudioPlayback | null = null;
+let eventConsumer: AbortController | null = null;
+let sessionState: SessionState = 'idle';
+let userTranscript = '';
+let assistantResponse = '';
+let assistantThinking = '';
+let lastError: string | null = null;
+let audioLevel = 0;
+let lastEventSummary = '';
 
 // ---------------------------------------------------------------------------
-// Init
+// Lifecycle
 // ---------------------------------------------------------------------------
 
 export function initVoiceTab(el: HTMLElement): TabLifecycle {
   container = el;
-  container.innerHTML = `
-    <!-- Pipeline Setup -->
-    <div id="voice-setup" class="scroll-area flex-col">
-      <div class="toolbar">
-        <div class="toolbar-title">Voice Assistant</div>
-        <div class="toolbar-actions"></div>
-      </div>
-      <div class="flex-1 flex-center">
-        <div class="pipeline-setup">
-          <h3 class="text-center mb-md">Set Up Voice Pipeline</h3>
-          <p class="text-center helper-text mb-xl">
-            Select models for each step of the voice AI pipeline.
-          </p>
-
-          <div class="setup-card" id="voice-setup-stt">
-            <div class="setup-step-number">1</div>
-            <div class="setup-card-info">
-              <div class="setup-card-title">Speech-to-Text</div>
-              <div class="setup-card-status">Select STT model</div>
-            </div>
-          </div>
-
-          <div class="setup-card" id="voice-setup-llm">
-            <div class="setup-step-number">2</div>
-            <div class="setup-card-info">
-              <div class="setup-card-title">Language Model</div>
-              <div class="setup-card-status">Select LLM model</div>
-            </div>
-          </div>
-
-          <div class="setup-card" id="voice-setup-tts">
-            <div class="setup-step-number">3</div>
-            <div class="setup-card-info">
-              <div class="setup-card-title">Text-to-Speech</div>
-              <div class="setup-card-status">Select TTS model</div>
-            </div>
-          </div>
-
-          <button class="btn btn-primary btn-lg w-full mt-xl" id="voice-start-btn" disabled>
-            Start Voice Assistant
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Voice Interface -->
-    <div id="voice-interface" class="voice-interface hidden">
-      <div class="toolbar">
-        <div class="toolbar-title">Voice Assistant</div>
-        <div class="toolbar-actions">
-          <button class="btn-ghost" id="voice-back-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="voice-canvas-container">
-        <canvas class="voice-canvas" id="voice-particle-canvas"></canvas>
-        <button class="mic-btn" id="voice-mic-btn">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-            <line x1="12" y1="19" x2="12" y2="23"/>
-            <line x1="8" y1="23" x2="16" y2="23"/>
-          </svg>
-        </button>
-      </div>
-      <div class="voice-status-panel">
-        <div id="voice-status" class="helper-text">Tap to speak</div>
-        <div id="voice-response" class="scroll-area voice-response-area"></div>
-      </div>
-    </div>
-  `;
-
-  canvas = container.querySelector('#voice-particle-canvas')!;
-
-  // Setup card clicks — open model selection for each modality.
-  // coexist: true because Voice needs STT + LLM + TTS loaded simultaneously.
-  container.querySelector('#voice-setup-stt')!.addEventListener('click', () => {
-    showModelSelectionSheet(ModelCategory.SpeechRecognition, { coexist: true });
-  });
-  container.querySelector('#voice-setup-llm')!.addEventListener('click', () => {
-    showModelSelectionSheet(ModelCategory.Language, { coexist: true });
-  });
-  container.querySelector('#voice-setup-tts')!.addEventListener('click', () => {
-    showModelSelectionSheet(ModelCategory.SpeechSynthesis, { coexist: true });
-  });
-
-  // Start Voice Assistant button
-  container.querySelector('#voice-start-btn')!.addEventListener('click', () => {
-    transitionToVoiceInterface();
-  });
-
-  // Back button from voice interface → setup
-  container.querySelector('#voice-back-btn')!.addEventListener('click', () => {
-    transitionToSetup();
-  });
-
-  // Mic button
-  container.querySelector('#voice-mic-btn')!.addEventListener('click', toggleMic);
-
-  // Subscribe to model changes so we can update pipeline state
-  ModelManager.onChange(() => refreshPipelineUI());
-
-  // Initial pipeline UI check (in case models are already loaded)
-  refreshPipelineUI();
-
-  // Return lifecycle callbacks for tab-switching cleanup
+  unmounted = false;
+  renderView();
   return {
-    onDeactivate(): void {
-      // Stop mic, VAD, particles, and cancel any in-flight generation
-      if (sessionActive) {
-        stopSession();
-        console.log('[Voice] Tab deactivated — session stopped');
-      }
+    onActivate: () => {
+      unmounted = false;
+      renderView();
+    },
+    onDeactivate: () => {
+      unmounted = true;
+      void stopSession({ silent: true });
     },
   };
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline State & UI
+// Readiness probing
 // ---------------------------------------------------------------------------
 
-/** Refresh setup card states and start button based on loaded models */
-function refreshPipelineUI(): void {
-  const startBtn = container.querySelector('#voice-start-btn') as HTMLButtonElement | null;
-  if (!startBtn) return;
+function readReadiness(): ComponentReadiness {
+  return {
+    llmReady: isComponentReady(SDKComponent.SDK_COMPONENT_LLM),
+    sttReady: isComponentReady(SDKComponent.SDK_COMPONENT_STT),
+    ttsReady: isComponentReady(SDKComponent.SDK_COMPONENT_TTS),
+    llmModelId: componentModelId(SDKComponent.SDK_COMPONENT_LLM),
+    sttModelId: componentModelId(SDKComponent.SDK_COMPONENT_STT),
+    ttsModelId: componentModelId(SDKComponent.SDK_COMPONENT_TTS),
+  };
+}
 
-  let allReady = true;
-
-  for (const step of PIPELINE_STEPS) {
-    const card = container.querySelector(`#${step.elementId}`);
-    if (!card) continue;
-
-    const statusEl = card.querySelector('.setup-card-status');
-    const stepNumber = card.querySelector('.setup-step-number');
-    const loadedModel = ModelManager.getLoadedModel(step.modality);
-
-    if (loadedModel) {
-      // Model is loaded — show checkmark and model name
-      if (statusEl) {
-        statusEl.textContent = loadedModel.name;
-        (statusEl as HTMLElement).classList.add('text-green');
-      }
-      if (stepNumber) {
-        stepNumber.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>`;
-      }
-      card.classList.add('loaded');
-    } else {
-      // Not loaded — show default state
-      if (statusEl) {
-        statusEl.textContent = step.defaultStatus;
-        (statusEl as HTMLElement).classList.remove('text-green');
-      }
-      const stepIdx = PIPELINE_STEPS.indexOf(step);
-      if (stepNumber) {
-        stepNumber.textContent = String(stepIdx + 1);
-      }
-      card.classList.remove('loaded');
-      allReady = false;
-    }
+function isComponentReady(component: SDKComponent): boolean {
+  try {
+    const snap = RunAnywhere.componentLifecycleSnapshot(component);
+    return snap?.state === ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY;
+  } catch {
+    return false;
   }
-
-  startBtn.disabled = !allReady;
 }
 
-/** Switch from pipeline setup → voice interface */
-function transitionToVoiceInterface(): void {
-  state = 'idle';
-  const setup = container.querySelector('#voice-setup') as HTMLElement;
-  const iface = container.querySelector('#voice-interface') as HTMLElement;
-  if (setup) setup.classList.add('hidden');
-  if (iface) iface.classList.remove('hidden');
-}
-
-/** Switch from voice interface → pipeline setup */
-function transitionToSetup(): void {
-  stopSession();
-  state = 'setup';
-  const setup = container.querySelector('#voice-setup') as HTMLElement;
-  const iface = container.querySelector('#voice-interface') as HTMLElement;
-  if (setup) setup.classList.remove('hidden');
-  if (iface) iface.classList.add('hidden');
-}
-
-// ---------------------------------------------------------------------------
-// UI Helpers
-// ---------------------------------------------------------------------------
-
-function setStatus(text: string): void {
-  const el = container.querySelector('#voice-status');
-  if (el) el.textContent = text;
-}
-
-function setResponse(html: string): void {
-  const el = container.querySelector('#voice-response');
-  if (el) el.innerHTML = html;
-}
-
-function setMicActive(active: boolean): void {
-  const micBtn = container.querySelector('#voice-mic-btn');
-  if (micBtn) micBtn.classList.toggle('listening', active);
-}
-
-// ---------------------------------------------------------------------------
-// Mic Toggle — starts / stops the continuous conversation session
-// ---------------------------------------------------------------------------
-
-async function toggleMic(): Promise<void> {
-  if (sessionActive) {
-    stopSession();
-  } else {
-    await startSession();
+function componentModelId(component: SDKComponent): string {
+  try {
+    const snap = RunAnywhere.componentLifecycleSnapshot(component);
+    return snap?.modelId ?? '';
+  } catch {
+    return '';
   }
 }
 
 // ---------------------------------------------------------------------------
-// Continuous conversation session  (matches iOS VoiceSessionHandle)
-//
-//   ┌──────────────────────────────────────────────┐
-//   │  [listening] ──(VAD silence)──► [processing]  │
-//   │       ▲                              │        │
-//   │       └──── [speaking] ◄─────────────┘        │
-//   └──────────────────────────────────────────────┘
+// Rendering
+// ---------------------------------------------------------------------------
+
+function renderView(): void {
+  if (unmounted) return;
+
+  const readiness = readReadiness();
+  const llamaApi = llamaCppSync();
+  if (!llamaApi) {
+    // Resolve in the background and re-render once the module is loaded so
+    // `LlamaCPP.isRegistered` becomes visible without further user action.
+    void llamaCpp().then(() => {
+      if (!unmounted) renderView();
+    }).catch(() => { /* surfaced elsewhere */ });
+  }
+  const llamaRegistered = llamaApi?.isRegistered ?? false;
+  const onnxRegistered = ONNX.isRegistered;
+  const allReady = readiness.llmReady && readiness.sttReady && readiness.ttsReady;
+  const isActive = sessionState !== 'idle'
+    && sessionState !== 'stopped'
+    && sessionState !== 'error';
+
+  container.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-title">Voice</div>
+      <div class="toolbar-actions">
+        <button class="btn btn-secondary" id="voice-refresh-btn">Refresh</button>
+      </div>
+    </div>
+    <div class="scroll-area">
+      <div class="docs-section">
+        <h3>Backend status</h3>
+        <ul class="feature-unavailable__list">
+          <li><code>LlamaCPP.isRegistered</code>: <strong>${llamaRegistered ? 'yes' : 'no'}</strong></li>
+          <li><code>ONNX.isRegistered</code>: <strong>${onnxRegistered ? 'yes' : 'no'}</strong></li>
+        </ul>
+        <div class="toolbar-actions">
+          ${llamaRegistered
+            ? ''
+            : '<button class="btn btn-secondary" id="voice-register-llama">Register LlamaCPP</button>'}
+          ${onnxRegistered
+            ? ''
+            : '<button class="btn btn-secondary" id="voice-register-onnx">Register ONNX</button>'}
+        </div>
+      </div>
+
+      <div class="docs-section">
+        <h3>Pipeline models</h3>
+        <p class="text-secondary">Each slot is loaded through the canonical model
+        lifecycle. Open the indicated tab to download and load the model — the
+        voice agent reuses whatever is currently loaded in that component.</p>
+        <ul class="feature-unavailable__list">
+          <li>
+            <strong>LLM:</strong>
+            ${readiness.llmReady
+              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.llmModelId || '(default)')}</code>`
+              : '<span class="badge badge-grey">Not loaded</span> — load any chat model from the <em>Chat</em> tab'}
+          </li>
+          <li>
+            <strong>STT:</strong>
+            ${readiness.sttReady
+              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.sttModelId || '(default)')}</code>`
+              : '<span class="badge badge-grey">Not loaded</span> — load Whisper Tiny from the <em>Transcribe</em> tab'}
+          </li>
+          <li>
+            <strong>TTS:</strong>
+            ${readiness.ttsReady
+              ? `<span class="badge badge-green">Loaded</span> <code>${escapeHtml(readiness.ttsModelId || '(default)')}</code>`
+              : '<span class="badge badge-grey">Not loaded</span> — load Piper US Lessac from the <em>Speak</em> tab'}
+          </li>
+        </ul>
+      </div>
+
+      <div class="docs-section">
+        <h3>Session</h3>
+        <p class="text-secondary">When all three models are loaded the agent
+        captures the microphone, dispatches each turn through
+        <code>RunAnywhere.streamVoiceAgent()</code>, and plays back the TTS
+        chunks via <code>AudioPlayback</code>.</p>
+        <div class="toolbar-actions">
+          <button
+            class="btn btn-primary"
+            id="voice-start-btn"
+            ${allReady && !isActive ? '' : 'disabled'}
+          >${isActive ? 'Session active' : 'Start Voice Session'}</button>
+          <button
+            class="btn btn-secondary"
+            id="voice-stop-btn"
+            ${isActive ? '' : 'disabled'}
+          >Stop</button>
+        </div>
+        <div class="docs-status">
+          <strong>State:</strong>
+          <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState)}">${prettyState(sessionState)}</span>
+          <span class="text-secondary" style="margin-left:8px"><code>${escapeHtml(lastEventSummary || '(no events yet)')}</code></span>
+        </div>
+        <div class="docs-status" id="voice-level-row">
+          <strong>Mic level:</strong>
+          <div class="progress-bar" style="display:inline-block;width:200px;margin-left:8px;vertical-align:middle">
+            <div class="progress-fill" style="width:${Math.round(audioLevel * 100)}%"></div>
+          </div>
+        </div>
+        ${lastError
+          ? `<div class="docs-status error">Error: ${escapeHtml(lastError)}</div>`
+          : ''}
+      </div>
+
+      <div class="docs-section">
+        <h3>You said</h3>
+        <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || '(waiting for speech...)')}</pre>
+      </div>
+
+      ${assistantThinking
+        ? `<div class="docs-section">
+            <h3>Assistant thinking</h3>
+            <pre id="voice-assistant-thinking" class="docs-pre">${escapeHtml(assistantThinking)}</pre>
+          </div>`
+        : ''}
+
+      <div class="docs-section">
+        <h3>Assistant</h3>
+        <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || '(no response yet)')}</pre>
+      </div>
+    </div>
+  `;
+
+  attachHandlers();
+}
+
+function attachHandlers(): void {
+  container.querySelector('#voice-refresh-btn')?.addEventListener('click', () => renderView());
+  container
+    .querySelector('#voice-register-llama')
+    ?.addEventListener('click', () => void registerLlamaCpp());
+  container
+    .querySelector('#voice-register-onnx')
+    ?.addEventListener('click', () => void registerOnnx());
+  container.querySelector('#voice-start-btn')?.addEventListener('click', () => void startSession());
+  container.querySelector('#voice-stop-btn')?.addEventListener('click', () => void stopSession());
+}
+
+// ---------------------------------------------------------------------------
+// Backend registration helpers
+// ---------------------------------------------------------------------------
+
+async function registerLlamaCpp(): Promise<void> {
+  lastError = null;
+  setEventSummary('Registering LlamaCPP backend...');
+  try {
+    const LlamaCPP = await llamaCpp();
+    await LlamaCPP.register({ acceleration: 'auto' });
+  } catch (err) {
+    lastError = `LlamaCPP register failed: ${formatErr(err)}`;
+  } finally {
+    renderView();
+  }
+}
+
+async function registerOnnx(): Promise<void> {
+  lastError = null;
+  setEventSummary('Registering ONNX backend...');
+  try {
+    await ONNX.register();
+  } catch (err) {
+    lastError = `ONNX register failed: ${formatErr(err)}`;
+  } finally {
+    renderView();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Session control
 // ---------------------------------------------------------------------------
 
 async function startSession(): Promise<void> {
-  sessionActive = true;
-  setMicActive(true);
-  setResponse('');
-  await startListening();
-}
+  if (sessionState !== 'idle' && sessionState !== 'stopped' && sessionState !== 'error') return;
 
-function stopSession(): void {
-  sessionActive = false;
-  pipeline.cancel();
-  stopVoiceVAD();
-  if (micCapture.isCapturing) micCapture.stop();
-  VAD.reset();
-  setMicActive(false);
-  stopParticles();
-  state = 'idle';
-  setStatus('Tap to speak');
-}
-
-/** Begin capturing audio and monitoring with SDK VAD */
-async function startListening(): Promise<void> {
-  if (!sessionActive) return;
-
-  state = 'listening';
-  setStatus('Listening...');
-
-  // Ensure Silero VAD model is loaded (auto-downloads, ~5MB)
-  const vadReady = await ensureVADLoaded();
-  if (!vadReady) {
-    setStatus('Failed to load VAD model');
-    stopSession();
-    return;
-  }
-  VAD.reset();
+  // Reset state.
+  userTranscript = '';
+  assistantResponse = '';
+  assistantThinking = '';
+  lastError = null;
+  sessionState = 'starting';
+  setEventSummary('Initializing voice agent...');
+  renderView();
 
   try {
-    await micCapture.start(onVoiceChunk, (level) => updateParticles(level));
-    startParticles();
-    startVoiceVAD();
-  } catch {
-    setStatus('Microphone access denied');
-    stopSession();
-  }
-}
+    // Initialize against the currently-loaded LLM/STT/TTS components.
+    await RunAnywhere.initializeVoiceAgentWithLoadedModels();
 
-// ---------------------------------------------------------------------------
-// VAD — SDK Silero VAD (replaces energy-threshold approach)
-// ---------------------------------------------------------------------------
-
-/** AudioCapture onChunk callback — feeds audio to SDK VAD. */
-function onVoiceChunk(samples: Float32Array): void {
-  if (!vadActive || state !== 'listening') return;
-  VAD.processSamples(samples);
-}
-
-function startVoiceVAD(): void {
-  stopVoiceVAD();
-  vadActive = true;
-
-  // Subscribe to speech activity events from the SDK VAD
-  unsubscribeVAD = VAD.onSpeechActivity((activity) => {
-    if (!sessionActive || state !== 'listening') return;
-
-    if (activity === SpeechActivity.Started) {
-      console.log('[Voice] Speech started (Silero)');
-    } else if (activity === SpeechActivity.Ended) {
-      console.log('[Voice] Speech ended (Silero)');
-
-      // Pop the completed speech segment
-      const segment = VAD.popSpeechSegment();
-      if (segment && segment.samples.length >= MIN_AUDIO_SAMPLES) {
-        console.log(`[Voice] Processing segment: ${segment.samples.length} samples (${(segment.samples.length / 16000).toFixed(1)}s)`);
-        // Stop mic during processing (will restart after TTS)
-        stopVoiceVAD();
-        micCapture.stop();
-        stopParticles();
-        runPipeline(segment.samples);
-      }
-    }
-  });
-
-  console.log('[Voice] Started SDK VAD monitoring');
-}
-
-function stopVoiceVAD(): void {
-  vadActive = false;
-  if (unsubscribeVAD) { unsubscribeVAD(); unsubscribeVAD = null; }
-}
-
-// ---------------------------------------------------------------------------
-// Voice Pipeline:  Audio → STT → LLM (streaming) → TTS → Speaker → Listen
-//
-// Uses VoicePipeline from the SDK which orchestrates STT → LLM → TTS
-// with streaming callbacks. The example app only handles UI updates.
-// ---------------------------------------------------------------------------
-
-async function runPipeline(audioData: Float32Array): Promise<void> {
-  state = 'processing';
-
-  try {
-    setStatus('Transcribing...');
-    console.log(`[Voice] STT: ${(audioData.length / 16000).toFixed(1)}s of audio`);
-
-    // Prepare a response container for streaming LLM output
-    const responseEl = container.querySelector('#voice-response');
-
-    await pipeline.processTurn(audioData, {
-      maxTokens: 150,
-      temperature: 0.7,
-      systemPrompt:
-        'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.',
-    }, {
-      onStateChange: (s) => {
-        if (s === PipelineState.ProcessingSTT) setStatus('Transcribing...');
-        else if (s === PipelineState.GeneratingResponse) setStatus('Thinking...');
-        else if (s === PipelineState.PlayingTTS) {
-          state = 'speaking';
-          setStatus('Speaking...');
-        }
-      },
-
-      onTranscription: (text) => {
-        if (!text) {
-          console.log('[Voice] No speech detected');
-          return;
-        }
-        console.log(`[Voice] STT result: "${text}"`);
-        setResponse(`<div class="text-secondary mb-sm"><strong>You:</strong> ${escapeHtml(text)}</div>`);
-        setStatus('Thinking...');
-        // Append streaming response container
-        if (responseEl) {
-          responseEl.innerHTML += `<div><strong>Assistant:</strong> <span id="voice-llm-output"></span></div>`;
-        }
-      },
-
-      onResponseToken: (_token, accumulated) => {
-        const outputSpan = container.querySelector('#voice-llm-output');
-        if (outputSpan) outputSpan.textContent = accumulated;
-      },
-
-      onResponseComplete: (text, llmResult) => {
-        const outputSpan = container.querySelector('#voice-llm-output');
-        if (outputSpan) outputSpan.textContent = text;
-        console.log(`[Voice] LLM: ${llmResult.tokensUsed} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s`);
-      },
-
-      onSynthesisComplete: async (audio, sampleRate) => {
-        console.log(`[Voice] TTS: playing ${(audio.length / sampleRate).toFixed(1)}s of audio`);
-        const player = new AudioPlayback({ sampleRate });
-        await player.play(audio, sampleRate);
-        player.dispose();
-      },
-
-      onError: (err) => {
-        console.error('[Voice] Pipeline error:', err);
-        setStatus(`Error: ${err.message}`);
-      },
+    // Start the microphone at the VAD-friendly 16 kHz mono Float32 rate.
+    audioCapture = new AudioCapture({ sampleRate: 16000, channels: 1 });
+    await audioCapture.start(undefined, (level) => {
+      audioLevel = level;
+      updateLevelBar();
     });
 
-    // Resume listening (continuous mode) or go idle
-    if (sessionActive) {
-      await startListening();
-    } else {
-      state = 'idle';
-      setStatus('Tap to speak');
+    // Prepare playback for TTS audio chunks. The actual sample rate is
+    // re-derived per `AudioFrameEvent.sampleRateHz`, but we seed at 22050
+    // (Piper default) so the first chunk plays without a context reset.
+    audioPlayback = new AudioPlayback({ sampleRate: 22050 });
+
+    sessionState = 'listening';
+    setEventSummary('Listening...');
+    renderView();
+
+    // Start consuming the proto event stream. We track the consumer via an
+    // `AbortController` so `stopSession()` can deterministically end it.
+    eventConsumer = new AbortController();
+    void consumeEvents(eventConsumer.signal);
+  } catch (err) {
+    lastError = `Failed to start voice session: ${formatErr(err)}`;
+    sessionState = 'error';
+    setEventSummary('Start failed.');
+    await stopSession({ silent: true });
+    renderView();
+  }
+}
+
+async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
+  const wasActive = sessionState !== 'idle' && sessionState !== 'stopped' && sessionState !== 'error';
+
+  eventConsumer?.abort();
+  eventConsumer = null;
+
+  if (audioCapture) {
+    try { audioCapture.stop(); } catch { /* ignore */ }
+    audioCapture = null;
+  }
+
+  if (audioPlayback) {
+    try { audioPlayback.dispose(); } catch { /* ignore */ }
+    audioPlayback = null;
+  }
+
+  audioLevel = 0;
+
+  try {
+    await RunAnywhere.cleanupVoiceAgent();
+  } catch {
+    // Cleanup is best-effort — silently swallow.
+  }
+
+  if (wasActive && sessionState !== 'error') {
+    sessionState = 'stopped';
+    setEventSummary('Session stopped.');
+  }
+
+  if (!opts.silent) renderView();
+}
+
+// ---------------------------------------------------------------------------
+// Event stream consumer
+// ---------------------------------------------------------------------------
+
+async function consumeEvents(signal: AbortSignal): Promise<void> {
+  try {
+    const stream = RunAnywhere.streamVoiceAgent();
+    for await (const event of stream) {
+      if (signal.aborted || unmounted) break;
+      handleVoiceEvent(event);
+      // Re-render incrementally; pre-compute the affected DOM regions to
+      // avoid replacing the whole panel on every token (which would jitter
+      // the user-input transcript while typing).
+      updateTextRegions();
     }
   } catch (err) {
-    console.error('[Voice] Pipeline error:', err);
-    const msg = err instanceof Error ? err.message : String(err);
-    setStatus(`Error: ${msg}`);
-    if (sessionActive) {
-      await startListening();
-    } else {
-      state = 'idle';
+    if (!signal.aborted) {
+      lastError = `Voice agent stream error: ${formatErr(err)}`;
+      sessionState = 'error';
+      renderView();
+    }
+  } finally {
+    if (!signal.aborted && !unmounted) {
+      // The stream finished on its own (e.g. session ended server-side).
+      if (sessionState !== 'error') {
+        sessionState = 'stopped';
+        renderView();
+      }
     }
   }
 }
 
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function handleVoiceEvent(event: VoiceEvent): void {
+  if (event.state) {
+    applyStateChange(event.state);
+    setEventSummary(`state: ${pipelineStateName(event.state.current)}`);
+  }
+  if (event.vad) {
+    applyVadEvent(event.vad);
+  }
+  if (event.userSaid) {
+    applyUserSaid(event.userSaid);
+  }
+  if (event.assistantToken) {
+    applyAssistantToken(event.assistantToken);
+  }
+  if (event.audio) {
+    void applyAudioFrame(event.audio);
+  }
+  if (event.error) {
+    applyErrorEvent(event.error);
+  }
+}
+
+function applyStateChange(state: StateChangeEvent): void {
+  switch (state.current) {
+    case VoiceEventPipelineState.PIPELINE_STATE_IDLE:
+    case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
+      if (sessionState !== 'speaking' && sessionState !== 'processing') {
+        sessionState = 'listening';
+      }
+      break;
+    case VoiceEventPipelineState.PIPELINE_STATE_PROCESSING_SPEECH:
+    case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
+    case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE:
+      sessionState = 'processing';
+      break;
+    case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
+    case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS:
+      sessionState = 'speaking';
+      break;
+    case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
+      sessionState = 'stopped';
+      break;
+    case VoiceEventPipelineState.PIPELINE_STATE_ERROR:
+      sessionState = 'error';
+      break;
+    default:
+      break;
+  }
+  // The state pill is part of the full re-render path; queue one.
+  scheduleRender();
+}
+
+function applyVadEvent(vad: VADEvent): void {
+  if (vad.isSpeech) {
+    sessionState = 'speech-detected';
+    scheduleRender();
+  } else if (sessionState === 'speech-detected') {
+    sessionState = 'processing';
+    scheduleRender();
+  }
+}
+
+function applyUserSaid(userSaid: UserSaidEvent): void {
+  // Partial hypotheses overwrite; finals stay until the next turn starts.
+  userTranscript = userSaid.text;
+}
+
+function applyAssistantToken(token: AssistantTokenEvent): void {
+  if (token.kind === TokenKind.TOKEN_KIND_THOUGHT) {
+    assistantThinking += token.text;
+  } else {
+    assistantResponse += token.text;
+  }
+}
+
+async function applyAudioFrame(frame: AudioFrameEvent): Promise<void> {
+  if (!frame.pcm || frame.pcm.byteLength === 0) return;
+  try {
+    const samples = decodePcm(frame);
+    const rate = frame.sampleRateHz || 22050;
+    audioPlayback = audioPlayback ?? new AudioPlayback({ sampleRate: rate });
+    // Fire-and-forget; subsequent chunks queue via the audio context.
+    void audioPlayback.play(samples, rate);
+  } catch (err) {
+    lastError = `Audio playback failed: ${formatErr(err)}`;
+    scheduleRender();
+  }
+}
+
+function applyErrorEvent(err: ErrorEvent): void {
+  if (err.message) {
+    lastError = err.message;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Particle Animation (Canvas2D approximation of Metal shader)
+// Helpers
 // ---------------------------------------------------------------------------
 
-function startParticles(): void {
-  resizeCanvas();
-  initParticles();
-  animateParticles();
+function decodePcm(frame: AudioFrameEvent): Float32Array {
+  const pcm = frame.pcm;
+  if (frame.encoding === AudioEncoding.AUDIO_ENCODING_PCM_S16_LE) {
+    const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+    const samples = new Float32Array(pcm.byteLength / 2);
+    for (let i = 0; i < samples.length; i += 1) {
+      samples[i] = view.getInt16(i * 2, true) / 0x8000;
+    }
+    return samples;
+  }
+  // Default to PCM-F32 little-endian (encoding 0 / unspecified or explicit).
+  const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+  const samples = new Float32Array(pcm.byteLength / 4);
+  for (let i = 0; i < samples.length; i += 1) {
+    samples[i] = view.getFloat32(i * 4, true);
+  }
+  return samples;
 }
 
-function stopParticles(): void {
-  if (animationFrame) {
-    cancelAnimationFrame(animationFrame);
-    animationFrame = null;
+function setEventSummary(text: string): void {
+  lastEventSummary = text;
+}
+
+let renderScheduled = false;
+function scheduleRender(): void {
+  if (renderScheduled || unmounted) return;
+  renderScheduled = true;
+  requestAnimationFrame(() => {
+    renderScheduled = false;
+    renderView();
+  });
+}
+
+function updateTextRegions(): void {
+  const userPre = container.querySelector<HTMLPreElement>('#voice-user-transcript');
+  if (userPre) userPre.textContent = userTranscript || '(waiting for speech...)';
+  const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
+  if (respPre) respPre.textContent = assistantResponse || '(no response yet)';
+  const thoughtPre = container.querySelector<HTMLPreElement>('#voice-assistant-thinking');
+  if (thoughtPre && assistantThinking) thoughtPre.textContent = assistantThinking;
+}
+
+function updateLevelBar(): void {
+  const fill = container.querySelector<HTMLDivElement>('#voice-level-row .progress-fill');
+  if (fill) fill.style.width = `${Math.round(audioLevel * 100)}%`;
+}
+
+function pipelineStateName(state: VoiceEventPipelineState): string {
+  switch (state) {
+    case VoiceEventPipelineState.PIPELINE_STATE_IDLE: return 'idle';
+    case VoiceEventPipelineState.PIPELINE_STATE_LISTENING: return 'listening';
+    case VoiceEventPipelineState.PIPELINE_STATE_THINKING: return 'thinking';
+    case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING: return 'speaking';
+    case VoiceEventPipelineState.PIPELINE_STATE_STOPPED: return 'stopped';
+    case VoiceEventPipelineState.PIPELINE_STATE_WAITING_WAKEWORD: return 'waiting-wakeword';
+    case VoiceEventPipelineState.PIPELINE_STATE_PROCESSING_SPEECH: return 'processing-speech';
+    case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE: return 'generating-response';
+    case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS: return 'playing-tts';
+    case VoiceEventPipelineState.PIPELINE_STATE_COOLDOWN: return 'cooldown';
+    case VoiceEventPipelineState.PIPELINE_STATE_ERROR: return 'error';
+    default: return 'unspecified';
   }
 }
 
-function resizeCanvas(): void {
-  const rect = canvas.parentElement!.getBoundingClientRect();
-  canvas.width = rect.width * devicePixelRatio;
-  canvas.height = rect.height * devicePixelRatio;
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-}
-
-function initParticles(): void {
-  particles = [];
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const warmColors = [
-    'rgba(255, 85, 0,',
-    'rgba(255, 140, 50,',
-    'rgba(230, 69, 0,',
-    'rgba(255, 170, 80,',
-    'rgba(200, 100, 30,',
-  ];
-
-  for (let i = 0; i < 60; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 80;
-    particles.push({
-      x: cx + Math.cos(angle) * dist,
-      y: cy + Math.sin(angle) * dist,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      radius: 3 + Math.random() * 8,
-      color: warmColors[i % warmColors.length],
-      alpha: 0.2 + Math.random() * 0.5,
-      phase: Math.random() * Math.PI * 2,
-    });
+function prettyState(state: SessionState): string {
+  switch (state) {
+    case 'idle': return 'Idle';
+    case 'starting': return 'Starting...';
+    case 'listening': return 'Listening';
+    case 'speech-detected': return 'Speech detected';
+    case 'processing': return 'Processing';
+    case 'speaking': return 'Speaking';
+    case 'stopped': return 'Stopped';
+    case 'error': return 'Error';
   }
 }
 
-function updateParticles(level: number): void {
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-  const energy = level * 3;
-
-  for (const p of particles) {
-    p.phase += 0.02;
-    const dx = cx - p.x;
-    const dy = cy - p.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    // Orbit + push out with audio energy
-    p.vx += (dy / dist) * 0.03 + (Math.random() - 0.5) * energy;
-    p.vy += (-dx / dist) * 0.03 + (Math.random() - 0.5) * energy;
-
-    // Pull toward center
-    p.vx += dx * 0.0005;
-    p.vy += dy * 0.0005;
-
-    // Damping
-    p.vx *= 0.98;
-    p.vy *= 0.98;
-
-    p.x += p.vx;
-    p.y += p.vy;
-    p.alpha = 0.2 + Math.sin(p.phase) * 0.15 + level * 0.3;
+function stateBadgeClass(state: SessionState): string {
+  switch (state) {
+    case 'listening':
+    case 'speech-detected':
+      return 'badge-green';
+    case 'processing':
+    case 'speaking':
+    case 'starting':
+      return 'badge-blue';
+    case 'error':
+      // No `.badge-red` rule is shipped today; use the grey variant tinted
+      // by the inline `error` docs-status class below so failures still
+      // surface visibly without depending on a missing rule.
+      return 'badge-grey';
+    default:
+      return 'badge-grey';
   }
 }
 
-function animateParticles(): void {
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (const p of particles) {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius * devicePixelRatio, 0, Math.PI * 2);
-    ctx.fillStyle = `${p.color} ${Math.min(p.alpha, 0.8)})`;
-    ctx.fill();
-  }
-
-  animationFrame = requestAnimationFrame(animateParticles);
+function formatErr(err: unknown): string {
+  if (isSDKException(err)) return err.message;
+  return formatError(err);
 }

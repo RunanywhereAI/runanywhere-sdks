@@ -39,7 +39,7 @@ runanywhere-sdk-android AAR          runanywhere-llamacpp-android AAR     runany
 | Mode | Trigger | What happens |
 |------|---------|-------------|
 | **Remote** (`testLocal=false`) | Default for CI/publishing | Each module's `downloadJniLibs` task downloads its own package from GitHub releases |
-| **Local** (`testLocal=true`) | `build-kotlin.sh --setup` | Script builds C++ from source and copies to each module's `src/androidMain/jniLibs/` |
+| **Local** (`testLocal=true`) | `build-kotlin.sh --setup` | Script builds C++ from source and copies to each module's `src/main/jniLibs/` |
 
 **Remote download mapping:**
 
@@ -99,9 +99,9 @@ Use a GitHub release that has per-ABI Android binaries (e.g., `v0.17.5`):
 cd sdk/runanywhere-kotlin
 
 # Clean all jniLibs
-rm -rf src/androidMain/jniLibs
-rm -rf modules/runanywhere-core-llamacpp/src/androidMain/jniLibs
-rm -rf modules/runanywhere-core-onnx/src/androidMain/jniLibs
+rm -rf src/main/jniLibs
+rm -rf modules/runanywhere-core-llamacpp/src/main/jniLibs
+rm -rf modules/runanywhere-core-onnx/src/main/jniLibs
 
 # Set version and publish (each module downloads its own libs)
 export SDK_VERSION=0.20.6
@@ -122,32 +122,32 @@ Build native libs from source first, then publish:
 ```bash
 # 1. Build C++ native libs (all backends, all ABIs)
 cd sdk/runanywhere-commons
-export ANDROID_NDK_HOME="$HOME/Library/Android/sdk/ndk/27.0.12077973"
+export ANDROID_NDK_HOME="$HOME/Library/Android/sdk/ndk/27.3.13750724"
 ./scripts/build-android.sh all arm64-v8a,armeabi-v7a,x86_64
 
 # 2. Distribute libs to each module's jniLibs (self-contained)
 cd ../runanywhere-kotlin
 for ABI in arm64-v8a armeabi-v7a x86_64; do
   # Root SDK: commons only
-  mkdir -p src/androidMain/jniLibs/$ABI
-  cp ../runanywhere-commons/dist/android/commons/$ABI/librac_commons.so src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/jni/$ABI/librunanywhere_jni.so src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/jni/$ABI/libc++_shared.so src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/jni/$ABI/libomp.so src/androidMain/jniLibs/$ABI/
+  mkdir -p src/main/jniLibs/$ABI
+  cp ../runanywhere-commons/dist/android/commons/$ABI/librac_commons.so src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/jni/$ABI/librunanywhere_jni.so src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/jni/$ABI/libc++_shared.so src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/jni/$ABI/libomp.so src/main/jniLibs/$ABI/
 
   # LlamaCPP module: backend only
-  mkdir -p modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/$ABI
-  cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp.so modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp_jni.so modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/$ABI/
+  mkdir -p modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI
+  cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp.so modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp_jni.so modules/runanywhere-core-llamacpp/src/main/jniLibs/$ABI/
 
   # ONNX module: backend only
-  mkdir -p modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx_jni.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libonnxruntime.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-c-api.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-cxx-api.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-jni.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
+  mkdir -p modules/runanywhere-core-onnx/src/main/jniLibs/$ABI
+  cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx_jni.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/onnx/$ABI/libonnxruntime.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-c-api.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-cxx-api.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
+  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-jni.so modules/runanywhere-core-onnx/src/main/jniLibs/$ABI/
 done
 
 # 3. Publish
@@ -258,7 +258,7 @@ No `pickFirsts` or workarounds needed. Each AAR bundles only its own native libs
 | 403 Forbidden | Verify namespace at central.sonatype.com |
 | Missing native libs in AAR | Clean all `jniLibs/` dirs and rebuild. Check each module has its own libs. |
 | `UnsatisfiedLinkError: nativeRegisterVlm` | Native libs are stale (pre-VLM). Rebuild from source with `build-android.sh`. |
-| Duplicate `.so` across AARs | Stale files in module `jniLibs/`. Delete and rebuild. Check `.gitignore` covers `src/androidMain/jniLibs/`. |
+| Duplicate `.so` across AARs | Stale files in module `jniLibs/`. Delete and rebuild. Check `.gitignore` covers `src/main/jniLibs/`. |
 | Staging repo "No objects found" | Drop the stale repo and re-upload |
 | OSSRH staging never auto-closes | Manually close/release via staging API |
 | `Unresolved reference 'json'` (JVM) | `org.json:json:20240303` is in `jvmAndroidMain` dependencies |

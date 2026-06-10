@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import RNFS from 'react-native-fs';
 import type { Conversation, Message } from '../types/chat';
 import { MessageRole } from '../types/chat';
+import { logDiagnostic } from '../utils/diagnostics';
 
 // Generate unique ID matching iOS UUID approach
 /* eslint-disable no-bitwise */
@@ -93,7 +94,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       const dirExists = await RNFS.exists(CONVERSATIONS_DIR);
       if (!dirExists) {
         await RNFS.mkdir(CONVERSATIONS_DIR);
-        console.warn('[ConversationStore] Created conversations directory');
+        logDiagnostic('[ConversationStore] Created conversations directory');
       }
 
       // Load all conversation files
@@ -122,7 +123,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
         (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
       );
 
-      console.warn(
+      logDiagnostic(
         `[ConversationStore] Loaded ${loadedConversations.length} conversations`
       );
       set({ conversations: loadedConversations, isLoading: false });
@@ -156,7 +157,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       currentConversation: conversation,
     }));
 
-    console.warn(
+    logDiagnostic(
       `[ConversationStore] Created conversation: ${conversation.id}`
     );
     return conversation;
@@ -191,7 +192,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
           : state.currentConversation,
     }));
 
-    console.warn(
+    logDiagnostic(
       `[ConversationStore] Updated conversation: ${conversation.id}`
     );
   },
@@ -226,7 +227,9 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       };
     });
 
-    console.warn(`[ConversationStore] Deleted conversation: ${conversationId}`);
+    logDiagnostic(
+      `[ConversationStore] Deleted conversation: ${conversationId}`
+    );
   },
 
   /**
@@ -406,7 +409,7 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       await RNFS.unlink(CONVERSATIONS_DIR);
       await RNFS.mkdir(CONVERSATIONS_DIR);
       set({ conversations: [], currentConversation: null });
-      console.warn('[ConversationStore] Cleared all conversations');
+      logDiagnostic('[ConversationStore] Cleared all conversations');
     } catch (error) {
       console.error(
         '[ConversationStore] Failed to clear conversations:',

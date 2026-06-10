@@ -15,7 +15,6 @@
 #ifndef RAC_DIFFUSION_TOKENIZER_H
 #define RAC_DIFFUSION_TOKENIZER_H
 
-// Flattened includes for Swift SDK
 #include "rac_types.h"
 #include "rac_diffusion_types.h"
 
@@ -52,7 +51,7 @@ extern "C" {
  * Example return values:
  * - SD_1_5: "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/tokenizer"
  * - SD_2_X: "https://huggingface.co/stabilityai/stable-diffusion-2-1/resolve/main/tokenizer"
- * - SDXL:   "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/tokenizer"
+ * - SDXL: "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/tokenizer"
  * - CUSTOM: Returns custom_url parameter
  */
 RAC_API const char* rac_diffusion_tokenizer_get_base_url(rac_diffusion_tokenizer_source_t source,
@@ -80,7 +79,8 @@ RAC_API const char* rac_diffusion_tokenizer_get_base_url(rac_diffusion_tokenizer
  *     url,
  *     sizeof(url)
  * );
- * // url = "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/tokenizer/vocab.json"
+ * // url =
+ * "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/tokenizer/vocab.json"
  * @endcode
  */
 RAC_API rac_result_t rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
@@ -126,9 +126,8 @@ RAC_API rac_result_t rac_diffusion_tokenizer_check_files(const char* model_dir,
  * rac_result_t result = rac_diffusion_tokenizer_ensure_files("/path/to/model", &config);
  * @endcode
  */
-RAC_API rac_result_t
-rac_diffusion_tokenizer_ensure_files(const char* model_dir,
-                                     const rac_diffusion_tokenizer_config_t* config);
+RAC_API rac_result_t rac_diffusion_tokenizer_ensure_files(
+    const char* model_dir, const rac_diffusion_tokenizer_config_t* config);
 
 /**
  * @brief Download a tokenizer file

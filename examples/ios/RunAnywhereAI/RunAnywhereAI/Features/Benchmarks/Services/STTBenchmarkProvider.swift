@@ -20,16 +20,25 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load
+        // Load (canonical proto-request form)
         let loadStart = Date()
-        try await RunAnywhere.loadSTTModel(model.id)
+        var loadRequest = RAModelLoadRequest()
+        loadRequest.modelID = model.id
+        loadRequest.category = .speechRecognition
+        let loadResult = await RunAnywhere.loadModel(loadRequest)
+        guard loadResult.success else {
+            throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
+        }
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
+
+        var unloadRequest = RAModelUnloadRequest()
+        unloadRequest.category = .speechRecognition
 
         do {
             // Generate audio
@@ -46,21 +55,21 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
             // Transcribe
             let benchStart = Date()
-            let options = STTOptions()
-            let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
+            let options = RASTTOptions.defaults()
+            let result = try await RunAnywhere.transcribe(audio: audioData, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
             // processingTime is in seconds
             metrics.audioLengthSeconds = audioDuration
-            metrics.realTimeFactor = result.metadata.realTimeFactor
+            metrics.realTimeFactor = Double(result.metadata.realTimeFactor)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            try? await RunAnywhere.unloadSTTModel()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             return metrics
         } catch {
-            try? await RunAnywhere.unloadSTTModel()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             throw error
         }
     }

@@ -5,24 +5,23 @@
 ///
 /// This is a thin wrapper around C++ LLM component functions.
 /// All business logic is in C++ - Dart only manages the handle.
-///
-/// STREAMING ARCHITECTURE:
-/// Streaming runs in a background isolate to prevent ANR (Application Not Responding).
-/// The C++ logger callback uses NativeCallable.listener which is thread-safe and
-/// can be called from any isolate. Token callbacks in the background isolate send
-/// messages to the main isolate via a SendPort.
-library dart_bridge_llm;
+library;
 
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:isolate'; // Keep for non-streaming generation
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:runanywhere/features/llm/llm_configuration.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationResult;
+import 'package:runanywhere/generated/llm_service.pb.dart'
+    show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
-import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// LLM component bridge for C++ interop.
 ///
@@ -30,13 +29,6 @@ import 'package:runanywhere/native/platform_loader.dart';
 /// Handles model loading, generation, and lifecycle.
 ///
 /// Matches Swift's CppBridge.LLM actor pattern.
-///
-/// Usage:
-/// ```dart
-/// final llm = DartBridgeLLM.shared;
-/// await llm.loadModel('/path/to/model.gguf', 'model-id', 'Model Name');
-/// final result = await llm.generate('Hello', maxTokens: 100);
-/// ```
 class DartBridgeLLM {
   // MARK: - Singleton
 
@@ -49,24 +41,7 @@ class DartBridgeLLM {
 
   RacHandle? _handle;
   String? _loadedModelId;
-  int? _loadedContextLength;
   final _logger = SDKLogger('DartBridge.LLM');
-
-  /// Active stream subscription for cancellation
-  StreamSubscription<String>? _activeStreamSubscription;
-
-  /// Cancel any active generation
-  void cancelGeneration() {
-    unawaited(_activeStreamSubscription?.cancel());
-    _activeStreamSubscription = null;
-    // Cancel at native level
-    cancel();
-  }
-
-  /// Set active stream subscription for cancellation
-  void setActiveStreamSubscription(StreamSubscription<String>? sub) {
-    _activeStreamSubscription = sub;
-  }
 
   // MARK: - Handle Management
 
@@ -132,47 +107,6 @@ class DartBridgeLLM {
 
   // MARK: - Model Lifecycle
 
-  /// Load an LLM model.
-  ///
-  /// [modelPath] - Full path to the model file.
-  /// [modelId] - Unique identifier for the model.
-  /// [modelName] - Human-readable name.
-  ///
-  /// Throws on failure.
-  Future<void> loadModel(
-    String modelPath,
-    String modelId,
-    String modelName,
-    int? contextLength,
-  ) async {
-    final handle = getHandle();
-
-    final pathPtr = modelPath.toNativeUtf8();
-    final idPtr = modelId.toNativeUtf8();
-    final namePtr = modelName.toNativeUtf8();
-
-    try {
-      _logger.debug('Calling rac_llm_component_load_model with handle=$handle');
-      final result = NativeFunctions.llmLoadModel(handle, pathPtr, idPtr, namePtr);
-      _logger.debug(
-          'rac_llm_component_load_model returned: $result (${RacResultCode.getMessage(result)})');
-
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to load LLM model: Error (code: $result)',
-        );
-      }
-
-      _loadedModelId = modelId;
-      _loadedContextLength = contextLength;
-      _logger.info('LLM model loaded: $modelId');
-    } finally {
-      calloc.free(pathPtr);
-      calloc.free(idPtr);
-      calloc.free(namePtr);
-    }
-  }
-
   /// Unload the current model.
   void unload() {
     if (_handle == null) return;
@@ -180,7 +114,6 @@ class DartBridgeLLM {
     try {
       NativeFunctions.llmCleanup(_handle!);
       _loadedModelId = null;
-      _loadedContextLength = null;
       _logger.info('LLM model unloaded');
     } catch (e) {
       _logger.error('Failed to unload LLM model: $e');
@@ -201,185 +134,178 @@ class DartBridgeLLM {
 
   // MARK: - Generation
 
-  /// Generate text from a prompt.
-  ///
-  /// [prompt] - Input prompt.
-  /// [maxTokens] - Maximum tokens to generate (default: 512).
-  /// [temperature] - Sampling temperature (default: 0.7).
-  /// [systemPrompt] - Optional system prompt for model behavior (default: null).
-  ///
-  /// Returns the generated text and metrics.
-  ///
-  /// IMPORTANT: This runs in a separate isolate to prevent heap corruption
-  /// from C++ Metal/GPU background threads.
-  Future<LLMComponentResult> generate(
-    String prompt, {
-    int maxTokens = 512,
-    double temperature = 0.7,
-    String? systemPrompt,
-  }) async {
-    final handle = getHandle();
-
-    if (!isLoaded) {
-      throw StateError('No LLM model loaded. Call loadModel() first.');
+  /// Generate text using the lifecycle-owned generated-proto LLM ABI.
+  LLMGenerationResult generateProto(LLMGenerateRequest request) {
+    // No `isLoaded` gate: the generated-proto ABI resolves the engine from the
+    // commons model lifecycle (acquire_lifecycle_llm), NOT from this bridge's
+    // own `_handle` (which the lifecycle load path never populates). Gating on
+    // `_handle`/isLoaded here is a phantom check that spuriously throws even
+    // when a model IS loaded via the lifecycle, diverging from Kotlin/Swift
+    // (which have no such gate). Commons returns a clear error if truly unloaded.
+    final fn = RacNative.bindings.rac_llm_generate_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_llm_generate_proto is unavailable');
     }
 
-    _validateGenerationParameters(
-      contextLength: _requireLoadedContextLength(),
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-    );
-
-    // Run FFI call in a separate isolate to avoid heap corruption
-    // from C++ background threads (Metal GPU operations)
-    final handleAddress = handle.address;
-    final tokens = maxTokens;
-    final temp = temperature;
-
-    _logger.debug('[PARAMS] generate: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
-
-    final result = await Isolate.run(() {
-      return _generateInIsolate(handleAddress, prompt, tokens, temp, systemPrompt);
-    });
-
-    if (result.error != null) {
-      throw StateError(result.error!);
-    }
-
-    return LLMComponentResult(
-      text: result.text ?? '',
-      promptTokens: result.promptTokens,
-      completionTokens: result.completionTokens,
-      totalTimeMs: result.totalTimeMs,
+    return DartBridgeProtoUtils.callRequest<LLMGenerationResult>(
+      request: request,
+      invoke: fn,
+      decode: LLMGenerationResult.fromBuffer,
+      symbol: 'rac_llm_generate_proto',
     );
   }
 
-  /// Generate text with streaming.
-  ///
-  /// Returns a stream of tokens as they are generated.
-  ///
-  /// ARCHITECTURE: Runs in a background isolate to prevent ANR.
-  /// The logger callback uses NativeCallable.listener which is thread-safe.
-  /// Tokens are sent back to the main isolate via SendPort for UI updates.
-  Stream<String> generateStream(
-    String prompt, {
-    int maxTokens = 512, // Can use higher values now since it's non-blocking
-    double temperature = 0.7,
-    String? systemPrompt,
-  }) {
-    final handle = getHandle();
-
-    if (!isLoaded) {
-      throw StateError('No LLM model loaded. Call loadModel() first.');
+  /// Stream text generation using the lifecycle-owned generated-proto LLM ABI.
+  Stream<LLMStreamEvent> generateStreamProto(LLMGenerateRequest request) {
+    // No `isLoaded` gate (see generateProto): generation resolves via the
+    // commons model lifecycle, not this bridge's `_handle`. The phantom gate
+    // here was the root cause of Flutter-only "No LLM model loaded" stream
+    // errors offline (the spurious throw then triggered a downstream cancel).
+    final fn = RacNative.bindings.rac_llm_generate_stream_proto;
+    if (fn == null) {
+      return Stream<LLMStreamEvent>.error(
+        UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
+      );
     }
 
-    _validateGenerationParameters(
-      contextLength: _requireLoadedContextLength(),
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-      streamingEnabled: true,
-    );
+    final controller = StreamController<LLMStreamEvent>(sync: false);
+    NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
+    var sawTerminalEvent = false;
 
-    // Create stream controller for emitting tokens to the caller
-    final controller = StreamController<String>();
+    Future<void> run() async {
+      final bytes = request.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
-    _logger.debug('[PARAMS] generateStream: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+      try {
+        // FLUTTER-IOS-006 / FLUTTER-AND-PROTO-002: use `isolateLocal` (not
+        // `.listener`) so the callback runs synchronously on the same
+        // thread that invoked `rac_llm_generate_stream_proto`. The commons
+        // producer (`dispatch_stream_event` in rac_llm_proto_service.cpp:353)
+        // serializes into a `thread_local std::vector<uint8_t> scratch` slot
+        // and immediately calls the callback with `scratch.data()`. With
+        // `.listener` mode the callback is queued onto the Dart isolate's
+        // event loop and runs ASYNCHRONOUSLY — by then a subsequent token
+        // emission has already resized/overwritten the `scratch` slot,
+        // leaving the captured pointer pointing at partially-overwritten
+        // bytes. The decode then fails with `Protocol message end-group tag
+        // did not match expected tag` (FLUTTER-IOS-006) or
+        // `InvalidProtocolBufferException: invalid tag (zero)`
+        // (FLUTTER-AND-PROTO-002).
+        //
+        // `isolateLocal` is safe here because:
+        //   1. `rac_llm_generate_stream_proto` runs synchronously on the
+        //      caller's thread (the Dart isolate).
+        //   2. The engine vtable's `generate_stream` (llamacpp, onnx, etc.)
+        //      iterates tokens on that same thread, invoking the proto
+        //      callback synchronously per token.
+        //   3. Therefore the callback always fires on the Dart isolate that
+        //      created it — the exact precondition `isolateLocal` requires.
+        callback = NativeCallable<RacLlmStreamProtoCallbackNative>.isolateLocal(
+          (Pointer<Uint8> bytesPtr, int bytesLen, Pointer<Void> _) {
+            if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+              return;
+            }
 
-    // Start streaming generation in a background isolate
-    unawaited(_startBackgroundStreaming(
-      handle.address,
-      prompt,
-      maxTokens,
-      temperature,
-      systemPrompt,
-      controller,
-    ));
+            try {
+              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+              final event = LLMStreamEvent.fromBuffer(copy);
+              sawTerminalEvent = sawTerminalEvent || event.isFinal;
+              controller.add(event);
+              if (event.isFinal) {
+                unawaited(controller.close());
+              }
+            } catch (e, st) {
+              controller.addError(e, st);
+              unawaited(controller.close());
+            }
+          },
+        );
 
+        final rc = fn(
+          requestPtr,
+          bytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(
+            StateError(
+              'rac_llm_generate_stream_proto failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ),
+          );
+          await controller.close();
+        } else if (!sawTerminalEvent && !controller.isClosed) {
+          await controller.close();
+        }
+      } catch (e, st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          await controller.close();
+        }
+      } finally {
+        calloc.free(requestPtr);
+        // commons-127: safety here relies on Dart isolate single-threading
+        // plus the synchronous nature of `rac_llm_generate_stream_proto`
+        // (the single-call ABI used by this bridge). `fn(...)` only returns
+        // after the engine vtable's `generate_stream` has finished iterating
+        // tokens on this same isolate thread, so by the time we reach this
+        // `finally` the NativeCallable can no longer be invoked. The
+        // `rac_llm_proto_quiesce` call below is a NO-OP for this path
+        // (commons only increments the in-flight counter inside
+        // `dispatch_llm_stream_event`, which is the REGISTRY path used by
+        // `rac_llm_set_stream_proto_callback` — never invoked by Flutter)
+        // but we still issue it defensively so that if commons ever fans
+        // out a post-return emission on a worker through the single-call
+        // ABI, this teardown sequence does the right thing without further
+        // changes here. Pattern mirrors the voice-agent / STT / TTS / VAD /
+        // VLM streaming bridges.
+        RacNative.bindings.rac_llm_proto_quiesce?.call();
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      // commons-127: cancel → quiesce → close. `rac_llm_cancel_proto`
+      // signals the engine to abort. Because the producing
+      // `rac_llm_generate_stream_proto` call runs synchronously on this
+      // Dart isolate thread, the NativeCallable cannot be re-entered once
+      // `run()` has returned — Dart isolate single-threading is what
+      // actually prevents the UAF here. `rac_llm_proto_quiesce` only spin-
+      // waits on commons' REGISTRY-path in-flight counter
+      // (`rac_llm_set_stream_proto_callback`), which Flutter never uses, so
+      // it is a NO-OP today. We still call it (best-effort, ignored if the
+      // symbol is absent) to future-proof this teardown the moment commons
+      // adds an async tail-emit on the single-call path.
+      cancelProto();
+      RacNative.bindings.rac_llm_proto_quiesce?.call();
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
     return controller.stream;
   }
 
-  /// Start streaming generation in a background isolate.
-  ///
-  /// ARCHITECTURE NOTE:
-  /// The logger callback now uses NativeCallable.listener which is thread-safe.
-  /// This allows us to run the FFI streaming call in a background isolate
-  /// without crashing when C++ logs. Tokens are sent back to the main isolate
-  /// via a ReceivePort/SendPort pair.
-  Future<void> _startBackgroundStreaming(
-    int handleAddress,
-    String prompt,
-    int maxTokens,
-    double temperature,
-    String? systemPrompt,
-    StreamController<String> controller,
-  ) async {
-    // Create a ReceivePort to receive tokens from the background isolate
-    final receivePort = ReceivePort();
-    
-    // Listen for messages from the background isolate
-    receivePort.listen((message) {
-      if (controller.isClosed) return;
-      
-      if (message is String) {
-        // It's a token
-        controller.add(message);
-      } else if (message is _StreamingMessage) {
-        if (message.isComplete) {
-          unawaited(controller.close());
-          receivePort.close();
-        } else if (message.error != null) {
-          controller.addError(StateError(message.error!));
-          unawaited(controller.close());
-          receivePort.close();
-        }
-      }
-    });
+  /// Cancel lifecycle-owned LLM generation.
+  sdk_events_pb.SDKEvent? cancelProto() {
+    final fn = RacNative.bindings.rac_llm_cancel_proto;
+    if (fn == null) {
+      cancel();
+      return null;
+    }
 
-    // Spawn background isolate for streaming
     try {
-      await Isolate.spawn(
-        _streamingIsolateEntry,
-        _StreamingIsolateParams(
-          sendPort: receivePort.sendPort,
-          handleAddress: handleAddress,
-          prompt: prompt,
-          maxTokens: maxTokens,
-          temperature: temperature,
-          systemPrompt: systemPrompt,
-        ),
+      return DartBridgeProtoUtils.callOut<sdk_events_pb.SDKEvent>(
+        invoke: fn,
+        decode: sdk_events_pb.SDKEvent.fromBuffer,
+        symbol: 'rac_llm_cancel_proto',
       );
     } catch (e) {
-      if (!controller.isClosed) {
-        controller.addError(e);
-        await controller.close();
-      }
-      receivePort.close();
+      _logger.error('Failed to cancel lifecycle-owned generation: $e');
+      return null;
     }
-  }
-
-  int _requireLoadedContextLength() {
-    final contextLength = _loadedContextLength;
-    // Fall back to a generous ceiling when registry metadata is absent,
-    // so generation is not blocked for models without explicit contextLength.
-    return (contextLength != null && contextLength > 0) ? contextLength : 32768;
-  }
-
-  void _validateGenerationParameters({
-    required int contextLength,
-    required int maxTokens,
-    required double temperature,
-    String? systemPrompt,
-    bool streamingEnabled = false,
-  }) {
-    LLMConfiguration(
-      contextLength: contextLength,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-      streamingEnabled: streamingEnabled,
-    ).validate();
   }
 
   // MARK: - Cleanup
@@ -391,286 +317,10 @@ class DartBridgeLLM {
         NativeFunctions.llmDestroy(_handle!);
         _handle = null;
         _loadedModelId = null;
-        _loadedContextLength = null;
         _logger.debug('LLM component destroyed');
       } catch (e) {
         _logger.error('Failed to destroy LLM component: $e');
       }
-    }
-  }
-}
-
-/// Result from LLM generation.
-class LLMComponentResult {
-  final String text;
-  final int promptTokens;
-  final int completionTokens;
-  final int totalTimeMs;
-
-  const LLMComponentResult({
-    required this.text,
-    required this.promptTokens,
-    required this.completionTokens,
-    required this.totalTimeMs,
-  });
-
-  double get tokensPerSecond {
-    if (totalTimeMs <= 0) return 0;
-    return completionTokens / (totalTimeMs / 1000.0);
-  }
-}
-
-// =============================================================================
-// Isolate Helper for FFI Generation
-// =============================================================================
-
-/// Result container for isolate communication (must be simple types).
-class _IsolateGenerationResult {
-  final String? text;
-  final int promptTokens;
-  final int completionTokens;
-  final int totalTimeMs;
-  final String? error;
-
-  const _IsolateGenerationResult({
-    this.text,
-    this.promptTokens = 0,
-    this.completionTokens = 0,
-    this.totalTimeMs = 0,
-    this.error,
-  });
-}
-
-// =============================================================================
-// Background Isolate Streaming Support
-// =============================================================================
-
-/// Parameters for the streaming isolate
-class _StreamingIsolateParams {
-  final SendPort sendPort;
-  final int handleAddress;
-  final String prompt;
-  final int maxTokens;
-  final double temperature;
-  final String? systemPrompt;
-
-  _StreamingIsolateParams({
-    required this.sendPort,
-    required this.handleAddress,
-    required this.prompt,
-    required this.maxTokens,
-    required this.temperature,
-    this.systemPrompt,
-  });
-}
-
-/// Message sent from streaming isolate to main isolate
-class _StreamingMessage {
-  final bool isComplete;
-  final String? error;
-
-  _StreamingMessage({this.isComplete = false, this.error});
-}
-
-/// SendPort for the current streaming operation in the background isolate
-SendPort? _isolateSendPort;
-
-/// Entry point for the streaming isolate
-@pragma('vm:entry-point')
-void _streamingIsolateEntry(_StreamingIsolateParams params) {
-  // Store the SendPort for callbacks to use
-  _isolateSendPort = params.sendPort;
-  
-  final handle = Pointer<Void>.fromAddress(params.handleAddress);
-  final promptPtr = params.prompt.toNativeUtf8();
-  final optionsPtr = calloc<RacLlmOptionsStruct>();
-  Pointer<Utf8>? systemPromptPtr;
-
-  try {
-    // Set options
-    optionsPtr.ref.maxTokens = params.maxTokens;
-    optionsPtr.ref.temperature = params.temperature;
-    optionsPtr.ref.topP = 1.0;
-    optionsPtr.ref.stopSequences = nullptr;
-    optionsPtr.ref.numStopSequences = 0;
-    optionsPtr.ref.streamingEnabled = RAC_TRUE;
-
-    // Set systemPrompt if provided
-    if (params.systemPrompt != null && params.systemPrompt!.isNotEmpty) {
-      systemPromptPtr = params.systemPrompt!.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr;
-    } else {
-      optionsPtr.ref.systemPrompt = nullptr;
-    }
-
-    final lib = PlatformLoader.loadCommons();
-
-    // Get callback function pointers
-    final tokenCallbackPtr =
-        Pointer.fromFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>(
-            _isolateTokenCallback, 1);
-    final completeCallbackPtr = Pointer.fromFunction<
-        Void Function(
-            Pointer<RacLlmResultStruct>, Pointer<Void>)>(_isolateCompleteCallback);
-    final errorCallbackPtr = Pointer.fromFunction<
-        Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>(_isolateErrorCallback);
-
-    final generateStreamFn = lib.lookupFunction<
-        Int32 Function(
-          RacHandle,
-          Pointer<Utf8>,
-          Pointer<RacLlmOptionsStruct>,
-          Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Pointer<RacLlmResultStruct>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<Void>,
-        ),
-        int Function(
-          RacHandle,
-          Pointer<Utf8>,
-          Pointer<RacLlmOptionsStruct>,
-          Pointer<NativeFunction<Int32 Function(Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Pointer<RacLlmResultStruct>, Pointer<Void>)>>,
-          Pointer<
-              NativeFunction<
-                  Void Function(Int32, Pointer<Utf8>, Pointer<Void>)>>,
-          Pointer<Void>,
-        )>('rac_llm_component_generate_stream');
-
-    // This FFI call blocks until generation is complete
-    final status = generateStreamFn(
-      handle,
-      promptPtr,
-      optionsPtr,
-      tokenCallbackPtr,
-      completeCallbackPtr,
-      errorCallbackPtr,
-      nullptr,
-    );
-
-    if (status != RAC_SUCCESS) {
-      params.sendPort.send(_StreamingMessage(
-        error: 'Failed to start streaming: ${RacResultCode.getMessage(status)}',
-      ));
-    }
-  } catch (e) {
-    params.sendPort.send(_StreamingMessage(error: 'Streaming exception: $e'));
-  } finally {
-    calloc.free(promptPtr);
-    calloc.free(optionsPtr);
-    if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr);
-    }
-    _isolateSendPort = null;
-  }
-}
-
-/// Token callback for background isolate streaming
-@pragma('vm:entry-point')
-int _isolateTokenCallback(Pointer<Utf8> token, Pointer<Void> userData) {
-  try {
-    if (_isolateSendPort != null && token != nullptr) {
-      final tokenStr = token.toDartString();
-      _isolateSendPort!.send(tokenStr);
-    }
-    return 1; // RAC_TRUE = continue generation
-  } catch (e) {
-    return 1; // Continue even on error
-  }
-}
-
-/// Completion callback for background isolate streaming
-@pragma('vm:entry-point')
-void _isolateCompleteCallback(
-    Pointer<RacLlmResultStruct> result, Pointer<Void> userData) {
-  _isolateSendPort?.send(_StreamingMessage(isComplete: true));
-}
-
-/// Error callback for background isolate streaming
-@pragma('vm:entry-point')
-void _isolateErrorCallback(
-    int errorCode, Pointer<Utf8> errorMsg, Pointer<Void> userData) {
-  final message = errorMsg != nullptr ? errorMsg.toDartString() : 'Unknown error';
-  _isolateSendPort?.send(_StreamingMessage(error: 'Generation error ($errorCode): $message'));
-}
-
-// =============================================================================
-// Isolate Helper for Non-Streaming Generation
-// =============================================================================
-
-/// Run LLM generation in an isolate.
-///
-/// This function is called from Isolate.run() and performs the actual FFI call.
-/// Running in a separate isolate prevents heap corruption from C++ background
-/// threads (Metal GPU operations on iOS).
-_IsolateGenerationResult _generateInIsolate(
-  int handleAddress,
-  String prompt,
-  int maxTokens,
-  double temperature,
-  String? systemPrompt,
-) {
-  final handle = Pointer<Void>.fromAddress(handleAddress);
-  final promptPtr = prompt.toNativeUtf8();
-  final optionsPtr = calloc<RacLlmOptionsStruct>();
-  final resultPtr = calloc<RacLlmResultStruct>();
-  Pointer<Utf8>? systemPromptPtr;
-
-  try {
-    // Set options - matching C++ rac_llm_options_t
-    optionsPtr.ref.maxTokens = maxTokens;
-    optionsPtr.ref.temperature = temperature;
-    optionsPtr.ref.topP = 1.0;
-    optionsPtr.ref.stopSequences = nullptr;
-    optionsPtr.ref.numStopSequences = 0;
-    optionsPtr.ref.streamingEnabled = RAC_FALSE;
-
-    // Set systemPrompt if provided
-    if (systemPrompt != null && systemPrompt.isNotEmpty) {
-      systemPromptPtr = systemPrompt.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr;
-    } else {
-      optionsPtr.ref.systemPrompt = nullptr;
-    }
-
-    final lib = PlatformLoader.loadCommons();
-    final generateFn = lib.lookupFunction<
-        Int32 Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmOptionsStruct>,
-            Pointer<RacLlmResultStruct>),
-        int Function(RacHandle, Pointer<Utf8>, Pointer<RacLlmOptionsStruct>,
-            Pointer<RacLlmResultStruct>)>('rac_llm_component_generate');
-
-    final status = generateFn(handle, promptPtr, optionsPtr, resultPtr);
-
-    if (status != RAC_SUCCESS) {
-      return _IsolateGenerationResult(
-        error: 'LLM generation failed: ${RacResultCode.getMessage(status)}',
-      );
-    }
-
-    final result = resultPtr.ref;
-    final text = result.text != nullptr ? result.text.toDartString() : '';
-
-    return _IsolateGenerationResult(
-      text: text,
-      promptTokens: result.promptTokens,
-      completionTokens: result.completionTokens,
-      totalTimeMs: result.totalTimeMs,
-    );
-  } catch (e) {
-    return _IsolateGenerationResult(error: 'Generation exception: $e');
-  } finally {
-    calloc.free(promptPtr);
-    calloc.free(optionsPtr);
-    calloc.free(resultPtr);
-    if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr);
     }
   }
 }

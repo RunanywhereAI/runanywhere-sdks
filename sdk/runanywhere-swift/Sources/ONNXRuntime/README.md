@@ -31,7 +31,7 @@ The ONNXRuntime module is included in the RunAnywhere SDK. Add it to your target
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
 ],
 targets: [
     .target(
@@ -85,53 +85,60 @@ struct MyApp: App {
 #### Loading a Model
 
 ```swift
-try await RunAnywhere.loadSTTModel("whisper-base-onnx")
-
-let isLoaded = await RunAnywhere.isSTTModelLoaded
+var req = RAModelLoadRequest()
+req.modelID = "whisper-base-onnx"
+req.category = .speechRecognition
+req.framework = .onnx
+let result = await RunAnywhere.loadModel(req)
+print("Loaded: \(result.resolvedPath)")
 ```
 
 #### Simple Transcription
 
 ```swift
 let audioData: Data = // your audio data (16kHz, mono, Float32)
-let text = try await RunAnywhere.transcribe(audioData)
-print("Transcribed: \(text)")
+let output = try await RunAnywhere.transcribe(audio: audioData)
+print("Transcribed: \(output.text)")
 ```
 
 #### Transcription with Options
 
 ```swift
-let options = STTOptions(
-    language: "en-US",
-    sampleRate: 16000,
-    enableWordTimestamps: true
-)
+var options = RASTTOptions.defaults()
+options.language = .en
+options.sampleRate = 16000
+options.enableWordTimestamps = true
 
-let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
-print("Text: \(result.text)")
-print("Confidence: \(result.confidence ?? 0)")
-if let language = result.detectedLanguage {
-    print("Detected language: \(language)")
+let output = try await RunAnywhere.transcribe(audio: audioData, options: options)
+print("Text: \(output.text)")
+print("Confidence: \(output.confidence)")
+if output.hasLanguageCode {
+    print("Detected language: \(output.languageCode)")
 }
 ```
 
 #### Streaming Transcription
 
 ```swift
-let output = try await RunAnywhere.transcribeStream(
-    audioData: audioData,
-    options: STTOptions(language: "en")
-) { partialResult in
-    print("Partial: \(partialResult.transcript)")
-}
+var options = RASTTOptions.defaults()
+options.language = .en
 
-print("Final: \(output.text)")
+for await partial in RunAnywhere.transcribeStream(audio: audioStream, options: options) {
+    if partial.isFinal {
+        print("Final: \(partial.text)")
+    } else {
+        print("Partial: \(partial.text)")
+    }
+}
 ```
 
 #### Unloading
 
 ```swift
-try await RunAnywhere.unloadSTTModel()
+var unload = RAModelUnloadRequest()
+unload.modelID = "whisper-base-onnx"
+unload.category = .speechRecognition
+_ = await RunAnywhere.unloadModel(unload)
 ```
 
 ### Text-to-Speech (TTS)
@@ -139,55 +146,50 @@ try await RunAnywhere.unloadSTTModel()
 #### Loading a Voice
 
 ```swift
-try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
-
-let isLoaded = await RunAnywhere.isTTSVoiceLoaded
+var req = RAModelLoadRequest()
+req.modelID = "piper-en-us-amy"
+req.category = .speechSynthesis
+req.framework = .onnx
+_ = await RunAnywhere.loadModel(req)
 ```
 
 #### Simple Synthesis
 
 ```swift
+var options = RATTSOptions.defaults()
+options.rate = 1.0
+options.pitch = 1.0
+options.volume = 0.8
+
 let output = try await RunAnywhere.synthesize(
     "Hello! Welcome to RunAnywhere.",
-    options: TTSOptions(rate: 1.0, pitch: 1.0, volume: 0.8)
+    options: options
 )
 
 // output.audioData contains the synthesized audio
-// output.duration contains the audio length in seconds
+// output.durationMs contains the audio length in ms
 ```
 
 #### Speak with Automatic Playback
 
 ```swift
 // Synthesize and play through device speakers
-try await RunAnywhere.speak("Hello world")
+let result = try await RunAnywhere.speak("Hello world")
 
 // With options
-let result = try await RunAnywhere.speak(
-    "Hello",
-    options: TTSOptions(rate: 1.2, pitch: 1.0)
-)
-print("Duration: \(result.duration)s")
+var options = RATTSOptions.defaults()
+options.rate = 1.2
+options.pitch = 1.0
+let result = try await RunAnywhere.speak("Hello", options: options)
+print("Duration: \(result.output.durationMs) ms")
 ```
 
 #### Streaming Synthesis
 
 ```swift
-let output = try await RunAnywhere.synthesizeStream(
-    "Long text to synthesize...",
-    options: TTSOptions()
-) { chunk in
-    // Process audio chunk as it's generated
-    playAudioChunk(chunk)
-}
-```
-
-#### Available Voices
-
-```swift
-let voices = await RunAnywhere.availableTTSVoices
-for voice in voices {
-    print("Voice: \(voice)")
+for await chunk in RunAnywhere.synthesizeStream("Long text to synthesize...") {
+    // Process audio chunk as it is generated
+    playAudioChunk(chunk.audioData)
 }
 ```
 
@@ -200,57 +202,34 @@ await RunAnywhere.stopSpeaking()
 
 ### Voice Activity Detection (VAD)
 
-#### Initialization
-
-```swift
-// Default configuration
-try await RunAnywhere.initializeVAD()
-
-// Custom configuration
-try await RunAnywhere.initializeVAD(VADConfiguration(
-    sampleRate: 16000,
-    frameLength: 0.032,
-    energyThreshold: 0.5
-))
-```
-
 #### Detection
 
 ```swift
-// From audio samples
-let samples: [Float] = // your audio samples
-let speechDetected = try await RunAnywhere.detectSpeech(in: samples)
+// Single buffer
+var opts = RAVADOptions()
+opts.sampleRate = 16000
+opts.energyThreshold = 0.5
 
-// From AVAudioPCMBuffer
-let buffer: AVAudioPCMBuffer = // your audio buffer
-let speechDetected = try await RunAnywhere.detectSpeech(in: buffer)
-```
-
-#### Callbacks
-
-```swift
-// Speech activity callback
-await RunAnywhere.setVADSpeechActivityCallback { event in
-    switch event {
-    case .started:
-        print("Speech started")
-    case .ended:
-        print("Speech ended")
-    }
-}
-
-// Audio buffer callback
-await RunAnywhere.setVADAudioBufferCallback { samples in
-    // Process audio samples
+let samples: Data = // Float32 PCM at 16 kHz mono
+let result = try await RunAnywhere.detectVoiceActivity(samples, options: opts)
+if result.isSpeech {
+    print("Speech detected (confidence: \(result.confidence))")
 }
 ```
 
-#### Control
+#### Streaming Detection
 
 ```swift
-try await RunAnywhere.startVAD()
-try await RunAnywhere.stopVAD()
-await RunAnywhere.cleanupVAD()
+// Stream VAD over a chunked AsyncStream<Data>
+for await vadResult in RunAnywhere.streamVAD(audio: audioStream) {
+    if vadResult.isSpeech { handleSpeechFrame(vadResult) }
+}
+```
+
+#### Reset
+
+```swift
+try await RunAnywhere.resetVAD()
 ```
 
 ## API Reference
@@ -258,45 +237,31 @@ await RunAnywhere.cleanupVAD()
 ### ONNX Module
 
 ```swift
-public enum ONNX: RunAnywhereModule {
-    /// Module identifier
-    public static let moduleId = "onnx"
-
-    /// Human-readable module name
-    public static let moduleName = "ONNX Runtime"
-
-    /// Capabilities provided by this module
-    public static let capabilities: Set<SDKComponent> = [.stt, .tts, .vad]
-
-    /// Default registration priority
-    public static let defaultPriority: Int = 100
-
-    /// Inference framework used
-    public static let inferenceFramework: InferenceFramework = .onnx
-
+public enum ONNX {
     /// Module version
     public static let version = "2.0.0"
 
     /// Underlying ONNX Runtime version
     public static let onnxRuntimeVersion = "1.23.2"
 
-    /// Register the module with the service registry
+    /// Register the ONNX backend with the C++ service registry.
+    /// Registers the generic ONNX module (embeddings + Silero VAD) and the
+    /// Sherpa-ONNX engine plugin (STT: Whisper / Zipformer / Paraformer,
+    /// TTS: Piper / VITS) so `framework == .sherpa` resolves through the
+    /// unified C++ plugin router.
     @MainActor
     public static func register(priority: Int = 100)
 
-    /// Unregister the module
+    /// Unregister the ONNX backend (also unregisters the Sherpa-ONNX plugin)
+    @MainActor
     public static func unregister()
 
-    /// Check if the module can handle a given STT model
-    public static func canHandleSTT(modelId: String?) -> Bool
-
-    /// Check if the module can handle a given TTS model
-    public static func canHandleTTS(modelId: String?) -> Bool
-
-    /// Check if the module can handle VAD
-    public static func canHandleVAD(modelId: String?) -> Bool
+    /// Trigger registration via property access (auto-registration helper)
+    public static let autoRegister: Void
 }
 ```
+
+`ONNX` is a thin `public enum` namespace. Model-to-backend routing (STT / TTS / VAD) is performed by the C++ plugin registry (`rac_plugin_find` / `rac_plugin_find_for_engine`) using the proto-typed `RAInferenceFramework` / `RAModelCategory` tables — there are no Swift-side `canHandleSTT` / `canHandleTTS` / `canHandleVAD` methods or `capabilities` set.
 
 ### Model Compatibility
 
@@ -401,7 +366,7 @@ Performance varies based on model size and device thermal state.
 
 ### Model Load Fails
 
-1. Ensure the model is downloaded: check `ModelInfo.isDownloaded`
+1. Ensure the model is downloaded: check `RAModelInfo.isDownloaded`
 2. Verify the model format matches the capability (Whisper for STT, Piper for TTS)
 3. Check available memory
 

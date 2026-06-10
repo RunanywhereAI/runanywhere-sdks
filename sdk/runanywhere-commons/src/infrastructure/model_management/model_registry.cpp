@@ -1,16 +1,40 @@
 /**
  * @file model_registry.cpp
- * @brief RunAnywhere Commons - Model Registry Implementation
+ * @brief RunAnywhere Commons - Model Registry Implementation (slim core)
  *
  * C++ port of Swift's ModelInfoService.
  * Swift Source: Sources/RunAnywhere/Infrastructure/ModelManagement/Services/ModelInfoService.swift
  *
  * CRITICAL: This is a direct port of Swift implementation - do NOT add custom logic!
  *
- * This is an in-memory model metadata store.
+ * This is an in-memory model metadata store. This TU is the slim core after the
+ * SRP split: registry lifecycle, struct-based CRUD, download-state
+ * normalization, and the proto snapshot helpers. The proto<->C conversion, the
+ * proto-byte ABI surface, filesystem discovery, and refresh/fetch live in the
+ * sibling model_registry_{convert,proto,discovery,refresh}.cpp TUs, all sharing
+ * model_registry_internal.h.
+ *
+ * Edge cases handled:
+ *   - Re-seeded entry after app relaunch: reconcile_registry_with_filesystem_locked
+ *     relinks local_path to the canonical
+ *     {base}/RunAnywhere/Models/{framework}/{id}/ folder via
+ *     canonical_model_folder_for + directory_contains_recognizable_model_file.
+ *   - Download-state normalization: normalize_model_registry_state +
+ *     overwrite_download_state_from_local_path derive is_downloaded/status from
+ *     local_path presence.
+ *   - Partial-update preservation: preserve_absent_proto_fields — an update proto
+ *     with empty local_path/artifact does not clobber existing values (avoids
+ *     wiping download state on metadata-only updates).
+ *   - Built-in vs user models: model_is_built_in entries are excluded from
+ *     discovery unless include_built_in is set.
+ *   - Path-root filtering in discover: path_matches_roots.
+ *   - Proto/struct dual storage: model_proto_bytes snapshot preserves fields the
+ *     legacy C struct cannot represent.
+ *   - Empty/duplicate model_id, missing handle, protobuf-unavailable build →
+ *     structured errors.
  */
 
-#include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -19,106 +43,206 @@
 #include <string>
 #include <vector>
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
-#include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
-// =============================================================================
-// INTERNAL STRUCTURES
-// =============================================================================
+#include "model_registry_internal.h"
 
-struct rac_model_registry {
-    // Model storage (model_id -> model_info)
-    std::map<std::string, rac_model_info_t*> models;
-
-    // Thread safety
-    std::mutex mutex;
-};
+using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
+// Note: the rac_model_registry struct definition lives in model_registry_internal.h.
 
-static rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
-    if (!src)
-        return nullptr;
+#ifdef RAC_HAVE_PROTOBUF
 
-    rac_model_info_t* copy = static_cast<rac_model_info_t*>(calloc(1, sizeof(rac_model_info_t)));
-    if (!copy)
-        return nullptr;
+namespace rac::infra::model_registry::detail {
 
-    copy->id = rac_strdup(src->id);
-    copy->name = rac_strdup(src->name);
-    copy->category = src->category;
-    copy->format = src->format;
-    copy->framework = src->framework;
-    copy->download_url = rac_strdup(src->download_url);
-    copy->local_path = rac_strdup(src->local_path);
-    // Copy artifact info struct (shallow copy for basic fields, deep copy for pointers)
-    copy->artifact_info.kind = src->artifact_info.kind;
-    copy->artifact_info.archive_type = src->artifact_info.archive_type;
-    copy->artifact_info.archive_structure = src->artifact_info.archive_structure;
-    copy->artifact_info.expected_files = nullptr;  // Complex structure, leave null for now
-    copy->artifact_info.file_descriptors = nullptr;
-    copy->artifact_info.file_descriptor_count = 0;
-    copy->artifact_info.strategy_id = rac_strdup(src->artifact_info.strategy_id);
-    copy->download_size = src->download_size;
-    copy->memory_required = src->memory_required;
-    copy->context_length = src->context_length;
-    copy->supports_thinking = src->supports_thinking;
-    copy->supports_lora = src->supports_lora;
+// -----------------------------------------------------------------------------
+// Download-state normalization
+// -----------------------------------------------------------------------------
 
-    // Copy tags
-    if (src->tags && src->tag_count > 0) {
-        copy->tags = static_cast<char**>(malloc(sizeof(char*) * src->tag_count));
-        if (copy->tags) {
-            for (size_t i = 0; i < src->tag_count; ++i) {
-                copy->tags[i] = rac_strdup(src->tags[i]);
-            }
-            copy->tag_count = src->tag_count;
-        }
-    }
-
-    copy->description = rac_strdup(src->description);
-    copy->source = src->source;
-    copy->created_at = src->created_at;
-    copy->updated_at = src->updated_at;
-    copy->last_used = src->last_used;
-    copy->usage_count = src->usage_count;
-
-    return copy;
+bool has_nonempty_local_path(const ModelInfo& model) {
+    return !model.local_path().empty();
 }
 
-static void free_model_info(rac_model_info_t* model) {
-    if (!model)
+bool registry_status_is_downloaded(ModelRegistryStatus status) {
+    return status == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
+           status == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED;
+}
+
+bool model_is_downloaded_from_fields(const ModelInfo& model) {
+    if (has_nonempty_local_path(model)) {
+        return true;
+    }
+    if (model.has_is_downloaded()) {
+        return model.is_downloaded();
+    }
+    if (model.has_registry_status()) {
+        return registry_status_is_downloaded(model.registry_status());
+    }
+    return false;
+}
+
+ModelRegistryStatus effective_registry_status(const ModelInfo& model) {
+    if (model.has_registry_status()) {
+        return model.registry_status();
+    }
+    return model_is_downloaded_from_fields(model)
+               ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+               : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED;
+}
+
+void normalize_model_registry_state(ModelInfo* model) {
+    if (!model) {
         return;
-
-    if (model->id)
-        free(model->id);
-    if (model->name)
-        free(model->name);
-    if (model->download_url)
-        free(model->download_url);
-    if (model->local_path)
-        free(model->local_path);
-    if (model->description)
-        free(model->description);
-
-    // Free artifact info strings
-    if (model->artifact_info.strategy_id) {
-        free(const_cast<char*>(model->artifact_info.strategy_id));
     }
 
-    if (model->tags) {
-        for (size_t i = 0; i < model->tag_count; ++i) {
-            if (model->tags[i])
-                free(model->tags[i]);
-        }
-        free(model->tags);
+    const bool downloaded = model_is_downloaded_from_fields(*model);
+    if (!model->has_is_downloaded()) {
+        model->set_is_downloaded(downloaded);
     }
-
-    free(model);
+    if (!model->has_is_available()) {
+        model->set_is_available(downloaded);
+    }
+    if (!model->has_registry_status()) {
+        model->set_registry_status(downloaded ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+                                              : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    }
 }
+
+void overwrite_download_state_from_local_path(ModelInfo* model) {
+    if (!model) {
+        return;
+    }
+
+    const bool downloaded = has_nonempty_local_path(*model);
+    model->set_is_downloaded(downloaded);
+    model->set_is_available(downloaded);
+
+    const ModelRegistryStatus current = effective_registry_status(*model);
+    if (downloaded) {
+        if (current != runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED &&
+            current != runanywhere::v1::MODEL_REGISTRY_STATUS_LOADING &&
+            current != runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
+            model->set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        }
+    } else if (registry_status_is_downloaded(current) ||
+               current == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADING ||
+               current == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADING ||
+               current == runanywhere::v1::MODEL_REGISTRY_STATUS_UNSPECIFIED) {
+        model->set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Proto snapshot helpers
+// -----------------------------------------------------------------------------
+
+rac_result_t store_proto_snapshot_locked(rac_model_registry_handle_t handle,
+                                         const std::string& model_id, const rac_model_info_t* model,
+                                         bool preserve_proto_only_fields,
+                                         bool overwrite_registry_state) {
+    ModelInfo snapshot;
+    bool parsed_existing = false;
+    if (preserve_proto_only_fields) {
+        auto proto_it = handle->model_proto_bytes.find(model_id);
+        if (proto_it != handle->model_proto_bytes.end()) {
+            parsed_existing = snapshot.ParseFromString(proto_it->second);
+        }
+    }
+    if (!parsed_existing) {
+        snapshot.Clear();
+    }
+
+    if (parsed_existing) {
+        overlay_struct_runtime_fields_to_proto(model, &snapshot, overwrite_registry_state);
+    } else {
+        model_info_to_proto(model, &snapshot,
+                            /*overwrite_artifact=*/true, overwrite_registry_state);
+    }
+    if (!snapshot.SerializeToString(&handle->model_proto_bytes[model_id])) {
+        handle->model_proto_bytes.erase(model_id);
+        return RAC_ERROR_UNKNOWN;
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t store_parsed_proto_snapshot_locked(rac_model_registry_handle_t handle,
+                                                const std::string& model_id,
+                                                const ModelInfo& parsed_proto) {
+    auto it = handle->models.find(model_id);
+    if (it == handle->models.end()) {
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    ModelInfo snapshot(parsed_proto);
+    normalize_model_registry_state(&snapshot);
+    overlay_struct_runtime_fields_to_proto(it->second, &snapshot,
+                                           /*overwrite_registry_state=*/false);
+    if (!snapshot.SerializeToString(&handle->model_proto_bytes[model_id])) {
+        handle->model_proto_bytes.erase(model_id);
+        return RAC_ERROR_UNKNOWN;
+    }
+    return RAC_SUCCESS;
+}
+
+ModelInfo model_snapshot_locked(rac_model_registry_handle_t handle, const std::string& model_id,
+                                const rac_model_info_t* model) {
+    ModelInfo snapshot;
+    auto proto_it = handle->model_proto_bytes.find(model_id);
+    if (proto_it != handle->model_proto_bytes.end() && snapshot.ParseFromString(proto_it->second)) {
+        overlay_struct_runtime_fields_to_proto(model, &snapshot,
+                                               /*overwrite_registry_state=*/false);
+    } else {
+        snapshot.Clear();
+        model_info_to_proto(model, &snapshot,
+                            /*overwrite_artifact=*/true,
+                            /*overwrite_registry_state=*/true);
+    }
+    return snapshot;
+}
+
+rac_result_t model_to_proto_bytes_locked(rac_model_registry_handle_t handle,
+                                         const std::string& model_id, const rac_model_info_t* model,
+                                         uint8_t** proto_bytes_out, size_t* proto_size_out) {
+    ModelInfo snapshot = model_snapshot_locked(handle, model_id, model);
+    return serialize_proto_to_owned_buffer(snapshot, proto_bytes_out, proto_size_out);
+}
+
+int64_t imported_size_for_request(const ModelImportRequest& request, const ModelInfo& model) {
+    int64_t total = 0;
+    for (const ModelFileDescriptor& file : request.files()) {
+        if (file.has_size_bytes() && file.size_bytes() > 0) {
+            total += file.size_bytes();
+        }
+    }
+    if (total > 0) {
+        return total;
+    }
+    return model.download_size_bytes() > 0 ? model.download_size_bytes() : 0;
+}
+
+bool get_model_snapshot_by_id(rac_model_registry_handle_t handle, const std::string& model_id,
+                              ModelInfo* out) {
+    if (!handle || !out) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(handle->mutex);
+    auto it = handle->models.find(model_id);
+    if (it == handle->models.end()) {
+        return false;
+    }
+    *out = model_snapshot_locked(handle, model_id, it->second);
+    normalize_model_registry_state(out);
+    return true;
+}
+
+}  // namespace rac::infra::model_registry::detail
+
+#endif  // RAC_HAVE_PROTOBUF
 
 // =============================================================================
 // PUBLIC API - LIFECYCLE
@@ -159,8 +283,19 @@ void rac_model_registry_destroy(rac_model_registry_handle_t handle) {
 // PUBLIC API - MODEL INFO
 // =============================================================================
 
-rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
-                                     const rac_model_info_t* model) {
+namespace rac::infra::model_registry::detail {
+
+// Shared save implementation. `preserve_empty_local_path` controls the
+// legacy "registerModel() passes localPath=nil, keep the existing one"
+// heuristic: the C struct cannot carry proto field-presence, so for the
+// non-proto callers (Swift/Kotlin/etc. registerModel and platform/auto
+// registration) an empty incoming local_path is treated as "unset" and the
+// existing path is kept. The proto register/update paths set this to false
+// because they have already resolved local_path presence-aware in the proto
+// domain (preserve_absent_proto_fields), so an empty local_path there is an
+// *explicit* reset that must win.
+rac_result_t save_model_info_impl(rac_model_registry_handle_t handle, const rac_model_info_t* model,
+                                  bool preserve_empty_local_path) {
     if (!handle || !model || !model->id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -175,8 +310,10 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         // This prevents registerModel() (which always passes localPath=nil) from
         // overwriting a localPath that was set by download completion or discovery.
         const char* existing_local_path = it->second->local_path;
-        bool should_preserve_path = existing_local_path && strlen(existing_local_path) > 0 &&
-                                    (!model->local_path || strlen(model->local_path) == 0);
+        bool should_preserve_path =
+            preserve_empty_local_path && (existing_local_path != nullptr) &&
+            strlen(existing_local_path) > 0 &&
+            (model->local_path == nullptr || strlen(model->local_path) == 0);
 
         // Store a deep copy of the incoming model
         rac_model_info_t* copy = deep_copy_model(model);
@@ -201,9 +338,38 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         handle->models[model_id] = copy;
     }
 
+#ifdef RAC_HAVE_PROTOBUF
+    auto stored = handle->models.find(model_id);
+    if (stored != handle->models.end()) {
+        rac_result_t proto_rc = store_proto_snapshot_locked(handle, model_id, stored->second,
+                                                            /*preserve_proto_only_fields=*/false,
+                                                            /*overwrite_registry_state=*/true);
+        if (proto_rc != RAC_SUCCESS) {
+            return proto_rc;
+        }
+
+        // Self-healing reconcile: if the incoming entry has no local_path but
+        // the canonical {base_dir}/RunAnywhere/Models/{framework}/{id}/ folder
+        // already exists on disk (typical for the 2nd app launch after a
+        // previous download), relink local_path immediately. This removes the
+        // ordering dependency between registerModel() and the one-shot
+        // discoverDownloadedModels() sweep in Phase 2.
+        try_reconcile_model_local_path_locked(handle, model_id, stored->second);
+    }
+#endif
+
     RAC_LOG_DEBUG("ModelRegistry", "Model saved");
 
     return RAC_SUCCESS;
+}
+
+}  // namespace rac::infra::model_registry::detail
+
+rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
+                                     const rac_model_info_t* model) {
+    // Legacy / non-proto callers: keep the "empty local_path means unset, so
+    // preserve the existing one" behaviour.
+    return save_model_info_impl(handle, model, /*preserve_empty_local_path=*/true);
 }
 
 rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle, const char* model_id,
@@ -256,7 +422,7 @@ rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
         if (model->local_path) {
             std::string model_path(model->local_path);
             // Check if search path starts with model's local_path
-            if (search_path.find(model_path) == 0 || model_path.find(search_path) == 0) {
+            if (search_path.starts_with(model_path) || model_path.starts_with(search_path)) {
                 *out_model = deep_copy_model(model);
                 if (!*out_model) {
                     return RAC_ERROR_OUT_OF_MEMORY;
@@ -298,7 +464,7 @@ rac_result_t rac_model_registry_get_all(rac_model_registry_handle_t handle,
             for (size_t j = 0; j < i; ++j) {
                 free_model_info((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -350,7 +516,7 @@ rac_result_t rac_model_registry_get_by_frameworks(rac_model_registry_handle_t ha
             for (size_t j = 0; j < i; ++j) {
                 free_model_info((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -377,7 +543,13 @@ rac_result_t rac_model_registry_update_last_used(rac_model_registry_handle_t han
     model->last_used = rac_get_current_time_ms() / 1000;  // Convert to seconds
     model->usage_count++;
 
+#ifdef RAC_HAVE_PROTOBUF
+    return store_proto_snapshot_locked(handle, model_id, model,
+                                       /*preserve_proto_only_fields=*/true,
+                                       /*overwrite_registry_state=*/false);
+#else
     return RAC_SUCCESS;
+#endif
 }
 
 rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handle, const char* model_id) {
@@ -394,6 +566,9 @@ rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handle, const
 
     free_model_info(it->second);
     handle->models.erase(it);
+#ifdef RAC_HAVE_PROTOBUF
+    handle->model_proto_bytes.erase(model_id);
+#endif
 
     RAC_LOG_DEBUG("ModelRegistry", "Model removed");
 
@@ -435,7 +610,7 @@ rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle_t handl
             for (size_t j = 0; j < i; ++j) {
                 free_model_info((*out_models)[j]);
             }
-            free(*out_models);
+            free(static_cast<void*>(*out_models));
             *out_models = nullptr;
             *out_count = 0;
             return RAC_ERROR_OUT_OF_MEMORY;
@@ -470,285 +645,11 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
     model->local_path = rac_strdup(local_path);
     model->updated_at = rac_get_current_time_ms() / 1000;
 
+#ifdef RAC_HAVE_PROTOBUF
+    return store_proto_snapshot_locked(handle, model_id, model,
+                                       /*preserve_proto_only_fields=*/true,
+                                       /*overwrite_registry_state=*/true);
+#else
     return RAC_SUCCESS;
-}
-
-// =============================================================================
-// PUBLIC API - QUERY HELPERS
-// =============================================================================
-
-// NOTE: rac_model_info_is_downloaded, rac_model_category_requires_context_length,
-// and rac_model_category_supports_thinking are defined in model_types.cpp
-
-rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_model_format_t format) {
-    // Infer from URL extension
-    if (url) {
-        size_t len = strlen(url);
-
-        if (len > 4 && strcmp(url + len - 4, ".zip") == 0) {
-            return RAC_ARTIFACT_KIND_ARCHIVE;
-        }
-        if (len > 4 && strcmp(url + len - 4, ".tar") == 0) {
-            return RAC_ARTIFACT_KIND_ARCHIVE;
-        }
-        if (len > 7 && strcmp(url + len - 7, ".tar.gz") == 0) {
-            return RAC_ARTIFACT_KIND_ARCHIVE;
-        }
-        if (len > 4 && strcmp(url + len - 4, ".tgz") == 0) {
-            return RAC_ARTIFACT_KIND_ARCHIVE;
-        }
-    }
-
-    // Default to single file for most formats
-    switch (format) {
-        case RAC_MODEL_FORMAT_GGUF:
-        case RAC_MODEL_FORMAT_ONNX:
-        case RAC_MODEL_FORMAT_BIN:
-            return RAC_ARTIFACT_KIND_SINGLE_FILE;
-        default:
-            return RAC_ARTIFACT_KIND_SINGLE_FILE;
-    }
-}
-
-// =============================================================================
-// PUBLIC API - MODEL DISCOVERY
-// =============================================================================
-
-// Helper to check if a folder contains valid model files for a framework
-static bool is_valid_model_folder(const rac_discovery_callbacks_t* callbacks,
-                                  const char* folder_path, rac_inference_framework_t framework) {
-    if (!callbacks || !callbacks->list_directory || !folder_path) {
-        return false;
-    }
-
-    char** entries = nullptr;
-    size_t count = 0;
-
-    // List directory contents
-    if (callbacks->list_directory(folder_path, &entries, &count, callbacks->user_data) !=
-        RAC_SUCCESS) {
-        return false;
-    }
-
-    bool found_model_file = false;
-
-    for (size_t i = 0; i < count && !found_model_file; i++) {
-        if (!entries[i])
-            continue;
-
-        // Build full path
-        std::string full_path = std::string(folder_path) + "/" + entries[i];
-
-        // Check if it's a model file for this framework
-        if (callbacks->is_model_file) {
-            if (callbacks->is_model_file(full_path.c_str(), framework, callbacks->user_data) ==
-                RAC_TRUE) {
-                found_model_file = true;
-            }
-        }
-
-        // For nested directories, recursively check (one level deep)
-        if (!found_model_file && callbacks->is_directory) {
-            if (callbacks->is_directory(full_path.c_str(), callbacks->user_data) == RAC_TRUE) {
-                // Check subdirectory for model files
-                char** sub_entries = nullptr;
-                size_t sub_count = 0;
-                if (callbacks->list_directory(full_path.c_str(), &sub_entries, &sub_count,
-                                              callbacks->user_data) == RAC_SUCCESS) {
-                    for (size_t j = 0; j < sub_count && !found_model_file; j++) {
-                        if (!sub_entries[j])
-                            continue;
-                        std::string sub_path = full_path + "/" + sub_entries[j];
-                        if (callbacks->is_model_file &&
-                            callbacks->is_model_file(sub_path.c_str(), framework,
-                                                     callbacks->user_data) == RAC_TRUE) {
-                            found_model_file = true;
-                        }
-                    }
-                    if (callbacks->free_entries) {
-                        callbacks->free_entries(sub_entries, sub_count, callbacks->user_data);
-                    }
-                }
-            }
-        }
-    }
-
-    if (callbacks->free_entries) {
-        callbacks->free_entries(entries, count, callbacks->user_data);
-    }
-
-    return found_model_file;
-}
-
-rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t handle,
-                                                    const rac_discovery_callbacks_t* callbacks,
-                                                    rac_discovery_result_t* out_result) {
-    if (!handle || !callbacks || !out_result) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    // Initialize result
-    out_result->discovered_count = 0;
-    out_result->discovered_models = nullptr;
-    out_result->unregistered_count = 0;
-
-    // Check required callbacks
-    if (!callbacks->list_directory || !callbacks->path_exists || !callbacks->is_directory) {
-        RAC_LOG_WARNING("ModelRegistry", "Discovery: Missing required callbacks");
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    RAC_LOG_INFO("ModelRegistry", "Starting model discovery scan...");
-
-    // Get models directory path
-    char models_dir[1024];
-    if (rac_model_paths_get_models_directory(models_dir, sizeof(models_dir)) != RAC_SUCCESS) {
-        RAC_LOG_WARNING("ModelRegistry", "Discovery: Base directory not configured");
-        return RAC_SUCCESS;  // Not an error, just nothing to discover
-    }
-
-    // Check if models directory exists
-    if (callbacks->path_exists(models_dir, callbacks->user_data) != RAC_TRUE) {
-        RAC_LOG_DEBUG("ModelRegistry", "Discovery: Models directory does not exist yet");
-        return RAC_SUCCESS;
-    }
-
-    // Frameworks to scan - include all frameworks that can have downloaded models
-    // Note: RAC_FRAMEWORK_UNKNOWN is included to recover models that were incorrectly
-    // stored in the "Unknown" directory due to missing framework mappings
-    rac_inference_framework_t frameworks[] = {
-        RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
-        RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
-        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
-        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-        RAC_FRAMEWORK_UNKNOWN};
-    size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
-
-    // Collect discovered models
-    std::vector<rac_discovered_model_t> discovered;
-    size_t unregistered = 0;
-
-    std::lock_guard<std::mutex> lock(handle->mutex);
-
-    for (size_t f = 0; f < framework_count; f++) {
-        rac_inference_framework_t framework = frameworks[f];
-
-        // Get framework directory path
-        char framework_dir[1024];
-        if (rac_model_paths_get_framework_directory(framework, framework_dir,
-                                                    sizeof(framework_dir)) != RAC_SUCCESS) {
-            continue;
-        }
-
-        // Check if framework directory exists
-        if (callbacks->path_exists(framework_dir, callbacks->user_data) != RAC_TRUE) {
-            continue;
-        }
-
-        // List model folders in this framework directory
-        char** model_folders = nullptr;
-        size_t folder_count = 0;
-
-        if (callbacks->list_directory(framework_dir, &model_folders, &folder_count,
-                                      callbacks->user_data) != RAC_SUCCESS) {
-            continue;
-        }
-
-        for (size_t i = 0; i < folder_count; i++) {
-            if (!model_folders[i])
-                continue;
-
-            // Skip hidden files
-            if (model_folders[i][0] == '.')
-                continue;
-
-            const char* model_id = model_folders[i];
-
-            // Build full path to model folder
-            std::string model_path = std::string(framework_dir) + "/" + model_id;
-
-            // Check if it's a directory
-            if (callbacks->is_directory(model_path.c_str(), callbacks->user_data) != RAC_TRUE) {
-                continue;
-            }
-
-            // Check if it contains valid model files
-            if (!is_valid_model_folder(callbacks, model_path.c_str(), framework)) {
-                continue;
-            }
-
-            // Check if this model is registered
-            auto it = handle->models.find(model_id);
-            if (it != handle->models.end()) {
-                // Model is registered - check if it needs update
-                rac_model_info_t* model = it->second;
-
-                if (!model->local_path || strlen(model->local_path) == 0) {
-                    // Update the local path
-                    if (model->local_path) {
-                        free(model->local_path);
-                    }
-                    model->local_path = rac_strdup(model_path.c_str());
-                    model->updated_at = rac_get_current_time_ms() / 1000;
-
-                    // Add to discovered list
-                    rac_discovered_model_t disc;
-                    disc.model_id = rac_strdup(model_id);
-                    disc.local_path = rac_strdup(model_path.c_str());
-                    disc.framework = framework;
-                    discovered.push_back(disc);
-
-                    RAC_LOG_INFO("ModelRegistry", "Discovered downloaded model");
-                }
-            } else {
-                // Model folder exists but not registered
-                unregistered++;
-                RAC_LOG_DEBUG("ModelRegistry", "Found unregistered model folder");
-            }
-        }
-
-        if (callbacks->free_entries) {
-            callbacks->free_entries(model_folders, folder_count, callbacks->user_data);
-        }
-    }
-
-    // Build result
-    out_result->discovered_count = discovered.size();
-    out_result->unregistered_count = unregistered;
-
-    if (!discovered.empty()) {
-        out_result->discovered_models = static_cast<rac_discovered_model_t*>(
-            malloc(sizeof(rac_discovered_model_t) * discovered.size()));
-        if (out_result->discovered_models) {
-            for (size_t i = 0; i < discovered.size(); i++) {
-                out_result->discovered_models[i] = discovered[i];
-            }
-        }
-    }
-
-    RAC_LOG_INFO("ModelRegistry", "Model discovery complete");
-
-    return RAC_SUCCESS;
-}
-
-void rac_discovery_result_free(rac_discovery_result_t* result) {
-    if (!result)
-        return;
-
-    if (result->discovered_models) {
-        for (size_t i = 0; i < result->discovered_count; i++) {
-            if (result->discovered_models[i].model_id) {
-                free(const_cast<char*>(result->discovered_models[i].model_id));
-            }
-            if (result->discovered_models[i].local_path) {
-                free(const_cast<char*>(result->discovered_models[i].local_path));
-            }
-        }
-        free(result->discovered_models);
-    }
-
-    result->discovered_models = nullptr;
-    result->discovered_count = 0;
-    result->unregistered_count = 0;
+#endif
 }

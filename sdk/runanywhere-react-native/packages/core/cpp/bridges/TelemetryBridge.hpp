@@ -8,7 +8,8 @@
  * Architecture:
  * - C++ telemetry manager handles all event logic (batching, JSON building)
  * - Platform SDK (React Native) only provides HTTP transport
- * - Events from analytics callback are routed to telemetry manager
+ * - The telemetry manager is registered as the C++ event router's telemetry
+ *   sink; the router feeds it events directly (no per-event callback)
  */
 
 #pragma once
@@ -16,7 +17,6 @@
 #include <string>
 #include <mutex>
 #include "rac_telemetry_manager.h"
-#include "rac_analytics_events.h"
 #include "rac_environment.h"
 
 namespace runanywhere {
@@ -28,7 +28,7 @@ namespace bridges {
  * This matches Swift's CppBridge.Telemetry implementation:
  * - Creates/destroys telemetry manager
  * - Registers HTTP callback for sending events
- * - Routes analytics events to telemetry manager
+ * - Attaches the manager as the C++ event router's telemetry sink
  */
 class TelemetryBridge {
 public:
@@ -66,27 +66,19 @@ public:
     bool isInitialized() const;
 
     /**
-     * Track analytics event from C++ callback
-     * Routes to rac_telemetry_manager_track_analytics
-     */
-    void trackAnalyticsEvent(
-        rac_event_type_t eventType,
-        const rac_analytics_event_data_t* data
-    );
-
-    /**
      * Flush pending telemetry events immediately
      */
     void flush();
 
     /**
-     * Register analytics events callback
-     * This routes analytics events to the telemetry manager
+     * Attach the telemetry manager as the C++ event router's telemetry sink.
+     * The router forwards every TELEMETRY-bit event into the manager via
+     * rac_telemetry_manager_track_proto; there is no per-event callback.
      */
     void registerEventsCallback();
 
     /**
-     * Unregister analytics events callback
+     * Detach the telemetry sink from the C++ event router.
      */
     void unregisterEventsCallback();
 
@@ -123,4 +115,3 @@ private:
 
 } // namespace bridges
 } // namespace runanywhere
-

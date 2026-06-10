@@ -25,6 +25,10 @@
 
 RunAnywhere Commons (`runanywhere-commons`) is the shared C++ foundation for the RunAnywhere SDK ecosystem. It provides a unified abstraction layer over multiple ML inference backends, enabling platform SDKs (Swift, Kotlin, Flutter) to access on-device AI capabilities through a consistent C API.
 
+The cross-SDK ownership rules for proto types, public SDK models, and shared
+C++ business logic are documented in
+[`docs/CPP_PROTO_OWNERSHIP.md`](../../../docs/CPP_PROTO_OWNERSHIP.md).
+
 ### Key Architectural Goals
 
 1. **Cross-Platform Consistency** - Single C++ codebase, identical API semantics across iOS, Android, macOS, Linux
@@ -70,31 +74,51 @@ typedef struct rac_llm_service_ops {
 - Backend can be statically or dynamically linked
 - Service instance is a simple POD struct
 
-### Priority-Based Provider Selection
+### Unified Engine Plugin Registry
 
-Service creation mirrors Swift's `ServiceRegistry` pattern:
+Each backend ships a single `rac_engine_vtable_t` (see
+`include/rac/plugin/rac_engine_vtable.h`) whose `metadata.abi_version`
+must match `RAC_PLUGIN_API_VERSION` (`3u`, in
+`include/rac/plugin/rac_plugin_entry.h`). The vtable carries 8 active
+per-primitive op-struct slots (LLM / STT / TTS / VAD / embeddings / rerank /
+VLM / diffusion) plus 10 reserved slots; primitives the engine does not
+serve are left `NULL`.
 
 ```c
-// Provider declares capability + priority + canHandle function
-rac_service_provider_t provider = {
-    .name = "LlamaCPPService",
-    .capability = RAC_CAPABILITY_TEXT_GENERATION,
-    .priority = 100,
-    .can_handle = llamacpp_can_handle,
-    .create = llamacpp_create_service,
+// engines/llamacpp/rac_plugin_entry_llamacpp.cpp (per-engine example)
+static const rac_engine_vtable_t g_llamacpp_vtable = {
+    .metadata = {
+        .abi_version = RAC_PLUGIN_API_VERSION,    // 3u
+        .name        = "llamacpp",
+        .display_name= "llama.cpp",
+        // ...
+        .priority    = 100,
+    },
+    .capability_check = llamacpp_capability_check,
+    .llm_ops          = &g_llamacpp_llm_ops,      // populated primitive
+    .stt_ops          = NULL,                     // not served
+    // ...
 };
-rac_service_register_provider(&provider);
 
-// Service creation queries providers in priority order
-// First provider where canHandle returns true creates the service
-rac_service_create(RAC_CAPABILITY_TEXT_GENERATION, &request, &handle);
+// Static build (iOS / WASM / RAC_STATIC_PLUGINS=ON): auto-registers
+// at image load time through a constructor.
+RAC_STATIC_PLUGIN_REGISTER(llamacpp);
+
+// Shared build: host loads the plugin through the loader.
+rac_registry_load_plugin("/path/to/librunanywhere_llamacpp.dylib");
+// ... later ...
+rac_registry_unload_plugin("llamacpp");
 ```
 
 **Resolution Flow:**
-1. Registry sorts providers by priority (higher first)
-2. For each provider, call `can_handle(request)`
-3. First provider returning `true` calls its `create` function
-4. Created service handle returned to caller
+1. Plugin `metadata.abi_version` is validated against
+   `RAC_PLUGIN_API_VERSION`; mismatch returns
+   `RAC_ERROR_ABI_VERSION_MISMATCH`.
+2. `capability_check` is invoked once; a non-zero return rejects the
+   plugin silently (e.g. Metal-only engines on Linux).
+3. The registry (`include/rac/plugin/rac_plugin_entry.h`) returns the
+   highest-priority plugin that serves the requested primitive (plain priority
+   order via `rac_plugin_find`) and dispatches through its op-struct.
 
 ---
 
@@ -123,24 +147,24 @@ rac_service_create(RAC_CAPABILITY_TEXT_GENERATION, &request, &handle);
 │  └───────┬───────┘  └───────┬───────┘  └───────┬───────┘  └─────┬─────┘ │
 │          │                  │                  │                │       │
 │  ┌───────▼──────────────────▼──────────────────▼────────────────▼─────┐ │
-│  │                    Service Registry                                 │ │
-│  │            Priority-based provider selection                        │ │
-│  │            canHandle → create → service handle                      │ │
+│  │                      Plugin Registry                               │ │
+│  │   ABI-versioned rac_engine_vtable_t (RAC_PLUGIN_API_VERSION = 4u)   │ │
+│  │   priority-order primitive op-struct dispatch (rac_plugin_find)     │ │
 │  └────────────────────────────────┬────────────────────────────────────┘ │
 └───────────────────────────────────│─────────────────────────────────────┘
                                     │
-                                    │ vtable dispatch
+                                    │ rac_engine_vtable_t dispatch
                                     │
 ┌───────────────────────────────────▼─────────────────────────────────────┐
 │                         Backend Layer                                    │
 │                                                                          │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
-│  │   LlamaCPP      │  │      ONNX       │  │   WhisperCPP    │         │
+│  │   LlamaCPP      │  │     Sherpa      │  │      ONNX       │         │
 │  │   Backend       │  │     Backend     │  │    Backend      │         │
 │  │                 │  │                 │  │                 │         │
-│  │  • GGUF models  │  │  • STT (Sherpa) │  │  • STT (GGML)   │         │
-│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • Multi-lang   │         │
-│  │  • Streaming    │  │  • VAD (Silero) │  │  • Fast CPU     │         │
+│  │  • GGUF models  │  │  • STT (Sherpa) │  │  • Embeddings   │         │
+│  │  • Metal GPU    │  │  • TTS (Piper)  │  │  • WakeWord     │         │
+│  │  • Streaming    │  │  • VAD (Silero) │  │  • ONNX Runtime │         │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘         │
 │                                                                          │
 │  ┌─────────────────────────────────────────────────────────────────────┐│
@@ -215,10 +239,9 @@ runanywhere-commons/
 │   │
 │   └── backends/                   # Backend-specific public headers
 │       ├── rac_llm_llamacpp.h      # LlamaCPP backend API
-│       ├── rac_stt_whispercpp.h    # WhisperCPP backend API
-│       ├── rac_stt_onnx.h          # ONNX STT API
-│       ├── rac_tts_onnx.h          # ONNX TTS API
-│       └── rac_vad_onnx.h          # ONNX VAD API
+│       ├── rac_stt_onnx.h          # Sherpa STT API
+│       ├── rac_tts_onnx.h          # Sherpa TTS API
+│       └── rac_vad_onnx.h          # Sherpa VAD API
 │
 ├── src/                            # Implementation files
 │   ├── core/                       # Core implementations
@@ -234,11 +257,15 @@ runanywhere-commons/
 │   │   ├── vad/                    # VAD component & energy VAD
 │   │   ├── voice_agent/            # Voice agent orchestration
 │   │   └── platform/               # Platform backend stubs
-│   ├── backends/                   # ML backend implementations
-│   │   ├── llamacpp/               # LlamaCPP integration
-│   │   ├── onnx/                   # ONNX/Sherpa-ONNX integration
-│   │   └── whispercpp/             # WhisperCPP integration
+│   ├── plugin/                     # Engine plugin registry + loader
+│   ├── router/                     # Engine router (HW profile, hints)
 │   └── jni/                        # JNI bridge for Android
+│
+│   # ML engine plugins live at the monorepo root under ../../engines/
+│   # (llamacpp, sherpa, onnx, metalrt, genie, coreml). Each
+│   # ships a rac_plugin_entry_<name>.cpp that publishes a
+│   # rac_engine_vtable_t via RAC_STATIC_PLUGIN_REGISTER or a dlopen'd
+│   # entry symbol. See ../../engines/.
 │
 ├── cmake/                          # CMake modules
 ├── scripts/                        # Build automation
@@ -279,65 +306,63 @@ rac_result_t result = rac_init(&config);
 **Initialization Flow:**
 1. Validate platform adapter (required callbacks)
 2. Initialize logging system
-3. Initialize module registry
-4. Initialize service registry
-5. Initialize model registry
-6. Set initialized flag
+3. Initialize model registry
+4. Set initialized flag
 
-### Module Registry
+(Engine plugins self-register into the plugin registry at image load /
+`rac_registry_load_plugin` time, not during `rac_init`.)
 
-Backends register as modules declaring their capabilities:
+> Historical: v2 had a separate module registry (`rac_module_register` /
+> `rac_module_list`) where backends declared coarse capabilities. It was
+> removed in v3; engine plugins (below) are now the only registration unit,
+> and capabilities are derived from the populated `rac_engine_vtable_t`
+> primitive op-structs.
 
-```c
-rac_module_info_t info = {
-    .id = "llamacpp",
-    .name = "LlamaCPP",
-    .version = "1.0.0",
-    .description = "LLM backend using llama.cpp",
-    .capabilities = (rac_capability_t[]){RAC_CAPABILITY_TEXT_GENERATION},
-    .num_capabilities = 1
-};
-rac_module_register(&info);
-```
+### Plugin Registry + Engine Router
 
-**Module Registry Responsibilities:**
-- Track registered modules
-- Query modules by capability
-- Support runtime module discovery
-
-### Service Registry
-
-Services are created through registered providers:
+Engine plugins are the single dispatch primitive in v3. Each plugin
+publishes one `rac_engine_vtable_t` (see
+`include/rac/plugin/rac_engine_vtable.h`) whose ABI is versioned by
+`RAC_PLUGIN_API_VERSION` in `include/rac/plugin/rac_plugin_entry.h`:
 
 ```c
-// Backend registers provider
-rac_service_provider_t provider = {
-    .name = "LlamaCPPService",
-    .capability = RAC_CAPABILITY_TEXT_GENERATION,
-    .priority = 100,
-    .can_handle = llamacpp_can_handle,
-    .create = llamacpp_create_service,
-    .user_data = NULL
-};
-rac_service_register_provider(&provider);
+// Static-linked plugin (iOS / WASM / RAC_STATIC_PLUGINS=ON):
+// engines/llamacpp/rac_plugin_entry_llamacpp.cpp declares the vtable
+// and calls RAC_STATIC_PLUGIN_REGISTER(llamacpp); a constructor wires
+// the vtable into the registry at image load time.
 
-// SDK creates service
-rac_service_request_t request = {
-    .identifier = "my-model",
-    .capability = RAC_CAPABILITY_TEXT_GENERATION,
-    .framework = RAC_FRAMEWORK_LLAMA_CPP,
-    .model_path = "/path/to/model.gguf"
-};
-
-rac_handle_t service;
-rac_service_create(RAC_CAPABILITY_TEXT_GENERATION, &request, &service);
+// Dynamically-loaded plugin (desktop + server):
+rac_result_t rc = rac_registry_load_plugin(
+    "/path/to/librunanywhere_llamacpp.dylib");
+// ... use primitives via their public rac_llm_* / rac_stt_* / ... APIs ...
+rac_registry_unload_plugin("llamacpp");
 ```
 
-**Provider Selection Algorithm:**
-1. Filter providers by capability
-2. Sort by priority (descending)
-3. For each provider: if `can_handle(request)` → call `create(request)`
-4. Return first successful service handle
+Service creation flows through the matching primitive's public API
+(`rac_llm_create`, `rac_stt_create`, ...), which the router resolves
+against the registered plugins:
+
+```c
+rac_handle_t llm;
+rac_llm_create("my-model-id", &llm);   // router picks a capable plugin
+```
+
+**Dispatch Algorithm:**
+1. `metadata.abi_version` is validated against `RAC_PLUGIN_API_VERSION`;
+   mismatch returns `RAC_ERROR_ABI_VERSION_MISMATCH` and the plugin is
+   rejected.
+2. `capability_check` is invoked once; non-zero quietly filters the
+   plugin out (e.g. Metal engines on Linux).
+3. The registry (`include/rac/plugin/rac_plugin_entry.h`) selects the
+   highest-priority plugin whose op-struct for the requested primitive is
+   non-NULL (plain priority order via `rac_plugin_find`); a name-pinned
+   engine can be requested via `rac_plugin_find_for_engine`.
+
+**Runtimes** (`include/rac/plugin/rac_runtime_vtable.h`) describe the
+compute target an engine runs on. Only the built-in CPU runtime fills the
+optional session-execution slots; Metal, Core ML, and ONNX Runtime are
+capability-only — they advertise device capabilities for routing and leave
+session execution to the engine.
 
 ### Logging System
 
@@ -666,7 +691,7 @@ Audio Input
         ▼
 ┌───────────────┐
 │      STT      │ ──► Transcribe audio to text
-│  (ONNX/Whisper)│
+│ (Sherpa/Cloud)│
 └───────┬───────┘
         │ Transcription
         ▼
@@ -938,49 +963,58 @@ rac_result_t my_function() {
 
 ## Extensibility
 
-### Adding a New Backend
+### Adding a New Engine Plugin
 
-1. **Create directory**: `src/backends/<name>/`
+1. **Create directory** at the monorepo root: `engines/<name>/`.
 
 2. **Implement backend class**:
    ```cpp
-   // <name>_backend.cpp
+   // engines/<name>/<name>_backend.cpp
    class MyBackend {
        bool load_model(const std::string& path, const nlohmann::json& config);
        Result generate(const std::string& prompt, const Options& options);
    };
    ```
 
-3. **Create RAC API wrapper**:
-   ```c
-   // rac_<cap>_<name>.h
-   RAC_API rac_result_t rac_<cap>_<name>_create(..., rac_handle_t* out);
-   RAC_API rac_result_t rac_<cap>_<name>_process(...);
-   RAC_API void rac_<cap>_<name>_destroy(rac_handle_t handle);
+3. **Implement primitive op-struct(s)** — one per capability the engine
+   serves (LLM / STT / TTS / VAD / embeddings / rerank / VLM / diffusion):
+   ```cpp
+   // engines/<name>/rac_backend_<name>_register.cpp
+   static const rac_llm_service_ops_t g_<name>_llm_ops = {
+       .initialize = ...,
+       .generate = ...,
+       .destroy = ...,
+   };
    ```
 
-4. **Implement vtable and registration**:
+4. **Publish the unified vtable** in the engine's plugin entry TU:
    ```cpp
-   // rac_backend_<name>_register.cpp
-   static const rac_<cap>_service_ops_t g_<name>_ops = {
-       .initialize = ...,
-       .process = ...,
-       .destroy = ...
+   // engines/<name>/rac_plugin_entry_<name>.cpp
+   #include "rac/plugin/rac_engine_vtable.h"
+   #include "rac/plugin/rac_plugin_entry.h"
+
+   static const rac_engine_vtable_t g_<name>_vtable = {
+       .metadata = {
+           .abi_version  = RAC_PLUGIN_API_VERSION,   // 3u
+           .name         = "<name>",
+           .display_name = "<Display Name>",
+           .priority     = 100,
+       },
+       .capability_check = <name>_capability_check,
+       .llm_ops          = &g_<name>_llm_ops,
+       // leave other primitive slots NULL
    };
 
-   rac_result_t rac_backend_<name>_register() {
-       // Register module
-       // Register service provider with can_handle + create
-   }
+   RAC_STATIC_PLUGIN_REGISTER(<name>);   // static builds auto-wire
    ```
 
-5. **Add to CMakeLists.txt**:
-   ```cmake
-   option(RAC_BACKEND_<NAME> "Build <name> backend" ON)
-   if(RAC_BACKEND_<NAME>)
-       add_subdirectory(src/backends/<name>)
-   endif()
-   ```
+   Shared builds expose the same entry symbol so hosts can load the
+   plugin via `rac_registry_load_plugin("librunanywhere_<name>.so")`.
+
+5. **Add to engines CMake**: wire the new plugin through
+   `rac_add_engine_plugin(<name> ...)` in `engines/CMakeLists.txt`.
+   The helper handles static-vs-shared mode based on the top-level
+   `RAC_STATIC_PLUGINS` option (forced ON for iOS / WASM).
 
 ### Adding a New Capability
 
@@ -1064,4 +1098,4 @@ Integration tests run through platform SDKs:
 ## See Also
 
 - [README.md](./README.md) - Getting started guide
-- [../CLAUDE.md](../CLAUDE.md) - AI context and coding guidelines
+- [../AGENTS.md](../AGENTS.md) - AI context and coding guidelines

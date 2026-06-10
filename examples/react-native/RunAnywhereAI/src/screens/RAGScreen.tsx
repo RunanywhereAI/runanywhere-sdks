@@ -22,10 +22,10 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeModules } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { pick as documentPick } from '@react-native-documents/picker';
@@ -37,41 +37,16 @@ import {
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
 
-import {
-  type ModelInfo as SDKModelInfo,
-  initializeNitroModulesGlobally,
-  ragCreatePipeline,
-  ragDestroyPipeline,
-  ragIngest,
-  ragQuery,
-} from '@runanywhere/core';
+import { RunAnywhere } from '@runanywhere/core';
+import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
+import { RAGConfiguration } from '@runanywhere/proto-ts/rag';
+import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 // MARK: - Types
 
 interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
-}
-
-// MARK: - Path Resolution Helpers (matching iOS DocumentRAGView)
-
-function resolveEmbeddingFilePath(localPath: string): string {
-  // Multi-file ONNX models set localPath to the folder.
-  // Return the path to model.onnx inside.
-  if (!localPath.endsWith('.onnx')) {
-    return `${localPath}/model.onnx`;
-  }
-  return localPath;
-}
-
-function resolveLLMFilePath(localPath: string): string {
-  // Single-file LlamaCpp models: localPath may point to the .gguf directly,
-  // or to a directory containing it.
-  if (localPath.endsWith('.gguf') || localPath.endsWith('.bin')) {
-    return localPath;
-  }
-  // Assume directory - the SDK already resolves to the gguf path in most cases
-  return localPath;
 }
 
 // MARK: - Document Text Extraction
@@ -118,9 +93,13 @@ export const RAGScreen: React.FC = () => {
 
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // D-6: RAG lifecycle is model-id-driven; commons resolves id → path.
+  // We just need both models selected (id present).
   const areModelsReady =
-    selectedEmbeddingModel?.localPath != null &&
-    selectedLLMModel?.localPath != null;
+    selectedEmbeddingModel?.id != null &&
+    selectedEmbeddingModel.id.length > 0 &&
+    selectedLLMModel?.id != null &&
+    selectedLLMModel.id.length > 0;
 
   const canAskQuestion =
     isDocumentLoaded && !isQuerying && currentQuestion.trim().length > 0;
@@ -129,21 +108,10 @@ export const RAGScreen: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
-    const timer = setTimeout(async () => {
-      try {
-        await initializeNitroModulesGlobally();
-        if (mounted) {
-          setIsNitroReady(true);
-          setNitroError(null);
-        }
-      } catch (err) {
-        if (mounted) {
-          setNitroError(
-            err instanceof Error
-              ? err.message
-              : 'Failed to initialize NitroModules'
-          );
-        }
+    const timer = setTimeout(() => {
+      if (mounted) {
+        setIsNitroReady(true);
+        setNitroError(null);
       }
     }, 500);
 
@@ -157,7 +125,7 @@ export const RAGScreen: React.FC = () => {
   useEffect(() => {
     return () => {
       if (isDocumentLoaded) {
-        ragDestroyPipeline().catch(console.error);
+        RunAnywhere.ragDestroyPipeline().catch(console.error);
       }
     };
   }, [isDocumentLoaded]);
@@ -167,11 +135,10 @@ export const RAGScreen: React.FC = () => {
   const handleSelectDocument = useCallback(async () => {
     if (!areModelsReady || !isNitroReady) return;
 
-    // areModelsReady already verifies both localPath values are non-null,
-    // but narrow explicitly so the type system agrees (avoids non-null assertions).
-    const embeddingLocalPath = selectedEmbeddingModel?.localPath;
-    const llmLocalPath = selectedLLMModel?.localPath;
-    if (!embeddingLocalPath || !llmLocalPath) return;
+    // D-6: RAG accepts model IDs; commons resolves them to artifact paths.
+    const embeddingModelId = selectedEmbeddingModel?.id;
+    const llmModelId = selectedLLMModel?.id;
+    if (!embeddingModelId || !llmModelId) return;
 
     try {
       const [result] = await documentPick({
@@ -187,25 +154,21 @@ export const RAGScreen: React.FC = () => {
       // Extract text from the picked file
       const text = await extractTextFromFile(fileUri);
 
-      // Build RAG configuration matching iOS ragConfig computed property.
-      // With multi-file registration, vocab.txt is co-located with model.onnx,
-      // so the C++ pipeline auto-discovers it (no embeddingConfigJSON needed).
-      const embeddingPath = resolveEmbeddingFilePath(embeddingLocalPath);
-      const llmPath = resolveLLMFilePath(llmLocalPath);
-
-      const config = {
-        embeddingModelPath: embeddingPath,
-        llmModelPath: llmPath,
-        topK: 3,
-        similarityThreshold: 0.12,
-        maxContextTokens: 2048,
-        chunkSize: 180,
-        chunkOverlap: 30,
-      };
+      // Build RAG configuration using model IDs. commons (via D-6) owns
+      // id → path resolution inside rac_rag_session_create_proto.
+      // Canonical defaults do the right thing (matches iOS DocumentRAG):
+      // commons derives the embedding dimension from the loaded embedding
+      // model, and the retrieval/chunking values come from idl/rag.proto
+      // rac_default annotations.
+      const config = RAGConfiguration.fromPartial({
+        ...rAGConfigurationDefaults(),
+        embeddingModelId,
+        llmModelId,
+      });
 
       // Create pipeline and ingest document (same as iOS loadDocument)
-      await ragCreatePipeline(config);
-      await ragIngest(text);
+      await RunAnywhere.ragCreatePipeline(config);
+      await RunAnywhere.ragIngest(text);
 
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
@@ -229,7 +192,7 @@ export const RAGScreen: React.FC = () => {
   }, [areModelsReady, isNitroReady, selectedEmbeddingModel, selectedLLMModel]);
 
   const handleChangeDocument = useCallback(async () => {
-    await ragDestroyPipeline();
+    await RunAnywhere.ragDestroyPipeline();
     setDocumentName(null);
     setIsDocumentLoaded(false);
     setMessages([]);
@@ -252,12 +215,10 @@ export const RAGScreen: React.FC = () => {
     setError(null);
 
     try {
-      const result = await ragQuery(question, {
-        maxTokens: 256,
-        temperature: 0.7,
-        topP: 0.9,
-        topK: 40,
-      });
+      // Canonical query defaults (matches iOS, which queries with
+      // RARAGQueryOptions.defaults(question:)) — commons stamps
+      // maxTokens/temperature/topP and retrieval values when unset.
+      const result = await RunAnywhere.ragQuery(question);
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },

@@ -1,60 +1,48 @@
 /**
  * @runanywhere/web-llamacpp
  *
- * LlamaCpp backend for the RunAnywhere Web SDK.
- * Provides on-device LLM, VLM, tool calling, structured output,
- * embeddings, and diffusion capabilities via llama.cpp compiled to WASM.
+ * LlamaCpp WASM backend for the RunAnywhere Web SDK.
+ *
+ * V2 canonical: this package is a SHELL. It loads `racommons-llamacpp.wasm`
+ * (or the WebGPU variant) as an independent Emscripten module, registers
+ * the platform adapter + the llama.cpp + llama.cpp-VLM backends, then
+ * claims the relevant capabilities (LLM/VLM/embeddings/diffusion/...) on
+ * the per-capability registry so every core proto-byte adapter routes
+ * through this module.
+ *
+ * After `LlamaCPP.register()` resolves, the public surface in
+ * `@runanywhere/web` (`RunAnywhere.generate(Stream)`,
+ * `RunAnywhere.generateWithTools`, `RunAnywhere.generateStructured(Stream)`,
+ * `RunAnywhere.processImage(Stream)`) flows through the proto-byte
+ * adapters into the WASM module without any further per-package wiring.
+ *
+ * # Public surface
+ *
+ * The package root intentionally exposes ONLY the registration facade
+ * (`LlamaCPP`, `autoRegister`) and its option types. The `LlamaCppBridge`
+ * singleton and `LlamaCppModule` runtime type are internal implementation
+ * details (mirroring `@runanywhere/web-onnx`).
+ *
+ * Usage:
+ *
+ *     import { RunAnywhere } from '@runanywhere/web';
+ *     import { LlamaCPP } from '@runanywhere/web-llamacpp';
+ *
+ *     await RunAnywhere.initialize({ environment: 'development' });
+ *     await LlamaCPP.register({ acceleration: 'auto' });
+ *
+ *     const stream = await RunAnywhere.generateStream({
+ *       prompt: 'Tell me a joke',
+ *       maxTokens: 256,
+ *       temperature: 0.7,
+ *     });
+ *     for await (const token of stream.stream) {
+ *       process.stdout.write(token);
+ *     }
+ *     const result = await stream.result;
  *
  * @packageDocumentation
- *
- * @example
- * ```typescript
- * import { RunAnywhere } from '@runanywhere/web';
- * import { LlamaCPP } from '@runanywhere/web-llamacpp';
- *
- * await RunAnywhere.initialize();
- * await LlamaCPP.register();
- *
- * // Now TextGeneration, VLM, etc. are available
- * const result = await TextGeneration.generate('Hello!', { maxTokens: 100 });
- * ```
  */
 
-// Module facade & provider
 export { LlamaCPP, autoRegister } from './LlamaCPP';
 export type { LlamaCPPRegisterOptions } from './LlamaCPP';
-export { LlamaCppProvider } from './LlamaCppProvider';
-
-// Foundation (WASM bridge — exposed for advanced URL override)
-export { LlamaCppBridge } from './Foundation/LlamaCppBridge';
-export type { LlamaCppModule } from './Foundation/LlamaCppBridge';
-
-// Extensions (backend-specific implementations)
-export { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
-export { VLM, VLMModelFamily } from './Extensions/RunAnywhere+VLM';
-export { VLMImageFormat } from './Extensions/VLMTypes';
-export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Extensions/VLMTypes';
-export { ToolCalling, ToolCallFormat, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Extensions/RunAnywhere+ToolCalling';
-export type {
-  ToolValue, ToolParameterType, ToolParameter, ToolDefinition,
-  ToolCall, ToolResult, ToolCallingOptions, ToolCallingResult, ToolExecutor,
-} from './Extensions/RunAnywhere+ToolCalling';
-export { StructuredOutput } from './Extensions/RunAnywhere+StructuredOutput';
-export type { StructuredOutputConfig, StructuredOutputValidation } from './Extensions/RunAnywhere+StructuredOutput';
-export { Diffusion } from './Extensions/RunAnywhere+Diffusion';
-export { DiffusionScheduler, DiffusionModelVariant, DiffusionMode } from './Extensions/RunAnywhere+Diffusion';
-export type { DiffusionGenerationOptions, DiffusionGenerationResult, DiffusionProgressCallback } from './Extensions/RunAnywhere+Diffusion';
-export { Embeddings } from './Extensions/RunAnywhere+Embeddings';
-export { EmbeddingsNormalize, EmbeddingsPooling } from './Extensions/RunAnywhere+Embeddings';
-export type { EmbeddingVector, EmbeddingsResult, EmbeddingsOptions } from './Extensions/RunAnywhere+Embeddings';
-
-// Telemetry & Analytics
-export { TelemetryService, getOrCreateDeviceId } from './Foundation/TelemetryService';
-
-// Infrastructure
-export { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
-export type {
-  VLMWorkerResult, VLMLoadModelParams, VLMProcessOptions,
-  VLMWorkerCommand, VLMWorkerResponse, ProgressListener,
-} from './Infrastructure/VLMWorkerBridge';
-export { startVLMWorkerRuntime } from './Infrastructure/VLMWorkerRuntime';

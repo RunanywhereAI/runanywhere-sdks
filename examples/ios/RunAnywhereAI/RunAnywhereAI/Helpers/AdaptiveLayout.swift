@@ -261,7 +261,7 @@ struct AdaptiveNavigation<Content: View>: View {
         NavigationView {
             content()
                 .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayModeCompat(.inline)
         }
         #endif
     }

@@ -19,11 +19,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   useWindowDimensions,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -32,7 +32,7 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
-import { FileSystem, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { type ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -61,18 +61,11 @@ const VLMScreen: React.FC = () => {
   // Handle model selection
   const handleModelSelected = useCallback(
     async (model: SDKModelInfo) => {
-      // 1. Find the projector path
-      const mmprojPath = model.localPath
-        ? await FileSystem.findMmprojForModel(model.localPath)
-        : undefined;
-
-      // 2. Load the model FIRST
-      if (model.localPath) {
-        await vlm.loadModel(model.localPath, model.name, mmprojPath);
-      }
+      // 1. Load the model FIRST
+      await vlm.loadModel(model.id, model.name);
       await vlm.checkModelStatus();
 
-      // 3. Close the modal AFTER the model is safely loaded and state is stable
+      // 2. Close the modal AFTER the model is safely loaded and state is stable
       setShowingModelSelection(false);
     },
     [vlm]
@@ -99,12 +92,9 @@ const VLMScreen: React.FC = () => {
     }
   }, [vlm]);
 
-  // Dismiss error (placeholder — hook does not expose setError yet).
-  // Retained for the error-banner callback once we add a clearError action.
-  const _handleDismissError = useCallback(() => {
-    // Reset error in next render to prevent flicker
-    // Since hook doesn't expose setError, we'll just let user retry
-  }, []);
+  const handleDismissError = useCallback(() => {
+    vlm.clearError();
+  }, [vlm]);
 
   // Main action button color
   const mainButtonColor = vlm.isAutoStreaming
@@ -220,9 +210,20 @@ const VLMScreen: React.FC = () => {
 
             {/* Error Banner */}
             {vlm.error && (
-              <View style={styles.errorBanner}>
+              <TouchableOpacity
+                style={styles.errorBanner}
+                onPress={handleDismissError}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss error"
+              >
                 <Text style={styles.errorText}>{vlm.error}</Text>
-              </View>
+                <Icon
+                  name="close"
+                  size={18}
+                  color={Colors.primaryRed}
+                  style={styles.errorDismissIcon}
+                />
+              </TouchableOpacity>
             )}
 
             {/* Description Content */}
@@ -336,7 +337,7 @@ const styles = StyleSheet.create({
 
   // Model Required Overlay
   modelRequiredOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.overlayMedium,
     justifyContent: 'center',
     alignItems: 'center',
@@ -470,10 +471,17 @@ const styles = StyleSheet.create({
     padding: Spacing.smallMedium,
     borderRadius: BorderRadius.regular,
     marginBottom: Spacing.medium,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   errorText: {
     ...Typography.caption,
     color: Colors.primaryRed,
+    flex: 1,
+  },
+  errorDismissIcon: {
+    marginLeft: Spacing.small,
   },
   descriptionScroll: {
     flex: 1,

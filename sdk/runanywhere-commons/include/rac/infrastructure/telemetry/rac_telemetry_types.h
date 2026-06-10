@@ -195,17 +195,6 @@ typedef struct rac_device_registration_info {
     int32_t performance_cores;       // Performance (P) cores
     int32_t efficiency_cores;        // Efficiency (E) cores
     const char* device_fingerprint;  // Unique device fingerprint (may be same as device_id)
-
-    // Legacy fields (for backward compatibility)
-    const char* device_type;  // "smartphone", "tablet", etc. (deprecated - use form_factor)
-    const char* os_name;      // "iOS", "Android" (deprecated - use platform)
-    int64_t total_disk_bytes;
-    int64_t available_disk_bytes;
-    const char* processor_info;
-    int32_t processor_count;  // Deprecated - use core_count
-    rac_bool_t is_simulator;
-    const char* locale;
-    const char* timezone;
 } rac_device_registration_info_t;
 
 /**

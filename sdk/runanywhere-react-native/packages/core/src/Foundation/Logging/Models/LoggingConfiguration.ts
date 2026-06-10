@@ -1,117 +1,49 @@
 /**
  * LoggingConfiguration.ts
  *
- * Configuration for the logging system with environment presets.
- *
- * Matches iOS: sdk/runanywhere-swift/Sources/RunAnywhere/Infrastructure/Logging/SDKLogger.swift
- *              (LoggingConfiguration struct)
+ * Environment presets for the generated `LoggingConfiguration` from
+ * `@runanywhere/proto-ts/logging`. The wire shape (enableLocalLogging,
+ * minLogLevel, includeSourceLocation, includeDeviceMetadata,
+ * enableRemoteLogging, enableSentryLogging) is shared across SDKs; this file
+ * only supplies the per-environment defaults. Fields not set here fall back to
+ * the proto defaults via `fromPartial`.
  */
 
 import { LogLevel } from './LogLevel';
+import { LoggingConfiguration } from '@runanywhere/proto-ts/logging';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
-// ============================================================================
-// SDK Environment
-// ============================================================================
+export type { LoggingConfiguration };
 
-/**
- * SDK environment for configuration
- * Matches iOS: SDKEnvironment
- */
-export enum SDKEnvironment {
-  Development = 'development',
-  Staging = 'staging',
-  Production = 'production',
-}
-
-// ============================================================================
-// Logging Configuration
-// ============================================================================
-
-/**
- * Configuration for the logging system.
- * Matches iOS: LoggingConfiguration struct
- */
-export interface LoggingConfiguration {
-  /** Enable local console logging */
-  enableLocalLogging: boolean;
-
-  /** Minimum log level to output */
-  minLogLevel: LogLevel;
-
-  /** Include device metadata in logs */
-  includeDeviceMetadata: boolean;
-
-  /** Enable Sentry logging */
-  enableSentryLogging: boolean;
-
-  /** Sentry DSN (required if enableSentryLogging is true) */
-  sentryDSN?: string;
-
-  /** Current environment */
-  environment: SDKEnvironment;
-}
-
-// ============================================================================
-// Default Configurations
-// ============================================================================
-
-/**
- * Default configuration for development environment
- */
-export const developmentConfig: LoggingConfiguration = {
+const DEVELOPMENT: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: true,
-  minLogLevel: LogLevel.Debug,
-  includeDeviceMetadata: false,
+  minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
   enableSentryLogging: true,
-  environment: SDKEnvironment.Development,
-};
+});
 
-/**
- * Default configuration for staging environment
- */
-export const stagingConfig: LoggingConfiguration = {
+const STAGING: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: true,
-  minLogLevel: LogLevel.Info,
-  includeDeviceMetadata: true,
-  enableSentryLogging: true,
-  environment: SDKEnvironment.Staging,
-};
+  minLogLevel: LogLevel.LOG_LEVEL_INFO,
+  enableSentryLogging: false,
+});
 
-/**
- * Default configuration for production environment
- */
-export const productionConfig: LoggingConfiguration = {
+const PRODUCTION: LoggingConfiguration = LoggingConfiguration.fromPartial({
   enableLocalLogging: false,
-  minLogLevel: LogLevel.Warning,
-  includeDeviceMetadata: true,
-  enableSentryLogging: true,
-  environment: SDKEnvironment.Production,
-};
+  minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+  enableSentryLogging: false,
+});
 
-/**
- * Get default configuration for an environment
- */
 export function getConfigurationForEnvironment(
   environment: SDKEnvironment
 ): LoggingConfiguration {
   switch (environment) {
-    case SDKEnvironment.Development:
-      return { ...developmentConfig };
-    case SDKEnvironment.Staging:
-      return { ...stagingConfig };
-    case SDKEnvironment.Production:
-      return { ...productionConfig };
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+      return { ...DEVELOPMENT };
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+      return { ...STAGING };
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return { ...PRODUCTION };
+    default:
+      return { ...DEVELOPMENT };
   }
-}
-
-/**
- * Create a custom configuration
- */
-export function createLoggingConfiguration(
-  partial: Partial<LoggingConfiguration>
-): LoggingConfiguration {
-  const defaultConfig = getConfigurationForEnvironment(
-    partial.environment ?? SDKEnvironment.Development
-  );
-  return { ...defaultConfig, ...partial };
 }

@@ -64,6 +64,12 @@ RAC_ONNX_API void rac_tts_onnx_stop(rac_handle_t handle);
 
 RAC_ONNX_API void rac_tts_onnx_destroy(rac_handle_t handle);
 
+/**
+ * Enumerates synthesis languages supported by the loaded ONNX TTS voice(s)
+ * as a JSON array, e.g. "[\"en\"]". Caller frees *out_json with free().
+ */
+RAC_ONNX_API rac_result_t rac_tts_onnx_get_languages(rac_handle_t handle, char** out_json);
+
 #ifdef __cplusplus
 }
 #endif

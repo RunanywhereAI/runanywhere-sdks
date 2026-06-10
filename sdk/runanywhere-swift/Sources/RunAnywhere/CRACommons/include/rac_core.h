@@ -11,6 +11,7 @@
 
 #include "rac_error.h"
 #include "rac_types.h"
+#include "rac_lora_registry.h"
 #include "rac_model_types.h"
 #include "rac_environment.h"
 
@@ -87,6 +88,19 @@ RAC_API rac_bool_t rac_is_initialized(void);
 RAC_API rac_version_t rac_get_version(void);
 
 /**
+ * Gets the canonical SDK version string.
+ *
+ * Returns the value of `sdk/runanywhere-commons/VERSION`, injected at build
+ * time via the RAC_VERSION_STRING compile define. This is the single source of
+ * truth every platform SDK delegates to for its public `version` constant
+ * instead of hand-maintaining a copy that can drift.
+ *
+ * @return Static, NUL-terminated version string (e.g. "0.19.13"); never NULL,
+ *         valid for the lifetime of the process. Do not free.
+ */
+RAC_API const char* rac_sdk_get_version(void);
+
+/**
  * Configures logging based on the environment.
  *
  * This configures C++ local logging (stderr) based on the environment:
@@ -102,196 +116,17 @@ RAC_API rac_version_t rac_get_version(void);
 RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
 
 // =============================================================================
-// MODULE INFORMATION
+// NOTE: The legacy service-registry surface (rac_service_request_t,
+// rac_service_provider_t, rac_service_can_handle_fn, rac_service_create_fn,
+// rac_service_register_provider, rac_service_unregister_provider,
+// rac_service_create, rac_service_list_providers, RAC_DEPRECATED_LEGACY_SVC)
+// was REMOVED in v3.0.0 (RAC_PLUGIN_API_VERSION 3u).
+//
+// New code uses the unified plugin registry from rac/plugin/rac_plugin_entry.h
+// (rac_plugin_register / rac_plugin_list / rac_plugin_find). Backend selection
+// is simple priority order — the highest-priority registered plugin that serves
+// the requested primitive wins; there is no hardware/format/accelerator scoring.
 // =============================================================================
-
-/**
- * Information about a registered module (backend).
- */
-typedef struct rac_module_info {
-    const char* id;          /**< Unique module identifier */
-    const char* name;        /**< Human-readable name */
-    const char* version;     /**< Module version string */
-    const char* description; /**< Module description */
-
-    /** Capabilities provided by this module */
-    const rac_capability_t* capabilities;
-    size_t num_capabilities;
-} rac_module_info_t;
-
-// =============================================================================
-// MODULE REGISTRATION API
-// =============================================================================
-
-/**
- * Registers a module with the registry.
- *
- * Modules (backends) call this to register themselves with the commons layer.
- * This allows the SDK to discover available backends at runtime.
- *
- * @param info Module information (copied internally)
- * @return RAC_SUCCESS on success, or an error code on failure
- */
-RAC_API rac_result_t rac_module_register(const rac_module_info_t* info);
-
-/**
- * Unregisters a module from the registry.
- *
- * @param module_id The unique ID of the module to unregister
- * @return RAC_SUCCESS on success, or an error code on failure
- */
-RAC_API rac_result_t rac_module_unregister(const char* module_id);
-
-/**
- * Gets the list of registered modules.
- *
- * @param out_modules Pointer to receive the module list (do not free)
- * @param out_count Pointer to receive the number of modules
- * @return RAC_SUCCESS on success, or an error code on failure
- *
- * @note The returned list is valid until the next module registration/unregistration.
- */
-RAC_API rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count);
-
-/**
- * Gets modules that provide a specific capability.
- *
- * @param capability The capability to search for
- * @param out_modules Pointer to receive the module list (do not free)
- * @param out_count Pointer to receive the number of modules
- * @return RAC_SUCCESS on success, or an error code on failure
- */
-RAC_API rac_result_t rac_modules_for_capability(rac_capability_t capability,
-                                                const rac_module_info_t** out_modules,
-                                                size_t* out_count);
-
-/**
- * Gets information about a specific module.
- *
- * @param module_id The unique ID of the module
- * @param out_info Pointer to receive the module info (do not free)
- * @return RAC_SUCCESS on success, or RAC_ERROR_MODULE_NOT_FOUND if not found
- */
-RAC_API rac_result_t rac_module_get_info(const char* module_id, const rac_module_info_t** out_info);
-
-// =============================================================================
-// SERVICE PROVIDER API - Mirrors Swift's ServiceRegistry
-// =============================================================================
-
-/**
- * Service request for creating services.
- * Passed to canHandle and create functions.
- *
- * Mirrors Swift's approach where canHandle receives a model/voice ID.
- */
-typedef struct rac_service_request {
-    /** Model or voice ID to check/create for (can be NULL for default) */
-    const char* identifier;
-
-    /** Configuration JSON string (can be NULL) */
-    const char* config_json;
-
-    /** The capability being requested */
-    rac_capability_t capability;
-
-    /** Framework hint for routing (from model registry) */
-    rac_inference_framework_t framework;
-
-    /** Local path to model file (can be NULL if using identifier lookup) */
-    const char* model_path;
-} rac_service_request_t;
-
-/**
- * canHandle function type.
- * Mirrors Swift's `canHandle: @Sendable (String?) -> Bool`
- *
- * @param request The service request
- * @param user_data Provider-specific context
- * @return RAC_TRUE if this provider can handle the request
- */
-typedef rac_bool_t (*rac_service_can_handle_fn)(const rac_service_request_t* request,
-                                                void* user_data);
-
-/**
- * Service factory function type.
- * Mirrors Swift's factory closure.
- *
- * @param request The service request
- * @param user_data Provider-specific context
- * @return Handle to created service, or NULL on failure
- */
-typedef rac_handle_t (*rac_service_create_fn)(const rac_service_request_t* request,
-                                              void* user_data);
-
-/**
- * Service provider registration.
- * Mirrors Swift's ServiceRegistration struct.
- */
-typedef struct rac_service_provider {
-    /** Provider name (e.g., "LlamaCPPService") */
-    const char* name;
-
-    /** Capability this provider offers */
-    rac_capability_t capability;
-
-    /** Priority (higher = preferred, default 100) */
-    int32_t priority;
-
-    /** Function to check if provider can handle request */
-    rac_service_can_handle_fn can_handle;
-
-    /** Function to create service instance */
-    rac_service_create_fn create;
-
-    /** User data passed to callbacks */
-    void* user_data;
-} rac_service_provider_t;
-
-/**
- * Registers a service provider.
- *
- * Mirrors Swift's ServiceRegistry.registerSTT/LLM/TTS/VAD methods.
- * Providers are sorted by priority (higher first).
- *
- * @param provider Provider information (copied internally)
- * @return RAC_SUCCESS on success, or an error code on failure
- */
-RAC_API rac_result_t rac_service_register_provider(const rac_service_provider_t* provider);
-
-/**
- * Unregisters a service provider.
- *
- * @param name The name of the provider to unregister
- * @param capability The capability the provider was registered for
- * @return RAC_SUCCESS on success, or an error code on failure
- */
-RAC_API rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t capability);
-
-/**
- * Creates a service for a specific capability.
- *
- * Mirrors Swift's createSTT/LLM/TTS/VAD methods.
- * Finds first provider that canHandle the request (sorted by priority).
- *
- * @param capability The capability needed
- * @param request The service request (can have identifier and config)
- * @param out_handle Pointer to receive the service handle
- * @return RAC_SUCCESS on success, or an error code on failure
- */
-RAC_API rac_result_t rac_service_create(rac_capability_t capability,
-                                        const rac_service_request_t* request,
-                                        rac_handle_t* out_handle);
-
-/**
- * Lists registered providers for a capability.
- *
- * @param capability The capability to list providers for
- * @param out_names Pointer to receive array of provider names
- * @param out_count Pointer to receive count
- * @return RAC_SUCCESS on success
- */
-RAC_API rac_result_t rac_service_list_providers(rac_capability_t capability,
-                                                const char*** out_names, size_t* out_count);
 
 // =============================================================================
 // GLOBAL MODEL REGISTRY API
@@ -326,13 +161,15 @@ RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info**
 
 /**
  * Gets model info from the global registry by local path.
+ * Convenience function that calls rac_model_registry_get_by_path on the global registry.
  * Useful when loading models by path instead of model_id.
  *
  * @param local_path Local path to search for
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
  */
-RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
+RAC_API rac_result_t rac_get_model_by_path(const char* local_path,
+                                           struct rac_model_info** out_model);
 
 // =============================================================================
 // GLOBAL LORA REGISTRY API
@@ -357,13 +194,14 @@ RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
 /**
  * @brief Query the global registry for adapters compatible with a model
  * @param model_id Model ID to match
- * @param out_entries Output: array of matching entries (caller must free with rac_lora_entry_array_free)
+ * @param out_entries Output: array of matching entries (caller must free with
+ * rac_lora_entry_array_free)
  * @param out_count Output: number of matching entries
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_get_lora_for_model(const char* model_id,
-                                             struct rac_lora_entry*** out_entries,
-                                             size_t* out_count);
+                                            struct rac_lora_entry*** out_entries,
+                                            size_t* out_count);
 
 #ifdef __cplusplus
 }

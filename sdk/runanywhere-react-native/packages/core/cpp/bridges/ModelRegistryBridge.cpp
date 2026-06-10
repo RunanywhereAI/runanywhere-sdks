@@ -3,6 +3,22 @@
  * @brief C++ bridge for model registry operations.
  *
  * Mirrors Swift's CppBridge+ModelRegistry.swift pattern.
+ *
+ * Bridge classification (see docs/CPP_PROTO_OWNERSHIP.md
+ * "Bridge Layer Audit"):
+ *   - `initialize()`, `shutdown()`, `getHandle()` stay as `internal`
+ *     adapter glue — the proto wrappers in
+ *     HybridRunAnywhereCore+Registry.cpp / +Lifecycle.cpp /
+ *     +Storage.cpp call `ModelRegistryBridge::shared().getHandle()` to
+ *     reach the global commons registry.
+ *   - All struct-level model APIs (`addModel`, `getModel`, `getAllModels`,
+ *     `getModels(filter)`, `getModelsByFramework`, `getDownloadedModels`,
+ *     `modelExists`, `isModelDownloaded`, `getModelPath`,
+ *     `getModelCount`, plus `fromRac`/`toRac` converters) are
+ *     `delete after SDK migration`. They wrap the non-proto
+ *     `rac_model_registry_*` struct ABI. The Nitro `*Proto` family in
+ *     +Registry.cpp already covers the proto path; remove these helpers
+ *     once RN TS callers move off the legacy `ModelRegistry`-style API.
  */
 
 #include "ModelRegistryBridge.hpp"

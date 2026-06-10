@@ -1,0 +1,23 @@
+realm/SwiftLint@0.63.2
+peripheryapp/periphery@3.7.4
+apple/swift-format@602.0.0
+apple/swift-protobuf@1.38.0
+# Mintfile covers Swift-package tooling only. The rest of the toolchain —
+# Homebrew formulas (protobuf, protoc-gen-grpc-swift) and Python codegen deps
+# (grpcio-tools, protobuf, pyyaml) — is installed by scripts/setup/setup-toolchain.sh,
+# the executable source of truth, and by the CI workflows directly.
+#
+# docs/dependencies/CENTRALIZATION.md §5 documents the Swift/iOS centralization
+# pattern (Mintfile, Package.swift, Package.resolved).
+#
+# Note: protoc-gen-grpc-swift comes from Homebrew (`brew install
+# protoc-gen-grpc-swift`) and is pulled into the IDL drift workflow
+# explicitly. We deliberately do NOT pin a Mintfile entry for it:
+# `grpc/grpc-swift` 2.x split its protoc plugin into the separate
+# `grpc/grpc-swift-protobuf` repository, but `mint bootstrap` of the
+# new repo fails with `Executable product not found` because the
+# Package.swift exports the plugin as `protoc-gen-grpc-swift-2` —
+# a name Mint does not auto-discover. Re-enabling Mint pinning for
+# this plugin requires either a future grpc-swift-protobuf release
+# that renames the exec or a Mint version that supports custom
+# product names.

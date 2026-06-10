@@ -35,17 +35,17 @@ struct VoiceAssistantView: View {
         }
         .adaptiveSheet(isPresented: $showSTTModelSelection) {
             ModelSelectionSheet(context: .stt) { model in
-                viewModel.setSTTModel(model)
+                await viewModel.setSTTModel(model)
             }
         }
         .adaptiveSheet(isPresented: $showLLMModelSelection) {
             ModelSelectionSheet(context: .llm) { model in
-                viewModel.setLLMModel(model)
+                await viewModel.setLLMModel(model)
             }
         }
         .adaptiveSheet(isPresented: $showTTSModelSelection) {
             ModelSelectionSheet(context: .tts) { model in
-                viewModel.setTTSModel(model)
+                await viewModel.setTTSModel(model)
             }
         }
         .onAppear {
@@ -152,7 +152,7 @@ extension VoiceAssistantView {
                 .padding(.vertical, 20)
                 .adaptiveConversationWidth()
             }
-            .onChange(of: viewModel.assistantResponse) { _ in
+            .onChange(of: viewModel.assistantResponse) { _, _ in
                 withAnimation {
                     proxy.scrollTo("assistant", anchor: .bottom)
                 }
@@ -297,7 +297,7 @@ extension VoiceAssistantView {
                             .id("responseEnd")
                         }
                         .padding(.horizontal, 30)
-                        .onChange(of: viewModel.assistantResponse) { _ in
+                        .onChange(of: viewModel.assistantResponse) { _, _ in
                             withAnimation {
                                 proxy.scrollTo("responseEnd", anchor: .bottom)
                             }
@@ -423,26 +423,14 @@ extension VoiceAssistantView {
                 action: {
                     // Snapshot state synchronously so the decision can't race with
                     // state updates that happen between the tap and the Task firing.
-                    let isSpeaking = viewModel.isSpeaking
-                    let isListening = viewModel.isListening
-                    let isConnected = viewModel.sessionState == .connected
+                    // Tap is only meaningful from an idle state (.disconnected /
+                    // .error) — barge-in / force-commit / resume are driven by
+                    // the C voice agent itself today, so taps in the speaking /
+                    // listening / connected states are intentionally inert.
                     let isActive = viewModel.isActive
-                    let action: (() async -> Void)? = {
-                        if isSpeaking {
-                            return { await viewModel.interruptSpeaking() }
-                        } else if isListening {
-                            return { await viewModel.sendAudioNow() }
-                        } else if isConnected {
-                            return { await viewModel.resumeListening() }
-                        } else if !isActive {
-                            return { await viewModel.startConversation() }
-                        } else {
-                            return nil
-                        }
-                    }()
-                    if let action = action {
-                        Task { await action() }
-                    }
+                    let isConnected = viewModel.sessionState == .connected
+                    guard !isActive && !isConnected else { return }
+                    Task { await viewModel.startConversation() }
                 },
                 onLongPress: {
                     // Snapshot state synchronously before spawning the Task.
@@ -502,7 +490,7 @@ extension VoiceAssistantView {
             )
             .navigationTitle("Voice Models")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarTitleDisplayModeCompat(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {

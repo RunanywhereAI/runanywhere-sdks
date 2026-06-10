@@ -49,17 +49,15 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Get all models from SDK registry
-      final sdkModels = await sdk.RunAnywhere.availableModels();
+      final sdkModels = await sdk.RunAnywhere.models.available();
 
-      // Convert SDK ModelInfo to app ModelInfo
-      _availableModels = sdkModels.map(_convertSDKModel).toList();
+      _availableModels = sdkModels;
 
       debugPrint(
           '✅ Loaded ${_availableModels.length} models from SDK registry');
       for (final model in _availableModels) {
         debugPrint(
-            '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework?.displayName ?? "Unknown"}] downloaded: ${model.isDownloaded}');
+            '  - ${model.name} (${model.category.displayName}) [${model.preferredFramework.displayName}] ready: ${model.isReadyOnDevice}');
       }
     } catch (e) {
       debugPrint('❌ Failed to load models from SDK: $e');
@@ -72,107 +70,13 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Convert SDK ModelInfo to app ModelInfo
-  ModelInfo _convertSDKModel(sdk.ModelInfo sdkModel) {
-    final framework = _convertFramework(sdkModel.framework);
-    return ModelInfo(
-      id: sdkModel.id,
-      name: sdkModel.name,
-      category: _convertCategory(sdkModel.category),
-      format: _convertFormat(sdkModel.format),
-      downloadURL: sdkModel.downloadURL?.toString(),
-      localPath: sdkModel.localPath?.toFilePath(),
-      memoryRequired: sdkModel.downloadSize,
-      compatibleFrameworks: [framework],
-      preferredFramework: framework,
-      supportsThinking: sdkModel.supportsThinking,
-    );
-  }
-
-  /// Convert SDK ModelCategory to app ModelCategory
-  ModelCategory _convertCategory(sdk.ModelCategory sdkCategory) {
-    switch (sdkCategory) {
-      case sdk.ModelCategory.language:
-        return ModelCategory.language;
-      case sdk.ModelCategory.multimodal:
-        return ModelCategory.multimodal;
-      case sdk.ModelCategory.speechRecognition:
-        return ModelCategory.speechRecognition;
-      case sdk.ModelCategory.speechSynthesis:
-        return ModelCategory.speechSynthesis;
-      case sdk.ModelCategory.vision:
-        return ModelCategory.vision;
-      case sdk.ModelCategory.imageGeneration:
-        return ModelCategory.imageGeneration;
-      case sdk.ModelCategory.audio:
-        return ModelCategory.audio;
-      case sdk.ModelCategory.embedding:
-        return ModelCategory.embedding;
-    }
-  }
-
-  /// Convert SDK ModelFormat to app ModelFormat
-  ModelFormat _convertFormat(sdk.ModelFormat sdkFormat) {
-    switch (sdkFormat) {
-      case sdk.ModelFormat.gguf:
-        return ModelFormat.gguf;
-      case sdk.ModelFormat.onnx:
-      case sdk.ModelFormat.ort:
-        return ModelFormat.onnx;
-      case sdk.ModelFormat.bin:
-        return ModelFormat.bin;
-      case sdk.ModelFormat.unknown:
-        return ModelFormat.unknown;
-    }
-  }
-
-  /// Convert SDK InferenceFramework to app LLMFramework
-  LLMFramework _convertFramework(sdk.InferenceFramework sdkFramework) {
-    switch (sdkFramework) {
-      case sdk.InferenceFramework.llamaCpp:
-        return LLMFramework.llamaCpp;
-      case sdk.InferenceFramework.foundationModels:
-        return LLMFramework.foundationModels;
-      case sdk.InferenceFramework.onnx:
-        return LLMFramework.onnxRuntime;
-      case sdk.InferenceFramework.systemTTS:
-        return LLMFramework.systemTTS;
-      case sdk.InferenceFramework.genie:
-        return LLMFramework.genie;
-      default:
-        return LLMFramework.unknown;
-    }
-  }
-
-  /// Convert app LLMFramework to SDK InferenceFramework
-  sdk.InferenceFramework _convertToSDKFramework(LLMFramework framework) {
-    switch (framework) {
-      case LLMFramework.llamaCpp:
-        return sdk.InferenceFramework.llamaCpp;
-      case LLMFramework.foundationModels:
-        return sdk.InferenceFramework.foundationModels;
-      case LLMFramework.onnxRuntime:
-        return sdk.InferenceFramework.onnx;
-      case LLMFramework.systemTTS:
-        return sdk.InferenceFramework.systemTTS;
-      case LLMFramework.genie:
-        return sdk.InferenceFramework.genie;
-      case LLMFramework.mediaPipe:
-      case LLMFramework.whisperKit:
-      case LLMFramework.unknown:
-        return sdk.InferenceFramework.unknown;
-    }
-  }
-
   /// Get available frameworks based on registered models
   Future<void> loadAvailableFrameworks() async {
     try {
       // Extract unique frameworks from available models
       final frameworks = <LLMFramework>{};
       for (final model in _availableModels) {
-        if (model.preferredFramework != null) {
-          frameworks.add(model.preferredFramework!);
-        }
+        frameworks.add(model.preferredFramework);
         frameworks.addAll(model.compatibleFrameworks);
       }
       _availableFrameworks = frameworks.toList();
@@ -228,22 +132,24 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('📥 Starting download for model: ${model.name}');
 
-      // Use SDK's public download API
-      await for (final progress in sdk.RunAnywhere.downloadModel(model.id)) {
-        final progressValue = progress.totalBytes > 0
-            ? progress.bytesDownloaded / progress.totalBytes
-            : 0.0;
+      await for (final progress in sdk.RunAnywhere.downloads.start(model.id)) {
+        final totalBytes = progress.totalBytes.toInt();
+        final progressValue = totalBytes > 0
+            ? progress.bytesDownloaded.toInt() / totalBytes
+            : progress.stageProgress.toDouble();
 
         _downloadProgress[model.id] = progressValue;
         progressHandler(progressValue);
         notifyListeners();
 
         // Check if completed or failed
-        if (progress.state.isCompleted) {
+        if (progress.stage == sdk.DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           debugPrint('✅ Download completed for model: ${model.name}');
           break;
-        } else if (progress.state.isFailed) {
-          throw Exception('Download failed');
+        } else if (progress.stage ==
+                sdk.DownloadStage.DOWNLOAD_STAGE_UNSPECIFIED &&
+            progress.errorMessage.isNotEmpty) {
+          throw Exception('Download failed: ${progress.errorMessage}');
         }
       }
 
@@ -266,8 +172,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('🗑️ Deleting model: ${model.name}');
 
-      // Use SDK's public delete API (now only takes modelId)
-      await sdk.RunAnywhere.deleteStoredModel(model.id);
+      await sdk.RunAnywhere.downloads.delete(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
@@ -286,22 +191,40 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // B-FL-4-001: short-circuit if the SDK already has this exact
+      // model loaded for the right capability. Re-calling load() each
+      // time the user taps Send was triggering an unnecessary native
+      // re-init for the same handle.
+      final alreadyLoadedId = switch (model.category) {
+        ModelCategory.MODEL_CATEGORY_LANGUAGE =>
+          await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION =>
+          sdk.RunAnywhere.stt.currentModelId,
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS =>
+          sdk.RunAnywhere.tts.currentVoiceId,
+        _ => await sdk.RunAnywhere.llm.currentModel().then((m) => m?.id),
+      };
+
+      if (alreadyLoadedId == model.id) {
+        debugPrint('♻️ Model ${model.name} already loaded — skipping reload');
+        _currentModel = model;
+        return;
+      }
+
       debugPrint('⏳ Loading model: ${model.name}');
 
-      // Use appropriate SDK method based on model category
       switch (model.category) {
-        case ModelCategory.language:
-          await sdk.RunAnywhere.loadModel(model.id);
+        case ModelCategory.MODEL_CATEGORY_LANGUAGE:
+          await sdk.RunAnywhere.llm.load(model.id);
           break;
-        case ModelCategory.speechRecognition:
-          await sdk.RunAnywhere.loadSTTModel(model.id);
+        case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
+          await sdk.RunAnywhere.stt.load(model.id);
           break;
-        case ModelCategory.speechSynthesis:
-          await sdk.RunAnywhere.loadTTSVoice(model.id);
+        case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
+          await sdk.RunAnywhere.tts.loadVoice(model.id);
           break;
         default:
-          // Default to LLM model loading
-          await sdk.RunAnywhere.loadModel(model.id);
+          await sdk.RunAnywhere.llm.load(model.id);
       }
 
       _currentModel = model;
@@ -316,85 +239,10 @@ class ModelListViewModel extends ChangeNotifier {
     }
   }
 
-  /// Unload the current model
-  Future<void> unloadCurrentModel() async {
-    if (_currentModel == null) return;
-
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      await sdk.RunAnywhere.unloadModel();
-      _currentModel = null;
-      debugPrint('✅ Model unloaded successfully');
-    } catch (e) {
-      debugPrint('❌ Failed to unload model: $e');
-      _errorMessage = 'Failed to unload model: $e';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  /// Add a custom model from URL using SDK
-  Future<void> addModelFromURL({
-    required String name,
-    required String url,
-    required LLMFramework framework,
-    int? estimatedSize,
-    bool supportsThinking = false,
-  }) async {
-    try {
-      debugPrint('➕ Adding model from URL: $name');
-
-      // Use SDK's public registration API
-      final modelInfo = sdk.RunAnywhere.registerModel(
-        name: name,
-        url: Uri.parse(url),
-        framework: _convertToSDKFramework(framework),
-        modality: sdk.ModelCategory.language,
-        supportsThinking: supportsThinking,
-      );
-
-      debugPrint(
-          '✅ Registered model with SDK: ${modelInfo.name} (${modelInfo.id})');
-
-      // Refresh models from registry
-      await loadModelsFromRegistry();
-
-      debugPrint('✅ Model $name added successfully');
-    } catch (e) {
-      debugPrint('❌ Failed to add model from URL: $e');
-      _errorMessage = 'Failed to add model: $e';
-      notifyListeners();
-    }
-  }
-
-  /// Add an imported model
-  Future<void> addImportedModel(ModelInfo model) async {
-    await loadModelsFromRegistry();
-  }
-
-  /// Get models for a specific framework
-  List<ModelInfo> modelsForFramework(LLMFramework framework) {
-    return _availableModels.where((model) {
-      if (framework == LLMFramework.foundationModels) {
-        return model.preferredFramework == LLMFramework.foundationModels;
-      }
-      return model.compatibleFrameworks.contains(framework);
-    }).toList();
-  }
-
   /// Get models for a specific context
   List<ModelInfo> modelsForContext(ModelSelectionContext context) {
     return _availableModels.where((model) {
       return context.relevantCategories.contains(model.category);
     }).toList();
-  }
-
-  /// Clear error message
-  void clearError() {
-    _errorMessage = null;
-    notifyListeners();
   }
 }

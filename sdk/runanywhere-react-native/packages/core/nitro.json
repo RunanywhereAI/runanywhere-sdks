@@ -14,6 +14,12 @@
     "RunAnywhereDeviceInfo": {
       "kotlin": "HybridRunAnywhereDeviceInfo",
       "swift": "HybridRunAnywhereDeviceInfo"
+    },
+    "LLM": {
+      "cpp": "HybridLLM"
+    },
+    "VoiceAgent": {
+      "cpp": "HybridVoiceAgent"
     }
   },
   "ignorePaths": ["node_modules", "lib", "example"]

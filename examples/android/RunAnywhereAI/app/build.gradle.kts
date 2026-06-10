@@ -1,17 +1,16 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
 }
 
 android {
     namespace = "com.runanywhere.runanywhereai"
-    compileSdk = 36
-
-    ndkVersion = "27.0.12077973"
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
 
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")
@@ -32,313 +31,67 @@ android {
     defaultConfig {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 13
         versionName = "0.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Native build disabled for now to focus on Kotlin implementation
-        // externalNativeBuild {
-        //     cmake {
-        //         cppFlags += listOf("-std=c++17", "-O3")
-        //         arguments += listOf(
-        //             "-DANDROID_STL=c++_shared",
-        //             "-DBUILD_SHARED_LIBS=ON"
-        //         )
-        //     }
-        // }
-
-        // Note: ndk.abiFilters removed — splits.abi handles ABI filtering
     }
 
     buildTypes {
-        debug {
-            isDebuggable = true
-            isMinifyEnabled = false
-            isShrinkResources = false
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
-
-            // Disable optimizations for faster builds
-            buildConfigField("boolean", "DEBUG_MODE", "true")
-            buildConfigField("String", "BUILD_TYPE", "\"debug\"")
-        }
-
         release {
-            // MUST be false for Play Store publishing
-            isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
-
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
-
-            // Build configuration fields
-            buildConfigField("boolean", "DEBUG_MODE", "false")
-            buildConfigField("String", "BUILD_TYPE", "\"release\"")
-
-            // MUST be false for Play Store publishing
-            isJniDebuggable = false
-
-            // Use release signing config if available
-            val releaseSigningConfig = signingConfigs.findByName("release")
-            if (releaseSigningConfig != null) {
-                signingConfig = releaseSigningConfig
-            }
-        }
-
-        create("benchmark") {
-            initWith(getByName("release"))
-            matchingFallbacks += listOf("release")
-            isDebuggable = false
-
-            // Additional optimizations for benchmarking
-            buildConfigField("boolean", "BENCHMARK_MODE", "true")
-            applicationIdSuffix = ".benchmark"
-            versionNameSuffix = "-benchmark"
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
-
-    // Signing configurations
-    // Using default debug keystore for now
-
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "x86_64")
-            isUniversalApk = false
-        }
-    }
-
-    // Packaging options
-    packaging {
-        resources {
-            excludes +=
-                listOf(
-                    "/META-INF/{AL2.0,LGPL2.1}",
-                    "/META-INF/DEPENDENCIES",
-                    "/META-INF/LICENSE",
-                    "/META-INF/LICENSE.txt",
-                    "/META-INF/NOTICE",
-                    "/META-INF/NOTICE.txt",
-                    "/META-INF/licenses/**",
-                    "/META-INF/AL2.0",
-                    "/META-INF/LGPL2.1",
-                    "**/kotlin/**",
-                    "kotlin/**",
-                    "META-INF/kotlin/**",
-                    "META-INF/*.kotlin_module",
-                    "META-INF/INDEX.LIST",
-                )
-        }
-
-        jniLibs {
-            // Use legacy packaging to extract libraries to filesystem
-            // This helps with symbol resolution for transitive dependencies
-            // CRITICAL: useLegacyPackaging = true is REQUIRED for 16KB page size support
-            // when using AGP < 8.5.1. With AGP 8.5.1+, this ensures proper extraction
-            // and 16KB alignment during packaging.
-            useLegacyPackaging = true
-
-            // Handle duplicate native libraries from multiple SDK modules.
-            // The main SDK, ONNX module, and LlamaCPP module may share common
-            // libraries (libc++_shared, libomp, librac_commons). Use a wildcard
-            // to safely pick the first copy for any ABI.
-            pickFirsts += listOf("lib/**/*.so")
-        }
-    }
-
-    // Bundle configuration for Play Store
-    bundle {
-        language {
-            enableSplit = true
-        }
-        density {
-            enableSplit = true
-        }
-        abi {
-            enableSplit = true
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-
-        // Kotlin compiler optimizations
-        freeCompilerArgs +=
-            listOf(
-                "-opt-in=kotlin.RequiresOptIn",
-                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-                "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-                "-Xjvm-default=all",
-            )
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
-
-        // Disable unused features for smaller APK
-        aidl = false
-        renderScript = false
-        resValues = false
-        shaders = false
-        viewBinding = false
-        dataBinding = false
     }
-    lint {
-        abortOnError = true
-        checkDependencies = false
-        warningsAsErrors = true
-        baseline = file("lint-baseline.xml")
-        lintConfig = file("lint.xml")
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            // The SDK + backend AARs each bundle the NDK runtime
+            // (libc++_shared.so) for every ABI, so the merge collides on the
+            // duplicate — take the first. (Backends currently ship as
+            // monolithic AARs; tracked as issues 002/005.)
+            pickFirsts += "**/libc++_shared.so"
+        }
     }
-    // Native build disabled for now to focus on Kotlin implementation
-    // externalNativeBuild {
-    //     cmake {
-    //         path = file("src/main/cpp/CMakeLists.txt")
-    //         version = "3.22.1"
-    //     }
-    // }
 }
 
 dependencies {
-    // SDK
-    implementation(project(":runanywhere-kotlin"))
-
-    // Backend modules - each is SELF-CONTAINED with all native libs
-    // Pick the backends you need:
-    implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
-    implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
-    // RAG pipeline is now part of the core SDK (not a separate module)
-    // Genie: closed-source AAR from Maven Central (Qualcomm NPU backend)
-    implementation("io.github.sanchitmonga22:runanywhere-genie-android:0.2.1")
-
-    // AndroidX Core & Lifecycle
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.activity.compose)
-
-    // Material Design
-    implementation(libs.material)
-
-    // Compose
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.ui)
-    implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
-
-    // Navigation
-    implementation(libs.androidx.navigation.compose)
-
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
-
-    // Serialization & DateTime
-    implementation(libs.kotlinx.serialization.json)
-    implementation(libs.kotlinx.datetime)
-
-    // Networking
+    implementation(files("../libs/runanywhere-sdk.aar"))
+    implementation(files("../libs/runanywhere-llamacpp.aar"))
+    implementation(files("../libs/runanywhere-onnx.aar"))
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging)
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.gson)
-    implementation(libs.gson)
-
-    // File Management & Storage
-    implementation(libs.commons.io)
-
-    // ========================================
-    // PDF Text Extraction (RAG document ingestion)
-    // ========================================
     implementation(libs.pdfbox.android)
 
-    // Background Work
-    implementation(libs.androidx.work.runtime.ktx)
-
-    // Speech Recognition & Audio Processing
-    implementation(libs.whisper.jni)
-    implementation(libs.android.vad.webrtc)
-    implementation(libs.prdownloader)
-
-    // Security
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.security.crypto)
-
-    // DataStore
-    implementation(libs.androidx.datastore.preferences)
-
-    // Permissions
-    implementation(libs.accompanist.permissions)
-
-    // CameraX
-    implementation(libs.androidx.camera.core)
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-
-    // Database
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-
-    // Play Services
-    implementation(libs.google.play.app.update)
-    implementation(libs.google.play.app.update.ktx)
-
-    // Logging
-    implementation(libs.timber)
-
-    // Testing
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.proto.wire.runtime)
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
 
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
-    androidTestImplementation(libs.androidx.ui.test.junit4)
-
-    debugImplementation(libs.androidx.ui.tooling)
-    debugImplementation(libs.androidx.ui.test.manifest)
-
-    // Kotlin version constraints
-    constraints {
-        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-        implementation("org.jetbrains.kotlin:kotlin-reflect") {
-            version {
-                strictly(libs.versions.kotlin.get())
-            }
-        }
-    }
-}
-
-detekt {
-    config.setFrom("${project.rootDir}/detekt.yml")
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.junit)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 }

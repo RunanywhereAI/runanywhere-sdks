@@ -9,6 +9,7 @@
 #define PlatformAdapterBridge_h
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,18 @@ bool PlatformAdapter_secureExists(const char* key);
  * @return true if successful
  */
 bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
+
+// ============================================================================
+// Native Directories
+// ============================================================================
+
+/**
+ * Get the native model base directory.
+ * iOS returns the app Documents directory.
+ * @param outValue Pointer to store the result (must be freed by caller with free())
+ * @return true if successful
+ */
+bool PlatformAdapter_getModelBaseDirectory(char** outValue);
 
 // ============================================================================
 // Device Info (Synchronous)
@@ -120,36 +133,12 @@ bool PlatformAdapter_getGPUFamily(char** outValue);
 bool PlatformAdapter_isTablet(void);
 
 // ============================================================================
-// HTTP POST for Device Registration (Synchronous)
+// HTTP Download (Async Platform Adapter Fallback)
 // ============================================================================
 
 /**
- * Synchronous HTTP POST for device registration
- * Called from C++ device manager callbacks
- *
- * @param url Full URL to POST to
- * @param jsonBody JSON body string
- * @param supabaseKey Supabase API key (for dev mode, can be NULL)
- * @param outStatusCode Pointer to store HTTP status code
- * @param outResponseBody Pointer to store response body (must be freed by caller)
- * @param outErrorMessage Pointer to store error message (must be freed by caller)
- * @return true if request succeeded (2xx or 409)
- */
-bool PlatformAdapter_httpPostSync(
-    const char* url,
-    const char* jsonBody,
-    const char* supabaseKey,
-    int* outStatusCode,
-    char** outResponseBody,
-    char** outErrorMessage
-);
-
-// ============================================================================
-// HTTP Download (Async)
-// ============================================================================
-
-/**
- * Start an HTTP download.
+ * Start an HTTP download for RACommons platform-adapter-only callers.
+ * Public RN model downloads use native C++ rac_http_download_execute.
  * @param url URL to download
  * @param destinationPath Destination file path
  * @param taskId Task identifier (provided by C++)
@@ -167,6 +156,71 @@ int PlatformAdapter_httpDownload(
  * @return true if cancellation initiated
  */
 bool PlatformAdapter_httpDownloadCancel(const char* taskId);
+
+// ============================================================================
+// Directory Enumeration (Platform Adapter Slots)
+// ============================================================================
+
+#include <stddef.h>
+
+/**
+ * One directory entry surface for the C++ platform adapter
+ * file_list_directory slot. Mirrors `rac_directory_entry_t` field-for-field
+ * so the C++ side can memcpy into the caller-provided rac_directory_entry_t
+ * array without an additional marshalling layer.
+ */
+typedef struct PlatformDirectoryEntry {
+    char name[512];  // RAC_DIRECTORY_ENTRY_NAME_MAX
+    bool is_dir;
+    int64_t size_bytes;
+} PlatformDirectoryEntry;
+
+/**
+ * Enumerate directory entries via FileManager.contentsOfDirectory.
+ *
+ * Two-call semantics: pass outEntries == NULL to query required capacity,
+ * then allocate and call again. Mirrors the rac_file_list_directory_fn
+ * contract documented on rac_platform_adapter.h.
+ *
+ * Truncation: entries whose UTF-8 name (+NUL) would exceed 512 bytes are
+ * skipped per the rac_directory_entry_t::name contract.
+ *
+ * @param dirPath     Absolute directory path.
+ * @param outEntries  Caller-allocated array (or NULL for capacity query).
+ * @param inOutCount  In: capacity of outEntries; Out: entries written
+ *                    (or total available when outEntries is NULL).
+ * @param outResult   Output result code (0=success, -183=not found,
+ *                    -805=internal error). MUST be non-NULL.
+ */
+void PlatformAdapter_listDirectory(const char* dirPath,
+                                   PlatformDirectoryEntry* outEntries,
+                                   size_t* inOutCount,
+                                   int* outResult);
+
+/**
+ * Check whether a path is a directory containing at least one entry.
+ *
+ * Used by rac_model_info_make_proto's is_downloaded gating for multi-file
+ * artifacts (mmproj + GGUF pairs, tokenizer + ONNX bundles).
+ *
+ * @param path Absolute directory path.
+ * @return true if the path is a directory with at least one entry; false
+ *         otherwise (missing, empty, or a regular file).
+ */
+bool PlatformAdapter_isNonEmptyDirectory(const char* path);
+
+/**
+ * Apple-only: returns UIDevice.identifierForVendor.uuidString.
+ *
+ * Used by rac_device_get_or_create_persistent_id as the stable fallback
+ * when secure-storage cache misses. Buffer must be >= 37 bytes.
+ *
+ * @param outBuffer  Caller-provided buffer to receive the UUID string.
+ * @param bufferSize Buffer size in bytes; MUST be >= 37 to succeed.
+ * @return 0 on success (outBuffer NUL-terminated), -423 if no vendor id
+ *         available, -261 if bufferSize is too small.
+ */
+int PlatformAdapter_getVendorId(char* outBuffer, size_t bufferSize);
 
 #ifdef __cplusplus
 }

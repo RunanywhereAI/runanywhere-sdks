@@ -1,40 +1,32 @@
 /**
  * @runanywhere/onnx - ONNX Provider
  *
- * ONNX Runtime module registration for React Native SDK.
+ * Internal ONNX Runtime module registration for React Native SDK.
  * Thin wrapper that triggers C++ backend registration for STT/TTS/VAD.
  *
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift
  */
 
 import { requireNativeONNXModule, isNativeONNXModuleAvailable } from './native/NativeRunAnywhereONNX';
-import { SDKLogger } from '@runanywhere/core';
+import { SDKLogger } from '@runanywhere/core/internal';
 
 // Use SDKLogger with ONNX.Provider category
 const logger = new SDKLogger('ONNX.Provider');
 
 /**
- * ONNX Module
+ * Internal ONNX provider implementation.
  *
- * Provides STT (Speech-to-Text), TTS (Text-to-Speech), and VAD capabilities
- * using ONNX Runtime / Sherpa-ONNX.
- * The actual services are provided by the C++ backend.
+ * Registers ONNX STT/TTS/VAD providers. Core owns public model lifecycle and
+ * inference surfaces.
  *
- * ## Registration
- *
- * ```typescript
- * import { ONNXProvider } from '@runanywhere/onnx';
- *
- * // Register the backend
- * await ONNXProvider.register();
- * ```
+ * @internal
  */
 export class ONNXProvider {
   static readonly moduleId = 'onnx';
   static readonly moduleName = 'ONNX Runtime';
   static readonly version = '1.23.2';
 
-  private static isRegistered = false;
+  private static registered = false;
 
   /**
    * Register ONNX backend with the C++ service registry.
@@ -44,7 +36,7 @@ export class ONNXProvider {
    * @returns Promise<boolean> true if registered successfully
    */
   static async register(): Promise<boolean> {
-    if (this.isRegistered) {
+    if (this.registered) {
       logger.debug('ONNX already registered, returning');
       return true;
     }
@@ -61,7 +53,7 @@ export class ONNXProvider {
       // Call the native registration method from the ONNX module
       const success = await native.registerBackend();
       if (success) {
-        this.isRegistered = true;
+        this.registered = true;
         logger.info('ONNX backend registered successfully (STT + TTS + VAD)');
       }
       return success;
@@ -77,7 +69,7 @@ export class ONNXProvider {
    * @returns Promise<boolean> true if unregistered successfully
    */
   static async unregister(): Promise<boolean> {
-    if (!this.isRegistered) {
+    if (!this.registered) {
       return true;
     }
 
@@ -89,7 +81,7 @@ export class ONNXProvider {
       const native = requireNativeONNXModule();
       const success = await native.unregisterBackend();
       if (success) {
-        this.isRegistered = false;
+        this.registered = false;
         logger.info('ONNX backend unregistered');
       }
       return success;
@@ -99,72 +91,21 @@ export class ONNXProvider {
   }
 
   /**
-   * Check if ONNX can handle STT models
+   * Check native registration state. Falls back to JS state if the native
+   * object cannot be created.
    */
-  static canHandleSTT(modelId: string | null | undefined): boolean {
-    if (!modelId) return false;
-    const lowercased = modelId.toLowerCase();
-    return (
-      lowercased.includes('whisper') ||
-      lowercased.includes('zipformer') ||
-      lowercased.includes('paraformer')
-    );
-  }
-
-  /**
-   * Check if ONNX can handle TTS models
-   */
-  static canHandleTTS(modelId: string | null | undefined): boolean {
-    if (!modelId) return false;
-    const lowercased = modelId.toLowerCase();
-    return lowercased.includes('piper') || lowercased.includes('vits');
-  }
-
-  /**
-   * Check if ONNX can handle VAD (always true for Silero VAD)
-   */
-  static canHandleVAD(_modelId: string | null | undefined): boolean {
-    return true; // ONNX Silero VAD is the default
-  }
-
-  /**
-   * Check if ONNX can handle a given model (STT/TTS/VAD)
-   */
-  static canHandle(modelId: string | null | undefined): boolean {
-    if (!modelId) {
+  static async isRegistered(): Promise<boolean> {
+    if (!isNativeONNXModuleAvailable()) {
       return false;
     }
-    const lowercased = modelId.toLowerCase();
 
-    // STT: Whisper models (ONNX format)
-    if (lowercased.includes('whisper') && !lowercased.includes('whisperkit')) {
-      return true;
+    try {
+      const native = requireNativeONNXModule();
+      const registered = await native.isBackendRegistered();
+      this.registered = registered;
+      return registered;
+    } catch {
+      return this.registered;
     }
-
-    // STT/TTS/VAD: Sherpa-ONNX models
-    if (lowercased.includes('sherpa-onnx') || lowercased.includes('sherpa_onnx')) {
-      return true;
-    }
-
-    // TTS: Piper models
-    if (lowercased.includes('piper')) {
-      return true;
-    }
-
-    // VAD: Silero VAD
-    if (lowercased.includes('silero') && lowercased.includes('vad')) {
-      return true;
-    }
-
-    return false;
   }
-}
-
-/**
- * Auto-register when module is imported
- */
-export function autoRegister(): void {
-  ONNXProvider.register().catch(() => {
-    // Silently handle registration failure during auto-registration
-  });
 }

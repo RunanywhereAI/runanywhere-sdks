@@ -2,15 +2,14 @@
  * NitroModulesGlobalInit.ts
  *
  * Global singleton for NitroModules initialization.
- * Ensures NitroModules.install() is called exactly ONCE globally,
- * preventing "global.__nitroDispatcher already exists" errors.
+ * Caches the NitroModules proxy installed by react-native-nitro-modules,
+ * preventing duplicate native install() calls for the same JS runtime.
  *
  * All packages should import and use this for safe NitroModules access.
  */
 
 import { NitroModules as NitroModulesNamed } from 'react-native-nitro-modules';
 import type { NitroModulesProxy } from 'react-native-nitro-modules/lib/typescript/NitroModulesProxy';
-import { NativeModules } from 'react-native';
 import { SDKLogger } from '../Foundation/Logging';
 
 /**
@@ -25,11 +24,8 @@ let _nitroInstallationPromise: Promise<NitroProxy> | null = null;
 /** Cached NitroModules proxy after successful installation */
 let _nitroModulesProxy: NitroProxy | null = null;
 
-/** Track whether native install() has been invoked */
-let _nitroInstallCalled = false;
-
 /**
- * Initialize NitroModules globally, ensuring install() is called exactly once.
+ * Initialize NitroModules globally, ensuring the SDK caches one proxy instance.
  * This MUST be called before any other modules try to access NitroModules.
  *
  * @returns Promise resolving to NitroModules proxy
@@ -50,28 +46,10 @@ export async function initializeNitroModulesGlobally(): Promise<NitroProxy> {
     try {
       SDKLogger.core.debug('[NitroModulesGlobalInit] Starting global initialization...');
 
-      // Try to get the proxy from the named import first (most reliable in Bridgeless)
+      // Importing react-native-nitro-modules installs Nitro into the current
+      // runtime. Calling NativeModules.NitroModules.install() again for the same
+      // Hermes runtime logs a false duplicate __nitroDispatcher failure.
       _nitroModulesProxy = NitroModulesNamed as unknown as NitroProxy;
-
-      // Always attempt native install() once to ensure JSI bindings are ready
-      const nativeNitro = NativeModules?.NitroModules as
-        | { install?: () => void }
-        | undefined;
-      if (!_nitroInstallCalled && nativeNitro && typeof nativeNitro.install === 'function') {
-        try {
-          SDKLogger.core.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
-          nativeNitro.install();
-          _nitroInstallCalled = true;
-          SDKLogger.core.debug('[NitroModulesGlobalInit] Native install() completed');
-        } catch (installError) {
-          SDKLogger.core.warning('[NitroModulesGlobalInit] Native install() failed', { error: installError });
-        }
-      }
-
-      // Try getting proxy again after install (if needed)
-      if (!_nitroModulesProxy) {
-        _nitroModulesProxy = NitroModulesNamed as unknown as NitroProxy;
-      }
 
       if (!_nitroModulesProxy) {
         throw new Error(

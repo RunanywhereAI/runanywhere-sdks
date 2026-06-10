@@ -37,15 +37,12 @@ final class LLMViewModel {
 
     // MARK: - LoRA Adapter State
 
-    private(set) var loraAdapters: [LoRAAdapterInfo] = []
+    private(set) var loraAdapters: [RALoRAAdapterInfo] = []
     private(set) var isLoadingLoRA = false
 
     // MARK: - LoRA Adapter Catalog State
 
-    private(set) var availableAdapters: [LoraAdapterCatalogEntry] = []
-    private(set) var adapterDownloadProgress: [String: Double] = [:]
-    private(set) var downloadedAdapterPaths: [String: String] = [:]
-    private(set) var isDownloadingAdapter: [String: Bool] = [:]
+    private(set) var availableAdapters: [RALoraAdapterCatalogEntry] = []
 
     // MARK: - User Settings
 
@@ -65,8 +62,10 @@ final class LLMViewModel {
 
     private var generationTask: Task<Void, Never>?
     var lifecycleCancellable: AnyCancellable?
+    var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    private var isViewModelInitialized = false
 
     // MARK: - Internal Accessors for Extensions
 
@@ -162,18 +161,29 @@ final class LLMViewModel {
     // MARK: - Initialization
 
     init() {
-        // Don't create conversation yet - wait until first message is sent
-        currentConversation = nil
+        // Sync model state immediately from shared state to avoid the race condition
+        // where the model was loaded before this ViewModel was created.
+        if let currentModel = ModelListViewModel.shared.currentModel {
+            isModelLoaded = true
+            loadedModelName = currentModel.name
+            loadedModelSupportsThinking = currentModel.supportsThinking
+            selectedFramework = currentModel.framework
+        }
+    }
 
-        // Listen for model loaded notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(modelLoaded(_:)),
-            name: Notification.Name("ModelLoaded"),
-            object: nil
-        )
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 
-        // Listen for conversation selection
+    /// Subscribes to SDK events and applies initial settings.
+    /// Idempotent — safe to call from View's `.task { }`.
+    func initialize() async {
+        guard !isViewModelInitialized else { return }
+        isViewModelInitialized = true
+
+        // Conversation selection is purely intra-app state with no SDK event
+        // counterpart, so it stays on NotificationCenter. Model lifecycle flows
+        // through the SDK event bus (subscribeToModelLifecycle) instead.
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(conversationSelected(_:)),
@@ -181,27 +191,17 @@ final class LLMViewModel {
             object: nil
         )
 
-        // Defer state-modifying operations to avoid "Publishing changes within view updates" warning
-        // These are deferred because init() may be called during view body evaluation
-        Task { @MainActor in
-            // Small delay to ensure view is fully initialized
-            try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+        subscribeToModelLifecycle()
 
-            // Subscribe to SDK events
-            self.subscribeToModelLifecycle()
+        // Reconcile against the SDK's authoritative model snapshot in case a
+        // model was loaded before this ViewModel subscribed.
+        await checkModelStatusFromSDK()
 
-            // Add system message if model is already loaded
-            if self.isModelLoaded {
-                self.addSystemMessage()
-            }
-
-            // Ensure settings are applied
-            await self.ensureSettingsAreApplied()
+        if isModelLoaded {
+            addSystemMessage()
         }
-    }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+        await ensureSettingsAreApplied()
     }
 
     // MARK: - Public Methods
@@ -240,7 +240,7 @@ final class LLMViewModel {
             conversationStore.addMessage(userMessage, to: conversation)
         }
 
-        // Create placeholder assistant message
+        // Append an empty assistant message slot that streaming tokens are written into.
         let assistantMessage = Message(role: .assistant, content: "")
         messages.append(assistantMessage)
 
@@ -250,9 +250,14 @@ final class LLMViewModel {
     private func executeGeneration(prompt: String, messageIndex: Int) async {
         do {
             try await ensureModelIsLoaded()
+
             let options = getGenerationOptions()
-            let effectivePrompt = applyThinkingModePrefix(to: prompt)
-            try await performGeneration(prompt: effectivePrompt, options: options, messageIndex: messageIndex)
+            // Send the raw user prompt and let C++ apply_chat_template handle
+            // formatting via the model's embedded GGUF template. The system
+            // prompt is passed separately in options so the C++ layer can
+            // place it correctly.
+            let effectiveOptions = options
+            try await performGeneration(prompt: prompt, options: effectiveOptions, messageIndex: messageIndex)
         } catch {
             await handleGenerationError(error, at: messageIndex)
         }
@@ -260,15 +265,9 @@ final class LLMViewModel {
         await finalizeGeneration(at: messageIndex)
     }
 
-    private func applyThinkingModePrefix(to prompt: String) -> String {
-        guard loadedModelSupportsThinking else { return prompt }
-        let thinkingModeEnabled = SettingsViewModel.shared.thinkingModeEnabled
-        return thinkingModeEnabled ? prompt : "/no_think\n\(prompt)"
-    }
-
     private func performGeneration(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
@@ -281,14 +280,9 @@ final class LLMViewModel {
             return
         }
 
-        let modelSupportsStreaming = await RunAnywhere.supportsLLMStreaming
-        let effectiveUseStreaming = useStreaming && modelSupportsStreaming
-
-        if !modelSupportsStreaming && useStreaming {
-            logger.info("Model doesn't support streaming, using non-streaming mode")
-        }
-
-        if effectiveUseStreaming {
+        // All LLM backends now handle streaming via the canonical generateStream
+        // entry point; the SDK no longer exposes a per-model capability flag.
+        if useStreaming {
             try await generateStreamingResponse(prompt: prompt, options: options, messageIndex: messageIndex)
         } else {
             try await generateNonStreamingResponse(prompt: prompt, options: options, messageIndex: messageIndex)
@@ -340,8 +334,16 @@ final class LLMViewModel {
         isLoadingLoRA = true
         error = nil
         do {
-            try await RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path: path, scale: scale))
-            await refreshLoraAdapters()
+            var config = RALoRAAdapterConfig()
+            config.adapterPath = path
+            config.scale = scale
+            var request = RALoRAApplyRequest()
+            request.adapters = [config]
+            let result = try await RunAnywhere.lora.apply(request)
+            guard result.success else {
+                throw LLMError.custom(result.errorMessage)
+            }
+            loraAdapters = result.adapters
             logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
         } catch {
             logger.error("Failed to load LoRA adapter: \(error)")
@@ -352,8 +354,10 @@ final class LLMViewModel {
 
     func removeLoraAdapter(path: String) async {
         do {
-            try await RunAnywhere.removeLoraAdapter(path)
-            await refreshLoraAdapters()
+            var request = RALoRARemoveRequest()
+            request.adapterPaths = [path]
+            let state = try await RunAnywhere.lora.remove(request)
+            try handleLoraState(state)
         } catch {
             logger.error("Failed to remove LoRA adapter: \(error)")
             self.error = error
@@ -362,8 +366,10 @@ final class LLMViewModel {
 
     func clearLoraAdapters() async {
         do {
-            try await RunAnywhere.clearLoraAdapters()
-            loraAdapters = []
+            var request = RALoRARemoveRequest()
+            request.clearAll_p = true
+            let state = try await RunAnywhere.lora.remove(request)
+            try handleLoraState(state)
         } catch {
             logger.error("Failed to clear LoRA adapters: \(error)")
             self.error = error
@@ -372,10 +378,18 @@ final class LLMViewModel {
 
     func refreshLoraAdapters() async {
         do {
-            loraAdapters = try await RunAnywhere.getLoadedLoraAdapters()
+            let state = try await RunAnywhere.lora.list()
+            try handleLoraState(state)
         } catch {
             logger.error("Failed to refresh LoRA adapters: \(error)")
         }
+    }
+
+    private func handleLoraState(_ state: RALoRAState) throws {
+        if state.hasErrorMessage, !state.errorMessage.isEmpty {
+            throw LLMError.custom(state.errorMessage)
+        }
+        loraAdapters = state.loadedAdapters
     }
 
     // MARK: - LoRA Adapter Catalog & Download
@@ -386,101 +400,162 @@ final class LLMViewModel {
             availableAdapters = []
             return
         }
-        availableAdapters = await RunAnywhere.loraAdaptersForModel(modelId)
-        syncDownloadedAdapterPaths()
+        do {
+            var query = RALoraAdapterCatalogQuery()
+            query.modelID = modelId
+            let result = try await RunAnywhere.lora.queryCatalog(query)
+            guard result.success else {
+                throw LLMError.custom(
+                    result.errorMessage.isEmpty ? "LoRA catalog query failed" : result.errorMessage
+                )
+            }
+            availableAdapters = result.entries
+        } catch {
+            logger.error("Failed to refresh LoRA catalog: \(error)")
+            self.error = error
+            availableAdapters = []
+        }
     }
 
-    func isAdapterDownloaded(_ adapter: LoraAdapterCatalogEntry) -> Bool {
-        downloadedAdapterPaths[adapter.id] != nil
+    func isAdapterDownloaded(_ adapter: RALoraAdapterCatalogEntry) -> Bool {
+        localPath(for: adapter) != nil
     }
 
-    func localPath(for adapter: LoraAdapterCatalogEntry) -> String? {
-        downloadedAdapterPaths[adapter.id]
+    func localPath(for adapter: RALoraAdapterCatalogEntry) -> String? {
+        guard adapter.isDownloaded, adapter.hasLocalPath, !adapter.localPath.isEmpty else {
+            return nil
+        }
+        return FileManager.default.fileExists(atPath: adapter.localPath) ? adapter.localPath : nil
     }
 
-    /// Downloads a catalog adapter from its URL, then loads it.
-    func downloadAndLoadAdapter(_ adapter: LoraAdapterCatalogEntry, scale: Float) async {
-        guard isDownloadingAdapter[adapter.id] != true else { return }
-
-        isDownloadingAdapter[adapter.id] = true
-        adapterDownloadProgress[adapter.id] = 0.0
+    /// Downloads a catalog adapter through the SDK's canonical download
+    /// pipeline, then applies the stable local path.
+    func downloadAndLoadAdapter(_ adapter: RALoraAdapterCatalogEntry, scale: Float) async {
+        isLoadingLoRA = true
         error = nil
 
         do {
-            let localPath: String
-            if let existing = downloadedAdapterPaths[adapter.id] {
-                localPath = existing
-            } else {
-                localPath = try await downloadAdapter(adapter)
+            let entry = try await ensureCatalogAdapterDownloaded(adapter)
+            updateAvailableAdapter(entry)
+            guard let localPath = localPath(for: entry) else {
+                throw LLMError.custom("LoRA adapter completion did not return a usable local path")
             }
+            isLoadingLoRA = false
             await loadLoraAdapter(path: localPath, scale: scale)
         } catch {
-            logger.error("Failed to download/load adapter \(adapter.id): \(error)")
+            logger.error("Failed to load adapter \(adapter.id): \(error)")
             self.error = error
+            isLoadingLoRA = false
         }
-
-        isDownloadingAdapter[adapter.id] = false
-        adapterDownloadProgress[adapter.id] = nil
     }
 
-    private func downloadAdapter(_ adapter: LoraAdapterCatalogEntry) async throws -> String {
-        let loraDir = Self.loraDownloadDirectory()
-        try FileManager.default.createDirectory(at: loraDir, withIntermediateDirectories: true)
-        let destinationURL = loraDir.appendingPathComponent(adapter.filename)
+    /// Copies a user-selected LoRA file into the sandbox before applying it. If
+    /// the file matches a catalog entry, the import completion is persisted
+    /// through the generated LoRA catalog ABI.
+    func importAndLoadLoraAdapter(url: URL, scale: Float) async {
+        isLoadingLoRA = true
+        error = nil
 
-        if FileManager.default.fileExists(atPath: destinationURL.path),
-           Self.isValidGGUF(at: destinationURL) {
-            downloadedAdapterPaths[adapter.id] = destinationURL.path
-            return destinationURL.path
-        }
-
-        // Remove any previously corrupted download
-        try? FileManager.default.removeItem(at: destinationURL)
-
-        let delegate = DownloadProgressDelegate { [weak self] progress in
-            Task { @MainActor in
-                self?.adapterDownloadProgress[adapter.id] = progress
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
             }
         }
 
-        let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
+        do {
+            let destination = try copyImportedAdapterToSandbox(from: url)
+            if let entry = availableAdapters.first(where: { catalogEntryMatches($0, fileURL: url) }) {
+                var request = RALoraAdapterDownloadCompletedRequest()
+                request.adapterID = entry.id
+                request.localPath = destination.path
+                request.imported = true
+                request.completedAtUnixMs = currentUnixMilliseconds()
+                request.statusMessage = "import completed"
+                if let fileSize = try fileSize(at: destination) {
+                    request.sizeBytes = fileSize
+                }
 
-        // Validate GGUF magic bytes before saving
-        guard Self.isValidGGUF(at: tempURL) else {
-            try? FileManager.default.removeItem(at: tempURL)
-            throw LLMError.custom(
-                "Downloaded file is not a valid GGUF adapter (server may have returned an error page)"
-            )
-        }
-
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
-        }
-        try FileManager.default.moveItem(at: tempURL, to: destinationURL)
-
-        downloadedAdapterPaths[adapter.id] = destinationURL.path
-        logger.info("Adapter downloaded to \(destinationURL.path)")
-        return destinationURL.path
-    }
-
-    /// Checks that a file starts with the GGUF magic bytes (0x47475546 = "GGUF").
-    private static func isValidGGUF(at url: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
-        defer { try? handle.close() }
-        guard let header = try? handle.read(upToCount: 4), header.count == 4 else { return false }
-        return header == Data([0x47, 0x47, 0x55, 0x46])  // "GGUF"
-    }
-
-    private func syncDownloadedAdapterPaths() {
-        let loraDir = Self.loraDownloadDirectory()
-        for adapter in availableAdapters {
-            let path = loraDir.appendingPathComponent(adapter.filename).path
-            if FileManager.default.fileExists(atPath: path) {
-                downloadedAdapterPaths[adapter.id] = path
+                let result = try await RunAnywhere.lora.markImportCompleted(request)
+                guard result.success else {
+                    throw LLMError.custom(
+                        result.errorMessage.isEmpty
+                            ? "LoRA adapter import completion was not persisted"
+                            : result.errorMessage
+                    )
+                }
+                updateAvailableAdapter(result.entry)
             }
+
+            isLoadingLoRA = false
+            await loadLoraAdapter(path: destination.path, scale: scale)
+        } catch {
+            logger.error("Failed to import LoRA adapter: \(error)")
+            self.error = error
+            isLoadingLoRA = false
         }
     }
 
+    private func ensureCatalogAdapterDownloaded(
+        _ adapter: RALoraAdapterCatalogEntry
+    ) async throws -> RALoraAdapterCatalogEntry {
+        if let localPath = localPath(for: adapter) {
+            var entry = adapter
+            entry.localPath = localPath
+            entry.isDownloaded = true
+            return entry
+        }
+
+        guard !adapter.id.isEmpty else {
+            throw LLMError.custom("LoRA catalog adapter id is required")
+        }
+
+        // One SDK call owns everything: artifact registration, transfer with
+        // resume/checksum/progress, on-disk placement, and catalog completion.
+        let localPath = try await RunAnywhere.lora.download(adapter)
+
+        var entry = adapter
+        entry.localPath = localPath
+        entry.isDownloaded = true
+        return entry
+    }
+
+    private func copyImportedAdapterToSandbox(from url: URL) throws -> URL {
+        let directory = Self.loraDownloadDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent(url.lastPathComponent, isDirectory: false)
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.copyItem(at: url, to: destination)
+        return destination
+    }
+
+    private func updateAvailableAdapter(_ entry: RALoraAdapterCatalogEntry) {
+        if let index = availableAdapters.firstIndex(where: { $0.id == entry.id }) {
+            availableAdapters[index] = entry
+        } else {
+            availableAdapters.append(entry)
+        }
+    }
+
+    private func catalogEntryMatches(_ entry: RALoraAdapterCatalogEntry, fileURL: URL) -> Bool {
+        let filename = fileURL.lastPathComponent
+        return entry.filename == filename || entry.localPath == fileURL.path
+    }
+
+    private func fileSize(at url: URL) throws -> Int64? {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.size] as? NSNumber)?.int64Value
+    }
+
+    private func currentUnixMilliseconds() -> Int64 {
+        Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+    }
+
+    /// Sandbox folder for user-imported adapter files (file-picker flow only;
+    /// catalog downloads are placed by the SDK).
     static func loraDownloadDirectory() -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent("LoRA", isDirectory: true)
@@ -494,7 +569,7 @@ final class LLMViewModel {
         }
     }
 
-    private func getGenerationOptions() -> LLMGenerationOptions {
+    private func getGenerationOptions() -> RALLMGenerationOptions {
         // Use object(forKey:) to distinguish an unset key (nil) from a value explicitly set to 0.0
         let savedTemperature = UserDefaults.standard.object(forKey: "defaultTemperature") as? Double
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
@@ -508,23 +583,29 @@ final class LLMViewModel {
 
         let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
 
-    let systemPromptInfo: String = {
-        guard let prompt = effectiveSystemPrompt else { return "nil" }
-        return "set(\(prompt.count) chars)"
-    }()
+        let systemPromptInfo: String = {
+            guard let prompt = effectiveSystemPrompt else { return "nil" }
+            return "set(\(prompt.count) chars)"
+        }()
 
-    logger.info(
-        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), "
-        + "maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), "
-        + "systemPrompt=\(systemPromptInfo)"
-    )
+        logger.info(
+            """
+            [PARAMS] App getGenerationOptions: \
+            temperature=\(effectiveSettings.temperature), \
+            maxTokens=\(effectiveSettings.maxTokens), \
+            thinkingMode=\(thinkingModeEnabled), \
+            systemPrompt=\(systemPromptInfo)
+            """
+        )
 
-    return LLMGenerationOptions(
-        maxTokens: effectiveSettings.maxTokens,
-        temperature: Float(effectiveSettings.temperature),
-        systemPrompt: effectiveSystemPrompt
-    )
-}
+        var options = RALLMGenerationOptions.defaults()
+        options.maxTokens = Int32(effectiveSettings.maxTokens)
+        options.temperature = Float(effectiveSettings.temperature)
+        if let effectiveSystemPrompt {
+            options.systemPrompt = effectiveSystemPrompt
+        }
+        return options
+    }
 
     // MARK: - Internal Methods - Helpers
 
@@ -546,34 +627,12 @@ final class LLMViewModel {
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
         logger.info(
-            "Settings applied - Temperature: \(temperature), "
-            + "MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
+            """
+            Settings applied - Temperature: \(temperature), \
+            MaxTokens: \(maxTokens), \
+            SystemPrompt: \(savedSystemPrompt ?? "nil")
+            """
         )
-    }
-
-    @objc
-    private func modelLoaded(_ notification: Notification) {
-        Task {
-            if let model = notification.object as? ModelInfo {
-                let supportsStreaming = await RunAnywhere.supportsLLMStreaming
-
-                await MainActor.run {
-                    self.isModelLoaded = true
-                    self.loadedModelName = model.name
-                    self.loadedModelSupportsThinking = model.supportsThinking
-                    self.selectedFramework = model.framework
-                    self.modelSupportsStreaming = supportsStreaming
-
-                    if self.messages.first?.role == .system {
-                        self.messages.removeFirst()
-                    }
-                    self.addSystemMessage()
-                    Task { await self.refreshAvailableAdapters() }
-                }
-            } else {
-                await self.checkModelStatus()
-            }
-        }
     }
 
     @objc
@@ -583,10 +642,5 @@ final class LLMViewModel {
         }
     }
 
-    /// Thin pass-through to the SDK's canonical `ThinkingContentParser.strip(from:)`
-    /// so the app has a single source of truth for `<think>` tag handling.
-    static func stripThinkTags(from text: String) -> String {
-        ThinkingContentParser.strip(from: text)
-    }
 }
 // swiftlint:enable type_body_length

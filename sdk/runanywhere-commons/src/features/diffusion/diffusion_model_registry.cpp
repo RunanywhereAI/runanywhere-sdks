@@ -132,8 +132,8 @@ static rac_bool_t builtin_can_handle(const char* model_id, void* /*user_data*/) 
     if (!model_id)
         return RAC_FALSE;
 
-    for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
-        if (std::strcmp(model_id, BUILTIN_MODELS[i]->model_id) == 0) {
+    for (const auto* model : BUILTIN_MODELS) {
+        if (std::strcmp(model_id, model->model_id) == 0) {
             return RAC_TRUE;
         }
     }
@@ -145,9 +145,9 @@ static rac_result_t builtin_get_model_def(const char* model_id, rac_diffusion_mo
     if (!model_id || !out_def)
         return RAC_ERROR_INVALID_ARGUMENT;
 
-    for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
-        if (std::strcmp(model_id, BUILTIN_MODELS[i]->model_id) == 0) {
-            *out_def = *BUILTIN_MODELS[i];
+    for (const auto* model : BUILTIN_MODELS) {
+        if (std::strcmp(model_id, model->model_id) == 0) {
+            *out_def = *model;
             return RAC_SUCCESS;
         }
     }
@@ -163,8 +163,8 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models, 
 
     // Count available models for this platform
     size_t count = 0;
-    for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
-        if (BUILTIN_MODELS[i]->platforms & current_platform) {
+    for (const auto* model : BUILTIN_MODELS) {
+        if ((model->platforms & current_platform) != 0U) {
             count++;
         }
     }
@@ -185,9 +185,9 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models, 
 
     // Copy available models
     size_t idx = 0;
-    for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
-        if (BUILTIN_MODELS[i]->platforms & current_platform) {
-            models[idx++] = *BUILTIN_MODELS[i];
+    for (const auto* model : BUILTIN_MODELS) {
+        if ((model->platforms & current_platform) != 0U) {
+            models[idx++] = *model;
         }
     }
 
@@ -252,7 +252,7 @@ void rac_diffusion_model_registry_init(void) {
 
     // Log available models for current platform
     uint32_t platform = detect_current_platform();
-    const char* platform_name = "Unknown";
+    const char* platform_name;
 #if defined(__APPLE__)
 #if TARGET_OS_IOS || TARGET_OS_SIMULATOR
     platform_name = "iOS";
@@ -332,7 +332,8 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
 
     // Try each strategy
     for (const auto& strategy : state.strategies) {
-        if (strategy.can_handle && strategy.can_handle(model_id, strategy.user_data)) {
+        if ((strategy.can_handle != nullptr) &&
+            strategy.can_handle(model_id, strategy.user_data) == RAC_TRUE) {
             if (strategy.get_model_def) {
                 rac_result_t result = strategy.get_model_def(model_id, out_def, strategy.user_data);
                 if (result == RAC_SUCCESS) {
@@ -379,9 +380,12 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
         return RAC_SUCCESS;
     }
 
-    // Allocate output
+    // Allocate output zero-initialised so any fields a strategy left unset
+    // (e.g., is_recommended) have a defined value (RAC_FALSE == 0). This
+    // also avoids clang-analyzer-core.UndefinedBinaryOperatorResult false
+    // positives in callers that read across the function-pointer boundary.
     auto* result = static_cast<rac_diffusion_model_def_t*>(
-        std::malloc(all_models.size() * sizeof(rac_diffusion_model_def_t)));
+        std::calloc(all_models.size(), sizeof(rac_diffusion_model_def_t)));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -409,7 +413,8 @@ rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* 
 
     // Find strategy that handles this model and use its backend selection
     for (const auto& strategy : state.strategies) {
-        if (strategy.can_handle && strategy.can_handle(model_id, strategy.user_data)) {
+        if ((strategy.can_handle != nullptr) &&
+            strategy.can_handle(model_id, strategy.user_data) == RAC_TRUE) {
             if (strategy.select_backend) {
                 rac_diffusion_backend_t backend =
                     strategy.select_backend(&model_def, strategy.user_data);
@@ -431,7 +436,7 @@ rac_bool_t rac_diffusion_model_registry_is_available(const char* model_id) {
 
     // Check platform availability
     uint32_t current_platform = detect_current_platform();
-    return (model_def.platforms & current_platform) ? RAC_TRUE : RAC_FALSE;
+    return ((model_def.platforms & current_platform) != 0U) ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_def_t* out_def) {
@@ -444,12 +449,17 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
 
     rac_result_t result = rac_diffusion_model_registry_list(&models, &count);
     if (result != RAC_SUCCESS || !models || count == 0) {
+        std::free(models);
         return RAC_ERROR_NOT_FOUND;
     }
 
-    // Find first recommended model
+    // Find first recommended model. Copy the field locally so the static
+    // analyzer can prove the comparison LHS is fully read before the
+    // branch (avoids clang-analyzer-core.UndefinedBinaryOperatorResult
+    // false positive across the function-pointer boundary in list()).
     for (size_t i = 0; i < count; i++) {
-        if (models[i].is_recommended) {
+        const rac_bool_t recommended = models[i].is_recommended;
+        if (recommended == RAC_TRUE) {
             *out_def = models[i];
             std::free(models);
             return RAC_SUCCESS;

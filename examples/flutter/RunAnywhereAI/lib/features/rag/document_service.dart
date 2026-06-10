@@ -53,7 +53,8 @@ class DocumentService {
     final pageCount = document.pages.count;
 
     for (var i = 0; i < pageCount; i++) {
-      final pageText = extractor.extractText(startPageIndex: i, endPageIndex: i);
+      final pageText =
+          extractor.extractText(startPageIndex: i, endPageIndex: i);
       if (pageText.trim().isNotEmpty) {
         if (buffer.isNotEmpty) buffer.write('\n');
         buffer.write(pageText);

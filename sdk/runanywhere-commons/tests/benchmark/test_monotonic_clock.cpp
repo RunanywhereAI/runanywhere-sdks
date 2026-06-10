@@ -3,10 +3,9 @@
  * @brief Tests for rac_monotonic_now_ms() monotonic clock
  */
 
-#include <gtest/gtest.h>
-
 #include <atomic>
 #include <chrono>
+#include <gtest/gtest.h>
 #include <thread>
 #include <vector>
 

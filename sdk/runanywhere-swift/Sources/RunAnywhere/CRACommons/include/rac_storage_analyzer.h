@@ -16,6 +16,7 @@
 
 #include "rac_error.h"
 #include "rac_types.h"
+#include "rac_proto_buffer.h"
 #include "rac_model_registry.h"
 #include "rac_model_types.h"
 
@@ -168,6 +169,15 @@ typedef int64_t (*rac_get_available_space_fn)(void* user_data);
  */
 typedef int64_t (*rac_get_total_space_fn)(void* user_data);
 
+typedef rac_result_t (*rac_storage_delete_path_fn)(const char* path, int recursive,
+                                                   void* user_data);
+
+typedef rac_result_t (*rac_storage_is_model_loaded_fn)(const char* model_id,
+                                                       rac_bool_t* out_is_loaded,
+                                                       void* user_data);
+
+typedef rac_result_t (*rac_storage_unload_model_fn)(const char* model_id, void* user_data);
+
 /**
  * @brief Platform callbacks for file operations
  */
@@ -177,6 +187,9 @@ typedef struct {
     rac_path_exists_fn path_exists;
     rac_get_available_space_fn get_available_space;
     rac_get_total_space_fn get_total_space;
+    rac_storage_delete_path_fn delete_path;
+    rac_storage_is_model_loaded_fn is_model_loaded;
+    rac_storage_unload_model_fn unload_model;
     void* user_data;
 } rac_storage_callbacks_t;
 
@@ -249,6 +262,26 @@ RAC_API rac_result_t rac_storage_analyzer_get_model_metrics(
 RAC_API rac_result_t rac_storage_analyzer_check_available(
     rac_storage_analyzer_handle_t handle, int64_t model_size, double safety_margin,
     rac_storage_availability_t* out_availability);
+
+RAC_API rac_result_t rac_storage_analyzer_info_proto(
+    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_buffer);
+
+RAC_API rac_result_t rac_storage_analyzer_availability_proto(
+    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_buffer);
+
+RAC_API rac_result_t rac_storage_analyzer_delete_plan_proto(
+    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_buffer);
+
+RAC_API rac_result_t rac_storage_analyzer_delete_proto(
+    rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_buffer);
 
 /**
  * @brief Calculate size at a path (file or directory)

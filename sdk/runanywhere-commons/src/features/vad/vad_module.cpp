@@ -1,0 +1,1468 @@
+/**
+ * @file vad_module.cpp
+ * @brief Unified VAD feature module.
+ *
+ * W4 component unification: merges the former vad_component.cpp (handle-based
+ * dual-backend component path — always-on energy VAD + optional model VAD —
+ * plus the *_component_*_proto verbs) with VAD's slice of
+ * rac_nonllm_lifecycle_proto_abi.cpp (the handle-less
+ * rac_vad_process_lifecycle_proto + configure/start/stop/reset verbs) into one
+ * TU. The dual-backend dispatch (model-first, energy-fallback) is preserved.
+ *
+ * The component section is a direct translation of Swift's VADCapability.swift;
+ * do NOT add features not present in the Swift code.
+ */
+
+#include "rac_vad_service_internal.h"
+#include "vad_threshold_registry.h"
+
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include "features/rac_nonllm_lifecycle_bridge.h"
+#include "rac/core/capabilities/rac_lifecycle.h"
+#include "rac/core/rac_core.h"
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_adapter.h"
+#include "rac/core/rac_structured_error.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/vad/rac_vad_component.h"
+#include "rac/features/vad/rac_vad_energy.h"
+#include "rac/features/vad/rac_vad_proto_adapters.h"
+#include "rac/features/vad/rac_vad_service.h"
+#include "rac/features/vad/rac_vad_stream.h"
+#include "rac/foundation/rac_proto_adapters.h"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+
+#if defined(RAC_HAVE_PROTOBUF)
+#include "sdk_events.pb.h"
+#include "vad_options.pb.h"
+#include "voice_events.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
+#endif
+
+// =============================================================================
+// INTERNAL STRUCTURES
+// =============================================================================
+
+struct rac_vad_component {
+    /** Energy VAD service handle (built-in fallback) */
+    rac_energy_vad_handle_t vad_service;
+
+    /** Model-loaded VAD service (from service registry, e.g. ONNX Silero) */
+    rac_vad_service_t* model_service;
+
+    /** Whether a model-based VAD service is loaded */
+    bool is_model_loaded;
+
+    /** Loaded model ID */
+    char* loaded_model_id;
+
+    /** Configuration */
+    rac_vad_config_t config;
+
+    /** Activity callback */
+    rac_vad_activity_callback_fn activity_callback;
+    void* activity_user_data;
+
+    /** Audio callback */
+    rac_vad_audio_callback_fn audio_callback;
+    void* audio_user_data;
+
+    /** Initialization state (atomic for lock-free query from callbacks) */
+    std::atomic<bool> is_initialized;
+
+    /** Mutex for thread safety */
+    std::mutex mtx;
+
+    rac_vad_component()
+        : vad_service(nullptr),
+          model_service(nullptr),
+          is_model_loaded(false),
+          loaded_model_id(nullptr),
+          activity_callback(nullptr),
+          activity_user_data(nullptr),
+          audio_callback(nullptr),
+          audio_user_data(nullptr),
+          is_initialized(false) {
+        // Initialize with defaults - matches rac_vad_types.h rac_vad_config_t
+        config = RAC_VAD_CONFIG_DEFAULT;
+    }
+};
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+namespace {
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+struct ProtoStreamSlot {
+    rac_vad_proto_stream_event_callback_fn callback{nullptr};
+    void* user_data{nullptr};
+    std::string request_id;
+    uint64_t next_seq{1};
+};
+
+std::mutex& proto_stream_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+std::unordered_map<rac_handle_t, ProtoStreamSlot>& proto_stream_slots() {
+    static std::unordered_map<rac_handle_t, ProtoStreamSlot> slots;
+    return slots;
+}
+
+bool proto_bytes_valid(const uint8_t* bytes, size_t size) {
+    return rac::proto::bytes_valid(bytes, size);
+}
+
+const void* proto_parse_data(const uint8_t* bytes, size_t size) {
+    return rac::proto::parse_bytes(bytes, size);
+}
+
+rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
+                                rac_proto_buffer_t* out) {
+    return rac::proto::copy_message(message, out, "failed to serialize VAD proto result");
+}
+
+float compute_rms_energy(const float* samples, size_t count) {
+    if (!samples || count == 0) {
+        return 0.0f;
+    }
+    double sum = 0.0;
+    for (size_t i = 0; i < count; ++i) {
+        sum += static_cast<double>(samples[i]) * static_cast<double>(samples[i]);
+    }
+    return static_cast<float>(std::sqrt(sum / static_cast<double>(count)));
+}
+
+runanywhere::v1::SpeechActivityKind speech_activity_kind(rac_speech_activity_t activity) {
+    switch (activity) {
+        case RAC_SPEECH_STARTED:
+            return runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_STARTED;
+        case RAC_SPEECH_ENDED:
+            return runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_ENDED;
+        case RAC_SPEECH_ONGOING:
+            return runanywhere::v1::SPEECH_ACTIVITY_KIND_ONGOING;
+        default:
+            return runanywhere::v1::SPEECH_ACTIVITY_KIND_UNSPECIFIED;
+    }
+}
+
+int64_t current_time_us() {
+    return rac_get_current_time_ms() * 1000;
+}
+
+std::string make_vad_request_id(rac_handle_t handle) {
+    const auto handle_bits = reinterpret_cast<uintptr_t>(handle);
+    return "vad-" + std::to_string(handle_bits) + "-" + std::to_string(rac_get_current_time_ms());
+}
+
+bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
+    if (event.seq() == 0 || event.timestamp_us() <= 0 || event.request_id().empty()) {
+        return false;
+    }
+
+    switch (event.kind()) {
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STARTED:
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STOPPED:
+            return true;
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME:
+            return event.has_result();
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
+            return event.has_activity();
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STATISTICS:
+            return event.has_statistics();
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR:
+            return event.error_code() != RAC_SUCCESS || event.has_error_message();
+        default:
+            return false;
+    }
+}
+
+void emit_vad_stream_event(const runanywhere::v1::VADStreamEvent& event,
+                           rac_vad_proto_stream_event_callback_fn callback, void* user_data) {
+    if (!callback || !validate_vad_stream_event(event)) {
+        return;
+    }
+
+    const size_t size = event.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size == 0 || event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
+    }
+}
+
+void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, int32_t duration_ms,
+                                rac_result_t error_code = RAC_SUCCESS) {
+    runanywhere::v1::VoiceEvent voice_event;
+    voice_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+    voice_event.set_category(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_CATEGORY_VAD
+                                                       : runanywhere::v1::EVENT_CATEGORY_ERROR);
+    voice_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                                       : runanywhere::v1::ERROR_SEVERITY_ERROR);
+    voice_event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
+    if (error_code == RAC_SUCCESS) {
+        auto* vad = voice_event.mutable_vad();
+        // VADEvent.type uses VADStreamEventKind; the speech/silence
+        // direction is carried in the companion is_speech field below.
+        vad->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
+        vad->set_confidence(confidence);
+        vad->set_is_speech(is_speech);
+        vad->set_speech_duration_ms(is_speech ? duration_ms : 0);
+        vad->set_silence_duration_ms(is_speech ? 0 : duration_ms);
+        vad->set_noise_floor_db(energy > 0.0f ? 20.0 * std::log10(energy) : -120.0);
+    } else {
+        auto* error = voice_event.mutable_error();
+        error->set_code(static_cast<int32_t>(error_code));
+        error->set_message(rac_error_message(error_code));
+        error->set_component("vad");
+        error->set_is_recoverable(true);
+    }
+
+    runanywhere::v1::SDKEvent sdk_event;
+    sdk_event.set_timestamp_ms(rac_get_current_time_ms());
+    sdk_event.set_id("vad-" + std::to_string(sdk_event.timestamp_ms()));
+    sdk_event.set_category(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_CATEGORY_VAD
+                                                     : runanywhere::v1::EVENT_CATEGORY_FAILURE);
+    sdk_event.set_component(runanywhere::v1::SDK_COMPONENT_VAD);
+    sdk_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
+                                                     : runanywhere::v1::ERROR_SEVERITY_ERROR);
+    sdk_event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    sdk_event.set_source("cpp");
+    sdk_event.set_operation_id("vad.process");
+    sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
+    const size_t size = sdk_event.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size == 0 || sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
+    }
+}
+
+void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) {
+    const rac_handle_t handle = reinterpret_cast<rac_handle_t>(user_data);
+    ProtoStreamSlot slot;
+    uint64_t seq = 0;
+    {
+        std::lock_guard<std::mutex> lock(proto_stream_mutex());
+        auto it = proto_stream_slots().find(handle);
+        if (it == proto_stream_slots().end() || it->second.callback == nullptr) {
+            return;
+        }
+        slot = it->second;
+        seq = it->second.next_seq++;
+    }
+
+    runanywhere::v1::VADStreamEvent event;
+    event.set_seq(seq);
+    event.set_timestamp_us(current_time_us());
+    event.set_request_id(slot.request_id);
+    event.set_kind(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
+    auto* payload = event.mutable_activity();
+    payload->set_event_type(speech_activity_kind(activity));
+    payload->set_timestamp_ms(rac_get_current_time_ms());
+    emit_vad_stream_event(event, slot.callback, slot.user_data);
+}
+
+void clear_proto_activity_slot(rac_handle_t handle) {
+    std::lock_guard<std::mutex> lock(proto_stream_mutex());
+    proto_stream_slots().erase(handle);
+}
+
+#endif  // RAC_HAVE_PROTOBUF
+
+}  // namespace
+
+/**
+ * Internal speech activity callback wrapper.
+ * Routes events from energy VAD to the user callback.
+ */
+static void vad_speech_activity_callback(rac_speech_activity_event_t event, void* user_data) {
+    auto* component = reinterpret_cast<rac_vad_component*>(user_data);
+    if (!component)
+        return;
+
+    // Emit telemetry-only voice-lifecycle event for speech activity.
+#if defined(RAC_HAVE_PROTOBUF)
+    {
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(event == RAC_SPEECH_ACTIVITY_STARTED
+                           ? runanywhere::v1::VOICE_EVENT_KIND_SPEECH_STARTED
+                           : runanywhere::v1::VOICE_EVENT_KIND_SPEECH_ENDED);
+        // SPEECH_ENDED telemetry reads speech_duration_ms (= duration_ms); the
+        // legacy call site passed the default (0) here, preserved exactly.
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_VAD,
+                                          runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice),
+                                          /*session_id=*/nullptr,
+                                          rac::events::legacy_destination_telemetry());
+    }
+#endif
+
+    // Route to user callback
+    if (component->activity_callback) {
+        rac_speech_activity_t activity{};
+        if (event == RAC_SPEECH_ACTIVITY_STARTED) {
+            activity = RAC_SPEECH_STARTED;
+        } else {
+            activity = RAC_SPEECH_ENDED;
+        }
+        component->activity_callback(activity, component->activity_user_data);
+    }
+}
+
+// =============================================================================
+// LIFECYCLE API
+// =============================================================================
+
+extern "C" rac_result_t rac_vad_component_create(rac_handle_t* out_handle) {
+    if (!out_handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    auto* component = new (std::nothrow) rac_vad_component();
+    if (!component) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    *out_handle = reinterpret_cast<rac_handle_t>(component);
+
+    RAC_LOG_INFO("VAD.Component", "VAD component created");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_vad_component_configure(rac_handle_t handle,
+                                                    const rac_vad_config_t* config) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!config)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // ==========================================================================
+    // VALIDATION - Ported from Swift VADConfiguration.swift:62-110
+    // ==========================================================================
+
+    // 1. Energy threshold range (Swift lines 64-69)
+    if (config->energy_threshold < 0.0f || config->energy_threshold > 1.0f) {
+        RAC_LOG_ERROR("VAD.Component",
+                      "Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // 2. Warning for very low threshold (Swift lines 72-77)
+    if (config->energy_threshold < 0.002f) {
+        RAC_LOG_WARNING("VAD.Component",
+                        "Energy threshold is very low (< 0.002) and may cause false positives");
+    }
+
+    // 3. Warning for very high threshold (Swift lines 80-85)
+    if (config->energy_threshold > 0.1f) {
+        RAC_LOG_WARNING("VAD.Component",
+                        "Energy threshold is very high (> 0.1) and may miss speech");
+    }
+
+    // 4. Sample rate validation (Swift lines 88-93)
+    if (config->sample_rate < 1 || config->sample_rate > 48000) {
+        RAC_LOG_ERROR("VAD.Component", "Sample rate must be between 1 and 48000 Hz");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // 5. Frame length validation (Swift lines 96-101)
+    if (config->frame_length <= 0.0f || config->frame_length > 1.0f) {
+        RAC_LOG_ERROR("VAD.Component", "Frame length must be between 0 and 1 second");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // 6. Calibration multiplier validation (Swift lines 104-109)
+    // Note: Check if calibration_multiplier exists in config
+    // Swift validates calibrationMultiplier >= 1.5 && <= 5.0
+
+    // ==========================================================================
+
+    component->config = *config;
+
+    RAC_LOG_INFO("VAD.Component", "VAD component configured");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_bool_t rac_vad_component_is_initialized(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    return component->is_initialized.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
+}
+
+extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (component->is_initialized) {
+        // Already initialized
+        return RAC_SUCCESS;
+    }
+
+    // Create energy VAD configuration
+    rac_energy_vad_config_t vad_config = {};
+    vad_config.sample_rate = component->config.sample_rate;
+    vad_config.frame_length = component->config.frame_length;
+    vad_config.energy_threshold = component->config.energy_threshold;
+
+    // Create energy VAD service
+    rac_result_t result = rac_energy_vad_create(&vad_config, &component->vad_service);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VAD.Component", "Failed to create energy VAD service");
+        return result;
+    }
+
+    // Set speech callback
+    result = rac_energy_vad_set_speech_callback(component->vad_service,
+                                                vad_speech_activity_callback, component);
+    if (result != RAC_SUCCESS) {
+        rac_energy_vad_destroy(component->vad_service);
+        component->vad_service = nullptr;
+        return result;
+    }
+
+    // Initialize the VAD (starts calibration)
+    result = rac_energy_vad_initialize(component->vad_service);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR("VAD.Component", "Failed to initialize energy VAD service");
+        rac_energy_vad_destroy(component->vad_service);
+        component->vad_service = nullptr;
+        return result;
+    }
+
+    component->is_initialized = true;
+
+    RAC_LOG_INFO("VAD.Component", "VAD component initialized");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_vad_component_cleanup(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Clean up model-loaded VAD service
+    if (component->model_service) {
+        if (component->model_service->ops && component->model_service->ops->destroy) {
+            component->model_service->ops->destroy(component->model_service->impl);
+        }
+        free(const_cast<char*>(component->model_service->model_id));
+        free(component->model_service);
+        component->model_service = nullptr;
+    }
+    component->is_model_loaded = false;
+    free(component->loaded_model_id);
+    component->loaded_model_id = nullptr;
+
+    // Clean up energy VAD service
+    if (component->vad_service) {
+        rac_energy_vad_stop(component->vad_service);
+        rac_energy_vad_destroy(component->vad_service);
+        component->vad_service = nullptr;
+    }
+
+    component->is_initialized = false;
+
+    RAC_LOG_INFO("VAD.Component", "VAD component cleaned up");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" void rac_vad_component_destroy(rac_handle_t handle) {
+    if (!handle)
+        return;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+
+#if defined(RAC_HAVE_PROTOBUF)
+    clear_proto_activity_slot(handle);
+#endif
+
+    // Cleanup first
+    rac_vad_component_cleanup(handle);
+
+    // Clear the SECOND proto-stream callback registry
+    // (g_slots in rac_vad_stream.cpp, set via rac_vad_set_stream_proto_callback)
+    // in addition to the proto_activity_slot cleared above. Without this, the
+    // wire-seq + stale user_data UAF triggers when the handle heap address is
+    // reused by a fresh component (rac_vad_component_create).
+    rac_vad_unset_stream_proto_callback(handle);
+    // Spin-wait for any in-flight
+    // dispatch_vad_stream_event() invocation on another thread before freeing
+    // the component. Mirrors rac_vlm_component_destroy / rac_llm_component_destroy.
+    rac_vad_proto_quiesce();
+
+    // Drop the registry's strong reference to
+    // this handle's threshold mutex so the map does not grow unbounded
+    // across the lifetime of the process. Concurrent threads still holding
+    // shared_ptr copies keep the mutex alive until they release it.
+    rac::vad::erase_threshold_mutex(handle);
+
+    RAC_LOG_INFO("VAD.Component", "VAD component destroyed");
+
+    delete component;
+}
+
+// =============================================================================
+// CALLBACK API
+// =============================================================================
+
+extern "C" rac_result_t
+rac_vad_component_set_activity_callback(rac_handle_t handle, rac_vad_activity_callback_fn callback,
+                                        void* user_data) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    component->activity_callback = callback;
+    component->activity_user_data = user_data;
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle,
+                                                             rac_vad_audio_callback_fn callback,
+                                                             void* user_data) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    component->audio_callback = callback;
+    component->audio_user_data = user_data;
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// CONTROL API
+// =============================================================================
+
+extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->is_initialized || !component->vad_service) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_result_t result = rac_energy_vad_start(component->vad_service);
+
+    if (result == RAC_SUCCESS) {
+#if defined(RAC_HAVE_PROTOBUF)
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+#endif
+    }
+
+    return result;
+}
+
+extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->vad_service) {
+        return RAC_SUCCESS;  // Already stopped
+    }
+
+    rac_result_t result = rac_energy_vad_stop(component->vad_service);
+
+    if (result == RAC_SUCCESS) {
+#if defined(RAC_HAVE_PROTOBUF)
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED);
+        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+#endif
+    }
+
+    return result;
+}
+
+extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->vad_service) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    return rac_energy_vad_reset(component->vad_service);
+}
+
+// =============================================================================
+// MODEL LOADING API
+// =============================================================================
+
+extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const char* model_path,
+                                                     const char* model_id, const char* model_name) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!model_path)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    (void)model_name;  // Reserved for future use
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Clear any prior proto-stream callback
+    // registration BEFORE re-creating the internal model service. The
+    // load_model path elides destroy → destroy-time clear never fires
+    // for handle reuse, so the wire-seq counter in g_slots() would retain its
+    // prior value and corrupt the proto stream on the very first detect call
+    // after a model switch.
+    rac_vad_unset_stream_proto_callback(handle);
+    // Drain any in-flight dispatcher bound to the
+    // previous model before swapping in the new one so user_data captured by
+    // the previous registration can be safely freed.
+    rac_vad_proto_quiesce();
+
+    // Unload any previously loaded model
+    if (component->model_service) {
+        if (component->model_service->ops && component->model_service->ops->destroy) {
+            component->model_service->ops->destroy(component->model_service->impl);
+        }
+        free(const_cast<char*>(component->model_service->model_id));
+        free(component->model_service);
+        component->model_service = nullptr;
+    }
+    component->is_model_loaded = false;
+    free(component->loaded_model_id);
+    component->loaded_model_id = nullptr;
+
+    // Create the model-backed VAD service via the service layer (registry
+    // lookup → backend create → "vad.backend.created" telemetry). The component
+    // owns lifecycle/selection; the service file owns creation. Mirrors how
+    // stt_module.cpp delegates to rac_stt_create.
+    rac_vad_service_t* service = nullptr;
+    rac_result_t result = rac::vad::create_model_vad_service(model_path, &service);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    component->model_service = service;
+    component->is_model_loaded = true;
+    component->loaded_model_id = model_id ? strdup(model_id) : nullptr;
+
+    // Start the model-based VAD. If start fails, roll back so `is_model_loaded`
+    // does not lie about a non-running service.
+    if (component->model_service->ops && component->model_service->ops->start) {
+        result = component->model_service->ops->start(component->model_service->impl);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VAD.Component", "Model VAD start failed: %d — rolling back load",
+                          result);
+            if (component->model_service->ops->destroy) {
+                component->model_service->ops->destroy(component->model_service->impl);
+            }
+            free(const_cast<char*>(component->model_service->model_id));
+            free(component->model_service);
+            component->model_service = nullptr;
+            component->is_model_loaded = false;
+            free(component->loaded_model_id);
+            component->loaded_model_id = nullptr;
+            return result;
+        }
+    }
+
+    RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_bool_t rac_vad_component_is_loaded(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    return component->is_model_loaded ? RAC_TRUE : RAC_FALSE;
+}
+
+extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->model_service) {
+        return RAC_SUCCESS;  // Nothing to unload
+    }
+
+    if (component->model_service->ops && component->model_service->ops->stop) {
+        component->model_service->ops->stop(component->model_service->impl);
+    }
+    if (component->model_service->ops && component->model_service->ops->destroy) {
+        component->model_service->ops->destroy(component->model_service->impl);
+    }
+    free(const_cast<char*>(component->model_service->model_id));
+    free(component->model_service);
+    component->model_service = nullptr;
+    component->is_model_loaded = false;
+    free(component->loaded_model_id);
+    component->loaded_model_id = nullptr;
+
+    RAC_LOG_INFO("VAD.Component", "VAD model unloaded, reverted to energy VAD");
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// PROCESSING API
+// =============================================================================
+
+extern "C" rac_result_t rac_vad_component_process(rac_handle_t handle, const float* samples,
+                                                  size_t num_samples, rac_bool_t* out_is_speech) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!samples || num_samples == 0)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_bool_t has_voice = RAC_FALSE;
+    rac_result_t result;
+
+    // Dispatch through model service if loaded (e.g., Silero via ONNX)
+    if (component->is_model_loaded && component->model_service && component->model_service->ops &&
+        component->model_service->ops->process) {
+        result = component->model_service->ops->process(component->model_service->impl, samples,
+                                                        num_samples, &has_voice);
+    } else if (component->is_initialized && component->vad_service) {
+        // Fall back to energy-based VAD
+        result =
+            rac_energy_vad_process_audio(component->vad_service, samples, num_samples, &has_voice);
+    } else {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    if (out_is_speech) {
+        *out_is_speech = has_voice;
+    }
+
+    // Route audio to audio callback if set
+    if (component->audio_callback && samples) {
+        component->audio_callback(samples, num_samples * sizeof(float), component->audio_user_data);
+    }
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// STATE QUERY API
+// =============================================================================
+
+extern "C" rac_bool_t rac_vad_component_is_speech_active(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->vad_service) {
+        return RAC_FALSE;
+    }
+
+    rac_bool_t is_active = RAC_FALSE;
+    rac_energy_vad_is_speech_active(component->vad_service, &is_active);
+    return is_active;
+}
+
+extern "C" float rac_vad_component_get_energy_threshold(rac_handle_t handle) {
+    if (!handle)
+        return 0.0f;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->vad_service) {
+        return component->config.energy_threshold;
+    }
+
+    float threshold = 0.0f;
+    rac_energy_vad_get_threshold(component->vad_service, &threshold);
+    return threshold;
+}
+
+extern "C" rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t handle,
+                                                               float threshold) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    // Validation - Ported from Swift VADConfiguration.validate()
+    if (threshold < 0.0f || threshold > 1.0f) {
+        RAC_LOG_ERROR("VAD.Component", "Threshold must be between 0.0 and 1.0");
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    // Warning for edge cases
+    if (threshold < 0.002f) {
+        RAC_LOG_WARNING("VAD.Component",
+                        "Threshold is very low (< 0.002) and may cause false positives");
+    }
+    if (threshold > 0.1f) {
+        RAC_LOG_WARNING("VAD.Component", "Threshold is very high (> 0.1) and may miss speech");
+    }
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    component->config.energy_threshold = threshold;
+
+    if (component->vad_service) {
+        return rac_energy_vad_set_threshold(component->vad_service, threshold);
+    }
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_lifecycle_state_t rac_vad_component_get_state(rac_handle_t handle) {
+    if (!handle)
+        return RAC_LIFECYCLE_STATE_IDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+
+    if (component->is_model_loaded) {
+        return RAC_LIFECYCLE_STATE_LOADED;
+    }
+
+    if (component->is_initialized.load(std::memory_order_acquire)) {
+        return RAC_LIFECYCLE_STATE_LOADED;
+    }
+
+    return RAC_LIFECYCLE_STATE_IDLE;
+}
+
+extern "C" rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,
+                                                      rac_lifecycle_metrics_t* out_metrics) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!out_metrics)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    // VAD doesn't use the standard lifecycle manager, so return basic metrics
+    memset(out_metrics, 0, sizeof(rac_lifecycle_metrics_t));
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+    if (component->is_initialized) {
+        out_metrics->total_loads = 1;
+        out_metrics->successful_loads = 1;
+    }
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
+                                                         float* ambient_level_out,
+                                                         float* recent_avg_out,
+                                                         float* recent_max_out) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    // Initialise outputs to safe defaults regardless of code path.
+    if (ambient_level_out)
+        *ambient_level_out = 0.0f;
+    if (recent_avg_out)
+        *recent_avg_out = 0.0f;
+    if (recent_max_out)
+        *recent_max_out = 0.0f;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // When a model-based VAD is active we cannot surface energy stats; return
+    // zeroes (RAC_SUCCESS) so callers don't need to special-case the path.
+    if (component->is_model_loaded || !component->vad_service) {
+        return RAC_SUCCESS;
+    }
+
+    // Delegate to the energy VAD statistics query.
+    rac_energy_vad_stats_t stats = {};
+    rac_result_t result = rac_energy_vad_get_statistics(component->vad_service, &stats);
+    if (result != RAC_SUCCESS) {
+        return result;
+    }
+
+    if (ambient_level_out)
+        *ambient_level_out = stats.ambient;
+    if (recent_avg_out)
+        *recent_avg_out = stats.recent_avg;
+    if (recent_max_out)
+        *recent_max_out = stats.recent_max;
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// GENERATED-PROTO C ABI
+// =============================================================================
+
+extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
+                                                          const uint8_t* config_proto_bytes,
+                                                          size_t config_proto_size) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)handle;
+    (void)config_proto_bytes;
+    (void)config_proto_size;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!handle) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (!proto_bytes_valid(config_proto_bytes, config_proto_size)) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    runanywhere::v1::VADConfiguration proto;
+    if (!proto.ParseFromArray(proto_parse_data(config_proto_bytes, config_proto_size),
+                              static_cast<int>(config_proto_size))) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    rac_vad_config_t config = RAC_VAD_CONFIG_DEFAULT;
+    config.sample_rate =
+        proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    config.frame_length = proto.frame_length_ms() > 0
+                              ? static_cast<float>(proto.frame_length_ms()) / 1000.0f
+                              : RAC_VAD_DEFAULT_FRAME_LENGTH;
+    config.energy_threshold =
+        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+    config.enable_auto_calibration = proto.enable_auto_calibration() ? RAC_TRUE : RAC_FALSE;
+    return rac_vad_component_configure(handle, &config);
+#endif
+}
+
+extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, const float* samples,
+                                                        size_t num_samples,
+                                                        const uint8_t* options_proto_bytes,
+                                                        size_t options_proto_size,
+                                                        rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)handle;
+    (void)samples;
+    (void)num_samples;
+    (void)options_proto_bytes;
+    (void)options_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    if (!handle || !samples || num_samples == 0) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VAD process proto requires handle and samples");
+    }
+    if (!proto_bytes_valid(options_proto_bytes, options_proto_size)) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "VADOptions bytes are invalid");
+    }
+
+    runanywhere::v1::VADOptions options;
+    if (!options.ParseFromArray(proto_parse_data(options_proto_bytes, options_proto_size),
+                                static_cast<int>(options_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse VADOptions");
+    }
+
+    int32_t sample_rate = RAC_VAD_DEFAULT_SAMPLE_RATE;
+    float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+    {
+        auto* component = reinterpret_cast<rac_vad_component*>(handle);
+        std::lock_guard<std::mutex> lock(component->mtx);
+        sample_rate = component->config.sample_rate > 0 ? component->config.sample_rate
+                                                        : RAC_VAD_DEFAULT_SAMPLE_RATE;
+        threshold = component->config.energy_threshold > 0.0f ? component->config.energy_threshold
+                                                              : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+    }
+
+    const bool has_override = options.threshold() > 0.0f;
+
+    // Serialize the get→set(override)→process→
+    // restore window on the same per-handle mutex used by the streaming
+    // proto path (rac_vad_stream.cpp). Without it, two threads on the same
+    // VAD handle (one one-shot, one streaming, or two of either) can
+    // interleave their set/restore calls and corrupt the persistent
+    // energy_threshold. Only acquire the mutex when an override is in
+    // effect; the common no-override path stays lock-free.
+    rac_bool_t is_speech = RAC_FALSE;
+    rac_result_t rc = RAC_SUCCESS;
+    if (has_override) {
+        auto handle_mutex = rac::vad::get_or_create_threshold_mutex(handle);
+        std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
+        const float original_threshold = rac_vad_component_get_energy_threshold(handle);
+        (void)rac_vad_component_set_energy_threshold(handle, options.threshold());
+        threshold = options.threshold();
+        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
+        (void)rac_vad_component_set_energy_threshold(handle, original_threshold);
+    } else {
+        rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
+    }
+    if (rc != RAC_SUCCESS) {
+        publish_vad_pipeline_event(false, 0.0f, 0.0f, 0, rc);
+        (void)rac_sdk_event_publish_failure(rc, "VAD processing failed", "vad", "process",
+                                            RAC_TRUE);
+        return rac_proto_buffer_set_error(out_result, rc, "VAD processing failed");
+    }
+
+    const float energy = compute_rms_energy(samples, num_samples);
+    const float confidence = threshold > 0.0f ? std::min(1.0f, energy / threshold)
+                                              : (is_speech == RAC_TRUE ? 1.0f : 0.0f);
+    const int32_t duration_ms = static_cast<int32_t>(
+        (static_cast<double>(num_samples) /
+         static_cast<double>(sample_rate > 0 ? sample_rate : RAC_VAD_DEFAULT_SAMPLE_RATE)) *
+        1000.0);
+
+    runanywhere::v1::VADResult result;
+    result.set_is_speech(is_speech == RAC_TRUE);
+    result.set_confidence(confidence);
+    result.set_energy(energy);
+    result.set_duration_ms(duration_ms);
+    publish_vad_pipeline_event(is_speech == RAC_TRUE, confidence, energy, duration_ms);
+    return copy_proto_message(result, out_result);
+#endif
+}
+
+extern "C" rac_result_t rac_vad_component_get_statistics_proto(rac_handle_t handle,
+                                                               rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)handle;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    if (!handle) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_HANDLE,
+                                          "VAD handle is required");
+    }
+
+    float ambient = 0.0f;
+    float recent_avg = 0.0f;
+    float recent_max = 0.0f;
+    rac_result_t rc = rac_vad_component_get_statistics(handle, &ambient, &recent_avg, &recent_max);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD statistics query failed");
+    }
+
+    runanywhere::v1::VADStatistics stats;
+    stats.set_current_energy(recent_avg);
+    stats.set_current_threshold(rac_vad_component_get_energy_threshold(handle));
+    stats.set_ambient_level(ambient);
+    stats.set_recent_avg(recent_avg);
+    stats.set_recent_max(recent_max);
+    return copy_proto_message(stats, out_result);
+#endif
+}
+
+extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
+    rac_handle_t handle, rac_vad_proto_stream_event_callback_fn callback, void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)handle;
+    (void)callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!handle) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    if (!callback) {
+        clear_proto_activity_slot(handle);
+        return rac_vad_component_set_activity_callback(handle, nullptr, nullptr);
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(proto_stream_mutex());
+        proto_stream_slots()[handle] = ProtoStreamSlot{.callback = callback,
+                                                       .user_data = user_data,
+                                                       .request_id = make_vad_request_id(handle),
+                                                       .next_seq = 1};
+    }
+    return rac_vad_component_set_activity_callback(handle, proto_activity_trampoline, handle);
+#endif
+}
+
+// =============================================================================
+// LIFECYCLE-OWNED GENERATED-PROTO C ABI (formerly VAD slice of
+// rac_nonllm_lifecycle_proto_abi.cpp)
+//
+// Handle-less verbs that resolve the loaded model via the global registry
+// (rac::lifecycle::acquire_lifecycle_vad). Verb map: process=generate,
+// configure=load.
+// =============================================================================
+
+namespace {
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+// Shared anon-ns helpers carried from rac_nonllm_lifecycle_proto_abi.cpp.
+// Internal linkage; distinct from the component-section helpers above
+// (proto_bytes_valid / proto_parse_data / copy_proto_message). compute_rms_energy
+// is NOT re-declared here — the component section above already defines it in
+// this same TU's anonymous namespace and it is reused below.
+bool valid_bytes(const uint8_t* bytes, size_t size) {
+    return rac::proto::bytes_valid(bytes, size);
+}
+
+const void* parse_data(const uint8_t* bytes, size_t size) {
+    return rac::proto::parse_bytes(bytes, size);
+}
+
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
+    return rac::proto::copy_message(message, out, "failed to serialize proto result");
+}
+
+rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
+    return rac::proto::parse_error(out, message);
+}
+
+rac_result_t parse_vad_request(const uint8_t* request_proto_bytes, size_t request_proto_size,
+                               runanywhere::v1::VADProcessRequest* out_request,
+                               rac_proto_buffer_t* out_error) {
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_error, "VADProcessRequest bytes are invalid");
+    }
+    if (!out_request->ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                     static_cast<int>(request_proto_size))) {
+        return parse_error(out_error, "failed to parse VADProcessRequest");
+    }
+    if (out_request->has_audio() && !out_request->audio().adapter_handle().empty()) {
+        return rac_proto_buffer_set_error(
+            out_error, RAC_ERROR_NOT_SUPPORTED,
+            "VADProcessRequest audio adapter_handle requires a platform adapter");
+    }
+    if (!out_request->has_audio() || out_request->audio().audio_data().empty()) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VADProcessRequest.audio.audio_data is required");
+    }
+    if (out_request->audio().channels() > 1) {
+        return rac_proto_buffer_set_error(
+            out_error, RAC_ERROR_NOT_SUPPORTED,
+            "VADProcessRequest multi-channel audio is not supported by the portable lifecycle ABI");
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
+                                std::vector<float>* out, rac_proto_buffer_t* out_error) {
+    const std::string& bytes = audio.audio_data();
+    out->clear();
+    switch (audio.encoding()) {
+        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_S16_LE: {
+            if (bytes.size() % sizeof(int16_t) != 0) {
+                return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                                  "VAD PCM_S16_LE audio byte length is invalid");
+            }
+            const size_t count = bytes.size() / sizeof(int16_t);
+            out->resize(count);
+            const auto* raw = reinterpret_cast<const uint8_t*>(bytes.data());
+            for (size_t i = 0; i < count; ++i) {
+                const int16_t sample =
+                    static_cast<int16_t>(static_cast<uint16_t>(raw[i * 2]) |
+                                         (static_cast<uint16_t>(raw[i * 2 + 1]) << 8));
+                (*out)[i] = static_cast<float>(sample) / 32768.0f;
+            }
+            return RAC_SUCCESS;
+        }
+        case runanywhere::v1::VAD_AUDIO_ENCODING_UNSPECIFIED:
+        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE: {
+            if (bytes.size() % sizeof(float) != 0) {
+                return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                                  "VAD PCM_F32_LE audio byte length is invalid");
+            }
+            const size_t count = bytes.size() / sizeof(float);
+            out->resize(count);
+            if (count > 0) {
+                std::memcpy(out->data(), bytes.data(), bytes.size());
+            }
+            return RAC_SUCCESS;
+        }
+        default:
+            return rac_proto_buffer_set_error(out_error, RAC_ERROR_NOT_SUPPORTED,
+                                              "VAD audio encoding is not supported");
+    }
+}
+
+rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref, rac_result_t op_rc,
+                                    float threshold, int32_t sample_rate, int32_t frame_length_ms,
+                                    rac_proto_buffer_t* out_result) {
+    runanywhere::v1::VADServiceState state;
+    state.set_is_ready(op_rc == RAC_SUCCESS);
+    const bool active = (ref.ops != nullptr && ref.ops->is_speech_active != nullptr &&
+                         ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
+    state.set_is_speech_active(active);
+    state.set_energy_threshold(threshold);
+    state.set_sample_rate(sample_rate);
+    state.set_frame_length_ms(frame_length_ms);
+    if (ref.model_id) {
+        state.set_current_model(ref.model_id);
+    }
+    if (op_rc != RAC_SUCCESS) {
+        state.set_error_code(op_rc);
+        state.set_error_message(rac_error_message(op_rc));
+    }
+    return copy_proto(state, out_result);
+}
+
+#endif  // RAC_HAVE_PROTOBUF
+
+[[maybe_unused]] rac_result_t feature_unavailable_lifecycle(rac_proto_buffer_t* out) {
+    return rac_proto_buffer_set_error(out, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+}
+
+}  // namespace
+
+extern "C" {
+
+rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                             size_t request_proto_size,
+                                             rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable_lifecycle(out_result);
+#else
+    runanywhere::v1::VADProcessRequest request;
+    rac_result_t rc =
+        parse_vad_request(request_proto_bytes, request_proto_size, &request, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
+
+    std::vector<float> samples;
+    rc = decode_vad_samples(request.audio(), &samples, out_result);
+    if (rc != RAC_SUCCESS)
+        return rc;
+    if (samples.empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VADProcessRequest decoded no samples");
+    }
+
+    rac::lifecycle::LifecycleVadRef ref;
+    rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+    if (request.has_options() && request.options().threshold() > 0.0f) {
+        threshold = request.options().threshold();
+        if (ref.ops->set_threshold) {
+            (void)ref.ops->set_threshold(ref.impl, threshold);
+        }
+    }
+
+    rac_bool_t is_speech = RAC_FALSE;
+    if (!ref.ops->process) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_NOT_SUPPORTED,
+                                          "VAD backend does not implement process");
+    }
+    rc = ref.ops->process(ref.impl, samples.data(), samples.size(), &is_speech);
+    if (rc != RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    const int32_t sample_rate = request.audio().sample_rate() > 0 ? request.audio().sample_rate()
+                                                                  : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    const float energy = compute_rms_energy(samples.data(), samples.size());
+    runanywhere::v1::VADResult result;
+    result.set_is_speech(is_speech == RAC_TRUE);
+    result.set_energy(energy);
+    result.set_confidence(threshold > 0.0f ? std::min(1.0f, energy / threshold)
+                                           : (is_speech == RAC_TRUE ? 1.0f : 0.0f));
+    int32_t duration_ms = static_cast<int32_t>(
+        (static_cast<double>(samples.size()) / static_cast<double>(sample_rate)) * 1000.0);
+    if (!samples.empty() && duration_ms == 0) {
+        duration_ms = 1;
+    }
+    result.set_duration_ms(duration_ms);
+    result.set_timestamp_ms(rac_get_current_time_ms());
+    rc = copy_proto(result, out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// VAD lifecycle configure / start / stop / reset ABIs (FLT-12)
+// ---------------------------------------------------------------------------
+
+rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                               size_t request_proto_size,
+                                               rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable_lifecycle(out_result);
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_result, "VADConfiguration bytes are invalid");
+    }
+    runanywhere::v1::VADConfiguration proto;
+    if (!proto.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                              static_cast<int>(request_proto_size))) {
+        return parse_error(out_result, "failed to parse VADConfiguration");
+    }
+
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    const int32_t sample_rate =
+        proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    const int32_t frame_length_ms =
+        proto.frame_length_ms() > 0 ? proto.frame_length_ms()
+                                    : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
+    const float threshold =
+        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->set_threshold) {
+        op_rc = ref.ops->set_threshold(ref.impl, threshold);
+    }
+
+    rc = emit_vad_service_state(ref, op_rc, threshold, sample_rate, frame_length_ms, out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable_lifecycle(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->start) {
+        op_rc = ref.ops->start(ref.impl);
+    }
+
+    rc = emit_vad_service_state(
+        ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
+        static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable_lifecycle(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->stop) {
+        op_rc = ref.ops->stop(ref.impl);
+    }
+
+    rc = emit_vad_service_state(
+        ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
+        static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_reset_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable_lifecycle(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->reset) {
+        op_rc = ref.ops->reset(ref.impl);
+    }
+
+    rc = emit_vad_service_state(
+        ref, op_rc, RAC_VAD_DEFAULT_ENERGY_THRESHOLD, RAC_VAD_DEFAULT_SAMPLE_RATE,
+        static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f), out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+}  // extern "C"

@@ -1,133 +1,203 @@
-/// RunAnywhere + Logging
-///
-/// Public API for configuring SDK logging.
-/// Mirrors Swift's RunAnywhere+Logging.swift.
-library runanywhere_logging;
+// SPDX-License-Identifier: Apache-2.0
+//
+// runanywhere_logging.dart — SDK logging configuration.
+// Mirrors Swift `RunAnywhere+Logging.swift` (one-to-one method parity).
+//
+// Public API surface (matches Swift):
+//   - configureLogging(LoggingConfiguration)
+//   - setLocalLoggingEnabled(bool)
+//   - setLogLevel(LogLevel)
+//   - setSentryLoggingEnabled(bool)
+//   - addLogDestination(LogDestination)
+//   - setDebugMode(bool)
+//   - flushLogs()
+//
+// Public types:
+//   - LogLevel             (generated, re-exported via sdk_logger.dart)
+//   - LoggingConfiguration (generated proto message; per-environment presets
+//                           below stay in Dart as factory helpers)
+//   - LogEntry             (generated proto message — single log record)
+//   - LogDestination       (hand-written host-side sink interface)
 
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/logging.pb.dart'
+    show LoggingConfiguration, LogEntry;
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
-import 'package:runanywhere/public/runanywhere.dart';
 
-// =============================================================================
-// Log Level Enum
-// =============================================================================
+/// Per-environment [LoggingConfiguration] presets. The generated proto message
+/// cannot be `const`-constructed, so the development/staging/production presets
+/// that used to be `static const` fields on the hand-written class now live
+/// here as factory helpers (mirrors Swift's environment factory helpers).
+class LoggingConfigurations {
+  LoggingConfigurations._();
 
-/// SDK Log levels
-enum SDKLogLevel {
-  trace,
-  debug,
-  info,
-  warning,
-  error,
-  fatal;
+  /// Default configuration: local logging on, INFO floor, device metadata on,
+  /// Sentry off. Replaces the old `const LoggingConfiguration()` default.
+  static LoggingConfiguration get defaults => LoggingConfiguration(
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_INFO,
+        includeDeviceMetadata: true,
+        enableSentryLogging: false,
+      );
 
-  /// Convert to C++ log level
-  int toC() {
-    switch (this) {
-      case SDKLogLevel.trace:
-        return 0;
-      case SDKLogLevel.debug:
-        return 1;
-      case SDKLogLevel.info:
-        return 2;
-      case SDKLogLevel.warning:
-        return 3;
-      case SDKLogLevel.error:
-        return 4;
-      case SDKLogLevel.fatal:
-        return 5;
-    }
-  }
+  /// Development preset — verbose logging, Sentry on (matches Swift).
+  static LoggingConfiguration get development => LoggingConfiguration(
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
+        includeDeviceMetadata: false,
+        enableSentryLogging: true,
+      );
+
+  /// Staging preset — info-level logging, Sentry off (matches Swift).
+  static LoggingConfiguration get staging => LoggingConfiguration(
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_INFO,
+        includeDeviceMetadata: true,
+        enableSentryLogging: false,
+      );
+
+  /// Production preset — warnings + errors only, local logging off,
+  /// Sentry off (matches Swift).
+  static LoggingConfiguration get production => LoggingConfiguration(
+        enableLocalLogging: false,
+        minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+        includeDeviceMetadata: true,
+        enableSentryLogging: false,
+      );
 }
 
-// =============================================================================
-// Logging Configuration
-// =============================================================================
+/// A pluggable log sink. Implement this to route SDK logs to your own
+/// telemetry/file/network destination. Mirrors Swift's `LogDestination`
+/// protocol. This is a host-side interface (carries no wire payload) and so
+/// stays hand-written rather than moving to the proto contract.
+abstract class LogDestination {
+  /// Stable identifier for this destination (e.g. `"console"`,
+  /// `"sentry"`, `"file"`). Used to deduplicate registrations.
+  String get identifier;
 
-/// Configuration for SDK logging
-class LoggingConfiguration {
-  final SDKLogLevel minimumLevel;
-  final bool localLoggingEnabled;
-  final bool sentryEnabled;
+  /// Whether this destination is currently available (e.g. network
+  /// reachable, file handle open).
+  bool get isAvailable;
 
-  const LoggingConfiguration({
-    this.minimumLevel = SDKLogLevel.info,
-    this.localLoggingEnabled = true,
-    this.sentryEnabled = false,
-  });
+  /// Receive a single log record.
+  void write(LogEntry entry);
 
-  /// Development configuration - verbose logging
-  static const development = LoggingConfiguration(
-    minimumLevel: SDKLogLevel.debug,
-    localLoggingEnabled: true,
-    sentryEnabled: false,
-  );
-
-  /// Production configuration - minimal logging
-  static const production = LoggingConfiguration(
-    minimumLevel: SDKLogLevel.warning,
-    localLoggingEnabled: false,
-    sentryEnabled: true,
-  );
+  /// Force-flush any buffered records.
+  void flush();
 }
 
-// =============================================================================
-// RunAnywhere Logging Extensions
-// =============================================================================
+/// Static helpers for configuring SDK logging.
+///
+/// One-to-one parity with Swift's `extension RunAnywhere` in
+/// `RunAnywhere+Logging.swift`. Swift defines these as static functions
+/// on the `RunAnywhere` enum; Dart has no static extensions on free
+/// types, so we expose the same surface via a non-instantiable
+/// `RunAnywhereLogging` class.
+class RunAnywhereLogging {
+  RunAnywhereLogging._();
 
-/// Extension methods for logging configuration
-extension RunAnywhereLogging on RunAnywhere {
-  /// Configure logging with a predefined configuration
+  // MARK: - Logging Configuration
+
+  /// Configure logging with a predefined configuration.
+  /// Mirrors Swift's `configureLogging(_:)`.
   static void configureLogging(LoggingConfiguration config) {
-    setLogLevel(config.minimumLevel);
-    setLocalLoggingEnabled(config.localLoggingEnabled);
-    // Sentry is handled by DartBridgeTelemetry
+    SDKLoggerConfig.shared.configure(config);
   }
 
-  /// Set minimum log level for SDK logging
-  static void setLogLevel(SDKLogLevel level) {
-    SDKLoggerConfig.shared.setMinLevel(level);
-  }
-
-  /// Enable or disable local console logging
+  /// Enable or disable local console logging.
+  /// Mirrors Swift's `setLocalLoggingEnabled(_:)`.
   static void setLocalLoggingEnabled(bool enabled) {
     SDKLoggerConfig.shared.setLocalLoggingEnabled(enabled);
   }
 
-  /// Enable verbose debugging mode
+  /// Set minimum log level for SDK logging.
+  /// Mirrors Swift's `setLogLevel(_:)`.
+  static void setLogLevel(LogLevel level) {
+    SDKLoggerConfig.shared.setMinLogLevel(level);
+  }
+
+  /// Enable or disable Sentry error tracking.
+  /// Mirrors Swift's `setSentryLoggingEnabled(_:)`.
+  static void setSentryLoggingEnabled(bool enabled) {
+    SDKLoggerConfig.shared.setSentryLoggingEnabled(enabled);
+  }
+
+  /// Add a custom log destination.
+  /// Mirrors Swift's `addLogDestination(_:)`. Destinations receive every
+  /// log record after filtering by [LogLevel].
+  static void addLogDestination(LogDestination destination) {
+    SDKLoggerConfig.shared.addDestination(destination);
+  }
+
+  /// Remove a previously-registered log destination.
+  ///
+  /// Flutter-specific extension: Swift's `Logging.shared` exposes a
+  /// remove-by-identifier method internally but does not surface a
+  /// public removal API in `RunAnywhere+Logging.swift`. We keep this
+  /// for symmetry with `addLogDestination` because Dart does not have
+  /// destination management hooks elsewhere on the public surface.
+  static void removeLogDestination(LogDestination destination) {
+    SDKLoggerConfig.shared.removeDestination(destination);
+  }
+
+  // MARK: - Debugging Helpers
+
+  /// Enable verbose debugging mode.
+  /// Mirrors Swift's `setDebugMode(_:)`.
   static void setDebugMode(bool enabled) {
-    setLogLevel(enabled ? SDKLogLevel.debug : SDKLogLevel.info);
+    setLogLevel(
+        enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
     setLocalLoggingEnabled(enabled);
   }
 
-  /// Force flush all pending logs
+  /// Force flush all pending logs to destinations.
+  /// Mirrors Swift's `flushLogs()`.
   static void flushLogs() {
+    for (final destination in SDKLoggerConfig.shared.destinations) {
+      destination.flush();
+    }
     DartBridgeTelemetry.flush();
   }
 }
 
-// =============================================================================
-// SDK Logger Configuration
-// =============================================================================
-
-/// Singleton for SDK logger configuration
+/// Singleton holding the currently-configured logging configuration +
+/// registered destinations. C++ logging is configured during
+/// `DartBridge.initialize()` based on environment.
 class SDKLoggerConfig {
+  SDKLoggerConfig._();
   static final SDKLoggerConfig shared = SDKLoggerConfig._();
 
-  SDKLoggerConfig._();
+  LoggingConfiguration _configuration = LoggingConfigurations.defaults;
+  final List<LogDestination> _destinations = <LogDestination>[];
 
-  SDKLogLevel _minLevel = SDKLogLevel.info;
-  bool _localLoggingEnabled = true;
+  LoggingConfiguration get configuration => _configuration;
+  List<LogDestination> get destinations =>
+      List<LogDestination>.unmodifiable(_destinations);
 
-  SDKLogLevel get minLevel => _minLevel;
-  bool get localLoggingEnabled => _localLoggingEnabled;
+  void configure(LoggingConfiguration config) {
+    _configuration = config;
+  }
 
-  void setMinLevel(SDKLogLevel level) {
-    _minLevel = level;
-    // C++ logging is configured during DartBridge.initialize() based on environment
-    // Re-initializing here is not needed as the level is set on the Dart side
+  void setMinLogLevel(LogLevel level) {
+    _configuration = _configuration.deepCopy()..minLogLevel = level;
   }
 
   void setLocalLoggingEnabled(bool enabled) {
-    _localLoggingEnabled = enabled;
+    _configuration = _configuration.deepCopy()..enableLocalLogging = enabled;
+  }
+
+  void setSentryLoggingEnabled(bool enabled) {
+    _configuration = _configuration.deepCopy()..enableSentryLogging = enabled;
+  }
+
+  void addDestination(LogDestination destination) {
+    if (!_destinations.any((d) => d.identifier == destination.identifier)) {
+      _destinations.add(destination);
+    }
+  }
+
+  void removeDestination(LogDestination destination) {
+    _destinations.removeWhere((d) => d.identifier == destination.identifier);
   }
 }

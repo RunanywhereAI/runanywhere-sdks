@@ -18,8 +18,6 @@ extension CppBridge {
     /// Swift provides: thin I/O callbacks (create dir, delete, list, stat, file size)
     public enum FileManager {
 
-        private static let logger = SDKLogger(category: "CppBridge.FileManager")
-
         // MARK: - Callbacks Construction
 
         /// Build rac_file_callbacks_t with Swift I/O implementations

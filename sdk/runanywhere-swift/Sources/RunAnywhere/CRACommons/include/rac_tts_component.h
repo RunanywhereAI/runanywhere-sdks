@@ -151,6 +151,19 @@ RAC_API rac_result_t rac_tts_component_get_metrics(rac_handle_t handle,
  */
 RAC_API void rac_tts_component_destroy(rac_handle_t handle);
 
+/**
+ * @brief Get supported languages for the loaded TTS voice as a JSON array string.
+ *
+ * Forwards to the underlying service/backend. Returns RAC_ERROR_BACKEND_NOT_READY
+ * if no voice is loaded, or RAC_ERROR_NOT_SUPPORTED if the backend cannot enumerate.
+ *
+ * @param handle    Component handle
+ * @param out_json  Output: malloc'd JSON string (e.g. "[\"en\",\"de\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_tts_component_get_supported_languages(rac_handle_t handle,
+                                                               char** out_json);
+
 #ifdef __cplusplus
 }
 #endif

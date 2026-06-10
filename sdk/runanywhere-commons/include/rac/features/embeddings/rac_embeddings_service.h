@@ -3,8 +3,22 @@
  * @brief RunAnywhere Commons - Embeddings Service Interface
  *
  * Vtable-based service interface for embedding generation.
- * Backends (llama.cpp, ONNX) implement the ops vtable and register
- * via rac_service_register_provider().
+ * v3.0.0: backends register via the unified plugin registry — each
+ * engine's `rac_plugin_entry_<name>()` returns a `rac_engine_vtable_t`
+ * whose `embedding_ops` slot points at the ops struct defined by the
+ * backend (e.g. `g_onnx_embeddings_ops` in
+ * `engines/onnx/rac_onnx_embeddings_register.cpp`).
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_embeddings_service_ops_t and rac_embeddings_service_t:
+ *     `internal`.
+ *   - Proto-byte APIs (rac_embeddings_embed_batch_proto,
+ *     rac_embeddings_embed_batch_lifecycle_proto): `SDK-facing default`
+ *     over runanywhere.v1.EmbeddingsRequest / EmbeddingsResult bytes.
+ *   - Struct APIs (rac_embeddings_create, create_with_config,
+ *     initialize, embed, embed_batch, get_info, cleanup, destroy):
+ *     `delete after SDK migration` for SDK callers; keep only as
+ *     backend smoke-test entry points.
  */
 
 #ifndef RAC_EMBEDDINGS_SERVICE_H
@@ -13,6 +27,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,6 +63,13 @@ typedef struct rac_embeddings_service_ops {
 
     /** Destroy the service */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new embeddings service.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_embeddings_service_ops_t;
 
 /**
@@ -123,6 +145,46 @@ RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char*
                                                 size_t num_texts,
                                                 const rac_embeddings_options_t* options,
                                                 rac_embeddings_result_t* out_result);
+
+/**
+ * @brief Generate embeddings for a proto-carried batch.
+ *
+ * request_proto_bytes encodes runanywhere.v1.EmbeddingsRequest.
+ * out_result receives serialized runanywhere.v1.EmbeddingsResult bytes with
+ * dense vector values populated.
+ */
+RAC_API rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
+                                                      const uint8_t* request_proto_bytes,
+                                                      size_t request_proto_size,
+                                                      rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Generate embeddings using the lifecycle-loaded embeddings model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.EmbeddingsRequest. Commons
+ * resolves the current embeddings lifecycle component and out_result receives
+ * serialized runanywhere.v1.EmbeddingsResult bytes.
+ */
+RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(const uint8_t* request_proto_bytes,
+                                                                size_t request_proto_size,
+                                                                rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Create an embeddings session from serialized
+ *        runanywhere.v1.EmbeddingsCreateRequest bytes.
+ *
+ * Replaces the legacy rac_embeddings_create / rac_embeddings_create_with_config
+ * paths used by RN/Kotlin/Web bridges with a canonical proto-byte ABI.
+ * The result carries an opaque uint64 handle (rac_handle_t) the SDK uses
+ * for subsequent rac_embeddings_embed_batch_proto / cleanup / destroy
+ * calls. On failure the handle is zero and error_code/error_message are
+ * populated.
+ *
+ * out_result receives serialized runanywhere.v1.EmbeddingsCreateResult bytes.
+ */
+RAC_API rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
+                                                 size_t request_proto_size,
+                                                 rac_proto_buffer_t* out_result);
 
 /**
  * @brief Get service information

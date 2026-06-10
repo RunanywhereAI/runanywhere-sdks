@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/features/chat/chat_interface_view.dart';
 import 'package:runanywhere_ai/features/settings/combined_settings_view.dart';
+import 'package:runanywhere_ai/features/solutions/solutions_view.dart';
 import 'package:runanywhere_ai/features/tools/tools_view.dart';
 import 'package:runanywhere_ai/features/vision/vision_hub_view.dart';
 import 'package:runanywhere_ai/features/voice/speech_to_text_view.dart';
@@ -30,7 +31,8 @@ class _ContentViewState extends State<ContentView> {
     TextToSpeechView(), // Tab 3: Text-to-Speech (Speak)
     VoiceAssistantView(), // Tab 4: Voice Assistant (STT + LLM + TTS)
     ToolsView(), // Tab 5: Tools (Tool Calling)
-    CombinedSettingsView(), // Tab 6: Settings (includes Storage)
+    SolutionsView(), // Tab 6: Solutions (YAML pipeline runner)
+    CombinedSettingsView(), // Tab 7: Settings (includes Storage)
   ];
 
   @override
@@ -42,47 +44,105 @@ class _ContentViewState extends State<ContentView> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
+        // B-FL-14-002: explicit height + vertical padding so the
+        // accessibility tap-target bounds match the visible icon centres
+        // and the "Transcribe" label doesn't truncate.
+        height: 80,
         indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
         onDestinationSelected: (index) {
           setState(() {
             _selectedTab = index;
           });
         },
-        // Tab labels match iOS exactly
+        // B-FL-2-001 (P3 batch): shorten "Transcribe" → "STT" so it fits
+        // alongside the other six labels without wrapping.
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.chat_bubble_outline),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.chat_bubble),
+            ),
             label: 'Chat',
           ),
           NavigationDestination(
-            icon: Icon(Icons.visibility_outlined),
-            selectedIcon: Icon(Icons.visibility),
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.visibility_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.visibility),
+            ),
             label: 'Vision',
           ),
           NavigationDestination(
-            icon: Icon(Icons.graphic_eq_outlined),
-            selectedIcon: Icon(Icons.graphic_eq),
-            label: 'Transcribe',
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.graphic_eq_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.graphic_eq),
+            ),
+            label: 'STT',
           ),
           NavigationDestination(
-            icon: Icon(Icons.volume_up_outlined),
-            selectedIcon: Icon(Icons.volume_up),
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.volume_up_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.volume_up),
+            ),
             label: 'Speak',
           ),
           NavigationDestination(
-            icon: Icon(Icons.mic_none),
-            selectedIcon: Icon(Icons.mic),
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.mic_none),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.mic),
+            ),
             label: 'Voice',
           ),
           NavigationDestination(
-            icon: Icon(Icons.build_outlined),
-            selectedIcon: Icon(Icons.build),
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.build_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.build),
+            ),
             label: 'Tools',
           ),
           NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.layers_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.layers),
+            ),
+            label: 'Solutions',
+          ),
+          NavigationDestination(
+            icon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.settings_outlined),
+            ),
+            selectedIcon: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Icon(Icons.settings),
+            ),
             label: 'Settings',
           ),
         ],

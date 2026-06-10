@@ -7,195 +7,74 @@
 //  Events are emitted by C++ layer via CppEventBridge.
 //
 
-@preconcurrency import AVFoundation
-import CRACommons
 import Foundation
-
-// MARK: - VAD State Storage
-
-/// Internal actor for managing VAD-specific state for callbacks
-private actor VADStateManager {
-    static let shared = VADStateManager()
-
-    var onAudioBuffer: (([Float]) -> Void)?
-    // periphery:ignore - Retained to prevent deallocation while C callback is active
-    var callbackContext: VADCallbackContext?
-
-    func setOnAudioBuffer(_ callback: (([Float]) -> Void)?) {
-        onAudioBuffer = callback
-    }
-
-    func setCallbackContext(_ context: VADCallbackContext?) {
-        callbackContext = context
-    }
-
-    func getAudioBufferCallback() -> (([Float]) -> Void)? {
-        onAudioBuffer
-    }
-}
 
 // MARK: - VAD Operations
 
 public extension RunAnywhere {
 
-    // MARK: - Initialization
-
-    /// Initialize VAD with default configuration
-    static func initializeVAD() async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
+    /// Detect voice activity in a raw PCM audio buffer.
+    ///
+    /// Routes through the commons VAD lifecycle service (handle-less) so the
+    /// Silero model loaded via `RunAnywhere.loadModel(...)` is actually used
+    /// instead of falling through to the energy-based fallback. Fixes SWIFT-VAD-001.
+    static func detectVoiceActivity(_ audioData: Data, options: RAVADOptions? = nil) async throws -> RAVADResult {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
-        try await CppBridge.VAD.shared.initialize()
+        guard audioData.count >= MemoryLayout<Float>.size else {
+            throw SDKException(code: .emptyAudioBuffer, message: "Audio data is empty", category: .component)
+        }
+
+        var request = RAVADProcessRequest()
+        var audioSource = RAVADAudioSource()
+        audioSource.audioData = audioData
+        request.audio = audioSource
+        if let options {
+            request.options = options
+        }
+        return try await CppBridge.VAD.shared.processLifecycle(request: request)
     }
 
-    /// Initialize VAD with configuration
-    /// - Parameter config: VAD configuration
-    static func initializeVAD(_ config: VADConfiguration) async throws {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
-        // Get handle and configure
-        let handle = try await CppBridge.VAD.shared.getHandle()
-
-        var cConfig = rac_vad_config_t()
-        cConfig.sample_rate = Int32(config.sampleRate)
-        cConfig.frame_length = Float(config.frameLength)
-        cConfig.energy_threshold = Float(config.energyThreshold)
-
-        let configResult = rac_vad_component_configure(handle, &cConfig)
-        if configResult != RAC_SUCCESS {
-            // Log warning but continue
-        }
-
-        // Initialize
-        let result = rac_vad_component_initialize(handle)
-        guard result == RAC_SUCCESS else {
-            throw SDKError.vad(.initializationFailed, "VAD initialization failed: \(result)")
+    /// Stream VAD results over a sequence of raw PCM audio chunks.
+    ///
+    /// Each element in `audio` must be `Data` holding IEEE-754 single-precision
+    /// PCM samples at 16 kHz mono. The returned `AsyncStream` yields one
+    /// `RAVADResult` per input chunk.
+    ///
+    /// When the underlying detector throws, the failure is surfaced as an
+    /// error-marked `RAVADResult` (non-empty `errorMessage`, non-zero
+    /// `errorCode`) and the stream finishes so callers do not silently keep
+    /// pumping audio into a dead detector.
+    static func streamVAD(audio: AsyncStream<Data>, options: RAVADOptions? = nil) -> AsyncStream<RAVADResult> {
+        AsyncStream<RAVADResult> { continuation in
+            let task = Task {
+                for await chunk in audio {
+                    guard !Task.isCancelled else { break }
+                    do {
+                        let vadResult = try await detectVoiceActivity(chunk, options: options)
+                        continuation.yield(vadResult)
+                    } catch {
+                        let sdkError = SDKException.from(error, category: .component)
+                        var failure = RAVADResult()
+                        failure.errorMessage = "VAD stream failed: \(sdkError.message)"
+                        failure.errorCode = Int32(sdkError.code.rawValue)
+                        continuation.yield(failure)
+                        break
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
-    /// Check if VAD is ready
-    static var isVADReady: Bool {
-        get async {
-            await CppBridge.VAD.shared.isInitialized
+    /// Reset VAD internal state.
+    static func resetVAD() async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-    }
-
-    // MARK: - Detection
-
-    /// Detect speech in audio buffer
-    /// - Parameter buffer: Audio buffer to analyze
-    /// - Returns: Whether speech was detected
-    static func detectSpeech(in buffer: AVAudioPCMBuffer) async throws -> Bool {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
-        // Convert AVAudioPCMBuffer to [Float]
-        guard let channelData = buffer.floatChannelData else {
-            throw SDKError.vad(.emptyAudioBuffer, "Audio buffer has no channel data")
-        }
-
-        let frameLength = Int(buffer.frameLength)
-        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-
-        return try await detectSpeech(in: samples)
-    }
-
-    /// Detect speech in audio samples
-    /// - Parameter samples: Float array of audio samples
-    /// - Returns: Whether speech was detected
-    static func detectSpeech(in samples: [Float]) async throws -> Bool {
-        guard isSDKInitialized else {
-            throw SDKError.general(.notInitialized, "SDK not initialized")
-        }
-
-        let handle = try await CppBridge.VAD.shared.getHandle()
-
-        var hasVoice: rac_bool_t = RAC_FALSE
-        let result = samples.withUnsafeBufferPointer { buffer in
-            rac_vad_component_process(
-                handle,
-                buffer.baseAddress,
-                buffer.count,
-                &hasVoice
-            )
-        }
-
-        guard result == RAC_SUCCESS else {
-            throw SDKError.vad(.processingFailed, "Failed to process samples: \(result)")
-        }
-
-        let detected = hasVoice == RAC_TRUE
-
-        // Forward to audio buffer callback if set
-        if let callback = await VADStateManager.shared.getAudioBufferCallback() {
-            callback(samples)
-        }
-
-        return detected
-    }
-
-    // MARK: - Control
-
-    /// Start VAD processing
-    static func startVAD() async throws {
-        try await CppBridge.VAD.shared.start()
-    }
-
-    /// Stop VAD processing
-    static func stopVAD() async throws {
-        try await CppBridge.VAD.shared.stop()
-    }
-
-    // MARK: - Callbacks
-
-    /// Set VAD speech activity callback
-    /// - Parameter callback: Callback invoked when speech state changes
-    static func setVADSpeechActivityCallback(_ callback: @escaping (SpeechActivityEvent) -> Void) async {
-        guard let handle = try? await CppBridge.VAD.shared.getHandle() else { return }
-
-        // Create callback context
-        let context = VADCallbackContext(onActivity: callback)
-        await VADStateManager.shared.setCallbackContext(context)
-        let contextPtr = Unmanaged.passRetained(context).toOpaque()
-
-        rac_vad_component_set_activity_callback(
-            handle,
-            { activity, userData in
-                guard let userData = userData else { return }
-                let ctx = Unmanaged<VADCallbackContext>.fromOpaque(userData).takeUnretainedValue()
-                let event: SpeechActivityEvent = activity == RAC_SPEECH_STARTED ? .started : .ended
-                ctx.onActivity(event)
-            },
-            contextPtr
-        )
-    }
-
-    /// Set VAD audio buffer callback
-    /// - Parameter callback: Callback invoked with audio samples
-    static func setVADAudioBufferCallback(_ callback: @escaping ([Float]) -> Void) async {
-        await VADStateManager.shared.setOnAudioBuffer(callback)
-    }
-
-    // MARK: - Cleanup
-
-    /// Cleanup VAD resources
-    static func cleanupVAD() async {
-        await CppBridge.VAD.shared.cleanup()
-        await VADStateManager.shared.setOnAudioBuffer(nil)
-        await VADStateManager.shared.setCallbackContext(nil)
-    }
-}
-
-// MARK: - Callback Context
-
-private final class VADCallbackContext: @unchecked Sendable {
-    let onActivity: (SpeechActivityEvent) -> Void
-
-    init(onActivity: @escaping (SpeechActivityEvent) -> Void) {
-        self.onActivity = onActivity
+        try await CppBridge.VAD.shared.reset()
     }
 }

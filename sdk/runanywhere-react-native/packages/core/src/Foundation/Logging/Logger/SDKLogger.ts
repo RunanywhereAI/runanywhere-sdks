@@ -54,7 +54,7 @@ export class SDKLogger {
    * @param metadata - Optional metadata key-value pairs
    */
   public debug(message: string, metadata?: Record<string, unknown>): void {
-    LoggingManager.shared.log(LogLevel.Debug, this.category, message, metadata);
+    LoggingManager.shared.log(LogLevel.LOG_LEVEL_DEBUG, this.category, message, metadata);
   }
 
   /**
@@ -64,7 +64,7 @@ export class SDKLogger {
    * @param metadata - Optional metadata key-value pairs
    */
   public info(message: string, metadata?: Record<string, unknown>): void {
-    LoggingManager.shared.log(LogLevel.Info, this.category, message, metadata);
+    LoggingManager.shared.log(LogLevel.LOG_LEVEL_INFO, this.category, message, metadata);
   }
 
   /**
@@ -75,7 +75,7 @@ export class SDKLogger {
    */
   public warning(message: string, metadata?: Record<string, unknown>): void {
     LoggingManager.shared.log(
-      LogLevel.Warning,
+      LogLevel.LOG_LEVEL_WARNING,
       this.category,
       message,
       metadata
@@ -89,7 +89,7 @@ export class SDKLogger {
    * @param metadata - Optional metadata key-value pairs
    */
   public error(message: string, metadata?: Record<string, unknown>): void {
-    LoggingManager.shared.log(LogLevel.Error, this.category, message, metadata);
+    LoggingManager.shared.log(LogLevel.LOG_LEVEL_ERROR, this.category, message, metadata);
   }
 
   /**
@@ -99,7 +99,7 @@ export class SDKLogger {
    * @param metadata - Optional metadata key-value pairs
    */
   public fault(message: string, metadata?: Record<string, unknown>): void {
-    LoggingManager.shared.log(LogLevel.Fault, this.category, message, metadata);
+    LoggingManager.shared.log(LogLevel.LOG_LEVEL_FATAL, this.category, message, metadata);
   }
 
   /**
@@ -144,20 +144,20 @@ export class SDKLogger {
       error_stack: error.stack,
     };
 
-    // If SDKError, include additional fields
+    // If SDKException, include additional fields from the wrapped proto.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sdkError = error as any;
-    if (sdkError.code !== undefined) {
-      metadata.error_code = sdkError.code;
+    const sdkErr = error as any;
+    if (sdkErr.code !== undefined) {
+      metadata.error_code = sdkErr.code;
     }
-    if (sdkError.category !== undefined) {
-      metadata.error_category = sdkError.category;
+    if (sdkErr.category !== undefined) {
+      metadata.error_category = sdkErr.category;
     }
-    if (sdkError.underlyingError !== undefined) {
-      metadata.underlying_error = sdkError.underlyingError.message;
+    if (sdkErr.proto?.nestedMessage) {
+      metadata.nested_message = sdkErr.proto.nestedMessage;
     }
 
-    LoggingManager.shared.log(LogLevel.Error, this.category, message, metadata);
+    LoggingManager.shared.log(LogLevel.LOG_LEVEL_ERROR, this.category, message, metadata);
   }
 
   // ==========================================================================

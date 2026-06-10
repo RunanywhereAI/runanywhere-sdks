@@ -12,25 +12,40 @@ import RunAnywhere
 extension LLMViewModel {
     // MARK: - Model Lifecycle Subscription
 
+    /// Subscribe to the SDK event bus for model lifecycle and generation
+    /// signals. The bus is the single source of truth — there is no parallel
+    /// NotificationCenter channel.
     func subscribeToModelLifecycle() {
-        lifecycleCancellable = RunAnywhere.events.events
+        // Typed lifecycle stream: the SDK folds all native load/unload
+        // channels into one publisher.
+        lifecycleCancellable = RunAnywhere.events.modelLifecycle
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    self.handleModelLifecycle(change)
+                }
+            }
+
+        // Generation analytics (TTFT, completion metrics) are chat-screen
+        // analytics, not lifecycle — they stay on the raw event bus.
+        generationCancellable = RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self else { return }
                 Task { @MainActor in
-                    self.handleSDKEvent(event)
+                    self.handleGenerationEvent(event)
                 }
             }
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 100_000_000)
-            await checkModelStatusFromSDK()
-        }
     }
 
     func checkModelStatusFromSDK() async {
-        let isLoaded = await RunAnywhere.isModelLoaded
-        let modelId = await RunAnywhere.getCurrentModelId()
+        // Resolve currently-loaded LLM via canonical proto snapshot API.
+        var request = RACurrentModelRequest()
+        request.category = .language
+        let snapshot = RunAnywhere.currentModel(request)
+        let isLoaded = snapshot.found
+        let modelId = snapshot.found ? snapshot.modelID : nil
 
         await MainActor.run {
             self.updateModelLoadedState(isLoaded: isLoaded)
@@ -44,36 +59,41 @@ extension LLMViewModel {
 
     // MARK: - SDK Event Handling
 
-    func handleSDKEvent(_ event: any SDKEvent) {
-        // Events now come from C++ via generic BridgedEvent
-        guard event.category == .llm else { return }
+    /// Apply a typed model load/unload change.
+    private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        guard change.component == .llm || change.event.category == .llm else { return }
 
-        let modelId = event.properties["model_id"] ?? ""
-        let generationId = event.properties["generation_id"] ?? ""
+        switch change.kind {
+        case .loaded:
+            handleModelLoadCompleted(modelId: change.modelID)
+        case .unloaded:
+            handleModelUnloaded(modelId: change.modelID)
+        }
+    }
 
-        switch event.type {
-        case "llm_model_load_completed":
-            handleModelLoadCompleted(modelId: modelId)
+    /// Decode generation-analytics signals (TTFT, completion metrics) from
+    /// the raw event bus.
+    private func handleGenerationEvent(_ event: RASDKEvent) {
+        guard event.category == .llm || event.component == .llm else { return }
 
-        case "llm_model_unloaded":
-            handleModelUnloaded(modelId: modelId)
+        let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
+        let generationId = event.generation.sessionID.isEmpty ? event.operationID : event.generation.sessionID
 
-        case "llm_model_load_started":
-            break
-
-        case "llm_first_token":
-            let ttft = Double(event.properties["time_to_first_token_ms"] ?? "0") ?? 0
+        switch event.generation.kind {
+        case .firstTokenGenerated:
+            let ttft = Double(event.generation.firstTokenLatencyMs)
             handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case "llm_generation_completed":
-            let inputTokens = Int(event.properties["input_tokens"] ?? "0") ?? 0
-            let outputTokens = Int(event.properties["output_tokens"] ?? "0") ?? 0
-            let durationMs = Double(event.properties["processing_time_ms"] ?? "0") ?? 0
-            let tps = Double(event.properties["tokens_per_second"] ?? "0") ?? 0
+        case .completed, .streamCompleted:
+            let outputTokens = Int(event.generation.tokensUsed)
+            let durationMs = Double(event.generation.latencyMs)
+            let tps = durationMs > 0 && outputTokens > 0
+                ? Double(outputTokens) / (durationMs / 1000.0)
+                : 0
             handleGenerationCompleted(
                 generationId: generationId,
                 modelId: modelId,
-                inputTokens: inputTokens,
+                inputTokens: Int(event.generation.inputTokens),
                 outputTokens: outputTokens,
                 durationMs: durationMs,
                 tokensPerSecond: tps
@@ -87,6 +107,9 @@ extension LLMViewModel {
     func handleModelLoadCompleted(modelId: String) {
         let wasLoaded = isModelLoadedValue
         updateModelLoadedState(isLoaded: true)
+        // All LLM backends expose streaming via the canonical generateStream
+        // entry; the SDK no longer publishes a per-model capability flag.
+        setModelSupportsStreaming(true)
 
         if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
             updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
@@ -97,6 +120,7 @@ extension LLMViewModel {
             if messagesValue.first?.role != .system {
                 addSystemMessage()
             }
+            Task { await refreshAvailableAdapters() }
         }
     }
 

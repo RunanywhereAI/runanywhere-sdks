@@ -6,6 +6,9 @@
  * For better separation of concerns, prefer including:
  * - rac_tts_types.h for data structures only
  * - rac_tts_service.h for the service interface
+ *
+ * Classification: pure include aggregator. See classification headers
+ * on rac_tts_types.h and rac_tts_service.h.
  */
 
 #ifndef RAC_TTS_H

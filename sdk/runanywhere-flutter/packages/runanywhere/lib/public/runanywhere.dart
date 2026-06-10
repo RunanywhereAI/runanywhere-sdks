@@ -1,101 +1,266 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// runanywhere.dart — RunAnywhere SDK static entry point.
+//
+// Usage:
+//   await RunAnywhere.initialize(
+//     environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+//   );
+//   await RunAnywhere.llm.load('llama-3-8b');
+//   final response = await RunAnywhere.llm.chat('Hello!');
+
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
-import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/storage_types.dart';
-import 'package:runanywhere/data/network/http_service.dart';
-import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
-import 'package:runanywhere/foundation/dependency_injection/service_container.dart'
-    hide SDKInitParams;
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
+import 'package:runanywhere/adapters/http_client_adapter.dart';
+import 'package:runanywhere/foundation/constants/sdk_constants.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/generated/download_service.pb.dart'
+    show DownloadProgress;
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationOptions, LLMGenerationResult;
+import 'package:runanywhere/generated/llm_service.pb.dart'
+    show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/model_types.pb.dart'
+    show
+        CurrentModelRequest,
+        CurrentModelResult,
+        ModelInfo,
+        ModelLoadRequest,
+        ModelLoadResult,
+        ModelUnloadRequest,
+        ModelUnloadResult;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show ModelCategory;
+import 'package:runanywhere/generated/rag.pb.dart'
+    show
+        RAGConfiguration,
+        RAGDocument,
+        RAGQueryOptions,
+        RAGResult,
+        RAGStatistics;
+import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
+import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
+import 'package:runanywhere/generated/structured_output.pb.dart'
+    show
+        JSONSchema,
+        StructuredOutputOptions,
+        StructuredOutputResult,
+        StructuredOutputStreamEvent;
+import 'package:runanywhere/generated/stt_options.pb.dart'
+    show STTOptions, STTOutput, STTPartialResult;
+import 'package:runanywhere/generated/tool_calling.pb.dart'
+    show
+        ToolCall,
+        ToolCallingOptions,
+        ToolCallingResult,
+        ToolDefinition,
+        ToolResult;
+import 'package:runanywhere/generated/tts_options.pb.dart'
+    show TTSOptions, TTSOutput, TTSSpeakResult, TTSVoiceInfo;
+import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
-import 'package:runanywhere/native/dart_bridge_file_manager.dart';
-import 'package:runanywhere/native/dart_bridge_model_paths.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_structured_output.dart';
-import 'package:runanywhere/native/dart_bridge_vlm.dart';
-import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
+import 'package:runanywhere/native/dart_bridge_environment.dart';
+import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
+import 'package:runanywhere/native/dart_bridge_telemetry.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_lora.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_plugin_loader.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_rag.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_solutions.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_tools.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/types/types.dart';
+import 'package:runanywhere/public/extensions/runanywhere_structured_output.dart';
 
-/// The RunAnywhere SDK entry point
+/// RunAnywhere SDK entry point.
 ///
-/// Matches Swift `RunAnywhere` enum from Public/RunAnywhere.swift
-class RunAnywhere {
-  static SDKInitParams? _initParams;
-  static SDKEnvironment? _currentEnvironment;
-  static bool _isInitialized = false;
+/// Static namespace matching Swift's `enum RunAnywhere` public surface.
+///
+/// Each capability class owns its own implementation. This type only
+/// coordinates lifecycle, state, events, and cross-SDK flat forwarding methods.
+abstract final class RunAnywhere {
+  // --- Lifecycle -----------------------------------------------------------
+
+  /// True after [initialize] has succeeded. Sourced from the C++ commons
+  /// (`rac_state_is_initialized`); Dart does not maintain a parallel flag.
+  static bool get isInitialized => DartBridge.isInitialized;
+
+  /// True if the SDK is active (initialized + has init params in commons).
+  static bool get isActive =>
+      DartBridge.isInitialized && _cachedInitParams != null;
+
+  /// True once Phase 2 (services) initialization has completed. Mirrors
+  /// Swift's `areServicesReady`. Phase 2 is detached from [initialize] —
+  /// callers needing it ready should `await completeServicesInitialization()`.
+  static bool get areServicesReady =>
+      DartBridge.isInitialized && DartBridge.servicesInitialized;
+
+  /// True once Phase 2 HTTP/auth setup succeeded. Tracked separately from
+  /// [areServicesReady] so an SDK that initialized offline (no connectivity)
+  /// can still report `areServicesReady=true` (local models stay usable)
+  /// while leaving this latch `false` for the next [ensureServicesReady]
+  /// call to retry via `rac_sdk_retry_http_proto`. Mirrors Swift's
+  /// `hasCompletedHTTPSetup` (RunAnywhere.swift:35) and Kotlin's
+  /// `_hasCompletedHTTPSetup` (RunAnywhere.kt:121).
+  static bool get hasCompletedHTTPSetup => _hasCompletedHTTPSetup;
+
+  /// Cached device id — populated during initialization. Mirrors Swift's
+  /// `deviceId: String`.
+  static String get deviceId =>
+      DartBridgeDevice.cachedDeviceId ?? 'unknown-device';
+
+  /// Authenticated user id, or null if not signed in. Mirrors Swift's
+  /// `getUserId()`.
+  static String? get userId => DartBridgeAuth.instance.getUserId();
+
+  /// Authenticated organization id, or null. Mirrors Swift's
+  /// `getOrganizationId()`.
+  static String? get organizationId =>
+      DartBridgeAuth.instance.getOrganizationId();
+
+  /// True if the SDK has a valid authentication token.
+  static bool get isAuthenticated => DartBridgeAuth.instance.isAuthenticated();
+
+  /// True if the device has been registered with the backend. Mirrors
+  /// Swift's `isDeviceRegistered()`.
+  static bool get isDeviceRegistered =>
+      DartBridgeDevice.instance.isDeviceRegistered();
+
+  /// Awaitable Phase-2 completion. Mirrors Swift's
+  /// `completeServicesInitialization()`. [initialize] detaches Phase 2
+  /// (platform service wiring plus commons-owned init orchestration) and stores
+  /// the resulting Future in [_servicesInitFuture]; concurrent callers share
+  /// that single Future so the work runs at most once.
+  /// Returns immediately once Phase 2 has resolved. Throws
+  /// [SDKException.notInitialized] if Phase 1 never ran.
+  static Future<void> completeServicesInitialization() {
+    if (!isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return _servicesInitFuture ?? Future<void>.value();
+  }
+
+  /// One-call "wait until everything is ready" entry point. Three paths let an
+  /// offline-first Phase 2 (services ready, HTTP/auth deferred in commons)
+  /// retry HTTP setup without re-running the full step list.
+  ///
+  ///  - Fast path: services ready + HTTP configured → return (O(1)).
+  ///  - Recovery path: services ready but HTTP failed (offline init) →
+  ///    retry HTTP via `rac_sdk_retry_http_proto` without re-running Phase 2.
+  ///  - Cold start path: services not ready → await the in-flight Phase-2
+  ///    future (or a fresh one if Phase 2 hasn't started yet).
+  ///
+  /// Concurrent callers share the same Phase-2 future, so the work executes
+  /// at most once.
+  static Future<void> ensureServicesReady() async {
+    if (!isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    // Fast path — services ready + HTTP/auth done.
+    if (areServicesReady && _hasCompletedHTTPSetup) return;
+    // Recovery path — services ready, HTTP/auth failed (offline init).
+    if (areServicesReady && !_hasCompletedHTTPSetup) {
+      await _retryHTTPSetup();
+      return;
+    }
+    // Cold start path — Phase 1 done but Phase 2 still running (or never
+    // dispatched). Await the in-flight future; concurrent callers share it.
+    await (_servicesInitFuture ?? Future<void>.value());
+  }
+
+  /// Initialization params (apiKey, baseURL, environment) — null
+  /// until [initialize] runs. Cached from the most recent
+  /// `initializeWithParams` call so callers can introspect what was
+  /// resolved (commons stores the canonical values too via
+  /// `rac_state_*`).
+  static SDKInitParams? get initParams => _cachedInitParams;
+
+  /// Current SDK environment. Sourced from `DartBridge` which mirrors
+  /// commons' canonical environment.
+  static SDKEnvironment? get environment =>
+      DartBridge.isInitialized ? DartBridge.environment : null;
+
+  // Cached params from the most recent successful initializeWithParams.
+  // The canonical source is commons (rac_state_*); this is a lightweight
+  // Dart accessor for callers that want the original Uri / apiKey shape.
+  static SDKInitParams? _cachedInitParams;
+
+  // One-shot Dart-only compatibility flag: startup downloaded-model discovery
+  // is owned by commons Phase 2; legacy callers still use runDiscoveryIfNeeded()
+  // as a readiness guard before listing registry contents.
   static bool _hasRunDiscovery = false;
-  static final List<ModelInfo> _registeredModels = [];
 
-  // Note: LLM state is managed by DartBridgeLLM's native handle
-  // Use DartBridge.llm.currentModelId and DartBridge.llm.isLoaded
+  // Latched HTTP/auth completion flag — see [hasCompletedHTTPSetup]. Phase 2
+  // sets this from the C++ `SdkInitResult.http_configured` snapshot;
+  // [_retryHTTPSetup] re-latches on a successful `rac_sdk_retry_http_proto`
+  // round-trip so subsequent `ensureServicesReady()` calls short-circuit.
+  static bool _hasCompletedHTTPSetup = false;
 
-  /// Access to service container
-  static ServiceContainer get serviceContainer => ServiceContainer.shared;
+  // Shared Phase-2 future. Mirrors Swift's `_servicesInitTask`. Stored at
+  // detach time inside [initializeWithParams]; replayed by
+  // [completeServicesInitialization]. Dart's single-threaded event loop
+  // makes the check-and-set atomic, so no explicit lock is needed (unlike
+  // Swift which uses `_servicesInitLock: DispatchQueue`).
+  static Future<void>? _servicesInitFuture;
 
-  /// Check if SDK is initialized
-  static bool get isSDKInitialized => _isInitialized;
-
-  /// Check if SDK is active
-  static bool get isActive => _isInitialized && _initParams != null;
-
-  /// Get initialization parameters
-  static SDKInitParams? get initParams => _initParams;
-
-  /// Current environment
-  static SDKEnvironment? get environment => _currentEnvironment;
-
-  /// Get current environment (alias for environment getter)
-  /// Matches Swift pattern for explicit method call
-  static SDKEnvironment? getCurrentEnvironment() => _currentEnvironment;
-
-  /// SDK version
+  /// SDK semver string (e.g. "4.0.0").
   static String get version => SDKConstants.version;
 
-  /// Event bus for SDK events
+  /// Event bus for cross-capability SDK events.
   static EventBus get events => EventBus.shared;
 
-  /// Initialize the SDK
+  /// Initialize the SDK with API key + base URL.
   static Future<void> initialize({
     String? apiKey,
     String? baseURL,
-    SDKEnvironment environment = SDKEnvironment.development,
+    SDKEnvironment environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
   }) async {
     final SDKInitParams params;
 
-    if (environment == SDKEnvironment.development) {
-      params = SDKInitParams(
-        apiKey: apiKey ?? '',
-        baseURL: Uri.parse(baseURL ?? 'https://api.runanywhere.ai'),
-        environment: environment,
-      );
+    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      if (baseURL == null || baseURL.isEmpty) {
+        params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
+      } else {
+        final uri = Uri.tryParse(baseURL);
+        if (uri == null) {
+          throw SDKException.validationFailed('Invalid base URL: $baseURL');
+        }
+        params = SDKInitParams(
+          apiKey: apiKey ?? '',
+          baseURL: uri,
+          environment: environment,
+        );
+      }
     } else {
       if (apiKey == null || apiKey.isEmpty) {
-        throw SDKError.validationFailed(
+        throw SDKException.validationFailed(
           'API key is required for ${environment.description} mode',
         );
       }
       if (baseURL == null || baseURL.isEmpty) {
-        throw SDKError.validationFailed(
+        throw SDKException.validationFailed(
           'Base URL is required for ${environment.description} mode',
         );
       }
       final uri = Uri.tryParse(baseURL);
       if (uri == null) {
-        throw SDKError.validationFailed('Invalid base URL: $baseURL');
+        throw SDKException.validationFailed('Invalid base URL: $baseURL');
       }
       params = SDKInitParams(
         apiKey: apiKey,
@@ -107,2582 +272,640 @@ class RunAnywhere {
     await initializeWithParams(params);
   }
 
-  /// Initialize with params
+  /// Initialize with fully-resolved [SDKInitParams].
   ///
-  /// Matches Swift `RunAnywhere.performCoreInit()` flow:
-  /// - Phase 1: DartBridge.initialize() (sync, ~1-5ms)
-  /// - Phase 2: DartBridge.initializeServices() (async, ~100-500ms)
+  /// Mirrors Swift `RunAnywhere.performCoreInit()` two-phase flow:
+  /// - Phase 1 (awaited): synchronous core init (~1–5 ms) — register
+  ///   platform adapter, configure logging, run `rac_state_initialize`,
+  ///   wire events / device / telemetry / file-manager callbacks.
+  ///   Completes before this method returns. Phase 1 failures throw to
+  ///   the caller.
+  /// - Phase 2 (detached): local service setup (HTTP/telemetry/model
+  ///   registry) + background services (device registration + auth).
+  ///   Mirrors Swift's `Task.detached(priority: .userInitiated)`. The
+  ///   resulting Future is stored in [_servicesInitFuture] so concurrent
+  ///   callers of [completeServicesInitialization] share it. Failures
+  ///   are non-critical — they are swallowed at the detach site (logged
+  ///   as warnings) but still observable to anyone awaiting
+  ///   [completeServicesInitialization] directly.
   static Future<void> initializeWithParams(SDKInitParams params) async {
-    if (_isInitialized) return;
+    if (DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Init');
-    EventBus.shared.publish(SDKInitializationStarted());
+    // C++ commons auto-emits INITIALIZATION_STAGE_STARTED via
+    // `event_publisher.cpp:531`; Dart does not re-emit a duplicate.
 
     try {
-      _currentEnvironment = params.environment;
-      _initParams = params;
+      _cachedInitParams = params;
 
-      // =========================================================================
-      // PHASE 1: Core Init (sync, ~1-5ms, no network)
-      // Matches Swift: RunAnywhere.performCoreInit() → CppBridge.initialize()
-      // =========================================================================
-      DartBridge.initialize(params.environment);
-      logger.debug('DartBridge initialized with platform adapter');
+      final phase1DeviceId = await DartBridgeDevice.instance.getDeviceId();
 
-      // =========================================================================
-      // PHASE 2: Services Init (async, ~100-500ms, may need network)
-      // =========================================================================
-
-      // Step 2.1: Initialize service bridges with credentials
-      await DartBridge.initializeServices(
+      // --- Phase 1: Core init (sync after Flutter async device-id lookup) ---
+      // Phase-1 failures (invalid env, library load) propagate to the
+      // caller via the surrounding try / rethrow.
+      DartBridge.initialize(
+        params.environment,
         apiKey: params.apiKey,
         baseURL: params.baseURL.toString(),
-        deviceId: DartBridgeDevice.cachedDeviceId,
+        deviceId: phase1DeviceId,
       );
-      logger.debug('Service bridges initialized');
+      DartBridge.registerEnsureServicesReadyHook(ensureServicesReady);
 
-      // Step 2.2: Set base directory for model paths
-      await DartBridge.modelPaths.setBaseDirectory();
-
-      // Step 2.3: Setup local services (HTTP, etc.)
-      await serviceContainer.setupLocalServices(
-        apiKey: params.apiKey,
-        baseURL: params.baseURL,
-        environment: params.environment,
+      logger.info(
+        'Phase 1 complete (${params.environment.description}); '
+        'Phase 2 dispatched in background',
       );
 
-      // Step 2.4: Register device with backend
-      await _registerDeviceIfNeeded(params, logger);
-
-      // Step 2.5: Authenticate with backend (non-fatal — offline inference
-      // still works if auth fails; telemetry silently no-ops).
-      // Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-      await _authenticateWithBackend(params, logger);
-
-      // Step 2.6: Initialize model registry
-      logger.debug('Initializing model registry...');
-      await DartBridgeModelRegistry.instance.initialize();
-
-      // NOTE: Discovery is NOT run here. It runs lazily on first availableModels() call.
-      // This matches Swift's Phase 2 behavior where discovery runs in background AFTER
-      // models have been registered by the app.
-
-      _isInitialized = true;
-      logger.info('✅ SDK initialized (${params.environment.description})');
-      EventBus.shared.publish(SDKInitializationCompleted());
-
-      // Track successful SDK initialization
-      TelemetryService.shared.trackSDKInit(
-        environment: params.environment.name,
-        success: true,
+      // --- Phase 2: Detached background services ---
+      // Mirrors Swift `Task.detached(priority: .userInitiated) { ... }`.
+      // Store the Future first so concurrent callers of
+      // `completeServicesInitialization()` see it before the detach
+      // wrapper might observe a failure. Phase 2 errors are swallowed
+      // here (non-critical) but still observable to direct awaiters.
+      final phase2 = _runPhase2(params, logger);
+      _servicesInitFuture = phase2;
+      unawaited(
+        phase2.catchError((Object error, StackTrace _) {
+          logger.warning('Phase 2 failed (non-critical): $error');
+        }),
       );
     } catch (e) {
-      logger.error('❌ SDK initialization failed: $e');
-      _initParams = null;
-      _currentEnvironment = null;
-      _isInitialized = false;
+      logger.error('SDK initialization failed: $e');
+      _cachedInitParams = null;
       _hasRunDiscovery = false;
-      EventBus.shared.publish(SDKInitializationFailed(e));
-
-      // Track failed SDK initialization
-      TelemetryService.shared.trackSDKInit(
-        environment: params.environment.name,
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'sdk_init_failed',
-        errorMessage: e.toString(),
-      );
-
+      _hasCompletedHTTPSetup = false;
+      _servicesInitFuture = null;
+      // Commons auto-emits INITIALIZATION_STAGE_FAILED via
+      // `event_publisher.cpp:557`; failure telemetry flows through
+      // structured errors. Dart does not re-emit a duplicate.
       rethrow;
     }
   }
 
-  /// Register device with backend if not already registered.
-  /// Matches Swift: CppBridge.Device.registerIfNeeded(environment:)
-  /// This MUST happen before authentication.
-  static Future<void> _registerDeviceIfNeeded(
-    SDKInitParams params,
-    SDKLogger logger,
-  ) async {
-    try {
-      // First ensure DartBridgeDevice is fully registered with callbacks
-      await DartBridgeDevice.register(
-        environment: params.environment,
-        baseURL: params.baseURL.toString(),
-      );
-
-      // Then call the C++ device registration
-      await DartBridgeDevice.instance.registerIfNeeded();
-      logger.debug('Device registration check completed');
-    } catch (e) {
-      // Device registration failures are non-critical
-      logger.warning('Device registration failed (non-critical): $e');
+  /// Platform-owned Phase 2 setup plus the commons deterministic init step-list.
+  /// Runs detached from [initializeWithParams] so the caller's
+  /// `await initialize()` returns after Phase 1 and the platform device-id
+  /// lookup needed to populate the commons init contract.
+  static Future<void> _runPhase2(SDKInitParams params, SDKLogger logger) async {
+    // Step 1: Configure the shared HTTP client. Mirrors Swift's inlined
+    // HTTP setup inside `RunAnywhere.performCoreInit()` (no DI container).
+    HTTPClientAdapter.shared.configure(
+      baseURL: params.baseURL.toString(),
+      apiKey: params.apiKey,
+      environment: params.environment,
+    );
+    if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      final supabaseConfig = SupabaseConfig.configuration(params.environment);
+      if (supabaseConfig != null) {
+        HTTPClientAdapter.shared.configureDev(
+          supabaseURL: supabaseConfig.projectURL.toString(),
+          supabaseKey: supabaseConfig.anonKey,
+        );
+      }
     }
+
+    // Step 2: Model-paths base directory. Commons Phase 2 performs downloaded
+    // model discovery, so the path root must exist before the proto call.
+    await DartBridge.modelPaths.setBaseDirectory();
+
+    // Step 3: Telemetry sink setup. The flush itself is now owned by commons
+    // Phase 2 via rac_events_flush_telemetry_sink.
+    DartBridgeTelemetry.initializeSync(environment: params.environment);
+    final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
+    await DartBridgeTelemetry.initialize(
+      environment: params.environment,
+      deviceId: telemetryDeviceId,
+      baseURL: HTTPClientAdapter.shared.isConfigured
+          ? params.baseURL.toString()
+          : null,
+    );
+
+    // Step 4: Global model registry handle.
+    await DartBridgeModelRegistry.instance.initialize();
+
+    // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent from the
+    // C++ init path (`event_publisher.cpp:544`) and the destination router
+    // forwards it to the registered telemetry sink, so Dart does not emit it.
+
+    // Step 5: Commons-owned deterministic Phase 2 orchestration: auth via the
+    // registered HTTP transport, device registration with build token, model
+    // assignment fetch, telemetry flush, and downloaded-model discovery.
+    final phase2Result = await DartBridge.initializeServices(
+      apiKey: params.apiKey,
+      baseURL: params.baseURL.toString(),
+      deviceId: telemetryDeviceId,
+      buildToken:
+          params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+          ? DartBridgeDevConfig.buildToken
+          : null,
+      forceRefreshAssignments: false,
+      flushTelemetry: true,
+      discoverDownloadedModels: true,
+      rescanLocalModels: true,
+    );
+
+    _hasCompletedHTTPSetup = _isHTTPSetupComplete(phase2Result);
+    if (phase2Result?.success == true) {
+      _hasRunDiscovery = true;
+    }
+
+    logger.info('Phase 2 complete (${params.environment.description})');
   }
 
-  /// Authenticate with backend for production/staging environments.
-  /// Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-  static Future<void> _authenticateWithBackend(
-    SDKInitParams params,
-    SDKLogger logger,
-  ) async {
+  /// Latched HTTP setup status from the generated commons init result.
+  static bool _isHTTPSetupComplete(SdkInitResult? result) {
+    if (result == null) return false;
+    if (result.hasHasCompletedHttpSetup()) {
+      return result.hasCompletedHttpSetup;
+    }
+    return result.httpConfigured;
+  }
+
+  /// Retry HTTP/auth after an offline initialization. The retry orchestration
+  /// lives in commons behind `rac_sdk_retry_http_proto`; Dart only latches the
+  /// generated result. Failures are logged and swallowed so the next call can
+  /// retry again.
+  static Future<void> _retryHTTPSetup() async {
+    final logger = SDKLogger('RunAnywhere.HTTPRetry');
+
     try {
-      // Initialize auth manager first
-      await DartBridgeAuth.initialize(
-        environment: params.environment,
-        baseURL: params.baseURL.toString(),
-      );
-
-      // Get device ID - MUST fetch properly, not just check cache
-      // This matches Swift's DeviceIdentity.persistentUUID and Kotlin's CppBridgeDevice.getDeviceId()
-      final deviceId = await DartBridgeDevice.instance.getDeviceId();
-      logger.debug('Authenticating with device ID: $deviceId');
-
-      // Authenticate with backend to get JWT tokens
-      final result = await DartBridgeAuth.instance.authenticate(
-        apiKey: params.apiKey,
-        deviceId: deviceId,
-      );
-
-      if (result.isSuccess) {
-        logger.info('Authenticated for ${params.environment.description}');
-        // Set access token on HTTP service for subsequent requests
-        if (result.data?.accessToken != null) {
-          HTTPService.shared.setToken(result.data!.accessToken!);
-        }
+      final proto = DartBridgeSdkInit.retryHTTP();
+      _hasCompletedHTTPSetup = _isHTTPSetupComplete(proto);
+      if (proto.hasWarning()) {
+        logger.debug('HTTP retry warning: ${proto.warning}');
+      }
+      if (_hasCompletedHTTPSetup) {
+        logger.info('HTTP/Auth setup succeeded on retry');
       } else {
-        // Log warning but don't fail - telemetry will fail silently
-        // and offline inference will still work
-        logger.warning(
-          'Authentication failed: ${result.error}',
-          metadata: {'environment': params.environment.name},
-        );
+        logger.debug('HTTP/Auth retry still missing usable config');
       }
     } catch (e) {
-      // Log warning but don't fail initialization
-      logger.warning(
-        'Authentication error: $e',
-        metadata: {'environment': params.environment.name},
-      );
+      logger.debug('HTTP retry proto failed: $e');
     }
   }
 
-  /// Get all available models from C++ registry.
-  ///
-  /// Returns all models that can be used with the SDK, including:
-  /// - Models registered via `registerModel()`
-  /// - Models discovered on filesystem during SDK init
-  ///
-  /// This reads from the C++ registry, which contains the authoritative
-  /// model state including localPath for downloaded models.
-  ///
-  /// Matches Swift: `return await CppBridge.ModelRegistry.shared.getAll()`
-  static Future<List<ModelInfo>> availableModels() async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    // Run discovery lazily on first call
-    // This ensures models are already registered before discovery runs
-    // (discovery updates local_path for registered models only)
-    if (!_hasRunDiscovery) {
-      await _runDiscovery();
-    }
-
-    // Read from C++ registry - this is the authoritative source
-    // Discovery populates localPath for downloaded models
-    final cppModels =
-        await DartBridgeModelRegistry.instance.getAllPublicModels();
-
-    // Merge with _registeredModels to include full metadata (downloadURL, etc.)
-    // C++ registry models may have localPath but lack some metadata
-    final uniqueModels = <String, ModelInfo>{};
-
-    // First add C++ registry models (have authoritative localPath)
-    for (final model in cppModels) {
-      uniqueModels[model.id] = model;
-    }
-
-    // Then merge _registeredModels to fill in any missing metadata
-    for (final dartModel in _registeredModels) {
-      final existing = uniqueModels[dartModel.id];
-      if (existing != null) {
-        // Merge: use C++ localPath but keep Dart's downloadURL and other metadata
-        uniqueModels[dartModel.id] = ModelInfo(
-          id: dartModel.id,
-          name: dartModel.name,
-          category: dartModel.category,
-          format: dartModel.format,
-          framework: dartModel.framework,
-          downloadURL: dartModel.downloadURL,
-          localPath: existing.localPath ?? dartModel.localPath,
-          artifactType: dartModel.artifactType,
-          downloadSize: dartModel.downloadSize,
-          contextLength: dartModel.contextLength,
-          supportsThinking: dartModel.supportsThinking,
-          thinkingPattern: dartModel.thinkingPattern,
-          description: dartModel.description,
-          source: dartModel.source,
-        );
-      } else {
-        // Model only in Dart list (not yet saved to C++ registry)
-        uniqueModels[dartModel.id] = dartModel;
-      }
-    }
-
-    return List.unmodifiable(uniqueModels.values.toList());
-  }
-
-  // ============================================================================
-  // MARK: - LLM State (matches Swift RunAnywhere+ModelManagement.swift)
-  // ============================================================================
-
-  /// Get the currently loaded LLM model ID
-  /// Returns null if no LLM model is loaded.
-  static String? get currentModelId => DartBridge.llm.currentModelId;
-
-  /// Check if an LLM model is currently loaded
-  static bool get isModelLoaded => DartBridge.llm.isLoaded;
-
-  /// Get the currently loaded LLM model as ModelInfo
-  /// Matches Swift: `RunAnywhere.currentLLMModel`
-  static Future<ModelInfo?> currentLLMModel() async {
-    final modelId = currentModelId;
-    if (modelId == null) return null;
-    final models = await availableModels();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == modelId,
-          orElse: () => null,
-        );
-  }
-
-  // ============================================================================
-  // MARK: - STT State (matches Swift RunAnywhere+ModelManagement.swift)
-  // ============================================================================
-
-  /// Get the currently loaded STT model ID
-  /// Returns null if no STT model is loaded.
-  static String? get currentSTTModelId => DartBridge.stt.currentModelId;
-
-  /// Check if an STT model is currently loaded
-  static bool get isSTTModelLoaded => DartBridge.stt.isLoaded;
-
-  /// Get the currently loaded STT model as ModelInfo
-  /// Matches Swift: `RunAnywhere.currentSTTModel`
-  static Future<ModelInfo?> currentSTTModel() async {
-    final modelId = currentSTTModelId;
-    if (modelId == null) return null;
-    final models = await availableModels();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == modelId,
-          orElse: () => null,
-        );
-  }
-
-  // ============================================================================
-  // MARK: - TTS State (matches Swift RunAnywhere+ModelManagement.swift)
-  // ============================================================================
-
-  /// Get the currently loaded TTS voice ID
-  /// Returns null if no TTS voice is loaded.
-  static String? get currentTTSVoiceId => DartBridge.tts.currentVoiceId;
-
-  /// Check if a TTS voice is currently loaded
-  static bool get isTTSVoiceLoaded => DartBridge.tts.isLoaded;
-
-  /// Get the currently loaded TTS voice as ModelInfo
-  /// Matches Swift: `RunAnywhere.currentTTSVoice` (TTS uses "voice" terminology)
-  static Future<ModelInfo?> currentTTSVoice() async {
-    final voiceId = currentTTSVoiceId;
-    if (voiceId == null) return null;
-    final models = await availableModels();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == voiceId,
-          orElse: () => null,
-        );
-  }
-
-  /// Load a model by ID
-  ///
-  /// Finds the model in the registry, gets its local path, and loads it
-  /// via the appropriate backend (LlamaCpp, ONNX, etc.)
-  static Future<void> loadModel(String modelId) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.LoadModel');
-    logger.info('Loading model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    // Emit load started event
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
-    try {
-      // Find the model in available models
-      final models = await availableModels();
-      final model = models.where((m) => m.id == modelId).firstOrNull;
-
-      if (model == null) {
-        throw SDKError.modelNotFound('Model not found: $modelId');
-      }
-
-      // Check if model has a local path (downloaded)
-      if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
-          'Model is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      // Resolve the actual model file path (matches Swift resolveModelFilePath)
-      // For LlamaCpp: finds the .gguf file in the model folder
-      // For ONNX: returns the model directory
-      final resolvedPath =
-          await DartBridge.modelPaths.resolveModelFilePath(model);
-      if (resolvedPath == null) {
-        throw SDKError.modelNotFound(
-            'Could not resolve model file path for: $modelId');
-      }
-      logger.info('Resolved model path: $resolvedPath');
-
-      // Unload any existing model first via the bridge
-      if (DartBridge.llm.isLoaded) {
-        logger.debug('Unloading previous model');
-        DartBridge.llm.unload();
-      }
-
-      // Load model directly via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
-      // The C++ layer handles finding the right backend via the service registry
-      logger.debug('Loading model via C++ bridge: $resolvedPath');
-      await DartBridge.llm.loadModel(
-        resolvedPath,
-        modelId,
-        model.name,
-        model.contextLength,
-      );
-
-      // Verify the model loaded successfully
-      if (!DartBridge.llm.isLoaded) {
-        throw SDKError.modelLoadFailed(
-          modelId,
-          'LLM model failed to load - model may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info(
-          'Model loaded successfully: ${model.name} (isLoaded=${DartBridge.llm.isLoaded})');
-
-      // Track model load success
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'llm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      // Emit load completed event
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-    } catch (e) {
-      logger.error('Failed to load model: $e');
-
-      // Track model load failure
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'llm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      // Emit load failed event
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-
-      rethrow;
-    }
-  }
-
-  /// Load an STT model
-  static Future<void> loadSTTModel(String modelId) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.LoadSTTModel');
-    logger.info('Loading STT model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
-    try {
-      // Find the model
-      final models = await availableModels();
-      final model = models.where((m) => m.id == modelId).firstOrNull;
-
-      if (model == null) {
-        throw SDKError.modelNotFound('STT model not found: $modelId');
-      }
-
-      if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
-          'STT model is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      // Resolve the actual model path
-      final resolvedPath =
-          await DartBridge.modelPaths.resolveModelFilePath(model);
-      if (resolvedPath == null) {
-        throw SDKError.modelNotFound(
-            'Could not resolve STT model file path for: $modelId');
-      }
-
-      // Unload any existing model first
-      if (DartBridge.stt.isLoaded) {
-        DartBridge.stt.unload();
-      }
-
-      // Load model directly via DartBridgeSTT (mirrors Swift CppBridge.STT pattern)
-      logger.debug('Loading STT model via C++ bridge: $resolvedPath');
-      await DartBridge.stt.loadModel(resolvedPath, modelId, model.name);
-
-      if (!DartBridge.stt.isLoaded) {
-        throw SDKError.sttNotAvailable(
-          'STT model failed to load - model may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      // Track STT model load success
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'stt',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-      logger.info('STT model loaded: ${model.name}');
-    } catch (e) {
-      logger.error('Failed to load STT model: $e');
-
-      // Track STT model load failure
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'stt',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'stt_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-      rethrow;
-    }
-  }
-
-  /// Unload the currently loaded STT model
-  /// Matches Swift: `RunAnywhere.unloadSTTModel()`
-  static Future<void> unloadSTTModel() async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    DartBridge.stt.unload();
-  }
-
-  // ============================================================================
-  // MARK: - STT Transcription (matches Swift RunAnywhere+STT.swift)
-  // ============================================================================
-
-  /// Transcribe audio data to text.
-  ///
-  /// [audioData] - Raw audio bytes (PCM16 at 16kHz mono expected).
-  ///
-  /// Returns the transcribed text.
-  ///
-  /// Example:
-  /// ```dart
-  /// final text = await RunAnywhere.transcribe(audioBytes);
-  /// ```
-  ///
-  /// Matches Swift: `RunAnywhere.transcribe(_:)`
-  static Future<String> transcribe(Uint8List audioData) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    if (!DartBridge.stt.isLoaded) {
-      throw SDKError.sttNotAvailable(
-        'No STT model loaded. Call loadSTTModel() first.',
-      );
-    }
-
-    final logger = SDKLogger('RunAnywhere.Transcribe');
-    logger.debug('Transcribing ${audioData.length} bytes of audio...');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-    final modelId = currentSTTModelId ?? 'unknown';
-
-    // Get model name for telemetry
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
-    final modelName = modelInfo?.name;
-
-    // Calculate audio duration from bytes (PCM16 at 16kHz mono)
-    // Duration = bytes / 2 (16-bit = 2 bytes) / 16000 Hz * 1000 ms
-    final calculatedDurationMs = (audioData.length / 32).round();
-
-    try {
-      final result = await DartBridge.stt.transcribe(audioData);
-      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      // Use calculated duration if C++ returns 0
-      final audioDurationMs =
-          result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
-
-      // Count words in transcription
-      final wordCount = result.text.trim().isEmpty
-          ? 0
-          : result.text.trim().split(RegExp(r'\s+')).length;
-
-      // Track transcription success with full metrics
-      TelemetryService.shared.trackTranscription(
-        modelId: modelId,
-        modelName: modelName,
-        audioDurationMs: audioDurationMs,
-        latencyMs: latencyMs,
-        wordCount: wordCount,
-        confidence: result.confidence,
-        language: result.language,
-        isStreaming: false, // Batch transcription
-      );
-
-      logger.info(
-          'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
-      return result.text;
-    } on SDKError {
-      rethrow;
-    } catch (e) {
-      // Track transcription failure
-      TelemetryService.shared.trackError(
-        errorCode: 'transcription_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      logger.error('Transcription failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Transcribe audio data with detailed result.
-  ///
-  /// [audioData] - Raw audio bytes (PCM16 at 16kHz mono expected).
-  ///
-  /// Returns STTResult with text, confidence, and metadata.
-  ///
-  /// Matches Swift: `RunAnywhere.transcribeWithOptions(_:options:)`
-  static Future<STTResult> transcribeWithResult(Uint8List audioData) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    if (!DartBridge.stt.isLoaded) {
-      throw SDKError.sttNotAvailable(
-        'No STT model loaded. Call loadSTTModel() first.',
-      );
-    }
-
-    final logger = SDKLogger('RunAnywhere.Transcribe');
-    logger.debug('Transcribing ${audioData.length} bytes with details...');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-    final modelId = currentSTTModelId ?? 'unknown';
-
-    // Get model name for telemetry
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
-    final modelName = modelInfo?.name;
-
-    // Calculate audio duration from bytes (PCM16 at 16kHz mono)
-    final calculatedDurationMs = (audioData.length / 32).round();
-
-    try {
-      final result = await DartBridge.stt.transcribe(audioData);
-      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      // Use calculated duration if C++ returns 0
-      final audioDurationMs =
-          result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
-
-      // Count words in transcription
-      final wordCount = result.text.trim().isEmpty
-          ? 0
-          : result.text.trim().split(RegExp(r'\s+')).length;
-
-      // Track transcription success with full metrics
-      TelemetryService.shared.trackTranscription(
-        modelId: modelId,
-        modelName: modelName,
-        audioDurationMs: audioDurationMs,
-        latencyMs: latencyMs,
-        wordCount: wordCount,
-        confidence: result.confidence,
-        language: result.language,
-        isStreaming: false, // Batch transcription
-      );
-
-      logger.info(
-          'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
-      return STTResult(
-        text: result.text,
-        confidence: result.confidence,
-        durationMs: audioDurationMs,
-        language: result.language,
-      );
-    } on SDKError {
-      // Re-throw validation / SDK errors so callers see the structured error
-      // instead of it being logged as a generic transcription failure.
-      rethrow;
-    } catch (e) {
-      // Track transcription failure
-      TelemetryService.shared.trackError(
-        errorCode: 'transcription_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      logger.error('Transcription failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Load a TTS voice
-  static Future<void> loadTTSVoice(String voiceId) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
-    logger.info('Loading TTS voice: $voiceId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: voiceId));
-
-    try {
-      // Find the voice model
-      final models = await availableModels();
-      final model = models.where((m) => m.id == voiceId).firstOrNull;
-
-      if (model == null) {
-        throw SDKError.modelNotFound('TTS voice not found: $voiceId');
-      }
-
-      if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
-          'TTS voice is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      // Resolve the actual voice path
-      final resolvedPath =
-          await DartBridge.modelPaths.resolveModelFilePath(model);
-      if (resolvedPath == null) {
-        throw SDKError.modelNotFound(
-            'Could not resolve TTS voice path for: $voiceId');
-      }
-
-      // Unload any existing voice first
-      if (DartBridge.tts.isLoaded) {
-        DartBridge.tts.unload();
-      }
-
-      // Load voice directly via DartBridgeTTS (mirrors Swift CppBridge.TTS pattern)
-      logger.debug('Loading TTS voice via C++ bridge: $resolvedPath');
-      await DartBridge.tts.loadVoice(resolvedPath, voiceId, model.name);
-
-      if (!DartBridge.tts.isLoaded) {
-        throw SDKError.ttsNotAvailable(
-          'TTS voice failed to load - voice may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      // Track TTS voice load success
-      TelemetryService.shared.trackModelLoad(
-        modelId: voiceId,
-        modelType: 'tts',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
-      logger.info('TTS voice loaded: ${model.name}');
-    } catch (e) {
-      logger.error('Failed to load TTS voice: $e');
-
-      // Track TTS voice load failure
-      TelemetryService.shared.trackModelLoad(
-        modelId: voiceId,
-        modelType: 'tts',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'tts_voice_load_failed',
-        errorMessage: e.toString(),
-        context: {'voice_id': voiceId},
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: voiceId,
-        error: e.toString(),
-      ));
-      rethrow;
-    }
-  }
-
-  /// Unload the currently loaded TTS voice
-  /// Matches Swift: `RunAnywhere.unloadTTSVoice()`
-  static Future<void> unloadTTSVoice() async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    DartBridge.tts.unload();
-  }
-
-  // ============================================================================
-  // MARK: - TTS Synthesis (matches Swift RunAnywhere+TTS.swift)
-  // ============================================================================
-
-  /// Synthesize speech from text.
-  ///
-  /// [text] - Text to synthesize.
-  /// [rate] - Speech rate (0.5 to 2.0, 1.0 is normal). Optional.
-  /// [pitch] - Speech pitch (0.5 to 2.0, 1.0 is normal). Optional.
-  /// [volume] - Speech volume (0.0 to 1.0). Optional.
-  ///
-  /// Returns audio samples as Float32List and metadata.
-  ///
-  /// Example:
-  /// ```dart
-  /// final result = await RunAnywhere.synthesize('Hello world');
-  /// // result.samples contains PCM audio data
-  /// // result.sampleRate is typically 22050 Hz
-  /// ```
-  ///
-  /// Matches Swift: `RunAnywhere.synthesize(_:)`
-  static Future<TTSResult> synthesize(
-    String text, {
-    double rate = 1.0,
-    double pitch = 1.0,
-    double volume = 1.0,
-  }) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    if (!DartBridge.tts.isLoaded) {
-      throw SDKError.ttsNotAvailable(
-        'No TTS voice loaded. Call loadTTSVoice() first.',
-      );
-    }
-
-    final logger = SDKLogger('RunAnywhere.Synthesize');
-    logger.debug(
-        'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-    final voiceId = currentTTSVoiceId ?? 'unknown';
-
-    // Get model name for telemetry
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(voiceId);
-    final modelName = modelInfo?.name;
-
-    try {
-      final result = await DartBridge.tts.synthesize(
-        text,
-        rate: rate,
-        pitch: pitch,
-        volume: volume,
-      );
-      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      // Calculate audio size in bytes (Float32 samples = 4 bytes each)
-      final audioSizeBytes = result.samples.length * 4;
-
-      // Track synthesis success with full metrics
-      TelemetryService.shared.trackSynthesis(
-        voiceId: voiceId,
-        modelName: modelName,
-        textLength: text.length,
-        audioDurationMs: result.durationMs,
-        latencyMs: latencyMs,
-        sampleRate: result.sampleRate,
-        audioSizeBytes: audioSizeBytes,
-      );
-
-      logger.info(
-          'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz');
-      return TTSResult(
-        samples: result.samples,
-        sampleRate: result.sampleRate,
-        durationMs: result.durationMs,
-      );
-    } on SDKError {
-      rethrow;
-    } catch (e) {
-      // Track synthesis failure
-      TelemetryService.shared.trackError(
-        errorCode: 'synthesis_failed',
-        errorMessage: e.toString(),
-        context: {'voice_id': voiceId, 'text_length': text.length},
-      );
-
-      logger.error('Synthesis failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Unload current model
-  static Future<void> unloadModel() async {
-    if (!_isInitialized) return;
-
-    final logger = SDKLogger('RunAnywhere.UnloadModel');
-
-    if (DartBridge.llm.isLoaded) {
-      final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-      logger.info('Unloading model: $modelId');
-
-      EventBus.shared.publish(SDKModelEvent.unloadStarted(modelId: modelId));
-
-      // Unload via C++ bridge (matches Swift CppBridge.LLM pattern)
-      DartBridge.llm.unload();
-
-      EventBus.shared.publish(SDKModelEvent.unloadCompleted(modelId: modelId));
-      logger.info('Model unloaded');
-    }
-  }
-
-  // ============================================================================
-  // MARK: - Voice Agent (matches Swift RunAnywhere+VoiceAgent.swift)
-  // ============================================================================
-
-  /// Check if the voice agent is ready (all required components loaded).
-  ///
-  /// Returns true if STT, LLM, and TTS are all loaded and ready.
-  ///
-  /// Matches Swift: `RunAnywhere.isVoiceAgentReady`
-  static bool get isVoiceAgentReady {
-    return DartBridge.stt.isLoaded &&
-        DartBridge.llm.isLoaded &&
-        DartBridge.tts.isLoaded;
-  }
-
-  /// Get the current state of all voice agent components (STT, LLM, TTS).
-  ///
-  /// Use this to check which models are loaded and ready for the voice pipeline.
-  /// Models are loaded via the individual APIs (loadSTTModel, loadModel, loadTTSVoice).
-  ///
-  /// Matches Swift: `RunAnywhere.getVoiceAgentComponentStates()`
-  static VoiceAgentComponentStates getVoiceAgentComponentStates() {
-    final sttId = currentSTTModelId;
-    final llmId = currentModelId;
-    final ttsId = currentTTSVoiceId;
-
-    return VoiceAgentComponentStates(
-      stt: sttId != null
-          ? ComponentLoadState.loaded(modelId: sttId)
-          : const ComponentLoadState.notLoaded(),
-      llm: llmId != null
-          ? ComponentLoadState.loaded(modelId: llmId)
-          : const ComponentLoadState.notLoaded(),
-      tts: ttsId != null
-          ? ComponentLoadState.loaded(modelId: ttsId)
-          : const ComponentLoadState.notLoaded(),
-    );
-  }
-
-  /// Start a voice session with audio capture, VAD, and full voice pipeline.
-  ///
-  /// This is the simplest way to integrate voice assistant functionality.
-  /// The session handles audio capture, VAD, and processing internally.
-  ///
-  /// Example:
-  /// ```dart
-  /// final session = await RunAnywhere.startVoiceSession();
-  ///
-  /// // Consume events
-  /// session.events.listen((event) {
-  ///   if (event is VoiceSessionListening) {
-  ///     audioMeter = event.audioLevel;
-  ///   } else if (event is VoiceSessionTurnCompleted) {
-  ///     userText = event.transcript;
-  ///     assistantText = event.response;
-  ///   }
-  /// });
-  ///
-  /// // Later...
-  /// session.stop();
-  /// ```
-  ///
-  /// Matches Swift: `RunAnywhere.startVoiceSession(config:)`
-  static Future<VoiceSessionHandle> startVoiceSession({
-    VoiceSessionConfig config = VoiceSessionConfig.defaultConfig,
-  }) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.VoiceSession');
-
-    // Create the session handle with all necessary callbacks
-    final session = VoiceSessionHandle(
-      config: config,
-      processAudioCallback: _processVoiceAgentAudio,
-      isVoiceAgentReadyCallback: () async => isVoiceAgentReady,
-      initializeVoiceAgentCallback: _initializeVoiceAgentWithLoadedModels,
-    );
-
-    logger.info('Voice session created with callbacks');
-
-    // Start the session (this will verify voice agent readiness)
-    try {
-      await session.start();
-      logger.info('Voice session started successfully');
-    } catch (e) {
-      logger.error('Failed to start voice session: $e');
-      rethrow;
-    }
-
-    return session;
-  }
-
-  /// Initialize voice agent using already-loaded models.
-  ///
-  /// This is called internally by VoiceSessionHandle when starting a session.
-  /// It verifies all components (STT, LLM, TTS) are loaded.
-  ///
-  /// Matches Swift: `RunAnywhere.initializeVoiceAgentWithLoadedModels()`
-  static Future<void> _initializeVoiceAgentWithLoadedModels() async {
-    final logger = SDKLogger('RunAnywhere.VoiceAgent');
-
-    if (!isVoiceAgentReady) {
-      throw SDKError.voiceAgentNotReady(
-        'Voice agent components not ready. Load STT, LLM, and TTS models first.',
-      );
-    }
-
-    try {
-      await DartBridge.voiceAgent.initializeWithLoadedModels();
-      logger.info('Voice agent initialized with loaded models');
-    } catch (e) {
-      logger.error('Failed to initialize voice agent: $e');
-      rethrow;
-    }
-  }
-
-  /// Process audio through the voice agent pipeline (STT -> LLM -> TTS).
-  ///
-  /// This is called internally by VoiceSessionHandle during audio processing.
-  ///
-  /// Matches Swift: `RunAnywhere.processVoiceTurn(_:)`
-  static Future<VoiceAgentProcessResult> _processVoiceAgentAudio(
-    Uint8List audioData,
-  ) async {
-    final logger = SDKLogger('RunAnywhere.VoiceAgent');
-    logger.debug('Processing ${audioData.length} bytes of audio...');
-
-    try {
-      // Use the DartBridgeVoiceAgent to process the voice turn
-      final result = await DartBridge.voiceAgent.processVoiceTurn(audioData);
-
-      // Audio is already in WAV format (C++ voice agent converts Float32 TTS to WAV)
-      // No conversion needed - pass directly to playback
-      final synthesizedAudio =
-          result.audioWavData.isNotEmpty ? result.audioWavData : null;
-
-      logger.info(
-        'Voice turn complete: transcript="${result.transcription.substring(0, result.transcription.length.clamp(0, 50))}", '
-        'response="${result.response.substring(0, result.response.length.clamp(0, 50))}", '
-        'audio=${synthesizedAudio?.length ?? 0} bytes',
-      );
-
-      return VoiceAgentProcessResult(
-        speechDetected: result.transcription.isNotEmpty,
-        transcription: result.transcription,
-        response: result.response,
-        synthesizedAudio: synthesizedAudio,
-      );
-    } catch (e) {
-      logger.error('Voice turn processing failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Cleanup voice agent resources.
-  ///
-  /// Call this when you're done with voice agent functionality.
-  ///
-  /// Matches Swift: `RunAnywhere.cleanupVoiceAgent()`
-  static void cleanupVoiceAgent() {
-    DartBridge.voiceAgent.cleanup();
-  }
-
-  // ============================================================================
-  // MARK: - Vision Language Model (matches Swift RunAnywhere+VisionLanguage.swift)
-  // ============================================================================
-
-  // -- Simple API --
-
-  /// Describe an image with a text prompt
-  ///
-  /// Matches Swift: `RunAnywhere.describeImage(_:prompt:)`
-  ///
-  /// ```dart
-  /// final description = await RunAnywhere.describeImage(
-  ///   VLMImage.filePath('/path/to/image.jpg'),
-  /// );
-  /// print(description); // "A white dog sitting on a bench"
-  /// ```
-  static Future<String> describeImage(
-    VLMImage image, {
-    String prompt = "What's in this image?",
-    VLMGenerationOptions options = const VLMGenerationOptions(),
-  }) async {
-    final result = await processImage(image, prompt: prompt, options: options);
-    return result.text;
-  }
-
-  /// Ask a question about an image
-  ///
-  /// Matches Swift: `RunAnywhere.askAboutImage(_:image:)`
-  ///
-  /// ```dart
-  /// final answer = await RunAnywhere.askAboutImage(
-  ///   'What color is the dog?',
-  ///   image: VLMImage.filePath('/path/to/image.jpg'),
-  /// );
-  /// print(answer); // "The dog is white"
-  /// ```
-  static Future<String> askAboutImage(
-    String question, {
-    required VLMImage image,
-    VLMGenerationOptions options = const VLMGenerationOptions(),
-  }) async {
-    final result = await processImage(image, prompt: question, options: options);
-    return result.text;
-  }
-
-  // -- Full API --
-
-  /// Process an image with VLM
-  ///
-  /// Matches Swift: `RunAnywhere.processImage(_:prompt:maxTokens:temperature:topP:)`
-  ///
-  /// ```dart
-  /// final result = await RunAnywhere.processImage(
-  ///   VLMImage.filePath('/path/to/image.jpg'),
-  ///   prompt: 'Describe this image in detail',
-  ///   maxTokens: 512,
-  ///   temperature: 0.7,
-  /// );
-  /// print('Response: ${result.text}');
-  /// print('Tokens: ${result.completionTokens}');
-  /// print('Speed: ${result.tokensPerSecond} tok/s');
-  /// ```
-  static Future<VLMResult> processImage(
-    VLMImage image, {
-    required String prompt,
-    VLMGenerationOptions options = const VLMGenerationOptions(),
-  }) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    if (!DartBridge.vlm.isLoaded) throw SDKError.vlmNotInitialized();
-
-    final logger = SDKLogger('RunAnywhere.VLM.ProcessImage');
-    final modelId = DartBridge.vlm.currentModelId ?? 'unknown';
-
-    try {
-      // Call the bridge to process the image
-      final bridgeResult = await _processImageViaBridge(
-        image,
-        prompt,
-        options,
-      );
-
-      logger.info(
-        'VLM processing complete: ${bridgeResult.completionTokens} tokens, '
-        '${bridgeResult.tokensPerSecond.toStringAsFixed(1)} tok/s',
-      );
-
-      // Track VLM generation success
-      TelemetryService.shared.trackGeneration(
-        modelId: modelId,
-        modelName: DartBridge.vlm.currentModelId,
-        promptTokens: bridgeResult.promptTokens,
-        completionTokens: bridgeResult.completionTokens,
-        latencyMs: bridgeResult.totalTimeMs.round(),
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        tokensPerSecond: bridgeResult.tokensPerSecond,
-        isStreaming: false,
-      );
-
-      return bridgeResult;
-    } catch (e) {
-      logger.error('VLM processing failed: $e');
-
-      // Track VLM generation failure
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_processing_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      rethrow;
-    }
-  }
-
-  /// Stream image processing with real-time tokens
-  ///
-  /// Matches Swift: `RunAnywhere.processImageStream(_:prompt:maxTokens:temperature:topP:)`
-  ///
-  /// ```dart
-  /// final result = await RunAnywhere.processImageStream(
-  ///   VLMImage.filePath('/path/to/image.jpg'),
-  ///   prompt: 'Describe this image',
-  /// );
-  ///
-  /// // Listen to tokens as they arrive
-  /// result.stream.listen((token) {
-  ///   print(token); // "A ", "white ", "dog ", ...
-  /// });
-  ///
-  /// // Wait for final metrics
-  /// final metrics = await result.metrics;
-  /// print('Total: ${metrics.completionTokens} tokens');
-  ///
-  /// // Or cancel early
-  /// result.cancel();
-  /// ```
-  static Future<VLMStreamingResult> processImageStream(
-    VLMImage image, {
-    required String prompt,
-    VLMGenerationOptions options = const VLMGenerationOptions(),
-  }) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    if (!DartBridge.vlm.isLoaded) throw SDKError.vlmNotInitialized();
-
-    final logger = SDKLogger('RunAnywhere.VLM.ProcessImageStream');
-    final modelId = DartBridge.vlm.currentModelId ?? 'unknown';
-    final startTime = DateTime.now();
-    DateTime? firstTokenTime;
-
-    // Create a broadcast stream controller for the tokens
-    final controller = StreamController<String>.broadcast();
-    final allTokens = <String>[];
-
-    try {
-      // Start streaming via the bridge
-      final tokenStream = _processImageStreamViaBridge(
-        image,
-        prompt,
-        options,
-      );
-
-      // Forward tokens and collect them
-      final subscription = tokenStream.listen(
-        (token) {
-          // Track first token time
-          firstTokenTime ??= DateTime.now();
-          allTokens.add(token);
-          if (!controller.isClosed) {
-            controller.add(token);
-          }
-        },
-        onError: (Object error) {
-          logger.error('VLM streaming error: $error');
-
-          // Track streaming error
-          TelemetryService.shared.trackError(
-            errorCode: 'vlm_streaming_failed',
-            errorMessage: error.toString(),
-            context: {'model_id': modelId},
-          );
-
-          if (!controller.isClosed) {
-            controller.addError(error);
-          }
-        },
-        onDone: () {
-          if (!controller.isClosed) {
-            unawaited(controller.close());
-          }
-        },
-      );
-
-      // Build result future that completes when stream is done
-      final metricsFuture = controller.stream.toList().then((_) {
-        final endTime = DateTime.now();
-        final totalTimeMs = endTime.difference(startTime).inMicroseconds / 1000.0;
-        final tokensPerSecond =
-            totalTimeMs > 0 ? allTokens.length / (totalTimeMs / 1000) : 0.0;
-
-        // Calculate time to first token
-        int? timeToFirstTokenMs;
-        if (firstTokenTime != null) {
-          timeToFirstTokenMs = firstTokenTime!.difference(startTime).inMilliseconds;
-        }
-
-        logger.info(
-          'VLM streaming complete: ${allTokens.length} tokens, '
-          '${tokensPerSecond.toStringAsFixed(1)} tok/s',
-        );
-
-        // Track VLM streaming success
-        TelemetryService.shared.trackGeneration(
-          modelId: modelId,
-          modelName: DartBridge.vlm.currentModelId,
-          promptTokens: 0, // Image tokens not exposed yet
-          completionTokens: allTokens.length,
-          latencyMs: totalTimeMs.round(),
-          temperature: options.temperature,
-          maxTokens: options.maxTokens,
-          tokensPerSecond: tokensPerSecond,
-          timeToFirstTokenMs: timeToFirstTokenMs,
-          isStreaming: true,
-        );
-
-        return VLMResult(
-          text: allTokens.join(),
-          promptTokens: 0, // Not provided by streaming API
-          completionTokens: allTokens.length,
-          totalTimeMs: totalTimeMs,
-          tokensPerSecond: tokensPerSecond,
-        );
-      });
-
-      return VLMStreamingResult(
-        stream: controller.stream,
-        metrics: metricsFuture,
-        cancel: () {
-          logger.debug('Cancelling VLM streaming');
-          DartBridge.vlm.cancel();
-          unawaited(subscription.cancel());
-          if (!controller.isClosed) {
-            unawaited(controller.close());
-          }
-        },
-      );
-    } catch (e) {
-      logger.error('Failed to start VLM streaming: $e');
-
-      // Track streaming start failure
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_streaming_start_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      rethrow;
-    }
-  }
-
-  // -- VLM State --
-
-  /// Get the currently loaded VLM model ID
-  static String? get currentVLMModelId => DartBridge.vlm.currentModelId;
-
-  /// Check if a VLM model is currently loaded
-  static bool get isVLMModelLoaded => DartBridge.vlm.isLoaded;
-
-  // -- Model Management --
-
-  /// Load a VLM model by ID
-  ///
-  /// Matches Swift: `RunAnywhere.loadVLMModel(_:)` (ModelInfo version)
-  ///
-  /// Resolves the main model .gguf file and mmproj .gguf file from the model folder.
-  ///
-  /// ```dart
-  /// await RunAnywhere.loadVLMModel('llava-1.5-7b');
-  /// print('VLM model loaded: ${RunAnywhere.currentVLMModelId}');
-  /// ```
-  static Future<void> loadVLMModel(String modelId) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.LoadVLMModel');
-    logger.info('Loading VLM model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    // Emit load started event
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
-    try {
-      // Find the model in available models
-      final models = await availableModels();
-      final model = models.where((m) => m.id == modelId).firstOrNull;
-
-      if (model == null) {
-        throw SDKError.modelNotFound('VLM model not found: $modelId');
-      }
-
-      // Check if model has a local path (downloaded)
-      if (model.localPath == null) {
-        throw SDKError.modelNotDownloaded(
-          'VLM model is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      // Resolve the model folder path
-      final modelFolder = model.localPath!.toFilePath();
-      logger.info('VLM model folder: $modelFolder');
-
-      // Resolve the actual model file path
-      final modelPath = await _resolveVLMModelFilePath(modelFolder, model);
-      if (modelPath == null) {
-        throw SDKError.modelNotFound(
-          'Could not find main VLM model file in: $modelFolder',
-        );
-      }
-      logger.info('Resolved VLM model path: $modelPath');
-
-      // Get the model directory for finding mmproj
-      final modelDir = Directory(modelPath).parent.path;
-
-      // Try to find mmproj file in same directory
-      final mmprojPath = await _findMmprojFile(modelDir);
-      logger.info('mmproj path: ${mmprojPath ?? "not found"}');
-
-      // Unload any existing model first
-      if (DartBridge.vlm.isLoaded) {
-        logger.debug('Unloading previous VLM model');
-        DartBridge.vlm.unload();
-      }
-
-      // Load the VLM model via the bridge
-      logger.debug('Loading VLM model via C++ bridge');
-      await DartBridge.vlm.loadModel(
-        modelPath,
-        mmprojPath,
-        modelId,
-        model.name,
-      );
-
-      // Verify the model loaded successfully
-      if (!DartBridge.vlm.isLoaded) {
-        throw SDKError.vlmModelLoadFailed(
-          'VLM model failed to load - model may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info(
-        'VLM model loaded successfully: ${model.name} (isLoaded=${DartBridge.vlm.isLoaded})',
-      );
-
-      // Track model load success
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      // Emit load completed event
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-    } catch (e) {
-      logger.error('Failed to load VLM model: $e');
-
-      // Track model load failure
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      // Emit load failed event
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-
-      rethrow;
-    }
-  }
-
-  /// Load a VLM model by ID using C++ path resolution
-  ///
-  /// Matches Swift: `RunAnywhere.loadVLMModelById(_:)`
-  ///
-  /// The C++ layer resolves the model path from the global registry.
-  /// The model must have been registered via `registerModel()` first.
-  ///
-  /// ```dart
-  /// await RunAnywhere.loadVLMModelById('llava-1.5-7b');
-  /// ```
-  static Future<void> loadVLMModelById(String modelId) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-
-    final logger = SDKLogger('RunAnywhere.LoadVLMModelById');
-    logger.info('Loading VLM model by ID: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
-    try {
-      if (DartBridge.vlm.isLoaded) {
-        logger.debug('Unloading previous VLM model');
-        DartBridge.vlm.unload();
-      }
-
-      await DartBridge.vlm.loadModelById(modelId);
-
-      if (!DartBridge.vlm.isLoaded) {
-        throw SDKError.vlmModelLoadFailed(
-          'VLM model failed to load - model may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info('VLM model loaded by ID: $modelId');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-    } catch (e) {
-      logger.error('Failed to load VLM model by ID: $e');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-
-      rethrow;
-    }
-  }
-
-  /// Load a VLM model from explicit file paths
-  ///
-  /// Matches Swift: `RunAnywhere.loadVLMModel(_:mmprojPath:modelId:modelName:)`
-  ///
-  /// ```dart
-  /// await RunAnywhere.loadVLMModelWithPath(
-  ///   '/path/to/model.gguf',
-  ///   mmprojPath: '/path/to/mmproj.gguf',
-  ///   modelId: 'llava-custom',
-  ///   modelName: 'LLaVA Custom',
-  /// );
-  /// ```
-  static Future<void> loadVLMModelWithPath(
-    String modelPath, {
-    String? mmprojPath,
-    required String modelId,
-    required String modelName,
-  }) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-
-    final logger = SDKLogger('RunAnywhere.LoadVLMModelWithPath');
-    logger.info('Loading VLM model from path: $modelPath');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-
-    try {
-      if (DartBridge.vlm.isLoaded) {
-        logger.debug('Unloading previous VLM model');
-        DartBridge.vlm.unload();
-      }
-
-      await DartBridge.vlm.loadModel(modelPath, mmprojPath, modelId, modelName);
-
-      if (!DartBridge.vlm.isLoaded) {
-        throw SDKError.vlmModelLoadFailed(
-          'VLM model failed to load - model may not be compatible',
-        );
-      }
-
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info('VLM model loaded from path: $modelPath');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-    } catch (e) {
-      logger.error('Failed to load VLM model from path: $e');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId, 'model_path': modelPath},
-      );
-
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-
-      rethrow;
-    }
-  }
-
-  /// Unload the currently loaded VLM model
-  ///
-  /// Matches Swift: `RunAnywhere.unloadVLMModel()`
-  static Future<void> unloadVLMModel() async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-
-    final logger = SDKLogger('RunAnywhere.UnloadVLMModel');
-    logger.debug('Unloading VLM model');
-
-    DartBridge.vlm.unload();
-
-    logger.info('VLM model unloaded');
-  }
-
-  /// Cancel ongoing VLM generation
-  ///
-  /// Matches Swift: `RunAnywhere.cancelVLMGeneration()`
-  static Future<void> cancelVLMGeneration() async {
-    DartBridge.vlm.cancel();
-  }
-
-  // -- Private VLM Helpers --
-
-  /// Helper to process image via bridge (non-streaming)
-  static Future<VLMResult> _processImageViaBridge(
-    VLMImage image,
-    String prompt,
-    VLMGenerationOptions options,
-  ) async {
-    // Extract format-specific data from sealed class
-    final format = image.format;
-    final VlmBridgeResult bridgeResult;
-
-    if (format is VLMImageFormatFilePath) {
-      bridgeResult = await DartBridge.vlm.processImage(
-        imageFormat: RacVlmImageFormat.filePath,
-        filePath: format.path,
-        prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
-      );
-    } else if (format is VLMImageFormatRgbPixels) {
-      bridgeResult = await DartBridge.vlm.processImage(
-        imageFormat: RacVlmImageFormat.rgbPixels,
-        pixelData: format.data,
-        width: format.width,
-        height: format.height,
-        prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
-      );
-    } else if (format is VLMImageFormatBase64) {
-      bridgeResult = await DartBridge.vlm.processImage(
-        imageFormat: RacVlmImageFormat.base64,
-        base64Data: format.encoded,
-        prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
-      );
-    } else {
-      throw SDKError.vlmInvalidImage('Unsupported image format');
-    }
-
-    // Convert VlmBridgeResult to VLMResult
-    return VLMResult(
-      text: bridgeResult.text,
-      promptTokens: bridgeResult.promptTokens,
-      completionTokens: bridgeResult.completionTokens,
-      totalTimeMs: bridgeResult.totalTimeMs.toDouble(),
-      tokensPerSecond: bridgeResult.tokensPerSecond,
-    );
-  }
-
-  /// Helper to process image via bridge (streaming)
-  static Stream<String> _processImageStreamViaBridge(
-    VLMImage image,
-    String prompt,
-    VLMGenerationOptions options,
-  ) {
-    // Extract format-specific data from sealed class
-    final format = image.format;
-
-    if (format is VLMImageFormatFilePath) {
-      return DartBridge.vlm.processImageStream(
-        imageFormat: RacVlmImageFormat.filePath,
-        filePath: format.path,
-        prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
-      );
-    } else if (format is VLMImageFormatRgbPixels) {
-      return DartBridge.vlm.processImageStream(
-        imageFormat: RacVlmImageFormat.rgbPixels,
-        pixelData: format.data,
-        width: format.width,
-        height: format.height,
-        prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
-      );
-    } else if (format is VLMImageFormatBase64) {
-      return DartBridge.vlm.processImageStream(
-        imageFormat: RacVlmImageFormat.base64,
-        base64Data: format.encoded,
-        prompt: prompt,
-        maxTokens: options.maxTokens,
-        temperature: options.temperature,
-        topP: options.topP,
-        useGpu: options.useGpu,
-        systemPrompt: options.systemPrompt,
-        maxImageSize: options.maxImageSize,
-        nThreads: options.nThreads,
-      );
-    } else {
-      throw SDKError.vlmInvalidImage('Unsupported image format');
-    }
-  }
-
-  /// Resolve VLM model file path (similar to LLM path resolution)
-  static Future<String?> _resolveVLMModelFilePath(
-    String modelFolder,
-    ModelInfo model,
-  ) async {
-    // If modelFolder points to a file (e.g. .gguf), use its parent directory
-    final file = File(modelFolder);
-    final dir = await file.exists() ? file.parent : Directory(modelFolder);
-    if (!await dir.exists()) return null;
-    final dirPath = dir.path;
-
-    try {
-      // List folder contents
-      final entities = await dir.list().toList();
-      final files =
-          entities.whereType<File>().map((f) => f.path.split('/').last).toList();
-
-      // Find .gguf files that are NOT mmproj files (main model)
-      final ggufFiles = files.where((f) => f.toLowerCase().endsWith('.gguf')).toList();
-      final mainModelFiles =
-          ggufFiles.where((f) => !f.toLowerCase().contains('mmproj')).toList();
-
-      if (mainModelFiles.isNotEmpty) {
-        return '$dirPath/${mainModelFiles.first}';
-      }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Find mmproj file in a directory
-  static Future<String?> _findMmprojFile(String modelDirPath) async {
-    final dir = Directory(modelDirPath);
-    if (!await dir.exists()) return null;
-
-    try {
-      await for (final entity in dir.list()) {
-        if (entity is File) {
-          final name = entity.path.split('/').last.toLowerCase();
-          if (name.contains('mmproj') && name.endsWith('.gguf')) {
-            return entity.path;
-          }
-        }
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // ============================================================================
-  // Text Generation (LLM)
-  // ============================================================================
-
-  /// Simple text generation - returns only the generated text
-  ///
-  /// Matches Swift `RunAnywhere.chat(_:)`.
-  ///
-  /// ```dart
-  /// final response = await RunAnywhere.chat('Hello, world!');
-  /// print(response);
-  /// ```
-  static Future<String> chat(String prompt) async {
-    final result = await generate(prompt);
-    return result.text;
-  }
-
-  /// Full text generation with metrics
-  ///
-  /// Matches Swift `RunAnywhere.generate(_:options:)`.
-  ///
-  /// ```dart
-  /// final result = await RunAnywhere.generate(
-  ///   'Explain quantum computing',
-  ///   options: LLMGenerationOptions(maxTokens: 200, temperature: 0.7),
-  /// );
-  /// print('Response: ${result.text}');
-  /// print('Latency: ${result.latencyMs}ms');
-  /// ```
-  static Future<LLMGenerationResult> generate(
-    String prompt, {
-    LLMGenerationOptions? options,
-  }) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final opts = options ?? const LLMGenerationOptions();
-    final startTime = DateTime.now();
-
-    // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
-    if (!DartBridge.llm.isLoaded) {
-      throw SDKError.componentNotReady(
-        'LLM model not loaded. Call loadModel() first.',
-      );
-    }
-
-    final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-
-    // Get model name from registry for telemetry
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
-    final modelName = modelInfo?.name;
-
-    // Determine effective system prompt - add JSON conversion instructions if structuredOutput is provided
-    String? effectiveSystemPrompt = opts.systemPrompt;
-    if (opts.structuredOutput != null) {
-      final jsonSystemPrompt =
-          DartBridgeStructuredOutput.shared.getSystemPrompt(
-        opts.structuredOutput!.schema,
-      );
-      // If user already provided a system prompt, prepend the JSON instructions
-      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
-        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
-      } else {
-        effectiveSystemPrompt = jsonSystemPrompt;
-      }
-    }
-
-    try {
-      // Generate directly via DartBridgeLLM (calls rac_llm_component_generate)
-      final result = await DartBridge.llm.generate(
-        prompt,
-        maxTokens: opts.maxTokens,
-        temperature: opts.temperature,
-        systemPrompt: effectiveSystemPrompt,
-      );
-
-      final endTime = DateTime.now();
-      final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
-      final tokensPerSecond = result.totalTimeMs > 0
-          ? (result.completionTokens / result.totalTimeMs) * 1000
-          : 0.0;
-
-      // Track generation success with full metrics (mirrors other SDKs)
-      TelemetryService.shared.trackGeneration(
-        modelId: modelId,
-        modelName: modelName,
-        promptTokens: result.promptTokens,
-        completionTokens: result.completionTokens,
-        latencyMs: latencyMs.round(),
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
-        contextLength: modelInfo?.contextLength,
-        tokensPerSecond: tokensPerSecond,
-        isStreaming: false,
-      );
-
-      // Extract structured data if structuredOutput is provided
-      Map<String, dynamic>? structuredData;
-      if (opts.structuredOutput != null) {
-        try {
-          final jsonString =
-              DartBridgeStructuredOutput.shared.extractJson(result.text);
-          if (jsonString != null) {
-            final parsed = jsonDecode(jsonString);
-            structuredData = _normalizeStructuredData(parsed);
-          }
-        } catch (e) {
-          // JSON extraction/parse failed — return text result without structured data
-          final logger = SDKLogger('StructuredOutputHandler');
-          logger.info('JSON extraction/parse failed: $e');
-        }
-      }
-
-      return LLMGenerationResult(
-        text: result.text,
-        inputTokens: result.promptTokens,
-        tokensUsed: result.completionTokens,
-        modelUsed: modelId,
-        latencyMs: latencyMs,
-        framework: 'llamacpp',
-        tokensPerSecond: tokensPerSecond,
-        structuredData: structuredData,
-      );
-    } on SDKError {
-      rethrow;
-    } catch (e) {
-      // Track generation failure
-      TelemetryService.shared.trackError(
-        errorCode: 'generation_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-      throw SDKError.generationFailed('$e');
-    }
-  }
-
-  /// Streaming text generation
-  ///
-  /// Matches Swift `RunAnywhere.generateStream(_:options:)`.
-  ///
-  /// Returns an `LLMStreamingResult` containing:
-  /// - `stream`: Stream of tokens as they are generated
-  /// - `result`: Future that completes with final generation metrics
-  /// - `cancel`: Function to cancel the generation
-  ///
-  /// ```dart
-  /// final result = await RunAnywhere.generateStream('Tell me a story');
-  ///
-  /// // Consume tokens as they arrive
-  /// await for (final token in result.stream) {
-  ///   print(token);
-  /// }
-  ///
-  /// // Get final metrics after stream completes
-  /// final metrics = await result.result;
-  /// print('Tokens: ${metrics.tokensUsed}');
-  ///
-  /// // Or cancel early if needed
-  /// result.cancel();
-  /// ```
-  static Future<LLMStreamingResult> generateStream(
-    String prompt, {
-    LLMGenerationOptions? options,
-  }) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final opts = options ?? const LLMGenerationOptions();
-    final startTime = DateTime.now();
-    DateTime? firstTokenTime;
-
-    // Verify model is loaded via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
-    if (!DartBridge.llm.isLoaded) {
-      throw SDKError.componentNotReady(
-        'LLM model not loaded. Call loadModel() first.',
-      );
-    }
-
-    final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-
-    // Get model name from registry for telemetry
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
-    final modelName = modelInfo?.name;
-
-    // Determine effective system prompt - add JSON conversion instructions if structuredOutput is provided
-    String? effectiveSystemPrompt = opts.systemPrompt;
-    if (opts.structuredOutput != null) {
-      final jsonSystemPrompt =
-          DartBridgeStructuredOutput.shared.getSystemPrompt(
-        opts.structuredOutput!.schema,
-      );
-      // If user already provided a system prompt, prepend the JSON instructions
-      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
-        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
-      } else {
-        effectiveSystemPrompt = jsonSystemPrompt;
-      }
-    }
-
-    // Create a broadcast stream controller for the tokens
-    final controller = StreamController<String>.broadcast();
-    final allTokens = <String>[];
-
-    // Start streaming generation via DartBridgeLLM
-    late final Stream<String> tokenStream;
-    try {
-      tokenStream = DartBridge.llm.generateStream(
-        prompt,
-        maxTokens: opts.maxTokens,
-        temperature: opts.temperature,
-        systemPrompt: effectiveSystemPrompt,
-      );
-    } on SDKError {
-      rethrow;
-    }
-
-    // Forward tokens and collect them, track subscription in bridge for cancellation
-    DartBridge.llm.setActiveStreamSubscription(
-      tokenStream.listen(
-        (token) {
-          // Track first token time
-          firstTokenTime ??= DateTime.now();
-          allTokens.add(token);
-          if (!controller.isClosed) {
-            controller.add(token);
-          }
-        },
-        onError: (Object error) {
-          // Track streaming generation error
-          TelemetryService.shared.trackError(
-            errorCode: 'streaming_generation_failed',
-            errorMessage: error.toString(),
-            context: {'model_id': modelId},
-          );
-          if (!controller.isClosed) {
-            controller.addError(error);
-          }
-        },
-        onDone: () {
-          if (!controller.isClosed) {
-            unawaited(controller.close());
-          }
-          // Clear subscription when done
-          DartBridge.llm.setActiveStreamSubscription(null);
-        },
-      ),
-    );
-
-    // Build result future that completes when stream is done
-    final resultFuture = controller.stream.toList().then((_) {
-      final endTime = DateTime.now();
-      final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
-      final tokensPerSecond =
-          latencyMs > 0 ? allTokens.length / (latencyMs / 1000) : 0.0;
-
-      // Calculate time to first token
-      int? timeToFirstTokenMs;
-      if (firstTokenTime != null) {
-        timeToFirstTokenMs =
-            firstTokenTime!.difference(startTime).inMilliseconds;
-      }
-
-      // Estimate tokens (~4 chars per token)
-      final promptTokens = (prompt.length / 4).ceil();
-      final completionTokens = allTokens.length;
-
-      // Track streaming generation success with full metrics (mirrors other SDKs)
-      TelemetryService.shared.trackGeneration(
-        modelId: modelId,
-        modelName: modelName,
-        promptTokens: promptTokens,
-        completionTokens: completionTokens,
-        latencyMs: latencyMs.round(),
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
-        contextLength: modelInfo?.contextLength,
-        tokensPerSecond: tokensPerSecond,
-        timeToFirstTokenMs: timeToFirstTokenMs,
-        isStreaming: true,
-      );
-
-      // Extract structured data if structuredOutput is provided
-      Map<String, dynamic>? structuredData;
-      final fullText = allTokens.join();
-      if (opts.structuredOutput != null) {
-        try {
-          final jsonString =
-              DartBridgeStructuredOutput.shared.extractJson(fullText);
-          if (jsonString != null) {
-            final parsed = jsonDecode(jsonString);
-            structuredData = _normalizeStructuredData(parsed);
-          }
-        } catch (_) {
-          // JSON extraction/parse failed — return text result without structured data
-        }
-      }
-
-      return LLMGenerationResult(
-        text: fullText,
-        inputTokens: promptTokens,
-        tokensUsed: completionTokens,
-        modelUsed: modelId,
-        latencyMs: latencyMs,
-        framework: 'llamacpp',
-        tokensPerSecond: tokensPerSecond,
-        structuredData: structuredData,
-      );
-    });
-
-    return LLMStreamingResult(
-      stream: controller.stream,
-      result: resultFuture,
-      cancel: () {
-        // Cancel via the bridge (handles both stream subscription and native cancel)
-        DartBridge.llm.cancelGeneration();
-      },
-    );
-  }
-
-  /// Cancel ongoing generation
-  static Future<void> cancelGeneration() async {
-    // Cancel via the bridge (handles both stream subscription and service)
-    DartBridge.llm.cancelGeneration();
-  }
-
-  /// Download a model by ID
-  ///
-  /// Matches Swift `RunAnywhere.downloadModel(_:)`.
-  ///
-  /// ```dart
-  /// await for (final progress in RunAnywhere.downloadModel('my-model-id')) {
-  ///   print('Progress: ${(progress.percentage * 100).toStringAsFixed(1)}%');
-  ///   if (progress.state.isCompleted) break;
-  /// }
-  /// ```
-  static Stream<DownloadProgress> downloadModel(String modelId) async* {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.Download');
-    logger.info('📥 Starting download for model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    await for (final progress
-        in ModelDownloadService.shared.downloadModel(modelId)) {
-      // Convert internal progress to public DownloadProgress
-      yield DownloadProgress(
-        bytesDownloaded: progress.bytesDownloaded,
-        totalBytes: progress.totalBytes,
-        state: _mapDownloadStage(progress.stage),
-      );
-
-      // Log progress at intervals
-      if (progress.stage == ModelDownloadStage.downloading) {
-        final pct = (progress.overallProgress * 100).toStringAsFixed(1);
-        if (progress.bytesDownloaded % (1024 * 1024) < 10000) {
-          // Log every ~1MB
-          logger.debug('Download progress: $pct%');
-        }
-      } else if (progress.stage == ModelDownloadStage.extracting) {
-        logger.info('Extracting model...');
-      } else if (progress.stage == ModelDownloadStage.completed) {
-        final downloadTimeMs =
-            DateTime.now().millisecondsSinceEpoch - startTime;
-        logger.info('✅ Download completed for model: $modelId');
-
-        // Track download success
-        TelemetryService.shared.trackModelDownload(
-          modelId: modelId,
-          success: true,
-          downloadTimeMs: downloadTimeMs,
-          sizeBytes: progress.totalBytes,
-        );
-      } else if (progress.stage == ModelDownloadStage.failed) {
-        logger.error('❌ Download failed: ${progress.error}');
-
-        // Track download failure
-        TelemetryService.shared.trackModelDownload(
-          modelId: modelId,
-          success: false,
-        );
-        TelemetryService.shared.trackError(
-          errorCode: 'download_failed',
-          errorMessage: progress.error ?? 'Unknown error',
-          context: {'model_id': modelId},
-        );
-      }
-    }
-  }
-
-  /// Map internal download stage to public state
-  static DownloadProgressState _mapDownloadStage(ModelDownloadStage stage) {
-    switch (stage) {
-      case ModelDownloadStage.downloading:
-      case ModelDownloadStage.extracting:
-      case ModelDownloadStage.verifying:
-        return DownloadProgressState.downloading;
-      case ModelDownloadStage.completed:
-        return DownloadProgressState.completed;
-      case ModelDownloadStage.failed:
-        return DownloadProgressState.failed;
-      case ModelDownloadStage.cancelled:
-        return DownloadProgressState.cancelled;
-    }
-  }
-
-  /// Delete a stored model
-  ///
-  /// Matches Swift `RunAnywhere.deleteStoredModel(modelId:)`.
-  static Future<void> deleteStoredModel(String modelId) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-    await DartBridgeModelRegistry.instance.removeModel(modelId);
-    EventBus.shared.publish(SDKModelEvent.deleted(modelId: modelId));
-  }
-
-  /// Get storage info including device storage, app storage, and downloaded models.
-  ///
-  /// Matches Swift: `RunAnywhere.getStorageInfo()`
-  static Future<StorageInfo> getStorageInfo() async {
-    if (!_isInitialized) {
-      return StorageInfo.empty;
-    }
-
-    try {
-      // Get device storage info
-      final deviceStorage = await _getDeviceStorageInfo();
-
-      // Get app storage info
-      final appStorage = await _getAppStorageInfo();
-
-      // Get downloaded models with sizes
-      final storedModels = await getDownloadedModelsWithInfo();
-      final modelMetrics = storedModels
-          .map((m) =>
-              ModelStorageMetrics(model: m.modelInfo, sizeOnDisk: m.size))
-          .toList();
-
-      return StorageInfo(
-        appStorage: appStorage,
-        deviceStorage: deviceStorage,
-        models: modelMetrics,
-      );
-    } catch (e) {
-      SDKLogger('RunAnywhere.Storage').error('Failed to get storage info: $e');
-      return StorageInfo.empty;
-    }
-  }
-
-  /// Get device storage information.
-  static Future<DeviceStorageInfo> _getDeviceStorageInfo() async {
-    try {
-      // Get device storage info from documents directory
-      final modelsDir = DartBridgeModelPaths.instance.getModelsDirectory();
-      if (modelsDir == null) {
-        return const DeviceStorageInfo(
-            totalSpace: 0, freeSpace: 0, usedSpace: 0);
-      }
-
-      // Calculate total storage used by models
-      final modelsDirSize = await _getDirectorySize(modelsDir);
-
-      // For iOS/Android, we can't easily get device free space without native code
-      // Return what we know: the models directory size
-      return DeviceStorageInfo(
-        totalSpace: modelsDirSize,
-        freeSpace: 0, // Would need native code to get real free space
-        usedSpace: modelsDirSize,
-      );
-    } catch (e) {
-      return const DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0);
-    }
-  }
-
-  /// Get app storage breakdown.
-  static Future<AppStorageInfo> _getAppStorageInfo() async {
-    try {
-      // Get models directory size
-      final modelsDir = DartBridgeModelPaths.instance.getModelsDirectory();
-      final modelsDirSize =
-          modelsDir != null ? await _getDirectorySize(modelsDir) : 0;
-
-      // For now, we'll estimate cache and app support as 0
-      // since we don't have a dedicated cache directory
-      return AppStorageInfo(
-        documentsSize: modelsDirSize,
-        cacheSize: 0,
-        appSupportSize: 0,
-        totalSize: modelsDirSize,
-      );
-    } catch (e) {
-      return const AppStorageInfo(
-        documentsSize: 0,
-        cacheSize: 0,
-        appSupportSize: 0,
-        totalSize: 0,
-      );
-    }
-  }
-
-  /// Calculate directory size — delegates to C++ file manager.
-  static Future<int> _getDirectorySize(String path) async {
-    return DartBridgeFileManager.calculateDirectorySize(path);
-  }
-
-  /// Get downloaded models with their file sizes.
-  ///
-  /// Returns a list of StoredModel objects with size information populated
-  /// from the actual files on disk.
-  ///
-  /// Matches Swift: `RunAnywhere.getDownloadedModelsWithInfo()`
-  static Future<List<StoredModel>> getDownloadedModelsWithInfo() async {
-    if (!_isInitialized) {
-      return [];
-    }
-
-    try {
-      // Get all models that have localPath set (are downloaded)
-      final allModels = await availableModels();
-      final downloadedModels =
-          allModels.where((m) => m.localPath != null).toList();
-
-      final storedModels = <StoredModel>[];
-
-      for (final model in downloadedModels) {
-        // Get the actual file size
-        final localPath = model.localPath!.toFilePath();
-        int fileSize = 0;
-
-        try {
-          // Check if it's a directory (for multi-file models) or single file
-          final file = File(localPath);
-          final dir = Directory(localPath);
-
-          if (await file.exists()) {
-            fileSize = await file.length();
-          } else if (await dir.exists()) {
-            fileSize = await _getDirectorySize(localPath);
-          }
-        } catch (e) {
-          SDKLogger('RunAnywhere.Storage')
-              .debug('Could not get size for ${model.id}: $e');
-        }
-
-        storedModels.add(StoredModel(
-          modelInfo: model,
-          size: fileSize,
-        ));
-      }
-
-      return storedModels;
-    } catch (e) {
-      SDKLogger('RunAnywhere.Storage')
-          .error('Failed to get downloaded models: $e');
-      return [];
-    }
-  }
-
-  /// Reset SDK state
-  static Future<void> reset() async {
-    // Flush pending telemetry events before reset
-    await TelemetryService.shared.shutdown();
-
-    _isInitialized = false;
-    _hasRunDiscovery = false;
-    _initParams = null;
-    _currentEnvironment = null;
-    _registeredModels.clear();
-    DartBridgeModelRegistry.instance.shutdown();
-    serviceContainer.reset();
-  }
-
-  /// Update the download status for a model in C++ registry
-  ///
-  /// Called by ModelDownloadService after a successful download.
-  /// Matches Swift: CppBridge.ModelRegistry.shared.updateDownloadStatus()
-  static Future<void> updateModelDownloadStatus(
-      String modelId, String? localPath) async {
-    await DartBridgeModelRegistry.instance
-        .updateDownloadStatus(modelId, localPath);
-  }
-
-  /// Remove a model from the C++ registry
-  ///
-  /// Called when a model is deleted.
-  /// Matches Swift: CppBridge.ModelRegistry.shared.remove()
-  static Future<void> removeModel(String modelId) async {
-    await DartBridgeModelRegistry.instance.removeModel(modelId);
-  }
-
-  /// Internal: Run discovery once on first availableModels() call
-  /// This ensures models are registered before discovery runs
-  static Future<void> _runDiscovery() async {
+  /// Compatibility hook for callers that previously triggered one-shot
+  /// downloaded-model discovery before listing. Startup discovery now runs in
+  /// commons Phase 2, so this only waits for Phase 2 once.
+  static Future<void> runDiscoveryIfNeeded() async {
     if (_hasRunDiscovery) return;
-
     final logger = SDKLogger('RunAnywhere.Discovery');
-    logger.debug(
-        'Running lazy discovery (models should already be registered)...');
-
-    final result =
-        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
-
+    try {
+      await completeServicesInitialization();
+    } catch (e) {
+      logger.debug('Phase 2 discovery readiness wait failed: $e');
+    }
     _hasRunDiscovery = true;
+  }
 
-    if (result.discoveredModels.isNotEmpty) {
-      logger.info(
-          '📦 Discovered ${result.discoveredModels.length} downloaded models');
-      for (final model in result.discoveredModels) {
-        logger.debug(
-            '  - ${model.modelId} -> ${model.localPath} (framework: ${model.framework})');
+  /// Reset all SDK state; clears registered models, cached
+  /// configuration, loaded backends. Useful for tests.
+  ///
+  /// Mirrors Swift `RunAnywhere.reset()`: this is the symmetric counterpart
+  /// of [initializeWithParams]. Calling reset() and then a subsequent
+  /// initialize(...) MUST run a fresh Phase 1 + Phase 2 against the new
+  /// params, so reset must clear the bridge's `_isInitialized` flag —
+  /// otherwise [initializeWithParams] short-circuits at
+  /// `if (DartBridge.isInitialized) return;` and the SDK stays in a
+  /// half-reset state (Dart caches empty, native bridge still marked
+  /// initialized).
+  static Future<void> reset() async {
+    DartBridgeTelemetry.flush();
+
+    DartBridge.modelLifecycle.reset();
+    _hasRunDiscovery = false;
+    _hasCompletedHTTPSetup = false;
+    _cachedInitParams = null;
+    _servicesInitFuture = null;
+    DartBridgeModelRegistry.instance.shutdown();
+    HTTPClientAdapter.shared.resetForTesting();
+    // Tear down the bridge LAST so dependents (telemetry/registry/HTTP)
+    // can flush against a still-initialized native side. Mirrors Swift's
+    // `await CppBridge.shutdown()` ordering inside `RunAnywhere.reset()`.
+    unawaited(DartBridge.shutdown());
+  }
+
+  // --- Capability surfaces -------------------------------------------------
+
+  /// LLM (text generation) — load, chat, generate, generate-stream, cancel.
+  static RunAnywhereLLM get llm => RunAnywhereLLM.shared;
+
+  /// STT (speech-to-text) — load, transcribe.
+  static RunAnywhereSTT get stt => RunAnywhereSTT.shared;
+
+  /// TTS (text-to-speech) — load voice, synthesize, speak.
+  static RunAnywhereTTS get tts => RunAnywhereTTS.shared;
+
+  /// VAD (voice activity detection) — initialize, detectSpeech, start/stop,
+  /// load model. Mirrors Swift's `RunAnywhere+VAD.swift` extension.
+  static RunAnywhereVAD get vad => RunAnywhereVAD.shared;
+
+  /// VLM (vision-language model) — load, processImage, processImageStream,
+  /// describe, askAbout.
+  static RunAnywhereVLM get vlm => RunAnywhereVLM.shared;
+
+  /// VisionLanguage namespace (Swift parity). Identical to [vlm].
+  static RunAnywhereVLM get visionLanguage => RunAnywhereVLM.shared;
+
+  /// Voice Agent (full STT → LLM → TTS pipeline) — initialize,
+  /// cleanup, isReady, eventStream. Symmetric with `llm.generateStream`:
+  /// `voice.eventStream()` returns `Stream<VoiceEvent>` and wraps
+  /// `VoiceAgentStreamAdapter` internally.
+  static RunAnywhereVoice get voice => RunAnywhereVoice.shared;
+
+  /// Models registry — list available, refresh from filesystem,
+  /// register, register multi-file, update download status, remove.
+  static RunAnywhereModels get models => RunAnywhereModels.shared;
+
+  /// Model/component lifecycle — generated proto load/unload/current/snapshot.
+  static RunAnywhereModelLifecycle get modelLifecycle =>
+      RunAnywhereModelLifecycle.shared;
+
+  /// Downloads — start, delete, storage info, list downloaded.
+  static RunAnywhereDownloads get downloads => RunAnywhereDownloads.shared;
+
+  /// Tools (LLM function calling) — register, execute, generateWithTools.
+  static RunAnywhereTools get tools => RunAnywhereTools.shared;
+
+  /// RAG (Retrieval-Augmented Generation) — pipeline lifecycle,
+  /// ingest, query, statistics.
+  static RunAnywhereRAG get rag => RunAnywhereRAG.shared;
+
+  /// Solutions (T4.7/T4.8) — proto/YAML-driven L5 pipeline runtime.
+  /// Construct a solution from a typed `SolutionConfig` proto, raw
+  /// proto bytes, or YAML sugar; returns a [SolutionHandle] with
+  /// start / stop / cancel / feed / closeInput / destroy verbs.
+  static RunAnywhereSolutions get solutions => RunAnywhereSolutions.shared;
+
+  // Diffusion (image generation) is intentionally NOT exposed on the public
+  // `RunAnywhere` namespace until the cross-SDK v2 contract for image
+  // generation lands (proto-backed lifecycle stream/cancel/capabilities ABIs
+  // across Swift/Kotlin/RN/Web). Removed under swift-parity-002-followup-flutter
+  // to keep the Swift-as-reference public surface coherent. The implementation
+  // in `public/capabilities/runanywhere_diffusion.dart` is retained for the
+  // day the contract is settled.
+
+  /// Embeddings — load an embeddings model and generate embedding vectors.
+  static RunAnywhereEmbeddings get embeddings => RunAnywhereEmbeddings.shared;
+
+  /// Runtime plugin loader (parity with Swift `RunAnywhere.PluginLoader`).
+  static RunAnywherePluginLoaderCapability get pluginLoader =>
+      RunAnywherePluginLoaderCapability.shared;
+
+  /// LoRA (Low-Rank Adaptation) capability — load, remove, register,
+  /// query loaded/registered adapters. Canonical §3 namespace.
+  static RunAnywhereLoRACapability get lora => RunAnywhereLoRACapability.shared;
+
+  /// Hybrid STT router — per-request dispatch between an on-device (offline,
+  /// sherpa) and a cloud (online, cloud) speech service. Vends the router
+  /// factory, the cloud-backend registry, the device-state installer, and
+  /// cloud plugin registration. Mirrors Kotlin `RACRouter` /
+  /// Swift `HybridSTTRouter`. STT-only today.
+  static RunAnywhereHybrid get hybrid => RunAnywhereHybrid.shared;
+
+  // -- Flat aliases for cross-SDK portability (canonical §0 — RN/Web/Swift use
+  //    flat method names; Flutter additionally exposes them so portable
+  //    code reads identically across SDKs).
+
+  /// Flat alias for `llm.load(modelId)`.
+  static Future<void> loadLLMModel(String modelId) =>
+      RunAnywhereLLM.shared.load(modelId);
+
+  /// Flat alias for `llm.unload()`.
+  static Future<void> unloadLLMModel() => RunAnywhereLLM.shared.unload();
+
+  /// Flat alias for `stt.load(modelId)`.
+  static Future<void> loadSTTModel(String modelId) =>
+      RunAnywhereSTT.shared.load(modelId);
+
+  /// Flat alias for `stt.unload()`.
+  static Future<void> unloadSTTModel() => RunAnywhereSTT.shared.unload();
+
+  /// Flat alias for `tts.loadVoice(voiceId)` — the canonical TTS load.
+  static Future<void> loadTTSVoice(String voiceId) =>
+      RunAnywhereTTS.shared.loadVoice(voiceId);
+
+  /// Flat alias for `tts.unloadVoice()`.
+  static Future<void> unloadTTSVoice() => RunAnywhereTTS.shared.unloadVoice();
+
+  /// Flat alias for `vlm.load(modelId)`.
+  static Future<void> loadVLMModel(String modelId) =>
+      RunAnywhereVLM.shared.load(modelId);
+
+  /// Flat alias for `vlm.unload()`.
+  static Future<void> unloadVLMModel() => RunAnywhereVLM.shared.unload();
+
+  /// Flat alias for `vad.loadModel(modelId)`.
+  static Future<void> loadVADModel(String modelId) =>
+      RunAnywhereVAD.shared.loadModel(modelId);
+
+  /// Flat alias for `vad.unloadModel()`.
+  static Future<void> unloadVADModel() => RunAnywhereVAD.shared.unloadModel();
+
+  /// Flat alias for `models.refreshModelRegistry()`.
+  static Future<void> refreshModelRegistry() =>
+      RunAnywhereModels.shared.refreshModelRegistry();
+
+  /// Proto-backed model lifecycle load. Matches the universal
+  /// `RunAnywhere.loadModel(request)` name on Swift, Kotlin, RN, and Web.
+  static Future<ModelLoadResult> loadModel(ModelLoadRequest request) =>
+      RunAnywhereModelLifecycle.shared.load(request);
+
+  /// Proto-backed model lifecycle unload. Matches the universal
+  /// `RunAnywhere.unloadModel(request)` name on Swift, Kotlin, RN, and Web.
+  static Future<ModelUnloadResult> unloadModel(ModelUnloadRequest request) =>
+      RunAnywhereModelLifecycle.shared.unload(request);
+
+  /// Polymorphic load — dispatch on [ModelInfo.category]. Drop-in replacement
+  /// for the per-capability `llm.load` / `stt.load` / `tts.loadVoice` /
+  /// `vlm.load` / `vad.loadModel` switch ladders that example view-models
+  /// otherwise hand-roll. Named `loadModelByInfo` to avoid collision with the
+  /// proto-backed [loadModel] overload (Dart has no method overloading).
+  static Future<void> loadModelByInfo(ModelInfo model) =>
+      RunAnywhereModels.shared.loadModel(model);
+
+  /// Polymorphic unload — dispatch on [ModelInfo.category]. Named
+  /// `unloadModelByInfo` to avoid collision with the proto-backed [unloadModel].
+  static Future<void> unloadModelByInfo(ModelInfo model) =>
+      RunAnywhereModels.shared.unloadModel(model);
+
+  /// Proto-backed current-model query.
+  static Future<CurrentModelResult> currentModel([
+    CurrentModelRequest? request,
+  ]) => RunAnywhereModelLifecycle.shared.current(request);
+
+  /// Full [ModelInfo] for the model currently loaded under [category], or
+  /// `null` when nothing is loaded for it.
+  static Future<ModelInfo?> modelInfoForCategory(ModelCategory category) =>
+      RunAnywhereModelLifecycle.shared.modelInfoForCategory(category);
+
+  /// Proto-backed component lifecycle snapshot.
+  static sdk_events_pb.ComponentLifecycleSnapshot? componentLifecycleSnapshot(
+    SDKComponent component,
+  ) => RunAnywhereModelLifecycle.shared.componentSnapshot(component);
+
+  // --- Canonical flat methods (§3-§10 of spec) --------------------------------
+
+  /// Canonical flat method — cancel any in-flight LLM generation.
+  /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.
+  static void cancelGeneration() => RunAnywhereLLM.shared.cancelGeneration();
+
+  /// True when an LLM model is currently loaded. Mirrors Swift's
+  /// `isLLMModelLoaded: Bool` property.
+  static bool get isLLMModelLoaded => RunAnywhereLLM.shared.isLoaded;
+
+  /// Currently-loaded LLM model info, or null.
+  static Future<ModelInfo?> get currentLLMModel =>
+      RunAnywhereLLM.shared.currentModel();
+
+  /// True when an STT model is currently loaded.
+  static bool get isSTTModelLoaded => RunAnywhereSTT.shared.isLoaded;
+
+  /// True when a TTS voice is currently loaded.
+  static bool get isTTSVoiceLoaded => RunAnywhereTTS.shared.isLoaded;
+
+  /// True when a VAD model is currently loaded.
+  static bool get isVADModelLoaded => RunAnywhereVAD.shared.isModelLoaded;
+
+  /// Flat alias — transcribe audio to proto [STTOutput].
+  /// Mirrors Swift / RN / Web `RunAnywhere.transcribe(audio:options:)`.
+  static Future<STTOutput> transcribe(Uint8List audio, [STTOptions? options]) =>
+      RunAnywhereSTT.shared.transcribe(audio, options);
+
+  /// Flat streaming alias — real FFI-backed streaming STT.
+  /// Mirrors Swift / RN / Web `RunAnywhere.transcribeStream`.
+  static Stream<STTPartialResult> transcribeStream(
+    Uint8List audio, {
+    STTOptions? options,
+  }) => RunAnywhereSTT.shared.transcribeStream(audio, options: options);
+
+  /// Flat chunk-feed streaming alias — session-based stream-in / stream-out
+  /// transcription; the native session owns endpointing. Mirrors Swift
+  /// `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`.
+  static Stream<STTPartialResult> transcribeStreamSession(
+    Stream<Uint8List> audio, {
+    STTOptions? options,
+  }) => RunAnywhereSTT.shared.transcribeStreamSession(audio, options: options);
+
+  /// Flat alias — synthesize text to proto [TTSOutput].
+  /// Mirrors Swift / RN / Web `RunAnywhere.synthesize(text:options:)`.
+  static Future<TTSOutput> synthesize(String text, [TTSOptions? options]) =>
+      RunAnywhereTTS.shared.synthesize(text, options);
+
+  /// Flat alias — speak text and return proto [TTSSpeakResult].
+  /// Mirrors Swift `RunAnywhere.speak(text:options:)`.
+  static Future<TTSSpeakResult> speak(String text, [TTSOptions? options]) =>
+      RunAnywhereTTS.shared.speak(text, options);
+
+  /// Flat alias — stop any in-flight synthesis.
+  static Future<void> stopSynthesis() => RunAnywhereTTS.shared.stopSynthesis();
+
+  /// Flat alias — list available TTS voices as [TTSVoiceInfo] proto objects.
+  /// Mirrors Swift `RunAnywhere.availableTTSVoices()`.
+  static Future<List<TTSVoiceInfo>> availableTTSVoices() async {
+    final voiceIds = await RunAnywhereTTS.shared.availableVoices();
+    return voiceIds.map((id) => TTSVoiceInfo(id: id, displayName: id)).toList();
+  }
+
+  /// Flat alias for loading a TTS model (distinct from loading a TTS voice).
+  /// Mirrors Swift `RunAnywhere.loadTTSModel(modelId:)`.
+  static Future<void> loadTTSModel(String modelId) => loadTTSVoice(modelId);
+
+  /// Flat alias for unloading the active TTS model.
+  static Future<void> unloadTTSModel() => unloadTTSVoice();
+
+  /// Flat generate — canonical cross-SDK positional signature.
+  /// Mirrors Swift / RN / Web `RunAnywhere.generate(prompt:options:)`.
+  static Future<LLMGenerationResult> generate(
+    String prompt, [
+    LLMGenerationOptions? options,
+  ]) => RunAnywhereLLM.shared.generate(prompt, options);
+
+  /// Flat generated-proto LLM request.
+  static Future<LLMGenerationResult> generateRequest(
+    LLMGenerateRequest request,
+  ) => RunAnywhereLLM.shared.generateRequest(request);
+
+  /// Flat streaming generate.
+  /// Mirrors Swift / RN / Web `RunAnywhere.generateStream(prompt:options:)`.
+  static Stream<LLMStreamEvent> generateStream(
+    String prompt, [
+    LLMGenerationOptions? options,
+  ]) => RunAnywhereLLM.shared.generateStream(prompt, options);
+
+  /// Flat generated-proto streaming LLM request.
+  static Stream<LLMStreamEvent> generateStreamRequest(
+    LLMGenerateRequest request,
+  ) => RunAnywhereLLM.shared.generateStreamRequest(request);
+
+  /// Extract structured output from raw model text using a typed schema.
+  static StructuredOutputResult extractStructuredOutput({
+    required String text,
+    required JSONSchema schema,
+  }) =>
+      RunAnywhereLLM.shared.extractStructuredOutput(text: text, schema: schema);
+
+  /// Generate structured output using commons orchestration.
+  static Future<StructuredOutputResult> generateStructured({
+    required String prompt,
+    required JSONSchema schema,
+    LLMGenerationOptions? options,
+  }) => RunAnywhereStructuredOutput.generateStructured(
+    prompt: prompt,
+    schema: schema,
+    options: options,
+  );
+
+  /// Stream structured output events.
+  static Stream<StructuredOutputStreamEvent> generateStructuredStream({
+    required String prompt,
+    required JSONSchema schema,
+    LLMGenerationOptions? options,
+  }) => RunAnywhereStructuredOutput.generateStructuredStream(
+    prompt: prompt,
+    schema: schema,
+    options: options,
+  );
+
+  /// Generate raw LLM text with a structured-output configuration.
+  static Future<LLMGenerationResult> generateWithStructuredOutput({
+    required String prompt,
+    required StructuredOutputOptions structuredOutput,
+    LLMGenerationOptions? options,
+  }) => RunAnywhereStructuredOutput.generateWithStructuredOutput(
+    prompt: prompt,
+    structuredOutput: structuredOutput,
+    options: options,
+  );
+
+  /// Register a tool executor.
+  static void registerTool(ToolDefinition definition, ToolExecutor executor) =>
+      RunAnywhereTools.shared.registerTool(definition, executor);
+
+  /// Register a typed generated-proto tool executor.
+  static void registerTypedTool(
+    ToolDefinition definition,
+    TypedToolExecutor executor,
+  ) => RunAnywhereTools.shared.registerTypedTool(definition, executor);
+
+  /// Unregister a tool by name.
+  static void unregisterTool(String toolName) =>
+      RunAnywhereTools.shared.unregisterTool(toolName);
+
+  /// Registered tool definitions.
+  static List<ToolDefinition> getRegisteredTools() =>
+      RunAnywhereTools.shared.getRegisteredTools();
+
+  /// Clear all registered tools.
+  static void clearTools() => RunAnywhereTools.shared.clearTools();
+
+  /// Execute a tool call manually.
+  static Future<ToolResult> executeTool(ToolCall toolCall) =>
+      RunAnywhereTools.shared.execute(toolCall);
+
+  /// Generate with tool calling support.
+  static Future<ToolCallingResult> generateWithTools(
+    String prompt, {
+    ToolCallingOptions? options,
+  }) => RunAnywhereTools.shared.generateWithTools(prompt, options: options);
+
+  /// Continue generation after a manual tool result.
+  static Future<ToolCallingResult> continueWithToolResult(
+    String originalPrompt,
+    ToolResult toolResult, {
+    ToolCallingOptions? options,
+  }) => RunAnywhereTools.shared.continueWithToolResult(
+    originalPrompt,
+    toolResult,
+    options: options,
+  );
+
+  /// RAG lifecycle-resolution helper.
+  static Future<RAGConfiguration> ragResolvedConfiguration({
+    required ModelInfo embeddingModel,
+    required ModelInfo llmModel,
+    RAGConfiguration? baseConfiguration,
+  }) => RunAnywhereRAG.shared.ragResolvedConfiguration(
+    embeddingModel: embeddingModel,
+    llmModel: llmModel,
+    baseConfiguration: baseConfiguration,
+  );
+
+  /// Create a RAG pipeline from generated config.
+  static Future<void> ragCreatePipeline(RAGConfiguration config) =>
+      RunAnywhereRAG.shared.ragCreatePipeline(config);
+
+  /// Create a RAG pipeline from registry models.
+  static Future<void> ragCreatePipelineForModels({
+    required ModelInfo embeddingModel,
+    required ModelInfo llmModel,
+    RAGConfiguration? baseConfiguration,
+  }) => RunAnywhereRAG.shared.ragCreatePipelineForModels(
+    embeddingModel: embeddingModel,
+    llmModel: llmModel,
+    baseConfiguration: baseConfiguration,
+  );
+
+  /// Destroy the RAG pipeline.
+  static Future<void> ragDestroyPipeline() =>
+      RunAnywhereRAG.shared.ragDestroyPipeline();
+
+  /// Ingest a generated-proto RAG document.
+  static Future<RAGStatistics> ragIngest(RAGDocument document) =>
+      RunAnywhereRAG.shared.ragIngest(document);
+
+  /// Add a batch of generated-proto RAG documents.
+  static Future<void> ragAddDocumentsBatch(List<RAGDocument> documents) =>
+      RunAnywhereRAG.shared.ragAddDocumentsBatch(documents);
+
+  /// RAG document count.
+  static Future<int> ragGetDocumentCount() =>
+      RunAnywhereRAG.shared.ragGetDocumentCount();
+
+  /// RAG document count convenience getter.
+  static Future<int> get ragDocumentCount =>
+      RunAnywhereRAG.shared.ragDocumentCount;
+
+  /// RAG statistics.
+  static Future<RAGStatistics> ragGetStatistics() =>
+      RunAnywhereRAG.shared.ragGetStatistics();
+
+  /// Clear RAG documents.
+  static Future<void> ragClearDocuments() =>
+      RunAnywhereRAG.shared.ragClearDocuments();
+
+  /// Query the RAG pipeline.
+  static Future<RAGResult> ragQuery(RAGQueryOptions options) =>
+      RunAnywhereRAG.shared.ragQuery(options);
+
+  /// Download a registered model by id. Drains the commons-backed progress
+  /// stream, forwarding each event to [onProgress], and returns the terminal
+  /// [DownloadProgress] on completion.
+  ///
+  /// Mirrors Swift `RunAnywhere.downloadModel(_:onProgress:) async throws ->
+  /// RADownloadProgress`: callers await the final result and observe progress
+  /// via the optional callback — they do not need to manage the stream
+  /// themselves. Throws [SDKException] on failure or cancellation.
+  static Future<DownloadProgress> downloadModel(
+    String modelId, {
+    Future<void> Function(DownloadProgress)? onProgress,
+  }) async {
+    DownloadProgress? last;
+    await for (final progress in RunAnywhereDownloads.shared.start(modelId)) {
+      last = progress;
+      if (onProgress != null) {
+        await onProgress(progress);
       }
-    } else {
-      logger.debug('No downloaded models discovered');
     }
+    return last ??
+        DownloadProgress(
+          modelId: modelId,
+          errorMessage: 'No progress events received for model: $modelId',
+        );
   }
 
-  /// Re-discover models on the filesystem via C++ registry.
-  ///
-  /// This scans the filesystem for downloaded models and updates the
-  /// C++ registry with localPath for discovered models.
-  ///
-  /// Note: This is called automatically on first availableModels() call.
-  /// You typically don't need to call this manually unless you've done
-  /// manual file operations outside the SDK.
-  ///
-  /// Matches Swift: CppBridge.ModelRegistry.shared.discoverDownloadedModels()
-  static Future<void> refreshDiscoveredModels() async {
-    if (!_isInitialized) return;
-
-    final logger = SDKLogger('RunAnywhere.Discovery');
-    final result =
-        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
-    if (result.discoveredModels.isNotEmpty) {
-      logger.info(
-          'Discovery found ${result.discoveredModels.length} downloaded models');
-    }
-  }
-
-  // ============================================================================
-  // Model Registration (matches Swift RunAnywhere.registerModel pattern)
-  // ============================================================================
-
-  /// Register a model with the SDK.
-  ///
-  /// Matches Swift `RunAnywhere.registerModel(id:name:url:framework:modality:artifactType:memoryRequirement:)`.
-  ///
-  /// This saves the model to the C++ registry so it can be discovered and loaded.
-  ///
-  /// ```dart
-  /// RunAnywhere.registerModel(
-  ///   id: 'smollm2-360m-q8_0',
-  ///   name: 'SmolLM2 360M Q8_0',
-  ///   url: Uri.parse('https://huggingface.co/.../model.gguf'),
-  ///   framework: InferenceFramework.llamaCpp,
-  ///   memoryRequirement: 500000000,
-  /// );
-  /// ```
-  static ModelInfo registerModel({
-    String? id,
-    required String name,
-    required Uri url,
-    required InferenceFramework framework,
-    ModelCategory modality = ModelCategory.language,
-    ModelArtifactType? artifactType,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    final format = _inferFormat(url.path);
-
-    final model = ModelInfo(
-      id: modelId,
-      name: name,
-      category: modality,
-      format: format,
-      framework: framework,
-      downloadURL: url,
-      artifactType: artifactType ?? ModelArtifactType.infer(url, format),
-      downloadSize: memoryRequirement,
-      supportsThinking: supportsThinking,
-      source: ModelSource.local,
-    );
-
-    _registeredModels.add(model);
-
-    // Save to C++ registry (fire-and-forget, matches Swift pattern)
-    // This is critical for model discovery and loading to work correctly
-    _saveToCppRegistry(model);
-
-    return model;
-  }
-
-  /// Register a multi-file model with the SDK.
-  ///
-  /// Matches Swift `RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)`.
-  ///
-  /// Use this for models that consist of multiple files that must be downloaded
-  /// together into the same directory (e.g. embedding model.onnx + vocab.txt).
-  ///
-  /// Each [ModelFileDescriptor] must specify both its [url] and [destinationPath].
-  ///
-  /// ```dart
-  /// RunAnywhere.registerMultiFileModel(
-  ///   id: 'all-minilm-l6-v2',
-  ///   name: 'All MiniLM L6 v2 (Embedding)',
-  ///   files: [
-  ///     ModelFileDescriptor(
-  ///       relativePath: 'model.onnx',
-  ///       destinationPath: 'model.onnx',
-  ///       url: Uri.parse('https://.../model.onnx'),
-  ///     ),
-  ///     ModelFileDescriptor(
-  ///       relativePath: 'vocab.txt',
-  ///       destinationPath: 'vocab.txt',
-  ///       url: Uri.parse('https://.../vocab.txt'),
-  ///     ),
-  ///   ],
-  ///   framework: InferenceFramework.onnx,
-  ///   modality: ModelCategory.embedding,
-  ///   memoryRequirement: 25500000,
-  /// );
-  /// ```
-  static ModelInfo registerMultiFileModel({
-    String? id,
-    required String name,
-    required List<ModelFileDescriptor> files,
-    required InferenceFramework framework,
-    ModelCategory modality = ModelCategory.embedding,
-    int? memoryRequirement,
-  }) {
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    // Primary download URL is the first file's URL (used for display/size queries)
-    final primaryUrl = files.isNotEmpty ? files.first.url : null;
-
-    final model = ModelInfo(
-      id: modelId,
-      name: name,
-      category: modality,
-      format: ModelFormat.onnx,
-      framework: framework,
-      downloadURL: primaryUrl,
-      artifactType: MultiFileArtifact(files: files),
-      downloadSize: memoryRequirement,
-      source: ModelSource.local,
-    );
-
-    _registeredModels.add(model);
-
-    // Save to C++ registry (fire-and-forget, matches Swift pattern)
-    _saveToCppRegistry(model);
-
-    return model;
-  }
-
-  /// Save model to C++ registry (fire-and-forget).
-  /// Matches Swift: `Task { try await CppBridge.ModelRegistry.shared.save(modelInfo) }`
-  static void _saveToCppRegistry(ModelInfo model) {
-    // Fire-and-forget save to C++ registry
-    unawaited(
-      DartBridgeModelRegistry.instance.savePublicModel(model).then((success) {
-        final logger = SDKLogger('RunAnywhere.Models');
-        if (!success) {
-          logger.warning('Failed to save model to C++ registry: ${model.id}');
-        }
-      }).catchError((Object error) {
-        SDKLogger('RunAnywhere.Models')
-            .error('Error saving model to C++ registry: $error');
-      }),
-    );
-  }
-
-  static ModelFormat _inferFormat(String path) {
-    final lower = path.toLowerCase();
-    if (lower.endsWith('.gguf')) return ModelFormat.gguf;
-    if (lower.endsWith('.onnx')) return ModelFormat.onnx;
-    if (lower.endsWith('.bin')) return ModelFormat.bin;
-    if (lower.endsWith('.ort')) return ModelFormat.ort;
-    return ModelFormat.unknown;
-  }
-
-  // ============================================================================
-  // Structured Output Helpers
-  // ============================================================================
-
-  /// Normalizes parsed JSON to Map<String, dynamic>.
-  /// If the parsed result is a List, wraps it in a Map with 'items' key.
-  /// If it's already a Map, returns it directly.
-  /// Returns null if parsing fails.
-  static Map<String, dynamic>? _normalizeStructuredData(dynamic parsed) {
-    if (parsed is Map<String, dynamic>) {
-      return parsed;
-    } else if (parsed is List) {
-      // Wrap array in object with 'items' key
-      return {'items': parsed};
-    } else if (parsed is Map) {
-      // Convert Map to Map<String, dynamic>; guard against non-String keys.
-      try {
-        return parsed.map((k, v) => MapEntry(k.toString(), v));
-      } catch (_) {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  // RAG methods are available via the RunAnywhereRAG extension in
-  // lib/public/extensions/runanywhere_rag.dart (async variants with event
-  // publishing).
+  /// Flat streaming voice agent events.
+  /// Mirrors Swift `RunAnywhere.streamVoiceAgent()`.
+  static Stream<VoiceEvent> streamVoiceAgent() =>
+      RunAnywhereVoice.shared.eventStream();
 }

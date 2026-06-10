@@ -254,21 +254,6 @@ typedef struct {
 void rac_auth_response_free(rac_auth_response_t* response);
 
 /**
- * @brief Free health response
- */
-void rac_health_response_free(rac_health_response_t* response);
-
-/**
- * @brief Free device registration response
- */
-void rac_device_reg_response_free(rac_device_reg_response_t* response);
-
-/**
- * @brief Free telemetry response
- */
-void rac_telemetry_response_free(rac_telemetry_response_t* response);
-
-/**
  * @brief Free API error
  */
 void rac_api_error_free(rac_api_error_t* error);
@@ -296,31 +281,6 @@ int rac_auth_response_from_json(const char* json, rac_auth_response_t* out_respo
  * @brief Serialize refresh request to JSON
  */
 char* rac_refresh_request_to_json(const rac_refresh_request_t* request);
-
-/**
- * @brief Serialize device registration request to JSON
- */
-char* rac_device_reg_request_to_json(const rac_device_reg_request_t* request);
-
-/**
- * @brief Parse device registration response from JSON
- */
-int rac_device_reg_response_from_json(const char* json, rac_device_reg_response_t* out_response);
-
-/**
- * @brief Serialize telemetry event to JSON
- */
-char* rac_telemetry_event_to_json(const rac_telemetry_event_t* event);
-
-/**
- * @brief Serialize telemetry batch to JSON
- */
-char* rac_telemetry_batch_to_json(const rac_telemetry_batch_t* batch);
-
-/**
- * @brief Parse telemetry response from JSON
- */
-int rac_telemetry_response_from_json(const char* json, rac_telemetry_response_t* out_response);
 
 /**
  * @brief Parse API error from HTTP response

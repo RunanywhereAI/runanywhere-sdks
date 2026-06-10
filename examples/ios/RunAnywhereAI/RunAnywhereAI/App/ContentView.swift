@@ -91,17 +91,6 @@ struct VisionHubView: View {
                             subtitle: "Chat with images using your camera or photos"
                         )
                     }
-
-                    NavigationLink {
-                        ImageGenerationView()
-                    } label: {
-                        FeatureRow(
-                            icon: "photo.on.rectangle.angled",
-                            iconColor: .pink,
-                            title: "Image Generation",
-                            subtitle: "Create images from text prompts"
-                        )
-                    }
                 } header: {
                     Text("Vision AI")
                 } footer: {
@@ -175,6 +164,17 @@ struct MoreHubView: View {
                             iconColor: .orange,
                             title: "Storage",
                             subtitle: "Manage models and files"
+                        )
+                    }
+
+                    NavigationLink {
+                        SolutionsView()
+                    } label: {
+                        FeatureRow(
+                            icon: "square.stack.3d.up",
+                            iconColor: .teal,
+                            title: "Solutions",
+                            subtitle: "Run prepackaged pipelines from YAML"
                         )
                     }
 

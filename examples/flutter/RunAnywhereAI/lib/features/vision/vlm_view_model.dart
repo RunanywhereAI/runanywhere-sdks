@@ -102,9 +102,9 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Check if VLM model is loaded
   Future<void> checkModelStatus() async {
-    _isModelLoaded = sdk.RunAnywhere.isVLMModelLoaded;
+    _isModelLoaded = sdk.RunAnywhere.vlm.isLoaded;
     if (_isModelLoaded) {
-      _loadedModelName = sdk.RunAnywhere.currentVLMModelId;
+      _loadedModelName = sdk.RunAnywhere.vlm.currentModelId;
     } else {
       _loadedModelName = null;
     }
@@ -117,7 +117,7 @@ class VLMViewModel extends ChangeNotifier {
       String modelId, String modelName, BuildContext context) async {
     try {
       debugPrint('🎯 Loading VLM model: $modelId');
-      await sdk.RunAnywhere.loadVLMModel(modelId);
+      await sdk.RunAnywhere.vlm.load(modelId);
       _isModelLoaded = true;
       _loadedModelName = modelName;
       notifyListeners();
@@ -128,9 +128,12 @@ class VLMViewModel extends ChangeNotifier {
       notifyListeners();
       if (context.mounted) {
         unawaited(
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load model: $e')),
-          ).closed.then((_) => null),
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
+                SnackBar(content: Text('Failed to load model: $e')),
+              )
+              .closed
+              .then((_) => null),
         );
       }
     }
@@ -155,24 +158,26 @@ class VLMViewModel extends ChangeNotifier {
       final xFile = await _cameraController!.takePicture();
 
       // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(xFile.path);
+      final image = sdk.VLMImage(filePath: xFile.path);
 
-      // Process image with streaming
-      final result = await sdk.RunAnywhere.processImageStream(
+      final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: 'Describe what you see briefly.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 200),
+        options: sdk.VLMGenerationOptions(maxTokens: 200),
       );
 
-      // Listen to stream and append tokens
+      // Listen to stream events and append token payloads.
       final buffer = StringBuffer(_currentDescription);
-      await for (final token in result.stream) {
-        buffer.write(token);
+      await for (final event in events) {
+        if (event.token.isEmpty) continue;
+        buffer.write(event.token);
         _currentDescription = buffer.toString();
         notifyListeners();
       }
 
-      debugPrint('✅ Single capture complete: ${_currentDescription.length} chars');
+      debugPrint(
+          '✅ Single capture complete: ${_currentDescription.length} chars');
+      debugPrint('VLM streaming completed');
     } catch (e) {
       debugPrint('❌ Single capture error: $e');
       _error = e.toString();
@@ -195,24 +200,26 @@ class VLMViewModel extends ChangeNotifier {
 
     try {
       // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(imagePath);
+      final image = sdk.VLMImage(filePath: imagePath);
 
-      // Process image with streaming (more detailed prompt)
-      final result = await sdk.RunAnywhere.processImageStream(
+      final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: 'Describe this image in detail.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 300),
+        options: sdk.VLMGenerationOptions(maxTokens: 300),
       );
 
-      // Listen to stream and append tokens
+      // Listen to stream events and append token payloads.
       final buffer = StringBuffer(_currentDescription);
-      await for (final token in result.stream) {
-        buffer.write(token);
+      await for (final event in events) {
+        if (event.token.isEmpty) continue;
+        buffer.write(event.token);
         _currentDescription = buffer.toString();
         notifyListeners();
       }
 
-      debugPrint('✅ Gallery photo described: ${_currentDescription.length} chars');
+      debugPrint(
+          '✅ Gallery photo described: ${_currentDescription.length} chars');
+      debugPrint('VLM streaming completed');
     } catch (e) {
       debugPrint('❌ Gallery photo error: $e');
       _error = e.toString();
@@ -246,7 +253,8 @@ class VLMViewModel extends ChangeNotifier {
         unawaited(_describeCurrentFrameForAutoStream());
       }
     });
-    debugPrint('🔴 Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
+    debugPrint(
+        '🔴 Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
   }
 
   /// Stop auto-streaming
@@ -279,25 +287,27 @@ class VLMViewModel extends ChangeNotifier {
       final xFile = await _cameraController!.takePicture();
 
       // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(xFile.path);
+      final image = sdk.VLMImage(filePath: xFile.path);
 
-      // Process image with streaming (shorter prompt for live mode)
-      final result = await sdk.RunAnywhere.processImageStream(
+      final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: 'Describe what you see in one sentence.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 100),
+        options: sdk.VLMGenerationOptions(maxTokens: 100),
       );
 
-      // Listen to stream and build description
+      // Listen to stream events and build description from token payloads.
       final buffer = StringBuffer(newDescription);
-      await for (final token in result.stream) {
-        buffer.write(token);
+      await for (final event in events) {
+        if (event.token.isEmpty) continue;
+        buffer.write(event.token);
         newDescription = buffer.toString();
         _currentDescription = newDescription;
         notifyListeners();
       }
 
-      debugPrint('🔴 Auto-stream capture complete: ${newDescription.length} chars');
+      debugPrint(
+          '🔴 Auto-stream capture complete: ${newDescription.length} chars');
+      debugPrint('VLM streaming completed');
     } catch (e) {
       // Only log errors in auto-stream mode (per iOS pattern)
       debugPrint('⚠️ Auto-stream error (non-critical): $e');
@@ -312,7 +322,7 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Cancel ongoing VLM generation
   Future<void> cancelGeneration() async {
-    unawaited(sdk.RunAnywhere.cancelVLMGeneration());
+    unawaited(sdk.RunAnywhere.vlm.cancelVLMGeneration());
     debugPrint('🛑 VLM generation cancelled');
   }
 

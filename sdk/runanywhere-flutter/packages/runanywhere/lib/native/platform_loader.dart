@@ -14,8 +14,10 @@ import 'dart:io';
 ///
 /// ## iOS
 /// XCFrameworks are statically linked into the app binary via CocoaPods.
-/// Symbols are available via `DynamicLibrary.executable()` which can find
-/// both global and local symbols in the main executable.
+/// Symbols are available through the process symbol table. In Xcode debug
+/// builds, the app code can be linked into `Runner.debug.dylib` instead of the
+/// small launcher executable, so the loader falls back to the executable only
+/// after process-wide lookup fails.
 ///
 /// ## Android
 /// .so files are loaded from jniLibs via `DynamicLibrary.open()`.
@@ -54,10 +56,6 @@ class PlatformLoader {
     }
   }
 
-  /// Legacy method for backward compatibility.
-  /// Loads the commons library by default.
-  static DynamicLibrary load() => loadCommons();
-
   /// Try to load the commons library, returning null if it fails.
   static DynamicLibrary? tryLoad() {
     try {
@@ -77,6 +75,40 @@ class PlatformLoader {
   /// platform handling, but modules can also implement their own loading.
   static DynamicLibrary loadLibrary(String libraryName) {
     return _loadLibrary(libraryName);
+  }
+
+  // Cached handle for the cloud-STT backend provider lib (Android only).
+  static DynamicLibrary? _cloudBackendLibrary;
+
+  /// Ensure the cloud-STT backend provider library is loaded so its symbols
+  /// (`rac_backend_cloud_register` / `rac_backend_cloud_unregister`) are
+  /// resolvable.
+  ///
+  /// On Android these symbols are DEFINED in the standalone
+  /// `librac_backend_cloud.so` (mirroring the standalone onnx/llamacpp backend
+  /// libs) and only IMPORTED (undefined) by `librunanywhere_jni.so`. The
+  /// commons handle therefore cannot resolve them until the provider lib is
+  /// `dlopen`ed into the process, which also satisfies the undefined import in
+  /// the commons JNI lib. This opens it once (idempotent) and tolerates its
+  /// absence (returns `false`) for builds that ship without the cloud backend.
+  ///
+  /// On iOS/macOS the cloud TU is statically linked into the process image
+  /// (resolved via `DynamicLibrary.process()` in [loadCommons]); there is no
+  /// separate provider lib, so this is a no-op that reports success.
+  static bool ensureCloudBackendLoaded() {
+    if (!Platform.isAndroid && !Platform.isLinux) {
+      // Statically linked into the process on iOS/macOS/Windows builds.
+      return true;
+    }
+    if (_cloudBackendLibrary != null) {
+      return true;
+    }
+    try {
+      _cloudBackendLibrary = DynamicLibrary.open('librac_backend_cloud.so');
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   static DynamicLibrary _loadLibrary(String libraryName) {
@@ -100,38 +132,45 @@ class PlatformLoader {
 
   /// Load on Android from jniLibs.
   static DynamicLibrary _loadAndroid(String libraryName) {
-    final soName = 'lib$libraryName.so';
-
-    try {
-      return DynamicLibrary.open(soName);
-    } catch (e) {
-      // Try JNI wrapper naming convention as fallback
-      if (libraryName == 'rac_commons') {
-        try {
-          return DynamicLibrary.open('librunanywhere_jni.so');
-        } catch (_) {
-          // Fall through
-        }
-      }
-      throw ArgumentError(
-        'Could not load $soName on Android: $e. '
-        'Ensure the native library is built and placed in jniLibs.',
-      );
+    final candidateNames = <String>['lib$libraryName.so'];
+    if (libraryName == 'rac_commons') {
+      candidateNames.add('librunanywhere_jni.so');
     }
+
+    Object? lastError;
+    for (final soName in candidateNames) {
+      try {
+        return DynamicLibrary.open(soName);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw ArgumentError(
+      'Could not load Android library for $libraryName. '
+      'Tried: ${candidateNames.join(", ")}. Last error: $lastError',
+    );
   }
 
-  /// Load on iOS using executable() for statically linked XCFramework.
+  /// Load on iOS using the process symbol table for statically linked XCFramework.
   ///
   /// On iOS, all XCFrameworks (RACommons, RABackendLlamaCPP, RABackendONNX)
   /// are statically linked into the app binary via CocoaPods.
   ///
-  /// IMPORTANT: We use DynamicLibrary.executable() instead of process() because:
-  /// - process() uses dlsym(RTLD_DEFAULT) which only finds GLOBAL symbols
-  /// - executable() can find both global and LOCAL symbols in the main binary
-  /// - With static linkage, symbols from xcframeworks become local ('t' in nm)
-  /// - This is the correct approach for statically linked Flutter plugins
+  /// In simulator debug builds, Xcode can place the app implementation and
+  /// statically linked pod objects in `Runner.debug.dylib`. `executable()`
+  /// targets the launcher executable and misses those symbols, while
+  /// `process()` uses RTLD_DEFAULT and finds exported symbols in all loaded
+  /// images. Fall back to `executable()` for app configurations that still link
+  /// RACommons into the main executable.
   static DynamicLibrary _loadIOS(String libraryName) {
-    return DynamicLibrary.executable();
+    try {
+      final lib = DynamicLibrary.process();
+      lib.lookup('rac_init');
+      return lib;
+    } catch (_) {
+      return DynamicLibrary.executable();
+    }
   }
 
   /// Load on macOS for development/testing.
@@ -260,9 +299,6 @@ class PlatformLoader {
   /// Check if the commons library is loaded.
   static bool get isCommonsLoaded => _commonsLibrary != null;
 
-  /// Legacy: Check if any native library is loaded.
-  static bool get isLoaded => _commonsLibrary != null;
-
   /// Get the last load error, if any.
   static String? get loadError => _loadError;
 
@@ -297,6 +333,4 @@ class PlatformLoader {
     }
   }
 
-  /// Convenience alias for load().
-  static DynamicLibrary loadNativeLibrary() => load();
 }

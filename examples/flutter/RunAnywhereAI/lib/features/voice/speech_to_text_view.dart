@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -31,7 +31,7 @@ enum STTMode {
       case STTMode.batch:
         return 'Record first, then transcribe all at once';
       case STTMode.live:
-        return 'Transcribe as you speak in real-time';
+        return 'Stream with live partial results';
     }
   }
 
@@ -79,6 +79,13 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       AudioRecordingService.instance;
   StreamSubscription<double>? _audioLevelSubscription;
 
+  // Live mode: mic chunks are fed straight into the SDK's streaming
+  // transcription session (RunAnywhere.transcribeStreamSession), which owns
+  // endpointing/segmentation natively. No app-side silence detection.
+  // Mirrors iOS STTViewModel.
+  StreamSubscription<dynamic>? _liveSubscription;
+  String _committedTranscription = '';
+
   bool get _hasModelSelected =>
       _selectedFramework != null && _selectedModelName != null;
 
@@ -90,6 +97,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   @override
   void dispose() {
+    unawaited(_liveSubscription?.cancel());
+    unawaited(_recordingService.stopStreaming());
     unawaited(_audioLevelSubscription?.cancel());
     super.dispose();
   }
@@ -128,25 +137,39 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Loading STT model: ${model.name}');
 
-      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
-      await sdk.RunAnywhere.loadSTTModel(model.id);
+      // Load STT model via v4 capability API.
+      await sdk.RunAnywhere.stt.load(model.id);
 
       setState(() {
-        _selectedFramework =
-            model.preferredFramework ?? LLMFramework.whisperKit;
+        _selectedFramework = model.preferredFramework;
         _selectedModelName = model.name;
-        // WhisperKit supports live mode, ONNX may have limitations
-        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit;
+        // Sherpa-ONNX supports streaming transcription via its
+        // zipformer/RNN-T runtime. Allow Live mode for Sherpa- and
+        // ONNX-backed STT models.
+        _supportsLiveMode = model.preferredFramework ==
+                LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN ||
+            model.preferredFramework == LLMFramework.INFERENCE_FRAMEWORK_ONNX;
         _isProcessing = false;
       });
 
-      debugPrint('✅ STT model loaded: ${model.name}');
+      debugPrint('STT model loaded successfully: ${model.name}');
     } catch (e) {
       debugPrint('❌ Failed to load STT model: $e');
       setState(() {
         _errorMessage = 'Failed to load model: $e';
         _isProcessing = false;
       });
+      // B-FL-10-002 / B-FL-12-002: surface load failures via SnackBar so the user
+      // sees them even if the inline error text is below the fold or behind a
+      // sheet animation.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('STT load failed: $e'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 
@@ -174,9 +197,15 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       _errorMessage = null;
       _transcribedText = '';
       _partialText = '';
+      _committedTranscription = '';
     });
 
-    // Start recording with the audio service
+    if (_selectedMode == STTMode.live) {
+      await _startLiveStreaming();
+      return;
+    }
+
+    // Batch: record to a buffer, transcribe once on stop.
     final recordingPath = await _recordingService.startRecording(
       sampleRate: 16000,
       numChannels: 1,
@@ -191,15 +220,75 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       return;
     }
 
-    // Subscribe to audio levels
+    _subscribeToAudioLevels();
+    debugPrint('Recording started in ${_selectedMode.displayName} mode');
+  }
+
+  /// Live mode: feed mic chunks into the SDK's streaming transcription
+  /// session. Non-final partials preview the current utterance; finals
+  /// commit it as a line (mirrors iOS STTViewModel.handleLivePartial).
+  Future<void> _startLiveStreaming() async {
+    final chunks = await _recordingService.startStreaming(
+      sampleRate: 16000,
+      numChannels: 1,
+    );
+    if (chunks == null) {
+      setState(() {
+        _isRecording = false;
+        _errorMessage = 'Failed to start streaming recording';
+      });
+      return;
+    }
+
+    _subscribeToAudioLevels();
+
+    _liveSubscription =
+        sdk.RunAnywhere.transcribeStreamSession(chunks).listen(
+      (partial) {
+        final text = partial.text.trim();
+        setState(() {
+          if (partial.isFinal) {
+            // Stream errors surface as a terminal partial carrying the
+            // failure text (see RunAnywhere.transcribeStreamSession).
+            if (text.startsWith('STT stream failed')) {
+              _errorMessage = text;
+              return;
+            }
+            if (text.isNotEmpty) {
+              _committedTranscription = _committedTranscription.isEmpty
+                  ? text
+                  : '$_committedTranscription\n$text';
+            }
+            _transcribedText = _committedTranscription;
+            _partialText = '';
+          } else if (text.isNotEmpty) {
+            _partialText = text;
+          }
+        });
+      },
+      onError: (Object e) {
+        setState(() {
+          _errorMessage = 'Transcription failed: $e';
+        });
+      },
+      onDone: () {
+        _liveSubscription = null;
+        if (mounted) {
+          setState(() => _isTranscribing = false);
+        }
+      },
+    );
+
+    debugPrint('Live streaming transcription started');
+  }
+
+  void _subscribeToAudioLevels() {
     _audioLevelSubscription =
         _recordingService.audioLevelStream?.listen((level) {
       setState(() {
         _audioLevel = level;
       });
     });
-
-    debugPrint('🎙️ Recording started in ${_selectedMode.displayName} mode');
   }
 
   Future<void> _stopRecording() async {
@@ -211,6 +300,14 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       _isRecording = false;
       _audioLevel = 0.0;
     });
+
+    if (_selectedMode == STTMode.live) {
+      // Closing the recorder ends the chunk stream, which lets the native
+      // session flush its final result; the live subscription ends with it.
+      setState(() => _isTranscribing = true);
+      await _recordingService.stopStreaming();
+      return;
+    }
 
     // Stop recording and get audio data
     final (audioData, _) = await _recordingService.stopRecording();
@@ -236,22 +333,20 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Check if STT model is loaded via SDK (matches Swift: RunAnywhere.isSTTModelLoaded)
-      if (!sdk.RunAnywhere.isSTTModelLoaded) {
+      if (!sdk.RunAnywhere.stt.isLoaded) {
         throw Exception(
             'STT component not loaded. Please load an STT model first.');
       }
 
-      // Call SDK transcription API (matches Swift: RunAnywhere.transcribe(_:))
       final audioBytes = Uint8List.fromList(audioData);
-      final transcribedText = await sdk.RunAnywhere.transcribe(audioBytes);
+      final result = await sdk.RunAnywhere.stt.transcribe(audioBytes);
 
       setState(() {
-        _transcribedText = transcribedText;
+        _transcribedText = result.text;
         _isTranscribing = false;
       });
 
-      debugPrint('✅ Transcription complete: ${transcribedText.length} chars');
+      debugPrint('✅ Transcription complete: ${result.text.length} chars');
     } catch (e) {
       debugPrint('❌ Transcription failed: $e');
       setState(() {
@@ -269,7 +364,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   }
 
   void _copyToClipboard() {
-    // TODO: Implement clipboard copy
+    if (_transcribedText.isEmpty) return;
+    unawaited(Clipboard.setData(ClipboardData(text: _transcribedText)));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Copied to clipboard')),
     );

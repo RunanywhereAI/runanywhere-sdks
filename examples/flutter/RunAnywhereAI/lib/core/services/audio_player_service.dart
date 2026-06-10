@@ -186,50 +186,6 @@ class AudioPlayerService {
     return wavFile;
   }
 
-  /// Play audio from file path
-  ///
-  /// [filePath] - Path to the audio file
-  /// [volume] - Volume level (0.0 to 1.0)
-  /// [rate] - Playback rate (0.5 to 2.0)
-  Future<void> playFromFile(
-    String filePath, {
-    double volume = 1.0,
-    double rate = 1.0,
-  }) async {
-    try {
-      // Stop any current playback
-      await stop();
-
-      // Set volume and rate
-      await _player.setVolume(volume.clamp(0.0, 1.0));
-      await _player.setPlaybackRate(rate.clamp(0.5, 2.0));
-
-      // Play the audio file
-      await _player.play(DeviceFileSource(filePath));
-
-      debugPrint('🎵 Playing audio from file: $filePath');
-    } catch (e) {
-      debugPrint('❌ Failed to play audio: $e');
-      rethrow;
-    }
-  }
-
-  /// Pause playback
-  Future<void> pause() async {
-    if (_isPlaying) {
-      await _player.pause();
-      debugPrint('⏸️ Audio playback paused');
-    }
-  }
-
-  /// Resume playback
-  Future<void> resume() async {
-    if (!_isPlaying) {
-      await _player.resume();
-      debugPrint('▶️ Audio playback resumed');
-    }
-  }
-
   /// Stop playback
   Future<void> stop() async {
     if (_isPlaying) {
@@ -238,22 +194,6 @@ class AudioPlayerService {
       _progressController.add(0.0);
       debugPrint('⏹️ Audio playback stopped');
     }
-  }
-
-  /// Seek to position
-  Future<void> seek(Duration position) async {
-    await _player.seek(position);
-    debugPrint('⏩ Seeked to: ${position.inSeconds}s');
-  }
-
-  /// Set volume (0.0 to 1.0)
-  Future<void> setVolume(double volume) async {
-    await _player.setVolume(volume.clamp(0.0, 1.0));
-  }
-
-  /// Set playback rate (0.5 to 2.0)
-  Future<void> setRate(double rate) async {
-    await _player.setPlaybackRate(rate.clamp(0.5, 2.0));
   }
 
   /// Clean up temporary audio file

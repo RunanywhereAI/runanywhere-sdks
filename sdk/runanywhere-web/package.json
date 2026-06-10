@@ -4,6 +4,7 @@
   "version": "0.19.13",
   "description": "RunAnywhere Web SDK - On-device AI for the browser via RACommons WASM",
   "workspaces": [
+    "../shared/proto-ts",
     "packages/core",
     "packages/llamacpp",
     "packages/onnx"
@@ -12,14 +13,22 @@
     "build:wasm": "cd wasm && ./scripts/build.sh",
     "build:wasm:debug": "cd wasm && ./scripts/build.sh --debug",
     "build:wasm:clean": "cd wasm && ./scripts/build.sh --clean",
-    "build:ts": "npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
+    "vendor:wasm:onnxruntime": "wasm/scripts/vendor-onnxruntime-wasm.sh",
+    "vendor:wasm:sherpa": "wasm/scripts/vendor-sherpa-onnx-wasm.sh",
+    "vendor:wasm:speech": "npm run vendor:wasm:onnxruntime && npm run vendor:wasm:sherpa",
+    "build:ts": "npm run build -w @runanywhere/proto-ts && npm run build -w packages/core && npm run build -w packages/llamacpp && npm run build -w packages/onnx",
     "build": "npm run build:ts",
     "dev": "npm run dev -w packages/core",
     "lint": "npm run lint -w packages/core && npm run lint -w packages/llamacpp && npm run lint -w packages/onnx",
-    "typecheck": "npm run typecheck -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx",
-    "clean": "rm -rf packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js packages/onnx/wasm/sherpa packages/core/wasm wasm/build"
+    "typecheck": "npm run typecheck -w @runanywhere/proto-ts && npm run typecheck -w packages/core && npm run build -w packages/core && npm run typecheck -w packages/llamacpp && npm run typecheck -w packages/onnx",
+    "test": "npm run test -w packages/core",
+    "test:browser": "playwright test",
+    "clean": "rm -rf ../shared/proto-ts/dist packages/core/dist packages/llamacpp/dist packages/onnx/dist packages/llamacpp/wasm/*.wasm packages/llamacpp/wasm/*.js packages/core/wasm wasm/build wasm/build-webgpu"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
   }
 }

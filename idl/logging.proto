@@ -1,0 +1,99 @@
+// RunAnywhere IDL — cross-platform logging configuration + records.
+//
+// Every SDK hand-writes an identical LogLevel enum + LoggingConfiguration +
+// LogEntry, each commented "must match Swift". Several SDKs declare the level
+// enum two or three times:
+//   Swift   Infrastructure/Logging/SDKLogger.swift  (LogLevel, LoggingConfiguration, LogEntry)
+//   Kotlin  public/extensions/RunAnywhereLogging.kt (LogLevel) +
+//           infrastructure/logging/SDKLogger.kt (LogLevel, LoggingConfiguration, LogEntry) +
+//           foundation/bridge/CppBridgeModelRegistry.kt (LogLevel)
+//   Flutter foundation/logging/sdk_logger.dart (LogLevel) +
+//           runanywhere_logging.dart (LoggingConfiguration, LogEntry, LogLevelC) +
+//           basic_types.dart (RacLogLevel)
+//   RN      Foundation/Logging/Models/LogLevel.ts + LoggingConfiguration.ts
+//   Web     Foundation/Logging/* (LoggingConfiguration, LogLevel)
+// This file is the single source of truth that replaces all of them.
+//
+// LogLevel mirrors the C ABI `rac_log_level_t`
+// (sdk/runanywhere-commons/include/rac/core/rac_types.h:196) EXACTLY, so the
+// generated enum round-trips with the platform-adapter `log` callback
+// (rac_platform_adapter.h) without a translation table. NOTE: the SDKs'
+// hand-written public LogLevel enums currently use a 5-value debug=0..fault=4
+// numbering that does NOT match the C ABI (trace=0..fatal=5); they should
+// converge onto this canonical enum.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "rac_options.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LoggingProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Severity, mirroring the C ABI `rac_log_level_t`. Larger value = more severe.
+// 0 is TRACE (not UNSPECIFIED) to keep numeric parity with the C enum — the
+// same C-ABI-aligned convention used by HttpDownloadStatus (0=OK) and
+// SdkInitEnvironment (0=DEVELOPMENT).
+// ---------------------------------------------------------------------------
+enum LogLevel {
+    LOG_LEVEL_TRACE   = 0 [(runanywhere.v1.rac_wire_string) = "trace",   (runanywhere.v1.rac_display_name) = "Trace"];
+    LOG_LEVEL_DEBUG   = 1 [(runanywhere.v1.rac_wire_string) = "debug",   (runanywhere.v1.rac_display_name) = "Debug"];
+    LOG_LEVEL_INFO    = 2 [(runanywhere.v1.rac_wire_string) = "info",    (runanywhere.v1.rac_display_name) = "Info"];
+    LOG_LEVEL_WARNING = 3 [(runanywhere.v1.rac_wire_string) = "warning", (runanywhere.v1.rac_display_name) = "Warning"];
+    LOG_LEVEL_ERROR   = 4 [(runanywhere.v1.rac_wire_string) = "error",   (runanywhere.v1.rac_display_name) = "Error"];
+    LOG_LEVEL_FATAL   = 5 [(runanywhere.v1.rac_wire_string) = "fatal",   (runanywhere.v1.rac_display_name) = "Fatal"];
+}
+
+// ---------------------------------------------------------------------------
+// SDK logging configuration. Union of the fields the per-SDK
+// LoggingConfiguration structs carry today; per-environment presets
+// (development/staging/production) stay in each SDK as factory helpers.
+// ---------------------------------------------------------------------------
+message LoggingConfiguration {
+    // Write logs to the platform-local sink (os_log / Logcat / console).
+    bool     enable_local_logging    = 1 [(runanywhere.v1.rac_default) = "true"];
+
+    // Minimum severity emitted. Messages below this level are dropped.
+    LogLevel min_log_level           = 2;
+
+    // Attach file:line:function source location to each record.
+    bool     include_source_location = 3;
+
+    // Attach device/build metadata (model, os version, app build) to records.
+    bool     include_device_metadata = 4;
+
+    // Forward records to the remote logging pipeline.
+    bool     enable_remote_logging   = 5;
+
+    // Forward error/fatal records to Sentry.
+    bool     enable_sentry_logging   = 6;
+}
+
+// ---------------------------------------------------------------------------
+// A single structured log record. Mirrors the per-SDK LogEntry shape.
+// ---------------------------------------------------------------------------
+message LogEntry {
+    int64               timestamp_unix_ms = 1;  // Wall-clock epoch milliseconds.
+    LogLevel            level             = 2;
+    string              category          = 3;  // Subsystem/tag (e.g. "STT", "Download").
+    string              message           = 4;
+    map<string, string> metadata          = 5;  // Optional structured context.
+
+    // Optional source location + context (Kotlin LogEntry carries these as
+    // first-class fields; other SDKs leave them empty). `line`/`error_code`
+    // use 0 as "unset".
+    string              file              = 6;
+    int32               line              = 7;
+    string              function          = 8;
+    int32               error_code        = 9;   // SDKError code, when the record describes an error.
+    string              model_id          = 10;
+    string              framework         = 11;
+}
