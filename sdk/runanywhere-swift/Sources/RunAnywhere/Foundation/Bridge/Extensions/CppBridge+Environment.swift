@@ -176,11 +176,6 @@ extension CppBridge {
             return String(cString: rac_endpoint_device_registration(Environment.toC(env)))
         }
 
-        /// Get telemetry endpoint for environment
-        public static func telemetry(for env: SDKEnvironment) -> String {
-            return String(cString: rac_endpoint_telemetry(Environment.toC(env)))
-        }
-
         /// Get model assignments endpoint
         public static func modelAssignments() -> String {
             return String(cString: rac_endpoint_model_assignments())
