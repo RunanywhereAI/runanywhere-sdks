@@ -4,9 +4,8 @@ import ai.runanywhere.proto.v1.ModelListRequest
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.features.TTS.System.SystemTTSModule
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
-import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.hybrid.Cloud
+import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
@@ -55,7 +54,7 @@ object ModelBootstrap {
                 continue
             }
             try {
-                CppBridgeModelRegistry.save(model.toModelInfo())
+                model.register()
                 ok++
             } catch (e: Exception) {
                 fail++

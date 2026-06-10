@@ -94,7 +94,7 @@ class ModelSelectionViewModel(
     }
 
     // Loads the model into memory and marks it current. Returns true on success so the caller
-    // can dismiss. Built-in frameworks and VOICE/RAG are selected by reference (no load).
+    // can dismiss. Built-in frameworks and RAG are selected by reference (no load).
     suspend fun select(model: RAModelInfo): Boolean {
         state = state.copy(busyModelId = model.id, error = null)
         return try {

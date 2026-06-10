@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.LLMStreamFinalResult
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import ai.runanywhere.proto.v1.TokenKind
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +17,6 @@ import com.runanywhere.runanywhereai.data.conversation.StoredTool
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
-import com.runanywhere.runanywhereai.util.ThinkingParser
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.cancelGeneration
@@ -104,14 +104,12 @@ class ChatViewModel : ViewModel() {
             messages[index] = messages[index].copy(text = "Error: ${result.error_message}")
             return
         }
-        val parsed = ThinkingParser.parse(result.text)
-        val thinking = parsed.thinking ?: result.thinking_content?.takeIf { it.isNotBlank() }
         val totalMs = result.generation_time_ms.toLong()
         val tps = result.tokens_per_second.takeIf { it > 0 }
             ?: if (totalMs > 0 && result.tokens_generated > 0) result.tokens_generated * 1000.0 / totalMs else 0.0
         messages[index] = messages[index].copy(
-            text = parsed.text,
-            thinking = thinking,
+            text = result.text,
+            thinking = result.thinking_content?.takeIf { it.isNotBlank() },
             stats = GenerationStats(
                 tokens = result.tokens_generated,
                 tokensPerSecond = tps,
@@ -123,7 +121,8 @@ class ChatViewModel : ViewModel() {
 
     private suspend fun streamReply(prompt: String, index: Int) {
         val options = generationOptions()
-        val raw = StringBuilder()
+        val answer = StringBuilder()
+        val thinking = StringBuilder()
         var finalResult: LLMStreamFinalResult? = null
         var streamError: String? = null
         val startTime = System.currentTimeMillis()
@@ -137,9 +136,14 @@ class ChatViewModel : ViewModel() {
             }
             if (event.token.isNotEmpty()) {
                 if (firstTokenTime == null) firstTokenTime = System.currentTimeMillis()
-                raw.append(event.token)
-                val parsed = ThinkingParser.parse(raw.toString())
-                messages[index] = messages[index].copy(text = parsed.text, thinking = parsed.thinking)
+                when (event.kind) {
+                    TokenKind.TOKEN_KIND_THOUGHT -> thinking.append(event.token)
+                    else -> answer.append(event.token)
+                }
+                messages[index] = messages[index].copy(
+                    text = answer.toString(),
+                    thinking = thinking.toString().takeIf { it.isNotBlank() },
+                )
             }
         }
 
@@ -148,12 +152,11 @@ class ChatViewModel : ViewModel() {
             return
         }
 
-        val source = finalResult?.text?.takeIf { it.isNotBlank() } ?: raw.toString()
-        val parsed = ThinkingParser.parse(source)
-        val thinking = parsed.thinking ?: finalResult?.thinking_content?.takeIf { it.isNotBlank() }
+        val finalThinking = finalResult?.thinking_content?.takeIf { it.isNotBlank() }
+            ?: thinking.toString().takeIf { it.isNotBlank() }
         messages[index] = messages[index].copy(
-            text = parsed.text,
-            thinking = thinking,
+            text = finalResult?.text?.takeIf { it.isNotBlank() } ?: answer.toString(),
+            thinking = finalThinking,
             stats = buildStats(finalResult, startTime, firstTokenTime),
         )
     }
@@ -165,7 +168,6 @@ class ChatViewModel : ViewModel() {
             auto_execute = true,
             temperature = s.temperature,
             max_tokens = s.maxTokens,
-            format_hint = toolFormatHint(GlobalState.model.loaded?.name),
         )
         val result = RunAnywhere.generateWithTools(
             prompt = prompt,
@@ -174,7 +176,6 @@ class ChatViewModel : ViewModel() {
             toolChoice = null,
             forcedToolName = null,
         )
-        val parsed = ThinkingParser.parse(result.text)
         val toolInfo = result.tool_calls.firstOrNull()?.let { call ->
             val toolResult = result.tool_results.firstOrNull { it.name == call.name }
             ToolCallInfo(
@@ -185,12 +186,16 @@ class ChatViewModel : ViewModel() {
                 error = toolResult?.error,
             )
         }
-        val content = parsed.text.ifBlank {
+        val content = result.text.ifBlank {
             result.error_message?.takeIf { it.isNotBlank() }?.let { "Error: $it" }
                 ?: toolInfo?.let { "Used ${it.name}." }
                 ?: "(no response)"
         }
-        messages[index] = messages[index].copy(text = content, thinking = parsed.thinking, tool = toolInfo)
+        messages[index] = messages[index].copy(
+            text = content,
+            thinking = result.thinking_content?.takeIf { it.isNotBlank() },
+            tool = toolInfo,
+        )
     }
 
     fun stop() {
@@ -277,11 +282,6 @@ private fun StoredMessage.toUi() = ChatMessage(
     tool = tool?.let { ToolCallInfo(it.name, it.arguments, it.result, it.success, it.error) },
     stats = stats?.let { GenerationStats(it.tokens, it.tokensPerSecond, it.timeToFirstTokenMs, it.totalTimeMs) },
 )
-
-private fun toolFormatHint(modelName: String?): String {
-    val name = modelName?.lowercase() ?: return "default"
-    return if (name.contains("lfm2") && name.contains("tool")) "lfm2" else "default"
-}
 
 private fun buildStats(
     result: LLMStreamFinalResult?,

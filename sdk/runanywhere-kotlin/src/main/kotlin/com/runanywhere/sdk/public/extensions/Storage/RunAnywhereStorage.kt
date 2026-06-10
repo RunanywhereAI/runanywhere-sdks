@@ -16,6 +16,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
+import ai.runanywhere.proto.v1.ExpectedModelFiles
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
@@ -184,6 +185,7 @@ suspend fun RunAnywhere.registerModel(
                 supportsThinking = supportsThinking,
                 source = source,
             ).setMultiFileArtifact(artifact)
+            .copy(expected_files = ExpectedModelFiles(files = multiFile))
 
     if (memoryRequirement != null) {
         model = model.copy(memory_required_bytes = memoryRequirement)

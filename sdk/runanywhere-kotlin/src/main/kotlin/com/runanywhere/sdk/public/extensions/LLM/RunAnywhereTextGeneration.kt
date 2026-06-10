@@ -206,6 +206,7 @@ suspend fun RunAnywhere.aggregateStream(
     val final = finalEvent?.result
     return RALLMGenerationResult(
         text = final?.text ?: fullResponse,
+        thinking_content = final?.thinking_content,
         input_tokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4),
         tokens_generated = final?.completion_tokens ?: tokenCount,
         response_tokens = final?.completion_tokens ?: tokenCount,
