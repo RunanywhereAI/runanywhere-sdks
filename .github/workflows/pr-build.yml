@@ -169,19 +169,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install Emscripten
-        run: |
-          git clone --depth 1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
-          /tmp/emsdk/emsdk install latest
-          /tmp/emsdk/emsdk activate latest
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: web
       - name: Configure (WASM)
-        run: |
-          source /tmp/emsdk/emsdk_env.sh
-          cmake --preset wasm
+        run: cmake --preset wasm
       - name: Build (WASM)
-        run: |
-          source /tmp/emsdk/emsdk_env.sh
-          cmake --build --preset wasm
+        run: cmake --build --preset wasm
 
   ios-device:
     runs-on: macos-15
@@ -197,18 +191,11 @@ jobs:
 
   android-arm64:
     runs-on: ubuntu-22.04
-    env:
-      # Stage the NDK outside the workspace so the unzip + extraction directory
-      # do NOT collide with the destination path (which previously caused
-      # `mv ... into a subdirectory of itself`).
-      ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
       - uses: actions/checkout@v4
-      - name: Install Android NDK
-        run: |
-          curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip -q /tmp/ndk.zip -d /tmp
-          test -d "${ANDROID_NDK_HOME}"
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: android
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh
@@ -256,20 +243,11 @@ jobs:
   kotlin-android:
     runs-on: ubuntu-22.04
     needs: [android-arm64]
-    env:
-      ANDROID_NDK_HOME: /tmp/android-ndk-r27c
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK 17 (Android Gradle Plugin 8.x requires Java 17+)
-        uses: actions/setup-java@v4
+      - uses: ./.github/actions/setup-toolchain
         with:
-          distribution: temurin
-          java-version: '17'
-      - name: Install Android NDK
-        run: |
-          curl -sSL -o /tmp/ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
-          unzip -q /tmp/ndk.zip -d /tmp
-          test -d "${ANDROID_NDK_HOME}"
+          platform: android
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Download vendored Sherpa-ONNX (Android)
         run: bash sdk/runanywhere-commons/scripts/android/download-sherpa-onnx.sh

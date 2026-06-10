@@ -596,9 +596,9 @@ jobs:
       - name: Stage natives into Flutter SDK plugin layouts
         run: |
           set -euo pipefail
-          # iOS: unzip xcframeworks into the Flutter plugin Binaries dirs so
-          # the local Flutter packages can resolve them.
-          IOS_DEST="$GITHUB_WORKSPACE/sdk/runanywhere-flutter/packages/runanywhere/ios/Binaries"
+          # iOS: unzip xcframeworks into the Flutter plugin Frameworks dir so
+          # the local Flutter package podspec can resolve them.
+          IOS_DEST="$GITHUB_WORKSPACE/sdk/runanywhere-flutter/packages/runanywhere/ios/Frameworks"
           mkdir -p "$IOS_DEST"
           for zip in native-ios-staging/*.zip; do
             [ -f "$zip" ] || continue

@@ -160,7 +160,9 @@ jobs:
         # (single source of truth for IDL codegen toolchain). Bump there first
         # — this workflow mirrors that pin.
         run: |
-          dart pub global activate protoc_plugin 25.0.0
+          PROTOC_GEN_DART_VERSION="$(grep -E '^PROTOC_GEN_DART_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2)"
+          echo "protoc-gen-dart version (pinned): ${PROTOC_GEN_DART_VERSION}"
+          dart pub global activate protoc_plugin "$PROTOC_GEN_DART_VERSION"
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Install ts-proto (npm)
