@@ -319,6 +319,73 @@ export class SDKException extends Error {
     });
   }
 
+  /**
+   * Processing/lifecycle-verb failure. Mirrors Swift call sites that throw
+   * `SDKException(code: .processingFailed, ..., category: .internal)`
+   * (RunAnywhere+Solutions.swift, RunAnywhere+LoRA.swift,
+   * RunAnywhere+Embeddings.swift).
+   */
+  static processingFailed(details?: string, cause?: Error): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_PROCESSING_FAILED,
+      details ?? 'Processing failed',
+      {
+        category: ErrorCategoryProto.ERROR_CATEGORY_INTERNAL,
+        nestedMessage: cause?.message,
+      }
+    );
+  }
+
+  /**
+   * Invalid handle/object state (e.g. using a destroyed handle). Mirrors
+   * Swift `SDKException(code: .invalidState, ..., category: .internal)`
+   * (RunAnywhere+Solutions.swift:100-104).
+   */
+  static invalidState(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_INVALID_STATE,
+      details ?? 'Invalid state',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_INTERNAL }
+    );
+  }
+
+  /**
+   * A required native service/plugin is missing or failed to respond.
+   * Mirrors Swift `SDKException(code: .serviceNotAvailable, ...,
+   * category: .component)` (HybridSTTRouter.swift).
+   */
+  static serviceNotAvailable(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_SERVICE_NOT_AVAILABLE,
+      details ?? 'Service not available',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_COMPONENT }
+    );
+  }
+
+  /**
+   * Operation timed out. Mirrors Swift `SDKException.timeout(_:)`
+   * (SDKException.swift:235 — code .timeout, category .network).
+   */
+  static timeout(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_TIMEOUT,
+      details ?? 'Operation timed out',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_NETWORK }
+    );
+  }
+
+  /**
+   * Invalid configuration. Mirrors Swift `SDKException.invalidConfiguration(_:)`
+   * (SDKException.swift:183 — code .invalidConfiguration, category .configuration).
+   */
+  static invalidConfiguration(details?: string): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_INVALID_CONFIGURATION,
+      details ?? 'Invalid configuration',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_CONFIGURATION }
+    );
+  }
+
   static componentNotReady(component?: string): SDKException {
     const message = component
       ? `${component} not ready`

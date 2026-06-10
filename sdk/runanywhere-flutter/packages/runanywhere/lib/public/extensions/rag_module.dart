@@ -27,10 +27,7 @@
 /// ```
 library;
 
-import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/model_types.pbenum.dart';
-import 'package:runanywhere/generated/sdk_events.pbenum.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 
 /// RAG module for Retrieval-Augmented Generation.
@@ -40,37 +37,8 @@ import 'package:runanywhere/native/dart_bridge_rag.dart';
 /// already-registered LlamaCpp backend.
 ///
 /// Matches the Swift RAGModule pattern from the iOS SDK.
-class RAGModule implements RunAnywhereModule {
-  // ============================================================================
-  // Singleton Pattern (matches LlamaCpp pattern exactly)
-  // ============================================================================
-
-  static final RAGModule _instance = RAGModule._internal();
-  static RAGModule get module => _instance;
-  RAGModule._internal();
-
-  // ============================================================================
-  // RunAnywhereModule Conformance
-  // ============================================================================
-
-  @override
-  String get moduleId => 'rag';
-
-  @override
-  String get moduleName => 'RAG';
-
-  @override
-  Set<SDKComponent> get capabilities => {
-        SDKComponent.SDK_COMPONENT_RAG,
-        SDKComponent.SDK_COMPONENT_LLM,
-      };
-
-  @override
-  int get defaultPriority => 100;
-
-  @override
-  InferenceFramework get inferenceFramework =>
-      InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
+class RAGModule {
+  RAGModule._();
 
   // ============================================================================
   // Registration State

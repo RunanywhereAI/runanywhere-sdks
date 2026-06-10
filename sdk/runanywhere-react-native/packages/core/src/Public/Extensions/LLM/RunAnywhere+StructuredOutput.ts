@@ -34,6 +34,7 @@ import {
 } from '@runanywhere/proto-ts/structured_output';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { generate as generateText } from './RunAnywhere+TextGeneration';
 
@@ -183,6 +184,8 @@ export async function generateStructured<T = unknown>(
   schema: JSONSchema,
   options?: StructuredOutputOptions
 ): Promise<StructuredOutputResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+StructuredOutput.swift:30-32).
+  requireInitialized();
   logger.debug('Generating structured output...');
   // Swift parity: structured generation rides the throwing generate path,
   // which gates on ensureServicesReady (RunAnywhere+TextGeneration.swift:48).
@@ -252,6 +255,9 @@ export function generateStructuredStream(
   schema: JSONSchema,
   options?: StructuredOutputOptions
 ): AsyncIterable<StructuredOutputStreamEvent> {
+  // Swift parity: guard isInitialized throws before the stream is built
+  // (RunAnywhere+StructuredOutput.swift:63-65).
+  requireInitialized();
   async function* resultGenerator(): AsyncGenerator<StructuredOutputStreamEvent> {
     const requestBytes = await encodeStructuredOutputRequest(prompt, schema, options);
     if (!isNativeModuleAvailable()) {

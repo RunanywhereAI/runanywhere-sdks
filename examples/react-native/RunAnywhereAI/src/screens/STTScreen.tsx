@@ -12,7 +12,7 @@
  * - Model status banner
  *
  * Architecture:
- * - Uses native audio recording (AudioService)
+ * - Uses the SDK's AudioCaptureManager (16kHz mono Int16 PCM chunks)
  * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
  * - Transcription via RunAnywhere.transcribe() with proto-canonical STT options
  * - Supports ONNX-based Whisper models
@@ -32,7 +32,6 @@ import {
   Animated,
   PermissionsAndroid,
   Linking,
-  NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
@@ -40,7 +39,6 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -53,7 +51,7 @@ import {
 import { STTMode } from '../types/voice';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere } from '@runanywhere/core';
+import { RunAnywhere, AudioCaptureManager } from '@runanywhere/core';
 import {
   AudioFormat,
   InferenceFramework,
@@ -64,52 +62,52 @@ import {
 import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 
-type NativeAudioRecordingResult = {
-  path?: string;
-  uri?: string;
-  fileSize?: number;
-};
+/** SDK capture emits 16kHz mono Int16 PCM. */
+const CAPTURE_SAMPLE_RATE = 16000;
+const CAPTURE_BYTES_PER_MS = (CAPTURE_SAMPLE_RATE * 2) / 1000;
+/** Skip transcription of chunks shorter than ~150ms (parity with the old
+ * 5000-byte recorded-file threshold). */
+const MIN_PCM_BYTES = 5000;
 
-type NativeAudioModuleType = {
-  startRecording?: () => Promise<NativeAudioRecordingResult>;
-  stopRecording?: () => Promise<NativeAudioRecordingResult>;
-  cancelRecording?: () => Promise<unknown>;
-};
+/** Wrap raw 16kHz mono Int16 PCM bytes in a WAV container. */
+function wrapPcm16InWav(pcmChunks: Uint8Array[]): Uint8Array {
+  const dataSize = pcmChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const wav = new Uint8Array(44 + dataSize);
+  const view = new DataView(wav.buffer);
 
-const NativeAudioModule = NativeModules.NativeAudioModule as
-  | NativeAudioModuleType
-  | undefined;
-
-const AudioRecorder = {
-  async startRecording(): Promise<string> {
-    if (!NativeAudioModule?.startRecording) {
-      throw new Error('NativeAudioModule.startRecording is not available');
+  const writeString = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) {
+      view.setUint8(offset + i, str.charCodeAt(i));
     }
-    const result = await NativeAudioModule.startRecording();
-    const path = result.path ?? result.uri;
-    if (!path) throw new Error('NativeAudioModule did not return a path');
-    return path;
-  },
-  async stopRecording(): Promise<{ uri: string }> {
-    if (!NativeAudioModule?.stopRecording) {
-      throw new Error('NativeAudioModule.stopRecording is not available');
-    }
-    const result = await NativeAudioModule.stopRecording();
-    const path = result.path ?? result.uri;
-    if (!path) throw new Error('NativeAudioModule did not return a path');
-    return { uri: path };
-  },
-  async cleanup(): Promise<void> {
-    await NativeAudioModule?.cancelRecording?.();
-  },
-};
+  };
 
-async function transcribeAudioFile(path: string) {
-  const audioBase64 = await RNFS.readFile(path, 'base64');
-  return RunAnywhere.transcribe(audioBase64, {
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true); // PCM fmt chunk size
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, CAPTURE_SAMPLE_RATE, true);
+  view.setUint32(28, CAPTURE_SAMPLE_RATE * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (const chunk of pcmChunks) {
+    wav.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return wav;
+}
+
+async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
+  return RunAnywhere.transcribe(wrapPcm16InWav(pcmChunks), {
     language: STTLanguage.STT_LANGUAGE_EN,
     audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
-    sampleRate: 16000,
+    sampleRate: CAPTURE_SAMPLE_RATE,
   });
 }
 
@@ -136,13 +134,23 @@ export const STTScreen: React.FC = () => {
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
 
-  // Audio recording path ref (for batch mode only)
-  const recordingPath = useRef<string | null>(null);
+  // SDK audio capture manager (one per screen instance)
+  const captureManagerRef = useRef<AudioCaptureManager | null>(null);
+  const getCaptureManager = (): AudioCaptureManager => {
+    if (!captureManagerRef.current) {
+      captureManagerRef.current = new AudioCaptureManager();
+    }
+    return captureManagerRef.current;
+  };
+
+  // Accumulated 16kHz mono Int16 PCM chunks for the in-flight recording
+  const pcmChunksRef = useRef<Uint8Array[]>([]);
+  const pcmBytesRef = useRef(0);
 
   // Live mode accumulated transcript ref
   const accumulatedTranscriptRef = useRef('');
 
-  // Live mode interval-based recording refs
+  // Live mode interval-based transcription refs
   const liveRecordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isLiveRecordingRef = useRef(false);
   const liveChunkCountRef = useRef(0);
@@ -183,12 +191,14 @@ export const STTScreen: React.FC = () => {
         clearTimeout(liveRecordingIntervalRef.current);
         liveRecordingIntervalRef.current = null;
       }
-      // Stop batch mode recorder
-      AudioRecorder.cleanup().catch(() => {});
-      // Clean up temp audio file
-      if (recordingPath.current) {
-        RNFS.unlink(recordingPath.current).catch(() => {});
+      // Stop the SDK capture manager
+      try {
+        captureManagerRef.current?.stopRecording();
+      } catch {
+        // Ignore — capture may never have started
       }
+      pcmChunksRef.current = [];
+      pcmBytesRef.current = 0;
     };
   }, []);
 
@@ -392,7 +402,33 @@ export const STTScreen: React.FC = () => {
   };
 
   /**
-   * Start recording audio
+   * Begin SDK microphone capture, accumulating PCM chunks in memory.
+   * Audio level + recording duration come straight from the capture stream.
+   */
+  const beginCapture = async () => {
+    const capture = getCaptureManager();
+    pcmChunksRef.current = [];
+    pcmBytesRef.current = 0;
+    await capture.startRecording((chunk: Uint8Array) => {
+      pcmChunksRef.current.push(chunk);
+      pcmBytesRef.current += chunk.length;
+      setAudioLevel(capture.audioLevel);
+      setRecordingDuration(pcmBytesRef.current / CAPTURE_BYTES_PER_MS);
+    });
+  };
+
+  /**
+   * Drain the accumulated PCM chunks (resets the buffer).
+   */
+  const drainCapturedChunks = (): Uint8Array[] => {
+    const chunks = pcmChunksRef.current;
+    pcmChunksRef.current = [];
+    pcmBytesRef.current = 0;
+    return chunks;
+  };
+
+  /**
+   * Start recording audio (batch mode)
    */
   const startRecording = async () => {
     try {
@@ -405,13 +441,8 @@ export const STTScreen: React.FC = () => {
         return;
       }
 
-      // Start recording using expo-av
-      console.warn('[STTScreen] Starting recorder...');
-      const uri = await AudioRecorder.startRecording();
-
-      // Store the returned URI as the recording path
-      recordingPath.current = uri;
-      console.warn('[STTScreen] Recording started at:', uri);
+      console.warn('[STTScreen] Starting SDK audio capture...');
+      await beginCapture();
 
       setIsRecording(true);
       setTranscript('');
@@ -423,42 +454,21 @@ export const STTScreen: React.FC = () => {
   };
 
   /**
-   * Stop recording and transcribe
-   * Native module handles audio format conversion using iOS AudioToolbox
+   * Stop recording and transcribe the in-memory PCM buffer.
    */
   const stopRecordingAndTranscribe = async () => {
     try {
       console.warn('[STTScreen] Stopping recording...');
 
-      // Stop recording
-      const { uri } = await AudioRecorder.stopRecording();
+      getCaptureManager().stopRecording();
       setIsRecording(false);
       setIsProcessing(true);
 
-      console.warn('[STTScreen] Recording stopped, file at:', uri);
+      const chunks = drainCapturedChunks();
+      const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
+      console.warn('[STTScreen] Recording size:', totalBytes, 'bytes');
 
-      // Use the URI returned by stopRecorder
-      const filePath = uri || recordingPath.current;
-      if (!filePath) {
-        throw new Error('Recording path not found');
-      }
-
-      // Normalize path - remove file:// prefix for RNFS and native module
-      const normalizedPath = filePath.startsWith('file://')
-        ? filePath.substring(7)
-        : filePath;
-
-      console.warn('[STTScreen] Normalized path:', normalizedPath);
-
-      const exists = await RNFS.exists(normalizedPath);
-      if (!exists) {
-        throw new Error('Recorded file not found at: ' + normalizedPath);
-      }
-
-      const stat = await RNFS.stat(normalizedPath);
-      console.warn('[STTScreen] Recording file size:', stat.size, 'bytes');
-
-      if (stat.size < 1000) {
+      if (totalBytes < 1000) {
         throw new Error('Recording too short');
       }
 
@@ -470,10 +480,8 @@ export const STTScreen: React.FC = () => {
         throw new Error('STT model not loaded');
       }
 
-      // Transcribe the audio file - native module handles format conversion
-      // iOS AudioToolbox converts M4A/CAF/WAV to 16kHz mono float32 PCM
       console.warn('[STTScreen] Starting transcription...');
-      const result = await transcribeAudioFile(normalizedPath);
+      const result = await transcribePcmChunks(chunks);
 
       console.warn('[STTScreen] Transcription result:', result);
 
@@ -483,10 +491,6 @@ export const STTScreen: React.FC = () => {
       } else {
         setTranscript('(No speech detected)');
       }
-
-      // Clean up temp file
-      await RNFS.unlink(normalizedPath).catch(() => {});
-      recordingPath.current = null;
     } catch (error: unknown) {
       console.error('[STTScreen] Transcription error:', error);
       const errorMessage =
@@ -504,8 +508,9 @@ export const STTScreen: React.FC = () => {
    * Start live transcription mode
    *
    * Implements pseudo-streaming for Whisper models (which are batch-only):
-   * Records audio in intervals (3 seconds), transcribes each chunk, and
-   * accumulates results for a live-like experience matching Swift SDK.
+   * the SDK capture runs continuously while a 3-second timer drains the
+   * accumulated PCM buffer, transcribes it, and appends the result for a
+   * live-like experience matching Swift SDK.
    */
   const startLiveTranscription = async () => {
     try {
@@ -538,8 +543,9 @@ export const STTScreen: React.FC = () => {
       isLiveRecordingRef.current = true;
       liveChunkCountRef.current = 0;
 
-      // Start initial recording chunk
-      await startLiveChunk();
+      // Start continuous SDK capture, then schedule the first chunk drain
+      await beginCapture();
+      scheduleLiveChunk();
       setIsRecording(true);
 
       console.warn('[STTScreen] Live transcription started');
@@ -554,40 +560,29 @@ export const STTScreen: React.FC = () => {
   };
 
   /**
-   * Start recording a live chunk (called repeatedly for pseudo-streaming)
+   * Schedule the next live chunk drain (3 seconds of audio per chunk).
    */
-  const startLiveChunk = async () => {
+  const scheduleLiveChunk = () => {
     if (!isLiveRecordingRef.current) {
       console.warn(
-        '[STTScreen] Live recording stopped, not starting new chunk'
+        '[STTScreen] Live recording stopped, not scheduling new chunk'
       );
       return;
     }
 
-    try {
-      liveChunkCountRef.current++;
-      const chunkNum = liveChunkCountRef.current;
-      console.warn(`[STTScreen] Starting live chunk #${chunkNum}...`);
+    liveChunkCountRef.current++;
+    const chunkNum = liveChunkCountRef.current;
+    console.warn(`[STTScreen] Scheduling live chunk #${chunkNum}...`);
 
-      // Record with expo-av
-      const path = await AudioRecorder.startRecording();
-      recordingPath.current = path;
-      console.warn(`[STTScreen] Live chunk #${chunkNum} recording at:`, path);
-
-      // Schedule transcription after interval (3 seconds for each chunk)
-      liveRecordingIntervalRef.current = setTimeout(async () => {
-        if (isLiveRecordingRef.current) {
-          await transcribeLiveChunk();
-        }
-      }, 3000);
-    } catch (error) {
-      console.error('[STTScreen] Error starting live chunk:', error);
-    }
+    liveRecordingIntervalRef.current = setTimeout(async () => {
+      if (isLiveRecordingRef.current) {
+        await transcribeLiveChunk();
+      }
+    }, 3000);
   };
 
   /**
-   * Transcribe the current live chunk and start the next one
-   * Uses react-native-audio-api for audio decoding
+   * Transcribe the accumulated live PCM buffer and schedule the next chunk.
    */
   const transcribeLiveChunk = async () => {
     if (!isLiveRecordingRef.current) {
@@ -598,39 +593,18 @@ export const STTScreen: React.FC = () => {
       console.warn('[STTScreen] Transcribing live chunk...');
       setPartialTranscript('Processing...');
 
-      // Stop current recording
-      const { uri: resultPath } = await AudioRecorder.stopRecording();
+      const chunks = drainCapturedChunks();
+      const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
 
-      // Get the path
-      let audioPath = resultPath;
-      if (audioPath.startsWith('file://')) {
-        audioPath = audioPath.replace('file://', '');
-      }
-
-      // Check file exists
-      const exists = await RNFS.exists(audioPath);
-      if (!exists) {
-        console.warn('[STTScreen] Live chunk file not found');
-        setPartialTranscript('Listening...');
-        if (isLiveRecordingRef.current) {
-          await startLiveChunk();
-        }
-        return;
-      }
-
-      // Check file size (skip very small files)
-      const stat = await RNFS.stat(audioPath);
-      if (stat.size < 5000) {
+      // Skip very small chunks
+      if (totalBytes < MIN_PCM_BYTES) {
         console.warn('[STTScreen] Chunk too small, skipping transcription');
         setPartialTranscript('Listening...');
-        if (isLiveRecordingRef.current) {
-          await startLiveChunk();
-        }
+        scheduleLiveChunk();
         return;
       }
 
-      // Transcribe using native module (handles audio decoding)
-      const result = await transcribeAudioFile(audioPath);
+      const result = await transcribePcmChunks(chunks);
       console.warn('[STTScreen] Live chunk transcription:', result.text);
 
       // Append to accumulated transcript if we got text
@@ -645,29 +619,21 @@ export const STTScreen: React.FC = () => {
         setConfidence(result.confidence || null);
       }
 
-      // Clean up chunk file
-      await RNFS.unlink(audioPath).catch(() => {});
-
       // Update partial transcript for next chunk
       setPartialTranscript('Listening...');
 
-      // Start next chunk if still recording
-      if (isLiveRecordingRef.current) {
-        await startLiveChunk();
-      }
+      // Schedule next chunk if still recording
+      scheduleLiveChunk();
     } catch (error) {
       console.error('[STTScreen] Error transcribing live chunk:', error);
       setPartialTranscript('Listening...');
       // Try to continue with next chunk
-      if (isLiveRecordingRef.current) {
-        await startLiveChunk();
-      }
+      scheduleLiveChunk();
     }
   };
 
   /**
-   * Stop live transcription
-   * Uses react-native-audio-api for final chunk decoding
+   * Stop live transcription and transcribe any remaining audio.
    */
   const stopLiveTranscription = async () => {
     console.warn('[STTScreen] Stopping live transcription...');
@@ -683,37 +649,23 @@ export const STTScreen: React.FC = () => {
       setIsProcessing(true);
       setPartialTranscript('Processing final chunk...');
 
-      // Stop current recording
-      const { uri: resultPath } = await AudioRecorder.stopRecording().catch(
-        () => ({ uri: '', durationMs: 0 })
-      );
+      // Stop the SDK capture and drain the remaining audio
+      getCaptureManager().stopRecording();
+      const chunks = drainCapturedChunks();
+      const totalBytes = chunks.reduce((sum, c) => sum + c.length, 0);
 
-      // Transcribe final chunk if there's audio
-      if (resultPath && recordingPath.current) {
-        let audioPath = resultPath;
-        if (audioPath.startsWith('file://')) {
-          audioPath = audioPath.replace('file://', '');
-        }
-
-        const exists = await RNFS.exists(audioPath);
-        if (exists) {
-          const stat = await RNFS.stat(audioPath);
-          if (stat.size >= 5000) {
-            console.warn('[STTScreen] Transcribing final live chunk...');
-            // Transcribe using native module (handles audio decoding)
-            const result = await transcribeAudioFile(audioPath);
-            if (result.text && result.text.trim()) {
-              const newText = result.text.trim();
-              if (accumulatedTranscriptRef.current) {
-                accumulatedTranscriptRef.current += ' ' + newText;
-              } else {
-                accumulatedTranscriptRef.current = newText;
-              }
-              setTranscript(accumulatedTranscriptRef.current);
-              setConfidence(result.confidence || null);
-            }
+      if (totalBytes >= MIN_PCM_BYTES) {
+        console.warn('[STTScreen] Transcribing final live chunk...');
+        const result = await transcribePcmChunks(chunks);
+        if (result.text && result.text.trim()) {
+          const newText = result.text.trim();
+          if (accumulatedTranscriptRef.current) {
+            accumulatedTranscriptRef.current += ' ' + newText;
+          } else {
+            accumulatedTranscriptRef.current = newText;
           }
-          await RNFS.unlink(audioPath).catch(() => {});
+          setTranscript(accumulatedTranscriptRef.current);
+          setConfidence(result.confidence || null);
         }
       }
 
@@ -730,7 +682,6 @@ export const STTScreen: React.FC = () => {
       setPartialTranscript('');
       setRecordingDuration(0);
       setAudioLevel(0);
-      recordingPath.current = null;
     }
   };
 

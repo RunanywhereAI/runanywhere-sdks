@@ -16,9 +16,6 @@ public enum SDKConstants {
     /// SDK name
     public static let name = "RunAnywhere SDK"
 
-    /// User agent string
-    public static let userAgent = "\(name)/\(version) (Swift)"
-
     /// Platform identifier
     #if os(iOS)
     public static let platform = "ios"

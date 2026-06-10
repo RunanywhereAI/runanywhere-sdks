@@ -572,6 +572,47 @@ rac_result_t refreshProtoViaSymbol(
 }
 #endif
 
+// Best-effort downloaded-model discovery pre-pass before a rescan refresh.
+// Mirrors Swift refreshModelRegistry (RunAnywhere+ModelRegistry.swift:54-63),
+// which runs CppBridge.ModelRegistry.discoverDownloadedModels() first with
+// its default request: recursive=true (field 2), link_downloaded=true
+// (field 3), query{downloaded_only=true} (field 5), include_user_imports=true
+// (field 7) — see CppBridge+ModelRegistry.swift defaultDiscoveryRequest().
+void discoverDownloadedModelsPrePass(rac_model_registry_handle_t registryHandle) {
+#if defined(__APPLE__)
+    auto* discoverProto = &rac_model_registry_discover_proto;
+#else
+    auto discoverProto =
+        proto_compat::symbol<proto_compat::RegistryRequestProtoFn>(
+            "rac_model_registry_discover_proto");
+    if (!discoverProto) {
+        LOGE("refreshModelRegistry: rac_model_registry_discover_proto unavailable");
+        return;
+    }
+#endif
+    // ModelDiscoveryRequest wire bytes.
+    std::vector<uint8_t> requestBytes;
+    appendRefreshBoolField(requestBytes, 2, true);  // recursive
+    appendRefreshBoolField(requestBytes, 3, true);  // link_downloaded
+    // query (field 5, nested ModelQuery{downloaded_only(4)=true}).
+    std::vector<uint8_t> queryBytes;
+    appendRefreshBoolField(queryBytes, 4, true);  // downloaded_only
+    requestBytes.push_back(static_cast<uint8_t>((5 << 3) | 0x02));  // LEN tag
+    requestBytes.push_back(static_cast<uint8_t>(queryBytes.size()));
+    requestBytes.insert(requestBytes.end(), queryBytes.begin(), queryBytes.end());
+    appendRefreshBoolField(requestBytes, 7, true);  // include_user_imports
+
+    rac_proto_buffer_t out;
+    proto_compat::initBuffer(&out);
+    rac_result_t rc = discoverProto(
+        registryHandle, requestBytes.data(), requestBytes.size(), &out);
+    if (rc != RAC_SUCCESS) {
+        // Non-fatal — Swift logs and proceeds with the refresh.
+        LOGE("refreshModelRegistry: discover pre-pass rc=%d", rc);
+    }
+    proto_compat::freeBuffer(&out);
+}
+
 } // namespace
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
@@ -584,12 +625,21 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
             return false;
         }
 
+        // Swift parity: rescanLocal first runs the downloaded-model
+        // discovery pre-pass (RunAnywhere+ModelRegistry.swift:56-58).
+        if (rescanLocal) {
+            discoverDownloadedModelsPrePass(registryHandle);
+        }
+
         // ModelRegistryRefreshRequest: field 1 include_remote_catalog,
-        // field 2 rescan_local, field 3 prune_orphans (all bool).
+        // field 2 rescan_local, field 3 prune_orphans, field 7
+        // include_downloaded_state (always true — Swift parity,
+        // RunAnywhere+ModelRegistry.swift:62).
         std::vector<uint8_t> requestBytes;
         appendRefreshBoolField(requestBytes, 1, includeRemoteCatalog);
         appendRefreshBoolField(requestBytes, 2, rescanLocal);
         appendRefreshBoolField(requestBytes, 3, pruneOrphans);
+        appendRefreshBoolField(requestBytes, 7, true);
 
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);

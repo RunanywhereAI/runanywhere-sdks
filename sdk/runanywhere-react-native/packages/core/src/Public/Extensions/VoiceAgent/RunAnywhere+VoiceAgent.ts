@@ -33,6 +33,10 @@ import { currentModel, loadModel } from '../Models/RunAnywhere+ModelLifecycle';
 import { VoiceAgentStreamAdapter } from '../../../Adapters/VoiceAgentStreamAdapter';
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import {
+  isSDKInitialized,
+  requireInitialized,
+} from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
@@ -72,7 +76,11 @@ export function defaultVoiceAgentComposeConfig(): ReturnType<typeof VoiceAgentCo
  * Matches Swift: `RunAnywhere.getVoiceAgentComponentStates()`.
  */
 export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
+  // Swift parity: guard isInitialized (RunAnywhere+VoiceAgent.swift:178-180).
+  requireInitialized();
   const native = ensureNative();
+  // Swift parity: RunAnywhere+VoiceAgent.swift:182 gates on ensureServicesReady.
+  await ensureServicesReady();
   try {
     const bytes = await native.voiceAgentComponentStatesProto();
     return VoiceAgentComponentStatesMessage.decode(arrayBufferToBytes(bytes));
@@ -87,6 +95,8 @@ export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponen
 export async function initializeVoiceAgent(
   config: ReturnType<typeof VoiceAgentComposeConfig.create>
 ): Promise<void> {
+  // Swift parity: guard isInitialized (RunAnywhere+VoiceAgent.swift:25-27).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VoiceAgent.swift:29 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -138,6 +148,9 @@ export const defaultVADModelID = 'silero-vad';
  *   when no VAD model is loaded (auto-load failed or skipped).
  */
 export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
+  // Swift parity: `guard isInitialized else { return false }`
+  // (RunAnywhere+VoiceAgent.swift:58).
+  if (!isSDKInitialized()) return false;
   if (!isNativeModuleAvailable()) return false;
 
   const snapshot = await currentModel(
@@ -200,6 +213,8 @@ export async function initializeVoiceAgentWithLoadedModels(
   ttsVoiceID?: string,
   ensureVAD: boolean = true
 ): Promise<void> {
+  // Swift parity: guard isInitialized (RunAnywhere+VoiceAgent.swift:118-120).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VoiceAgent.swift:122 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -260,6 +275,8 @@ export async function initializeVoiceAgentWithLoadedModels(
 export async function processVoiceTurn(
   audioData: ArrayBuffer | Uint8Array
 ): Promise<VoiceAgentResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+VoiceAgent.swift:189-191).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VoiceAgent.swift:182 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -314,6 +331,11 @@ export async function cleanupVoiceAgent(): Promise<void> {
 export function streamVoiceAgent(): AsyncIterable<VoiceEvent> {
   return {
     async *[Symbol.asyncIterator]() {
+      // Swift parity: not-initialized finishes the stream silently
+      // (RunAnywhere+VoiceAgent.swift:211-214).
+      if (!isSDKInitialized()) {
+        return;
+      }
       const handle = await getVoiceAgentHandle();
       const adapter = new VoiceAgentStreamAdapter(handle);
       yield* adapter.stream();

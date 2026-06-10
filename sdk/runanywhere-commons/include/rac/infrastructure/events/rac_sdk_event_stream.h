@@ -125,7 +125,13 @@ RAC_API rac_result_t rac_events_flush_telemetry_sink(void);
 namespace rac::events {
 
 rac_result_t publish_initialization_started();
-rac_result_t publish_initialization_completed();
+/**
+ * @param duration_ms Wall-clock duration of the completed init phase; emitted
+ *                    as the envelope property "duration_ms" when >= 0 (the
+ *                    payload Swift used to attach via its hand-emitted
+ *                    duplicate event). Pass -1 to omit.
+ */
+rac_result_t publish_initialization_completed(int64_t duration_ms = -1);
 rac_result_t publish_initialization_failed(rac_result_t error_code, const char* message);
 rac_result_t publish_shutdown();
 rac_result_t publish_device_registered(const char* device_id);

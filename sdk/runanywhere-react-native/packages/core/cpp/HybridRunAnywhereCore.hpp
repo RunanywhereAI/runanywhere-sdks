@@ -142,6 +142,7 @@ public:
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> clearCache() override;
+  std::shared_ptr<Promise<bool>> cleanTempFiles() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(
@@ -220,6 +221,22 @@ public:
   std::shared_ptr<Promise<void>> sttTranscribeStreamProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes,
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+
+  // STT Streaming Session (rac_stt_stream.h) — mirrors Swift
+  // CppBridge+STT.swift `transcribeSessionStream`. Single concurrent
+  // session (one callback slot per handle).
+  std::shared_ptr<Promise<bool>> sttStreamLoadModel(
+    const std::string& modelPath,
+    const std::string& modelId,
+    const std::string& modelName) override;
+  std::shared_ptr<Promise<double>> sttStreamStart(
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+  std::shared_ptr<Promise<void>> sttStreamFeed(
+    double sessionId,
+    const std::shared_ptr<ArrayBuffer>& audioBytes) override;
+  std::shared_ptr<Promise<void>> sttStreamStop(double sessionId) override;
+  std::shared_ptr<Promise<void>> sttStreamCancel(double sessionId) override;
 
   // ============================================================================
   // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)

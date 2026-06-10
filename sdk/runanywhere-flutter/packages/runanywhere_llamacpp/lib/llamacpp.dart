@@ -27,11 +27,7 @@
 /// ```
 library;
 
-import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework;
-import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 
@@ -41,14 +37,8 @@ import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 /// with GGUF models and Metal/GPU acceleration.
 ///
 /// Matches Swift `LlamaCPP` enum from LlamaCPPRuntime/LlamaCPP.swift.
-class LlamaCpp implements RunAnywhereModule {
-  // ============================================================================
-  // Singleton Pattern (matches Swift enum pattern)
-  // ============================================================================
-
-  static final LlamaCpp _instance = LlamaCpp._internal();
-  static LlamaCpp get module => _instance;
-  LlamaCpp._internal();
+class LlamaCpp {
+  LlamaCpp._();
 
   // ============================================================================
   // Module Info (matches Swift exactly)
@@ -59,29 +49,6 @@ class LlamaCpp implements RunAnywhereModule {
 
   /// LlamaCPP library version (underlying C++ library)
   static const String llamaCppVersion = 'b7199';
-
-  // ============================================================================
-  // RunAnywhereModule Conformance (matches Swift exactly)
-  // ============================================================================
-
-  @override
-  String get moduleId => 'llamacpp';
-
-  @override
-  String get moduleName => 'LlamaCPP';
-
-  @override
-  Set<SDKComponent> get capabilities => {
-        SDKComponent.SDK_COMPONENT_LLM,
-        SDKComponent.SDK_COMPONENT_VLM,
-      };
-
-  @override
-  int get defaultPriority => 100;
-
-  @override
-  InferenceFramework get inferenceFramework =>
-      InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
 
   // ============================================================================
   // Registration State

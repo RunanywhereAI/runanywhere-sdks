@@ -3,8 +3,7 @@
 /// Functional LLM routing is Android/Snapdragon-only and requires native
 /// binaries built with the Qualcomm Genie SDK. Without those binaries, the
 /// backend remains unavailable and is not selected by the native router.
-/// It is a **thin wrapper** around the native plugin shell. The module reports
-/// LLM capability only after native registration succeeds.
+/// It is a **thin wrapper** around the native plugin shell.
 ///
 /// ## Architecture (matches Swift/Kotlin)
 ///
@@ -31,11 +30,7 @@ library;
 
 import 'dart:async';
 
-import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework;
-import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_genie/native/genie_bindings.dart';
 
@@ -45,14 +40,8 @@ import 'package:runanywhere_genie/native/genie_bindings.dart';
 /// registration succeeds on Android/Snapdragon hardware.
 ///
 /// Matches the Swift/Kotlin Genie module pattern.
-class Genie implements RunAnywhereModule {
-  // ============================================================================
-  // Singleton Pattern (matches Swift enum pattern)
-  // ============================================================================
-
-  static final Genie _instance = Genie._internal();
-  static Genie get module => _instance;
-  Genie._internal();
+class Genie {
+  Genie._();
 
   // ============================================================================
   // Module Info (matches Swift exactly)
@@ -69,27 +58,6 @@ class Genie implements RunAnywhereModule {
   /// Used by Android `binary_config.gradle` (`genieVersion = '0.3.0'`) for
   /// release URL resolution.
   static const String genieNativeVersion = '0.3.0';
-
-  // ============================================================================
-  // RunAnywhereModule Conformance (matches Swift exactly)
-  // ============================================================================
-
-  @override
-  String get moduleId => 'genie';
-
-  @override
-  String get moduleName => 'Genie';
-
-  @override
-  Set<SDKComponent> get capabilities =>
-      _isRegistered ? {SDKComponent.SDK_COMPONENT_LLM} : {};
-
-  @override
-  int get defaultPriority => _isRegistered ? 200 : 0;
-
-  @override
-  InferenceFramework get inferenceFramework =>
-      InferenceFramework.INFERENCE_FRAMEWORK_GENIE;
 
   // ============================================================================
   // Registration State

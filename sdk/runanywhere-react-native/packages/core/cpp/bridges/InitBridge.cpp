@@ -22,6 +22,7 @@
 #include "rac_auth_manager.h"
 #endif
 
+#include <algorithm>
 #include <cstddef>
 
 #if __has_include("rac/lifecycle/rac_sdk_init.h")
@@ -685,21 +686,17 @@ static std::mutex g_http_download_mutex;
 static std::unordered_map<std::string, http_download_context> g_http_downloads;
 static std::atomic<uint64_t> g_http_download_counter{0};
 
-static std::string appendOnConflictForSupabaseUpsert(const std::string& url) {
-    if (url.find("/rest/v1/sdk_devices") == std::string::npos ||
-        url.find("on_conflict=") != std::string::npos) {
-        return url;
-    }
-
-    return url + (url.find('?') == std::string::npos ? "?" : "&") + "on_conflict=device_id";
-}
-
 static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     const std::string& url,
     const std::string& jsonBody,
     const std::string& apiKey
 ) {
-    std::string finalUrl = appendOnConflictForSupabaseUpsert(url);
+    // Supabase device-registration upserts route through
+    // rac_http_request_set_upsert_mode below (commons appends
+    // ?on_conflict=<field> and the merge-duplicates Prefer header) instead of
+    // duplicating the Supabase wire protocol at this layer.
+    const bool isDeviceUpsert =
+        url.find("/rest/v1/sdk_devices") != std::string::npos;
 
     std::vector<rac_http_header_kv_t> headers = {
         {"Content-Type", "application/json"},
@@ -710,7 +707,6 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
         headers.push_back({"apikey", apiKey.c_str()});
         bearer = "Bearer " + apiKey;
         headers.push_back({"Authorization", bearer.c_str()});
-        headers.push_back({"Prefer", "resolution=merge-duplicates"});
     }
 
     rac_http_client_t* client = nullptr;
@@ -721,7 +717,7 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
 
     rac_http_request_t req{};
     req.method = "POST";
-    req.url = finalUrl.c_str();
+    req.url = url.c_str();
     req.headers = headers.data();
     req.header_count = headers.size();
     req.body_bytes = reinterpret_cast<const uint8_t*>(jsonBody.data());
@@ -729,6 +725,9 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     req.timeout_ms = 30000;
     req.follow_redirects = RAC_TRUE;
     req.expected_checksum_hex = nullptr;
+    if (isDeviceUpsert) {
+        rac_http_request_set_upsert_mode(&req, "device_id");
+    }
 
     rac_http_response_t resp{};
     rac_result_t sendResult = rac_http_request_send(client, &req, &resp);
@@ -813,6 +812,12 @@ static void freeProtoBuffer(rac_proto_buffer_t* buffer) {
     initProtoBuffer(buffer);
 }
 
+// Minimal protobuf wire writers/readers for the SdkInitPhase1/2Request and
+// SdkInitResult messages. Deliberate bridge convention: this C++ layer links
+// NO protobuf runtime (same as HybridRunAnywhereCore+Registry.cpp), so the
+// handful of init fields are wire-encoded by hand against the field numbers
+// in idl/sdk_init.proto. If a message here grows beyond a few scalar fields,
+// move the encoding into a commons rac_* helper instead of extending this.
 static void appendVarint(std::vector<uint8_t>& out, uint64_t value) {
     while (value >= 0x80) {
         out.push_back(static_cast<uint8_t>(value | 0x80));
@@ -1820,18 +1825,12 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
 #if defined(__APPLE__)
         info.platform = "ios";
         info.osName = "iOS";
-        info.hasNeuralEngine = true;
-        info.neuralEngineCores = 16;
 #elif defined(ANDROID) || defined(__ANDROID__)
         info.platform = "android";
         info.osName = "Android";
-        info.hasNeuralEngine = false;
-        info.neuralEngineCores = 0;
 #else
         info.platform = "unknown";
         info.osName = "Unknown";
-        info.hasNeuralEngine = false;
-        info.neuralEngineCores = 0;
 #endif
         info.sdkVersion = InitBridge::shared().getSdkVersion();
         info.deviceModel = InitBridge::shared().getDeviceModel();
@@ -1847,8 +1846,31 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
         info.batteryLevel = -1.0f;
         info.batteryState = "";
         info.isLowPowerMode = false;
-        info.performanceCores = info.coreCount > 4 ? 2 : 1;
-        info.efficiencyCores = info.coreCount - info.performanceCores;
+        // Mirrors Swift DeviceInfo.swift: Neural Engine is derived from the
+        // architecture (arm64 Apple silicon), never hardcoded — x86 simulators
+        // report none. Cores follow Swift's `hasNeuralEngine ? 16 : 0`.
+#if defined(__APPLE__)
+        info.hasNeuralEngine = info.architecture == "arm64";
+#else
+        info.hasNeuralEngine = false;
+#endif
+        info.neuralEngineCores = info.hasNeuralEngine ? 16 : 0;
+        // Core split mirrors Swift getCoreDistribution(totalCores:modelId:):
+        // iPhone → 2P + rest E; iPad/Mac → ~40% performance (min 2);
+        // default → totalCores/3 performance (min 1).
+        const std::string& model = info.deviceModel;
+        const int totalCores = info.coreCount;
+        int perfCores;
+        if (model.rfind("iPhone", 0) == 0) {
+            perfCores = 2;
+        } else if (model.rfind("iPad", 0) == 0 || model.rfind("Mac", 0) == 0) {
+            perfCores = std::max(2, totalCores * 2 / 5);
+        } else {
+            perfCores = std::max(1, totalCores / 3);
+        }
+        perfCores = std::min(perfCores, totalCores);
+        info.performanceCores = perfCores;
+        info.efficiencyCores = totalCores - perfCores;
         return info;
     };
 

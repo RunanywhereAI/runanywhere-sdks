@@ -8,14 +8,22 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `HybridAudioCaptureSpec` to properly resolve imports.
+namespace margelo::nitro::runanywhere { class HybridAudioCaptureSpec; }
+// Forward declaration of `HybridAudioPlaybackSpec` to properly resolve imports.
+namespace margelo::nitro::runanywhere { class HybridAudioPlaybackSpec; }
 // Forward declaration of `HybridRunAnywhereDeviceInfoSpec` to properly resolve imports.
 namespace margelo::nitro::runanywhere { class HybridRunAnywhereDeviceInfoSpec; }
 
 // Include C++ defined types
+#include "HybridAudioCaptureSpec.hpp"
+#include "HybridAudioPlaybackSpec.hpp"
 #include "HybridRunAnywhereDeviceInfoSpec.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -29,6 +37,10 @@ namespace margelo::nitro::runanywhere { class HybridRunAnywhereDeviceInfoSpec; }
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridAudioCaptureSpec_cxx` to properly resolve imports.
+namespace RunAnywhereCore { class HybridAudioCaptureSpec_cxx; }
+// Forward declaration of `HybridAudioPlaybackSpec_cxx` to properly resolve imports.
+namespace RunAnywhereCore { class HybridAudioPlaybackSpec_cxx; }
 // Forward declaration of `HybridRunAnywhereDeviceInfoSpec_cxx` to properly resolve imports.
 namespace RunAnywhereCore { class HybridRunAnywhereDeviceInfoSpec_cxx; }
 

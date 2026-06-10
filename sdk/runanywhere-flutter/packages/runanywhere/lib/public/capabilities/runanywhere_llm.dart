@@ -291,25 +291,29 @@ class RunAnywhereLLM {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
+    // Phase-2 readiness gate, mirroring Swift's `try await
+    // ensureServicesReady()` (RunAnywhere+TextGeneration.swift:48). With the
+    // http_applicable latch this is O(1) offline — commons marks HTTP setup
+    // not-applicable and the guard short-circuits instead of re-attempting
+    // a remote round-trip per call.
+    await DartBridge.ensureServicesReady();
 
     final startTime = DateTime.now();
 
+    // No "model loaded" pre-flight here — Swift has none; commons surfaces
+    // a structured error when no model is loaded.
     final modelId = currentModelId;
-    if (modelId == null) {
-      throw SDKException.componentNotReady(
-        'LLM model not loaded. Call loadModel() first.',
-      );
-    }
 
     try {
       final effectiveRequest = LLMGenerateRequest()
         ..mergeFromMessage(request)
         ..streamingEnabled = false;
-      final result = _generateProto(effectiveRequest);
+      final result = await _generateProto(effectiveRequest);
 
       final endTime = DateTime.now();
       final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
-      if (!result.hasModelUsed() || result.modelUsed.isEmpty) {
+      if ((!result.hasModelUsed() || result.modelUsed.isEmpty) &&
+          modelId != null) {
         result.modelUsed = modelId;
       }
       if (!result.hasGenerationTimeMs() || result.generationTimeMs <= 0) {
@@ -342,12 +346,8 @@ class RunAnywhereLLM {
       throw SDKException.notInitialized();
     }
 
-    if (currentModelId == null) {
-      throw SDKException.componentNotReady(
-        'LLM model not loaded. Call loadModel() first.',
-      );
-    }
-
+    // No "model loaded" pre-flight here — Swift has none; commons surfaces
+    // a structured error when no model is loaded.
     final effectiveRequest = LLMGenerateRequest()
       ..mergeFromMessage(request)
       ..streamingEnabled = true;
@@ -364,14 +364,17 @@ class RunAnywhereLLM {
     bool streaming = false,
   }) {
     final opts = options ?? LLMGenerationOptions();
+    // Defaults mirror Swift `RALLMGenerationOptions.defaults()`
+    // (RALLMTypes+CppBridge.swift:13-21): maxTokens=100, temperature=0.8,
+    // topP=1.0, topK=0, repetitionPenalty=1.0.
     return LLMGenerateRequest(
       prompt: prompt,
       maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
       temperature: opts.hasTemperature() ? opts.temperature : 0.8,
-      topP: opts.hasTopP() ? opts.topP : null,
-      topK: opts.hasTopK() ? opts.topK : null,
+      topP: opts.hasTopP() ? opts.topP : 1.0,
+      topK: opts.hasTopK() ? opts.topK : 0,
       repetitionPenalty:
-          opts.hasRepetitionPenalty() ? opts.repetitionPenalty : null,
+          opts.hasRepetitionPenalty() ? opts.repetitionPenalty : 1.0,
       stopSequences: opts.stopSequences,
       systemPrompt: opts.hasSystemPrompt() ? opts.systemPrompt : null,
       emitThoughts: opts.hasThinkingPattern(),
@@ -444,7 +447,7 @@ class RunAnywhereLLM {
         SDKComponent.SDK_COMPONENT_LLM,
       );
 
-  LLMGenerationResult _generateProto(LLMGenerateRequest request) {
+  Future<LLMGenerationResult> _generateProto(LLMGenerateRequest request) {
     return DartBridgeLLM.shared.generateProto(request);
   }
 
@@ -452,23 +455,21 @@ class RunAnywhereLLM {
     final controller = StreamController<LLMStreamEvent>(sync: false);
 
     Future<void> run() async {
-      // Best-effort Phase-2 readiness, kicked off in the BACKGROUND (NOT
-      // awaited). On-device LLM generation must not be gated on — or delayed
-      // by — a remote auth/config round-trip: offline, `ensureServicesReady()`'s
-      // recovery path blocks ~4s on a DNS timeout (unreachable dev endpoint)
-      // before failing. Local generation resolves the engine from the commons
-      // model lifecycle and does not need it, so awaiting only adds latency to
-      // every send. Fire-and-forget; auth retries on the next online call.
-      // Mirrors the ungated non-streaming `generate` / RAG paths and Swift/Kotlin
-      // best-effort readiness.
-      unawaited(
-        DartBridge.ensureServicesReady().catchError((Object e) {
-          SDKLogger('RunAnywhere.GenerateStream').debug(
-            'Services not ready (HTTP/auth deferred — will retry on next '
-            'online call); proceeded with local generation: $e',
-          );
-        }),
-      );
+      try {
+        // Phase-2 readiness gate, mirroring Swift's `try await
+        // ensureServicesReady()` (RunAnywhere+TextGeneration.swift:77).
+        // The http_applicable latch keeps this O(1) offline — commons marks
+        // HTTP setup not-applicable, so the guard no longer re-attempts a
+        // remote round-trip (the old ~4s DNS stall) on every send.
+        await DartBridge.ensureServicesReady();
+      } catch (e) {
+        if (!controller.isClosed) {
+          controller
+              .addError(e is SDKException ? e : SDKException.generationFailed('$e'));
+          await controller.close();
+        }
+        return;
+      }
       final upstream = DartBridgeLLM.shared.generateStreamProto(request);
       await controller.addStream(upstream);
       await controller.close();

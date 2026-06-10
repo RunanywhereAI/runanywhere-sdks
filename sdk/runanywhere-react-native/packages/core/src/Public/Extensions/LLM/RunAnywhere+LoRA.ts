@@ -50,6 +50,7 @@ import {
 } from '@runanywhere/proto-ts/lora_options';
 import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import {
   ModelCategory,
@@ -239,6 +240,8 @@ async function checkCompatibility(
 async function register(
   entry: LoraAdapterCatalogEntry
 ): Promise<LoraAdapterCatalogEntry> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:77-79).
+  requireInitialized();
   const native = ensureNative();
   const result = decodeRequired(
     await native.loraRegisterCatalogEntryProto(encodeCatalogEntry(entry)),
@@ -252,6 +255,8 @@ async function register(
 async function listCatalog(
   request?: LoraAdapterCatalogListRequest
 ): Promise<LoraAdapterCatalogListResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:88-90).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogListProto(encodeCatalogListRequest(request)),
@@ -263,6 +268,8 @@ async function listCatalog(
 async function queryCatalog(
   query: LoraAdapterCatalogQuery
 ): Promise<LoraAdapterCatalogListResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:99-101).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogQueryProto(encodeCatalogQuery(query)),
@@ -274,6 +281,8 @@ async function queryCatalog(
 async function getCatalogEntry(
   request: LoraAdapterCatalogGetRequest
 ): Promise<LoraAdapterCatalogGetResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:110-112).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogGetProto(encodeCatalogGetRequest(request)),
@@ -285,6 +294,8 @@ async function getCatalogEntry(
 async function markDownloadCompleted(
   request: LoraAdapterDownloadCompletedRequest
 ): Promise<LoraAdapterDownloadCompletedResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+LoRA.swift:125-127).
+  requireInitialized();
   const native = ensureNative();
   return decodeRequired(
     await native.loraCatalogMarkDownloadCompletedProto(
@@ -408,7 +419,8 @@ async function adaptersForModel(
     LoraAdapterCatalogQueryMessage.fromPartial({ modelId })
   );
   if (!result.success) {
-    throw SDKException.generationFailedWith(
+    // Swift parity: .processingFailed (RunAnywhere+LoRA.swift:157-163).
+    throw SDKException.processingFailed(
       result.errorMessage || 'LoRA catalog query failed'
     );
   }
@@ -422,7 +434,8 @@ async function adaptersForModel(
 async function allRegistered(): Promise<LoraAdapterCatalogEntry[]> {
   const result = await listCatalog();
   if (!result.success) {
-    throw SDKException.generationFailedWith(
+    // Swift parity: .processingFailed (RunAnywhere+LoRA.swift:172-178).
+    throw SDKException.processingFailed(
       result.errorMessage || 'LoRA catalog list failed'
     );
   }

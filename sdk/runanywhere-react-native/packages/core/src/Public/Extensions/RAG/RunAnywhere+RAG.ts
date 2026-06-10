@@ -12,6 +12,7 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import type {
   RAGConfiguration,
   RAGQueryOptions,
@@ -100,6 +101,8 @@ export async function ragCreatePipeline(
     return ragCreatePipeline(config);
   }
   const config = configOrModels as RAGConfiguration;
+  // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:59-61).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+RAG.swift:62 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -144,6 +147,8 @@ export async function ragIngest(
   textOrDocument: string | RAGDocument,
   metadataJson?: string
 ): Promise<RAGStatistics> {
+  // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:93-95).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+RAG.swift:96 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -201,6 +206,8 @@ export async function ragAddDocumentsBatch(
 export async function ragAddDocumentsBatch(
   documents: RAGDocument[] | Array<{ text: string; metadataJson?: string }>
 ): Promise<void> {
+  // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:110-112).
+  requireInitialized();
   for (const doc of documents) {
     // Distinguish RAGDocument proto (has typed `metadata` map) from the
     // convenience ad-hoc shape (has `metadataJson` string).
@@ -235,6 +242,8 @@ export async function ragQuery(
   questionOrOptions: string | RAGQueryOptions,
   options?: Partial<Omit<RAGQueryOptions, 'question'>>
 ): Promise<RAGResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:191-193).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+RAG.swift:194 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -242,6 +251,12 @@ export async function ragQuery(
     typeof questionOrOptions === 'string'
       ? RAGQueryOptionsMessage.fromPartial({
           ...options,
+          // Defaults mirror Swift RARAGQueryOptions.defaults(question:)
+          // (generated from IDL rac_default annotations): maxTokens 512,
+          // temperature 0.7, topP 1.0. Caller-provided options override.
+          maxTokens: options?.maxTokens ?? 512,
+          temperature: options?.temperature ?? 0.7,
+          topP: options?.topP ?? 1.0,
           question: questionOrOptions,
         })
       : questionOrOptions;
@@ -253,18 +268,31 @@ export async function ragQuery(
 
 /** Clear all documents from the pipeline. */
 export async function ragClearDocuments(): Promise<void> {
+  // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:154-156).
+  requireInitialized();
   const native = ensureNative();
   await native.ragClearProto();
 }
 
-/** Get the number of indexed document chunks. */
+/**
+ * Get the number of indexed document chunks.
+ *
+ * Swift parity (RunAnywhere+RAG.swift:128-134): never throws — returns 0
+ * when the SDK/pipeline is not ready or stats are unavailable.
+ */
 export async function ragGetDocumentCount(): Promise<number> {
-  const stats = await ragGetStatistics();
-  return stats.indexedChunks;
+  try {
+    const stats = await ragGetStatistics();
+    return stats.indexedChunks;
+  } catch {
+    return 0;
+  }
 }
 
-/** Get pipeline statistics. */
+/** Get pipeline statistics. Throws when the SDK or pipeline is not ready. */
 export async function ragGetStatistics(): Promise<RAGStatistics> {
+  // Swift parity: guard isInitialized (RunAnywhere+RAG.swift:143-145).
+  requireInitialized();
   const native = ensureNative();
   const statsBytes = await native.ragStatsProto();
   return decodeRequired(statsBytes, RAGStatisticsMessage.decode, 'ragStatsProto');

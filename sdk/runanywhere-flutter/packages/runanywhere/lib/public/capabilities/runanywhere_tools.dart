@@ -12,12 +12,20 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi' show nullptr;
 
+import 'package:ffi/ffi.dart' show Utf8Pointer;
 import 'package:fixnum/fixnum.dart' show Int64;
+import 'package:protobuf/protobuf.dart'
+    show GeneratedMessageGenericExtensions;
+import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/llm_options.pb.dart'
+    show LLMGenerationOptions;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCall,
+        ToolCallFormatName,
         ToolCallingOptions,
         ToolCallingResult,
         ToolCallingSessionCreateRequest,
@@ -164,51 +172,69 @@ class RunAnywhereTools {
   /// tool name the LLM is forced to invoke. Overrides
   /// `options.forcedToolName` when non-null.
   ///
-  /// Mirrors Swift `RunAnywhere.generateWithTools(prompt:options:toolOptions:toolChoice:forcedToolName:)`
-  /// (`RunAnywhere+ToolCalling.swift:234-253`, `makeRunLoopRequest:457-514`).
+  /// Mirrors Swift `RunAnywhere.generateWithTools(prompt:options:toolOptions:toolChoice:forcedToolName:validateCalls:)`
+  /// (`RunAnywhere+ToolCalling.swift:250-280`, `makeRunLoopRequest:491-548`):
+  /// tool options take precedence per knob, falling back to the LLM
+  /// generation [llmOptions]; `top_p` always comes from the LLM options;
+  /// `validate_calls` is left UNSET unless the caller supplies it (commons
+  /// applies its documented default).
   Future<ToolCallingResult> generateWithTools(
     String prompt, {
+    LLMGenerationOptions? llmOptions,
     ToolCallingOptions? options,
     ToolChoiceMode? toolChoice,
     String? forcedToolName,
     bool? validateCalls,
   }) async {
-    final opts = options ?? ToolCallingOptions();
+    // Swift default: `options: RALLMGenerationOptions = .defaults()`.
+    final llm = llmOptions ?? _defaultLLMOptions();
+    // Swift: `toolOptions ?? (options.hasToolCalling ? options.toolCalling
+    // : RAToolCallingOptions.defaults())`.
+    final opts = (options ??
+            (llm.hasToolCalling() ? llm.toolCalling : _defaultToolOptions()))
+        .deepCopy();
+    if (toolChoice != null) {
+      opts.toolChoice = toolChoice;
+    }
+    if (forcedToolName != null) {
+      opts.forcedToolName = forcedToolName;
+    }
     final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
 
-    // Thread tool_choice / forced_tool_name
-    // all the way through to the commons request envelope (fields 7/8 on
-    // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
-    // them — not just the inline ToolCallingOptions snapshot. Top-level
-    // kw args override the options snapshot to mirror Swift behavior.
-    final ToolChoiceMode? effectiveToolChoice = toolChoice ??
-        (opts.hasToolChoice() &&
-                opts.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
-            ? opts.toolChoice
-            : null);
-    final String? effectiveForcedToolName = forcedToolName ??
-        (opts.hasForcedToolName() && opts.forcedToolName.isNotEmpty
-            ? opts.forcedToolName
-            : null);
-
+    // Mirrors Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:491-548).
     final request = ToolCallingSessionCreateRequest(
       prompt: prompt,
       tools: tools,
-      formatHint: opts.formatHint,
-      maxIterations: opts.hasMaxIterations() ? opts.maxIterations : 5,
-      keepToolsAvailable:
-          opts.hasKeepToolsAvailable() ? opts.keepToolsAvailable : false,
-      // Optional override for the IDL validate_calls knob; defaults to true
-      // like Swift (RunAnywhere+ToolCalling.swift:256).
-      validateCalls: validateCalls ?? true,
-      toolChoice: effectiveToolChoice,
-      forcedToolName: effectiveForcedToolName,
-      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
-      temperature: opts.hasTemperature() ? opts.temperature : 0.3,
-      // Suppress thinking when requested (commons prepends the no-think directive).
-      disableThinking: opts.hasDisableThinking() && opts.disableThinking,
+      formatHint: opts.resolvedFormatName,
+      maxIterations: opts.maxToolCallCount,
+      keepToolsAvailable: opts.keepToolsAvailable,
+      maxTokens: (opts.hasMaxTokens() && opts.maxTokens > 0)
+          ? opts.maxTokens
+          : llm.maxTokens,
+      temperature: opts.hasTemperature() ? opts.temperature : llm.temperature,
+      topP: llm.topP,
+      // Suppress thinking when either options surface asks for it.
+      disableThinking: opts.disableThinking || llm.disableThinking,
     );
+    // `validate_calls` is `optional bool` on the proto — leave it UNSET when
+    // the caller did not supply a value so commons applies its documented
+    // default (true).
+    if (validateCalls != null) {
+      request.validateCalls = validateCalls;
+    }
+    if (opts.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
+      request.toolChoice = opts.toolChoice;
+    }
+    if (opts.hasForcedToolName() && opts.forcedToolName.isNotEmpty) {
+      request.forcedToolName = opts.forcedToolName;
+    }
+    // System prompt: tool options win, then the LLM options.
+    if (opts.hasSystemPrompt() && opts.systemPrompt.isNotEmpty) {
+      request.systemPrompt = opts.systemPrompt;
+    } else if (llm.hasSystemPrompt() && llm.systemPrompt.isNotEmpty) {
+      request.systemPrompt = llm.systemPrompt;
+    }
 
     final session = DartBridgeToolCalling.shared.createSession(request);
     // Publish the active session handle so consumers can
@@ -333,10 +359,58 @@ class RunAnywhereTools {
 
   // -- helpers --------------------------------------------------------------
 
+  /// Mirrors Swift `RALLMGenerationOptions.defaults()`
+  /// (RALLMTypes+CppBridge.swift:13-21).
+  static LLMGenerationOptions _defaultLLMOptions() => LLMGenerationOptions(
+        maxTokens: 100,
+        temperature: 0.8,
+        topP: 1.0,
+        topK: 0,
+        repetitionPenalty: 1.0,
+      );
 
+  /// Mirrors Swift `RAToolCallingOptions.defaults()`
+  /// (ToolCallingTypes.swift:148-154).
+  static ToolCallingOptions _defaultToolOptions() => ToolCallingOptions(
+        maxIterations: 5,
+        maxToolCalls: 5,
+        autoExecute: true,
+        format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+        formatHint: 'default',
+      );
 }
 
 Int64 _toFixnum(int value) => Int64(value);
+
+/// Run-loop knobs derived from [ToolCallingOptions]. Mirrors Swift's
+/// `RAToolCallingOptions` extension (ToolCallingTypes.swift:157-171).
+extension ToolCallingOptionsRunLoop on ToolCallingOptions {
+  /// Effective max tool-call iterations — explicit max_tool_calls wins over
+  /// max_iterations; non-positive values fall back to 5.
+  int get maxToolCallCount {
+    final explicit = hasMaxToolCalls() ? maxToolCalls : maxIterations;
+    return explicit > 0 ? explicit : 5;
+  }
+
+  /// Format hint string for the commons session request. Delegates the
+  /// proto-enum → hint-string mapping to commons
+  /// (`rac_tool_call_format_hint_from_format_name`) so every SDK shares one
+  /// source of truth.
+  String get resolvedFormatName {
+    if (hasFormat()) {
+      final fn =
+          RacNative.bindings.rac_tool_call_format_hint_from_format_name;
+      if (fn != null) {
+        final ptr = fn(format.value);
+        if (ptr != nullptr) {
+          // Static literal owned by commons — read, never free.
+          return ptr.toDartString();
+        }
+      }
+    }
+    return formatHint.isEmpty ? 'default' : formatHint;
+  }
+}
 
 /// Generated-proto [ToolValue] helpers. Recursive JSON conversion lives in
 /// commons; this class only exposes ergonomic Dart entrypoints.

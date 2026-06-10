@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:fixnum/fixnum.dart' as fixnum;
+import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
@@ -122,6 +123,12 @@ pb.InferenceFramework _frameworkProtoFromC(int cFramework) {
       pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 }
 
+/// Public C → proto inference-framework mapper. Mirrors Swift
+/// `RAInferenceFramework.fromCFramework(_:)` — delegates to commons'
+/// `rac_inference_framework_to_proto`.
+pb.InferenceFramework inferenceFrameworkFromC(int cFramework) =>
+    _frameworkProtoFromC(cFramework);
+
 // =============================================================================
 // Generated proto <-> C++ conversion helpers
 // =============================================================================
@@ -201,6 +208,26 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
         value,
         99, // RAC_FRAMEWORK_UNKNOWN
       );
+
+  /// Snake_case key for analytics/telemetry. Delegates to commons'
+  /// `rac_inference_framework_analytics_key` so the table lives in one
+  /// place across every SDK — mirrors Swift
+  /// `RAInferenceFramework.analyticsKey` (ModelTypes.swift:195-199).
+  String get analyticsKey {
+    final fn = RacNative.bindings.rac_inference_framework_analytics_key;
+    if (fn == null) return 'unknown';
+    final out = calloc<Pointer<Utf8>>();
+    try {
+      final rc = fn(toC(), out);
+      if (rc != RacResultCode.success || out.value == nullptr) {
+        return 'unknown';
+      }
+      // Static literal owned by commons — read, never free.
+      return out.value.toDartString();
+    } finally {
+      calloc.free(out);
+    }
+  }
 
   String get displayName {
     switch (this) {

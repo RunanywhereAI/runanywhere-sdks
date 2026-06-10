@@ -11,6 +11,8 @@
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/download_service.pbenum.dart'
     show DownloadState;
+import 'package:runanywhere/generated/errors.pbenum.dart'
+    show ErrorCategory, ErrorCode;
 import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
@@ -237,8 +239,10 @@ class RunAnywhereLoRACapability {
     final saved =
         await DartBridgeModelRegistry.instance.saveProtoModel(artifact);
     if (!saved) {
-      throw SDKException.invalidConfiguration(
-        'Model registry rejected LoRA artifact ${artifact.id}',
+      // Mirrors Swift CppBridge.ModelRegistry.save failure
+      // (CppBridge+ModelRegistry.swift:160-162): `.processingFailed`.
+      throw SDKException.processingFailed(
+        'Failed to save model via proto registry: ${artifact.id}',
       );
     }
     return artifact;
@@ -262,10 +266,14 @@ class RunAnywhereLoRACapability {
         in RunAnywhereDownloads.shared.start(artifact.id)) {
       onProgress?.call(progress.overallProgress);
       if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
-        throw SDKException.invalidConfiguration(
-          progress.errorMessage.isNotEmpty
+        // Mirrors Swift's `RunAnywhere.downloadModel` terminal-failure throw
+        // (`.downloadFailed`, network category).
+        throw SDKException.make(
+          code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          message: progress.errorMessage.isNotEmpty
               ? progress.errorMessage
               : 'LoRA adapter download failed for ${entry.id}',
+          category: ErrorCategory.ERROR_CATEGORY_NETWORK,
         );
       }
       if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
@@ -281,8 +289,13 @@ class RunAnywhereLoRACapability {
       localPath = lookup?.localPath ?? '';
     }
     if (localPath.isEmpty) {
-      throw SDKException.invalidConfiguration(
-        "LoRA adapter '${entry.id}' downloaded but no local path was recorded",
+      // Mirrors Swift RunAnywhere+LoRADownload.swift:128-134:
+      // `.downloadFailed`, network category.
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+        message:
+            "LoRA adapter '${entry.id}' downloaded but no local path was recorded",
+        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
       );
     }
 

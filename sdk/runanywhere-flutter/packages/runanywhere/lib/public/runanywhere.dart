@@ -19,7 +19,9 @@ import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart'
-    show DownloadProgress;
+    show DownloadProgress, DownloadState;
+import 'package:runanywhere/generated/errors.pbenum.dart'
+    show ErrorCategory, ErrorCode;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
@@ -71,6 +73,8 @@ import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
+    show ProtoInferenceFrameworkCppBridge;
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
@@ -146,17 +150,52 @@ abstract final class RunAnywhere {
       DartBridgeDevice.instance.isDeviceRegistered();
 
   /// Awaitable Phase-2 completion. Mirrors Swift's
-  /// `completeServicesInitialization()`. [initialize] detaches Phase 2
-  /// (platform service wiring plus commons-owned init orchestration) and stores
-  /// the resulting Future in [_servicesInitFuture]; concurrent callers share
-  /// that single Future so the work runs at most once.
-  /// Returns immediately once Phase 2 has resolved. Throws
-  /// [SDKException.notInitialized] if Phase 1 never ran.
+  /// `completeServicesInitialization()` (RunAnywhere.swift:255-273):
+  /// concurrent callers share the in-flight Future so the step list runs at
+  /// most once, and a FAILED Phase 2 is cleared so the next call rebuilds a
+  /// fresh one (retry) instead of replaying the stored failure forever.
+  /// Throws [SDKException.notInitialized] if Phase 1 never ran.
   static Future<void> completeServicesInitialization() {
     if (!isInitialized) {
       throw SDKException.notInitialized();
     }
-    return _servicesInitFuture ?? Future<void>.value();
+    if (areServicesReady) {
+      return Future<void>.value();
+    }
+    final existing = _servicesInitFuture;
+    if (existing != null) {
+      return existing;
+    }
+    final params = _cachedInitParams;
+    if (params == null) {
+      throw SDKException.notInitialized();
+    }
+    return _dispatchPhase2(params, SDKLogger('RunAnywhere.Services'));
+  }
+
+  /// Start (or restart) Phase 2 and store the shared Future. The Future is
+  /// cleared on completion — success is then gated by [areServicesReady],
+  /// and failure clearing is what makes [completeServicesInitialization]
+  /// retryable, mirroring Swift's clear-on-both-paths
+  /// (RunAnywhere.swift:267-273).
+  static Future<void> _dispatchPhase2(SDKInitParams params, SDKLogger logger) {
+    final future = _runPhase2(params, logger);
+    _servicesInitFuture = future;
+    unawaited(
+      future.then<void>(
+        (_) {
+          if (identical(_servicesInitFuture, future)) {
+            _servicesInitFuture = null;
+          }
+        },
+        onError: (Object _, StackTrace _) {
+          if (identical(_servicesInitFuture, future)) {
+            _servicesInitFuture = null;
+          }
+        },
+      ),
+    );
+    return future;
   }
 
   /// One-call "wait until everything is ready" entry point. Three paths let an
@@ -178,16 +217,23 @@ abstract final class RunAnywhere {
     if (!isInitialized) {
       throw SDKException.notInitialized();
     }
-    // Fast path — services ready + HTTP/auth done.
-    if (areServicesReady && _hasCompletedHTTPSetup) return;
-    // Recovery path — services ready, HTTP/auth failed (offline init).
-    if (areServicesReady && !_hasCompletedHTTPSetup) {
+    // Fast path — services ready + HTTP/auth done, OR HTTP setup does not
+    // apply to this configuration (nothing to retry — avoids re-attempting
+    // HTTP on every guarded call when offline). Mirrors Swift's
+    // `readiness.http || !readiness.applicable` (RunAnywhere.swift:344).
+    if (areServicesReady && (_hasCompletedHTTPSetup || !_httpSetupApplicable)) {
+      return;
+    }
+    // Recovery path — services ready, HTTP/auth failed (offline init) and a
+    // retry can actually succeed.
+    if (areServicesReady && !_hasCompletedHTTPSetup && _httpSetupApplicable) {
       await _retryHTTPSetup();
       return;
     }
-    // Cold start path — Phase 1 done but Phase 2 still running (or never
-    // dispatched). Await the in-flight future; concurrent callers share it.
-    await (_servicesInitFuture ?? Future<void>.value());
+    // Cold start path — Phase 1 done but Phase 2 still running, never
+    // dispatched, or cleared after a failure. completeServicesInitialization
+    // shares the in-flight Future or rebuilds a fresh one.
+    await completeServicesInitialization();
   }
 
   /// Initialization params (apiKey, baseURL, environment) — null
@@ -212,6 +258,14 @@ abstract final class RunAnywhere {
   // [_retryHTTPSetup] re-latches on a successful `rac_sdk_retry_http_proto`
   // round-trip so subsequent `ensureServicesReady()` calls short-circuit.
   static bool _hasCompletedHTTPSetup = false;
+
+  // Whether HTTP setup applies to this configuration at all. Phase 2 latches
+  // it from `SdkInitResult.http_applicable` (sdk_init.proto field 11) — false
+  // means commons decided there is nothing to retry (e.g. dev mode with no
+  // usable credentials), so [_ensureServicesReady] must NOT re-attempt HTTP
+  // on every guarded call (that was the offline per-call stall). Mirrors
+  // Swift's `httpSetupApplicable` (RunAnywhere.swift:328, :344).
+  static bool _httpSetupApplicable = true;
 
   // Shared Phase-2 future. Mirrors Swift's `_servicesInitTask`. Stored at
   // detach time inside [initializeWithParams]; replayed by
@@ -324,8 +378,8 @@ abstract final class RunAnywhere {
     );
     final modelId = snapshot.found ? snapshot.modelId : '';
     final framework = snapshot.found
-        ? _frameworkAnalyticsKey(snapshot.model.framework)
-        : _frameworkAnalyticsKey(InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN);
+        ? snapshot.model.framework.analyticsKey
+        : InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey;
 
     // Prefer the backend's terminal aggregate result when the final event
     // carries one, matching Swift/Web; otherwise fall back to the locally
@@ -363,41 +417,6 @@ abstract final class RunAnywhere {
     return result;
   }
 
-  /// Analytics key for an [InferenceFramework]. Pure-Dart proxy for the
-  /// canonical `rac_inference_framework_analytics_key` table in commons
-  /// (model_types.cpp / Swift `RAInferenceFramework.analyticsKey`); keep in
-  /// lock-step when a framework is added.
-  static String _frameworkAnalyticsKey(InferenceFramework framework) {
-    switch (framework) {
-      case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-        return 'onnx';
-      case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
-        return 'sherpa';
-      case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return 'llama_cpp';
-      case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return 'foundation_models';
-      case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return 'system_tts';
-      case InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
-        return 'fluid_audio';
-      case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-        return 'coreml';
-      case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
-        return 'mlx';
-      case InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
-        return 'metalrt';
-      case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return 'genie';
-      case InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
-        return 'built_in';
-      case InferenceFramework.INFERENCE_FRAMEWORK_NONE:
-        return 'none';
-      default:
-        return 'unknown';
-    }
-  }
-
   /// Initialize the SDK with API key + base URL.
   static Future<void> initialize({
     String? apiKey,
@@ -407,19 +426,10 @@ abstract final class RunAnywhere {
     final SDKInitParams params;
 
     if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      if (baseURL == null || baseURL.isEmpty) {
-        params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
-      } else {
-        final uri = Uri.tryParse(baseURL);
-        if (uri == null) {
-          throw SDKException.validationFailed('Invalid base URL: $baseURL');
-        }
-        params = SDKInitParams(
-          apiKey: apiKey ?? '',
-          baseURL: uri,
-          environment: environment,
-        );
-      }
+      // Development mode ignores any caller-supplied baseURL and always uses
+      // the dev placeholder / Supabase-derived URL. Mirrors Swift
+      // RunAnywhere.swift:125-127 (`SDKInitParams(forDevelopmentWithAPIKey:)`).
+      params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
     } else {
       if (apiKey == null || apiKey.isEmpty) {
         throw SDKException.validationFailed(
@@ -499,12 +509,12 @@ abstract final class RunAnywhere {
 
       // --- Phase 2: Detached background services ---
       // Mirrors Swift `Task.detached(priority: .userInitiated) { ... }`.
-      // Store the Future first so concurrent callers of
+      // _dispatchPhase2 stores the Future first so concurrent callers of
       // `completeServicesInitialization()` see it before the detach
-      // wrapper might observe a failure. Phase 2 errors are swallowed
-      // here (non-critical) but still observable to direct awaiters.
-      final phase2 = _runPhase2(params, logger);
-      _servicesInitFuture = phase2;
+      // wrapper might observe a failure, and clears it on failure so the
+      // next call retries. Phase 2 errors are swallowed here
+      // (non-critical) but still observable to direct awaiters.
+      final phase2 = _dispatchPhase2(params, logger);
       unawaited(
         phase2.catchError((Object error, StackTrace _) {
           logger.warning('Phase 2 failed (non-critical): $error');
@@ -514,10 +524,11 @@ abstract final class RunAnywhere {
       logger.error('SDK initialization failed: $e');
       _cachedInitParams = null;
       _hasCompletedHTTPSetup = false;
+      _httpSetupApplicable = true;
       _servicesInitFuture = null;
-      // Commons auto-emits INITIALIZATION_STAGE_FAILED via
-      // `event_publisher.cpp:557`; failure telemetry flows through
-      // structured errors. Dart does not re-emit a duplicate.
+      // Commons auto-emits INITIALIZATION_STAGE_FAILED from
+      // rac_sdk_init_phase1_proto (sdk_init.cpp); failure telemetry flows
+      // through structured errors. Dart does not re-emit a duplicate.
       rethrow;
     }
   }
@@ -564,9 +575,10 @@ abstract final class RunAnywhere {
     // Step 4: Global model registry handle.
     await DartBridgeModelRegistry.instance.initialize();
 
-    // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent from the
-    // C++ init path (`event_publisher.cpp:544`) and the destination router
-    // forwards it to the registered telemetry sink, so Dart does not emit it.
+    // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent (with a
+    // duration_ms property) from rac_sdk_init_phase1_proto and the destination
+    // router forwards it to the registered telemetry sink, so Dart does not
+    // emit it.
 
     // Step 5: Commons-owned deterministic Phase 2 orchestration: auth via the
     // registered HTTP transport, device registration with build token, model
@@ -586,6 +598,7 @@ abstract final class RunAnywhere {
     );
 
     _hasCompletedHTTPSetup = _isHTTPSetupComplete(phase2Result);
+    _httpSetupApplicable = phase2Result?.httpApplicable ?? true;
 
     logger.info('Phase 2 complete (${params.environment.description})');
   }
@@ -609,6 +622,7 @@ abstract final class RunAnywhere {
     try {
       final proto = DartBridgeSdkInit.retryHTTP();
       _hasCompletedHTTPSetup = _isHTTPSetupComplete(proto);
+      _httpSetupApplicable = proto.httpApplicable;
       if (proto.hasWarning()) {
         logger.debug('HTTP retry warning: ${proto.warning}');
       }
@@ -638,14 +652,17 @@ abstract final class RunAnywhere {
 
     DartBridge.modelLifecycle.reset();
     _hasCompletedHTTPSetup = false;
+    _httpSetupApplicable = true;
     _cachedInitParams = null;
     _servicesInitFuture = null;
     DartBridgeModelRegistry.instance.shutdown();
     HTTPClientAdapter.shared.resetForTesting();
     // Tear down the bridge LAST so dependents (telemetry/registry/HTTP)
-    // can flush against a still-initialized native side. Mirrors Swift's
-    // `await CppBridge.shutdown()` ordering inside `RunAnywhere.reset()`.
-    unawaited(DartBridge.shutdown());
+    // can flush against a still-initialized native side, and AWAIT it so a
+    // `reset(); initialize()` sequence cannot race the still-true
+    // `_isInitialized` short-circuit. Mirrors Swift's
+    // `await CppBridge.shutdown()` (RunAnywhere.swift:109).
+    await DartBridge.shutdown();
   }
 
   // --- Capability surfaces -------------------------------------------------
@@ -957,11 +974,36 @@ abstract final class RunAnywhere {
         await onProgress(progress);
       }
     }
-    return last ??
-        DownloadProgress(
-          modelId: modelId,
-          errorMessage: 'No progress events received for model: $modelId',
+
+    // Mirror Swift `reportDownloadProgress`: terminal FAILED / CANCELLED
+    // states throw structured SDKExceptions instead of returning the
+    // failure progress to the caller.
+    final terminal = last;
+    if (terminal == null) {
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+        message: 'No progress events received for model: $modelId',
+        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
+      );
+    }
+    switch (terminal.state) {
+      case DownloadState.DOWNLOAD_STATE_FAILED:
+        throw SDKException.make(
+          code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          message: terminal.errorMessage.isEmpty
+              ? 'Download failed'
+              : terminal.errorMessage,
+          category: ErrorCategory.ERROR_CATEGORY_NETWORK,
         );
+      case DownloadState.DOWNLOAD_STATE_CANCELLED:
+        throw SDKException.make(
+          code: ErrorCode.ERROR_CODE_CANCELLED,
+          message: 'Download cancelled',
+          category: ErrorCategory.ERROR_CATEGORY_NETWORK,
+        );
+      default:
+        return terminal;
+    }
   }
 
   /// Flat streaming voice agent events.

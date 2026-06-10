@@ -87,6 +87,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* progressBytes */)>& onProgressBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;
+      virtual std::shared_ptr<Promise<bool>> cleanTempFiles() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeletePlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
@@ -112,6 +113,11 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> sttTranscribeStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> sttStreamLoadModel(const std::string& modelPath, const std::string& modelId, const std::string& modelName) = 0;
+      virtual std::shared_ptr<Promise<double>> sttStreamStart(const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> sttStreamFeed(double sessionId, const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
+      virtual std::shared_ptr<Promise<void>> sttStreamStop(double sessionId) = 0;
+      virtual std::shared_ptr<Promise<void>> sttStreamCancel(double sessionId) = 0;
       virtual std::shared_ptr<Promise<double>> hybridSttRouterCreate() = 0;
       virtual std::shared_ptr<Promise<void>> hybridSttRouterDestroy(double routerHandle) = 0;
       virtual std::shared_ptr<Promise<double>> hybridSttRouterCreateService(const std::string& engineHint, const std::string& modelIdOrPath, const std::string& configJson) = 0;

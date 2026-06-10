@@ -8,16 +8,18 @@
 #include "RunAnywhereCore-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
+#include "HybridAudioCaptureSpecSwift.hpp"
+#include "HybridAudioPlaybackSpecSwift.hpp"
 #include "HybridRunAnywhereDeviceInfoSpecSwift.hpp"
 #include "RunAnywhereCore-Swift-Cxx-Umbrella.hpp"
 #include <NitroModules/NitroDefines.hpp>
 
 namespace margelo::nitro::runanywhere::bridge::swift {
 
-  // pragma MARK: std::function<void(const std::string& /* result */)>
-  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = RunAnywhereCore::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
+  // pragma MARK: std::function<void(bool /* result */)>
+  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = RunAnywhereCore::Func_void_bool::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](bool result) mutable -> void {
       swiftClosure.call(result);
     };
   }
@@ -30,18 +32,66 @@ namespace margelo::nitro::runanywhere::bridge::swift {
     };
   }
   
-  // pragma MARK: std::function<void(double /* result */)>
-  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = RunAnywhereCore::Func_void_double::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](double result) mutable -> void {
+  // pragma MARK: std::function<void()>
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = RunAnywhereCore::Func_void::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
+      swiftClosure.call();
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
+  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = RunAnywhereCore::Func_void_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::shared_ptr<ArrayBuffer>& chunk) mutable -> void {
+      swiftClosure.call(ArrayBufferHolder(chunk));
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridAudioCaptureSpec>
+  std::shared_ptr<HybridAudioCaptureSpec> create_std__shared_ptr_HybridAudioCaptureSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    RunAnywhereCore::HybridAudioCaptureSpec_cxx swiftPart = RunAnywhereCore::HybridAudioCaptureSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::runanywhere::HybridAudioCaptureSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridAudioCaptureSpec_(std__shared_ptr_HybridAudioCaptureSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::runanywhere::HybridAudioCaptureSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::runanywhere::HybridAudioCaptureSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridAudioCaptureSpec\" is not implemented in Swift!");
+    }
+    #endif
+    RunAnywhereCore::HybridAudioCaptureSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridAudioPlaybackSpec>
+  std::shared_ptr<HybridAudioPlaybackSpec> create_std__shared_ptr_HybridAudioPlaybackSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    RunAnywhereCore::HybridAudioPlaybackSpec_cxx swiftPart = RunAnywhereCore::HybridAudioPlaybackSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::runanywhere::HybridAudioPlaybackSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridAudioPlaybackSpec_(std__shared_ptr_HybridAudioPlaybackSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::runanywhere::HybridAudioPlaybackSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::runanywhere::HybridAudioPlaybackSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridAudioPlaybackSpec\" is not implemented in Swift!");
+    }
+    #endif
+    RunAnywhereCore::HybridAudioPlaybackSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = RunAnywhereCore::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
       swiftClosure.call(result);
     };
   }
   
-  // pragma MARK: std::function<void(bool /* result */)>
-  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = RunAnywhereCore::Func_void_bool::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](bool result) mutable -> void {
+  // pragma MARK: std::function<void(double /* result */)>
+  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = RunAnywhereCore::Func_void_double::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](double result) mutable -> void {
       swiftClosure.call(result);
     };
   }

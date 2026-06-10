@@ -30,6 +30,7 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import {
@@ -99,7 +100,9 @@ export class HybridSTTRouter {
     await ensureServicesReady();
     const handle = await requireNativeModule().hybridSttRouterCreate();
     if (!handle) {
-      throw SDKException.componentNotReady('rac_stt_hybrid_router_create returned 0');
+      // Swift parity: create failure throws .serviceNotAvailable
+      // (HybridSTTRouter.swift:97-103).
+      throw SDKException.serviceNotAvailable('rac_stt_hybrid_router_create returned 0');
     }
     return new HybridSTTRouter(handle);
   }
@@ -142,7 +145,8 @@ export class HybridSTTRouter {
     if (rcOff !== RAC_SUCCESS) {
       await native.hybridSttRouterDestroyService(offlineHandle);
       await native.hybridSttRouterDestroyService(onlineHandle);
-      throw SDKException.componentNotReady(
+      // Swift parity: HybridSTTRouter.swift:166-173 throws .serviceNotAvailable.
+      throw SDKException.serviceNotAvailable(
         `hybridSttRouterSetOfflineService rc=${rcOff}`
       );
     }
@@ -155,7 +159,8 @@ export class HybridSTTRouter {
       await native.hybridSttRouterSetOfflineService(this.handle, 0, this.emptyBytes());
       await native.hybridSttRouterDestroyService(offlineHandle);
       await native.hybridSttRouterDestroyService(onlineHandle);
-      throw SDKException.componentNotReady(
+      // Swift parity: HybridSTTRouter.swift:178-186 throws .serviceNotAvailable.
+      throw SDKException.serviceNotAvailable(
         `hybridSttRouterSetOnlineService rc=${rcOn}`
       );
     }
@@ -181,7 +186,9 @@ export class HybridSTTRouter {
         await native.hybridSttRouterSetOnlineService(this.handle, 0, this.emptyBytes());
         await native.hybridSttRouterDestroyService(offlineHandle);
         await native.hybridSttRouterDestroyService(onlineHandle);
-        throw SDKException.componentNotReady(
+        // Swift parity: registration failures during setPair throw
+        // .serviceNotAvailable (HybridSTTRouter.swift:200-210).
+        throw SDKException.serviceNotAvailable(
           `hybridRegisterCustomFilter('${custom.name}') rc=${rc}`
         );
       }
@@ -197,7 +204,8 @@ export class HybridSTTRouter {
       await native.hybridSttRouterSetOnlineService(this.handle, 0, this.emptyBytes());
       await native.hybridSttRouterDestroyService(offlineHandle);
       await native.hybridSttRouterDestroyService(onlineHandle);
-      throw SDKException.componentNotReady(`hybridSttRouterSetPolicy rc=${rcPolicy}`);
+      // Swift parity: HybridSTTRouter.swift:200-210 throws .serviceNotAvailable.
+      throw SDKException.serviceNotAvailable(`hybridSttRouterSetPolicy rc=${rcPolicy}`);
     }
 
     this.offline = { handle: offlineHandle, model: offline };
@@ -210,7 +218,11 @@ export class HybridSTTRouter {
    * installed policy (filters -> rank -> invoke -> fallback) in commons and
    * returns the chosen backend's result plus the routing decision.
    *
-   * @param audio   File-encoded audio (wav/mp3/flac/…) OR raw PCM bytes.
+   * @param audio   File-encoded audio (wav/mp3/flac/…) OR raw PCM bytes. Raw
+   *                PCM16 is wrapped in a WAV container by the commons router
+   *                (rac_stt_hybrid_router_proto.cpp) so one payload serves
+   *                both services; WAV input and declared compressed formats
+   *                pass through unchanged.
    * @param options Optional language / sampleRate / audioFormat hints.
    */
   async transcribe(
@@ -219,7 +231,10 @@ export class HybridSTTRouter {
   ): Promise<HybridTranscribeResult> {
     this.ensureOpen();
     if (this.offline == null || this.online == null) {
-      throw SDKException.componentNotReady('setPair() not called');
+      // No direct Swift analog (Swift lets commons reject the unpaired
+      // transcribe); aligned with the Swift router's .serviceNotAvailable
+      // failure family for missing services.
+      throw SDKException.serviceNotAvailable('setPair() not called');
     }
     const native = requireNativeModule();
 
@@ -265,7 +280,14 @@ export class HybridSTTRouter {
 
   private ensureOpen(): void {
     if (!this.handle) {
-      throw SDKException.componentNotReady('HybridSTTRouter is closed');
+      // Swift parity: notOpen() throws .notInitialized with category
+      // .component and message "HybridSTTRouter is closed"
+      // (HybridSTTRouter.swift:490-496).
+      throw SDKException.of(
+        ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+        'HybridSTTRouter is closed',
+        { category: ErrorCategory.ERROR_CATEGORY_COMPONENT }
+      );
     }
   }
 
@@ -287,7 +309,9 @@ export class HybridSTTRouter {
       configJson
     );
     if (!handle) {
-      throw SDKException.componentNotReady(
+      // Swift parity: createService failures throw .serviceNotAvailable
+      // (HybridSTTRouter.swift:368-409).
+      throw SDKException.serviceNotAvailable(
         `Failed to create '${engineHint}' STT service for model '${model.id}'. ` +
           'Register the backend first (ONNX.register() for sherpa, ' +
           'CloudSTT.register() for cloud).'
@@ -344,13 +368,17 @@ export class HybridSTTRouter {
   private decodeResponse(buffer: ArrayBuffer): HybridTranscribeResult {
     const bytes = arrayBufferToBytes(buffer);
     if (bytes.byteLength === 0) {
-      throw SDKException.generationFailedWith('Hybrid STT transcribe returned no response');
+      // Swift parity: transcribe failures throw .serviceNotAvailable
+      // (HybridSTTRouter.swift:256-262).
+      throw SDKException.serviceNotAvailable('Hybrid STT transcribe returned no response');
     }
     const message = HybridSttTranscribeResponse.decode(bytes);
     if (message.rc !== RAC_SUCCESS) {
       const reason = message.errorMsg || `Hybrid STT transcribe failed (rc=${message.rc})`;
       logger.warning(reason);
-      throw SDKException.generationFailedWith(reason);
+      // Swift parity: decodeResponse throws .serviceNotAvailable
+      // (HybridSTTRouter.swift:291-300).
+      throw SDKException.serviceNotAvailable(reason);
     }
     const routing = message.routing;
     return {

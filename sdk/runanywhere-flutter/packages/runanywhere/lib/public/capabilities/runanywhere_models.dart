@@ -134,6 +134,7 @@ class RunAnywhereModels {
     }
 
     final ok = await DartBridgeModelRegistry.instance.refresh(
+      rescanLocal: rescanLocal,
       includeRemoteCatalog: includeRemoteCatalog,
       pruneOrphans: pruneOrphans,
     );
@@ -209,7 +210,8 @@ class RunAnywhereModels {
     required String name,
     required List<ModelFileDescriptor> files,
     required InferenceFramework framework,
-    ModelCategory modality = ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    // Mirrors Swift RunAnywhere+Storage.swift:135 (`modality: ModelCategory = .language`).
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
     int? contextLength,
     bool supportsThinking = false,

@@ -18,6 +18,7 @@ import {
 } from '../../../native';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import {
   VLMGenerationOptions as VLMGenerationOptionsMessage,
@@ -51,16 +52,19 @@ function buildVLMOptions(
   return VLMGenerationOptionsMessage.fromPartial({
     ...options,
     prompt: options?.prompt ?? '',
-    maxTokens: options?.maxTokens ?? 2048,
+    // Defaults mirror Swift RAVLMGenerationOptions.defaults()
+    // (RAVLMImage+Helpers.swift): maxTokens 256, temperature 0.7,
+    // topP 0.9, topK 40; no useGpu override (proto default).
+    maxTokens: options?.maxTokens ?? 256,
     temperature: options?.temperature ?? 0.7,
     topP: options?.topP ?? 0.9,
-    topK: options?.topK ?? 0,
+    topK: options?.topK ?? 40,
     stopSequences: options?.stopSequences ?? [],
     streamingEnabled,
     systemPrompt: options?.systemPrompt,
     maxImageSize: options?.maxImageSize ?? 0,
     nThreads: options?.nThreads ?? 0,
-    useGpu: options?.useGpu ?? true,
+    useGpu: options?.useGpu ?? false,
     modelFamily: options?.modelFamily ?? 0,
     customChatTemplate: options?.customChatTemplate,
     imageMarkerOverride: options?.imageMarkerOverride,
@@ -112,6 +116,8 @@ export async function processImage(
   optionsOrPrompt: Partial<VLMGenerationOptions> | string,
   legacyOptions?: Partial<VLMGenerationOptions>
 ): Promise<VLMResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+VisionLanguage.swift:28-30).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VisionLanguage.swift:31 gates on ensureServicesReady.
   await ensureServicesReady();
@@ -140,6 +146,8 @@ export async function processImageStream(
   optionsOrPrompt: Partial<VLMGenerationOptions> | string,
   legacyOptions?: Partial<VLMGenerationOptions>
 ): Promise<AsyncIterable<VLMStreamEvent>> {
+  // Swift parity: guard isInitialized (RunAnywhere+VisionLanguage.swift:56-58).
+  requireInitialized();
   const native = ensureNative();
   // Swift parity: RunAnywhere+VisionLanguage.swift:59 gates on ensureServicesReady.
   await ensureServicesReady();

@@ -36,8 +36,6 @@ import {
   getModelFrameworks,
   getPrimaryFramework,
   isModelCompatibleWithFramework,
-  createModelInfoSummary,
-  SYSTEM_TTS_FRAMEWORK,
 } from '../../utils/modelDisplay';
 
 // Import SDK types and values
@@ -46,7 +44,6 @@ import { RunAnywhere } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelCategory,
-  ModelFormat,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 
@@ -283,15 +280,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       frameworkCounts.set(framework, count + 1);
     });
 
-    // Add System TTS for TTS context
-    if (context === ModelSelectionContext.TTS) {
-      frameworkCounts.set(SYSTEM_TTS_FRAMEWORK, 1);
-    }
-
     return Array.from(frameworkCounts.entries())
       .map(([framework, count]) => getFrameworkInfo(framework, count))
       .sort((a, b) => b.modelCount - a.modelCount);
-  }, [availableModels, context]);
+  }, [availableModels]);
 
   /**
    * Get models for a specific framework
@@ -385,30 +377,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   };
 
   /**
-   * Handle System TTS selection
-   */
-  const handleSelectSystemTTS = async () => {
-    try {
-      // Create a pseudo model for System TTS
-      const systemTTSModel = createModelInfoSummary({
-        id: 'system-tts',
-        name: 'System TTS',
-        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        framework: SYSTEM_TTS_FRAMEWORK,
-        format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
-        localPath: 'builtin://system-tts',
-        isDownloaded: true,
-        isAvailable: true,
-      });
-
-      // Parent is responsible for closing the modal
-      await onModelSelected(systemTTSModel);
-    } catch (error) {
-      console.error('[ModelSelectionSheet] Error selecting System TTS:', error);
-    }
-  };
-
-  /**
    * Render framework row
    */
   const renderFrameworkRow = (info: FrameworkDisplayInfo) => {
@@ -452,10 +420,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Render expanded models for a framework
    */
   const renderExpandedModels = (framework: InferenceFramework) => {
-    if (framework === SYSTEM_TTS_FRAMEWORK) {
-      return renderSystemTTSRow();
-    }
-
     const models = getModelsForFramework(framework);
 
     if (models.length === 0) {
@@ -474,43 +438,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       </View>
     );
   };
-
-  /**
-   * Render System TTS row
-   */
-  const renderSystemTTSRow = () => (
-    <View style={styles.modelsList}>
-      <View style={styles.modelRow}>
-        <View style={styles.modelInfo}>
-          <Text style={styles.modelName}>Default System Voice</Text>
-          <View style={styles.modelMeta}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Built-in</Text>
-            </View>
-            <Text style={styles.modelMetaText}>AVSpeechSynthesizer</Text>
-          </View>
-          <View style={styles.statusRow}>
-            <Icon
-              name="checkmark-circle"
-              size={14}
-              color={Colors.statusGreen}
-            />
-            <Text style={[styles.statusText, { color: Colors.statusGreen }]}>
-              Always available
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={handleSelectSystemTTS}
-          disabled={isLoadingModel}
-        >
-          <Text style={styles.selectButtonText}>Select</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 
   /**
    * Render model row

@@ -14,6 +14,10 @@ import {
   isNativeModuleAvailable,
 } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import {
+  isSDKInitialized,
+  requireInitialized,
+} from '../../../Foundation/Initialization/InitializedGuard';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import type {
   LLMGenerationOptions,
@@ -42,8 +46,10 @@ function buildLLMGenerateRequest(
 ): LLMGenerateRequest {
   return LLMGenerateRequest.fromPartial({
     prompt,
-    maxTokens: options?.maxTokens ?? 1000,
-    temperature: options?.temperature ?? 0.7,
+    // Defaults mirror Swift RALLMTypes+CppBridge.swift (maxTokens 100,
+    // temperature 0.8, topP 1.0, topK 0, repetitionPenalty 1.0).
+    maxTokens: options?.maxTokens ?? 100,
+    temperature: options?.temperature ?? 0.8,
     topP: options?.topP ?? 1.0,
     topK: options?.topK ?? 0,
     systemPrompt: options?.systemPrompt ?? '',
@@ -112,6 +118,8 @@ export async function generate(
   requestOrPrompt: LLMGenerateRequest | string,
   options?: LLMGenerationOptions
 ): Promise<LLMGenerationResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+TextGeneration.swift:44-46).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
@@ -151,6 +159,8 @@ export function generateStream(
   requestOrPrompt: LLMGenerateRequest | string,
   options?: LLMGenerationOptions,
 ): AsyncIterable<LLMStreamEventType> {
+  // Swift parity: guard isInitialized (RunAnywhere+TextGeneration.swift:73-75).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
@@ -204,6 +214,11 @@ export function generateStream(
  * Matches Swift SDK: `RunAnywhere.cancelGeneration() async`.
  */
 export async function cancelGeneration(): Promise<void> {
+  // Swift parity: `guard isInitialized else { return }`
+  // (RunAnywhere+TextGeneration.swift:98).
+  if (!isSDKInitialized()) {
+    return;
+  }
   if (!isNativeModuleAvailable()) {
     return;
   }
@@ -279,14 +294,28 @@ export async function aggregateStream(
   // final event carries one, matching the Web SDK; fall back to the locally
   // concatenated text / wall-clock metrics for backends that omit it.
   const final = finalEvent?.result;
+  const inputTokens =
+    final?.promptTokens ?? Math.max(1, Math.floor(prompt.length / 4));
+  const tokensGenerated = final?.completionTokens ?? tokenCount;
   return LLMGenerationResultMessage.fromPartial({
     text: final?.text ?? fullResponse,
-    inputTokens: final?.promptTokens ?? Math.max(1, Math.floor(prompt.length / 4)),
-    tokensGenerated: final?.completionTokens ?? tokenCount,
-    responseTokens: final?.completionTokens ?? tokenCount,
+    // Swift parity (RunAnywhere+TextGeneration.swift:176-178): propagate the
+    // backend's thinking content only when the final event carries it.
+    ...(final?.thinkingContent !== undefined
+      ? { thinkingContent: final.thinkingContent }
+      : {}),
+    inputTokens,
+    tokensGenerated,
+    responseTokens: tokensGenerated,
+    // Swift parity (line 182): totalTokens falls back to input + generated.
+    totalTokens: final?.totalTokens ?? inputTokens + tokensGenerated,
     modelUsed: modelId,
     generationTimeMs: final?.totalTimeMs ?? totalLatencyMs,
     framework,
+    // Swift parity (lines 186-187): prompt/decode timings from the backend's
+    // terminal aggregate, 0 when absent.
+    promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,
+    decodeTimeMs: final?.decodeTimeMs ?? 0,
     tokensPerSecond:
       final?.tokensPerSecond ??
       (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),

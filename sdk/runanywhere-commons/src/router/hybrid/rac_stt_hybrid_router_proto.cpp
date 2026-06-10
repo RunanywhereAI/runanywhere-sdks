@@ -24,6 +24,7 @@
 
 #include "hybrid_router.pb.h"
 
+#include "rac/core/rac_audio_utils.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/router/hybrid/rac_hybrid_device_state.h"
@@ -132,6 +133,50 @@ void build_context(const v1::HybridRoutingContext& /*proto_ctx*/,
         out.is_online = true;
         out.battery_percent = 100;
     }
+}
+
+bool is_wav_container(const std::string& audio) {
+    return audio.size() >= 12 && std::memcmp(audio.data(), "RIFF", 4) == 0 &&
+           std::memcmp(audio.data() + 8, "WAVE", 4) == 0;
+}
+
+/**
+ * Normalise the audio payload for the shared offline+online dispatch. The
+ * router hands ONE payload to both services, and only a WAV container
+ * satisfies both: sherpa parses WAV inline (and falls back to raw PCM16),
+ * but cloud providers upload the bytes verbatim as an `audio/wav` file part
+ * and reject headerless PCM. Raw PCM16 is therefore wrapped via
+ * rac_audio_int16_to_wav using the request's sample rate (16 kHz when unset,
+ * sherpa's own default). Input that is already a container — WAV by
+ * RIFF/WAVE magic, or a declared compressed format — passes through
+ * unchanged. Owned by commons so every SDK gets the same behaviour.
+ *
+ * Returns a malloc'd WAV buffer (caller frees with rac_free) and updates
+ * options in place, or nullptr when the payload passes through as-is.
+ */
+void* normalize_audio_payload(const std::string& audio,
+                              rac_stt_options_t& options,
+                              const uint8_t**    out_data,
+                              size_t*            out_size) {
+    *out_data = reinterpret_cast<const uint8_t*>(audio.data());
+    *out_size = audio.size();
+    const bool is_compressed = options.audio_format > RAC_AUDIO_FORMAT_WAV;
+    if (audio.empty() || is_compressed || is_wav_container(audio)) {
+        return nullptr;
+    }
+    const int32_t sample_rate = options.sample_rate > 0 ? options.sample_rate : 16000;
+    void*  wav_data = nullptr;
+    size_t wav_size = 0;
+    if (rac_audio_int16_to_wav(audio.data(), audio.size(), sample_rate, &wav_data,
+                               &wav_size) != RAC_SUCCESS ||
+        wav_data == nullptr) {
+        return nullptr;  // fail open: dispatch the raw payload unchanged
+    }
+    options.sample_rate = sample_rate;
+    options.audio_format = RAC_AUDIO_FORMAT_WAV;
+    *out_data = static_cast<const uint8_t*>(wav_data);
+    *out_size = wav_size;
+    return wav_data;
 }
 
 rac_result_t build_response_bytes(const rac_stt_result_t&             result,
@@ -244,13 +289,17 @@ rac_result_t rac_stt_hybrid_router_transcribe_proto(
     }
 
     const std::string& audio = req.audio_bytes();
+    const uint8_t*     audio_data = nullptr;
+    size_t             audio_size = 0;
+    void* owned_wav = normalize_audio_payload(audio, options, &audio_data, &audio_size);
 
     rac_stt_result_t             result{};
     rac_hybrid_routed_metadata_t meta{};
     const rac_result_t           transcribe_rc = rac_stt_hybrid_router_transcribe(
         handle, &ctx,
-        audio.data(), audio.size(),
+        audio_data, audio_size,
         &options, &result, &meta);
+    rac_free(owned_wav);
 
     const rac_result_t encode_rc = build_response_bytes(
         result, meta, transcribe_rc, out_response_bytes, out_response_size);

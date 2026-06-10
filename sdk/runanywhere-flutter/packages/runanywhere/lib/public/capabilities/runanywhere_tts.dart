@@ -12,6 +12,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
@@ -21,6 +22,7 @@ import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_audio.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
+import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 
@@ -162,14 +164,31 @@ class RunAnywhereTTS {
   }
 
   /// Stream generated [TTSOutput] chunks as they are produced.
+  ///
+  /// Not-ready contract mirrors Swift `synthesizeStream`
+  /// (RunAnywhere+TTS.swift:52-68): an uninitialized SDK, failed Phase-2
+  /// readiness, or missing lifecycle voice finishes the stream SILENTLY
+  /// instead of throwing; session-start failures surface as a terminal
+  /// error-marked [TTSOutput].
   Stream<TTSOutput> synthesizeStream(
     String text, {
     TTSOptions? options,
   }) async* {
     if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
+      return; // Silent finish (Swift parity).
     }
-    final voiceId = await _requireLoadedVoiceId();
+    try {
+      await DartBridge.ensureServicesReady();
+    } catch (_) {
+      return; // Silent finish (Swift parity).
+    }
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(category: _ttsCategory),
+    );
+    if (!current.found || current.modelId.isEmpty) {
+      return; // Silent finish (Swift parity).
+    }
+    final voiceId = current.modelId;
     final opts = _effectiveOptions(options ?? TTSOptions());
     final request = TTSSynthesisRequest(
       text: opts.enableSsml ? null : text,
@@ -177,8 +196,20 @@ class RunAnywhereTTS {
       options: opts,
       metadata: <String, String>{'voice_id': voiceId}.entries,
     );
-    await for (final event
-        in DartBridgeTTS.shared.synthesizeStreamLifecycleProto(request)) {
+    Stream<TTSStreamEvent> events;
+    try {
+      events = DartBridgeTTS.shared.synthesizeStreamLifecycleProto(request);
+    } catch (e) {
+      // Mirrors Swift's failure output (RunAnywhere+TTS.swift:79-86).
+      yield TTSOutput(
+        timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
+        isFinal: true,
+        errorMessage: 'TTS stream failed: $e',
+        errorCode: RacResultCode.errorProcessingFailed,
+      );
+      return;
+    }
+    await for (final event in events) {
       if (event.hasOutput()) {
         yield event.output;
       }
@@ -269,8 +300,11 @@ class RunAnywhereTTS {
     if (current.found && current.modelId.isNotEmpty) {
       return current.modelId;
     }
-    throw SDKException.ttsNotAvailable(
-      'No TTS voice loaded through commons lifecycle. Call loadTTSVoice() first.',
+    // Mirrors Swift synthesize() (RunAnywhere+TTS.swift:35-37):
+    // `.notInitialized` / "TTS voice not loaded" / component category.
+    throw SDKException.make(
+      code: ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      message: 'TTS voice not loaded',
     );
   }
 

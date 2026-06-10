@@ -15,11 +15,7 @@ import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
-import com.runanywhere.sdk.generated.convenience.fromWireString
-import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
-import com.runanywhere.sdk.public.configuration.SDKEnvironment
-import com.runanywhere.sdk.public.configuration.SDKInitParams
 
 /**
  * Android implementation of [CppBridgePlatformAdapter.PlatformSecureStorage] using
@@ -76,66 +72,12 @@ class AndroidKeychainManager(
         encryptedPreferences.edit().clear().apply()
     }
 
-    /**
-     * Store SDK initialization parameters securely.
-     *
-     * Mirrors Swift KeychainManager.storeSDKParams(_:): api key, base URL, and
-     * environment wire string are persisted under stable SDK keys.
-     */
-    fun storeSDKParams(params: SDKInitParams): Boolean {
-        val success =
-            setString(KEY_API_KEY, params.apiKey) &&
-                setString(KEY_BASE_URL, params.baseURL) &&
-                setString(KEY_ENVIRONMENT, params.environment.wireString)
-        if (success) {
-            logger.info("SDK parameters stored securely")
-        }
-        return success
-    }
-
-    /**
-     * Retrieve stored SDK initialization parameters, validating them before
-     * returning. Returns null when any field is absent or invalid.
-     */
-    fun retrieveSDKParams(): SDKInitParams? {
-        val apiKey = getString(KEY_API_KEY) ?: return null
-        val baseURL = getString(KEY_BASE_URL) ?: return null
-        val environment =
-            getString(KEY_ENVIRONMENT)
-                ?.let { SDKEnvironment.fromWireString(it) }
-                ?: return null
-
-        return runCatching {
-            SDKInitParams.create(apiKey = apiKey, baseURL = baseURL, environment = environment)
-        }.onSuccess {
-            logger.debug("Retrieved SDK parameters from secure storage")
-        }.onFailure {
-            logger.debug("Stored SDK parameters were invalid: ${it.message}")
-        }.getOrNull()
-    }
-
-    /** Clear stored SDK initialization parameters. */
-    fun clearSDKParams(): Boolean =
-        delete(KEY_API_KEY) &&
-            delete(KEY_BASE_URL) &&
-            delete(KEY_ENVIRONMENT)
-
-    private fun setString(key: String, value: String): Boolean =
-        set(key, value.toByteArray(Charsets.UTF_8))
-
-    private fun getString(key: String): String? =
-        get(key)?.toString(Charsets.UTF_8)
-
     companion object {
         /** Filename of the AES-GCM/SIV encrypted preferences store. */
         private const val ENCRYPTED_PREFS_NAME = "runanywhere_secure_storage_encrypted"
 
         /** Logger category for secure-storage operations. */
         private const val LOG_CATEGORY = "SecureStorage"
-
-        private const val KEY_API_KEY = "com.runanywhere.sdk.apiKey"
-        private const val KEY_BASE_URL = "com.runanywhere.sdk.baseURL"
-        private const val KEY_ENVIRONMENT = "com.runanywhere.sdk.environment"
     }
 }
 

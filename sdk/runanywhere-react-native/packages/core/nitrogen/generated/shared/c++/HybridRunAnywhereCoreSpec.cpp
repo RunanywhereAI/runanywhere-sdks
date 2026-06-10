@@ -49,6 +49,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("setDownloadProgressCallbackProto", &HybridRunAnywhereCoreSpec::setDownloadProgressCallbackProto);
       prototype.registerHybridMethod("clearDownloadProgressCallbackProto", &HybridRunAnywhereCoreSpec::clearDownloadProgressCallbackProto);
       prototype.registerHybridMethod("clearCache", &HybridRunAnywhereCoreSpec::clearCache);
+      prototype.registerHybridMethod("cleanTempFiles", &HybridRunAnywhereCoreSpec::cleanTempFiles);
       prototype.registerHybridMethod("storageInfoProto", &HybridRunAnywhereCoreSpec::storageInfoProto);
       prototype.registerHybridMethod("storageAvailabilityProto", &HybridRunAnywhereCoreSpec::storageAvailabilityProto);
       prototype.registerHybridMethod("storageDeletePlanProto", &HybridRunAnywhereCoreSpec::storageDeletePlanProto);
@@ -74,6 +75,11 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
       prototype.registerHybridMethod("sttTranscribeProto", &HybridRunAnywhereCoreSpec::sttTranscribeProto);
       prototype.registerHybridMethod("sttTranscribeStreamProto", &HybridRunAnywhereCoreSpec::sttTranscribeStreamProto);
+      prototype.registerHybridMethod("sttStreamLoadModel", &HybridRunAnywhereCoreSpec::sttStreamLoadModel);
+      prototype.registerHybridMethod("sttStreamStart", &HybridRunAnywhereCoreSpec::sttStreamStart);
+      prototype.registerHybridMethod("sttStreamFeed", &HybridRunAnywhereCoreSpec::sttStreamFeed);
+      prototype.registerHybridMethod("sttStreamStop", &HybridRunAnywhereCoreSpec::sttStreamStop);
+      prototype.registerHybridMethod("sttStreamCancel", &HybridRunAnywhereCoreSpec::sttStreamCancel);
       prototype.registerHybridMethod("hybridSttRouterCreate", &HybridRunAnywhereCoreSpec::hybridSttRouterCreate);
       prototype.registerHybridMethod("hybridSttRouterDestroy", &HybridRunAnywhereCoreSpec::hybridSttRouterDestroy);
       prototype.registerHybridMethod("hybridSttRouterCreateService", &HybridRunAnywhereCoreSpec::hybridSttRouterCreateService);

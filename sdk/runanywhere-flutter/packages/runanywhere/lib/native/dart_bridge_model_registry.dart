@@ -556,6 +556,7 @@ class DartBridgeModelRegistry {
   /// model list should use [discoverDownloadedModels] — the Models capability
   /// does exactly that.
   Future<bool> refresh({
+    required bool rescanLocal,
     required bool includeRemoteCatalog,
     required bool pruneOrphans,
   }) async {
@@ -567,13 +568,19 @@ class DartBridgeModelRegistry {
       return false;
     }
     try {
+      // Full request mirrors Swift RunAnywhere+ModelRegistry.swift
+      // refreshModelRegistry: rescanLocal is forwarded and
+      // includeDownloadedState is always true so the refreshed registry
+      // carries downloaded-state reconciliation.
       final result =
           DartBridgeProtoUtils.callRequestWithHandle<
               model_pb.ModelRegistryRefreshResult>(
         handle: handle,
         request: model_pb.ModelRegistryRefreshRequest(
+          rescanLocal: rescanLocal,
           includeRemoteCatalog: includeRemoteCatalog,
           pruneOrphans: pruneOrphans,
+          includeDownloadedState: true,
         ),
         invoke: fn,
         decode: model_pb.ModelRegistryRefreshResult.fromBuffer,

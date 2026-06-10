@@ -10,18 +10,14 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCategory;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/vad_options.pb.dart'
-    show
-        VADAudioEncoding,
-        VADAudioSource,
-        VADOptions,
-        VADProcessRequest,
-        VADResult;
+    show VADAudioSource, VADOptions, VADProcessRequest, VADResult;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
@@ -41,7 +37,13 @@ class RunAnywhereVAD {
 
 
 
-  /// Detect voice activity from PCM16 bytes.
+  /// Detect voice activity in a raw PCM audio buffer.
+  ///
+  /// Routes through the commons VAD lifecycle service (handle-less). Mirrors
+  /// Swift `detectVoiceActivity(_:options:)` (RunAnywhere+VAD.swift:22-39):
+  /// the request carries only the raw audio bytes plus caller options — no
+  /// forced encoding and no model-id metadata; commons resolves the loaded
+  /// model and surfaces a structured error when none is loaded.
   Future<VADResult> detectVoiceActivity(
     Uint8List audio, [
     VADOptions? options,
@@ -49,11 +51,15 @@ class RunAnywhereVAD {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    return _processAudioData(
-      audio,
-      options ?? VADOptions(),
-      VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
+    final request = VADProcessRequest(
+      audio: VADAudioSource(
+        audioData: audio,
+        sampleRate: 16000,
+        channels: 1,
+      ),
+      options: options ?? VADOptions(),
     );
+    return DartBridgeVAD.shared.processLifecycleProto(request);
   }
 
 
@@ -74,14 +80,29 @@ class RunAnywhereVAD {
 
   /// Stream VAD results from a continuous audio byte stream.
   ///
-  /// Mirrors Swift's `RunAnywhere.streamVAD(audio:)`. The canonical Flutter
-  /// VAD surface is `detectVoiceActivity(...)` / `streamVAD(...)` / `reset()`.
-  /// Per-event callback setters were intentionally removed (see Swift's
-  /// public VAD surface in `RunAnywhere+VAD.swift`); subscribe to this
-  /// stream instead of registering a speech-activity callback.
+  /// Mirrors Swift's `RunAnywhere.streamVAD(audio:)`
+  /// (RunAnywhere+VAD.swift:50-72): when the underlying detector throws, the
+  /// failure surfaces as an error-marked [VADResult] (non-empty
+  /// `errorMessage`, non-zero `errorCode`) and the stream finishes — callers
+  /// do not silently keep pumping audio into a dead detector, and the stream
+  /// never aborts with an exception.
   Stream<VADResult> streamVAD(Stream<Uint8List> audio) async* {
     await for (final chunk in audio) {
-      yield await detectVoiceActivity(chunk);
+      VADResult result;
+      try {
+        result = await detectVoiceActivity(chunk);
+      } catch (e) {
+        final sdkError = SDKException.from(
+          e,
+          category: ErrorCategory.ERROR_CATEGORY_COMPONENT,
+        );
+        yield VADResult(
+          errorMessage: 'VAD stream failed: ${sdkError.message}',
+          errorCode: sdkError.code.value,
+        );
+        return;
+      }
+      yield result;
     }
   }
 
@@ -175,41 +196,6 @@ class RunAnywhereVAD {
     }
   }
 
-
-  Future<VADResult> _processAudioData(
-    Uint8List audio,
-    VADOptions options,
-    VADAudioEncoding encoding,
-  ) async {
-    final modelId = await _requireLoadedModelId();
-    final request = VADProcessRequest(
-      audio: VADAudioSource(
-        audioData: audio,
-        encoding: encoding,
-        sampleRate: 16000,
-        channels: 1,
-      ),
-      options: options,
-      metadata: <String, String>{'model_id': modelId}.entries,
-    );
-    return DartBridgeVAD.shared.processLifecycleProto(request);
-  }
-
-  Future<String> _requireLoadedModelId() async {
-    final snapshotModelId = currentModelId;
-    if (snapshotModelId != null) {
-      return snapshotModelId;
-    }
-    final current = await RunAnywhereModelLifecycle.shared.current(
-      model_pb.CurrentModelRequest(category: _vadCategory),
-    );
-    if (current.found && current.modelId.isNotEmpty) {
-      return current.modelId;
-    }
-    throw SDKException.componentNotReady(
-      'No VAD model loaded through commons lifecycle. Call loadVADModel() first.',
-    );
-  }
 
   ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
       RunAnywhereModelLifecycle.shared.componentSnapshot(

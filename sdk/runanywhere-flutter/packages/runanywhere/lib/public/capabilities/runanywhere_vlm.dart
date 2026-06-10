@@ -174,12 +174,15 @@ class RunAnywhereVLM {
     VLMGenerationOptions options, {
     bool streaming = false,
   }) {
+    // Defaults mirror Swift `RAVLMGenerationOptions.defaults()`
+    // (RAVLMImage+Helpers.swift:25-33): maxTokens=256, temperature=0.7,
+    // topP=0.9, topK=40 — no Flutter-only useGpu default.
     final opts = options.deepCopy();
     if (!opts.hasPrompt()) {
       opts.prompt = prompt;
     }
     if (!opts.hasMaxTokens()) {
-      opts.maxTokens = 2048;
+      opts.maxTokens = 256;
     }
     if (!opts.hasTemperature()) {
       opts.temperature = 0.7;
@@ -187,8 +190,8 @@ class RunAnywhereVLM {
     if (!opts.hasTopP()) {
       opts.topP = 0.9;
     }
-    if (!opts.hasUseGpu()) {
-      opts.useGpu = true;
+    if (!opts.hasTopK()) {
+      opts.topK = 40;
     }
     opts.streamingEnabled = streaming;
     return opts;

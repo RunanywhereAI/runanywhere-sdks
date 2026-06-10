@@ -126,8 +126,9 @@ export async function getStorageInfo(): Promise<StorageInfo | null> {
 }
 
 /**
- * Clear cache
- * Delegates to C++ FileManagerBridge for file cache/temp clearing.
+ * Clear the SDK's Cache directory. Mirrors Swift `clearCache()` →
+ * `CppBridge.FileManager.clearCache()` (cache only — temp files are cleaned
+ * by [cleanTempFiles]).
  */
 export async function clearCache(): Promise<void> {
   // Clear file caches via native module (C++ handles directory clearing)
@@ -146,11 +147,20 @@ export async function clearCache(): Promise<void> {
 }
 
 /**
- * Clean temporary files.
- * Uses the currently exposed native cache cleanup hook until a temp-specific
- * Nitro method is available.
+ * Clear the SDK's Temp directory. Mirrors Swift `cleanTempFiles()` →
+ * `CppBridge.FileManager.clearTemp()`.
  */
 export async function cleanTempFiles(): Promise<boolean> {
-  await clearCache();
-  return true;
+  if (!isNativeModuleAvailable()) {
+    return false;
+  }
+  try {
+    // Swift parity: RunAnywhere+Storage.swift:321 gates on ensureServicesReady.
+    await ensureServicesReady();
+    const native = requireNativeModule();
+    return await native.cleanTempFiles();
+  } catch (error) {
+    logger.warning('Failed to clean temp files:', { error });
+    return false;
+  }
 }

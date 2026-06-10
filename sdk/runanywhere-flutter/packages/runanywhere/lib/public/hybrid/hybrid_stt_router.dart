@@ -179,10 +179,12 @@ class HybridSttRouter {
       throw StateError('setPair() must be called before transcribe()');
     }
 
-    // Pure pass-through: commons owns the entire routing decision. Dart marshals
-    // the request and decodes the response; it does NOT pre-filter candidates
-    // or toggle slots. HybridRoutingContext is empty on the wire (device-state
-    // lives behind the vtable); it is still emitted for a stable wire shape.
+    // Pure pass-through: commons owns the entire routing decision AND the
+    // raw-PCM16 → WAV payload normalisation (rac_stt_hybrid_router_proto.cpp).
+    // Dart marshals the request and decodes the response; it does NOT
+    // pre-filter candidates or toggle slots. HybridRoutingContext is empty on
+    // the wire (device-state lives behind the vtable); it is still emitted
+    // for a stable wire shape.
     final request = pb.HybridSttTranscribeRequest(
       audioBytes: audioBytes,
       context: pb.HybridRoutingContext(),

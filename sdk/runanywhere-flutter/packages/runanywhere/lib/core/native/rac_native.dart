@@ -1193,6 +1193,46 @@ typedef RacAudioComputeLevelDbDart = int Function(
 );
 
 // ============================================================================
+// SDK metadata + enum convenience helpers (rac_core.h / rac_environment.h /
+// rac_model_types.h / rac_tool_calling.h)
+// ============================================================================
+
+/// `const char* rac_sdk_get_version(void)` — canonical SDK semver string
+/// sourced from `sdk/runanywhere-commons/VERSION`.
+typedef RacSdkGetVersionNative = ffi.Pointer<Utf8> Function();
+typedef RacSdkGetVersionDart = ffi.Pointer<Utf8> Function();
+
+/// `bool rac_env_*(rac_environment_t env)` predicate family
+/// (is_production / is_testing / requires_auth / requires_backend_url /
+/// should_send_telemetry / should_sync_with_backend).
+typedef RacEnvPredicateNative = ffi.Bool Function(ffi.Int32);
+typedef RacEnvPredicateDart = bool Function(int);
+
+/// `rac_result_t rac_inference_framework_analytics_key(
+///     rac_inference_framework_t f, const char** out)`.
+/// `out` receives a statically-allocated literal — do NOT free.
+typedef RacEnumToCStringNative = ffi.Int32 Function(
+  ffi.Int32,
+  ffi.Pointer<ffi.Pointer<Utf8>>,
+);
+typedef RacEnumToCStringDart = int Function(
+  int,
+  ffi.Pointer<ffi.Pointer<Utf8>>,
+);
+
+/// `rac_inference_framework_t rac_model_category_default_framework(
+///     rac_model_category_t)` and
+/// `rac_bool_t rac_model_category_requires_context_length(
+///     rac_model_category_t)` — int-enum in, int out.
+typedef RacEnumToIntNative = ffi.Int32 Function(ffi.Int32);
+typedef RacEnumToIntDart = int Function(int);
+
+/// `const char* rac_tool_call_format_hint_from_format_name(int32_t)` —
+/// static lowercase hint string (do not free).
+typedef RacToolCallFormatHintNative = ffi.Pointer<Utf8> Function(ffi.Int32);
+typedef RacToolCallFormatHintDart = ffi.Pointer<Utf8> Function(int);
+
+// ============================================================================
 // Bindings facade
 // ============================================================================
 
@@ -1983,6 +2023,57 @@ class RacBindings {
             _lookupOptional<RacProtoQuiesceDart>(
           () => lib.lookupFunction<RacProtoQuiesceNative, RacProtoQuiesceDart>(
               'rac_tool_calling_session_proto_quiesce'),
+        ),
+        rac_sdk_get_version = _lookupOptional<RacSdkGetVersionDart>(
+          () => lib.lookupFunction<RacSdkGetVersionNative,
+              RacSdkGetVersionDart>('rac_sdk_get_version'),
+        ),
+        rac_env_is_production = _lookupOptional<RacEnvPredicateDart>(
+          () => lib.lookupFunction<RacEnvPredicateNative,
+              RacEnvPredicateDart>('rac_env_is_production'),
+        ),
+        rac_env_is_testing = _lookupOptional<RacEnvPredicateDart>(
+          () => lib.lookupFunction<RacEnvPredicateNative,
+              RacEnvPredicateDart>('rac_env_is_testing'),
+        ),
+        rac_env_requires_auth = _lookupOptional<RacEnvPredicateDart>(
+          () => lib.lookupFunction<RacEnvPredicateNative,
+              RacEnvPredicateDart>('rac_env_requires_auth'),
+        ),
+        rac_env_requires_backend_url = _lookupOptional<RacEnvPredicateDart>(
+          () => lib.lookupFunction<RacEnvPredicateNative,
+              RacEnvPredicateDart>('rac_env_requires_backend_url'),
+        ),
+        rac_env_should_send_telemetry = _lookupOptional<RacEnvPredicateDart>(
+          () => lib.lookupFunction<RacEnvPredicateNative,
+              RacEnvPredicateDart>('rac_env_should_send_telemetry'),
+        ),
+        rac_env_should_sync_with_backend =
+            _lookupOptional<RacEnvPredicateDart>(
+          () => lib.lookupFunction<RacEnvPredicateNative,
+              RacEnvPredicateDart>('rac_env_should_sync_with_backend'),
+        ),
+        rac_inference_framework_analytics_key =
+            _lookupOptional<RacEnumToCStringDart>(
+          () => lib.lookupFunction<RacEnumToCStringNative,
+                  RacEnumToCStringDart>(
+              'rac_inference_framework_analytics_key'),
+        ),
+        rac_model_category_default_framework =
+            _lookupOptional<RacEnumToIntDart>(
+          () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
+              'rac_model_category_default_framework'),
+        ),
+        rac_model_category_requires_context_length =
+            _lookupOptional<RacEnumToIntDart>(
+          () => lib.lookupFunction<RacEnumToIntNative, RacEnumToIntDart>(
+              'rac_model_category_requires_context_length'),
+        ),
+        rac_tool_call_format_hint_from_format_name =
+            _lookupOptional<RacToolCallFormatHintDart>(
+          () => lib.lookupFunction<RacToolCallFormatHintNative,
+                  RacToolCallFormatHintDart>(
+              'rac_tool_call_format_hint_from_format_name'),
         );
 
   // Shared proto buffers -----------------------------------------------------
@@ -2392,6 +2483,51 @@ class RacBindings {
   /// `rac_tool_calling_session_proto_quiesce` — spin-wait tool-calling session
   /// dispatches. Null when the loaded commons binary predates the export.
   final RacProtoQuiesceDart? rac_tool_calling_session_proto_quiesce;
+
+  // SDK metadata + enum convenience helpers ----------------------------------
+
+  /// `rac_sdk_get_version` — canonical SDK semver string from commons
+  /// (mirrors Swift `SDKConstants.version`). Null on older binaries.
+  final RacSdkGetVersionDart? rac_sdk_get_version;
+
+  /// `rac_env_is_production(rac_environment_t)` — true only for production.
+  final RacEnvPredicateDart? rac_env_is_production;
+
+  /// `rac_env_is_testing(rac_environment_t)` — true for development/staging.
+  final RacEnvPredicateDart? rac_env_is_testing;
+
+  /// `rac_env_requires_auth(rac_environment_t)` — true for non-development.
+  final RacEnvPredicateDart? rac_env_requires_auth;
+
+  /// `rac_env_requires_backend_url(rac_environment_t)` — true for
+  /// staging/production.
+  final RacEnvPredicateDart? rac_env_requires_backend_url;
+
+  /// `rac_env_should_send_telemetry(rac_environment_t)` — true only for
+  /// production.
+  final RacEnvPredicateDart? rac_env_should_send_telemetry;
+
+  /// `rac_env_should_sync_with_backend(rac_environment_t)` — true for
+  /// staging/production.
+  final RacEnvPredicateDart? rac_env_should_sync_with_backend;
+
+  /// `rac_inference_framework_analytics_key` — snake_case analytics key for
+  /// a C `rac_inference_framework_t` value (mirrors Swift
+  /// `RAInferenceFramework.analyticsKey`). Out pointer is static — never free.
+  final RacEnumToCStringDart? rac_inference_framework_analytics_key;
+
+  /// `rac_model_category_default_framework` — fallback
+  /// `rac_inference_framework_t` for a C `rac_model_category_t` value.
+  final RacEnumToIntDart? rac_model_category_default_framework;
+
+  /// `rac_model_category_requires_context_length` — `rac_bool_t` for a C
+  /// `rac_model_category_t` value.
+  final RacEnumToIntDart? rac_model_category_requires_context_length;
+
+  /// `rac_tool_call_format_hint_from_format_name` — static lowercase hint
+  /// string for a `runanywhere.v1.ToolCallFormatName` enum int (mirrors
+  /// Swift `RAToolCallingOptions.resolvedFormatName`). Never free.
+  final RacToolCallFormatHintDart? rac_tool_call_format_hint_from_format_name;
 }
 
 /// Entry point for the typed commons FFI bindings.

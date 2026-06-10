@@ -1,18 +1,13 @@
 import { Colors } from '../theme/colors';
 import { RunAnywhere } from '@runanywhere/core';
-import type { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   InferenceFramework,
   ModelFormat,
-  ModelInfo as ModelInfoMessage,
-  ModelSource,
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 
 export const DEFAULT_INFERENCE_FRAMEWORK =
   InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
-export const SYSTEM_TTS_FRAMEWORK =
-  InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
 
 // Display-name table lives in the SDK (`RunAnywhere.formatFramework`),
 // proxying the canonical `rac_framework_display_name` C ABI in
@@ -151,43 +146,4 @@ export const getModelFormatLabel = (format?: ModelFormat | null): string => {
     default:
       return 'Model';
   }
-};
-
-export const createModelInfoSummary = (options: {
-  id: string;
-  name: string;
-  category: ModelCategory;
-  framework: InferenceFramework;
-  format?: ModelFormat;
-  localPath?: string;
-  isDownloaded?: boolean;
-  isAvailable?: boolean;
-}): ModelInfo => {
-  const now = Date.now();
-  const format = options.format ?? ModelFormat.MODEL_FORMAT_UNKNOWN;
-  return ModelInfoMessage.fromPartial({
-    id: options.id,
-    name: options.name,
-    category: options.category,
-    format,
-    framework: options.framework,
-    preferredFramework: options.framework,
-    downloadUrl: '',
-    localPath: options.localPath ?? '',
-    downloadSizeBytes: 0,
-    contextLength: 0,
-    supportsThinking: false,
-    supportsLora: false,
-    description: '',
-    source: ModelSource.MODEL_SOURCE_LOCAL,
-    createdAtUnixMs: now,
-    updatedAtUnixMs: now,
-    memoryRequiredBytes: 0,
-    isDownloaded: options.isDownloaded ?? true,
-    isAvailable: options.isAvailable ?? true,
-    compatibility: {
-      compatibleFrameworks: [options.framework],
-      compatibleFormats: [format],
-    },
-  });
 };

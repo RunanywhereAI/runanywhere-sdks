@@ -23,4 +23,28 @@ public final class RunAnywhereCoreAutolinking {
   public static func isRunAnywhereDeviceInfoRecyclable() -> Bool {
     return HybridRunAnywhereDeviceInfo.self is any RecyclableView.Type
   }
+  
+  public static func createAudioCapture() -> bridge.std__shared_ptr_HybridAudioCaptureSpec_ {
+    let hybridObject = HybridAudioCapture()
+    return { () -> bridge.std__shared_ptr_HybridAudioCaptureSpec_ in
+      let __cxxWrapped = hybridObject.getCxxWrapper()
+      return __cxxWrapped.getCxxPart()
+    }()
+  }
+  
+  public static func isAudioCaptureRecyclable() -> Bool {
+    return HybridAudioCapture.self is any RecyclableView.Type
+  }
+  
+  public static func createAudioPlayback() -> bridge.std__shared_ptr_HybridAudioPlaybackSpec_ {
+    let hybridObject = HybridAudioPlayback()
+    return { () -> bridge.std__shared_ptr_HybridAudioPlaybackSpec_ in
+      let __cxxWrapped = hybridObject.getCxxWrapper()
+      return __cxxWrapped.getCxxPart()
+    }()
+  }
+  
+  public static func isAudioPlaybackRecyclable() -> Bool {
+    return HybridAudioPlayback.self is any RecyclableView.Type
+  }
 }

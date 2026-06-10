@@ -431,6 +431,26 @@ rac_result_t discover_downloaded_models(SdkInitResult* result) {
 
 extern "C" {
 
+namespace {
+
+/**
+ * Phase-1 failure: publish the lifecycle FAILED event (the single source of
+ * INITIALIZATION_STAGE_* emits — platform SDKs no longer hand-emit
+ * duplicates) and serialize the failed SdkInitResult.
+ */
+rac_result_t phase1_failure(rac_result_t code, const char* message, int64_t start_ms,
+                            rac_proto_buffer_t* out_result) {
+    rac::events::publish_initialization_failed(code, message);
+    SdkInitResult result;
+    result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
+    result.set_success(false);
+    set_error_from_code(&result, code, message);
+    result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
+    return serialize_result(result, out_result);
+}
+
+}  // namespace
+
 rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t in_size,
                                        rac_proto_buffer_t* out_RASdkInitResult) {
     if (!out_RASdkInitResult) {
@@ -444,27 +464,24 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
 #else
     const int64_t start_ms = rac_monotonic_now_ms();
 
+    // Single source of SDK lifecycle events: STARTED at entry (before
+    // validation, matching Swift's old hand-emit timing), FAILED on every
+    // failure path, COMPLETED + duration_ms on success.
+    rac::events::publish_initialization_started();
+
     const rac_result_t validate = rac_proto_bytes_validate(in_request_bytes, in_size);
     if (validate != RAC_SUCCESS) {
-        SdkInitResult result;
-        result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-        result.set_success(false);
-        set_error_from_code(&result, validate, "Invalid SdkInitPhase1Request bytes");
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
-        return serialize_result(result, out_RASdkInitResult);
+        return phase1_failure(validate, "Invalid SdkInitPhase1Request bytes", start_ms,
+                              out_RASdkInitResult);
     }
 
     SdkInitPhase1Request request;
     if (in_size > 0) {
         const void* data = rac_proto_bytes_data_or_empty(in_request_bytes, in_size);
         if (!request.ParseFromArray(data, static_cast<int>(in_size))) {
-            SdkInitResult result;
-            result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-            result.set_success(false);
-            set_error_from_code(&result, RAC_ERROR_INVALID_ARGUMENT,
-                                "Failed to parse SdkInitPhase1Request");
-            result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
-            return serialize_result(result, out_RASdkInitResult);
+            return phase1_failure(RAC_ERROR_INVALID_ARGUMENT,
+                                  "Failed to parse SdkInitPhase1Request", start_ms,
+                                  out_RASdkInitResult);
         }
     }
 
@@ -481,24 +498,16 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
         const rac_validation_result_t key_check =
             rac_validate_api_key(api_key.empty() ? nullptr : api_key.c_str(), env);
         if (key_check != RAC_VALIDATION_OK) {
-            SdkInitResult result;
-            result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-            result.set_success(false);
-            set_error_from_code(&result, RAC_ERROR_INVALID_ARGUMENT,
-                                rac_validation_error_message(key_check));
-            result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
-            return serialize_result(result, out_RASdkInitResult);
+            return phase1_failure(RAC_ERROR_INVALID_ARGUMENT,
+                                  rac_validation_error_message(key_check), start_ms,
+                                  out_RASdkInitResult);
         }
         const rac_validation_result_t url_check =
             rac_validate_base_url(base_url.empty() ? nullptr : base_url.c_str(), env);
         if (url_check != RAC_VALIDATION_OK) {
-            SdkInitResult result;
-            result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-            result.set_success(false);
-            set_error_from_code(&result, RAC_ERROR_INVALID_ARGUMENT,
-                                rac_validation_error_message(url_check));
-            result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
-            return serialize_result(result, out_RASdkInitResult);
+            return phase1_failure(RAC_ERROR_INVALID_ARGUMENT,
+                                  rac_validation_error_message(url_check), start_ms,
+                                  out_RASdkInitResult);
         }
     }
 
@@ -514,12 +523,8 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
                                                        base_url.empty() ? "" : base_url.c_str(),
                                                        device_id.empty() ? "" : device_id.c_str());
     if (state_rc != RAC_SUCCESS) {
-        SdkInitResult result;
-        result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-        result.set_success(false);
-        set_error_from_code(&result, state_rc, "rac_state_initialize failed");
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
-        return serialize_result(result, out_RASdkInitResult);
+        return phase1_failure(state_rc, "rac_state_initialize failed", start_ms,
+                              out_RASdkInitResult);
     }
 
     rac_sdk_config_t sdk_config = {};
@@ -532,20 +537,18 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
 
     const rac_validation_result_t sdk_config_rc = rac_sdk_init(&sdk_config);
     if (sdk_config_rc != RAC_VALIDATION_OK) {
-        SdkInitResult result;
-        result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-        result.set_success(false);
-        set_error_from_code(&result, RAC_ERROR_INVALID_CONFIGURATION,
-                            rac_validation_error_message(sdk_config_rc));
-        result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
-        return serialize_result(result, out_RASdkInitResult);
+        return phase1_failure(RAC_ERROR_INVALID_CONFIGURATION,
+                              rac_validation_error_message(sdk_config_rc), start_ms,
+                              out_RASdkInitResult);
     }
 
     // Phase 1 complete.
+    const int64_t duration_ms = rac_monotonic_now_ms() - start_ms;
+    rac::events::publish_initialization_completed(duration_ms);
     SdkInitResult result;
     result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
     result.set_success(true);
-    result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
+    result.set_duration_ms(duration_ms);
     return serialize_result(result, out_RASdkInitResult);
 #endif  // RAC_HAVE_PROTOBUF
 }

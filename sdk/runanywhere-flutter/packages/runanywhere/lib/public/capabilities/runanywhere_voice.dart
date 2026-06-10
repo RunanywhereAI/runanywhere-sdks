@@ -16,16 +16,14 @@ import 'dart:typed_data';
 import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
-import 'package:runanywhere/generated/vad_options.pb.dart'
-    show VADConfiguration;
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_proto;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/generated/voice_events.pb.dart'
     as voice_event_proto;
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
@@ -164,8 +162,13 @@ class RunAnywhereVoice {
     if (!llmSnap.found || llmSnap.modelId.isEmpty) missing.add('LLM');
     if (!ttsSnap.found || ttsSnap.modelId.isEmpty) missing.add('TTS');
     if (missing.isNotEmpty) {
-      throw SDKException.voiceAgentNotReady(
-        'Cannot initialize voice agent: Models not loaded: ${missing.join(', ')}',
+      // Mirrors Swift initializeVoiceAgentWithLoadedModels
+      // (RunAnywhere+VoiceAgent.swift:141-147): `.modelNotLoaded`, component
+      // category.
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
+        message:
+            'Cannot initialize voice agent: Models not loaded: ${missing.join(', ')}',
       );
     }
 
@@ -186,42 +189,23 @@ class RunAnywhereVoice {
     }
   }
 
-  /// Initialize the voice agent from a [voice_agent_proto.VoiceAgentComposeConfig]. Loads
-  /// the STT/LLM/TTS models referenced by the config, optionally
-  /// initializes VAD, then performs the standard handle init. Mirrors
-  /// Swift's `RunAnywhere.initializeVoiceAgent(_ config:)`.
+  /// Initialize the voice agent from a
+  /// [voice_agent_proto.VoiceAgentComposeConfig].
+  ///
+  /// Mirrors Swift `RunAnywhere.initializeVoiceAgent(_ config:)`
+  /// (RunAnywhere+VoiceAgent.swift:24-31) exactly: C++ handle init only — no
+  /// model preloading. Models referenced by the config must already be loaded
+  /// through the canonical lifecycle (`RunAnywhere.loadModel`); the C++ voice
+  /// agent composes over the shared component handles.
   Future<void> initializeVoiceAgent(
     voice_agent_proto.VoiceAgentComposeConfig config,
   ) async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
 
-    if (config.hasSttModelId()) {
-      await RunAnywhereSTT.shared.load(config.sttModelId);
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
     }
-    if (config.hasLlmModelId()) {
-      await RunAnywhereLLM.shared.load(config.llmModelId);
-    }
-    if (config.hasTtsVoiceId()) {
-      await RunAnywhereTTS.shared.loadVoice(config.ttsVoiceId);
-    }
-    if (config.hasVadSampleRate() ||
-        config.hasVadFrameLength() ||
-        config.hasVadEnergyThreshold()) {
-      // Configure the lifecycle-owned VAD directly through the bridge —
-      // the public VAD surface is trimmed to Swift parity
-      // (detectVoiceActivity / streamVAD / reset).
-      DartBridgeVAD.shared.configureLifecycleProto(
-        VADConfiguration(
-          sampleRate: config.hasVadSampleRate() ? config.vadSampleRate : 16000,
-          frameLengthMs: config.hasVadFrameLength()
-              ? (config.vadFrameLength * 1000).round()
-              : 30,
-          threshold: config.hasVadEnergyThreshold()
-              ? config.vadEnergyThreshold
-              : 0.015,
-        ),
-      );
-    }
+    await DartBridge.ensureServicesReady();
 
     await DartBridge.voiceAgent.initializeProto(config);
     logger.info('Voice agent initialized from configuration');

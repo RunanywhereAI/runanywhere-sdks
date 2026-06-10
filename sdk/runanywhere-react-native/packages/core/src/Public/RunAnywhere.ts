@@ -39,15 +39,8 @@ import {
   resetState,
 } from '../Foundation/Initialization/InitializationState';
 import { registerServicesReadyGuard } from '../Foundation/Initialization/ServicesReadyGuard';
+import { registerInitializedProvider } from '../Foundation/Initialization/InitializedGuard';
 import type { SDKInitOptions } from '../types/models';
-import {
-  EventDestination,
-  InitializationStage,
-  SDKComponent,
-  SDKEvent as SDKEventCodec,
-} from '@runanywhere/proto-ts/sdk_events';
-import { EventCategory } from '@runanywhere/proto-ts/component_types';
-import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 
 // Import extensions
 import * as TextGeneration from './Extensions/LLM/RunAnywhere+TextGeneration';
@@ -144,31 +137,8 @@ function environmentToConfigString(environment: SDKEnvironment): string {
   }
 }
 
-function publishInitializationEvent(
-  stage: InitializationStage,
-  error = ''
-): void {
-  void SDKEvents.publishSDKEvent(
-    SDKEventCodec.fromPartial({
-      timestampMs: Date.now(),
-      severity: error
-        ? ErrorSeverity.ERROR_SEVERITY_ERROR
-        : ErrorSeverity.ERROR_SEVERITY_INFO,
-      category: EventCategory.EVENT_CATEGORY_INITIALIZATION,
-      component: SDKComponent.SDK_COMPONENT_UNSPECIFIED,
-      id: `rn-init-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      destination: EventDestination.EVENT_DESTINATION_ALL,
-      operationId: 'sdk.initialize',
-      source: 'react_native',
-      initialization: {
-        stage,
-        source: 'react_native',
-        error,
-        version: SDKConstants.version,
-      },
-    })
-  ).catch(() => undefined);
-}
+// Lifecycle INITIALIZATION_STAGE_* events are published once by commons
+// (rac_sdk_init_phase1_proto); RN no longer hand-emits duplicates.
 
 // ============================================================================
 // RunAnywhere SDK
@@ -248,7 +218,6 @@ export const RunAnywhere = {
           rescanLocalModels: phase2Request.rescanLocalModels,
         };
 
-        publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
         logger.info('SDK initialization starting...');
         ensureProtoTextEncoding();
 
@@ -292,7 +261,6 @@ export const RunAnywhere = {
           initState = markCoreInitialized(initState, initParams, 'core');
 
           logger.info('SDK initialized successfully');
-          publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
 
           // completeServicesInitialization() manages servicesInitPromise internally.
           // Do NOT wipe it here — an unconditional null would destroy any in-flight
@@ -308,10 +276,6 @@ export const RunAnywhere = {
           const msg = error instanceof Error ? error.message : String(error);
           logger.error(`SDK initialization failed: ${msg}`);
           initState = markInitializationFailed(initState, error as Error);
-          publishInitializationEvent(
-            InitializationStage.INITIALIZATION_STAGE_FAILED,
-            msg
-          );
           throw error;
         }
       } finally {
@@ -399,7 +363,6 @@ export const RunAnywhere = {
       } else {
         logger.info('Services initialisation completed (HTTP/auth deferred — will retry on next online call).');
       }
-      publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
     })();
 
     try {
@@ -407,10 +370,6 @@ export const RunAnywhere = {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error(`Services initialisation failed: ${msg}`);
-      publishInitializationEvent(
-        InitializationStage.INITIALIZATION_STAGE_FAILED,
-        msg
-      );
       throw error;
     } finally {
       servicesInitPromise = null;
@@ -778,3 +737,8 @@ async function ensureServicesReadyInternal(): Promise<void> {
 // Register the Phase-2 guard so extension files can call ensureServicesReady()
 // without importing RunAnywhere directly (avoids circular imports).
 registerServicesReadyGuard(ensureServicesReadyInternal);
+
+// Register the live Phase-1 flag so extension files can run the Swift-shaped
+// `guard isInitialized` check (requireInitialized / isSDKInitialized) without
+// importing RunAnywhere directly (avoids circular imports).
+registerInitializedProvider(() => initState.isCoreInitialized);

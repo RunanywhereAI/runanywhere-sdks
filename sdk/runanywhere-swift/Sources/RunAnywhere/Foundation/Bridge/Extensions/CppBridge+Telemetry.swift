@@ -210,22 +210,8 @@ private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool
 extension CppBridge.Events {
     // MARK: - SDK Lifecycle Events
 
-    /// Emit SDK init started event via the canonical SDK event proto stream.
-    public static func emitSDKInitStarted() {
-        publishInitialization(stage: .started)
-    }
-
-    /// Emit SDK init completed event via the canonical SDK event proto stream.
-    public static func emitSDKInitCompleted(durationMs: Double) {
-        var properties: [String: String] = [:]
-        properties["duration_ms"] = String(durationMs)
-        publishInitialization(stage: .completed, properties: properties)
-    }
-
-    /// Emit SDK init failed event via the canonical SDK event proto stream.
-    public static func emitSDKInitFailed(error: SDKException) {
-        publishInitialization(stage: .failed, error: error.message)
-    }
+    // SDK init STARTED/COMPLETED/FAILED are published once by commons
+    // (rac_sdk_init_phase1_proto) — Swift no longer hand-emits them.
 
     /// Emit SDK models loaded event via the canonical SDK event proto stream.
     public static func emitSDKModelsLoaded(count: Int) {

@@ -12,6 +12,7 @@ import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart'
     show STTLanguageWireString;
+import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
@@ -174,8 +175,11 @@ class RunAnywhereSTT {
     Stream<Uint8List> audio, {
     STTOptions? options,
   }) {
+    // Not-ready contract mirrors Swift (RunAnywhere+STT.swift:56-69): an
+    // uninitialized SDK, failed Phase-2 readiness, or missing lifecycle model
+    // finishes the stream SILENTLY instead of throwing.
     if (!DartBridge.isInitialized) {
-      return Stream.error(SDKException.notInitialized());
+      return const Stream<STTPartialResult>.empty();
     }
 
     late final StreamController<STTPartialResult> controller;
@@ -183,6 +187,11 @@ class RunAnywhereSTT {
       onListen: () async {
         var sawFinal = false;
         try {
+          try {
+            await DartBridge.ensureServicesReady();
+          } catch (_) {
+            return; // Silent finish (Swift parity).
+          }
           // Streaming sessions are handle-bound: resolve the lifecycle
           // current model and load it onto the bridge component handle
           // (mirrors Swift `prepareStreamingHandle`).
@@ -190,10 +199,7 @@ class RunAnywhereSTT {
             model_pb.CurrentModelRequest(category: _sttCategory),
           );
           if (!current.found) {
-            throw SDKException.sttNotAvailable(
-              'No STT model loaded through commons lifecycle. '
-              'Call loadSTTModel() first.',
-            );
+            return; // Silent finish (Swift parity).
           }
           final modelId =
               current.modelId.isNotEmpty ? current.modelId : current.model.id;
@@ -201,8 +207,9 @@ class RunAnywhereSTT {
               ? current.resolvedPath
               : current.model.localPath;
           if (modelId.isEmpty || modelPath.isEmpty) {
-            throw SDKException.sttNotAvailable(
-              'Loaded STT model is missing a resolved path',
+            throw SDKException.make(
+              code: ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+              message: 'Loaded STT model is missing a resolved path',
             );
           }
           DartBridgeSTT.shared.loadModelForStreaming(
@@ -225,13 +232,14 @@ class RunAnywhereSTT {
           if (!sawFinal && !controller.isClosed) {
             controller.add(STTPartialResult(isFinal: true));
           }
-        } catch (e, st) {
+        } catch (e) {
+          // Bridge errors surface as a terminal failure partial (Swift
+          // RunAnywhere+STT.swift:92-98) — no stream error.
           if (!controller.isClosed) {
             controller.add(STTPartialResult(
               text: 'STT stream failed: $e',
               isFinal: true,
             ));
-            controller.addError(e, st);
           }
         } finally {
           unawaited(controller.close());
@@ -306,8 +314,11 @@ class RunAnywhereSTT {
     if (current.found && current.modelId.isNotEmpty) {
       return current.modelId;
     }
-    throw SDKException.sttNotAvailable(
-      'No STT model loaded through commons lifecycle. Call loadSTTModel() first.',
+    // Mirrors Swift transcribe() (RunAnywhere+STT.swift:29-30):
+    // `.notInitialized` / "STT model not loaded" / component category.
+    throw SDKException.make(
+      code: ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      message: 'STT model not loaded',
     );
   }
 

@@ -8,14 +8,14 @@ import 'dart:io';
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/component_types.pbenum.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
-import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
-import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events;
+import 'package:runanywhere/generated/errors.pbenum.dart'
+    show ErrorCategory, ErrorCode;
+import 'package:runanywhere/generated/model_types.pb.dart'
+    show ModelImportRequest, ModelInfo;
 import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
-import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
@@ -175,7 +175,7 @@ class RunAnywhereDownloads {
       if (_isTerminalState(startResult.initialProgress.state)) {
         if (startResult.initialProgress.state ==
             DownloadState.DOWNLOAD_STATE_COMPLETED) {
-          await _handleDownloadCompleted(startResult.initialProgress, logger);
+          await _persistDownloadCompletion(model, startResult.initialProgress);
         }
         _activeTaskIdsByModel.remove(modelId);
         return;
@@ -209,7 +209,7 @@ class RunAnywhereDownloads {
         if (_isTerminalState(progress.state)) {
           reachedTerminal = true;
           if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
-            await _handleDownloadCompleted(progress, logger);
+            await _persistDownloadCompletion(model, progress);
           }
           break;
         }
@@ -242,46 +242,56 @@ class RunAnywhereDownloads {
         state == DownloadState.DOWNLOAD_STATE_CANCELLED;
   }
 
-  Future<void> _handleDownloadCompleted(
+  /// Persist a completed download into the model registry through the
+  /// generated model-import contract.
+  ///
+  /// Mirrors Swift `RunAnywhere.persistDownloadCompletion(model:progress:)`
+  /// (RunAnywhere+Storage.swift): builds an explicit [ModelImportRequest]
+  /// (overwrite, downloaded, local path from the completed download) and
+  /// throws when the import fails. Commons owns the download events; no
+  /// SDK-side event emission happens here.
+  Future<void> _persistDownloadCompletion(
+    ModelInfo model,
     DownloadProgress progress,
-    SDKLogger logger,
   ) async {
-    var localPath = progress.localPath;
-
-    try {
-      await RunAnywhereModels.shared.refreshModelRegistry();
-      final model = await DartBridgeModelRegistry.instance
-          .getProtoModel(progress.modelId);
-      if (model != null && model.localPath.isNotEmpty) {
-        localPath = model.localPath;
-      }
-    } catch (e) {
-      logger.warning(
-        'Failed to refresh model registry after download: $e',
+    final localPath =
+        progress.localPath.isEmpty ? model.localPath : progress.localPath;
+    if (localPath.isEmpty) {
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_INVALID_STATE,
+        message: 'Download completed without a local_path; cannot import '
+            'completion into the model registry',
+        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
       );
     }
 
-    DartBridgeEvents.instance.emit(sdk_events.SDKEvent(
-      timestampMs: fixnum.Int64(DateTime.now().millisecondsSinceEpoch),
-      category: EventCategory.EVENT_CATEGORY_MODEL,
-      source: 'flutter.downloads',
-      model: sdk_events.ModelEvent(
-        kind: sdk_events.ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED,
-        modelId: progress.modelId,
-        taskId: progress.taskId,
-        progress: _completedProgress(progress),
-        bytesDownloaded: progress.bytesDownloaded,
-        totalBytes: progress.totalBytes,
-        downloadState: progress.state.name,
-        localPath: localPath,
-      ),
-    ));
-  }
+    final importedModel = model.deepCopy()
+      ..localPath = localPath
+      ..isDownloaded = true
+      ..isAvailable = true
+      ..updatedAtUnixMs = fixnum.Int64(DateTime.now().millisecondsSinceEpoch);
 
-  static double _completedProgress(DownloadProgress progress) {
-    if (progress.overallProgress > 0) return progress.overallProgress;
-    if (progress.stageProgress > 0) return progress.stageProgress;
-    return 1;
+    final result = await DartBridgeModelRegistry.instance.importModel(
+      ModelImportRequest(
+        model: importedModel,
+        sourcePath: localPath,
+        overwriteExisting: true,
+        copyIntoManagedStorage: false,
+        validateBeforeRegister: false,
+        files: importedModel.hasMultiFile()
+            ? importedModel.multiFile.files
+            : null,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+        message: result.errorMessage.isEmpty
+            ? 'Downloaded model could not be imported into the registry'
+            : result.errorMessage,
+        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
+      );
+    }
   }
 
   /// Cancel an active model download if the adapter still owns it.

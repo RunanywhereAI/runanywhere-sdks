@@ -7,6 +7,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { isSDKInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import {
   CurrentModelRequest,
   CurrentModelResult,
@@ -66,6 +67,17 @@ function decode<T>(
 export async function loadModel(
   request: ModelLoadRequestMessage
 ): Promise<ModelLoadResultMessage> {
+  // Swift parity: guard isInitialized returns a failed result carrying the
+  // request's id/category/framework (RunAnywhere+ModelLifecycle.swift:23-31).
+  if (!isSDKInitialized()) {
+    return ModelLoadResult.fromPartial({
+      success: false,
+      modelId: request.modelId,
+      category: request.category,
+      framework: request.framework,
+      errorMessage: 'SDK not initialized',
+    });
+  }
   if (!isNativeModuleAvailable()) {
     return ModelLoadResult.fromPartial({
       success: false,
@@ -94,6 +106,14 @@ export async function loadModel(
 export async function unloadModel(
   request: ModelUnloadRequestMessage
 ): Promise<ModelUnloadResultMessage> {
+  // Swift parity: guard isInitialized returns a failed result
+  // (RunAnywhere+ModelLifecycle.swift:42-47).
+  if (!isSDKInitialized()) {
+    return ModelUnloadResult.fromPartial({
+      success: false,
+      errorMessage: 'SDK not initialized',
+    });
+  }
   if (!isNativeModuleAvailable()) {
     return ModelUnloadResult.fromPartial({
       success: false,

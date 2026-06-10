@@ -271,10 +271,18 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Clear model cache
+   * Clear the SDK's Cache directory only. Mirrors Swift `clearCache()` →
+   * `CppBridge.FileManager.clearCache()`.
    * @returns true if cleared successfully
    */
   clearCache(): Promise<boolean>;
+
+  /**
+   * Clear the SDK's Temp directory only. Mirrors Swift `cleanTempFiles()` →
+   * `CppBridge.FileManager.clearTemp()`.
+   * @returns true if cleared successfully
+   */
+  cleanTempFiles(): Promise<boolean>;
 
   /**
    * Analyze storage from serialized runanywhere.v1.StorageInfoRequest bytes.
@@ -454,6 +462,59 @@ export interface RunAnywhereCore extends HybridObject<{
     requestBytes: ArrayBuffer,
     onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
+
+  // ============================================================================
+  // STT Streaming Session (live partials)
+  // Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`:
+  // load model on the streaming handle, register the proto-byte callback,
+  // start the session, feed audio frames, then stop (drain finals) or
+  // cancel (immediate teardown). C ABI: rac_stt_stream.h.
+  // ============================================================================
+
+  /**
+   * Load an STT model onto the global streaming STT component handle
+   * (`rac_stt_component_load_model`). Same-model fast path: re-loading the
+   * currently loaded modelId is a no-op. Rejects on load failure.
+   */
+  sttStreamLoadModel(
+    modelPath: string,
+    modelId: string,
+    modelName: string
+  ): Promise<boolean>;
+
+  /**
+   * Start a streaming transcription session. Registers `onEventBytes`
+   * (serialized `runanywhere.v1.STTStreamEvent` per invocation) BEFORE
+   * `rac_stt_stream_start_proto`. Only one concurrent session is supported
+   * (the C ABI exposes a single callback slot per handle) — a second start
+   * while a session is active rejects.
+   *
+   * @param optionsBytes Serialized `runanywhere.v1.STTOptions`.
+   * @returns session id as a number (non-zero); failures reject.
+   */
+  sttStreamStart(
+    optionsBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<number>;
+
+  /**
+   * Feed a PCM audio frame into an active session
+   * (`rac_stt_stream_feed_audio_proto`). Rejects on feed failure.
+   */
+  sttStreamFeed(sessionId: number, audioBytes: ArrayBuffer): Promise<void>;
+
+  /**
+   * Stop a session (`rac_stt_stream_stop_proto`) — drains final events
+   * through the still-registered callback, then tears down the callback
+   * slot. Rejects if the native stop fails (after teardown).
+   */
+  sttStreamStop(sessionId: number): Promise<void>;
+
+  /**
+   * Cancel a session immediately (`rac_stt_stream_cancel_proto`) and tear
+   * down the callback slot. Idempotent on unknown session ids.
+   */
+  sttStreamCancel(sessionId: number): Promise<void>;
 
   // ============================================================================
   // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)

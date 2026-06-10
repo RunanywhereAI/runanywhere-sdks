@@ -17,6 +17,10 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import {
+  isSDKInitialized,
+  requireInitialized,
+} from '../../../Foundation/Initialization/InitializedGuard';
 import { ensureServicesReady, ensureServicesReadyOrIgnore } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
@@ -125,6 +129,8 @@ export interface RegisterMultiFileModelInput {
 export async function registerModel(
   input: RegisterModelInput,
 ): Promise<ModelInfo> {
+  // Swift parity: guard isInitialized (RunAnywhere+Storage.swift:31-33).
+  requireInitialized();
   if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
   const modality = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
@@ -253,6 +259,8 @@ function inferArchiveType(url: string): ArchiveType {
 export async function registerArchiveModel(
   input: RegisterArchiveModelInput,
 ): Promise<ModelInfo> {
+  // Swift parity: guard isInitialized (RunAnywhere+Storage.swift:84-86).
+  requireInitialized();
   if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
   const modality = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
@@ -307,6 +315,8 @@ export async function registerArchiveModel(
 export async function registerMultiFileModel(
   input: RegisterMultiFileModelInput
 ): Promise<ModelInfo> {
+  // Swift parity: guard isInitialized (RunAnywhere+Storage.swift:141-143).
+  requireInitialized();
   if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
   const message = ModelInfoCodec.fromPartial({
@@ -350,13 +360,22 @@ export async function registerMultiFileModel(
 // ---------------------------------------------------------------------------
 
 /**
- * Get all registered models. Mirrors Swift's `RunAnywhere.listModels(_:)`.
+ * Get all registered models. Mirrors Swift's `RunAnywhere.listModels(_:)`:
+ * the request's `query` (when set) routes through the query path; an empty
+ * request lists everything. Default request is empty — Swift's
+ * `RAModelListRequest()` — so `includeCounts` stays at proto default (false).
  */
 export async function listModels(
-  _request: ModelListRequest = ModelListRequest.fromPartial({
-    includeCounts: true,
-  })
+  request: ModelListRequest = ModelListRequest.fromPartial({})
 ): Promise<ModelListResult> {
+  // Swift parity: guard isInitialized returns a failed result
+  // (RunAnywhere+ModelRegistry.swift:11-16).
+  if (!isSDKInitialized()) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'SDK not initialized',
+    });
+  }
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
       success: false,
@@ -365,6 +384,11 @@ export async function listModels(
   }
   // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:17).
   await ensureServicesReadyOrIgnore();
+  // Swift parity (CppBridge+ModelRegistry.swift list()): a request with a
+  // query dispatches to the query path; otherwise list all.
+  if (request.query !== undefined) {
+    return queryModels(request.query);
+  }
   const native = requireNativeModule();
   const buffer = await native.getAvailableModelsProto();
   const bytes = arrayBufferToBytes(buffer);
@@ -381,6 +405,14 @@ export async function listModels(
  * Query registered models. Mirrors Swift's `RunAnywhere.queryModels(_:)`.
  */
 export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
+  // Swift parity: queryModels delegates to listModels, whose isInitialized
+  // guard returns a failed result (RunAnywhere+ModelRegistry.swift:11-25).
+  if (!isSDKInitialized()) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'SDK not initialized',
+    });
+  }
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
       success: false,
@@ -405,6 +437,14 @@ export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
  * Get one registered model. Mirrors Swift's `RunAnywhere.getModel(_:)`.
  */
 export async function getModel(request: ModelGetRequest): Promise<ModelGetResult> {
+  // Swift parity: guard isInitialized returns found=false
+  // (RunAnywhere+ModelRegistry.swift:28-33).
+  if (!isSDKInitialized()) {
+    return ModelGetResult.fromPartial({
+      found: false,
+      errorMessage: 'SDK not initialized',
+    });
+  }
   if (!isNativeModuleAvailable()) {
     return ModelGetResult.fromPartial({
       found: false,
@@ -457,6 +497,8 @@ export async function downloadedModels(): Promise<ModelListResult> {
 export async function importModel(
   request: ModelImportRequest
 ): Promise<ModelImportResult> {
+  // Swift parity: guard isInitialized throws (RunAnywhere+Storage.swift:287-289).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     return ModelImportResult.fromPartial({
       success: false,
@@ -792,9 +834,13 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
           }
           const model = ModelInfoCodec.decode(modelBytes);
           modelForImport = model;
+          // Plan fields mirror Swift RunAnywhere+Storage.swift:183-188.
           const planRequest = DownloadPlanRequest.fromPartial({
             modelId,
             model,
+            resumeExisting: true,
+            validateExistingBytes: true,
+            verifyChecksums: (model.checksumSha256?.length ?? 0) > 0,
           });
           const plan = await planDownload(native, planRequest);
           if (!plan.canStart) {
@@ -920,6 +966,15 @@ export async function downloadModel(
   model: ModelInfo,
   onProgress?: (progress: DownloadProgress) => void,
 ): Promise<DownloadProgress> {
+  // Swift parity: guard isInitialized throws .notInitialized with category
+  // .network (RunAnywhere+Storage.swift:176-178).
+  if (!isSDKInitialized()) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      'SDK not initialized',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK },
+    );
+  }
   const iterable = downloadModelStream(model);
   const iterator = iterable[Symbol.asyncIterator]();
   let last: DownloadProgress | undefined;
@@ -956,6 +1011,9 @@ export async function refreshModelRegistry(
     pruneOrphans?: boolean;
   } = {}
 ): Promise<void> {
+  // Swift parity: `guard isInitialized else { return }`
+  // (RunAnywhere+ModelRegistry.swift:51).
+  if (!isSDKInitialized()) return;
   if (!isNativeModuleAvailable()) return;
   const {
     rescanLocal = true,
@@ -980,7 +1038,11 @@ export async function refreshModelRegistry(
  * Framework the SDK falls back to when a category has no explicit model
  * framework resolved (e.g. a pending UI selection that has not yet matched a
  * catalogued model). Mirrors commons' `rac_model_category_default_framework`
- * and Swift's `RAModelCategory.defaultFramework`.
+ * (model_types.cpp:122-137) and Swift's `RAModelCategory.defaultFramework`,
+ * which delegates to that C ABI.
+ *
+ * TODO(layer-down): expose `rac_model_category_default_framework` through
+ * the Nitro bridge and delegate, removing this mirrored mapping.
  */
 export function getDefaultFramework(
   category: ModelCategory

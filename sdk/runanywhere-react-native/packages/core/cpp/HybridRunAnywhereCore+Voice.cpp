@@ -590,6 +590,208 @@ HybridRunAnywhereCore::sttTranscribeStreamProto(
 }
 
 // ============================================================================
+// STT Streaming Session (rac_stt_stream.h)
+// Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`: callback is
+// registered BEFORE start, stop drains final events THROUGH the
+// still-registered callback, and teardown follows the canonical recipe —
+// stop/cancel first, then unset callback -> rac_stt_proto_quiesce -> free
+// user_data (rac_stt_stream.h:79-84).
+//
+// The C ABI exposes ONE callback slot per handle, so the bridge tracks a
+// single live session guarded by a mutex and rejects a second concurrent
+// start.
+// ============================================================================
+
+namespace {
+
+struct STTStreamSession {
+    uint64_t sessionId = 0;
+    rac_handle_t handle = nullptr;
+    std::shared_ptr<StreamCallback> callback;
+};
+
+std::mutex g_stt_stream_mutex;
+STTStreamSession g_stt_stream_session;
+// Same-model fast path mirror of Swift CppBridge.STT `loadedModelId`.
+std::string g_stt_stream_loaded_model_id;
+
+// Pop the live session if it matches `sessionId` (0 matches any live
+// session — used by global teardown). Returns an empty session when there
+// is no match.
+STTStreamSession takeSTTStreamSession(uint64_t sessionId) {
+    std::lock_guard<std::mutex> lock(g_stt_stream_mutex);
+    if (g_stt_stream_session.sessionId == 0 ||
+        (sessionId != 0 && g_stt_stream_session.sessionId != sessionId)) {
+        return {};
+    }
+    STTStreamSession session = std::move(g_stt_stream_session);
+    g_stt_stream_session = {};
+    return session;
+}
+
+// Canonical teardown tail (after stop/cancel already ran): unset the
+// callback slot, quiesce in-flight dispatches, drop the registry ref.
+void teardownSTTStreamSession(STTStreamSession& session) {
+    if (session.handle) {
+        if (auto unset = proto_compat::symbol<proto_compat::STTStreamUnsetProtoCallbackFn>(
+                "rac_stt_unset_stream_proto_callback")) {
+            unset(session.handle);
+        }
+    }
+    releaseStreamCallback(session.callback, "rac_stt_proto_quiesce");
+    session = {};
+}
+
+// Cancel-and-teardown for global component reset / cancel paths.
+void cancelSTTStreamSession(STTStreamSession& session) {
+    if (session.sessionId == 0) {
+        return;
+    }
+    if (auto cancel = proto_compat::symbol<proto_compat::STTStreamFinishProtoFn>(
+            "rac_stt_stream_cancel_proto")) {
+        cancel(session.sessionId);
+    }
+    teardownSTTStreamSession(session);
+}
+
+} // namespace
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::sttStreamLoadModel(
+    const std::string& modelPath,
+    const std::string& modelId,
+    const std::string& modelName) {
+    return Promise<bool>::async([modelPath, modelId, modelName]() -> bool {
+        rac_handle_t handle = getGlobalSTTHandle();
+        if (!handle) {
+            throw std::runtime_error("sttStreamLoadModel: STT component unavailable");
+        }
+        {
+            // Same-model fast path — skips redundant backend load work.
+            // Gated on the component still reporting loaded so an
+            // unloadSTTModel() in between cannot stale-skip the reload.
+            std::lock_guard<std::mutex> lock(g_stt_stream_mutex);
+            if (!modelId.empty() && g_stt_stream_loaded_model_id == modelId &&
+                rac_stt_component_is_loaded(handle) == RAC_TRUE) {
+                return true;
+            }
+        }
+        rac_result_t rc = rac_stt_component_load_model(
+            handle, modelPath.c_str(), modelId.c_str(), modelName.c_str());
+        if (rc != RAC_SUCCESS) {
+            throw std::runtime_error("sttStreamLoadModel failed: rc=" + std::to_string(rc));
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_stt_stream_mutex);
+            g_stt_stream_loaded_model_id = modelId;
+        }
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<double>> HybridRunAnywhereCore::sttStreamStart(
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<double>::async([options = std::move(options), onEventBytes]() -> double {
+        auto setCallback = proto_compat::symbol<proto_compat::STTStreamSetProtoCallbackFn>(
+            "rac_stt_set_stream_proto_callback");
+        auto unsetCallback = proto_compat::symbol<proto_compat::STTStreamUnsetProtoCallbackFn>(
+            "rac_stt_unset_stream_proto_callback");
+        auto start = proto_compat::symbol<proto_compat::STTStreamStartProtoFn>(
+            "rac_stt_stream_start_proto");
+        if (!setCallback || !unsetCallback || !start) {
+            throw std::runtime_error(
+                "sttStreamStart: rac_stt_stream session ABI unavailable");
+        }
+        rac_handle_t handle = getGlobalSTTHandle();
+        if (!handle) {
+            throw std::runtime_error("sttStreamStart: STT component unavailable");
+        }
+
+        std::lock_guard<std::mutex> lock(g_stt_stream_mutex);
+        if (g_stt_stream_session.sessionId != 0) {
+            throw std::runtime_error(
+                "sttStreamStart: an STT stream session is already active "
+                "(one callback slot per handle)");
+        }
+
+        // Publish-before-install: registry holds the strong ref before the C
+        // callback can fire (see registerStreamCallback comment above).
+        auto reg = registerStreamCallback(onEventBytes);
+        rac_result_t rc = setCallback(handle, protoBytesCallback, reg.get());
+        if (rc != RAC_SUCCESS) {
+            releaseStreamCallback(reg, "rac_stt_proto_quiesce");
+            throw std::runtime_error(
+                "sttStreamStart: callback registration failed: rc=" + std::to_string(rc));
+        }
+
+        uint64_t sessionId = 0;
+        const uint8_t* data = options.empty() ? nullptr : options.data();
+        rc = start(handle, data, options.size(), &sessionId);
+        if (rc != RAC_SUCCESS || sessionId == 0) {
+            unsetCallback(handle);
+            releaseStreamCallback(reg, "rac_stt_proto_quiesce");
+            throw std::runtime_error(
+                "sttStreamStart failed: rc=" + std::to_string(rc));
+        }
+
+        g_stt_stream_session.sessionId = sessionId;
+        g_stt_stream_session.handle = handle;
+        g_stt_stream_session.callback = reg;
+        return static_cast<double>(sessionId);
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::sttStreamFeed(
+    double sessionId,
+    const std::shared_ptr<ArrayBuffer>& audioBytes) {
+    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    return Promise<void>::async([sessionId, audio = std::move(audio)]() {
+        if (audio.empty()) {
+            return; // Skip empty chunks (Swift parity).
+        }
+        auto feed = proto_compat::symbol<proto_compat::STTStreamFeedAudioProtoFn>(
+            "rac_stt_stream_feed_audio_proto");
+        if (!feed) {
+            throw std::runtime_error(
+                "sttStreamFeed: rac_stt_stream_feed_audio_proto unavailable");
+        }
+        rac_result_t rc = feed(static_cast<uint64_t>(sessionId), audio.data(), audio.size());
+        if (rc != RAC_SUCCESS) {
+            throw std::runtime_error("sttStreamFeed failed: rc=" + std::to_string(rc));
+        }
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::sttStreamStop(double sessionId) {
+    return Promise<void>::async([sessionId]() {
+        auto session = takeSTTStreamSession(static_cast<uint64_t>(sessionId));
+        if (session.sessionId == 0) {
+            return; // Unknown / already torn down — idempotent.
+        }
+        // Stop FIRST so final events drain through the still-registered
+        // callback, then run the canonical teardown tail.
+        rac_result_t rc = RAC_ERROR_NOT_SUPPORTED;
+        if (auto stop = proto_compat::symbol<proto_compat::STTStreamFinishProtoFn>(
+                "rac_stt_stream_stop_proto")) {
+            rc = stop(session.sessionId);
+        }
+        teardownSTTStreamSession(session);
+        if (rc != RAC_SUCCESS) {
+            throw std::runtime_error("sttStreamStop failed: rc=" + std::to_string(rc));
+        }
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::sttStreamCancel(double sessionId) {
+    return Promise<void>::async([sessionId]() {
+        auto session = takeSTTStreamSession(static_cast<uint64_t>(sessionId));
+        // Idempotent on unknown session ids — no throw.
+        cancelSTTStreamSession(session);
+    });
+}
+
+// ============================================================================
 // TTS Capability (Backend-Agnostic)
 // Calls rac_tts_component_* APIs - works with any registered backend
 // Uses a global TTS component handle shared across HybridRunAnywhereCore instances
@@ -1241,6 +1443,15 @@ void resetAllGlobalComponentHandles() {
             rac_llm_component_destroy(g_llm_component_handle);
             g_llm_component_handle = nullptr;
         }
+    }
+    {
+        // Cancel any live STT streaming session BEFORE destroying the STT
+        // component its callback slot is registered on (cancel -> unset ->
+        // quiesce -> free user_data, per rac_stt_stream.h:79-84).
+        auto session = takeSTTStreamSession(0);
+        cancelSTTStreamSession(session);
+        std::lock_guard<std::mutex> lock(g_stt_stream_mutex);
+        g_stt_stream_loaded_model_id.clear();
     }
     {
         std::lock_guard<std::mutex> lock(g_stt_mutex);
