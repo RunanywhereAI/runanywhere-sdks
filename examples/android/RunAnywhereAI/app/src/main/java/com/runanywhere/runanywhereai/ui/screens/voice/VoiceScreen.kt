@@ -72,17 +72,17 @@ fun VoiceScreen() {
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) voiceVm.toggle(ttsVoice) }
+    ) { granted -> if (granted) voiceVm.toggle() }
 
     fun onMic() {
         if (voiceVm.state != VoiceState.IDLE) {
-            voiceVm.toggle(ttsVoice)
+            voiceVm.toggle()
             return
         }
         if (!ready) return
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
-        if (granted) voiceVm.toggle(ttsVoice) else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (granted) voiceVm.toggle() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     LaunchedEffect(voiceVm.turns.size) {

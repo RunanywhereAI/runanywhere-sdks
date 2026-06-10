@@ -21,8 +21,14 @@
 package com.runanywhere.sdk.public
 
 import android.content.Context
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -338,9 +344,26 @@ object RunAnywhere {
                     baseURL = params.baseURL,
                 )
 
+                CppBridgeSDKEvents.emitSDKInitStarted()
+
+                CppBridgeAuth.initialize()
+                CppBridgeFileManager.register()
+                val baseDir = CppBridgeModelPaths.getBaseDirectory()
+                logger.debug("Model storage base directory materialized: $baseDir")
+
+                val phase1Result =
+                    CppBridgeSdkInit.phase1(
+                        environment = params.environment,
+                        apiKey = params.apiKey,
+                        baseURL = params.baseURL,
+                        deviceId = CppBridgeDevice.getDeviceIdCallback(),
+                    )
+                logger.debug("SDK config initialized: linkedModels=${phase1Result.linked_models_count}")
+
                 _isInitialized = true
 
                 val initDurationMs = System.currentTimeMillis() - initStartTime
+                CppBridgeSDKEvents.emitSDKInitCompleted(initDurationMs.toDouble())
                 logger.info("Phase 1 complete in ${initDurationMs}ms (${params.environment.wireString})")
 
                 if (startBackgroundServices) {
@@ -372,6 +395,7 @@ object RunAnywhere {
                 _hasCompletedHTTPSetup = false
                 _httpSetupApplicable = true
                 servicesInitJob = null
+                CppBridgeState.reset()
                 throw error
             }
         }

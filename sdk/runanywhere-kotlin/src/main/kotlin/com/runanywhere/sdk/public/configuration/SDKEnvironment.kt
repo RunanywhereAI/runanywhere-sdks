@@ -16,6 +16,7 @@
 
 package com.runanywhere.sdk.public.configuration
 
+import ai.runanywhere.proto.v1.LogLevel
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEnvironment
 import com.runanywhere.sdk.foundation.errors.SDKException
 
@@ -60,6 +61,51 @@ val SDKEnvironment.description: String
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> "Production Environment"
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "Unspecified Environment"
         }
+
+val deployableSDKEnvironments: List<SDKEnvironment>
+    get() =
+        listOf(
+            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+            SDKEnvironment.SDK_ENVIRONMENT_STAGING,
+            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        )
+
+val SDKEnvironment.isProduction: Boolean
+    get() = CppBridgeEnvironment.isProduction(this)
+
+val SDKEnvironment.isTesting: Boolean
+    get() = CppBridgeEnvironment.isTesting(this)
+
+val SDKEnvironment.requiresBackendURL: Boolean
+    get() = CppBridgeEnvironment.requiresBackendURL(this)
+
+val SDKEnvironment.requiresAuthentication: Boolean
+    get() = CppBridgeEnvironment.requiresAuth(this)
+
+val SDKEnvironment.shouldSendTelemetry: Boolean
+    get() = CppBridgeEnvironment.shouldSendTelemetry(this)
+
+val SDKEnvironment.shouldSyncWithBackend: Boolean
+    get() = CppBridgeEnvironment.shouldSyncWithBackend(this)
+
+val SDKEnvironment.defaultLogLevel: LogLevel
+    get() =
+        when (this) {
+            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.LOG_LEVEL_DEBUG
+            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.LOG_LEVEL_INFO
+            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.LOG_LEVEL_WARNING
+            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.LOG_LEVEL_INFO
+        }
+
+val SDKEnvironment.isCompatibleWithCurrentBuild: Boolean
+    get() = this != SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED && (!isProduction || !isSDKDebugBuild())
+
+private fun isSDKDebugBuild(): Boolean =
+    runCatching {
+        val buildConfigClass = Class.forName("com.runanywhere.sdk.BuildConfig")
+        val debugField = buildConfigClass.getField("DEBUG")
+        debugField.getBoolean(null)
+    }.getOrDefault(false)
 
 // SDKInitParams — mirrors Swift's `SDKInitParams` struct (3 constructors +
 // validate). Kotlin uses `String` for `baseURL` (no commonMain URL type;

@@ -209,6 +209,11 @@ object CppBridgeState {
      * Mirrors Swift's `CppBridge.State.reset()`.
      */
     fun reset() {
+        try {
+            RunAnywhereBridge.racStateReset()
+        } catch (t: Throwable) {
+            logger.warn("racStateReset threw during state reset: ${t.message}")
+        }
         isInitialized = false
         servicesInitialized = false
         servicesInitializing = false

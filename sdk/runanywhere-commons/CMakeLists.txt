@@ -980,8 +980,10 @@ else()
     set(RAC_DESKTOP_SOURCES "")
 endif()
 
-# Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
-if(APPLE AND RAC_BUILD_PLATFORM)
+# Platform services.
+# Apple exposes Foundation Models + System TTS + CoreML Diffusion.
+# Android exposes TextToSpeech-backed System TTS through the same callback backend.
+if((APPLE OR ANDROID) AND RAC_BUILD_PLATFORM)
     set(RAC_PLATFORM_SOURCES
         src/features/platform/rac_llm_platform.cpp
         src/features/platform/rac_tts_platform.cpp
@@ -989,7 +991,11 @@ if(APPLE AND RAC_BUILD_PLATFORM)
         src/features/platform/rac_backend_platform_register.cpp
         src/features/platform/rac_plugin_entry_platform.cpp
     )
-    message(STATUS "Building platform services: Apple Foundation Models, System TTS, CoreML Diffusion")
+    if(APPLE)
+        message(STATUS "Building platform services: Apple Foundation Models, System TTS, CoreML Diffusion")
+    else()
+        message(STATUS "Building platform services: Android System TTS")
+    endif()
 else()
     set(RAC_PLATFORM_SOURCES "")
 endif()

@@ -133,8 +133,8 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
     }.flowOn(Dispatchers.IO)
 }
 
-fun RunAnywhere.cancelGeneration() {
-    runBlocking { CppBridgeLLM.cancelProto() }
+suspend fun RunAnywhere.cancelGeneration() {
+    CppBridgeLLM.cancelProto()
 }
 
 // MARK: - Stream Aggregation

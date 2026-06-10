@@ -159,6 +159,13 @@ interface LoRA {
 private const val LORA_ARTIFACT_MODEL_ID_PREFIX = "lora-adapter:"
 private const val LORA_ARTIFACT_TAG = "lora-adapter"
 
+private suspend fun ensureLoraReady() {
+    if (!RunAnywhere.isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    RunAnywhere.ensureServicesReady()
+}
+
 /**
  * Stable model-registry id used for a LoRA adapter artifact.
  *
@@ -242,28 +249,37 @@ fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
  * delegate to [CppBridgeLoraRegistry] on `Dispatchers.IO`.
  */
 internal object AndroidLoRA : LoRA {
-    override suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult =
-        withContext(Dispatchers.IO) {
+    override suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.apply(request)
         }
+    }
 
-    override suspend fun remove(request: RALoRARemoveRequest): RALoRAState =
-        withContext(Dispatchers.IO) {
+    override suspend fun remove(request: RALoRARemoveRequest): RALoRAState {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.remove(request)
         }
+    }
 
-    override suspend fun list(): RALoRAState =
-        withContext(Dispatchers.IO) {
+    override suspend fun list(): RALoRAState {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.list(RALoRAState())
         }
+    }
 
-    override suspend fun state(): RALoRAState =
-        withContext(Dispatchers.IO) {
+    override suspend fun state(): RALoRAState {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.state(RALoRAState())
         }
+    }
 
-    override suspend fun checkCompatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult =
-        withContext(Dispatchers.IO) {
+    override suspend fun checkCompatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             try {
                 CppBridgeLoraRegistry.compatibility(config)
             } catch (e: Exception) {
@@ -273,11 +289,14 @@ internal object AndroidLoRA : LoRA {
                 )
             }
         }
+    }
 
-    override suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry =
-        withContext(Dispatchers.IO) {
+    override suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.register(entry)
         }
+    }
 
     override suspend fun registerArtifact(entry: LoraAdapterCatalogEntry): RAModelInfo {
         val registeredEntry = register(entry)
@@ -290,6 +309,7 @@ internal object AndroidLoRA : LoRA {
         entry: LoraAdapterCatalogEntry,
         onProgress: (suspend (DownloadProgress) -> Unit)?,
     ): String {
+        ensureLoraReady()
         val artifact = registerArtifact(entry)
         val finalProgress = RunAnywhere.downloadModel(artifact, onProgress = onProgress)
 
@@ -317,29 +337,37 @@ internal object AndroidLoRA : LoRA {
 
     override suspend fun listCatalog(
         request: LoraAdapterCatalogListRequest,
-    ): LoraAdapterCatalogListResult =
-        withContext(Dispatchers.IO) {
+    ): LoraAdapterCatalogListResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.listCatalog(request)
         }
+    }
 
-    override suspend fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult =
-        withContext(Dispatchers.IO) {
+    override suspend fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.queryCatalog(query)
         }
+    }
 
     override suspend fun getCatalogEntry(
         request: LoraAdapterCatalogGetRequest,
-    ): LoraAdapterCatalogGetResult =
-        withContext(Dispatchers.IO) {
+    ): LoraAdapterCatalogGetResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.getCatalogEntry(request)
         }
+    }
 
     override suspend fun markDownloadCompleted(
         request: LoraAdapterDownloadCompletedRequest,
-    ): LoraAdapterDownloadCompletedResult =
-        withContext(Dispatchers.IO) {
+    ): LoraAdapterDownloadCompletedResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.markDownloadCompleted(request)
         }
+    }
 }
 
 val RunAnywhere.lora: LoRA

@@ -24,12 +24,7 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
-import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
-import ai.runanywhere.proto.v1.ComponentLifecycleState
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.SDKComponent
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
@@ -39,43 +34,19 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 public class ComponentVTable internal constructor(
     public val component: SDKComponent,
     private val createFn: () -> Long,
+    private val isLoadedFn: (Long) -> Boolean,
     private val destroyFn: (Long) -> Unit,
+    private val cleanupFn: (Long) -> Int,
     public val loadModel: ((handle: Long, path: String, id: String, name: String) -> Int)?,
 ) {
     public fun create(): Long = createFn()
 
     public fun destroy(handle: Long) = destroyFn(handle)
 
-    /**
-     * Proto-canonical readiness check. Returns true iff the lifecycle
-     * snapshot reports `COMPONENT_LIFECYCLE_STATE_READY` (the only state
-     * indicating an active, usable, loaded asset). Falls back to
-     * `false` if the snapshot is unavailable, matching Swift's
-     * `rac_*_component_is_loaded` semantics. `handle` is part of the
-     * vtable contract (parity with Swift's `rac_*_component_is_loaded`
-     * C ABI) but the proto-canonical readiness check routes through
-     * the lifecycle snapshot, which is keyed by component.
-     */
-    @Suppress("UnusedParameter")
-    public fun isLoaded(handle: Long): Boolean {
-        val snapshot: ComponentLifecycleSnapshot =
-            CppBridgeModelLifecycle.snapshot(component) ?: return false
-        return snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY
-    }
+    public fun isLoaded(handle: Long): Boolean = isLoadedFn(handle)
 
-    /**
-     * Cleanup via the canonical proto unload path. Best-effort —
-     * mirrors Swift where `rac_*_component_cleanup` errors are
-     * intentionally discarded (the cleanup is fire-and-forget).
-     * `handle` is part of the vtable contract (parity with Swift's
-     * `rac_*_component_cleanup` C ABI) but the unload routes through
-     * the lifecycle, which is keyed by component.
-     */
-    @Suppress("UnusedParameter")
     public fun cleanup(handle: Long) {
-        CppBridgeModelLifecycle.unload(
-            ModelUnloadRequest(unload_all = true),
-        )
+        cleanupFn(handle)
     }
 
     public companion object {
@@ -83,64 +54,50 @@ public class ComponentVTable internal constructor(
             ComponentVTable(
                 component = SDKComponent.SDK_COMPONENT_LLM,
                 createFn = { RunAnywhereBridge.racLlmComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racLlmComponentIsLoaded(handle) },
                 destroyFn = { handle -> RunAnywhereBridge.racLlmComponentDestroy(handle) },
-                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+                cleanupFn = { handle -> RunAnywhereBridge.racLlmComponentCleanup(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racLlmComponentLoadModel(handle, path, id, name) },
             )
 
         public val stt: ComponentVTable =
             ComponentVTable(
                 component = SDKComponent.SDK_COMPONENT_STT,
                 createFn = { RunAnywhereBridge.racSttComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racSttComponentIsLoaded(handle) },
                 destroyFn = { handle -> RunAnywhereBridge.racSttComponentDestroy(handle) },
-                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+                cleanupFn = { handle -> RunAnywhereBridge.racSttComponentCleanup(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racSttComponentLoadModel(handle, path, id, name) },
             )
 
         public val tts: ComponentVTable =
             ComponentVTable(
                 component = SDKComponent.SDK_COMPONENT_TTS,
                 createFn = { RunAnywhereBridge.racTtsComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racTtsComponentIsLoaded(handle) },
                 destroyFn = { handle -> RunAnywhereBridge.racTtsComponentDestroy(handle) },
-                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+                cleanupFn = { handle -> RunAnywhereBridge.racTtsComponentCleanup(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racTtsComponentLoadVoice(handle, path, id, name) },
             )
 
         public val vad: ComponentVTable =
             ComponentVTable(
                 component = SDKComponent.SDK_COMPONENT_VAD,
                 createFn = { RunAnywhereBridge.racVadComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racVadComponentIsLoaded(handle) },
                 destroyFn = { handle -> RunAnywhereBridge.racVadComponentDestroy(handle) },
-                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+                cleanupFn = { handle -> RunAnywhereBridge.racVadComponentCleanup(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racVadComponentLoadModel(handle, path, id, name) },
             )
 
         public val vlm: ComponentVTable =
             ComponentVTable(
                 component = SDKComponent.SDK_COMPONENT_VLM,
-                // VLM in the Kotlin SDK never owns a bare component handle
-                // (load+create are fused at the proto service layer).
-                // The slot is kept for shape uniformity but is dead in practice.
-                createFn = { 0L },
-                destroyFn = { handle -> RunAnywhereBridge.racVlmDestroy(handle) },
-                // Slot kept for shape uniformity.
-                loadModel = { _, _, id, _ -> loadViaLifecycle(id) },
+                createFn = { RunAnywhereBridge.racVlmComponentCreate() },
+                isLoadedFn = { handle -> RunAnywhereBridge.racVlmComponentIsLoaded(handle) },
+                destroyFn = { handle -> RunAnywhereBridge.racVlmComponentDestroy(handle) },
+                cleanupFn = { handle -> RunAnywhereBridge.racVlmComponentCleanup(handle) },
+                loadModel = { handle, path, id, name -> RunAnywhereBridge.racVlmComponentLoadModel(handle, path, id, name) },
             )
-
-        /**
-         * Shared helper that funnels every modality's `loadModel` slot
-         * through the canonical `rac_model_lifecycle_load_proto`. The
-         * registry resolves path/framework/category from the
-         * `model_id`, so callers only need to supply the id here.
-         * Returns RAC_SUCCESS on success or RAC_ERROR_MODEL_LOAD_FAILED
-         * otherwise.
-         */
-        private fun loadViaLifecycle(modelId: String): Int {
-            val result =
-                CppBridgeModelLifecycle.load(
-                    ModelLoadRequest(model_id = modelId),
-                ) ?: return RunAnywhereBridge.RAC_ERROR_MODEL_LOAD_FAILED
-            return if (result.success) {
-                RunAnywhereBridge.RAC_SUCCESS
-            } else {
-                RunAnywhereBridge.RAC_ERROR_MODEL_LOAD_FAILED
-            }
-        }
     }
 }

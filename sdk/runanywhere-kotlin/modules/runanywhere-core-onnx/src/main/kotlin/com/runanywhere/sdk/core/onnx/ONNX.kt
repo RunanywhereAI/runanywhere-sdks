@@ -2,6 +2,8 @@ package com.runanywhere.sdk.core.onnx
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * ONNX Runtime module for embedding services.
@@ -52,6 +54,11 @@ object ONNX {
     @Volatile
     private var isRegistered = false
 
+    @Volatile
+    private var isSherpaRegistered = false
+    private val registrationMutex = Mutex()
+    private val registrationLock = Any()
+
     // MARK: - Registration
 
     /**
@@ -62,18 +69,30 @@ object ONNX {
      * await module bootstrap from a coroutine scope.
      */
     suspend fun register() {
-        registerInternal()
+        registrationMutex.withLock {
+            registerInternal()
+        }
     }
 
     /**
      * Unregister the ONNX backend from C++ registry.
      */
     suspend fun unregister() {
-        if (!isRegistered) return
+        registrationMutex.withLock {
+            if (!isRegistered) return
 
-        unregisterNative()
-        isRegistered = false
-        logger.info("ONNX backend unregistered")
+            if (isSherpaRegistered) {
+                unregisterSherpaNative()
+                isSherpaRegistered = false
+                logger.info("Sherpa backend unregistered")
+            }
+
+            if (isRegistered) {
+                unregisterNative()
+                isRegistered = false
+                logger.info("ONNX backend unregistered")
+            }
+        }
     }
 
     private fun registerInternal() {
@@ -97,6 +116,10 @@ object ONNX {
         logger.info("ONNX backend registered successfully (embeddings)")
     }
 
+    internal fun markSherpaRegistered() {
+        isSherpaRegistered = true
+    }
+
     // `canHandleSTT` / `canHandleTTS` / `canHandleVAD` deleted per
     // gaps/kotlin.md — mirrors SWIFT-DUP-CANHANDLE. The C++ plugin router
     // (`rac_router_*` / `rac_plugin_route`) is the only routing authority;
@@ -109,7 +132,9 @@ object ONNX {
      * Access this property to trigger C++ backend registration.
      */
     val autoRegister: Unit by lazy {
-        registerInternal()
+        synchronized(registrationLock) {
+            registerInternal()
+        }
     }
 }
 
@@ -139,6 +164,13 @@ internal fun ONNX.registerNative(): Int {
     logger.debug("Calling native ONNX register")
     val result = ONNXBridge.nativeRegister()
     logger.debug("Native ONNX register returned: $result")
+    val sherpaResult = ONNXBridge.nativeRegisterSherpa()
+    if (sherpaResult == 0 || sherpaResult == -4) {
+        ONNX.markSherpaRegistered()
+        logger.info("Sherpa backend registered successfully")
+    } else {
+        logger.warning("Sherpa registration returned code: $sherpaResult")
+    }
     return result
 }
 
@@ -149,5 +181,12 @@ internal fun ONNX.unregisterNative(): Int {
     logger.debug("Calling native ONNX unregister")
     val result = ONNXBridge.nativeUnregister()
     logger.debug("Native ONNX unregister returned: $result")
+    return result
+}
+
+internal fun ONNX.unregisterSherpaNative(): Int {
+    logger.debug("Calling native Sherpa unregister")
+    val result = ONNXBridge.nativeUnregisterSherpa()
+    logger.debug("Native Sherpa unregister returned: $result")
     return result
 }

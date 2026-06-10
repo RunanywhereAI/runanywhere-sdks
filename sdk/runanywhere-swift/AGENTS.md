@@ -94,7 +94,7 @@ Async Swift bridged to synchronous C ABI via `DispatchSemaphore` or `DispatchGro
 
 ### Backend Module Pattern
 
-Each runtime backend (`LlamaCPPRuntime`, `ONNXRuntime`) is a thin `public enum` exposing static `register(priority:)` / `unregister()` / `autoRegister` whose primary job is calling a single `rac_backend_*_register()` C function. Registration is guarded by a static `isRegistered` bool.
+Each runtime backend (`LlamaCPPRuntime`, `ONNXRuntime`) is a thin `public enum` exposing static `register(priority:)` / `unregister()` / `autoRegister` whose primary job is calling the relevant `rac_backend_*_register()` C function. Registration state is main-actor isolated so register/unregister cannot race; ONNX also explicitly registers/unregisters the Sherpa engine plugin for STT/TTS/VAD parity.
 
 | Module | Capabilities | Framework |
 |--------|-------------|-----------|

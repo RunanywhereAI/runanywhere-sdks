@@ -17,8 +17,12 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelGetRequest
 import ai.runanywhere.proto.v1.ModelGetResult
+import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ModelListResult
@@ -27,6 +31,7 @@ import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.make
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 // MARK: - Registry Discovery (Swift parity)
@@ -45,12 +50,52 @@ internal fun registerModelInternal(modelInfo: RAModelInfo) {
     }
 }
 
+// MARK: - Public Registration API
+
+suspend fun RunAnywhere.registerModel(modelInfo: RAModelInfo): RAModelInfo {
+    if (!isInitialized) {
+        throw IllegalStateException("SDK not initialized")
+    }
+    ensureServicesReady()
+    registerModelInternal(modelInfo)
+    return modelInfo
+}
+
+suspend fun RunAnywhere.registerModel(
+    id: String? = null,
+    name: String,
+    url: String,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
+): RAModelInfo {
+    val model =
+        ModelInfo
+            .make(
+                id = id ?: generatedModelId(url, name),
+                name = name,
+                category = modality,
+                format = ModelFormat.MODEL_FORMAT_UNSPECIFIED,
+                framework = framework,
+                downloadURL = url,
+                downloadSizeBytes = memoryRequirement,
+                supportsThinking = supportsThinking,
+            ).copy(
+                memory_required_bytes = memoryRequirement ?: 0L,
+                supports_lora = supportsLora,
+            )
+    return registerModel(model)
+}
+
 // MARK: - Swift-Parity Discovery API
 
-suspend fun RunAnywhere.listModels(request: ModelListRequest): ModelListResult {
+suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest()): ModelListResult {
     if (!isInitialized) {
         return ModelListResult(success = false, error_message = "SDK not initialized")
     }
+    ensureServicesReady()
     val infoList =
         if (request.query != null) {
             CppBridgeModelRegistry.query(request.query)
@@ -67,6 +112,7 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     if (!isInitialized) {
         return ModelGetResult(found = false, error_message = "SDK not initialized")
     }
+    ensureServicesReady()
     if (request.model_id.isEmpty()) {
         return ModelGetResult(found = false, error_message = "model_id is required")
     }
@@ -105,3 +151,14 @@ suspend fun RunAnywhere.refreshModelRegistry(
 
 private fun modelListResult(list: ModelInfoList): ModelListResult =
     ModelListResult(success = true, models = list)
+
+private fun generatedModelId(url: String, name: String): String {
+    val source = url.substringAfterLast('/').substringBeforeLast('.').ifBlank { name }
+    return source
+        .lowercase()
+        .map { if (it.isLetterOrDigit()) it else '-' }
+        .joinToString("")
+        .trim('-')
+        .replace(Regex("-+"), "-")
+        .ifBlank { "model-${System.currentTimeMillis()}" }
+}

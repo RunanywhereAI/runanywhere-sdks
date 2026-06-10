@@ -94,4 +94,20 @@ RAC_DEFINE_ENGINE_JNI_BRIDGE(com_runanywhere_sdk_core_onnx_ONNXBridge, rac_backe
                              rac_backend_onnx_jni_after_register, RAC_PRIMITIVE_EMBED, "onnx",
                              RAC_ONNX_JNI_VERSION_STR)
 
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegisterSherpa(JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(
+        rac_engine_register_sibling("librac_backend_sherpa.so", "rac_backend_sherpa_register"));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeUnregisterSherpa(JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(
+        rac_engine_register_sibling("librac_backend_sherpa.so", "rac_backend_sherpa_unregister"));
+}
+
 }  // extern "C"

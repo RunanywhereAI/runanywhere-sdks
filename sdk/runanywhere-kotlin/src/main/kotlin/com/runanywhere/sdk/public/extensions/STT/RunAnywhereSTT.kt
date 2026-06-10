@@ -13,7 +13,6 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.STTStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -23,9 +22,7 @@ import com.runanywhere.sdk.public.types.RASTTOutput
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 
 /**
  * Proto-aliased partial-result envelope mirroring Swift's
@@ -93,49 +90,26 @@ fun RunAnywhere.transcribeStream(
 
         val streamJob =
             launch {
+                var sawFinal = false
                 try {
-                    // Accumulate all chunks before invoking the bridge — mirrors
-                    // Swift's `var accumulated = Data()` pattern. Single bridge
-                    // call produces contiguous audio, preserving native decoder
-                    // state and matching Swift's canonical contract.
-                    val buffer = ByteArrayOutputStream()
-                    audio.collect { chunk -> buffer.write(chunk) }
-
-                    CppBridgeSTT.transcribeStream(buffer.toByteArray(), options) { event ->
-                        when (event.kind) {
-                            STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL -> {
-                                val partial = event.partial
-                                if (partial != null) {
-                                    trySend(partial).isSuccess
-                                } else {
-                                    true
-                                }
-                            }
-                            STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL -> {
-                                val basis = event.partial ?: RASTTPartialResult()
-                                trySend(
-                                    basis.copy(
-                                        is_final = true,
-                                        final_output = event.final_output ?: basis.final_output,
-                                    ),
-                                ).isSuccess
-                            }
-                            STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR -> {
-                                val message = event.error_message ?: "STT stream error"
-                                trySend(
-                                    RASTTPartialResult(
-                                        text = "STT stream failed: $message",
-                                        is_final = true,
-                                    ),
-                                ).isSuccess
-                            }
-                            else -> true // STARTED / ENDPOINT / UNSPECIFIED — no partial-result envelope to emit.
+                    CppBridgeSTT.transcribeSessionStream(audio, options, current) { partial ->
+                        if (partial.is_final) {
+                            sawFinal = true
                         }
+                        trySend(partial).isSuccess
                     }
-                    trySend(RASTTPartialResult(is_final = true))
+                    if (!sawFinal) {
+                        trySend(RASTTPartialResult(is_final = true))
+                    }
                     close()
                 } catch (e: Throwable) {
-                    close(e)
+                    trySend(
+                        RASTTPartialResult(
+                            text = "STT stream failed: ${e.message ?: e::class.simpleName.orEmpty()}",
+                            is_final = true,
+                        ),
+                    )
+                    close()
                 }
             }
         awaitClose {

@@ -136,7 +136,7 @@
                 "ANDROID_PLATFORM": "android-24",
                 "ANDROID_STL": "c++_shared",
                 "RAC_BUILD_JNI": "ON",
-                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_PLATFORM": "ON",
                 "RAC_BUILD_BACKENDS": "ON",
                 "RAC_BUILD_SHARED": "ON"
             }

@@ -204,12 +204,21 @@ object CppBridgeModelPaths {
                 cAbiCode = result,
             )
         }
+        synchronized(lock) {
+            baseDirectory = baseDir
+        }
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
             "Base directory set to: $baseDir",
         )
     }
+
+    /**
+     * Read back the base directory configured in commons. Mirrors Swift
+     * `CppBridge.ModelPaths.baseDirectory`.
+     */
+    fun configuredBaseDirectory(): String? = RunAnywhereBridge.racModelPathsGetBaseDir()
 
     /**
      * Get the canonical models directory (`{base_dir}/RunAnywhere/Models/`).
@@ -334,8 +343,7 @@ object CppBridgeModelPaths {
         val provider = pathProvider
         val basePath =
             if (provider != null) {
-                val filesDir = provider.getFilesDirectory()
-                File(filesDir, "runanywhere").absolutePath
+                provider.getFilesDirectory()
             } else {
                 val userHome = System.getProperty("user.home")
                 if (userHome != null) {

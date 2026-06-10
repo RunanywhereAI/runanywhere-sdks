@@ -72,13 +72,14 @@ Mirrors the iOS Swift SDK pattern:
 
 **Phase 1** — `RunAnywhere.initialize(apiKey, environment)` — synchronous, ~1-5ms:
 - Loads native library via `System.loadLibrary("runanywhere_jni")`
-- Registers platform adapter, auth, OkHttp transport, telemetry, file manager callbacks
+- Registers platform adapter, OkHttp transport, C++ logging, telemetry/events, and device callbacks in `CppBridge.initialize`
+- Runs SDK phase-1 state validation, auth storage setup, file manager registration, and model-path base setup from `RunAnywhere.performCoreInit`
 - Protected by `synchronized(lock)`
 
 **Phase 2** — `RunAnywhere.completeServicesInitialization()` — suspend, makes network calls:
 - Authenticates with backend (prod/staging only)
 - Fetches model assignments
-- Registers platform services, flushes telemetry, triggers device registration
+- Registers platform services, including Android System TTS callbacks, flushes telemetry, triggers device registration
 - Protected by coroutine `Mutex`, auto-called by `ensureServicesReady()` on first feature use
 
 ### JNI Bridge Architecture
@@ -103,7 +104,7 @@ The entry point is `RunAnywhere` (a Kotlin `object` singleton in `src/main/kotli
 
 | File | Capability |
 |------|-----------|
-| `LLM/RunAnywhereTextGeneration.kt` | `generate(prompt, RALLMGenerationOptions?) → RALLMGenerationResult`, `generateStream(...) → Flow<RALLMStreamEvent>`, `cancelGeneration()` |
+| `LLM/RunAnywhereTextGeneration.kt` | `generate(prompt, RALLMGenerationOptions?) → RALLMGenerationResult`, `generateStream(...) → Flow<RALLMStreamEvent>`, `suspend cancelGeneration()` |
 | `STT/RunAnywhereSTT.kt` | `transcribe(audio, RASTTOptions)`, `transcribeStream(Flow<ByteArray>, RASTTOptions?) → Flow<RASTTPartialResult>` |
 | `TTS/RunAnywhereTTS.kt` | `synthesize(text, RATTSOptions)`, `speak()`, `synthesizeStream() → Flow<RATTSOutput>`, `stopSpeaking()`, `stopSynthesis()` |
 | `VAD/RunAnywhereVAD.kt` | `detectVoiceActivity()`, `streamVAD(Flow<ByteArray>, RAVADOptions?)`, `resetVAD()` |

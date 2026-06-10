@@ -42,8 +42,12 @@ internal fun initializePlatformBridge(environment: SDKEnvironment, apiKey: Strin
         CppBridgeTelemetry.setBaseUrl(baseURL)
         logger.debug("Telemetry base URL configured: $baseURL")
     }
+    if (!apiKey.isNullOrEmpty()) {
+        CppBridgeTelemetry.setApiKey(apiKey)
+        logger.debug("Telemetry API key configured")
+    }
 
-    CppBridge.initialize(resolvedEnvironment, apiKey, baseURL)
+    CppBridge.initialize(resolvedEnvironment)
 
     // Wire the public EventBus to the canonical native SDKEvent stream
     // so consumers see lifecycle/error/model events emitted by C++.

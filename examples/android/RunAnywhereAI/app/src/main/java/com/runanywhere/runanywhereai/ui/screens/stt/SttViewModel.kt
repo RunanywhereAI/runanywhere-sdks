@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.HybridCascade
 import com.runanywhere.sdk.hybrid.HybridFilter
@@ -68,9 +69,8 @@ class SttViewModel : ViewModel() {
         private set
 
     // Registry id of the cloud backend used for the online side of the hybrid
-    // router. Defaults to the built-in Sarvam entry; can be pointed at any
-    // developer-registered provider (see CloudProviderRepository).
-    var onlineProviderId by mutableStateOf(ONLINE_MODEL_ID)
+    // router. Providers are configured by the user in Cloud Providers.
+    var onlineProviderId by mutableStateOf(CloudProviderRepository.defaultProviderId)
         private set
 
     fun selectOnlineProvider(id: String) {
@@ -93,6 +93,7 @@ class SttViewModel : ViewModel() {
 
     private var router: HybridSTTRouter? = null
     private var routerOfflineId: String? = null
+    private var routerOnlineId: String? = null
 
     fun selectMode(value: SttMode) {
         if (!isRecording && !isTranscribing) mode = value
@@ -122,6 +123,7 @@ class SttViewModel : ViewModel() {
         val current = router
         router = null
         routerOfflineId = null
+        routerOnlineId = null
         if (current != null) viewModelScope.launch(Dispatchers.IO) { runCatching { current.close() } }
     }
 
@@ -218,11 +220,16 @@ class SttViewModel : ViewModel() {
             error = "Select a model first."
             return
         }
+        val onlineId = resolveOnlineProviderId()
+        if (onlineId.isNullOrBlank()) {
+            error = "Add a cloud provider before using hybrid transcription."
+            return
+        }
         try {
             val wav = pcmToWav(audio, AudioRecorder.SAMPLE_RATE)
             val started = System.currentTimeMillis()
             val result = withContext(Dispatchers.IO) {
-                ensureRouter(offlineId).transcribe(
+                ensureRouter(offlineId, onlineId).transcribe(
                     wav,
                     HybridTranscribeOptions(sample_rate = AudioRecorder.SAMPLE_RATE, audio_format = WAV_FORMAT),
                 )
@@ -252,8 +259,18 @@ class SttViewModel : ViewModel() {
         }
     }
 
-    private fun ensureRouter(offlineId: String): HybridSTTRouter {
-        router?.let { if (routerOfflineId == offlineId) return it else it.close() }
+    private fun resolveOnlineProviderId(): String? {
+        val selected = onlineProviderId?.takeIf { id -> CloudProviderRepository.providers.any { it.id == id } }
+        val resolved = selected ?: CloudProviderRepository.defaultProviderId
+        if (resolved != onlineProviderId) {
+            onlineProviderId = resolved
+            invalidateRouter()
+        }
+        return resolved
+    }
+
+    private fun ensureRouter(offlineId: String, onlineId: String): HybridSTTRouter {
+        router?.let { if (routerOfflineId == offlineId && routerOnlineId == onlineId) return it else it.close() }
         val created = HybridSTTRouter()
         val filters = buildList {
             if (requireNetwork) add(HybridFilter.Network)
@@ -262,7 +279,7 @@ class SttViewModel : ViewModel() {
         try {
             created.setPair(
                 offline = HybridModel.offlineSherpa(offlineId),
-                online = HybridModel.onlineCloud(onlineProviderId),
+                online = HybridModel.onlineCloud(onlineId),
                 policy = HybridRoutingPolicy(
                     hardFilters = filters,
                     cascade = HybridCascade.Confidence(confidenceThreshold),
@@ -279,6 +296,7 @@ class SttViewModel : ViewModel() {
         }
         router = created
         routerOfflineId = offlineId
+        routerOnlineId = onlineId
         return created
     }
 
@@ -325,7 +343,6 @@ class SttViewModel : ViewModel() {
     private companion object {
         const val MIN_BYTES = 16000
         const val WAV_FORMAT = 1
-        const val ONLINE_MODEL_ID = "saaras"
     }
 }
 

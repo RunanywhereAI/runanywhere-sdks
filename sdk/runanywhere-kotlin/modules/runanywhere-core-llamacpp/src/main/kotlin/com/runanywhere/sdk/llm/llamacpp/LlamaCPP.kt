@@ -2,6 +2,8 @@ package com.runanywhere.sdk.llm.llamacpp
 
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * LlamaCPP module for LLM text generation.
@@ -56,6 +58,8 @@ object LlamaCPP {
 
     @Volatile
     private var isRegistered = false
+    private val registrationMutex = Mutex()
+    private val registrationLock = Any()
 
     // MARK: - Registration
 
@@ -68,18 +72,22 @@ object LlamaCPP {
      * Suspend so that callers can await module bootstrap from a coroutine scope.
      */
     suspend fun register() {
-        registerInternal()
+        registrationMutex.withLock {
+            registerInternal()
+        }
     }
 
     /**
      * Unregister the LlamaCPP backend from C++ registry.
      */
     suspend fun unregister() {
-        if (!isRegistered) return
+        registrationMutex.withLock {
+            if (!isRegistered) return
 
-        unregisterNative()
-        isRegistered = false
-        logger.info("LlamaCPP backend unregistered")
+            unregisterNative()
+            isRegistered = false
+            logger.info("LlamaCPP backend unregistered")
+        }
     }
 
     private fun registerInternal() {
@@ -115,7 +123,9 @@ object LlamaCPP {
      * Access this property to trigger C++ backend registration.
      */
     val autoRegister: Unit by lazy {
-        registerInternal()
+        synchronized(registrationLock) {
+            registerInternal()
+        }
     }
 }
 

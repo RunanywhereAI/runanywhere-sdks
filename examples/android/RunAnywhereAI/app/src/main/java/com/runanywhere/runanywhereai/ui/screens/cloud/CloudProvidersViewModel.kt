@@ -32,7 +32,6 @@ class CloudProvidersViewModel : ViewModel() {
     fun delete(id: String) = CloudProviderRepository.remove(id)
 
     // Stable per-provider id, also used as the SDK provider name + registry id.
-    // Never "sarvam"/"saaras" so a custom provider can't collide with the built-in.
     private fun newId(label: String, preset: CloudPreset): String {
         val slug = label.lowercase().filter { it.isLetterOrDigit() }
             .take(12).ifBlank { preset.name.lowercase() }

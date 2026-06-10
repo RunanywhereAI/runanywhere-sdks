@@ -45,18 +45,18 @@ internal object LoggingConfigurationPresets {
             min_log_level = LogLevel.LOG_LEVEL_INFO,
             include_source_location = true,
             enable_remote_logging = false,
-            enable_sentry_logging = true,
+            enable_sentry_logging = false,
             include_device_metadata = true,
         )
 
-    /** Production: warning+ only, Sentry enabled for error tracking. */
+    /** Production: warning+ only; Sentry opt-in is controlled separately. */
     val production =
         LoggingConfiguration(
             enable_local_logging = false,
             min_log_level = LogLevel.LOG_LEVEL_WARNING,
             include_source_location = false,
             enable_remote_logging = false,
-            enable_sentry_logging = true,
+            enable_sentry_logging = false,
             include_device_metadata = true,
         )
 

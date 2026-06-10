@@ -65,6 +65,18 @@ object CppBridgeEnvironment {
             else -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
         }
 
+    fun isProduction(env: SDKEnvironment): Boolean =
+        RunAnywhereBridge.racEnvIsProduction(toC(env))
+
+    fun isTesting(env: SDKEnvironment): Boolean =
+        RunAnywhereBridge.racEnvIsTesting(toC(env))
+
+    fun shouldSendTelemetry(env: SDKEnvironment): Boolean =
+        RunAnywhereBridge.racEnvShouldSendTelemetry(toC(env))
+
+    fun shouldSyncWithBackend(env: SDKEnvironment): Boolean =
+        RunAnywhereBridge.racEnvShouldSyncWithBackend(toC(env))
+
     /**
      * Whether [env] requires authentication. Mirrors Swift's
      * `CppBridge.Environment.requiresAuth(_:)` — delegates to

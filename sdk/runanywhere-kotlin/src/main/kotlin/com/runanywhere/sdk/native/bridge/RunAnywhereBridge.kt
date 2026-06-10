@@ -109,7 +109,7 @@ object RunAnywhereBridge {
     // LOGGING (rac_logger.h)
 
     @JvmStatic
-    external fun racConfigureLogging(level: Int, logFilePath: String?): Int
+    external fun racConfigureLogging(environment: Int): Int
 
     @JvmStatic
     external fun racLog(level: Int, tag: String, message: String)
@@ -150,6 +150,9 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racModelPathsSetBaseDir(baseDir: String): Int
 
+    @JvmStatic
+    external fun racModelPathsGetBaseDir(): String?
+
     /**
      * Get the model folder path under the canonical schema:
      * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/`
@@ -165,6 +168,15 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racLlmComponentCreate(): Long
+
+    @JvmStatic
+    external fun racLlmComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racLlmComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racLlmComponentCleanup(handle: Long): Int
 
     @JvmStatic
     external fun racLlmComponentDestroy(handle: Long)
@@ -198,6 +210,15 @@ object RunAnywhereBridge {
     external fun racSttComponentCreate(): Long
 
     @JvmStatic
+    external fun racSttComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racSttComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racSttComponentCleanup(handle: Long): Int
+
+    @JvmStatic
     external fun racSttComponentDestroy(handle: Long)
 
     @JvmStatic
@@ -219,10 +240,48 @@ object RunAnywhereBridge {
         listener: NativeProtoProgressListener?,
     ): Int
 
+    @JvmStatic
+    external fun racSttSetStreamProtoCallback(
+        handle: Long,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
+    @JvmStatic
+    external fun racSttUnsetStreamProtoCallback(handle: Long): Int
+
+    @JvmStatic
+    external fun racSttProtoQuiesce()
+
+    /**
+     * Start a lifecycle-owned STT stream session.
+     *
+     * @return positive session id on success; negative RAC error code on failure.
+     */
+    @JvmStatic
+    external fun racSttStreamStartProto(handle: Long, optionsProto: ByteArray): Long
+
+    @JvmStatic
+    external fun racSttStreamFeedAudioProto(sessionId: Long, audioData: ByteArray): Int
+
+    @JvmStatic
+    external fun racSttStreamStopProto(sessionId: Long): Int
+
+    @JvmStatic
+    external fun racSttStreamCancelProto(sessionId: Long): Int
+
     // TTS COMPONENT (rac_tts_component.h)
 
     @JvmStatic
     external fun racTtsComponentCreate(): Long
+
+    @JvmStatic
+    external fun racTtsComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racTtsComponentLoadVoice(handle: Long, voicePath: String, voiceId: String, voiceName: String): Int
+
+    @JvmStatic
+    external fun racTtsComponentCleanup(handle: Long): Int
 
     @JvmStatic
     external fun racTtsComponentDestroy(handle: Long)
@@ -265,6 +324,12 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racVadComponentCreate(): Long
+
+    @JvmStatic
+    external fun racVadComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racVadComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
 
     @JvmStatic
     external fun racVadComponentDestroy(handle: Long)
@@ -323,6 +388,21 @@ object RunAnywhereBridge {
     // VLM GENERATED-PROTO SERVICE ABI (rac_vlm_service.h)
 
     @JvmStatic
+    external fun racVlmComponentCreate(): Long
+
+    @JvmStatic
+    external fun racVlmComponentIsLoaded(handle: Long): Boolean
+
+    @JvmStatic
+    external fun racVlmComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String): Int
+
+    @JvmStatic
+    external fun racVlmComponentCleanup(handle: Long): Int
+
+    @JvmStatic
+    external fun racVlmComponentDestroy(handle: Long)
+
+    @JvmStatic
     external fun racVlmComponentLoadResolvedArtifactsProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic
@@ -371,6 +451,12 @@ object RunAnywhereBridge {
     //
     // This mirrors the Swift SDK architecture where each backend has its own
     // XCFramework (RABackendLlamaCPP, RABackendONNX) with separate registration.
+
+    @JvmStatic
+    external fun racPlatformRegisterSystemTts(): Int
+
+    @JvmStatic
+    external fun racPlatformUnregister(): Int
 
     // Download + non-proto model-registry thunks removed. All of
     // `racDownloadStart` /
@@ -1502,6 +1588,9 @@ object RunAnywhereBridge {
     /** Check whether the device-registered flag is set. */
     @JvmStatic external fun racStateIsDeviceRegistered(): Boolean
 
+    /** Reset SDK state to defaults without tearing down every subsystem. */
+    @JvmStatic external fun racStateReset()
+
     /** Resolve or create the persistent device ID. Returns null on failure. */
     @JvmStatic external fun racDeviceGetOrCreatePersistentId(): String?
 
@@ -1562,6 +1651,13 @@ object RunAnywhereBridge {
 
     /** Canonical raw value string (e.g. "LlamaCpp", "ONNX"). Null on failure. */
     @JvmStatic external fun racFrameworkRawValue(frameworkProto: Int): String?
+
+    @JvmStatic external fun racModelCategoryRequiresContextLength(categoryProto: Int): Boolean
+
+    @JvmStatic external fun racModelCategorySupportsThinking(categoryProto: Int): Boolean
+
+    /** Returns proto InferenceFramework int, or UNKNOWN on failure. */
+    @JvmStatic external fun racModelCategoryDefaultFramework(categoryProto: Int): Int
 
     // ARCHIVE TYPE helpers
 
@@ -1652,6 +1748,14 @@ object RunAnywhereBridge {
     @JvmStatic external fun racFileManagerCheckStorage(required: Long): Boolean
 
     // ENVIRONMENT VALIDATION + ENDPOINTS (Swift-alignment)
+
+    @JvmStatic external fun racEnvIsProduction(env: Int): Boolean
+
+    @JvmStatic external fun racEnvIsTesting(env: Int): Boolean
+
+    @JvmStatic external fun racEnvShouldSendTelemetry(env: Int): Boolean
+
+    @JvmStatic external fun racEnvShouldSyncWithBackend(env: Int): Boolean
 
     /** Check if an environment int requires API authentication. */
     @JvmStatic external fun racEnvRequiresAuth(env: Int): Boolean

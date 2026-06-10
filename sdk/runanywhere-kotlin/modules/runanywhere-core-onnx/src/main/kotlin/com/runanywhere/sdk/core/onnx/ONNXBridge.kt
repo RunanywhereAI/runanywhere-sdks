@@ -102,6 +102,9 @@ internal object ONNXBridge {
     @JvmStatic
     external fun nativeRegister(): Int
 
+    @JvmStatic
+    external fun nativeRegisterSherpa(): Int
+
     /**
      * Unregister the ONNX backend from the C++ service registry.
      *
@@ -109,4 +112,7 @@ internal object ONNXBridge {
      */
     @JvmStatic
     external fun nativeUnregister(): Int
+
+    @JvmStatic
+    external fun nativeUnregisterSherpa(): Int
 }

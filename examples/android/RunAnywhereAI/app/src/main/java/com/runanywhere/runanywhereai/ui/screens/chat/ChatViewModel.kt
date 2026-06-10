@@ -195,7 +195,7 @@ class ChatViewModel : ViewModel() {
 
     fun stop() {
         job?.cancel()
-        RunAnywhere.cancelGeneration()
+        viewModelScope.launch { RunAnywhere.cancelGeneration() }
         isGenerating = false
     }
 

@@ -67,6 +67,7 @@ class VoiceAgentStreamAdapter internal constructor(
             streamKey = streamKey,
             register = { h, cb -> bridge.registerCallback(h, cb) },
             unregister = { h, id -> bridge.unregisterCallback(h, id) },
+            quiesce = { bridge.quiesce() },
             decodeEvent = { bytes -> VoiceEvent.ADAPTER.decode(bytes) },
             // Voice agents have no terminal event — collectors detach
             // explicitly. Mirrors Swift's VoiceAgent convenience init.
@@ -95,6 +96,9 @@ class VoiceAgentStreamAdapter internal constructor(
 
         /** Tear down the registration identified by [callbackId]. */
         fun unregisterCallback(handle: Long, callbackId: Long)
+
+        /** Wait for in-flight native callback dispatches to return. */
+        fun quiesce() {}
     }
 
     internal companion object {
@@ -165,6 +169,8 @@ class VoiceAgentStreamAdapter internal constructor(
         override fun unregisterCallback(handle: Long, callbackId: Long) =
             nativeUnregisterCallback(handle, callbackId)
 
+        override fun quiesce() = nativeQuiesce()
+
         /**
          * JNI bridge: registers a Kotlin lambda as the proto-byte
          * callback for [handle]. The thunk stores the lambda in a global
@@ -183,5 +189,8 @@ class VoiceAgentStreamAdapter internal constructor(
 
         @JvmStatic
         private external fun nativeUnregisterCallback(handle: Long, callbackId: Long)
+
+        @JvmStatic
+        private external fun nativeQuiesce()
     }
 }

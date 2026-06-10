@@ -88,6 +88,9 @@ import kotlinx.coroutines.flow.callbackFlow
  *   identified by `callbackId`. Pass a no-op id-less closure if your ABI
  *   uses a NULL-callback re-installation pattern (mirror Swift's
  *   VoiceAgent specialization).
+ * @param quiesce Optional closure that waits for in-flight native callback
+ *   dispatches to finish after [unregister] and before collector channels are
+ *   closed. Mirrors Swift's HandleStreamAdapter teardown contract.
  * @param decodeEvent Closure that parses one proto-byte payload into
  *   an [Event]. Typically `{ bytes -> Event.ADAPTER.decode(bytes) }`.
  * @param isTerminalEvent Optional predicate that classifies an event
@@ -100,6 +103,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
     private val streamKey: String,
     private val register: (Handle, (ByteArray) -> Unit) -> Long,
     private val unregister: (Handle, Long) -> Unit,
+    private val quiesce: (() -> Unit)? = null,
     private val decodeEvent: (ByteArray) -> Event,
     private val isTerminalEvent: ((Event) -> Boolean)? = null,
 ) {
@@ -116,7 +120,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
      */
     fun stream(): Flow<Event> =
         callbackFlow<Event> {
-            val fanOut = fanOutFor(streamKey, handle, register, unregister, decodeEvent, isTerminalEvent)
+            val fanOut = fanOutFor(streamKey, handle, register, unregister, quiesce, decodeEvent, isTerminalEvent)
             val channel: SendChannel<Event> = channel
             val added = fanOut.attach(channel)
             if (!added) {
@@ -169,6 +173,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
         private val storeKey: StoreKey,
         private val register: (Any, (ByteArray) -> Unit) -> Long,
         private val unregister: (Any, Long) -> Unit,
+        private val quiesce: (() -> Unit)?,
         private val decodeEvent: (ByteArray) -> Event,
         private val isTerminalEvent: ((Event) -> Boolean)?,
     ) {
@@ -299,6 +304,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             if (idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
                 unregister(handle, idToUnregister)
+                quiesce?.invoke()
             }
         }
 
@@ -325,6 +331,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             if (idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
                 unregister(handle, idToUnregister)
+                quiesce?.invoke()
             }
             for (c in snapshot) c.close()
         }
@@ -369,6 +376,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                     if (idToUnregister != INVALID_CALLBACK_ID) {
                         removeFanOut(storeKey)
                         unregister(handle, idToUnregister)
+                        quiesce?.invoke()
                     }
                     for (c in snapshot) c.close(t)
                     return
@@ -400,6 +408,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             if (isFinal && idToUnregister != INVALID_CALLBACK_ID) {
                 removeFanOut(storeKey)
                 unregister(handle, idToUnregister)
+                quiesce?.invoke()
             }
 
             for (c in snapshot) {
@@ -441,6 +450,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
             handle: H,
             register: (H, (ByteArray) -> Unit) -> Long,
             unregister: (H, Long) -> Unit,
+            quiesce: (() -> Unit)?,
             decodeEvent: (ByteArray) -> E,
             isTerminalEvent: ((E) -> Boolean)?,
         ): HandleFanOut<E> {
@@ -462,6 +472,7 @@ class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
                         storeKey = key,
                         register = register as (Any, (ByteArray) -> Unit) -> Long,
                         unregister = unregister as (Any, Long) -> Unit,
+                        quiesce = quiesce,
                         decodeEvent = decodeEvent,
                         isTerminalEvent = isTerminalEvent,
                     )

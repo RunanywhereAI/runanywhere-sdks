@@ -17,9 +17,13 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.CurrentModelResult
+import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.STTAudioSource
 import ai.runanywhere.proto.v1.STTOutput
+import ai.runanywhere.proto.v1.STTPartialResult
 import ai.runanywhere.proto.v1.STTStreamEvent
+import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.STTTranscriptionRequest
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
@@ -31,6 +35,9 @@ import com.runanywhere.sdk.public.types.RASTTOptions
 import com.runanywhere.sdk.public.types.RASTTOutput
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 
 private fun <M : Message<M, *>> decodeOrThrow(
     adapter: ProtoAdapter<M>,
@@ -190,4 +197,145 @@ object CppBridgeSTT {
             )
         checkRc(rc, "racSttTranscribeStreamLifecycleProto")
     }
+
+    /**
+     * Incremental stream-in / stream-out transcription.
+     *
+     * Mirrors Swift's `transcribeSessionStream`: prepare a component handle
+     * for the lifecycle-loaded model, register one proto callback, start a
+     * session, feed each incoming audio chunk as it arrives, then stop or
+     * cancel the session depending on collection outcome.
+     */
+    suspend fun transcribeSessionStream(
+        audio: Flow<ByteArray>,
+        options: RASTTOptions,
+        loadedModel: CurrentModelResult,
+        onPartial: (STTPartialResult) -> Boolean,
+    ) {
+        val handle = prepareStreamingHandle(loadedModel)
+        var sessionId = 0L
+        var shouldCancel = false
+
+        val listener =
+            NativeProtoProgressListener { bytes ->
+                val partial = partialFromEvent(STTStreamEvent.ADAPTER.decode(bytes))
+                partial?.let(onPartial) ?: true
+            }
+
+        checkRc(
+            RunAnywhereBridge.racSttSetStreamProtoCallback(handle, listener),
+            "racSttSetStreamProtoCallback",
+        )
+
+        try {
+            val started = RunAnywhereBridge.racSttStreamStartProto(handle, RASTTOptions.ADAPTER.encode(options))
+            if (started <= 0L) {
+                throw SDKException.operation("racSttStreamStartProto failed with rc=$started")
+            }
+            sessionId = started
+
+            audio.collect { chunk ->
+                if (chunk.isEmpty()) return@collect
+                val feedRc = RunAnywhereBridge.racSttStreamFeedAudioProto(sessionId, chunk)
+                if (feedRc != RunAnywhereBridge.RAC_SUCCESS) {
+                    onPartial(errorPartial("STT stream feed failed: $feedRc", feedRc))
+                    shouldCancel = true
+                    throw SDKException.operation("racSttStreamFeedAudioProto failed with rc=$feedRc")
+                }
+            }
+
+            val stopRc = RunAnywhereBridge.racSttStreamStopProto(sessionId)
+            if (stopRc != RunAnywhereBridge.RAC_SUCCESS) {
+                onPartial(errorPartial("STT stream stop failed: $stopRc", stopRc))
+            }
+        } catch (e: CancellationException) {
+            shouldCancel = true
+            throw e
+        } catch (e: Throwable) {
+            shouldCancel = true
+            throw e
+        } finally {
+            if (shouldCancel && sessionId > 0L) {
+                RunAnywhereBridge.racSttStreamCancelProto(sessionId)
+            }
+            RunAnywhereBridge.racSttUnsetStreamProtoCallback(handle)
+            RunAnywhereBridge.racSttProtoQuiesce()
+        }
+    }
+
+    private suspend fun prepareStreamingHandle(snapshot: CurrentModelResult): Long {
+        if (!snapshot.found) {
+            throw SDKException.modelNotLoaded()
+        }
+
+        val model = snapshot.model
+        val modelId = snapshot.model_id.ifEmpty { model?.id.orEmpty() }
+        val modelName = model?.name?.ifEmpty { modelId } ?: modelId
+        val modelPath = snapshot.resolved_path.ifEmpty { model?.local_path.orEmpty() }
+        if (modelId.isEmpty() || modelPath.isEmpty()) {
+            throw SDKException.modelLoadFailed(
+                modelId = modelId,
+                reason = "Loaded STT model is missing a resolved path",
+            )
+        }
+
+        if (currentModelId == modelId) {
+            return getHandle()
+        }
+
+        loadModel(
+            modelPath = modelPath,
+            modelId = modelId,
+            modelName = modelName,
+            framework = snapshot.framework.toCFramework(),
+        )
+        return getHandle()
+    }
+
+    private fun partialFromEvent(event: STTStreamEvent): STTPartialResult? =
+        when (event.kind) {
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL,
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT,
+            -> event.partial
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL -> {
+                val basis = event.partial ?: STTPartialResult()
+                basis.copy(
+                    is_final = true,
+                    final_output = event.final_output ?: basis.final_output,
+                    text = basis.text.ifEmpty { event.final_output?.text.orEmpty() },
+                )
+            }
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR ->
+                errorPartial(
+                    event.error_message ?: "STT stream failed",
+                    event.error_code,
+                )
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
+            STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED,
+            -> null
+        }
+
+    private fun errorPartial(message: String, code: Int): STTPartialResult =
+        STTPartialResult(
+            text = message,
+            is_final = true,
+            final_output = STTOutput(text = message, error_message = message, error_code = code),
+        )
+
+    private fun InferenceFramework.toCFramework(): Int =
+        when (this) {
+            InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> CppBridgeModelRegistry.Framework.ONNX
+            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
+            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
+            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
+            InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
+            InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
+            InferenceFramework.INFERENCE_FRAMEWORK_NONE -> CppBridgeModelRegistry.Framework.NONE
+            InferenceFramework.INFERENCE_FRAMEWORK_MLX -> CppBridgeModelRegistry.Framework.MLX
+            InferenceFramework.INFERENCE_FRAMEWORK_COREML -> CppBridgeModelRegistry.Framework.COREML
+            InferenceFramework.INFERENCE_FRAMEWORK_METALRT -> CppBridgeModelRegistry.Framework.METALRT
+            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> CppBridgeModelRegistry.Framework.GENIE
+            InferenceFramework.INFERENCE_FRAMEWORK_SHERPA -> CppBridgeModelRegistry.Framework.SHERPA
+            else -> CppBridgeModelRegistry.Framework.UNKNOWN
+        }
 }

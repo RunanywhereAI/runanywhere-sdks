@@ -1,12 +1,11 @@
 # RunAnywhere Kotlin SDK
 
-**Privacy-first, on-device AI for Android & JVM**. Run LLMs, speech-to-text, text-to-speech, and voice agents locally with cloud fallback, OTA updates, and production observability.
+**Privacy-first, on-device AI for Android**. Run LLMs, speech-to-text, text-to-speech, and voice agents locally with cloud fallback, OTA updates, and production observability.
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.runanywhere.sdk/runanywhere-kotlin?label=Maven%20Central)](https://search.maven.org/artifact/com.runanywhere.sdk/runanywhere-kotlin)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Platform: Android 7.0+](https://img.shields.io/badge/Platform-Android%207.0%2B-green)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.0%2B-blue?logo=kotlin)](https://kotlinlang.org)
-[![KMP](https://img.shields.io/badge/Kotlin%20Multiplatform-Supported-purple)](https://kotlinlang.org/docs/multiplatform.html)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1%2B-blue?logo=kotlin)](https://kotlinlang.org)
 
 ---
 
@@ -31,21 +30,23 @@
 ```kotlin
 dependencies {
     // Core SDK
-    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.1.4")
+    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.19.13")
 
     // Optional: LLM support (llama.cpp backend) - ~34MB
-    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.1.4")
+    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.19.13")
 
-    // Optional: STT/TTS/VAD support (ONNX backend) - ~25MB
-    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.1.4")
+    // Optional: STT/TTS/VAD support (Sherpa/ONNX backend) - ~25MB
+    implementation("com.runanywhere.sdk:runanywhere-core-onnx:0.19.13")
 }
 ```
+
+Android System TTS is also registered by the core SDK during service initialization through the platform backend. Use the `system-tts` built-in voice when you want Android `TextToSpeech` playback instead of an ONNX/Sherpa voice model.
 
 ### 2. Initialize SDK (Application.onCreate)
 
 ```kotlin
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
 
 class MyApplication : Application() {
     override fun onCreate() {
@@ -54,7 +55,7 @@ class MyApplication : Application() {
         // Initialize RunAnywhere (fast, ~1-5ms)
         RunAnywhere.initialize(
             apiKey = "your-api-key",    // Optional for development
-            environment = SDKEnvironment.DEVELOPMENT
+            environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
         )
     }
 }
@@ -65,13 +66,13 @@ class MyApplication : Application() {
 ```kotlin
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.*
-import com.runanywhere.sdk.public.types.RAInferenceFramework
+import ai.runanywhere.proto.v1.InferenceFramework
 
 // Register a model from HuggingFace
 val modelInfo = RunAnywhere.registerModel(
     name = "Qwen 0.5B",
     url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q8_0.gguf",
-    framework = RAInferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    framework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
 )
 
 // Download the model (observe progress)

@@ -78,6 +78,7 @@ suspend fun RunAnywhere.ragResolvedConfiguration(
     baseConfiguration: RARAGConfiguration,
 ): RARAGConfiguration {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     val embedding =
         loadRagArtifactModel(
             this,
@@ -143,6 +144,7 @@ suspend fun RunAnywhere.ragCreatePipeline(
 
 suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     ensureRagNativeLibsLoaded()
     withContext(Dispatchers.IO) {
         CppBridgeRAG.create(config)
@@ -151,13 +153,15 @@ suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
 
 suspend fun RunAnywhere.ragDestroyPipeline() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     withContext(Dispatchers.IO) {
         CppBridgeRAG.destroy()
     }
 }
 
-suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String?) {
+suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String? = null) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     val document = RAGDocument.create(text = text, metadataJSON = metadataJSON)
     withContext(Dispatchers.IO) {
         CppBridgeRAG.ingest(document)
@@ -166,6 +170,7 @@ suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String?) {
 
 suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.ingest(document)
     }
@@ -173,6 +178,7 @@ suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
 
 suspend fun RunAnywhere.ragClearDocuments() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     withContext(Dispatchers.IO) {
         CppBridgeRAG.clear()
     }
@@ -180,6 +186,7 @@ suspend fun RunAnywhere.ragClearDocuments() {
 
 suspend fun RunAnywhere.ragGetDocumentCount(): Int =
     withContext(Dispatchers.IO) {
+        ensureServicesReady()
         CppBridgeRAG.stats().indexed_chunks.toInt()
     }
 
@@ -188,6 +195,7 @@ suspend fun RunAnywhere.ragQuery(
     options: RAGQueryOptions? = null,
 ): RAGResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.query((options ?: RAGQueryOptions.defaults(question)).copy(question = question))
     }
@@ -196,20 +204,20 @@ suspend fun RunAnywhere.ragQuery(
 suspend fun RunAnywhere.ragQuery(options: RAGQueryOptions): RAGResult =
     ragQuery(options.question, options)
 
-suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>): RARAGStatistics {
+suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    if (documents.isEmpty()) return ragGetStatistics()
-    return withContext(Dispatchers.IO) {
-        var lastStats = CppBridgeRAG.stats()
+    ensureServicesReady()
+    if (documents.isEmpty()) return
+    withContext(Dispatchers.IO) {
         documents.forEach { document ->
-            lastStats = CppBridgeRAG.ingest(document)
+            CppBridgeRAG.ingest(document)
         }
-        lastStats
     }
 }
 
 suspend fun RunAnywhere.ragGetStatistics(): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.stats()
     }

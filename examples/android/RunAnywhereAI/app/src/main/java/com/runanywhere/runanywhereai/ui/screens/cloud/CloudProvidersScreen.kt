@@ -64,8 +64,6 @@ fun CloudProvidersScreen() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            BuiltInCard()
-
             vm.providers.forEach { config ->
                 ProviderCard(
                     config = config,
@@ -97,42 +95,6 @@ fun CloudProvidersScreen() {
 }
 
 private class EditTarget(val config: CloudProviderConfig?)
-
-@Composable
-private fun BuiltInCard() {
-    val dimens = LocalDimens.current
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(dimens.radiusLg),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(dimens.spacingLg),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-        ) {
-            Icon(
-                RACIcons.Outline.Cloud,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(dimens.iconMd),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Sarvam", style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    "Built-in · saaras:v3",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                "Default",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 @Composable
 private fun ProviderCard(config: CloudProviderConfig, onEdit: () -> Unit, onDelete: () -> Unit) {

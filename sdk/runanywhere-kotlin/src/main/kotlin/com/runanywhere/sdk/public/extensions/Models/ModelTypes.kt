@@ -19,11 +19,13 @@ import java.net.URI
 
 val ModelCategory.requiresContextLength: Boolean
     get() =
-        this == ModelCategory.MODEL_CATEGORY_LANGUAGE ||
-            this == ModelCategory.MODEL_CATEGORY_MULTIMODAL
+        runCatching { RunAnywhereBridge.racModelCategoryRequiresContextLength(value) }
+            .getOrElse { requiresContextLengthFallback() }
 
 val ModelCategory.supportsThinking: Boolean
-    get() = requiresContextLength
+    get() =
+        runCatching { RunAnywhereBridge.racModelCategorySupportsThinking(value) }
+            .getOrElse { requiresContextLengthFallback() }
 
 /**
  * Framework the SDK falls back to when a category has no explicit model
@@ -33,17 +35,27 @@ val ModelCategory.supportsThinking: Boolean
  */
 val ModelCategory.defaultFramework: InferenceFramework
     get() =
-        when (this) {
-            ModelCategory.MODEL_CATEGORY_LANGUAGE,
-            ModelCategory.MODEL_CATEGORY_MULTIMODAL,
-            -> InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-            ModelCategory.MODEL_CATEGORY_EMBEDDING,
-            ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-            -> InferenceFramework.INFERENCE_FRAMEWORK_ONNX
-            else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
-        }
+        runCatching {
+            InferenceFramework.fromValue(RunAnywhereBridge.racModelCategoryDefaultFramework(value))
+                ?: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+        }.getOrElse { defaultFrameworkFallback() }
+
+private fun ModelCategory.requiresContextLengthFallback(): Boolean =
+    this == ModelCategory.MODEL_CATEGORY_LANGUAGE ||
+        this == ModelCategory.MODEL_CATEGORY_MULTIMODAL
+
+private fun ModelCategory.defaultFrameworkFallback(): InferenceFramework =
+    when (this) {
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        -> InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        ModelCategory.MODEL_CATEGORY_EMBEDDING,
+        ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+        -> InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+        else -> InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+    }
 
 /**
  * Canonical wire string for a framework (e.g. "LlamaCpp", "ONNX"). Routes

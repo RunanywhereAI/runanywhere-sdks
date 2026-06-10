@@ -178,6 +178,14 @@ extern "C" const rac_llm_service_ops_t g_platform_llm_ops = {
     .cancel = platform_llm_vtable_cancel,
     .cleanup = platform_llm_vtable_cleanup,
     .destroy = platform_llm_vtable_destroy,
+    .load_lora = nullptr,
+    .remove_lora = nullptr,
+    .clear_lora = nullptr,
+    .get_lora_info = nullptr,
+    .inject_system_prompt = nullptr,
+    .append_context = nullptr,
+    .generate_from_context = nullptr,
+    .clear_context = nullptr,
     .create = platform_llm_create_impl,
 };
 
@@ -329,6 +337,7 @@ extern "C" const rac_tts_service_ops_t g_platform_tts_ops = {
     .cleanup = platform_tts_vtable_cleanup,
     .destroy = platform_tts_vtable_destroy,
     .create = platform_tts_create_impl,
+    .get_languages = nullptr,
 };
 
 namespace {
@@ -577,6 +586,7 @@ PlatformRegistryState& get_state() {
 // BUILT-IN MODEL REGISTRATION
 // =============================================================================
 
+#if defined(__APPLE__)
 void register_coreml_diffusion_entry() {
     rac_model_registry* registry = rac_get_model_registry();
     if (registry == nullptr) {
@@ -671,6 +681,7 @@ void register_foundation_models_entry() {
     free(model.local_path);
     free(model.description);
 }
+#endif  // defined(__APPLE__)
 
 void register_system_tts_entry() {
     rac_model_registry* registry = rac_get_model_registry();
@@ -733,12 +744,14 @@ rac_result_t rac_backend_platform_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // v3 Phase B7: plugin registration for the 3 platform primitives
-    // (LLM, TTS, Diffusion) via rac_plugin_entry_platform() — see
+    // v3 Phase B7: plugin registration for the platform primitives via
+    // rac_plugin_entry_platform() — see
     // sdk/runanywhere-commons/src/features/platform/rac_plugin_entry_platform.cpp.
+#if defined(__APPLE__)
     register_foundation_models_entry();
-    register_system_tts_entry();
     register_coreml_diffusion_entry();
+#endif
+    register_system_tts_entry();
 
     state.registered = true;
     RAC_LOG_INFO(LOG_CAT,

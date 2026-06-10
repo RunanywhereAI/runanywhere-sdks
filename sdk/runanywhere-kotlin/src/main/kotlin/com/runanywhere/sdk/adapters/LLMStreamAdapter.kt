@@ -70,6 +70,7 @@ class LLMStreamAdapter internal constructor(
             streamKey = streamKey,
             register = { h, cb -> bridge.registerCallback(h, cb) },
             unregister = { h, id -> bridge.unregisterCallback(h, id) },
+            quiesce = { bridge.quiesce() },
             decodeEvent = { bytes -> LLMStreamEvent.ADAPTER.decode(bytes) },
             // LLM streams terminate on is_final. Mirrors Swift's
             // LLMStreamAdapter convenience init `isTerminalEvent: { $0.isFinal }`.
@@ -99,6 +100,9 @@ class LLMStreamAdapter internal constructor(
 
         /** Tear down the registration identified by [callbackId]. */
         fun unregisterCallback(handle: Long, callbackId: Long)
+
+        /** Wait for in-flight native callback dispatches to return. */
+        fun quiesce() {}
     }
 
     internal companion object {
@@ -168,6 +172,8 @@ class LLMStreamAdapter internal constructor(
         override fun unregisterCallback(handle: Long, callbackId: Long) =
             nativeUnregisterCallback(handle, callbackId)
 
+        override fun quiesce() = nativeQuiesce()
+
         /**
          * JNI bridge: registers a Kotlin lambda as the proto-byte callback
          * for [handle]. The thunk stores the lambda in a global ref +
@@ -186,5 +192,8 @@ class LLMStreamAdapter internal constructor(
 
         @JvmStatic
         private external fun nativeUnregisterCallback(handle: Long, callbackId: Long)
+
+        @JvmStatic
+        private external fun nativeQuiesce()
     }
 }

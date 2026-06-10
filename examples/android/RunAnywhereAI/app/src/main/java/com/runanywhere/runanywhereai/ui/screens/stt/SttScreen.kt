@@ -68,12 +68,7 @@ fun SttScreen() {
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
     val busy = sttVm.isRecording || sttVm.isTranscribing
-    val onlineLabel = if (sttVm.onlineProviderId == CloudProviderRepository.BUILTIN_SARVAM_ID) {
-        "Sarvam · ${sttVm.onlineProviderId}"
-    } else {
-        CloudProviderRepository.providers.firstOrNull { it.id == sttVm.onlineProviderId }?.label
-            ?: sttVm.onlineProviderId
-    }
+    val onlineLabel = CloudProviderRepository.labelFor(sttVm.onlineProviderId) ?: "Add a cloud provider"
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -160,16 +155,13 @@ fun SttScreen() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CloudProviderPicker(
-    selectedId: String,
+    selectedId: String?,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val dimens = LocalDimens.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val options = buildList {
-        add(CloudProviderRepository.BUILTIN_SARVAM_ID to "Sarvam · ${CloudProviderRepository.BUILTIN_SARVAM_ID}")
-        CloudProviderRepository.providers.forEach { add(it.id to "${it.label} · ${it.preset.label}") }
-    }
+    val options = CloudProviderRepository.providers.map { it.id to "${it.label} · ${it.preset.label}" }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -190,6 +182,14 @@ private fun CloudProviderPicker(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(vertical = dimens.spacingMd),
             )
+            if (options.isEmpty()) {
+                Text(
+                    "Add a provider from More > Cloud Providers before using hybrid transcription.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = dimens.spacingSm),
+                )
+            }
             options.forEach { (id, label) ->
                 Row(
                     modifier = Modifier

@@ -8,20 +8,17 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
+import com.runanywhere.sdk.features.TTS.System.SystemTTSModule
 import com.runanywhere.sdk.foundation.bridge.CppBridge.initialize
 import com.runanywhere.sdk.foundation.bridge.CppBridge.initializeServices
 import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdown
 import com.runanywhere.sdk.foundation.bridge.CppBridge.shutdownSuspending
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSdkInit
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeState
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
@@ -36,6 +33,7 @@ import com.runanywhere.sdk.infrastructure.logging.SentryDestination
 import com.runanywhere.sdk.infrastructure.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.cEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -125,14 +123,8 @@ object CppBridge {
      * Mirrors Swift SDK's initialize() which is also synchronous with no network calls.
      *
      * @param environment The SDK environment to use
-     * @param apiKey API key for authentication (required for production/staging)
-     * @param baseURL Backend API base URL (required for production/staging)
      */
-    fun initialize(
-        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-        apiKey: String? = null,
-        baseURL: String? = null,
-    ) {
+    fun initialize(environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
         synchronized(lock) {
             if (CppBridgeState.isInitialized) {
                 return
@@ -148,14 +140,6 @@ object CppBridge {
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
 
-            // Initialize the native auth manager with a secure-storage
-            // vtable backed by the platform adapter secureGet/secureSet/
-            // secureDelete callbacks. Must happen AFTER the adapter is
-            // registered (the JNI-side vtable delegates to it) and BEFORE any
-            // auth operation. Without this, tokens are lost on every process
-            // restart because rac_auth_save_tokens / rac_auth_clear are no-ops.
-            CppBridgeAuth.initialize()
-
             // Install the OkHttp HTTP transport BEFORE
             // any network I/O happens (device registration, model assignment
             // fetch, telemetry, auth all go through rac_http_request_*). The
@@ -164,12 +148,11 @@ object CppBridge {
             // on ~5% of devices. Safe to no-op if the native lib is missing.
             registerOkHttpTransport()
 
-            setupSentryHooks(environment)
-
-            // Initialize Sentry if enabled for this environment (staging/production)
-            if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                setupSentryLogging(environment)
+            if (CppBridgeState.nativeLibraryLoaded) {
+                RunAnywhereBridge.racConfigureLogging(environment.cEnvironment)
             }
+
+            setupSentryHooks(environment)
 
             // Register telemetry HTTP callback (just sets isRegistered flag)
             CppBridgeTelemetry.register()
@@ -178,33 +161,7 @@ object CppBridge {
             // can determine correct behavior for production/staging modes
             CppBridgeTelemetry.setEnvironment(environment)
 
-            // Configure telemetry base URL and API key ONLY for production/staging mode.
-            // In development mode, commons reads Supabase URL/key from dev config.
-            // Networked auth is deferred to commons Phase 2 to avoid blocking
-            // Phase 1 on the UI thread.
-            if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                if (!baseURL.isNullOrEmpty()) {
-                    CppBridgeTelemetry.setBaseUrl(baseURL)
-                    logger.debug("Telemetry base URL configured")
-                }
-                if (!apiKey.isNullOrEmpty()) {
-                    CppBridgeTelemetry.setApiKey(apiKey)
-                    logger.debug("Telemetry API key configured")
-                }
-                logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
-            } else {
-                if (CppBridgeDevConfig.hasUsableSupabaseConfig) {
-                    logger.debug("Development mode: using Supabase URL from C++ dev config")
-                } else {
-                    logger.debug("Development mode: no usable Supabase config; external telemetry/auth/device registration disabled")
-                }
-            }
-
             CppBridgeDevice.register()
-
-            // REQUIRED before device registration so it uses the correct sdk_version.
-            // Mirrors Swift SDK's rac_sdk_init() call in CppBridge+State.swift
-            initializeSdkConfig(environment, apiKey, baseURL)
 
             initializeTelemetryManager(environment)
 
@@ -213,34 +170,13 @@ object CppBridge {
             val telemetryHandle = CppBridgeTelemetry.getTelemetryHandle()
             if (telemetryHandle != 0L) {
                 CppBridgeSDKEvents.register(telemetryHandle)
-                // Emit SDK init started event (mirroring Swift SDK)
-                CppBridgeSDKEvents.emitSDKInitStarted()
             } else {
                 logger.warn("Telemetry handle not available, analytics events will not be tracked")
             }
 
-            // Register file manager I/O callbacks for C++ file management
-            CppBridgeFileManager.register()
-
-            // Eagerly materialize the model storage base directory AND push it
-            // into the C++ core via rac_model_paths_set_base_dir. Without this,
-            // rac_model_paths_get_model_folder() returns RAC_ERROR_NOT_INITIALIZED
-            // and any rac_download_plan_proto() call fails with "failed to
-            // compute model storage path" — blocking all model downloads.
-            // CppBridgeModelPaths.pathProvider must already be set by the app
-            // (e.g., AndroidPlatformContext.initialize() wires context.filesDir).
-            try {
-                val baseDir = CppBridgeModelPaths.getBaseDirectory()
-                logger.debug("Model storage base directory materialized: $baseDir")
-            } catch (t: Throwable) {
-                logger.warn("Failed to materialize model storage base dir: ${t.message}")
-            }
-
             CppBridgeState.isInitialized = true
 
-            // Emit SDK init completed event with duration
             val initDurationMs = System.currentTimeMillis() - initStartTime
-            CppBridgeSDKEvents.emitSDKInitCompleted(initDurationMs.toDouble())
             logger.debug("Phase 1 complete in ${initDurationMs}ms ($environment)")
         }
     }
@@ -284,45 +220,6 @@ object CppBridge {
         } catch (e: Exception) {
             logger.error("Failed to initialize telemetry manager: ${e.message}")
         }
-    }
-
-    /**
-     * Initialize SDK configuration (Phase 1 core init) through the canonical
-     * commons C ABI `rac_sdk_init_phase1_proto`.
-     *
-     * Drives validation (`rac_validate_api_key` / `rac_validate_base_url`),
-     * persists the api_key/base_url through secure storage, and runs
-     * `rac_state_initialize` — replacing the legacy `racSdkInit` struct ABI.
-     * The validation contract now runs on Android exactly like iOS, so a
-     * malformed apiKey/baseURL is rejected (throws [SDKException]) instead of
-     * silently booting.
-     *
-     * Mirrors Swift's `CppBridge.SdkInit.phase1(...)` call in RunAnywhere.swift.
-     *
-     * @param environment SDK environment
-     * @param apiKey API key for authentication (required for production/staging)
-     * @param baseURL Backend API base URL (required for production/staging)
-     */
-    private fun initializeSdkConfig(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
-        val deviceId = CppBridgeDevice.getDeviceIdCallback()
-        logger.debug("Initializing SDK config (phase 1): env=$environment")
-        if (!apiKey.isNullOrEmpty()) {
-            logger.debug("API key provided: ${apiKey.take(10)}...")
-        }
-        if (!baseURL.isNullOrEmpty()) {
-            logger.debug("Base URL: $baseURL")
-        }
-
-        val result =
-            CppBridgeSdkInit.phase1(
-                environment = environment,
-                apiKey = apiKey.orEmpty(),
-                baseURL = baseURL.orEmpty(),
-                deviceId = deviceId,
-            )
-        logger.debug(
-            "SDK config initialized (phase 1): linkedModels=${result.linked_models_count}",
-        )
     }
 
     /**
@@ -449,6 +346,8 @@ object CppBridge {
                 logger.debug("HTTP adapter configuration for callbacks: configured=$configured")
             }
 
+            SystemTTSModule.register()
+
             synchronized(lock) {
                 CppBridgeState.servicesInitialized = true
                 CppBridgeState.servicesInitializing = false
@@ -549,6 +448,7 @@ object CppBridge {
             CppBridgeDevice.unregister()
             CppBridgeTelemetry.unregister()
             CppBridgeSDKEvents.unregister()
+            SystemTTSModule.unregister()
 
             // Release the OkHttp transport before the
             // platform adapter, so any final rac_http_request_* inside shutdown
@@ -564,9 +464,7 @@ object CppBridge {
             Logging.sentrySetupHook = null
             Logging.sentryTeardownHook = null
 
-            CppBridgeState.servicesInitialized = false
-            CppBridgeState.servicesInitializing = false
-            CppBridgeState.isInitialized = false
+            CppBridgeState.reset()
         }
     }
 

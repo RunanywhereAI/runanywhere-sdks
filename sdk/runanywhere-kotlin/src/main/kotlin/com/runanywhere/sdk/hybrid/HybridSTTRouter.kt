@@ -88,6 +88,7 @@ class HybridSTTRouter : Closeable {
      * Bind the offline + online models, install the policy, and register any
      * custom-filter predicates. Replaces any previous pairing.
      */
+    @Synchronized
     fun setPair(
         offline: HybridModel,
         online: HybridModel,
@@ -182,6 +183,7 @@ class HybridSTTRouter : Closeable {
      * @param options Optional language / sample-rate / audio-format hints
      *                (proto-typed [HybridTranscribeOptions]).
      */
+    @Synchronized
     fun transcribe(
         audio: ByteArray,
         options: HybridTranscribeOptions = HybridTranscribeOptions(),
@@ -202,6 +204,7 @@ class HybridSTTRouter : Closeable {
      * exposes a cancel op today, so commons treats this as a no-op until one
      * does — see rac_stt_hybrid_router_cancel.)
      */
+    @Synchronized
     fun cancel() {
         val handle = nativeHandle
         if (handle == 0L) {
@@ -216,6 +219,7 @@ class HybridSTTRouter : Closeable {
      * Detach + destroy both services, unregister custom filters, and destroy
      * the router handle. Idempotent.
      */
+    @Synchronized
     override fun close() {
         val handle = nativeHandle
         if (handle != 0L) {

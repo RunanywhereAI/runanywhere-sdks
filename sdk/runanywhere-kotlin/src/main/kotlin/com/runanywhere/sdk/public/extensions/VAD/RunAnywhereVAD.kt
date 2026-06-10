@@ -37,7 +37,7 @@ suspend fun RunAnywhere.detectVoiceActivity(
         throw SDKException.notInitialized("SDK not initialized")
     }
 
-    if (audioData.size < 2) {
+    if (audioData.size < 4) {
         throw SDKException.operation("Audio data is empty")
     }
 

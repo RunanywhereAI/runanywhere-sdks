@@ -125,6 +125,7 @@ suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
 
 suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     voiceAgentInitialized = false
     val states =
         CppBridgeVoiceAgent.initialize(
@@ -137,6 +138,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) 
 
 suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
 }
 
@@ -166,6 +168,7 @@ suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
     ensureVAD: Boolean = true,
 ) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
 
     if (ensureVAD) {
         ensureDefaultVAD()
@@ -196,6 +199,8 @@ suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
 }
 
 suspend fun RunAnywhere.cleanupVoiceAgent() {
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureServicesReady()
     // Match Swift: cleanup voice-agent handle + reset flag.
     voiceAgentInitialized = false
     CppBridgeVoiceAgent.destroy()
@@ -226,6 +231,7 @@ fun RunAnywhere.streamVoiceAgent(): kotlinx.coroutines.flow.Flow<ai.runanywhere.
     // context via `flow { ... }` + `emitAll` so the public API stays a
     // non-suspend `fun` returning Flow.
     return kotlinx.coroutines.flow.flow {
+        ensureServicesReady()
         val handle = CppBridgeVoiceAgent.getHandle()
         com.runanywhere.sdk.adapters
             .VoiceAgentStreamAdapter(handle)

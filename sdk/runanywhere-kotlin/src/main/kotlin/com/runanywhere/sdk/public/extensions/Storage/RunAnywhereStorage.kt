@@ -111,14 +111,14 @@ suspend fun RunAnywhere.registerModel(
 suspend fun RunAnywhere.registerModel(
     archiveUrl: String,
     structure: ArchiveStructure,
-    id: String?,
+    id: String? = null,
     name: String,
     framework: InferenceFramework,
-    modality: ModelCategory,
-    archiveType: ArchiveType?,
-    memoryRequirement: Long?,
-    supportsThinking: Boolean,
-    supportsLora: Boolean,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    archiveType: ArchiveType? = null,
+    memoryRequirement: Long? = null,
+    supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
 ): RAModelInfo {
     val resolvedArtifactType: ModelArtifactType? =
         archiveType?.let { type ->
@@ -162,11 +162,11 @@ suspend fun RunAnywhere.registerModel(
     id: String,
     name: String,
     framework: InferenceFramework,
-    modality: ModelCategory,
-    memoryRequirement: Long?,
-    contextLength: Int?,
-    supportsThinking: Boolean,
-    source: ModelSource,
+    modality: ModelCategory = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    memoryRequirement: Long? = null,
+    contextLength: Int? = null,
+    supportsThinking: Boolean = false,
+    source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -197,25 +197,29 @@ suspend fun RunAnywhere.registerModel(
 
 suspend fun RunAnywhere.importModel(request: ModelImportRequest): ModelImportResult {
     requireStorageInitialized(this)
+    ensureServicesReady()
     return CppBridgeModelRegistry.importModel(request)
 }
 
 // MARK: - Storage Information
 
-suspend fun RunAnywhere.getStorageInfo(request: StorageInfoRequest): StorageInfoResult {
+suspend fun RunAnywhere.getStorageInfo(request: StorageInfoRequest = StorageInfoRequest()): StorageInfoResult {
     requireStorageInitialized(this)
+    ensureServicesReady()
     return CppBridgeStorage.info(request)
         ?: throw SDKException.storage("Native storage info proto API unavailable")
 }
 
 suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDeleteResult {
     requireStorageInitialized(this)
+    ensureServicesReady()
     return CppBridgeStorage.delete(request)
         ?: throw SDKException.storage("Native storage delete proto API unavailable")
 }
 
 suspend fun RunAnywhere.clearCache() {
     requireStorageInitialized(this)
+    ensureServicesReady()
     if (!CppBridgeFileManager.clearCache()) {
         throw SDKException.storage("Failed to clear cache")
     }
@@ -223,6 +227,7 @@ suspend fun RunAnywhere.clearCache() {
 
 suspend fun RunAnywhere.cleanTempFiles() {
     requireStorageInitialized(this)
+    ensureServicesReady()
     if (!CppBridgeFileManager.clearTemp()) {
         throw SDKException.storage("Failed to clean temp files")
     }

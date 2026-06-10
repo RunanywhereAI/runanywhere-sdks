@@ -17,16 +17,15 @@ object CloudProviderRepository {
     private const val PREFS = "cloud_providers"
     private const val KEY_LIST = "providers"
 
-    // The built-in Sarvam entry seeded by ModelBootstrap (static native adapter);
-    // it isn't managed here, but the UI offers it as the default online backend.
-    const val BUILTIN_SARVAM_ID = "saaras"
-
     private val json = Json { ignoreUnknownKeys = true }
     private val serializer = ListSerializer(CloudProviderConfig.serializer())
     private var prefs: SharedPreferences? = null
 
     var providers: List<CloudProviderConfig> by mutableStateOf(emptyList())
         private set
+
+    val defaultProviderId: String?
+        get() = providers.firstOrNull()?.id
 
     fun initialize(context: Context) {
         if (prefs != null) return
@@ -56,6 +55,9 @@ object CloudProviderRepository {
             Cloud.unregisterModel(id)
         }.onFailure { RACLog.w("cloud provider unregister failed: ${it.message}") }
     }
+
+    fun labelFor(id: String?): String? =
+        id?.let { providerId -> providers.firstOrNull { it.id == providerId }?.label ?: providerId }
 
     private fun register(config: CloudProviderConfig) {
         runCatching {
