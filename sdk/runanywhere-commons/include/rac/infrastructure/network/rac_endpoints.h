@@ -28,14 +28,17 @@ extern "C" {
 // =============================================================================
 
 #define RAC_ENDPOINT_DEVICE_REGISTER "/api/v1/devices/register"
-#define RAC_ENDPOINT_TELEMETRY "/api/v1/sdk/telemetry"
+
+// V2 per-modality telemetry ingest. The full path is this prefix + the
+// modality segment ("llm", "stt", "tts", "vlm", "rag", "imagegen", "system",
+// "model"), e.g. "/api/v2/sdk/telemetry/llm".
+#define RAC_ENDPOINT_TELEMETRY_V2_PREFIX "/api/v2/sdk/telemetry/"
 
 // =============================================================================
 // Device Management - Development (Supabase REST API)
 // =============================================================================
 
 #define RAC_ENDPOINT_DEV_DEVICE_REGISTER "/rest/v1/sdk_devices"
-#define RAC_ENDPOINT_DEV_TELEMETRY "/rest/v1/telemetry_events"
 
 // =============================================================================
 // Model Management
@@ -53,13 +56,6 @@ extern "C" {
  * @return Endpoint path string
  */
 const char* rac_endpoint_device_registration(rac_environment_t env);
-
-/**
- * @brief Get telemetry endpoint for environment
- * @param env The environment
- * @return Endpoint path string
- */
-const char* rac_endpoint_telemetry(rac_environment_t env);
 
 /**
  * @brief Get model assignments endpoint
