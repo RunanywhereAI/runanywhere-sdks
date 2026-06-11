@@ -355,6 +355,9 @@ static int handle_auth_response(const char* json, bool refresh) {
     // deadlock.
     if (result == 0) {
         publish_auth_success_event(&response, refresh);
+        // A token is now available — drain telemetry batches deferred by the
+        // pre-auth flush gate (see rac_telemetry_manager_flush).
+        rac_events_flush_telemetry_sink();
     } else {
         publish_auth_failure_event("Failed to update authentication state", refresh);
     }

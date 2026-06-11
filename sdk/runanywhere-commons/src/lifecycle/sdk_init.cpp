@@ -265,7 +265,26 @@ rac_result_t perform_authentication(SdkInitResult* result) {
         return RAC_SUCCESS;
     }
     if (rac_auth_is_authenticated()) {
-        return perform_token_refresh(result);
+        const rac_result_t refresh_rc = perform_token_refresh(result);
+        if (refresh_rc == RAC_SUCCESS) {
+            return RAC_SUCCESS;
+        }
+        if (refresh_rc != RAC_ERROR_HTTP_ERROR && refresh_rc != RAC_ERROR_INVALID_RESPONSE &&
+            refresh_rc != RAC_ERROR_INVALID_CONFIGURATION) {
+            // Transport-level failure (offline/timeout) — keep the persisted
+            // tokens so a later retry can still refresh.
+            return refresh_rc;
+        }
+        // The backend rejected the refresh token (expired/rotated) or the
+        // persisted state is unusable. Without this fallback the stale tokens
+        // keep rac_auth_is_authenticated() true forever and every
+        // token-requiring request 401s. Drop the state and re-authenticate
+        // with the API key.
+        RAC_LOG_WARNING("SDKInit",
+                        "Token refresh rejected (rc=%d), clearing auth state and "
+                        "re-authenticating",
+                        refresh_rc);
+        rac_auth_clear();
     }
 
     const rac_environment_t env = rac_state_get_environment();
@@ -722,8 +741,10 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
         return serialize_result(result, out_RASdkInitResult);
     }
 
-    const rac_result_t auth_rc =
-        rac_auth_is_authenticated() ? perform_token_refresh(&result) : perform_authentication(&result);
+    // perform_authentication() handles the refreshed/stale/unauthenticated
+    // cases itself, including the rejected-refresh → clear + full re-auth
+    // fallback — so the retry path must not short-circuit into a bare refresh.
+    const rac_result_t auth_rc = perform_authentication(&result);
     result.set_success(true);
     if (auth_rc != RAC_SUCCESS) {
         append_warning(&result, warning_from_code("auth retry deferred", auth_rc));
