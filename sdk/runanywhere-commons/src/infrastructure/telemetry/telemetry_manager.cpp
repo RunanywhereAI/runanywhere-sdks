@@ -205,7 +205,14 @@ rac_telemetry_manager_t* rac_telemetry_manager_create(rac_environment_t env, con
     manager->sdk_version = sdk_version ? sdk_version : "";
     manager->http_callback = nullptr;
     manager->http_user_data = nullptr;
-    manager->last_flush_time_ms = 0;  // Initialize to 0 (will be set on first flush)
+    // Start the batch timer at creation. Flushing the very first tracked event
+    // immediately ("first flush to start timer") handed the batch to the SDK's
+    // HTTP layer during Phase 1 — before HTTPClientAdapter.configure() — and
+    // the fire-and-forget callback silently dropped it (sdk.init.started was
+    // lost on every launch). First flush now waits for batch size / timeout /
+    // a completion event / the Phase-2 flush kick, all of which run after the
+    // HTTP layer is configured.
+    manager->last_flush_time_ms = get_current_timestamp_ms();
 
     RAC_LOG_DEBUG("Telemetry", "Telemetry manager created for environment %d", env);
 
@@ -331,12 +338,6 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
             RAC_LOG_DEBUG("Telemetry", "Auto-flushing: timeout reached (%lld ms since last flush)",
                           current_time - manager->last_flush_time_ms);
         }
-        // First flush: start the timer by flushing immediately if we have events
-        else if (manager->last_flush_time_ms == 0 && queue_size > 0) {
-            should_flush = true;
-            RAC_LOG_DEBUG("Telemetry", "Production: first flush to start timer (queue size: %zu)",
-                          queue_size);
-        }
     }
 
     if (should_flush) {
@@ -362,29 +363,34 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
     out_is_completion = false;
     switch (ev.event_case()) {
         case SDKEvent::kGeneration: {
+            // Generation events are emitted by both LLM and VLM (streamed VLM
+            // rides the same GenerationEvent); prefix by component so a VLM
+            // stream doesn't surface as "llm.generation.*" under modality vlm.
+            const char* p =
+                ev.component() == runanywhere::v1::SDK_COMPONENT_VLM ? "vlm" : "llm";
             switch (ev.generation().kind()) {
                 case runanywhere::v1::GENERATION_EVENT_KIND_STARTED:
-                    return "llm.generation.started";
+                    return std::string(p) + ".generation.started";
                 case runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED:
-                    return "llm.generation.first_token";
+                    return std::string(p) + ".generation.first_token";
                 case runanywhere::v1::GENERATION_EVENT_KIND_STREAMING_UPDATE:
-                    return "llm.generation.streaming";
+                    return std::string(p) + ".generation.streaming";
                 case runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED:
                 case runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED:
                     out_is_completion = true;
-                    return "llm.generation.completed";
+                    return std::string(p) + ".generation.completed";
                 case runanywhere::v1::GENERATION_EVENT_KIND_FAILED:
                     out_is_completion = true;
-                    return "llm.generation.failed";
+                    return std::string(p) + ".generation.failed";
                 case runanywhere::v1::GENERATION_EVENT_KIND_CANCELLED:
                     out_is_completion = true;
-                    return "llm.generation.cancelled";
+                    return std::string(p) + ".generation.cancelled";
                 case runanywhere::v1::GENERATION_EVENT_KIND_CANCEL_REQUESTED:
-                    return "llm.generation.cancel_requested";
+                    return std::string(p) + ".generation.cancel_requested";
                 case runanywhere::v1::GENERATION_EVENT_KIND_MODEL_UNLOADED:
-                    return "llm.model.unloaded";
+                    return std::string(p) + ".model.unloaded";
                 default:
-                    return "llm.generation";
+                    return std::string(p) + ".generation";
             }
         }
         case SDKEvent::kModel: {
@@ -660,7 +666,33 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
     std::string event_type = proto_event_type_string(ev, is_completion);
     payload.event_type = event_type.c_str();
 
-    const bool is_model_event = ev.event_case() == SDKEvent::kModel;
+    // Oneof arms the translator has no name for (component lifecycle state
+    // transitions, cancellation envelopes, …) must not reach the backend as
+    // literal "unknown" rows — they are public/log events, not analytics.
+    if (event_type == "unknown") {
+        return RAC_SUCCESS;
+    }
+
+    // Model artifact events (download/extraction/delete) group under the
+    // shared "model" modality. Load/unload events are per-component — their
+    // event_type already says stt.model.* / tts.voice.* / llm.model.* — so
+    // route them to that component's modality instead of "model" (keeps the
+    // dashboard's modality column consistent with the event name).
+    bool is_model_event = false;
+    if (ev.event_case() == SDKEvent::kModel) {
+        switch (ev.model().kind()) {
+            case runanywhere::v1::MODEL_EVENT_KIND_LOAD_STARTED:
+            case runanywhere::v1::MODEL_EVENT_KIND_LOAD_PROGRESS:
+            case runanywhere::v1::MODEL_EVENT_KIND_LOAD_COMPLETED:
+            case runanywhere::v1::MODEL_EVENT_KIND_LOAD_FAILED:
+            case runanywhere::v1::MODEL_EVENT_KIND_UNLOAD_COMPLETED:
+                is_model_event = ev.component() == runanywhere::v1::SDK_COMPONENT_UNSPECIFIED;
+                break;
+            default:
+                is_model_event = true;
+                break;
+        }
+    }
     payload.modality = component_to_modality(ev.component(), is_model_event);
 
     // Common: session id from the envelope.
@@ -839,8 +871,24 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             //   imagegen/diffusion → only progress (not a /imagegen schema field),
             //                        so it routes with base fields only.
             const auto& c = ev.capability();
-            if (!c.model_id().empty())
+            if (!c.model_id().empty()) {
                 payload.model_id = c.model_id().c_str();
+                // Dashboards render model_name; mirror the kGeneration/kModel
+                // extractors' id-as-name fallback so capability rows aren't blank.
+                payload.model_name = c.model_id().c_str();
+            }
+            // CapabilityOperationEvent has no duration field; completed
+            // emitters carry it in the envelope properties map instead
+            // (internal contract — avoids a proto change).
+            {
+                auto it = ev.properties().find("duration_ms");
+                if (it != ev.properties().end()) {
+                    const double dur = std::atof(it->second.c_str());
+                    if (dur > 0.0) {
+                        payload.processing_time_ms = dur;
+                    }
+                }
+            }
             // LoRA capability events ride on SDK_COMPONENT_LLM, so component_to_modality
             // mapped them to "llm". Override to "lora" by capability kind. model_id
             // carries the base model; the operation is encoded in event_type.
@@ -915,6 +963,30 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
         }
         default:
             break;
+    }
+
+    // Uniform terminal-status rule: any terminal event that reached this point
+    // without an error is a success; failures were already marked FALSE via the
+    // error extraction above. Started/progress events stay unset (no outcome
+    // yet) and cancellations stay unset (user action, neither success nor
+    // failure). Per-arm extractors above may have set success already — this
+    // only fills the gaps (sdk.init.completed, model.download.completed,
+    // device.registered, storage events, …).
+    if (payload.has_success == RAC_FALSE) {
+        auto ends_with = [&event_type](const char* suffix) {
+            const size_t n = strlen(suffix);
+            return event_type.size() >= n &&
+                   event_type.compare(event_type.size() - n, n, suffix) == 0;
+        };
+        if (ends_with(".failed")) {
+            payload.success = RAC_FALSE;
+            payload.has_success = RAC_TRUE;
+        } else if (ends_with(".completed") || ends_with(".loaded") || ends_with(".deleted") ||
+                   ends_with(".cleared") || ends_with(".cleaned") || ends_with(".registered") ||
+                   ends_with(".stopped")) {
+            payload.success = RAC_TRUE;
+            payload.has_success = RAC_TRUE;
+        }
     }
 
     rac_result_t result = rac_telemetry_manager_track(manager, &payload);
@@ -1009,6 +1081,9 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
         rac_result_t result =
             rac_telemetry_manager_batch_to_json(&batch, manager->environment, &json, &json_len);
         if (result != RAC_SUCCESS || !json) {
+            RAC_LOG_WARNING("Telemetry", "Dropping telemetry batch: JSON build failed (rc=%d, "
+                            "modality=%s, %zu events)",
+                            (int)result, modality.c_str(), modality_events.size());
             continue;
         }
 
