@@ -763,7 +763,14 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
 
 bool SherpaSTT::supports_streaming() const {
 #if SHERPA_ONNX_AVAILABLE
-    return false;
+    // Sherpa-ONNX supports chunked streaming for every loaded model via the
+    // implemented create_stream/feed_audio/decode path (offline recognizers use
+    // SherpaOnnxCreateOfflineStream for per-phrase decoding; online recognizers
+    // use the streaming API). The engines refactor left this stubbed to false,
+    // which made rac_stt_component_transcribe_stream reject Live mode with
+    // RAC_ERROR_NOT_SUPPORTED (-236). Streaming is supported whenever the
+    // recognizer is built.
+    return true;
 #else
     return false;
 #endif
