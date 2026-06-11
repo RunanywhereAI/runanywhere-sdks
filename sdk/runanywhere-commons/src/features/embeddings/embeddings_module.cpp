@@ -373,7 +373,7 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error) {
+                        const char* error, double duration_ms = 0.0) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -396,6 +396,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_output_count(output_count);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -508,7 +513,8 @@ rac_result_t rac_embeddings_embed_batch_proto(rac_handle_t handle,
     rc = copy_proto(proto, out_result);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED,
                        "embeddings.embedBatch", 1.0f, static_cast<int64_t>(texts.size()),
-                       proto.vectors_size(), nullptr);
+                       proto.vectors_size(), nullptr,
+                       static_cast<double>(result.processing_time_ms));
     rac_embeddings_result_free(&result);
     return rc;
 #endif

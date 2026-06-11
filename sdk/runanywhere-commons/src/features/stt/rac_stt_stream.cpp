@@ -359,6 +359,8 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     rac_audio_format_enum_t audio_format = RAC_AUDIO_FORMAT_PCM;
     rac_handle_t backend_stream_handle = nullptr;
     bool backend_stream_unsupported = false;
+    std::string request_id;
+    bool first_chunk = false;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
@@ -378,8 +380,10 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         audio_format = it->second.audio_format;
         backend_stream_handle = it->second.backend_stream_handle;
         backend_stream_unsupported = it->second.backend_stream_unsupported;
+        request_id = it->second.request_id;
         if (audio_size > 0) {
             // Aggregate for the one summary telemetry row emitted at stop.
+            first_chunk = (it->second.chunks_fed == 0);
             it->second.chunks_fed += 1;
             it->second.audio_bytes += audio_size;
         }
@@ -389,6 +393,27 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
     }
     if (audio_size == 0) {
         return RAC_SUCCESS;
+    }
+
+    // Session-level started — pairs with the one STT_COMPLETED summary emitted
+    // at stop so the dashboard sees a started/completed pair per stream
+    // session (per-chunk events are PUBLIC-only).
+    if (first_chunk) {
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED);
+        if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
+            voice.set_model_id(model_id);
+        }
+        voice.set_is_streaming(true);
+        if (!language_buffer.empty()) {
+            voice.set_language(language_buffer);
+        }
+        if (sample_rate > 0) {
+            voice.set_sample_rate(sample_rate);
+        }
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          request_id.c_str());
     }
 
     // Build per-call options. The language buffer lives in language_buffer

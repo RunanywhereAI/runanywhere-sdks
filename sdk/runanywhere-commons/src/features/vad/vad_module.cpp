@@ -88,6 +88,10 @@ struct rac_vad_component {
     /** Initialization state (atomic for lock-free query from callbacks) */
     std::atomic<bool> is_initialized;
 
+    /** Set between start() and stop() so stop() on a never-started component
+     *  doesn't emit an unpaired vad.stopped telemetry event. */
+    bool is_running = false;
+
     /** Mutex for thread safety */
     std::mutex mtx;
 
@@ -585,12 +589,16 @@ extern "C" rac_result_t rac_vad_component_start(rac_handle_t handle) {
     rac_result_t result = rac_energy_vad_start(component->vad_service);
 
     if (result == RAC_SUCCESS) {
+        const bool was_running = component->is_running;
+        component->is_running = true;
+        if (!was_running) {
 #if defined(RAC_HAVE_PROTOBUF)
-        runanywhere::v1::VoiceLifecycleEvent voice;
-        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
-        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
-                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+            runanywhere::v1::VoiceLifecycleEvent voice;
+            voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STARTED);
+            rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                                 runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
 #endif
+        }
     }
 
     return result;
@@ -610,12 +618,16 @@ extern "C" rac_result_t rac_vad_component_stop(rac_handle_t handle) {
     rac_result_t result = rac_energy_vad_stop(component->vad_service);
 
     if (result == RAC_SUCCESS) {
+        const bool was_running = component->is_running;
+        component->is_running = false;
+        if (was_running) {
 #if defined(RAC_HAVE_PROTOBUF)
-        runanywhere::v1::VoiceLifecycleEvent voice;
-        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED);
-        rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
-                             runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
+            runanywhere::v1::VoiceLifecycleEvent voice;
+            voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_VAD_STOPPED);
+            rac::events::publish(runanywhere::v1::SDK_COMPONENT_VAD,
+                                 runanywhere::v1::EVENT_CATEGORY_VAD, std::move(voice));
 #endif
+        }
     }
 
     return result;

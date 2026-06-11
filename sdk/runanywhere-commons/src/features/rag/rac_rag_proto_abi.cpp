@@ -86,7 +86,8 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error) {
+                        const char* error, double duration_ms = 0.0,
+                        const char* model_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     event.set_id(event_id());
     event.set_timestamp_ms(now_ms());
@@ -99,6 +100,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_RAG);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
@@ -108,6 +112,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_output_count(output_count);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -173,6 +182,10 @@ std::string resolve_rag_model_id_to_path(const std::string& model_id,
 // ---------------------------------------------------------------------------
 struct Session {
     std::unique_ptr<RAGBackend> backend;
+    // Registry ids captured at create — telemetry attribution only (ingestion
+    // events report the embedding model, query events the LLM).
+    std::string embedding_model_id;
+    std::string llm_model_id;
 };
 
 Session* as_session(rac_handle_t handle) {
@@ -346,6 +359,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
 
     try {
         auto session = std::make_unique<Session>();
+        session->embedding_model_id = embedding_model_id;
+        session->llm_model_id = llm_model_id;
         RAGBackendConfig backend_config = build_backend_config(proto);
         // When the caller does not pin embedding_dimension, derive it from the
         // loaded embedding model rather than falling back to the struct default
@@ -435,8 +450,9 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_
     }
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED,
-                       "rag.ingest", 0.0f, 1, 0, nullptr);
+                       "rag.ingest", 0.0f, 1, 0, nullptr, 0.0, s->embedding_model_id.c_str());
 
+    const auto ingest_start = std::chrono::steady_clock::now();
     bool added = false;
     try {
         added = s->backend->add_document(document.text(), metadata);
@@ -454,8 +470,13 @@ rac_result_t rac_rag_ingest_proto(rac_handle_t session, const uint8_t* document_
 
     auto stats = make_stats(*s->backend);
     rac_result_t rc = copy_proto(stats, out_stats);
+    const double ingest_ms =
+        std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
+            std::chrono::steady_clock::now() - ingest_start)
+            .count();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED,
-                       "rag.ingest", 1.0f, 1, stats.indexed_chunks(), nullptr);
+                       "rag.ingest", 1.0f, 1, stats.indexed_chunks(), nullptr, ingest_ms,
+                       s->embedding_model_id.c_str());
     return rc;
 #endif
 }
@@ -519,7 +540,9 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
     overrides.similarity_threshold = query_proto.similarity_threshold();
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
-                       "rag.query", 0.0f, 1, 0, nullptr);
+                       "rag.query", 0.0f, 1, 0, nullptr, 0.0,
+                       s->llm_model_id.empty() ? s->embedding_model_id.c_str()
+                                               : s->llm_model_id.c_str());
 
     const auto t_start = std::chrono::high_resolution_clock::now();
     rac_llm_result_t llm_result = {};
@@ -585,7 +608,9 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
 
     rac_result_t rc = copy_proto(proto, out_result);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
-                       "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr);
+                       "rag.query", 1.0f, 1, proto.retrieved_chunks_size(), nullptr, total_ms,
+                       s->llm_model_id.empty() ? s->embedding_model_id.c_str()
+                                               : s->llm_model_id.c_str());
     rac_llm_result_free(&llm_result);
     return rc;
 #endif

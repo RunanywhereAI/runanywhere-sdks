@@ -987,7 +987,8 @@ void publish_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, const char* operation,
                         float progress, int64_t input_count, int64_t output_count,
-                        const char* error) {
+                        const char* error, double duration_ms = 0.0,
+                        const char* model_id = nullptr) {
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, (error != nullptr && error[0] != '\0')
                                   ? runanywhere::v1::ERROR_SEVERITY_ERROR
@@ -995,6 +996,9 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
+    if (model_id != nullptr && model_id[0] != '\0') {
+        cap->set_model_id(model_id);
+    }
     if (operation) {
         event.set_operation_id(operation);
         cap->set_operation(operation);
@@ -1004,6 +1008,11 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind, cons
     cap->set_output_count(output_count);
     if (error)
         cap->set_error(error);
+    // CapabilityOperationEvent has no duration field; telemetry reads it from
+    // the envelope properties map (see telemetry_manager kCapability extraction).
+    if (duration_ms > 0.0) {
+        (*event.mutable_properties())["duration_ms"] = std::to_string(duration_ms);
+    }
     publish_event(event);
 }
 
@@ -1369,7 +1378,8 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
     }
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.process",
-                       0.0f, 1, 0, nullptr);
+                       0.0f, 1, 0, nullptr, 0.0,
+                       have_lifecycle ? lifecycle_ref.model_id : nullptr);
 
     rac_vlm_result_t result = {};
     if (have_lifecycle) {
@@ -1400,7 +1410,9 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
         rc = copy_proto(proto, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.process", 1.0f, 1, proto.completion_tokens(), nullptr);
+                       "vlm.process", 1.0f, 1, proto.completion_tokens(), nullptr,
+                       static_cast<double>(proto.processing_time_ms()),
+                       have_lifecycle ? lifecycle_ref.model_id : nullptr);
     rac_vlm_result_free(&result);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
@@ -1470,7 +1482,8 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
     }
 
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED,
-                       "vlm.processStream", 0.0f, 1, 0, nullptr);
+                       "vlm.processStream", 0.0f, 1, 0, nullptr, 0.0,
+                       have_lifecycle ? lifecycle_ref.model_id : nullptr);
 
     const auto start = std::chrono::steady_clock::now();
     // Heap-allocate StreamCtx via unique_ptr so its lifetime clearly outlives
@@ -1515,6 +1528,11 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
     {
         runanywhere::v1::SDKEvent terminal;
         populate_envelope(&terminal, runanywhere::v1::ERROR_SEVERITY_INFO);
+        // PUBLIC only: stream consumers need the terminal envelope, but the
+        // VLM_COMPLETED capability event below is the single telemetry row for
+        // this operation — destination ALL here produced a duplicate
+        // vlm.generation.completed row per stream.
+        terminal.set_destination(runanywhere::v1::EVENT_DESTINATION_PUBLIC);
         auto* generation = terminal.mutable_generation();
         generation->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED);
         generation->set_response(ctx->text);
@@ -1541,8 +1559,12 @@ rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* im
             std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
         rc = copy_proto(proto, out_result);
     }
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.processStream", 1.0f, 1, ctx->token_count, nullptr);
+    publish_capability(
+        runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED, "vlm.processStream", 1.0f,
+        1, ctx->token_count, nullptr,
+        static_cast<double>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()),
+        have_lifecycle ? lifecycle_ref.model_id : nullptr);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
     rac::foundation::rac_vlm_options_free_owned(&options);
@@ -1652,7 +1674,7 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.generate",
-                       0.0f, 1, 0, nullptr);
+                       0.0f, 1, 0, nullptr, 0.0, ref.model_id);
 
     rac_vlm_result_t raw = {};
     rc = (ref.ops && ref.ops->process) ? ref.ops->process(ref.impl, &image, prompt, &options, &raw)
@@ -1674,7 +1696,8 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
         rc = copy_proto(result, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr);
+                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr,
+                       static_cast<double>(result.processing_time_ms()), ref.model_id);
     rac_vlm_result_free(&raw);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
@@ -1740,7 +1763,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
 
     rac::vlm::clear_lifecycle_vlm_cancel(&ref);
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED, "vlm.stream",
-                       0.0f, 1, 0, nullptr);
+                       0.0f, 1, 0, nullptr, 0.0, ref.model_id);
 
     GeneratedStreamCtx ctx;
     ctx.callback = callback;
@@ -1782,7 +1805,8 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                           "vlm.stream", 1.0f, 1, ctx.token_count, nullptr);
+                           "vlm.stream", 1.0f, 1, ctx.token_count, nullptr,
+                           static_cast<double>(elapsed_ms), ref.model_id);
     }
 
     free_vlm_image(&image);
