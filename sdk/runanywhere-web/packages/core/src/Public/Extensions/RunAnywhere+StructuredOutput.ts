@@ -5,7 +5,10 @@
  * Provides schema-driven JSON generation via `RunAnywhere.structuredOutput.*`.
  */
 
-import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import type {
+  LLMGenerationOptions,
+  LLMGenerationResult,
+} from '@runanywhere/proto-ts/llm_options';
 import {
   StructuredOutputMode,
   StructuredOutputOptions as StructuredOutputOptionsMessage,
@@ -28,7 +31,11 @@ import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule';
-import { generateStructuredStream, type JSONSchemaDescriptor } from './RunAnywhere+TextGeneration';
+import {
+  TextGeneration,
+  generateStructuredStream,
+  type JSONSchemaDescriptor,
+} from './RunAnywhere+TextGeneration';
 
 export type {
   StructuredOutputOptions,
@@ -269,6 +276,45 @@ export async function generateStructured<T = unknown>(
       `Structured output deserialization failed: ${(error as Error).message}`,
     );
   }
+}
+
+/**
+ * Generate raw text via the LLM with a structured-output configuration
+ * applied to the request. Returns the raw `LLMGenerationResult`; callers can
+ * pass `result.text` to `extractStructuredOutput(text, schema)` for parsing.
+ *
+ * Mirrors Swift `generateWithStructuredOutput(prompt:structuredOutput:options:)`
+ * (RunAnywhere+StructuredOutput.swift:139-156): when
+ * `includeSchemaInPrompt` is set, the prompt is prepared through the commons
+ * structured-output primitive and any system prompt it produces overrides the
+ * caller's; the structured-output options ride the generate request (mapped
+ * to jsonSchema / responseFormat / grammar by `buildLLMGenerateRequest`).
+ */
+export async function generateWithStructuredOutput(
+  prompt: string,
+  structuredOutput: Partial<StructuredOutputOptions>,
+  options?: Partial<LLMGenerationOptions>,
+): Promise<LLMGenerationResult> {
+  const normalizedStructured = buildStructuredOutputOptions(structuredOutput);
+  let systemPrompt = options?.systemPrompt;
+  if (normalizedStructured.includeSchemaInPrompt) {
+    const prep = preparePrompt(prompt, normalizedStructured);
+    if (prep.errorCode !== 0) {
+      // Swift parity: RunAnywhere+StructuredOutput.swift:149.
+      throw SDKException.processingFailed(
+        prep.errorMessage ?? 'structured-output prompt preparation failed',
+      );
+    }
+    if (prep.systemPrompt !== undefined) {
+      systemPrompt = prep.systemPrompt;
+    }
+  }
+  return TextGeneration.generate({
+    ...options,
+    ...(systemPrompt !== undefined ? { systemPrompt } : {}),
+    structuredOutput: normalizedStructured,
+    prompt,
+  });
 }
 
 /**

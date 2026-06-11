@@ -21,6 +21,9 @@ import {
   rAGConfigurationDefaults,
   rAGQueryOptionsDefaults,
 } from '@runanywhere/proto-ts/convenience/rag_convenience';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
+import { ModelRegistry } from './RunAnywhere+ModelRegistry';
 
 const logger = new SDKLogger('RAG');
 const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
@@ -486,13 +489,79 @@ function createId(prefix: string): string {
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Load one RAG artifact model through the commons lifecycle and surface a
+ * Swift-shaped failure. Mirrors the private `loadRAGArtifactModel`
+ * (RunAnywhere+RAG.swift:202-224): category falls back when the registry
+ * entry leaves it unspecified, and failures throw
+ * `"{label} model '{id}': {message}"` with MODEL_LOAD_FAILED.
+ */
+async function loadRagArtifactModel(
+  modelId: string,
+  fallbackCategory: ModelCategory,
+  errorLabel: string,
+): Promise<string> {
+  const model = ModelRegistry.getModel(modelId);
+  const category =
+    model && model.category !== ModelCategory.MODEL_CATEGORY_UNSPECIFIED
+      ? model.category
+      : fallbackCategory;
+  const result = await WebModelLifecycle.loadModelAsync({
+    modelId,
+    category,
+    ...(model?.framework !== undefined ? { framework: model.framework } : {}),
+    forceReload: false,
+    validateAvailability: false,
+  });
+  if (!result?.success) {
+    const message = result?.errorMessage
+      || `${errorLabel} model lifecycle artifact resolution failed`;
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
+      `${errorLabel} model '${modelId}': ${message}`,
+    );
+  }
+  return result.modelId || modelId;
+}
+
+/**
+ * Build a generated RAG configuration from registry models by using commons
+ * lifecycle resolution for the embedding and LLM artifacts, then stamping the
+ * lifecycle-resolved model ids onto the base configuration. Mirrors Swift
+ * `ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)`
+ * (RunAnywhere+RAG.swift:19-35 + RAGProto+Helpers.swift
+ * `resolvingLifecycleArtifacts`).
+ */
+export async function ragResolvedConfiguration(
+  embeddingModelId: string,
+  llmModelId: string,
+  baseConfiguration?: Partial<RAGConfiguration>,
+): Promise<RAGConfiguration> {
+  const embedding = await loadRagArtifactModel(
+    embeddingModelId,
+    ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    'Embedding',
+  );
+  const llm = await loadRagArtifactModel(
+    llmModelId,
+    ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    'LLM',
+  );
+  return createDefaultRAGConfiguration({
+    ...baseConfiguration,
+    embeddingModelId: embedding,
+    llmModelId: llm,
+  });
+}
+
 export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>;
 /**
  * Bootstrap overload: create the RAG pipeline from two registry model ids.
  * Mirrors Swift `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)`
- * (RunAnywhere+RAG.swift:39-50), which builds an `RAGConfiguration` from two
- * models on top of the generated defaults; on Web, model artifact layout is
- * resolved by the commons lifecycle inside the native session create.
+ * (RunAnywhere+RAG.swift:39-50): the configuration comes from
+ * [ragResolvedConfiguration], so both artifacts are loaded through the
+ * commons lifecycle (with lifecycle-resolved model ids) before the native
+ * session create runs.
  */
 export async function ragCreatePipeline(
   embeddingModelId: string,
@@ -505,11 +574,11 @@ export async function ragCreatePipeline(
   baseConfiguration?: Partial<RAGConfiguration>,
 ): Promise<void> {
   const config = typeof configOrEmbeddingModelId === 'string'
-    ? createDefaultRAGConfiguration({
-      ...baseConfiguration,
-      embeddingModelId: configOrEmbeddingModelId,
-      llmModelId: llmModelId ?? '',
-    })
+    ? await ragResolvedConfiguration(
+      configOrEmbeddingModelId,
+      llmModelId ?? '',
+      baseConfiguration,
+    )
     : configOrEmbeddingModelId;
   const provider = activeProvider();
   if (provider) {

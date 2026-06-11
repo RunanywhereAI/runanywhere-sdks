@@ -28,7 +28,10 @@ import {
   type RegisterMultiFileOptions,
 } from './RunAnywhere+Storage';
 import { TextGeneration as TextGenerationCapability } from './RunAnywhere+TextGeneration';
-import { generateStructured as generateStructuredImpl } from './RunAnywhere+StructuredOutput';
+import {
+  generateStructured as generateStructuredImpl,
+  generateWithStructuredOutput as generateWithStructuredOutputImpl,
+} from './RunAnywhere+StructuredOutput';
 import { ToolCalling as ToolCallingCapability } from './RunAnywhere+ToolCalling';
 import { STT as STTCapability } from './RunAnywhere+STT';
 import { TTS as TTSCapability } from './RunAnywhere+TTS';
@@ -42,6 +45,7 @@ import {
   ragGetStatistics as ragGetStatisticsImpl,
   ragIngest as ragIngestImpl,
   ragQuery as ragQueryImpl,
+  ragResolvedConfiguration as ragResolvedConfigurationImpl,
 } from './RunAnywhere+RAG';
 import {
   cleanupVoiceAgent as cleanupVoiceAgentImpl,
@@ -193,6 +197,11 @@ export const flatFacade = {
   // `generateStructured(prompt:schema:options:)` (RunAnywhere+StructuredOutput.swift:25).
   generateStructured: generateStructuredImpl,
 
+  // Mirrors Swift's flat
+  // `generateWithStructuredOutput(prompt:structuredOutput:options:)`
+  // (RunAnywhere+StructuredOutput.swift:139-156).
+  generateWithStructuredOutput: generateWithStructuredOutputImpl,
+
   generateStructuredStream(
     ...args: Parameters<typeof TextGenerationCapability.generateStructuredStream>
   ): ReturnType<typeof TextGenerationCapability.generateStructuredStream> {
@@ -283,6 +292,14 @@ export const flatFacade = {
   // (RunAnywhere+RAG.swift:39-50 / :58) and the text + document ragIngest
   // overloads (RunAnywhere+RAG.swift:86-100).
   ragCreatePipeline: ragCreatePipelineImpl,
+
+  // Mirrors Swift `ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)`
+  // (RunAnywhere+RAG.swift:19-35).
+  ragResolvedConfiguration(
+    ...args: Parameters<typeof ragResolvedConfigurationImpl>
+  ): ReturnType<typeof ragResolvedConfigurationImpl> {
+    return ragResolvedConfigurationImpl(...args);
+  },
 
   ragDestroyPipeline(): ReturnType<typeof ragDestroyPipelineImpl> {
     return ragDestroyPipelineImpl();
