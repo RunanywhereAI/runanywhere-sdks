@@ -100,6 +100,12 @@ void ensure_default_vad_loaded() {
     runanywhere::v1::ModelLoadRequest load_request;
     load_request.set_model_id(kDefaultVADModelID);
     load_request.set_category(runanywhere::v1::MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION);
+    // Auto-download when the catalogued entry has no local artifact yet:
+    // lifecycle load rejects not-downloaded models (no more bare-id paths
+    // reaching the backend), and the energy fallback emits none of the
+    // lifecycle events the orchestrator needs — a missing Silero model
+    // would otherwise mean a silent session.
+    load_request.set_validate_availability(true);
     std::string load_bytes;
     if (!load_request.SerializeToString(&load_bytes)) {
         return;
