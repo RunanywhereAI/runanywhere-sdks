@@ -141,16 +141,14 @@ export class HybridSttRouter {
     const bridge = new ProtoWasmBridge(module, logger);
     const outHandlePtr = bridge.allocOutPtr();
     if (!outHandlePtr) {
-      throw SDKException.componentNotReady('hybrid.stt', 'failed to allocate router handle slot');
+      throw SDKException.serviceNotAvailable('failed to allocate router handle slot');
     }
     try {
       const rc = module._rac_stt_hybrid_router_create!(outHandlePtr);
       const handle = bridge.readU32(outHandlePtr);
       if (rc !== RAC_OK || !handle) {
-        throw SDKException.componentNotReady(
-          'hybrid.stt',
-          `rac_stt_hybrid_router_create failed (rc=${rc})`,
-        );
+        // Swift parity: HybridSTTRouter.swift:99 throws `.serviceNotAvailable` + `.component`.
+        throw SDKException.serviceNotAvailable(`rac_stt_hybrid_router_create failed (rc=${rc})`);
       }
       return new HybridSttRouter(module, handle);
     } finally {
@@ -210,7 +208,7 @@ export class HybridSttRouter {
     if (rcOff !== RAC_OK) {
       this.destroyService(offlineService);
       this.destroyService(onlineService);
-      throw SDKException.componentNotReady('hybrid.stt', `set_offline_service_proto failed (rc=${rcOff})`);
+      throw SDKException.serviceNotAvailable(`set_offline_service_proto failed (rc=${rcOff})`);
     }
 
     const rcOn = bridge.withHeapBytes(onDescriptor, (ptr, size) =>
@@ -222,7 +220,7 @@ export class HybridSttRouter {
       mod._rac_stt_hybrid_router_set_offline_service_proto!(this.handle, 0, 0, 0);
       this.destroyService(offlineService);
       this.destroyService(onlineService);
-      throw SDKException.componentNotReady('hybrid.stt', `set_online_service_proto failed (rc=${rcOn})`);
+      throw SDKException.serviceNotAvailable(`set_online_service_proto failed (rc=${rcOn})`);
     }
 
     // Register custom-filter predicates with commons BEFORE installing the
@@ -244,7 +242,7 @@ export class HybridSttRouter {
       mod._rac_stt_hybrid_router_set_online_service_proto!(this.handle, 0, 0, 0);
       this.destroyService(offlineService);
       this.destroyService(onlineService);
-      throw SDKException.componentNotReady('hybrid.stt', `set_policy_proto failed (rc=${rcPolicy})`);
+      throw SDKException.serviceNotAvailable(`set_policy_proto failed (rc=${rcPolicy})`);
     }
 
     this.offline = offlineService;
@@ -266,7 +264,7 @@ export class HybridSttRouter {
   ): HybridTranscribeResult {
     this.ensureOpen();
     if (!this.offline || !this.online) {
-      throw SDKException.componentNotReady('hybrid.stt', 'setPair() must be called before transcribe()');
+      throw SDKException.serviceNotAvailable('setPair() must be called before transcribe()');
     }
     const mod = this.module;
     const bridge = new ProtoWasmBridge(mod, logger);
@@ -277,7 +275,7 @@ export class HybridSttRouter {
     if (!outBytesPtr || !outSizePtr) {
       if (outBytesPtr) bridge.free(outBytesPtr);
       if (outSizePtr) bridge.free(outSizePtr);
-      throw SDKException.componentNotReady('hybrid.stt', 'failed to allocate transcribe out-pointers');
+      throw SDKException.serviceNotAvailable('failed to allocate transcribe out-pointers');
     }
 
     let responsePtr = 0;
@@ -290,16 +288,13 @@ export class HybridSttRouter {
       responsePtr = bridge.readU32(outBytesPtr);
       const responseSize = bridge.readU32(outSizePtr);
       if (rc !== RAC_OK || !responsePtr || responseSize === 0) {
-        throw SDKException.componentNotReady(
-          'hybrid.stt',
-          `rac_stt_hybrid_router_transcribe_proto failed (rc=${rc})`,
-        );
+        throw SDKException.serviceNotAvailable(`rac_stt_hybrid_router_transcribe_proto failed (rc=${rc})`);
       }
       const responseBytes = mod.HEAPU8.slice(responsePtr, responsePtr + responseSize);
       const decoded = decodeTranscribeResponse(responseBytes);
       if (decoded.rc !== 0) {
         const message = decoded.errorMessage || `Hybrid STT transcribe failed (rc=${decoded.rc})`;
-        throw SDKException.componentNotReady('hybrid.stt', message);
+        throw SDKException.serviceNotAvailable(message);
       }
       return decoded.result;
     } finally {
@@ -457,7 +452,7 @@ export class HybridSttRouter {
 
   private ensureOpen(): void {
     if (!this.handle) {
-      throw SDKException.componentNotReady('hybrid.stt', 'HybridSttRouter is closed');
+      throw SDKException.serviceNotAvailable('HybridSttRouter is closed');
     }
   }
 }

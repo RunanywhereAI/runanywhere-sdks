@@ -5,11 +5,11 @@
  * been deleted; all throw sites now use SDKException. SDKException wraps the
  * canonical proto-ts `SDKError` shape from `@runanywhere/proto-ts/errors` so a
  * thrown error can carry the full proto envelope (category, code, message,
- * details, c_abi_code, context) for wire interop while still behaving like a
- * plain `Error` to TS callers.
+ * nested_message, c_abi_code, context) for wire interop while still behaving
+ * like a plain `Error` to TS callers.
  *
  * Source of truth (wire shape): idl/errors.proto
- *   - ProtoSDKError = { category, code, c_abi_code, message, details?, ... }
+ *   - ProtoSDKError = { category, code, c_abi_code, message, nested_message?, ... }
  */
 import {
   ErrorCategory as ProtoErrorCategory,
@@ -134,19 +134,16 @@ export class SDKException extends Error {
     }
   }
 
-  /** The signed-negative C ABI code (matches rac_result_t). */
-  get code(): number {
-    return this.proto.cAbiCode ?? 0;
-  }
-
-  /** The positive proto ErrorCode value (matches Swift proto.code / RAErrorCode.rawValue). */
-  get protoCode(): ProtoErrorCode {
+  /** The positive proto ErrorCode value. Mirrors Swift `SDKException.code`
+   * (`RAErrorCode`, SDKException.swift:62). */
+  get code(): ProtoErrorCode {
     return this.proto.code;
   }
 
-  /** Optional structured details (proto.nestedMessage). */
-  get details(): string | undefined {
-    return this.proto.nestedMessage;
+  /** The signed-negative C ABI code (matches rac_result_t). Mirrors the
+   * proto `cAbiCode` field Swift exposes via `proto.cAbiCode` / `rawCABICode`. */
+  get cAbiCode(): number {
+    return this.proto.cAbiCode ?? 0;
   }
 
   /**
@@ -162,18 +159,53 @@ export class SDKException extends Error {
     return typed && typed.length > 0 ? typed : undefined;
   }
 
+  /**
+   * Human-readable remediation hint for the wrapped error code.
+   *
+   * Mirrors Swift's computed `recoverySuggestion` property
+   * (SDKException.swift:87-110) case-for-case. Returns `undefined` for codes
+   * with no actionable suggestion (including cancellation).
+   */
+  get recoverySuggestion(): string | undefined {
+    switch (this.proto.code) {
+      case ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED:
+        return 'Initialize the component before using it.';
+      case ProtoErrorCode.ERROR_CODE_MODEL_NOT_FOUND:
+        return 'Ensure the model is downloaded and the path is correct.';
+      case ProtoErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE:
+        return 'Check your internet connection and try again.';
+      case ProtoErrorCode.ERROR_CODE_INSUFFICIENT_STORAGE:
+        return 'Free up storage space and try again.';
+      case ProtoErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY:
+        return 'Close other applications to free up memory.';
+      case ProtoErrorCode.ERROR_CODE_MICROPHONE_PERMISSION_DENIED:
+        return 'Grant microphone permission in Settings.';
+      case ProtoErrorCode.ERROR_CODE_TIMEOUT:
+        return 'Try again or check your connection.';
+      case ProtoErrorCode.ERROR_CODE_INVALID_API_KEY:
+        return 'Verify your API key is correct.';
+      case ProtoErrorCode.ERROR_CODE_CANCELLED:
+        return undefined;
+      default:
+        return undefined;
+    }
+  }
+
   /** Whether the result code indicates success (code === 0). */
   static isSuccess(resultCode: number): boolean {
     return resultCode === 0;
   }
 
-  /** Build an SDKException from a signed numeric `rac_result_t` code + message. */
+  /** Build an SDKException from a signed numeric `rac_result_t` code + message.
+   * Web-platform-specific WASM bridge primitive — no Swift counterpart by design. */
   static fromCode(code: number, message: string, details?: string): SDKException {
     return new SDKException(code, message, details);
   }
 
   /**
    * Build an SDKException from a raw `rac_result_t` result code.
+   * Web-platform-specific WASM bridge primitive (optional in-process module
+   * parameter) — Swift's nearest analog is `SDKException.from(rcResult:)`.
    *
    * When a loaded WASM [wasm] module is supplied, the rac_result_t -> proto
    * translation is routed through the canonical commons helper
@@ -196,6 +228,22 @@ export class SDKException extends Error {
     }
     const message = `RACommons error: ${resultCode}`;
     return SDKException.fromCode(resultCode, message, details);
+  }
+
+  /**
+   * Throw an `SDKException` if the `rac_result_t` indicates failure; no-op on
+   * `RAC_SUCCESS` (0). Mirrors Swift `SDKException.throwIfError(_:)`
+   * (RASDKError+Helpers.swift:92-96). The optional `details`/`wasm` arguments
+   * follow {@link fromRACResult} so the rac_result_t → proto translation can
+   * route through the canonical commons helper when a module is loaded.
+   */
+  static throwIfError(
+    resultCode: number,
+    details?: string,
+    wasm?: { module: ProtoWasmModule; logger: SDKLogger },
+  ): void {
+    if (SDKException.isSuccess(resultCode)) return;
+    throw SDKException.fromRACResult(resultCode, details, wasm);
   }
 
   /**
@@ -273,6 +321,7 @@ export class SDKException extends Error {
     return new SDKException(proto);
   }
 
+  /** Web-platform-specific WASM bridge primitive — no Swift counterpart by design. */
   static wasmNotLoaded(message = 'WASM module not loaded'): SDKException {
     return SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_WASM_NOT_LOADED, message);
   }
@@ -284,22 +333,8 @@ export class SDKException extends Error {
     );
   }
 
-  static componentNotReady(component: string, details?: string): SDKException {
-    return SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
-      `Component not ready: ${component}`,
-      details,
-    );
-  }
-
-  static generationFailed(details?: string): SDKException {
-    return SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
-      'Generation failed',
-      details,
-    );
-  }
-
+  /** Web-platform-specific backend-registration primitive (V2 split-package
+   * WASM loading) — no Swift counterpart by design. */
   static backendNotAvailable(feature: string, details?: string): SDKException {
     return SDKException.fromCode(
       -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
@@ -308,8 +343,82 @@ export class SDKException extends Error {
     );
   }
 
-  static invalidInput(message: string, details?: string): SDKException {
-    return SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_INVALID_PARAMETER, message, details);
+  /**
+   * Failed operation.
+   *
+   * Mirrors the dominant Swift pairing
+   * `SDKException(code: .processingFailed, message:, category: .internal)`
+   * (CppBridge+NativeProtoABI.swift:76, RunAnywhere+StructuredOutput.swift:149,
+   * RunAnywhere+Solutions.swift:110, ...).
+   */
+  static processingFailed(message: string, details?: string): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+      code: ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+      message,
+      nestedMessage: details,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(-ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
+  }
+
+  /**
+   * Wrong-state call (operation invoked while the component is in a state
+   * that cannot serve it).
+   *
+   * Swift throws `.invalidState` via the constructor with per-site categories
+   * (RunAnywhere+Solutions.swift:101 `.internal`, RunAnywhere+Storage.swift:436
+   * `.network`); this factory uses Swift's constructor-default `.component`,
+   * which also matches the canonical C++ range table for code 231.
+   */
+  static invalidState(message: string, details?: string): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+      code: ProtoErrorCode.ERROR_CODE_INVALID_STATE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_INVALID_STATE,
+      message,
+      nestedMessage: details,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(-ProtoErrorCode.ERROR_CODE_INVALID_STATE),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
+  }
+
+  /**
+   * Required service is missing / could not be brought up.
+   *
+   * Mirrors Swift `SDKException(code: .serviceNotAvailable, message:,
+   * category: .component)` (SystemFoundationModelsService.swift:45,
+   * HybridSTTRouter.swift:99 and all other router sites).
+   */
+  static serviceNotAvailable(message: string, details?: string): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+      code: ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE,
+      message,
+      nestedMessage: details,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(-ProtoErrorCode.ERROR_CODE_SERVICE_NOT_AVAILABLE),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
   }
 
   /**
@@ -330,12 +439,39 @@ export class SDKException extends Error {
    * Code / category / cAbiCode mirror the Swift / Kotlin / Flutter / RN
    * wire shape (ERROR_CODE_INVALID_ARGUMENT = 259, ERROR_CATEGORY_VALIDATION,
    * cAbiCode = -259).
+   *
+   * The plain-string overload mirrors Swift `validationFailed(_ message:)`
+   * (SDKException.swift:188-190): code `.validationFailed`,
+   * category `.validation`.
    */
+  static validationFailed(message: string): SDKException;
   static validationFailed(args: {
     fieldPath: string;
     message: string;
     cause?: Error;
+  }): SDKException;
+  static validationFailed(args: string | {
+    fieldPath: string;
+    message: string;
+    cause?: Error;
   }): SDKException {
+    if (typeof args === 'string') {
+      const proto: ProtoSDKError = {
+        category: ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
+        code: ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
+        cAbiCode: -ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
+        message: args,
+        nestedMessage: undefined,
+        context: undefined,
+        timestampMs: Date.now(),
+        severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+        component: 'validation',
+        retryable: false,
+        remediationHint: '',
+        correlationId: '',
+      };
+      return new SDKException(proto);
+    }
     const proto: ProtoSDKError = {
       category: ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
       code: ProtoErrorCode.ERROR_CODE_INVALID_ARGUMENT,
@@ -354,6 +490,87 @@ export class SDKException extends Error {
       timestampMs: Date.now(),
       severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
       component: 'validation',
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
+  }
+
+  /**
+   * Map an ONNX Runtime C error code into an SDKException.
+   *
+   * Verbatim port of Swift `SDKException.fromONNXCode(_:)`
+   * (SDKException.swift:299-341): same code→proto-code table, same messages,
+   * category pinned to INTERNAL.
+   */
+  static fromONNXCode(code: number): SDKException {
+    let protoCode: ProtoErrorCode;
+    let message: string;
+    switch (code) {
+      case 0:
+        protoCode = ProtoErrorCode.ERROR_CODE_UNKNOWN;
+        message = 'Unexpected success code passed to error handler';
+        break;
+      case -1:
+        protoCode = ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED;
+        message = 'ONNX Runtime initialization failed';
+        break;
+      case -2:
+        protoCode = ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED;
+        message = 'Failed to load ONNX model';
+        break;
+      case -3:
+        protoCode = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED;
+        message = 'ONNX inference failed';
+        break;
+      case -4:
+        protoCode = ProtoErrorCode.ERROR_CODE_INVALID_STATE;
+        message = 'Invalid ONNX handle';
+        break;
+      case -5:
+        protoCode = ProtoErrorCode.ERROR_CODE_INVALID_INPUT;
+        message = 'Invalid ONNX parameters';
+        break;
+      case -6:
+        protoCode = ProtoErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY;
+        message = 'ONNX Runtime out of memory';
+        break;
+      case -7:
+        protoCode = ProtoErrorCode.ERROR_CODE_NOT_IMPLEMENTED;
+        message = 'ONNX feature not implemented';
+        break;
+      case -8:
+        protoCode = ProtoErrorCode.ERROR_CODE_CANCELLED;
+        message = 'ONNX operation cancelled';
+        break;
+      case -9:
+        protoCode = ProtoErrorCode.ERROR_CODE_TIMEOUT;
+        message = 'ONNX operation timed out';
+        break;
+      case -10:
+        protoCode = ProtoErrorCode.ERROR_CODE_STORAGE_ERROR;
+        message = 'ONNX IO error';
+        break;
+      default:
+        protoCode = ProtoErrorCode.ERROR_CODE_UNKNOWN;
+        message = `ONNX error code: ${code}`;
+        break;
+    }
+    const proto: ProtoSDKError = {
+      // Swift pins category .internal for ONNX mapping; the code-range table
+      // would derive a per-range category, so construct the proto directly.
+      category: ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+      code: protoCode,
+      // Round-trip C ABI code: positive proto code ↔ negative rac_result_t
+      // (Swift caps at raw <= 899; every code in this table qualifies).
+      cAbiCode: -protoCode,
+      message,
+      nestedMessage: undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(-protoCode),
       retryable: false,
       remediationHint: '',
       correlationId: '',

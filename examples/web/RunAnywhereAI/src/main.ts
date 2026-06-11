@@ -293,9 +293,11 @@ async function initializeSDK(): Promise<void> {
   // proto-byte adapter via `setRunanywhereModule`. Until a backend has
   // registered, inference verbs throw "backend not available".
   try {
+    // Verbose logging is configured through the logging facade (Swift parity:
+    // `RunAnywhere.setDebugMode(_:)`), not an init option.
+    RunAnywhere.setDebugMode(true);
     await RunAnywhere.initialize({
       environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-      debug: true,
     });
 
     // Attempt to restore previously chosen local storage directory.

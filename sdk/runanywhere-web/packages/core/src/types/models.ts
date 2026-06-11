@@ -29,14 +29,14 @@ export interface SDKInitOptions {
   apiKey?: string;
   baseURL?: string;
   environment?: SDKEnvironment;
-  /** Optional development-mode device registration build token. */
+  /** Optional development-mode device registration build token (dev-mode parity with Swift). */
   buildToken?: string;
-  debug?: boolean;
-  /** Hardware acceleration preference for LLM/VLM inference. */
+  /** Hardware acceleration preference for LLM/VLM inference. Web-only (WebGPU platform option); no Swift counterpart. */
   acceleration?: AccelerationPreference;
   /**
    * Custom URL to the WebGPU-enabled racommons-webgpu.js glue file.
    * Only used when acceleration is 'auto' or 'webgpu'.
+   * Web-only (WebGPU platform option); no Swift counterpart.
    */
   webgpuWasmUrl?: string;
 }

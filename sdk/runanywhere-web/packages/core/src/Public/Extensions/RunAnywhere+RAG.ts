@@ -17,7 +17,10 @@ import type {
   RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
-import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
+import {
+  rAGConfigurationDefaults,
+  rAGQueryOptionsDefaults,
+} from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 const logger = new SDKLogger('RAG');
 const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
@@ -43,6 +46,10 @@ export interface RAGProvider {
   ragCreatePipeline(config: RAGConfiguration): Promise<void>;
   ragDestroyPipeline(): Promise<void>;
   ragIngest(text: string, metadataJson?: string): Promise<void>;
+  /** Ingest a generated-proto document. Optional — providers without
+   * document-level ingest fall back to `ragIngest(text, metadataJson)`.
+   * Mirrors Swift `ragIngest(_ document:)` (RunAnywhere+RAG.swift:92). */
+  ragIngestDocument?(document: RAGDocument): Promise<RAGStatistics>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
   ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
   ragClearDocuments(): Promise<void>;
@@ -212,14 +219,21 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   async ragIngest(text: string, metadataJson?: string): Promise<void> {
+    // Mirrors Swift's text overload delegating to the document overload
+    // (RunAnywhere+RAG.swift:86-88).
+    await this.ragIngestDocument(makeRAGDocument(text, metadataJson));
+  }
+
+  async ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
     const session = await this.ensureSession();
-    const stats = this.adapter.ingest(session, makeRAGDocument(text, metadataJson));
+    const stats = this.adapter.ingest(session, document);
     if (!stats) {
       throw SDKException.backendNotAvailable(
         'RAG.ingest',
         'Native RAG ingest returned no statistics.',
       );
     }
+    return stats;
   }
 
   async ragAddDocumentsBatch(documents: Array<{ text: string; metadataJson?: string }>): Promise<void> {
@@ -341,17 +355,23 @@ function makeRAGQuery(
   config: RAGConfiguration,
   options: RAGQueryOverrides,
 ): RAGQueryOptions {
+  // Seed with the proto-generated canonical defaults (maxTokens 512 /
+  // temperature 0.7 / topP 1.0 from idl/rag.proto rac_default) so Web matches
+  // Swift's `RARAGQueryOptions.defaults(question:)` (RAGProto+Helpers.swift:72).
+  //
   // Per rag.proto: `retrievalTopK = 0` and `similarityThreshold = 0` mean
   // "use the RAGConfiguration default" so falling back to 0 when neither the
   // per-query override nor the pipeline config supplies a value is the
   // correct way to defer to commons.
+  const defaults = rAGQueryOptionsDefaults();
   return {
+    ...defaults,
     question,
     systemPrompt: options.systemPrompt,
-    maxTokens: options.maxTokens ?? 512,
-    temperature: options.temperature ?? 0.4,
-    topP: options.topP ?? 1,
-    topK: options.topK ?? 0,
+    maxTokens: options.maxTokens ?? defaults.maxTokens,
+    temperature: options.temperature ?? defaults.temperature,
+    topP: options.topP ?? defaults.topP,
+    topK: options.topK ?? defaults.topK,
     retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
     similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
     stream: options.stream ?? false,
@@ -466,7 +486,31 @@ function createId(prefix: string): string {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>;
+/**
+ * Bootstrap overload: create the RAG pipeline from two registry model ids.
+ * Mirrors Swift `ragCreatePipeline(embeddingModel:llmModel:baseConfiguration:)`
+ * (RunAnywhere+RAG.swift:39-50), which builds an `RAGConfiguration` from two
+ * models on top of the generated defaults; on Web, model artifact layout is
+ * resolved by the commons lifecycle inside the native session create.
+ */
+export async function ragCreatePipeline(
+  embeddingModelId: string,
+  llmModelId: string,
+  baseConfiguration?: Partial<RAGConfiguration>,
+): Promise<void>;
+export async function ragCreatePipeline(
+  configOrEmbeddingModelId: RAGConfiguration | string,
+  llmModelId?: string,
+  baseConfiguration?: Partial<RAGConfiguration>,
+): Promise<void> {
+  const config = typeof configOrEmbeddingModelId === 'string'
+    ? createDefaultRAGConfiguration({
+      ...baseConfiguration,
+      embeddingModelId: configOrEmbeddingModelId,
+      llmModelId: llmModelId ?? '',
+    })
+    : configOrEmbeddingModelId;
   const provider = activeProvider();
   if (provider) {
     await provider.ragCreatePipeline(config);
@@ -497,8 +541,33 @@ export async function ragDestroyPipeline(): Promise<void> {
   logger.info('RAG pipeline destroyed');
 }
 
-export async function ragIngest(text: string, metadataJson?: string): Promise<void> {
-  await requireProvider('RAG.ingest').ragIngest(text, metadataJson);
+export async function ragIngest(text: string, metadataJson?: string): Promise<void>;
+/**
+ * Ingest a generated-proto document. Mirrors Swift's discardable-result
+ * document overload (RunAnywhere+RAG.swift:91-100).
+ */
+export async function ragIngest(document: RAGDocument): Promise<RAGStatistics>;
+export async function ragIngest(
+  textOrDocument: string | RAGDocument,
+  metadataJson?: string,
+): Promise<void | RAGStatistics> {
+  if (typeof textOrDocument === 'string') {
+    await requireProvider('RAG.ingest').ragIngest(textOrDocument, metadataJson);
+    return;
+  }
+  return ragIngestDocument(textOrDocument);
+}
+
+export async function ragIngestDocument(document: RAGDocument): Promise<RAGStatistics> {
+  const p = requireProvider('RAG.ingest');
+  if (p.ragIngestDocument) return p.ragIngestDocument(document);
+  // Provider without document-level ingest: fall back to the text path and
+  // report the post-ingest statistics snapshot.
+  const metadataJson = document.metadata && Object.keys(document.metadata).length > 0
+    ? JSON.stringify(document.metadata)
+    : undefined;
+  await p.ragIngest(document.text, metadataJson);
+  return ragGetStatistics();
 }
 
 export async function ragAddDocumentsBatch(
@@ -650,21 +719,18 @@ export async function ragEnsureReady(
 }
 
 /**
- * Public `RunAnywhere.rag.*` namespace. Members marked `@webOnly` are
- * Web-platform extensions that do not appear in the Swift source-of-truth
- * (`RunAnywhere+RAG.swift`). They live here until either the cross-SDK
- * spec adopts them (Kotlin / Flutter / RN / Swift) or the consumer surface
- * migrates to the Swift-aligned subset.
+ * Public `RunAnywhere.rag.*` namespace — Web-only extensions ONLY.
  *
- * Swift-aligned surface (cross-SDK canonical):
- *   - `createPipeline`     ↔ `ragCreatePipeline`
- *   - `destroyPipeline`    ↔ `ragDestroyPipeline`
- *   - `ingest`             ↔ `ragIngest`
- *   - `addDocumentsBatch`  ↔ `ragAddDocumentsBatch`
- *   - `query`              ↔ `ragQuery`
- *   - `clearDocuments`     ↔ `ragClearDocuments`
- *   - `getDocumentCount`   ↔ `ragGetDocumentCount`
- *   - `getStatistics`      ↔ `ragGetStatistics`
+ * The Swift source of truth (`RunAnywhere+RAG.swift`) has no `rag` namespace;
+ * its flat verbs (`ragCreatePipeline`, `ragDestroyPipeline`, `ragIngest`,
+ * `ragAddDocumentsBatch`, `ragQuery`, `ragClearDocuments`,
+ * `ragGetDocumentCount`, `ragGetStatistics`) live directly on the
+ * `RunAnywhere` facade (see RunAnywhere+FlatFacade.ts) and are the canonical
+ * cross-SDK surface. Every member below is a Web-platform extension that does
+ * not appear in Swift — provider registration is the Web plugin pattern
+ * (backend packages install providers at register() time, where Swift links
+ * CppBridge statically), and availability probing exists because Web WASM
+ * backends register asynchronously after `initialize()`.
  */
 export const RAG = {
   /** @webOnly Provider wiring entry point. Backend packages call this during register(). */
@@ -681,16 +747,8 @@ export const RAG = {
   capabilities: ragGetCapabilities,
   /** @webOnly Build a default `RAGConfiguration` with sensible field defaults. */
   defaultConfiguration: createDefaultRAGConfiguration,
-  createPipeline: ragCreatePipeline,
-  destroyPipeline: ragDestroyPipeline,
   /** @webOnly Idempotent "create-if-missing" bootstrap used by Web example apps. */
   ensureReady: ragEnsureReady,
-  ingest: ragIngest,
-  addDocumentsBatch: ragAddDocumentsBatch,
-  query: ragQuery,
-  clearDocuments: ragClearDocuments,
-  getDocumentCount: ragGetDocumentCount,
-  getStatistics: ragGetStatistics,
   /** @webOnly Document-level listing — pending the cross-SDK native list API. */
   listDocuments: ragListDocuments,
   /** @webOnly Document-level removal — pending the cross-SDK native remove API. */

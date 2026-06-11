@@ -30,10 +30,6 @@ import {
 } from '../../runtime/SpeechBackendExports';
 import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
-import {
-  getSpeechProvider,
-  hasSpeechProviderTTS,
-} from './SpeechProvider';
 
 export type { TTSOptions, TTSOutput, TTSVoiceInfo };
 
@@ -113,10 +109,7 @@ function callCreate(module: TTSComponentModule): number {
     }
     const handle = bridge.readU32(outPtr);
     if (!handle) {
-      throw SDKException.componentNotReady(
-        'tts',
-        'rac_tts_component_create returned null handle',
-      );
+      throw SDKException.processingFailed('rac_tts_component_create returned null handle');
     }
     return handle;
   } finally {
@@ -310,33 +303,10 @@ export async function synthesize(
     }
   }
 
-  // Provider-first dispatch: route through standalone Sherpa (or any
-  // other registered SpeechProvider) when present, otherwise fall back
-  // to the proto-byte path.
-  if (hasSpeechProviderTTS()) {
-    const provider = getSpeechProvider()!;
-    if (voicePath && (typeof provider.isTTSLoaded !== 'function' || !provider.isTTSLoaded())) {
-      if (typeof provider.loadTTS !== 'function') {
-        throw SDKException.backendNotAvailable(
-          'RunAnywhere.tts.synthesizeAuto',
-          `SpeechProvider "${provider.id}" does not implement loadTTS.`,
-        );
-      }
-      await provider.loadTTS({ id: voiceId ?? voicePath, path: voicePath, name: voiceName });
-    }
-    if (typeof provider.synthesize !== 'function') {
-      throw SDKException.backendNotAvailable(
-        'RunAnywhere.tts.synthesizeAuto',
-        `SpeechProvider "${provider.id}" does not implement synthesize.`,
-      );
-    }
-    return provider.synthesize({ text, options });
-  }
-
   const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
   if (!voicePath) {
-    throw SDKException.componentNotReady(
-      'tts',
+    // Swift parity: RunAnywhere+TTS.swift:36 throws `.notInitialized` ("TTS voice not loaded").
+    throw SDKException.notInitialized(
       'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
     );
   }

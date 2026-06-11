@@ -90,6 +90,34 @@ export type ToolCallingGenerationOptions = Omit<Partial<LLMGenerationOptions>, '
   toolCalling?: Partial<ToolCallingOptions>;
 };
 
+/**
+ * Extra options accepted by [generateWithTools]. Mirrors Swift's
+ * `generateWithTools(prompt:options:toolOptions:...)` two-channel shape
+ * (RunAnywhere+ToolCalling.swift:250-257) the same way the RN SDK does.
+ */
+export interface GenerateWithToolsOptions {
+  signal?: AbortSignal;
+  /**
+   * LLM generation options channel — Swift parity
+   * (`generateWithTools(prompt:options:toolOptions:...)`): tool options that
+   * are unset fall back to these, and `topP` comes from here exclusively.
+   * Defaults mirror Swift `RALLMGenerationOptions.defaults()`
+   * (maxTokens 100, temperature 0.8, topP 1.0).
+   */
+  llmOptions?: Partial<
+    Pick<
+      LLMGenerationOptions,
+      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
+    >
+  >;
+  /**
+   * Swift parity: when omitted the proto field stays UNSET so commons applies
+   * its documented default (true). Hosts that delegate validation to their
+   * executor pass `false`.
+   */
+  validateCalls?: boolean;
+}
+
 export type ToolExecutor = (toolCall: ToolCall) => ToolResult | Promise<ToolResult>;
 
 const registeredTools = new Map<string, RegisteredTool>();
@@ -267,32 +295,43 @@ function toolResultWithDefaults(
 /**
  * Build the ToolCallingSessionCreateRequest proto consumed by
  * `_rac_tool_calling_session_create_proto`. Mirrors Swift's
- * `makeRunLoopRequest` (RunAnywhere+ToolCalling.swift:320) so the C++ loop
- * receives identical input regardless of SDK.
+ * `makeRunLoopRequest` (RunAnywhere+ToolCalling.swift:491-548) so the C++
+ * loop receives identical input regardless of SDK: tool options take
+ * precedence, unset values fall back to the LLM options channel, whose
+ * defaults are Swift's `RALLMGenerationOptions.defaults()`
+ * (maxTokens 100, temperature 0.8, topP 1.0).
  */
 function buildSessionCreateRequest(
   prompt: string,
   tools: ToolDefinition[],
   effectiveOptions: ToolCallingOptions,
+  extra: GenerateWithToolsOptions = {},
 ): Uint8Array {
+  const llm = extra.llmOptions;
+  const toolMaxTokens = effectiveOptions.maxTokens;
   const maxIterations =
     (effectiveOptions.maxIterations ?? 0) > 0
       ? effectiveOptions.maxIterations
       : (effectiveOptions.maxToolCalls ?? 0);
   const request = ToolCallingSessionCreateRequestMessage.fromPartial({
     prompt,
-    maxTokens: effectiveOptions.maxTokens ?? 0,
-    temperature: effectiveOptions.temperature ?? 0,
-    topP: 0,
-    systemPrompt: effectiveOptions.systemPrompt ?? '',
+    maxTokens:
+      toolMaxTokens !== undefined && toolMaxTokens > 0
+        ? toolMaxTokens
+        : (llm?.maxTokens ?? 100),
+    temperature: effectiveOptions.temperature ?? llm?.temperature ?? 0.8,
+    // topP has no slot on ToolCallingOptions — Swift reads it from the LLM
+    // options channel exclusively (RunAnywhere+ToolCalling.swift:516).
+    topP: llm?.topP ?? 1.0,
+    systemPrompt: effectiveOptions.systemPrompt || llm?.systemPrompt || '',
     tools,
     formatHint: effectiveOptions.formatHint ?? '',
     maxIterations: maxIterations ?? 0,
     keepToolsAvailable: effectiveOptions.keepToolsAvailable ?? false,
-    // Commons default is validateCalls=true; pass true explicitly so that the
-    // C++ run loop validates each parsed tool call against the request's tools
-    // before invoking the JS executor (parity with Swift makeRunLoopRequest).
-    validateCalls: true,
+    // `validate_calls` is `optional bool` on the proto. Leave it UNSET unless
+    // the caller chose, so commons applies its documented default (true) —
+    // parity with Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:528-537).
+    validateCalls: extra.validateCalls,
     // pass2-syn-006-followup-web: thread the OpenAI-style tool_choice /
     // forced_tool_name knobs into the canonical request envelope (idl
     // fields 7/8). Commons build_options_snapshot copies them onto every
@@ -306,8 +345,11 @@ function buildSessionCreateRequest(
       effectiveOptions.forcedToolName && effectiveOptions.forcedToolName.length > 0
         ? effectiveOptions.forcedToolName
         : undefined,
-    // Suppress thinking when requested (commons prepends the no-think directive).
-    disableThinking: effectiveOptions.disableThinking ?? false,
+    // Suppress thinking when EITHER options surface asks for it — Swift:
+    // `toolOptions.disableThinking || options.disableThinking`
+    // (RunAnywhere+ToolCalling.swift:548).
+    disableThinking:
+      (effectiveOptions.disableThinking ?? false) || (llm?.disableThinking ?? false),
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }
@@ -521,7 +563,7 @@ export const ToolCalling = {
   async generateWithTools(
     prompt: string,
     options: Partial<ToolCallingOptions> = {},
-    extra: { signal?: AbortSignal } = {},
+    extra: GenerateWithToolsOptions = {},
   ): Promise<ToolCallingResult> {
     // pass3-syn-153: short-circuit when the AbortSignal is already aborted
     // BEFORE allocating the trampoline / handle slot or calling commons.
@@ -558,7 +600,7 @@ export const ToolCalling = {
     }
 
     const bridge = new ProtoWasmBridge(module, logger);
-    const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions);
+    const requestBytes = buildSessionCreateRequest(prompt, tools, effectiveOptions, extra);
 
     // Event queue: the C session callback fires synchronously inside
     // session_create_proto / session_step_with_result_proto. We buffer events

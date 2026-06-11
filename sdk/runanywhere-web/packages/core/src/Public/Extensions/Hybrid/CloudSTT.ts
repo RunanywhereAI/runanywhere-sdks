@@ -36,6 +36,10 @@ import {
 import type { HybridWasmModule } from './HybridWasmModule';
 import { DEFAULT_CLOUD_PROVIDER } from './HybridTypes';
 import { CloudSttBackendConfig } from '@runanywhere/proto-ts/hybrid_router';
+import {
+  registerCloudSttProvider,
+  unregisterCloudSttProvider,
+} from './CloudSttProvider';
 
 const logger = new SDKLogger('CloudSTT');
 
@@ -166,6 +170,21 @@ export const CloudSTT = {
   unregisterModel(id: string): boolean {
     return registry.delete(id);
   },
+
+  /**
+   * Register (or replace) a developer-defined cloud STT provider handler
+   * under `name`. The handler performs the whole request host-side; tie a
+   * model to it with `CloudSTT.register({ provider: name, ... })`. Mirrors
+   * Swift `Cloud.registerProvider(_:_:)` (CloudSttProvider.swift:145).
+   */
+  registerProvider: registerCloudSttProvider,
+
+  /**
+   * Remove a developer-defined provider previously registered via
+   * `registerProvider`. Idempotent for unknown names. Mirrors Swift
+   * `Cloud.unregisterProvider(_:)` (CloudSttProvider.swift:209).
+   */
+  unregisterProvider: unregisterCloudSttProvider,
 
   /** Clear the in-memory credential/model registry. */
   clear(): void {

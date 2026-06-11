@@ -11,6 +11,7 @@ import {
   StructuredOutputOptions as StructuredOutputOptionsMessage,
   StructuredOutputPromptResult as StructuredOutputPromptResultMessage,
   StructuredOutputRequest as StructuredOutputRequestMessage,
+  StructuredOutputStreamEventKind,
   StructuredOutputValidation as StructuredOutputValidationMessage,
   StructuredOutputValidationRequest as StructuredOutputValidationRequestMessage,
   type StructuredOutputOptions,
@@ -224,7 +225,67 @@ function validate(
   );
 }
 
+/**
+ * Generate structured output from a prompt using a JSON schema. This is the
+ * implementation behind the Swift-named flat facade verb
+ * `RunAnywhere.generateStructured(...)` (mirrors
+ * `RunAnywhere+StructuredOutput.swift` `generateStructured(prompt:schema:options:)`).
+ *
+ * Drives the token stream to completion and returns the validated result
+ * carried by the terminal `.completed` event (token events are ignored here —
+ * this is the non-streaming convenience wrapper).
+ */
+export async function generateStructured<T = unknown>(
+  prompt: string,
+  schema: StructuredOutputSchema<T>,
+  options?: Partial<LLMGenerationOptions>,
+): Promise<T> {
+  let result: StructuredOutputResult | undefined;
+  for await (const event of generateStructuredStream(prompt, schema, options)) {
+    if (
+      event.kind === StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
+      && event.result
+    ) {
+      result = event.result;
+    }
+  }
+  // Swift parity: RunAnywhere+StructuredOutput.swift:149 throws `.processingFailed`.
+  if (!result) {
+    throw SDKException.processingFailed('Structured output did not return a result');
+  }
+  if (result.validation && !result.validation.isValid) {
+    throw SDKException.processingFailed(
+      result.validation.errorMessage ?? 'Structured output validation failed',
+    );
+  }
+  const jsonText = new TextDecoder().decode(result.parsedJson);
+  if (typeof schema.parse === 'function') {
+    return schema.parse(jsonText);
+  }
+  try {
+    return JSON.parse(jsonText) as T;
+  } catch (error) {
+    throw SDKException.processingFailed(
+      `Structured output deserialization failed: ${(error as Error).message}`,
+    );
+  }
+}
+
+/**
+ * Public `RunAnywhere.structuredOutput.*` namespace — Web-only extensions
+ * ONLY.
+ *
+ * The Swift source of truth (`RunAnywhere+StructuredOutput.swift`) has no
+ * `structuredOutput` namespace; its flat verbs (`generateStructured`,
+ * `generateStructuredStream`, plus `extractStructuredOutput` from
+ * `RunAnywhere+TextGeneration.swift`) live directly on the `RunAnywhere`
+ * facade (see RunAnywhere+FlatFacade.ts). The members below are Web-platform
+ * extensions: the export probe exists because Web WASM backends register
+ * asynchronously, and the proto primitives (`preparePrompt` / `validate`)
+ * are exposed where Swift keeps them internal on `CppBridge.StructuredOutput`.
+ */
 export const StructuredOutput = {
+  /** @webOnly Probe whether the active WASM build exports the structured-output proto ABI. */
   supportsProtoStructuredOutput(): boolean {
     const module = getModuleForCapability('structured-output');
     if (!module) return false;
@@ -234,37 +295,9 @@ export const StructuredOutput = {
     ]).length === 0 && new ProtoWasmBridge(module, logger).hasProtoBufferExports();
   },
 
+  /** @webOnly Raw `rac_structured_output_prepare_prompt_proto` primitive (internal CppBridge helper in Swift). */
   preparePrompt,
 
+  /** @webOnly Raw `rac_structured_output_validate_proto` primitive (internal CppBridge helper in Swift). */
   validate,
-
-  async generate<T = unknown>(
-    prompt: string,
-    schema: StructuredOutputSchema<T>,
-    options?: Partial<LLMGenerationOptions>,
-  ): Promise<T> {
-    let result: StructuredOutputResult | undefined;
-    for await (const event of generateStructuredStream(prompt, schema, options)) {
-      result = event;
-    }
-    if (!result) {
-      throw SDKException.generationFailed('Structured output did not return a result');
-    }
-    if (result.validation && !result.validation.isValid) {
-      throw SDKException.generationFailed(
-        result.validation.errorMessage ?? 'Structured output validation failed',
-      );
-    }
-    const jsonText = new TextDecoder().decode(result.parsedJson);
-    if (typeof schema.parse === 'function') {
-      return schema.parse(jsonText);
-    }
-    try {
-      return JSON.parse(jsonText) as T;
-    } catch (error) {
-      throw SDKException.generationFailed(
-        `Structured output deserialization failed: ${(error as Error).message}`,
-      );
-    }
-  },
 };

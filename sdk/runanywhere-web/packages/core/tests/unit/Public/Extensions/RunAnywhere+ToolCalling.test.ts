@@ -354,9 +354,10 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
     expect(module.capturedCreateRequest!.formatHint).toBe('openai');
     expect(module.capturedCreateRequest!.maxIterations).toBe(5);
     expect(module.capturedCreateRequest!.keepToolsAvailable).toBe(true);
-    // pass2-syn-006-followup-web: validateCalls true is hard-coded for
-    // parity with Swift's makeRunLoopRequest.
-    expect(module.capturedCreateRequest!.validateCalls).toBe(true);
+    // Swift makeRunLoopRequest parity (RunAnywhere+ToolCalling.swift:528-536):
+    // validate_calls stays UNSET unless the caller specifies it, so commons
+    // applies its documented default (true).
+    expect(module.capturedCreateRequest!.validateCalls).toBeUndefined();
     expect(module.capturedCreateRequest!.toolChoice).toBe(
       ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     );
@@ -417,9 +418,12 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
 
     expect(captured).toBeInstanceOf(SDKException);
     const sdkErr = captured as SDKException;
-    expect(sdkErr.code).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
+    // `.code` is the positive proto ErrorCode (Swift parity); the signed
+    // rac_result_t lives on `.cAbiCode`.
+    expect(sdkErr.code).toBe(ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
+    expect(sdkErr.cAbiCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
     expect(sdkErr.message).toMatch(/decode failed/i);
-    expect(sdkErr.details ?? '').toMatch(/ToolCallingSessionEvent/i);
+    expect(sdkErr.proto.nestedMessage ?? '').toMatch(/ToolCallingSessionEvent/i);
   });
 
   it('encodes step_with_result with the tool-call id, result JSON, and (on failure) the error message', async () => {
@@ -576,8 +580,9 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     }
 
     expect(captured).toBeInstanceOf(SDKException);
-    expect((captured as SDKException).code).toBe(-ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
-    expect((captured as SDKException).details ?? '').toMatch(/already aborted/i);
+    expect((captured as SDKException).code).toBe(ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
+    expect((captured as SDKException).cAbiCode).toBe(-ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
+    expect((captured as SDKException).proto.nestedMessage ?? '').toMatch(/already aborted/i);
     // The eager-abort gate MUST be reached before we touch commons / addFunction.
     expect(createSpy).not.toHaveBeenCalled();
     expect(module.cancelHandles).toHaveLength(0);

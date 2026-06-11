@@ -12,6 +12,7 @@ export type { StorageBackend } from './Public/RunAnywhere';
 export type {
   JSONSchemaDescriptor,
   StructuredOutputResult,
+  StructuredOutputStreamEvent,
   TextGenerationOptions,
 } from './Public/Extensions/RunAnywhere+TextGeneration';
 export type { ToolCallingGenerationOptions } from './Public/Extensions/RunAnywhere+ToolCalling';
@@ -117,6 +118,9 @@ export type {
 export { setStreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
 export type { StreamWorkerFactory } from './runtime/StreamWorkerFactoryRegistry';
 
+// SDK metadata constants — mirror Swift `SDKConstants.version/name/platform`.
+export { SDK_NAME, SDK_PLATFORM, SDK_VERSION } from './Foundation/Version';
+
 // For error codes use ProtoErrorCode from '@runanywhere/proto-ts/errors' (re-exported below).
 export { SDKException, isSDKException } from './Foundation/SDKException';
 export type { ProtoErrorContext, ProtoSDKError } from './Foundation/SDKException';
@@ -147,3 +151,27 @@ export * from './types/index';
 
 // Helpers — pure-JS proxies for commons utilities.
 export { formatFramework } from './Public/Helpers/formatFramework';
+
+// Tool calling — Swift-parity two-channel options for generateWithTools.
+export type { GenerateWithToolsOptions } from './Public/Extensions/RunAnywhere+ToolCalling';
+
+// Cloud STT provider table — developer-defined providers by name (mirrors
+// Swift Cloud.registerProvider / Cloud.unregisterProvider).
+export {
+  CloudAudioFormat,
+  registerCloudSttProvider,
+  unregisterCloudSttProvider,
+} from './Public/Extensions/Hybrid/CloudSttProvider';
+export type {
+  CloudSttRequest,
+  CloudSttResult,
+  SttProviderHandler,
+} from './Public/Extensions/Hybrid/CloudSttProvider';
+
+// Audio conversion helpers — mirrors Swift RAAudioConvert.swift
+// (`RunAnywhere.pcm16ToFloat32` / `pcm16ToFloat32Samples` / `pcm16ToWav`).
+export {
+  pcm16ToFloat32,
+  pcm16ToFloat32Samples,
+  pcm16ToWav,
+} from './Public/Extensions/RunAnywhere+AudioConvert';

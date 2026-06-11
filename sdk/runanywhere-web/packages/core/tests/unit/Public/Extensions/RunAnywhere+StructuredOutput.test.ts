@@ -4,6 +4,7 @@ import {
   StructuredOutputPromptResult,
   StructuredOutputRequest,
   StructuredOutputResult,
+  StructuredOutputStreamEventKind,
   StructuredOutputValidation,
   StructuredOutputValidationRequest,
   StructuredOutputMode,
@@ -11,17 +12,16 @@ import {
   type StructuredOutputPromptResult as ProtoStructuredOutputPromptResult,
   type StructuredOutputRequest as ProtoStructuredOutputRequest,
   type StructuredOutputResult as ProtoStructuredOutputResult,
+  type StructuredOutputStreamEvent as ProtoStructuredOutputStreamEvent,
   type StructuredOutputValidation as ProtoStructuredOutputValidation,
   type StructuredOutputValidationRequest as ProtoStructuredOutputValidationRequest,
 } from '@runanywhere/proto-ts/structured_output';
 import {
   LLMGenerateRequest,
+  LLMStreamEvent,
   type LLMGenerateRequest as ProtoLLMGenerateRequest,
+  type LLMStreamEvent as ProtoLLMStreamEvent,
 } from '@runanywhere/proto-ts/llm_service';
-import {
-  LLMGenerationResult,
-  type LLMGenerationResult as ProtoLLMGenerationResult,
-} from '@runanywhere/proto-ts/llm_options';
 
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { SDKException } from '../../../../src/Foundation/SDKException';
@@ -49,7 +49,10 @@ function makeStructuredOutputModule(
   handlerOrHandlers:
     | ((request: ProtoStructuredOutputParseRequest) => ProtoStructuredOutputResult)
     | StructuredOutputHandlers,
-  generateHandler?: (request: ProtoLLMGenerateRequest) => ProtoLLMGenerationResult,
+  llmStreamHandler?: (
+    request: ProtoLLMGenerateRequest,
+    emit: (event: ProtoLLMStreamEvent) => void,
+  ) => number,
 ): ModalityProtoModule & EmscriptenRunanywhereModule {
   const handlers = typeof handlerOrHandlers === 'function'
     ? { parse: handlerOrHandlers }
@@ -78,12 +81,33 @@ function makeStructuredOutputModule(
     heap32[(outResult + OFF_STATUS) >>> 2] = 0;
   };
 
+  const writeEmptyResult = (outResult: number): void => {
+    heapU32[(outResult + OFF_DATA) >>> 2] = 0;
+    heapU32[(outResult + OFF_SIZE) >>> 2] = 0;
+    heap32[(outResult + OFF_STATUS) >>> 2] = 0;
+  };
+
+  // Map of synthetic function-table indices to JS callbacks. Mirrors the
+  // Emscripten function table that `addFunction` populates in real builds
+  // (same harness pattern as RunAnywhere+TextGenerationStream.test.ts).
+  const callbackTable = new Map<number, (bytesPtr: number, size: number) => unknown>();
+  let nextCallbackId = 1;
+
   const module: Partial<ModalityProtoModule & EmscriptenRunanywhereModule> = {
     HEAPU8: heapU8,
     HEAPU32: heapU32,
     HEAP32: heap32,
     _malloc: malloc,
     _free: () => undefined,
+    addFunction(fn: (...args: number[]) => unknown, _signature: string): number {
+      const id = nextCallbackId;
+      nextCallbackId += 1;
+      callbackTable.set(id, fn as (bytesPtr: number, size: number) => unknown);
+      return id;
+    },
+    removeFunction(ptr: number): void {
+      callbackTable.delete(ptr);
+    },
     _rac_proto_buffer_init(bufferPtr: number): void {
       heapU32[(bufferPtr + OFF_DATA) >>> 2] = 0;
       heapU32[(bufferPtr + OFF_SIZE) >>> 2] = 0;
@@ -134,43 +158,55 @@ function makeStructuredOutputModule(
       return 0;
     };
   }
-  if (generateHandler) {
+  if (llmStreamHandler) {
     module._rac_llm_generate_proto = (
-      requestPtr: number,
-      requestSize: number,
+      _requestPtr: number,
+      _requestSize: number,
       outResult: number,
     ): number => {
-      const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
-      const request = LLMGenerateRequest.decode(requestBytes);
-      const resultBytes = LLMGenerationResult.encode(generateHandler(request)).finish();
-      writeResult(outResult, resultBytes);
+      // Present so `supportsProtoLLM()` (which requires the
+      // generate/generate_stream/cancel trio) returns true; the streaming
+      // structured-output path never exercises it.
+      writeEmptyResult(outResult);
       return 0;
     };
-    module._rac_llm_generate_stream_proto = () => 0;
-    module._rac_llm_cancel_proto = () => 0;
+    module._rac_llm_generate_stream_proto = (
+      requestPtr: number,
+      requestSize: number,
+      callbackPtr: number,
+      _userData: number,
+    ): number => {
+      const fn = callbackTable.get(callbackPtr);
+      if (!fn) {
+        throw new Error(
+          `_rac_llm_generate_stream_proto: unknown callback id ${callbackPtr}`,
+        );
+      }
+      const requestBytes = heapU8.slice(requestPtr, requestPtr + requestSize);
+      const request = LLMGenerateRequest.decode(requestBytes);
+      const emit = (event: ProtoLLMStreamEvent): void => {
+        const eventBytes = LLMStreamEvent.encode(event).finish();
+        const ptr = malloc(eventBytes.byteLength);
+        heapU8.set(eventBytes, ptr);
+        fn(ptr, eventBytes.byteLength);
+      };
+      return llmStreamHandler(request, emit);
+    };
+    module._rac_llm_cancel_proto = (outEventPtr: number): number => {
+      writeEmptyResult(outEventPtr);
+      return 0;
+    };
   }
   return module as ModalityProtoModule & EmscriptenRunanywhereModule;
 }
 
-function llmResult(text: string): ProtoLLMGenerationResult {
-  return {
-    text,
-    inputTokens: 0,
-    tokensGenerated: 0,
-    modelUsed: 'test',
-    generationTimeMs: 0,
-    tokensPerSecond: 0,
-    finishReason: 'stop',
-    thinkingTokens: 0,
-    responseTokens: 0,
-    totalTokens: 0,
+function streamingTokenEvent(token: string, isFinal = false): ProtoLLMStreamEvent {
+  return LLMStreamEvent.fromPartial({
+    token,
+    isFinal,
+    finishReason: isFinal ? 'stop' : '',
     errorCode: 0,
-    cachedPromptTokens: 0,
-    promptEvalTimeMs: 0,
-    decodeTimeMs: 0,
-    toolCalls: [],
-    toolResults: [],
-  };
+  });
 }
 
 describe('extractStructuredOutput', () => {
@@ -327,7 +363,7 @@ describe('generateStructuredStream', () => {
     clearRunanywhereModule();
   });
 
-  it('parses generated text through StructuredOutput.Parse proto bytes', async () => {
+  it('streams token events then parses the accumulated text into a terminal COMPLETED event', async () => {
     let capturedGenerate: ProtoLLMGenerateRequest | undefined;
     let capturedParse: ProtoStructuredOutputParseRequest | undefined;
     const module = makeStructuredOutputModule(
@@ -347,14 +383,18 @@ describe('generateStructuredStream', () => {
           errorCode: 0,
         };
       },
-      (request) => {
+      (request, emit) => {
         capturedGenerate = request;
-        return llmResult('prefix {"city":"San Francisco"} suffix');
+        emit(streamingTokenEvent('prefix '));
+        emit(streamingTokenEvent('{"city":"San Francisco"}'));
+        emit(streamingTokenEvent(' suffix'));
+        emit(streamingTokenEvent('', true));
+        return 0;
       },
     );
     ModalityProtoAdapter.setDefaultModule(module);
 
-    const events: ProtoStructuredOutputResult[] = [];
+    const events: ProtoStructuredOutputStreamEvent[] = [];
     for await (const event of generateStructuredStream(
       'weather in SF',
       { jsonSchema: '{"type":"object","required":["city"]}' },
@@ -363,11 +403,42 @@ describe('generateStructuredStream', () => {
       events.push(event);
     }
 
+    // The LLM request goes through the real streaming path with the schema
+    // mapped from the structured-output options (Swift
+    // RALLMTypes+CppBridge.swift:66-74 parity) and the Swift defaults
+    // (RALLMTypes+CppBridge.swift:13-21) filling the unset knobs.
     expect(capturedGenerate?.prompt).toBe('weather in SF');
+    expect(capturedGenerate?.streamingEnabled).toBe(true);
     expect(capturedGenerate?.jsonSchema).toBe('{"type":"object","required":["city"]}');
+    expect(capturedGenerate?.responseFormat).toBe('json_schema');
+    expect(capturedGenerate?.maxTokens).toBe(64);
+    expect(capturedGenerate?.temperature).toBeCloseTo(0.8);
+    expect(capturedGenerate?.topP).toBeCloseTo(1.0);
+    expect(capturedGenerate?.repetitionPenalty).toBeCloseTo(1.0);
+
+    // Three TOKEN events stream through before the terminal COMPLETED event;
+    // `seq` is monotonically increasing across the whole stream.
+    expect(events).toHaveLength(4);
+    expect(events.map((event) => event.kind)).toEqual([
+      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+      StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
+    ]);
+    expect(events.slice(0, 3).map((event) => event.token)).toEqual([
+      'prefix ',
+      '{"city":"San Francisco"}',
+      ' suffix',
+    ]);
+    expect(events.map((event) => event.seq)).toEqual([1, 2, 3, 4]);
+
+    // The accumulated transcript is parsed through StructuredOutput.Parse
+    // proto bytes and carried on the terminal event's `result`.
     expect(capturedParse?.text).toBe('prefix {"city":"San Francisco"} suffix');
     expect(capturedParse?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
-    expect(events).toHaveLength(1);
-    expect(new TextDecoder().decode(events[0]!.parsedJson)).toBe('{"city":"San Francisco"}');
+    const terminal = events[3]!;
+    expect(terminal.result).toBeDefined();
+    expect(new TextDecoder().decode(terminal.result!.parsedJson)).toBe('{"city":"San Francisco"}');
+    expect(terminal.result!.validation?.isValid).toBe(true);
   });
 });

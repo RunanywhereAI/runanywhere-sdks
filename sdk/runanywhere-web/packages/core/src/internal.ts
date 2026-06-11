@@ -121,6 +121,14 @@ export { ModelLifecycleAdapter } from './Adapters/ModelLifecycleAdapter';
 export type { ModelLifecycleModule } from './Adapters/ModelLifecycleAdapter';
 export { DownloadAdapter } from './Adapters/DownloadAdapter';
 export type { DownloadModule, ProtoDownloadProgressHandler } from './Adapters/DownloadAdapter';
+
+// Raw proto-bridge namespaces (Web's CppBridge analog). Swift keeps its
+// bridge internal, so these are NOT on the public `RunAnywhere` facade —
+// app code uses the flat Swift-named verbs (`downloadModel`, `listModels`,
+// `importModel`, ...) instead. Backend packages and harnesses that need the
+// raw plan/start/poll or registry mutate primitives import them from here.
+export { Downloads } from './Public/Extensions/RunAnywhere+Downloads';
+export { ModelRegistry } from './Public/Extensions/RunAnywhere+ModelRegistry';
 export { StorageAdapter } from './Adapters/StorageAdapter';
 export type { StorageModule } from './Adapters/StorageAdapter';
 export { SDKEventStreamAdapter } from './Adapters/SDKEventStreamAdapter';
@@ -189,32 +197,6 @@ export {
 export type {
   VisionLanguageProvider,
 } from './Public/Extensions/RunAnywhere+VisionLanguage';
-
-// SpeechProvider escape hatch — INTERNAL / EXPERIMENTAL only. See the
-// REMOVAL CONTRACT comment in `./Public/Extensions/SpeechProvider.ts`.
-// The proto-byte adapters (STTProtoAdapter / TTSProtoAdapter /
-// VADProtoAdapter) remain the canonical core speech path; the symbols
-// below MUST disappear once the unified racommons-llamacpp.wasm artifact
-// passes STT/TTS/VAD smoke tests with ORT + Sherpa linked in
-// (DUPLICATE-ABSTRACTIONS-AND-SOLID-001).
-export {
-  disposeSpeechProvider,
-  getSpeechProvider,
-  hasSpeechProviderSTT,
-  hasSpeechProviderTTS,
-  hasSpeechProviderVAD,
-  setSpeechProvider,
-} from './Public/Extensions/SpeechProvider';
-export type {
-  SpeechProvider,
-  SpeechProviderDetectVoiceInput,
-  SpeechProviderModelHandle,
-  SpeechProviderSTTLoadRequest,
-  SpeechProviderSynthesizeInput,
-  SpeechProviderTTSLoadRequest,
-  SpeechProviderTranscribeInput,
-  SpeechProviderVADLoadRequest,
-} from './Public/Extensions/SpeechProvider';
 
 export { SolutionAdapter, SolutionHandle } from './Adapters/SolutionAdapter';
 export type { SolutionRunInput } from './Adapters/SolutionAdapter';

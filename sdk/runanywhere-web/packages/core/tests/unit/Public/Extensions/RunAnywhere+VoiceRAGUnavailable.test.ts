@@ -6,14 +6,19 @@ import {
   RAG,
   createRAGNativeProvider,
   createDefaultRAGConfiguration,
+  ragCreatePipeline,
+  ragGetStatistics,
+  ragQuery,
   setRAGProvider,
   setRAGSessionHandle,
   unavailableRAGResult,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import {
   VoiceAgent,
+  processVoiceTurn,
   setVoiceAgentHandle,
   setVoiceAgentProvider,
+  streamVoiceAgent,
 } from '../../../../src/Public/Extensions/RunAnywhere+VoiceAgent';
 
 describe('VoiceAgent and RAG provider-required facades', () => {
@@ -26,7 +31,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   it('returns a typed voice-agent unavailable result instead of composed fallback success', async () => {
     expect(VoiceAgent.availability().available).toBe(false);
 
-    const result = await VoiceAgent.processTurn(new Float32Array([0, 0, 0, 0]));
+    const result = await processVoiceTurn(new Float32Array([0, 0, 0, 0]));
 
     expect(result.speechDetected).toBe(false);
     expect(result.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
@@ -35,7 +40,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   });
 
   it('emits a typed voice-agent error event when no stream provider is registered', async () => {
-    const iterator = VoiceAgent.stream()[Symbol.asyncIterator]();
+    const iterator = streamVoiceAgent()[Symbol.asyncIterator]();
     const first = await iterator.next();
 
     expect(first.done).toBe(false);
@@ -46,8 +51,8 @@ describe('VoiceAgent and RAG provider-required facades', () => {
   it('returns typed RAG unavailable query/statistics results without local vector fallback', async () => {
     expect(RAG.availability().available).toBe(false);
 
-    const query = await RAG.query('What is indexed?');
-    const stats = await RAG.getStatistics();
+    const query = await ragQuery('What is indexed?');
+    const stats = await ragGetStatistics();
 
     expect(query.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
     expect(query.retrievedChunks).toEqual([]);
@@ -59,7 +64,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
 
     const availability = RAG.availability();
-    const query = await RAG.query('What is indexed?');
+    const query = await ragQuery('What is indexed?');
 
     expect(availability.available).toBe(false);
     expect(availability.source).toBe('wasm-exports');
@@ -80,14 +85,15 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
     setRAGProvider(createRAGNativeProvider());
 
-    await expect(RAG.createPipeline(createDefaultRAGConfiguration({
+    await expect(ragCreatePipeline(createDefaultRAGConfiguration({
       embeddingModelPath: '/models/embed.onnx',
       llmModelPath: '/models/llm.gguf',
       persistIndex: true,
       indexPath: 'opfs://runanywhere/rag/docs',
     }))).rejects.toMatchObject({
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      details: expect.stringContaining('browser storage-backed index adapter'),
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      proto: { nestedMessage: expect.stringContaining('browser storage-backed index adapter') },
     });
 
     expect(RAG.capabilities().persistent).toBe(false);
@@ -122,12 +128,14 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
 
     await expect(RAG.listDocuments()).rejects.toMatchObject({
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      details: expect.stringContaining('does not expose document listing'),
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      proto: { nestedMessage: expect.stringContaining('does not expose document listing') },
     });
     await expect(RAG.removeDocument('doc-1')).rejects.toMatchObject({
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      details: expect.stringContaining('does not expose document-level removal'),
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      proto: { nestedMessage: expect.stringContaining('does not expose document-level removal') },
     });
   });
 
@@ -161,8 +169,9 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
 
     await expect(RAG.listDocuments()).rejects.toMatchObject({
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      details: expect.stringContaining('does not expose document listing'),
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      proto: { nestedMessage: expect.stringContaining('does not expose document listing') },
     });
   });
 
@@ -196,7 +205,8 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
 
     await expect(RAG.listDocuments()).rejects.toMatchObject({
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
     });
   });
 });

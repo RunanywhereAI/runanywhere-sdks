@@ -11,9 +11,9 @@
  *      either one so the chat tab is considered interactive as soon as the
  *      user has a clear path to a model.
  *
- * Model actions flow through the proto-byte bridges:
+ * Model actions flow through the flat Swift-named facade verbs:
  *
- *   - `RunAnywhere.modelRegistry.*`    — catalog list / get
+ *   - `RunAnywhere.listModels()` / `getModel(...)` — catalog list / get
  *   - `RunAnywhere.downloadModel(...)` — download with progress callback
  *   - `RunAnywhere.loadModel(...)`     — load through the C++ lifecycle ABI
  *

@@ -62,8 +62,8 @@ export const VisionLanguage = {
       WebModelLifecycle.currentModel({ includeModelMetadata: true });
 
     if (!current?.modelId) {
-      throw SDKException.componentNotReady(
-        'vlm',
+      // Swift parity: RunAnywhere+VisionLanguage.swift:40 throws `.notInitialized` ("VLM model not loaded").
+      throw SDKException.notInitialized(
         'No VLM model is loaded. Call RunAnywhere.loadModel(...) with a multimodal model before RunAnywhere.processImage().',
       );
     }
@@ -116,12 +116,15 @@ function normalizeVLMGenerationOptions(
   options: VLMGenerationOptions,
   streamingEnabled: boolean,
 ): VLMGenerationOptions {
+  // Defaults mirror Swift `RAVLMGenerationOptions.defaults()`
+  // (RAVLMImage+Helpers.swift:25-33): maxTokens 256, temperature 0.7,
+  // topP 0.9, topK 40. Normalize only when unset/<=0.
   return {
     prompt: options.prompt ?? '',
-    maxTokens: options.maxTokens > 0 ? options.maxTokens : 2048,
+    maxTokens: options.maxTokens > 0 ? options.maxTokens : 256,
     temperature: options.temperature > 0 ? options.temperature : 0.7,
     topP: options.topP > 0 ? options.topP : 0.9,
-    topK: options.topK ?? 0,
+    topK: options.topK > 0 ? options.topK : 40,
     stopSequences: options.stopSequences ?? [],
     streamingEnabled,
     systemPrompt: options.systemPrompt,

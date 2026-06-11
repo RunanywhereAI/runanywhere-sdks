@@ -6,7 +6,7 @@
  * embedded inline as string constants (no asset bundling). Each lifecycle
  * transition is appended to a simple scrolling log.
  */
-import { RunAnywhere } from '@runanywhere/web';
+import { RunAnywhere, type RAGAvailability } from '@runanywhere/web';
 import { ONNX } from '@runanywhere/web-onnx';
 import type { TabLifecycle } from '../app';
 import { formatError } from '../services/format-error';
@@ -104,24 +104,19 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
     }
 
     if (name === 'RAG') {
-      let availability = RunAnywhere.rag.availability();
-      // wasm-exports means the RAG WASM is healthy but no provider has
-      // bootstrapped yet; the example owns that bootstrap so the demo can
-      // exercise the public API end-to-end. Only treat truly missing exports
-      // (RAC_BACKEND_RAG=OFF or no WASM module) as terminal.
-      if (!availability.available && availability.source === 'wasm-exports') {
-        try {
-          await RunAnywhere.rag.createPipeline(
-            RunAnywhere.rag.defaultConfiguration({
-              embeddingModelId: 'all-minilm-l6-v2',
-              llmModelId: 'smollm2-360m-q8_0',
-            }),
-          );
-          availability = RunAnywhere.rag.availability();
-        } catch (err) {
-          append(`N/A RAG: bootstrap failed: ${formatError(err)}`);
-          return;
-        }
+      // `rag.ensureReady` owns the bootstrap: when the RAG WASM exports are
+      // healthy but no provider has bootstrapped yet, the SDK creates the
+      // native session; truly missing exports (RAC_BACKEND_RAG=OFF or no
+      // WASM module) come back as a terminal unavailable snapshot.
+      let availability: RAGAvailability;
+      try {
+        availability = await RunAnywhere.rag.ensureReady({
+          embeddingModelId: 'all-minilm-l6-v2',
+          llmModelId: 'smollm2-360m-q8_0',
+        });
+      } catch (err) {
+        append(`N/A RAG: bootstrap failed: ${formatError(err)}`);
+        return;
       }
       if (!availability.available) {
         append(`N/A RAG: ${availability.reason}`);

@@ -14,6 +14,11 @@
 import { HybridSttRouter } from './Hybrid/HybridSttRouter';
 import { CloudSTT, cloud, type CloudSTTConfig } from './Hybrid/CloudSTT';
 import {
+  registerCloudSttProvider,
+  unregisterCloudSttProvider,
+  type SttProviderHandler,
+} from './Hybrid/CloudSttProvider';
+import {
   setHybridDeviceStateProvider,
   browserDeviceStateProvider,
   type HybridDeviceStateProvider,
@@ -47,6 +52,18 @@ export const Hybrid = {
    * side is routable. Returns false when the build doesn't link the cloud engine. */
   registerCloudBackend(): boolean {
     return CloudSTT.registerBackend();
+  },
+
+  /** Register a developer-defined cloud STT provider handler by name (the
+   * host owns build + HTTP + parse). Mirrors Swift `Cloud.registerProvider`. */
+  registerCloudProvider(name: string, handler: SttProviderHandler): boolean {
+    return registerCloudSttProvider(name, handler);
+  },
+
+  /** Remove a developer-defined cloud STT provider. Idempotent for unknown
+   * names. Mirrors Swift `Cloud.unregisterProvider`. */
+  unregisterCloudProvider(name: string): void {
+    unregisterCloudSttProvider(name);
   },
 
   /** Install the host device-state provider the router consults for the

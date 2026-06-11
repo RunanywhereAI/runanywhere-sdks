@@ -255,15 +255,6 @@ const CATALOG: readonly CatalogEntry[] = [
  * because no backend WASM has loaded).
  */
 export function registerModelCatalog(): number {
-  const availability = RunAnywhere.modelRegistry.availability();
-  if (availability.status !== 'available') {
-    console.warn(
-      '[model-catalog] proto registry unavailable, skipping registration:',
-      availability,
-    );
-    return 0;
-  }
-
   let registered = 0;
   for (const entry of CATALOG) {
     if (tryRegister(entry)) {

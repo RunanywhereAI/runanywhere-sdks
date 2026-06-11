@@ -729,6 +729,13 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_storage_analyzer_delete_plan_proto"
     "_rac_storage_analyzer_delete_proto"
 
+    # File manager cache/temp clears. C++-side shims (wasm_exports.cpp) build
+    # the rac_file_callbacks_t against this module's MEMFS and forward to
+    # commons rac_file_manager_clear_cache/clear_temp — Swift clearCache /
+    # cleanTempFiles parity for the Web flat API.
+    "_rac_wasm_file_manager_clear_cache"
+    "_rac_wasm_file_manager_clear_temp"
+
     # VLM service
     "_rac_vlm_get_builtin_template"
     "_rac_vlm_result_free"
@@ -929,7 +936,6 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_sizeof_tts_result"
     "_rac_wasm_sizeof_vad_config"
     "_rac_wasm_sizeof_voice_agent_config"
-    "_rac_wasm_sizeof_voice_agent_result"
     "_rac_wasm_sizeof_vlm_options"
     "_rac_wasm_sizeof_vlm_result"
     "_rac_wasm_sizeof_vlm_image"
@@ -1020,6 +1026,11 @@ set(RAC_EXPORTED_FUNCTIONS_SHERPA
 set(RAC_EXPORTED_FUNCTIONS_CLOUD
     "_rac_backend_cloud_register"
     "_rac_backend_cloud_unregister"
+    # Host-supplied cloud STT provider registry (rac_cloud_stt_provider.h) —
+    # backs CloudSTT.registerProvider/unregisterProvider on the Web facade
+    # (Swift Cloud.registerProvider parity).
+    "_rac_cloud_register_stt_provider"
+    "_rac_cloud_unregister_stt_provider"
 )
 
 # RAG generated-proto pipeline. The RAG OBJECT library folds into

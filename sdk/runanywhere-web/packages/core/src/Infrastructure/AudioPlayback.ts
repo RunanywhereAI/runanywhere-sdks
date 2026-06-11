@@ -92,14 +92,14 @@ export class AudioPlayback {
       source.onended = () => {
         this._isPlaying = false;
         this.currentSource = null;
-        EventBus.shared.emit('playback.completed', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs });
+        EventBus.shared.publish('playback.completed', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs });
         resolve();
       };
 
       this.currentSource = source;
       this._isPlaying = true;
 
-      EventBus.shared.emit('playback.started', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs, sampleRate: rate });
+      EventBus.shared.publish('playback.started', EventCategory.EVENT_CATEGORY_AUDIO, { durationMs, sampleRate: rate });
       source.start();
     });
   }
