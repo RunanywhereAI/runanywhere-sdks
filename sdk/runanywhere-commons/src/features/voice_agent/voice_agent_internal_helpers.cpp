@@ -29,6 +29,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #if defined(RAC_HAVE_PROTOBUF)
 #include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 // Voice agent proto path consults the global model lifecycle (level 1:
@@ -176,11 +177,9 @@ void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_e
     sdk_event.set_source("cpp");
     sdk_event.set_operation_id("voice_agent.pipeline");
     sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
-    const size_t size = sdk_event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size == 0 || sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the events layer so voice-agent telemetry reaches the
+    // telemetry + log sinks per the destination bitmask, not just public.
+    (void)rac::events::publish_prebuilt(sdk_event);
 }
 
 void emit_generated_voice_event(rac_voice_agent_handle_t handle,

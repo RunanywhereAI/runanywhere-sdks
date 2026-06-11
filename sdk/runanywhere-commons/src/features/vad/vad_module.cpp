@@ -251,11 +251,9 @@ void publish_vad_pipeline_event(bool is_speech, float confidence, float energy, 
     sdk_event.set_source("cpp");
     sdk_event.set_operation_id("vad.process");
     sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
-    const size_t size = sdk_event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size == 0 || sdk_event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        (void)rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
-    }
+    // Route through the events layer. telemetry_records gates per-frame VAD out
+    // of the telemetry batch (only failures recorded), so this does not flood.
+    (void)rac::events::publish_prebuilt(sdk_event);
 }
 
 void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) {
