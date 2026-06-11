@@ -19,6 +19,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASTTOptions
 import com.runanywhere.sdk.public.types.RASTTOutput
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -88,8 +89,12 @@ fun RunAnywhere.transcribeStream(
             return@callbackFlow
         }
 
+        // Dispatch off the collector's context: session start creates the
+        // recognizer (seconds of blocking JNI) and every audio chunk is fed
+        // through a blocking JNI call. Collected from the main thread (the
+        // common case for view-models) this froze the UI and ANR'd the app.
         val streamJob =
-            launch {
+            launch(Dispatchers.IO) {
                 var sawFinal = false
                 try {
                     CppBridgeSTT.transcribeSessionStream(audio, options, current) { partial ->

@@ -176,19 +176,13 @@ object CppBridgeVLM {
                 VLMGenerationOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->
                     try {
-                        val streamEvent = VlmStreamEventMapper.decodeStreamPayload(bytes)
-                        if (streamEvent != null) {
-                            val sdkEvent = VlmStreamEventMapper.toSdkEvent(streamEvent)
-                            if (sdkEvent != null) {
-                                onEvent(sdkEvent)
-                            }
-                            VlmStreamEventMapper.shouldContinueNativeStream(streamEvent)
-                        } else {
-                            onEvent(SDKEvent.ADAPTER.decode(bytes))
-                            true
-                        }
-                    } catch (e: SDKException) {
-                        throw e
+                        // `rac_vlm_process_stream_proto` emits canonical SDKEvent
+                        // envelopes (per-token TOKEN_GENERATED + terminal
+                        // STREAM_COMPLETED — vlm_module.cpp stream_token_trampoline).
+                        // Decode SDKEvent directly: trying VLMStreamEvent first
+                        // mis-decodes these bytes (proto skips unknown fields,
+                        // kind stays UNSPECIFIED) and every event gets dropped.
+                        onEvent(SDKEvent.ADAPTER.decode(bytes))
                     } catch (e: Exception) {
                         logger.warning("Failed to decode VLM stream event: ${e.message}")
                         true
