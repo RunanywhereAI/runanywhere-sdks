@@ -280,6 +280,25 @@ rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t
         // Only retrieved_docs_count has a data source today; the other RAG fields
         // (query_token_count, embedding_model, top_k, …) are optional and omitted.
         json.add_int("retrieved_docs_count", payload->retrieved_docs_count);
+    } else if (strcmp(modality, "embeddings") == 0) {
+        // input_count / vectors_produced / embedding_model have sources today;
+        // embedding_dimension / total_tokens / batch_size need a proto carrier.
+        json.add_int("input_count", payload->input_count);
+        json.add_int("vectors_produced", payload->vectors_produced);
+        json.add_string("embedding_model", payload->model_id);
+    } else if (strcmp(modality, "voice") == 0) {
+        // Per-turn voice-agent pipeline summary (from MetricsEvent).
+        json.add_double("stt_ms", payload->voice_stt_ms);
+        json.add_double("llm_ms", payload->voice_llm_ms);
+        json.add_double("tts_ms", payload->voice_tts_ms);
+        json.add_double("total_ms", payload->voice_total_ms);
+    } else if (strcmp(modality, "vad") == 0) {
+        json.add_double("speech_duration_ms", payload->speech_duration_ms);
+        json.add_double("silence_duration_ms", payload->silence_duration_ms);
+        json.add_int("sample_rate", payload->sample_rate);
+    } else if (strcmp(modality, "lora") == 0) {
+        // operation is encoded in event_type; base model rides on model_id.
+        json.add_string("base_model_id", payload->model_id);
     } else if (strcmp(modality, "imagegen") == 0) {
         // Diffusion capability events carry only progress, which the imagegen
         // schema does not accept — emit base fields only until diffusion supplies

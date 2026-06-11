@@ -15,7 +15,9 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -47,7 +49,8 @@ struct rac_telemetry_manager {
     // Batching configuration
     static constexpr size_t BATCH_SIZE_PRODUCTION = 10;  // Flush after 10 events in production
     static constexpr int64_t BATCH_TIMEOUT_MS = 5000;    // Flush after 5 seconds in production
-    int64_t last_flush_time_ms = 0;                      // Track last flush time for timeout
+    static constexpr size_t MAX_QUEUE_SIZE = 256;  // Cap while flushes defer (e.g. pre-auth)
+    int64_t last_flush_time_ms = 0;                // Track last flush time for timeout
 };
 
 // =============================================================================
@@ -91,6 +94,27 @@ char* dup_string(const char* s) {
     if (copy)
         memcpy(copy, s, len);
     return copy;
+}
+
+// Free the strings dup'd into a queued payload copy
+void free_payload_strings(rac_telemetry_payload_t& event) {
+    free((void*)event.id);
+    free((void*)event.event_type);
+    free((void*)event.modality);
+    free((void*)event.device_id);
+    free((void*)event.session_id);
+    free((void*)event.model_id);
+    free((void*)event.model_name);
+    free((void*)event.framework);
+    free((void*)event.device);
+    free((void*)event.os_version);
+    free((void*)event.platform);
+    free((void*)event.sdk_version);
+    free((void*)event.error_message);
+    free((void*)event.error_code);
+    free((void*)event.language);
+    free((void*)event.voice);
+    free((void*)event.archive_type);
 }
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -149,6 +173,12 @@ const char* component_to_modality(runanywhere::v1::SDKComponent component, bool 
             return "rag";
         case runanywhere::v1::SDK_COMPONENT_DIFFUSION:
             return "imagegen";
+        case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS:
+            return "embeddings";
+        case runanywhere::v1::SDK_COMPONENT_VAD:
+            return "vad";
+        case runanywhere::v1::SDK_COMPONENT_VOICE_AGENT:
+            return "voice";
         default:
             return "system";
     }
@@ -188,6 +218,15 @@ void rac_telemetry_manager_destroy(rac_telemetry_manager_t* manager) {
 
     // Flush any remaining events
     rac_telemetry_manager_flush(manager);
+
+    // Anything still queued (e.g. flush deferred pre-auth) is freed, not sent
+    {
+        std::lock_guard<std::mutex> lock(manager->queue_mutex);
+        for (auto& event : manager->queue) {
+            free_payload_strings(event);
+        }
+        manager->queue.clear();
+    }
 
     delete manager;
     RAC_LOG_DEBUG("Telemetry", "Telemetry manager destroyed");
@@ -244,6 +283,12 @@ rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
 
     {
         std::lock_guard<std::mutex> lock(manager->queue_mutex);
+        if (manager->queue.size() >= rac_telemetry_manager::MAX_QUEUE_SIZE) {
+            RAC_LOG_WARNING("Telemetry", "Queue full (%zu events), dropping oldest",
+                            manager->queue.size());
+            free_payload_strings(manager->queue.front());
+            manager->queue.erase(manager->queue.begin());
+        }
         manager->queue.push_back(copy);
     }
 
@@ -456,6 +501,16 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
         }
         case SDKEvent::kNetwork:
             return "network.connectivity.changed";
+        case SDKEvent::kVoicePipeline: {
+            if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
+                return "vad.process";
+            }
+            if (ev.voice_pipeline().payload_case() == runanywhere::v1::VoiceEvent::kMetrics) {
+                out_is_completion = true;
+                return "voice.turn.metrics";
+            }
+            return "voice.pipeline";
+        }
         case SDKEvent::kCapability: {
             // VLM / RAG / diffusion (imagegen) capability operations. *_COMPLETED
             // and *_FAILED are terminal → flag for immediate flush.
@@ -491,6 +546,23 @@ std::string proto_event_type_string(const SDKEvent& ev, bool& out_is_completion)
                 case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_FAILED:
                     out_is_completion = true;
                     return "rag.query.failed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED:
+                    return "embeddings.embed.started";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED:
+                    out_is_completion = true;
+                    return "embeddings.embed.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_FAILED:
+                    out_is_completion = true;
+                    return "embeddings.embed.failed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
+                    out_is_completion = true;
+                    return "lora.attach.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
+                    out_is_completion = true;
+                    return "lora.detach.completed";
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED:
+                    out_is_completion = true;
+                    return "lora.failed";
                 default:
                     return "capability";
             }
@@ -533,6 +605,15 @@ bool telemetry_records(const SDKEvent& ev) {
         case SDKEvent::kCapability:
             return ev.capability().kind() !=
                    runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_PROGRESS;
+        case SDKEvent::kVoicePipeline:
+            // VAD is per-frame → record failures only (avoid flooding). Voice-agent
+            // records only the per-turn MetricsEvent summary; all other pipeline
+            // sub-events (tokens, state changes, audio frames) stay public/log only.
+            if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
+                return ev.has_error() ||
+                       ev.category() == runanywhere::v1::EVENT_CATEGORY_FAILURE;
+            }
+            return ev.voice_pipeline().payload_case() == runanywhere::v1::VoiceEvent::kMetrics;
         case SDKEvent::kModel:
             switch (ev.model().kind()) {
                 case runanywhere::v1::MODEL_EVENT_KIND_LOAD_PROGRESS:
@@ -760,6 +841,18 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
             const auto& c = ev.capability();
             if (!c.model_id().empty())
                 payload.model_id = c.model_id().c_str();
+            // LoRA capability events ride on SDK_COMPONENT_LLM, so component_to_modality
+            // mapped them to "llm". Override to "lora" by capability kind. model_id
+            // carries the base model; the operation is encoded in event_type.
+            switch (c.kind()) {
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_FAILED:
+                    payload.modality = "lora";
+                    break;
+                default:
+                    break;
+            }
             switch (ev.component()) {
                 case runanywhere::v1::SDK_COMPONENT_VLM:
                     payload.image_count = static_cast<int32_t>(c.input_count());
@@ -769,6 +862,12 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 case runanywhere::v1::SDK_COMPONENT_RAG:
                     payload.retrieved_docs_count = static_cast<int32_t>(c.output_count());
                     break;
+                case runanywhere::v1::SDK_COMPONENT_EMBEDDINGS:
+                    // input_count = texts embedded, output_count = vectors produced.
+                    // embedding_model is read from model_id (set above) in the JSON.
+                    payload.input_count = static_cast<int32_t>(c.input_count());
+                    payload.vectors_produced = static_cast<int32_t>(c.output_count());
+                    break;
                 default:
                     break;
             }
@@ -777,6 +876,9 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                 case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED:
                 case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED:
                 case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_DIFFUSION_COMPLETED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_COMPLETED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_ATTACHED:
+                case runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_LORA_DETACHED:
                     if (!ev.has_error()) {
                         payload.success = RAC_TRUE;
                         payload.has_success = RAC_TRUE;
@@ -784,6 +886,30 @@ rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
                     break;
                 default:
                     break;
+            }
+            break;
+        }
+        case SDKEvent::kVoicePipeline: {
+            const auto& vp = ev.voice_pipeline();
+            if (ev.component() == runanywhere::v1::SDK_COMPONENT_VAD) {
+                if (vp.payload_case() == runanywhere::v1::VoiceEvent::kVad) {
+                    payload.speech_duration_ms =
+                        static_cast<double>(vp.vad().speech_duration_ms());
+                    payload.silence_duration_ms =
+                        static_cast<double>(vp.vad().silence_duration_ms());
+                }
+            } else if (vp.payload_case() == runanywhere::v1::VoiceEvent::kMetrics) {
+                // Per-turn voice-agent pipeline summary.
+                const auto& m = vp.metrics();
+                payload.voice_stt_ms = m.stt_final_ms();
+                payload.voice_llm_ms = m.llm_total_ms();
+                payload.voice_tts_ms = m.tts_total_ms();
+                payload.voice_total_ms = m.end_to_end_ms();
+                payload.processing_time_ms = m.end_to_end_ms();
+                if (!ev.has_error()) {
+                    payload.success = RAC_TRUE;
+                    payload.has_success = RAC_TRUE;
+                }
             }
             break;
         }
@@ -823,6 +949,23 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
     if (!manager->http_callback) {
         RAC_LOG_DEBUG("Telemetry", "No HTTP callback registered, cannot flush telemetry");
         return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    // The V2 telemetry endpoints only accept a JWT; flushing before
+    // authentication would 401 and silently drop the batch (the HTTP callback
+    // is fire-and-forget). Keep events queued — rac_auth_handle_*_response
+    // kicks a flush the moment a token lands.
+    if (rac_env_requires_auth(manager->environment) && !rac_auth_is_authenticated()) {
+        size_t queued = 0;
+        {
+            std::lock_guard<std::mutex> lock(manager->queue_mutex);
+            queued = manager->queue.size();
+        }
+        if (queued > 0) {
+            RAC_LOG_DEBUG("Telemetry", "Deferring flush of %zu events: not authenticated yet",
+                          queued);
+        }
+        return RAC_SUCCESS;
     }
 
     // Get events from queue
@@ -877,23 +1020,7 @@ rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager) {
 
     // Free duplicated strings in events
     for (auto& event : events) {
-        free((void*)event.id);
-        free((void*)event.event_type);
-        free((void*)event.modality);
-        free((void*)event.device_id);
-        free((void*)event.session_id);
-        free((void*)event.model_id);
-        free((void*)event.model_name);
-        free((void*)event.framework);
-        free((void*)event.device);
-        free((void*)event.os_version);
-        free((void*)event.platform);
-        free((void*)event.sdk_version);
-        free((void*)event.error_message);
-        free((void*)event.error_code);
-        free((void*)event.language);
-        free((void*)event.voice);
-        free((void*)event.archive_type);
+        free_payload_strings(event);
     }
 
     return RAC_SUCCESS;

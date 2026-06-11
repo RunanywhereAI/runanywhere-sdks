@@ -110,8 +110,19 @@ typedef struct rac_telemetry_payload {
     // RAG-specific fields
     int32_t retrieved_docs_count;
 
+    // Embeddings-specific fields (embedding_model is read from model_id)
+    int32_t input_count;       // texts embedded in the op
+    int32_t vectors_produced;  // vectors returned
+
+    // Voice-agent per-turn pipeline fields (from MetricsEvent)
+    double voice_stt_ms;
+    double voice_llm_ms;
+    double voice_tts_ms;
+    double voice_total_ms;
+
     // VAD fields
     double speech_duration_ms;
+    double silence_duration_ms;
 
     // SDK lifecycle fields
     int32_t count;
