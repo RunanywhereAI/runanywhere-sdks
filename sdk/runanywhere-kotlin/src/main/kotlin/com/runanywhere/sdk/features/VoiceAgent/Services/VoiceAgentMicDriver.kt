@@ -19,7 +19,9 @@ package com.runanywhere.sdk.features.VoiceAgent.Services
 
 import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
+import ai.runanywhere.proto.v1.VoiceEvent
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
+import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.ByteArrayOutputStream
@@ -46,6 +48,7 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
 
     private val logger = SDKLogger("VoiceAgentMic")
     private val capture = AudioCaptureManager()
+    private val playback = AudioPlaybackManager()
 
     suspend fun run() {
         val chunks = Channel<ByteArray>(Channel.UNLIMITED)
@@ -55,6 +58,7 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
             segmentLoop(chunks)
         } finally {
             capture.stopRecording()
+            playback.stop()
             chunks.close()
             logger.info("Voice-agent mic capture stopped")
         }
@@ -113,7 +117,7 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
         }
     }
 
-    private fun processTurn(audio: ByteArray) {
+    private suspend fun processTurn(audio: ByteArray) {
         val request =
             VoiceAgentTurnRequest(
                 request_id = UUID.randomUUID().toString(),
@@ -123,15 +127,33 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
                 encoding = AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
             )
         logger.info("Submitting voice turn (${audio.size} bytes)")
+
+        // Accumulate synthesized TTS frames from the turn's event stream;
+        // played after the native call returns. Events also reach
+        // streamVoiceAgent() collectors via the handle callback fan-out.
+        val ttsPcm = ByteArrayOutputStream()
+        var ttsSampleRate = 0
+        var ttsEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         try {
-            // Events reach streamVoiceAgent() collectors via the handle
-            // callback fan-out; this listener only keeps the native stream
-            // alive.
             val rc =
                 RunAnywhereBridge.racVoiceAgentProcessTurnProto(
                     handle,
                     VoiceAgentTurnRequest.ADAPTER.encode(request),
-                ) { true }
+                ) { bytes ->
+                    try {
+                        val frame = VoiceEvent.ADAPTER.decode(bytes).audio
+                        if (frame != null && frame.pcm.size > 0) {
+                            ttsPcm.write(frame.pcm.toByteArray())
+                            if (frame.sample_rate_hz > 0) ttsSampleRate = frame.sample_rate_hz
+                            if (frame.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+                                ttsEncoding = frame.encoding
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // Non-VoiceEvent or undecodable payload — ignore.
+                    }
+                    true
+                }
             if (rc != RunAnywhereBridge.RAC_SUCCESS) {
                 logger.warning("Voice turn failed: rc=$rc")
             }
@@ -140,6 +162,66 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
         } catch (e: Throwable) {
             logger.error("Voice turn threw: ${e.message}")
         }
+
+        playTtsAudio(ttsPcm.toByteArray(), ttsSampleRate, ttsEncoding)
+    }
+
+    // Play the turn's synthesized reply through the shared TTS sink. Runs
+    // before segmentLoop drains stale mic chunks, so the microphone stays
+    // gated while the device speaks (no self-transcription).
+    private suspend fun playTtsAudio(pcm: ByteArray, sampleRateHz: Int, encoding: AudioEncoding) {
+        if (pcm.isEmpty()) return
+        val sampleRate = if (sampleRateHz > 0) sampleRateHz else DEFAULT_TTS_SAMPLE_RATE_HZ
+        val wav =
+            when (encoding) {
+                AudioEncoding.AUDIO_ENCODING_PCM_S16_LE -> pcmS16ToWav(pcm, sampleRate)
+                // TTS backends emit f32 LE (AudioFrameEvent contract default).
+                else -> RunAnywhereBridge.racAudioFloat32ToWav(pcm, sampleRate)
+            }
+        if (wav == null || wav.isEmpty()) {
+            logger.warning("TTS audio conversion failed (${pcm.size} bytes, ${sampleRate}Hz, $encoding)")
+            return
+        }
+        logger.info("Playing agent reply (${pcm.size} PCM bytes @ ${sampleRate}Hz)")
+        try {
+            playback.play(wav)
+        } catch (e: CancellationException) {
+            playback.stop()
+            throw e
+        } catch (e: Exception) {
+            logger.warning("Agent reply playback failed: ${e.message}")
+        }
+    }
+
+    private fun pcmS16ToWav(pcm: ByteArray, sampleRate: Int): ByteArray {
+        val channels = 1
+        val bitsPerSample = 16
+        val byteRate = sampleRate * channels * bitsPerSample / 8
+        val header = ByteArray(44)
+        fun putInt(offset: Int, value: Int) {
+            header[offset] = value.toByte()
+            header[offset + 1] = (value shr 8).toByte()
+            header[offset + 2] = (value shr 16).toByte()
+            header[offset + 3] = (value shr 24).toByte()
+        }
+        fun putShort(offset: Int, value: Int) {
+            header[offset] = value.toByte()
+            header[offset + 1] = (value shr 8).toByte()
+        }
+        "RIFF".toByteArray().copyInto(header, 0)
+        putInt(4, 36 + pcm.size)
+        "WAVE".toByteArray().copyInto(header, 8)
+        "fmt ".toByteArray().copyInto(header, 12)
+        putInt(16, 16)
+        putShort(20, 1)
+        putShort(22, channels)
+        putInt(24, sampleRate)
+        putInt(28, byteRate)
+        putShort(32, channels * bitsPerSample / 8)
+        putShort(34, bitsPerSample)
+        "data".toByteArray().copyInto(header, 36)
+        putInt(40, pcm.size)
+        return header + pcm
     }
 
     private fun rms(chunk: ByteArray): Double {
@@ -173,5 +255,8 @@ internal class VoiceAgentMicDriver(private val handle: Long) {
 
         /** Leading chunks kept so the utterance onset is not clipped. */
         const val PRE_ROLL_CHUNKS = 3
+
+        /** Piper's native rate; used when the audio frame omits sample_rate_hz. */
+        const val DEFAULT_TTS_SAMPLE_RATE_HZ = 22_050
     }
 }

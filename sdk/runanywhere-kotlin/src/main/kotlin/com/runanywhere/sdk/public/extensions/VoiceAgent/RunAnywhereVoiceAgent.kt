@@ -224,7 +224,12 @@ suspend fun RunAnywhere.cleanupVoiceAgent() {
     ensureServicesReady()
     // Match Swift: cleanup voice-agent handle + reset flag.
     voiceAgentInitialized = false
-    CppBridgeVoiceAgent.destroy()
+    // Off-main: destroy waits for any in-flight turn (STT→LLM→TTS) to
+    // finish. Called from the main thread mid-generation this froze the UI
+    // until the turn completed — the Stop button appeared dead.
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        CppBridgeVoiceAgent.destroy()
+    }
 }
 
 suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult {
