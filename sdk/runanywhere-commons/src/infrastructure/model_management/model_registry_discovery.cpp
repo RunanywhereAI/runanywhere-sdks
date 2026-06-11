@@ -257,10 +257,20 @@ bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
     }
     const char* base = rac_model_paths_get_base_dir();
     if (!base || *base == '\0') {
+        RAC_LOG_WARNING("ModelRegistry", "Reconcile miss '%s': base_dir not configured", model->id);
         return false;
     }
     const std::filesystem::path folder = canonical_model_folder_for(model->id, model->framework);
-    if (folder.empty() || !directory_contains_recognizable_model_file(folder.generic_string())) {
+    if (folder.empty()) {
+        RAC_LOG_WARNING("ModelRegistry", "Reconcile miss '%s': cannot build canonical folder",
+                        model->id);
+        return false;
+    }
+    if (!directory_contains_recognizable_model_file(folder.generic_string())) {
+        // Normal state for catalog entries that were never downloaded — keep
+        // at DEBUG so each launch doesn't emit one warning per such model.
+        RAC_LOG_DEBUG("ModelRegistry", "Reconcile miss '%s': no model file under %s", model->id,
+                      folder.generic_string().c_str());
         return false;
     }
 

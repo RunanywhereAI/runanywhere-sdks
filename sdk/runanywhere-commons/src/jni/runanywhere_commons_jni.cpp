@@ -1519,6 +1519,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
         (g_method_is_non_empty_directory != nullptr) ? jni_is_non_empty_directory_callback : nullptr;
     g_c_adapter.user_data = nullptr;
 
+    // Install the populated struct as the commons-wide platform adapter
+    // (mirrors Swift's CppBridge.PlatformAdapter.register()). Without this,
+    // rac_get_platform_adapter() stays NULL for the whole process — the
+    // legacy racInit() was the only caller and the Kotlin SDK's phase1-proto
+    // init flow never invokes it — so every adapter-dependent commons path
+    // (RAC_LOG forwarding to logcat, registry filesystem reconcile,
+    // is_downloaded directory probes) silently no-ops.
+    const rac_result_t adapter_rc = rac_set_platform_adapter(&g_c_adapter);
+    if (adapter_rc != RAC_SUCCESS) {
+        LOGe("racSetPlatformAdapter: rac_set_platform_adapter failed: %d", (int)adapter_rc);
+        return adapter_rc;
+    }
+
     LOGi("racSetPlatformAdapter: adapter set successfully");
     return RAC_SUCCESS;
 }
