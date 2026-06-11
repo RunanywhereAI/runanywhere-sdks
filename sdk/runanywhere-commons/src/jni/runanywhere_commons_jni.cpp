@@ -7573,7 +7573,11 @@ void rac_jni_erase_vad_listeners(JNIEnv* env, uintptr_t handle_key) {
 // XCFramework (RABackendLlamaCPP, RABackendONNX).
 // =============================================================================
 
-JNIEXPORT jint JNICALL
+// NOTE: this and racPlatformUnregister live AFTER the file's `extern "C"` block
+// (closed at the platform-TTS section), so they must declare C linkage
+// individually — otherwise the C++ compiler mangles the JNI export name and the
+// runtime fails with "No implementation found for ...racPlatformRegisterSystemTts".
+extern "C" JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSystemTts(JNIEnv* env,
                                                                                      jclass clazz) {
     (void)env;
@@ -7606,7 +7610,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformRegisterSyst
     return static_cast<jint>(result);
 }
 
-JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformUnregister(JNIEnv* env,
                                                                                jclass clazz) {
     (void)env;
