@@ -240,118 +240,6 @@ bool get_model_snapshot_by_id(rac_model_registry_handle_t handle, const std::str
     return true;
 }
 
-// -----------------------------------------------------------------------------
-// Disk persistence — download/registry state must survive a process restart.
-// The registry is otherwise purely in-memory, so a previously downloaded model
-// would show as not-downloaded on the next launch (the example app then renders
-// a Download button over it). All file I/O goes through the platform adapter,
-// never std::filesystem, so this works identically on native and Web/OPFS.
-// Callers must hold handle->mutex.
-// -----------------------------------------------------------------------------
-
-// {models_dir}/.registry.pb — co-located with model folders, dot-prefixed so the
-// download-folder discovery scan ignores it. Empty when base_dir is unconfigured.
-std::string registry_persist_path_locked() {
-    char buffer[4096];
-    if (rac_model_paths_get_models_directory(buffer, sizeof(buffer)) != RAC_SUCCESS ||
-        buffer[0] == '\0') {
-        return {};
-    }
-    std::string dir(buffer);
-    if (dir.back() != '/') {
-        dir.push_back('/');
-    }
-    dir += ".registry.pb";
-    return dir;
-}
-
-void persist_registry_locked(rac_model_registry_handle_t handle) {
-    if (!handle) {
-        return;
-    }
-    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
-    if (!adapter || !adapter->file_write) {
-        return;  // No writable filesystem yet (or base_dir not configured).
-    }
-    const std::string path = registry_persist_path_locked();
-    if (path.empty()) {
-        return;
-    }
-
-    ModelInfoList list;
-    for (const auto& pair : handle->model_proto_bytes) {
-        ModelInfo* entry = list.add_models();
-        if (!entry->ParseFromString(pair.second)) {
-            list.mutable_models()->RemoveLast();
-        }
-    }
-
-    std::string serialized;
-    if (!list.SerializeToString(&serialized)) {
-        return;
-    }
-    const rac_result_t rc = adapter->file_write(path.c_str(), serialized.data(), serialized.size(),
-                                                adapter->user_data);
-    if (rc != RAC_SUCCESS) {
-        RAC_LOG_DEBUG("ModelRegistry", "Registry persist failed (rc=%d) at %s",
-                      static_cast<int>(rc), path.c_str());
-    }
-}
-
-void load_registry_from_disk_locked(rac_model_registry_handle_t handle) {
-    if (!handle) {
-        return;
-    }
-    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
-    if (!adapter || !adapter->file_read || !adapter->file_exists) {
-        return;
-    }
-    const std::string path = registry_persist_path_locked();
-    if (path.empty()) {
-        return;
-    }
-    if (adapter->file_exists(path.c_str(), adapter->user_data) != RAC_TRUE) {
-        return;
-    }
-
-    void* data = nullptr;
-    size_t size = 0;
-    if (adapter->file_read(path.c_str(), &data, &size, adapter->user_data) != RAC_SUCCESS) {
-        return;
-    }
-    ModelInfoList list;
-    // file_read yields data==nullptr for a zero-byte file (a valid empty list).
-    const bool parsed =
-        (size == 0) || (data != nullptr && list.ParseFromArray(data, static_cast<int>(size)));
-    if (data != nullptr) {
-        free(data);  // file_read allocates with malloc (see jni_file_read_callback).
-    }
-    if (!parsed) {
-        return;
-    }
-
-    int restored = 0;
-    for (const ModelInfo& model : list.models()) {
-        const std::string id = model.id();
-        if (id.empty() || handle->models.count(id) > 0) {
-            continue;  // Skip empties; never clobber a live in-memory entry.
-        }
-        rac_model_info_t* info = model_info_from_proto(model);
-        if (!info) {
-            continue;
-        }
-        handle->models[id] = info;
-        std::string serialized;
-        if (model.SerializeToString(&serialized)) {
-            handle->model_proto_bytes[id] = std::move(serialized);
-        }
-        ++restored;
-    }
-    if (restored > 0) {
-        RAC_LOG_INFO("ModelRegistry", "Restored %d persisted model(s) on init", restored);
-    }
-}
-
 }  // namespace rac::infra::model_registry::detail
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -467,10 +355,6 @@ rac_result_t save_model_info_impl(rac_model_registry_handle_t handle, const rac_
         // ordering dependency between registerModel() and the one-shot
         // discoverDownloadedModels() sweep in Phase 2.
         try_reconcile_model_local_path_locked(handle, model_id, stored->second);
-
-        // Persist so this registration/update survives a process restart. Covers
-        // the within-save reconcile above too (it runs first).
-        persist_registry_locked(handle);
     }
 #endif
 
@@ -684,8 +568,6 @@ rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handle, const
     handle->models.erase(it);
 #ifdef RAC_HAVE_PROTOBUF
     handle->model_proto_bytes.erase(model_id);
-    // Persist the removal so it does not reappear after a restart.
-    persist_registry_locked(handle);
 #endif
 
     RAC_LOG_DEBUG("ModelRegistry", "Model removed");
@@ -764,26 +646,10 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
     model->updated_at = rac_get_current_time_ms() / 1000;
 
 #ifdef RAC_HAVE_PROTOBUF
-    const rac_result_t snapshot_rc = store_proto_snapshot_locked(handle, model_id, model,
-                                                                 /*preserve_proto_only_fields=*/true,
-                                                                 /*overwrite_registry_state=*/true);
-    if (snapshot_rc == RAC_SUCCESS) {
-        // Persist the new download state so it survives a process restart.
-        persist_registry_locked(handle);
-    }
-    return snapshot_rc;
+    return store_proto_snapshot_locked(handle, model_id, model,
+                                       /*preserve_proto_only_fields=*/true,
+                                       /*overwrite_registry_state=*/true);
 #else
     return RAC_SUCCESS;
 #endif
-}
-
-rac_result_t rac_model_registry_load_from_disk(rac_model_registry_handle_t handle) {
-    if (!handle) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-#ifdef RAC_HAVE_PROTOBUF
-    std::lock_guard<std::mutex> lock(handle->mutex);
-    load_registry_from_disk_locked(handle);
-#endif
-    return RAC_SUCCESS;
 }

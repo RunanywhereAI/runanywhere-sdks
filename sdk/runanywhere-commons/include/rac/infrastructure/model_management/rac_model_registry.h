@@ -187,27 +187,6 @@ RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registr
                                                                const char* model_id,
                                                                const char* local_path);
 
-/**
- * @brief Load persisted registry entries from disk into the in-memory registry.
- *
- * The registry is otherwise in-memory only, so download/registry state would not
- * survive a process restart. The registry write paths persist a serialized
- * snapshot to {models_dir}/.registry.pb (via the platform adapter, so it works on
- * native and Web/OPFS alike); this restores it. Entries already present in memory
- * are left untouched (never clobbers a live session). Idempotent and safe to call
- * when the snapshot, the adapter file slots, or the configured base dir are
- * absent — in those cases it is a no-op returning RAC_SUCCESS.
- *
- * Call this during init AFTER the model paths base dir is configured and BEFORE
- * fetching remote model assignments, so persisted local_path values are present
- * when the assignment merge runs (which preserves an existing local_path).
- *
- * @param handle Registry handle
- * @return RAC_SUCCESS (including the no-op cases) or RAC_ERROR_INVALID_ARGUMENT
- *         when handle is NULL.
- */
-RAC_API rac_result_t rac_model_registry_load_from_disk(rac_model_registry_handle_t handle);
-
 // =============================================================================
 // PROTO-BYTE MODEL INFO API
 // =============================================================================
