@@ -43,6 +43,8 @@
 #include "rac/features/stt/rac_stt_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "infrastructure/events/sdk_event_publish.h"
+#include "sdk_events.pb.h"
 #include "stt_options.pb.h"
 #endif
 
@@ -77,6 +79,12 @@ struct StreamSession {
     // transcribe_stream path.
     rac_handle_t backend_stream_handle = nullptr;
     bool backend_stream_unsupported = false;
+    // Session aggregates for the ONE telemetry summary emitted at stop —
+    // per-chunk events are PUBLIC-only so a live session does not produce a
+    // telemetry row (and an HTTP flush) per chunk.
+    int64_t started_at_ms = 0;
+    uint64_t chunks_fed = 0;
+    uint64_t audio_bytes = 0;
 };
 
 std::mutex& g_mu() {
@@ -255,6 +263,9 @@ rac_result_t rac_stt_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         s.handle = handle;
         s.request_id = "stt-" + std::to_string(id);
         s.is_cancelled.store(false, std::memory_order_relaxed);
+        s.started_at_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
         // Honor every STTOptions field
         // the C ABI's rac_stt_options_t can carry. Previously this dropped
         // language_code, sample_rate, audio_format, and detect_language
@@ -367,6 +378,11 @@ rac_result_t rac_stt_stream_feed_audio_proto(uint64_t session_id, const uint8_t*
         audio_format = it->second.audio_format;
         backend_stream_handle = it->second.backend_stream_handle;
         backend_stream_unsupported = it->second.backend_stream_unsupported;
+        if (audio_size > 0) {
+            // Aggregate for the one summary telemetry row emitted at stop.
+            it->second.chunks_fed += 1;
+            it->second.audio_bytes += audio_size;
+        }
     }
     if (component_handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
@@ -553,6 +569,12 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
     // path that may re-enter commons.
     rac_handle_t component_handle = nullptr;
     rac_handle_t backend_stream_handle = nullptr;
+    std::string request_id;
+    std::string language;
+    int32_t sample_rate = 0;
+    int64_t started_at_ms = 0;
+    uint64_t chunks_fed = 0;
+    uint64_t audio_bytes = 0;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_sessions().find(session_id);
@@ -561,11 +583,49 @@ rac_result_t rac_stt_stream_stop_proto(uint64_t session_id) {
         component_handle = it->second.handle;
         backend_stream_handle = it->second.backend_stream_handle;
         it->second.backend_stream_handle = nullptr;
+        request_id = it->second.request_id;
+        language = it->second.language;
+        sample_rate = it->second.sample_rate;
+        started_at_ms = it->second.started_at_ms;
+        chunks_fed = it->second.chunks_fed;
+        audio_bytes = it->second.audio_bytes;
         g_sessions().erase(it);
     }
     if (component_handle && backend_stream_handle) {
         (void)rac_stt_component_stream_destroy(component_handle, backend_stream_handle);
     }
+
+#if defined(RAC_HAVE_PROTOBUF)
+    // ONE telemetry summary per streaming session. Per-chunk events are
+    // PUBLIC-only (they were producing telemetry rows + an HTTP flush per
+    // chunk); this row carries the session aggregates instead.
+    if (chunks_fed > 0) {
+        const int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   std::chrono::system_clock::now().time_since_epoch())
+                                   .count();
+        runanywhere::v1::VoiceLifecycleEvent voice;
+        voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
+        if (const char* model_id = rac_stt_component_get_model_id(component_handle)) {
+            voice.set_model_id(model_id);
+        }
+        voice.set_is_streaming(true);
+        voice.set_audio_size_bytes(static_cast<int32_t>(audio_bytes));
+        // Session wall-clock duration; chunk count rides on segment-less
+        // word_count-free schema via audio size + duration.
+        if (started_at_ms > 0 && now_ms > started_at_ms) {
+            voice.set_duration_ms(now_ms - started_at_ms);
+        }
+        if (!language.empty()) {
+            voice.set_language(language);
+        }
+        if (sample_rate > 0) {
+            voice.set_sample_rate(sample_rate);
+        }
+        rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
+                                          runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
+                                          request_id.c_str());
+    }
+#endif
     return RAC_SUCCESS;
 }
 

@@ -285,13 +285,15 @@ void emit_stt_stream_event(const runanywhere::v1::STTStreamEvent& event,
 }
 
 void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind, const char* text,
-                             float confidence, rac_result_t error_code = RAC_SUCCESS) {
+                             float confidence, rac_result_t error_code = RAC_SUCCESS,
+                             runanywhere::v1::EventDestination destination =
+                                 runanywhere::v1::EVENT_DESTINATION_ALL) {
     runanywhere::v1::SDKEvent event;
     event.set_timestamp_ms(rac_get_current_time_ms());
     event.set_id(generate_unique_id());
     event.set_category(runanywhere::v1::EVENT_CATEGORY_STT);
     event.set_component(runanywhere::v1::SDK_COMPONENT_STT);
-    event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_destination(destination);
     event.set_source("cpp");
     event.set_operation_id("stt.transcribe");
     event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
@@ -836,9 +838,14 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         voice.set_is_streaming(true);  // Streaming mode!
         voice.set_sample_rate(component->config.sample_rate);
         voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        // PUBLIC only: this fires once per streamed CHUNK (the live path calls
+        // transcribe_stream per chunk), so routing it to telemetry produced
+        // rows + an HTTP flush per chunk. The session summary is recorded once
+        // at rac_stt_stream_stop_proto instead.
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
                                           runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                          transcription_id.c_str());
+                                          transcription_id.c_str(),
+                                          runanywhere::v1::EVENT_DESTINATION_PUBLIC);
     }
 #endif
 
@@ -896,9 +903,13 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         // word_count not available for streaming - text is delivered via callbacks
         voice.set_sample_rate(component->config.sample_rate);
         voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
+        // PUBLIC only: per-chunk completion (see the STARTED emit above). The
+        // STT_COMPLETED kind is a telemetry completion trigger, so on the
+        // telemetry path it forced one HTTP flush PER CHUNK.
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_STT,
                                           runanywhere::v1::EVENT_CATEGORY_STT, std::move(voice),
-                                          transcription_id.c_str());
+                                          transcription_id.c_str(),
+                                          runanywhere::v1::EVENT_DESTINATION_PUBLIC);
 #endif
     }
 
@@ -1046,8 +1057,12 @@ rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, 
 
     runanywhere::v1::STTOutput output;
     fill_stt_output(result, options, audio_size, model_id, &output);
+    // PUBLIC only: rac_stt_component_transcribe (called above) already emitted
+    // the full-metrics STT_COMPLETED telemetry row; this wrapper-level event
+    // would double-count every batch transcription.
     publish_stt_voice_event(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED, result.text,
-                            result.confidence);
+                            result.confidence, RAC_SUCCESS,
+                            runanywhere::v1::EVENT_DESTINATION_PUBLIC);
     rac_stt_result_free(&result);
     return copy_proto_message(output, out_result);
 #endif
