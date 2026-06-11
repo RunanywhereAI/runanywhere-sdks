@@ -23,6 +23,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
+import kotlinx.coroutines.launch
 
 /**
  * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
@@ -90,7 +91,16 @@ val RunAnywhere.defaultVADModelID: String
  * @return `true` when a VAD model is loaded after the call; `false`
  *   when no VAD model is loaded (auto-load failed or skipped).
  */
-suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
+suspend fun RunAnywhere.ensureDefaultVAD(
+    modelID: String? = null,
+): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+    ensureDefaultVADBlocking(modelID)
+}
+
+// Blocking JNI body of [ensureDefaultVAD] — may download + load the Silero
+// model. Kept separate so callers already on a worker dispatcher skip the
+// extra hop.
+private fun RunAnywhere.ensureDefaultVADBlocking(modelID: String? = null): Boolean {
     if (!isInitialized) return false
 
     val currentRequest =
@@ -111,6 +121,11 @@ suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
         ModelLoadRequest(
             model_id = targetID,
             category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+            // Auto-download when the catalogued entry has no local artifact:
+            // lifecycle load rejects not-downloaded models, and the energy
+            // fallback emits none of the lifecycle events the voice agent
+            // needs — a missing Silero model means a silent session.
+            validate_availability = true,
         )
     val result = CppBridgeModelLifecycle.load(loadRequest)
     if (result == null || !result.success) {
@@ -170,32 +185,38 @@ suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureServicesReady()
 
-    if (ensureVAD) {
-        ensureDefaultVAD()
-    }
+    // Off-main: ensureDefaultVAD may download + load the Silero model
+    // (validate_availability) and the snapshot/initialize calls are blocking
+    // JNI. View-models call this from the main thread; running it there
+    // froze the UI for the duration of the VAD bootstrap.
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        if (ensureVAD) {
+            ensureDefaultVADBlocking()
+        }
 
-    if (voiceAgentInitialized && areAllComponentsLoaded()) return
-    if (!areAllComponentsLoaded()) {
-        val missing = getMissingComponents()
-        throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
-    }
+        if (voiceAgentInitialized && areAllComponentsLoaded()) return@withContext
+        if (!areAllComponentsLoaded()) {
+            val missing = getMissingComponents()
+            throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
+        }
 
-    val sttSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_STT)
-    val llmSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_LLM)
+        val sttSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_STT)
+        val llmSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_LLM)
 
-    val composeConfig =
-        RAVoiceAgentComposeConfig(
-            stt_model_id = sttSnap?.model_id?.takeIf { it.isNotBlank() },
-            llm_model_id = llmSnap?.model_id?.takeIf { it.isNotBlank() },
-            tts_voice_id = ttsVoiceId?.takeIf { it.isNotBlank() },
+        val composeConfig =
+            RAVoiceAgentComposeConfig(
+                stt_model_id = sttSnap?.model_id?.takeIf { it.isNotBlank() },
+                llm_model_id = llmSnap?.model_id?.takeIf { it.isNotBlank() },
+                tts_voice_id = ttsVoiceId?.takeIf { it.isNotBlank() },
+            )
+
+        val handle = CppBridgeVoiceAgent.getHandle()
+        val states = CppBridgeVoiceAgent.initialize(handle, composeConfig)
+        voiceAgentInitialized = states.ready
+        voiceAgentLogger.info(
+            "VoiceAgent initialized from loaded models (ttsVoiceId=${ttsVoiceId ?: "<default>"}, ready=${states.ready})",
         )
-
-    val handle = CppBridgeVoiceAgent.getHandle()
-    val states = CppBridgeVoiceAgent.initialize(handle, composeConfig)
-    voiceAgentInitialized = states.ready
-    voiceAgentLogger.info(
-        "VoiceAgent initialized from loaded models (ttsVoiceId=${ttsVoiceId ?: "<default>"}, ready=${states.ready})",
-    )
+    }
 }
 
 suspend fun RunAnywhere.cleanupVoiceAgent() {
@@ -228,14 +249,33 @@ fun RunAnywhere.streamVoiceAgent(): kotlinx.coroutines.flow.Flow<ai.runanywhere.
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     // W3-6: composite getHandle() is now suspend (gathers from 4 sub-component
     // actors before composing). Defer the call into the Flow's coroutine
-    // context via `flow { ... }` + `emitAll` so the public API stays a
-    // non-suspend `fun` returning Flow.
+    // context via `flow { ... }` so the public API stays a non-suspend `fun`
+    // returning Flow.
+    //
+    // The C ABI owns no microphone (rac_voice_agent.h audio-ingress
+    // contract): subscribing to the handle callback alone is dead-air. While
+    // the returned flow is collected, a VoiceAgentMicDriver captures mic
+    // audio, segments utterances, and drives per-utterance turns whose
+    // VoiceEvents fan out to this same handle callback. Cancelling the
+    // collector tears down capture.
     return kotlinx.coroutines.flow.flow {
         ensureServicesReady()
         val handle = CppBridgeVoiceAgent.getHandle()
-        com.runanywhere.sdk.adapters
-            .VoiceAgentStreamAdapter(handle)
-            .stream()
-            .collect { event -> emit(event) }
+        kotlinx.coroutines.coroutineScope {
+            val driver =
+                launch(kotlinx.coroutines.Dispatchers.IO) {
+                    com.runanywhere.sdk.features.VoiceAgent.Services
+                        .VoiceAgentMicDriver(handle)
+                        .run()
+                }
+            try {
+                com.runanywhere.sdk.adapters
+                    .VoiceAgentStreamAdapter(handle)
+                    .stream()
+                    .collect { event -> emit(event) }
+            } finally {
+                driver.cancel()
+            }
+        }
     }
 }

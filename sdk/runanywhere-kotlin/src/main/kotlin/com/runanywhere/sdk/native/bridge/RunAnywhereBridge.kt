@@ -1059,6 +1059,21 @@ object RunAnywhereBridge {
     /** Process one voice turn and return serialized VoiceAgentResult bytes. */
     @JvmStatic external fun racVoiceAgentProcessVoiceTurnProto(handle: Long, audioData: ByteArray): ByteArray?
 
+    /**
+     * Drive one voice turn from serialized VoiceAgentTurnRequest bytes and
+     * stream VoiceEvent bytes on [listener]. Events also fan out to the
+     * handle callback registered via the VoiceAgentStreamAdapter, so
+     * streamVoiceAgent() collectors observe the same turn. Synchronous —
+     * runs the full VAD→STT→LLM→TTS pipeline before returning. Returns
+     * rac_result_t (0 = success).
+     */
+    @JvmStatic
+    external fun racVoiceAgentProcessTurnProto(
+        handle: Long,
+        requestBytes: ByteArray,
+        listener: NativeProtoProgressListener,
+    ): Int
+
     // TOOL-CALLING SESSION (rac_tool_calling.h)
     //
     // Native-owned state machine for generate → parse → execute → loop. The
