@@ -61,7 +61,7 @@ fun VoiceScreen() {
     val sttVm: ModelSelectionViewModel =
         viewModel(key = "voice-stt", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.STT))
     val ttsVm: ModelSelectionViewModel =
-        viewModel(key = "voice-tts", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.TTS))
+        viewModel(key = "voice-tts", factory = ModelSelectionViewModel.Factory(ModelSelectionContext.VOICE_TTS))
     var sheet by remember { mutableStateOf<ModelSelectionViewModel?>(null) }
     val listState = rememberLazyListState()
 

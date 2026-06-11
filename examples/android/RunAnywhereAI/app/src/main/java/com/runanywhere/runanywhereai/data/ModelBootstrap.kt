@@ -9,6 +9,7 @@ import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
+import com.runanywhere.sdk.public.extensions.refreshModelRegistry
 import kotlin.coroutines.cancellation.CancellationException
 
 // Seeds the native registry on launch (backends + curated catalog + LoRA). Without this the
@@ -20,6 +21,20 @@ object ModelBootstrap {
         registerRemoteBackends()
         seedCatalog()
         seedLora()
+        relinkDownloads()
+    }
+
+    // The native registry is in-memory only; the SDK's own rescan runs during Phase 2,
+    // before this catalog exists, so it links nothing. Rescan again now that the seeded
+    // entries are present — otherwise downloaded models show as not-downloaded after restart.
+    private suspend fun relinkDownloads() {
+        try {
+            RunAnywhere.refreshModelRegistry(rescanLocal = true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            RACLog.w("local rescan failed — downloaded models may need re-download", e)
+        }
     }
 
     private suspend fun registerCoreBackends() {

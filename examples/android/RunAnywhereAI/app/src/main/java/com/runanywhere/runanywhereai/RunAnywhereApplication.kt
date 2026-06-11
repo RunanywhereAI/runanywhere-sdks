@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.security.AndroidPlatformContext
 import com.runanywhere.sdk.hybrid.AndroidDeviceStateProvider
 import com.runanywhere.sdk.hybrid.HybridDeviceState
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.setDebugMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +49,10 @@ class RunAnywhereApplication : Application() {
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL,
             environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         )
+        // Production env disables SDK console logging entirely; without this
+        // debug builds emit zero SDK logs to logcat, which makes on-device
+        // issues (voice/STT/VLM) undiagnosable.
+        if (BuildConfig.DEBUG) RunAnywhere.setDebugMode(true)
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()

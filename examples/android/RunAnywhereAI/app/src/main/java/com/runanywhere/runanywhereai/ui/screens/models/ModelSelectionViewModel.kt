@@ -46,7 +46,7 @@ class ModelSelectionViewModel(
 
     init {
         viewModelScope.launch {
-            while (!RunAnywhere.isInitialized) delay(150)
+            while (!GlobalState.ready) delay(150)
             reload()
         }
     }
@@ -59,6 +59,7 @@ class ModelSelectionViewModel(
         try {
             val models = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
                 .filter { context.accepts(it.category) }
+                .filter { context.allowsBuiltIn || !isBuiltIn(it) }
             state = state.copy(models = models, isLoading = false, error = null)
             syncCurrent(models)
             autoLoadIfNeeded(models)
@@ -146,13 +147,22 @@ class ModelSelectionViewModel(
         if (!isLlm || GlobalState.model.isLoaded) return
         val category = context.loadCategory ?: return
         val candidate = models.firstOrNull { isReady(it) && !isBuiltIn(it) } ?: return
-        runCatching {
-            val result = RunAnywhere.loadModel(RAModelLoadRequest(model_id = candidate.id, category = category))
-            if (result.success) {
-                GlobalState.model.set(candidate)
-                GlobalState.lora.set(null)
-            }
-        }.onFailure { RACLog.w("auto-load skipped: ${candidate.id}") }
+        // Several LLM-context view-models (scaffold + voice screen) reload
+        // concurrently at startup; without this gate each one auto-loads the
+        // same model in parallel.
+        if (!autoLoadInFlight.compareAndSet(false, true)) return
+        try {
+            if (GlobalState.model.isLoaded) return
+            runCatching {
+                val result = RunAnywhere.loadModel(RAModelLoadRequest(model_id = candidate.id, category = category))
+                if (result.success) {
+                    GlobalState.model.set(candidate)
+                    GlobalState.lora.set(null)
+                }
+            }.onFailure { RACLog.w("auto-load skipped: ${candidate.id}") }
+        } finally {
+            autoLoadInFlight.set(false)
+        }
     }
 
     private fun isBuiltIn(model: RAModelInfo): Boolean =
@@ -163,5 +173,9 @@ class ModelSelectionViewModel(
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             ModelSelectionViewModel(context) as T
+    }
+
+    private companion object {
+        val autoLoadInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
     }
 }
