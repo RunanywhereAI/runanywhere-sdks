@@ -1,488 +1,193 @@
 /**
- * RunAnywhere React Native SDK - Event Bus
+ * Swift-shaped SDK event bus.
  *
- * Central event bus for SDK-wide event distribution.
- * Wraps NativeEventEmitter for cross-platform event handling.
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Events/EventBus.swift
+ * Mirrors Swift's `EventBus.shared` surface while using the RN native
+ * proto-byte SDKEvent subscription underneath.
  */
 
-import { NativeEventEmitter, NativeModules } from 'react-native';
-import { SDKLogger } from '../../Foundation/Logging';
-import type {
-  AnySDKEvent,
-  ComponentInitializationEvent,
-  SDKComponent,
-  SDKConfigurationEvent,
-  SDKDeviceEvent,
-  SDKEventListener,
-  SDKFrameworkEvent,
-  SDKGenerationEvent,
-  SDKInitializationEvent,
-  SDKModelEvent,
-  SDKNetworkEvent,
-  SDKPerformanceEvent,
-  SDKStorageEvent,
-  SDKVoiceEvent,
-  UnsubscribeFunction,
-} from '../../types';
+import type { SDKEvent as SDKEventMessage } from '@runanywhere/proto-ts/sdk_events';
+import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import {
+  publishSDKEvent,
+  subscribeSDKEvents,
+} from '../Extensions/Events/RunAnywhere+SDKEvents';
 
-// Native module reference - accessed lazily in setup() to avoid
-// accessing NativeModules before React Native is fully initialized (bridgeless mode)
-function getRunAnywhereModule() {
-  return NativeModules.RunAnywhereModule;
-}
+export type SDKEventHandler = (event: SDKEventMessage) => void;
+export type EventBusCancellable = () => void;
 
-// Event name constants matching native modules
-export const NativeEventNames = {
-  // Initialization events
-  SDK_INITIALIZATION: 'RunAnywhere_SDKInitialization',
-  // Configuration events
-  SDK_CONFIGURATION: 'RunAnywhere_SDKConfiguration',
-  // Generation events
-  SDK_GENERATION: 'RunAnywhere_SDKGeneration',
-  // Model events
-  SDK_MODEL: 'RunAnywhere_SDKModel',
-  // Voice events
-  SDK_VOICE: 'RunAnywhere_SDKVoice',
-  // Performance events
-  SDK_PERFORMANCE: 'RunAnywhere_SDKPerformance',
-  // Network events
-  SDK_NETWORK: 'RunAnywhere_SDKNetwork',
-  // Storage events
-  SDK_STORAGE: 'RunAnywhere_SDKStorage',
-  // Framework events
-  SDK_FRAMEWORK: 'RunAnywhere_SDKFramework',
-  // Device events
-  SDK_DEVICE: 'RunAnywhere_SDKDevice',
-  // Component events
-  SDK_COMPONENT: 'RunAnywhere_SDKComponent',
-  // All events (catch-all)
-  SDK_ALL_EVENTS: 'RunAnywhere_AllEvents',
-} as const;
+type NativeUnsubscribe = () => Promise<void>;
 
-type NativeEventName = (typeof NativeEventNames)[keyof typeof NativeEventNames];
+export class EventBus {
+  private static readonly singleton = new EventBus();
 
-/**
- * Central event bus for SDK-wide event distribution
- * Thread-safe event bus using React Native's NativeEventEmitter
- */
-class EventBusImpl {
-  private emitter: NativeEventEmitter | null = null;
-  private subscriptions: Map<string, Set<SDKEventListener<AnySDKEvent>>> =
-    new Map();
-  private nativeSubscriptions: Map<NativeEventName, { remove: () => void }> =
-    new Map();
-  private isSetup = false;
+  static get shared(): EventBus {
+    return EventBus.singleton;
+  }
 
-  /**
-   * Setup the event bus with the native module
-   * Called automatically when first subscription is made
-   */
-  private setup(): void {
-    if (this.isSetup) return;
+  private readonly listeners = new Set<SDKEventHandler>();
+  private readonly categoryListeners = new Map<EventCategory, Set<SDKEventHandler>>();
+  private nativeSubscription: Promise<NativeUnsubscribe> | null = null;
 
-    // Only create NativeEventEmitter if native module exists
-    // Access NativeModules lazily to avoid issues with bridgeless mode
-    const RunAnywhereModule = getRunAnywhereModule();
-    if (RunAnywhereModule) {
-      this.emitter = new NativeEventEmitter(RunAnywhereModule);
-
-      // Subscribe to all native event types
-      this.setupNativeListener(NativeEventNames.SDK_INITIALIZATION);
-      this.setupNativeListener(NativeEventNames.SDK_CONFIGURATION);
-      this.setupNativeListener(NativeEventNames.SDK_GENERATION);
-      this.setupNativeListener(NativeEventNames.SDK_MODEL);
-      this.setupNativeListener(NativeEventNames.SDK_VOICE);
-      this.setupNativeListener(NativeEventNames.SDK_PERFORMANCE);
-      this.setupNativeListener(NativeEventNames.SDK_NETWORK);
-      this.setupNativeListener(NativeEventNames.SDK_STORAGE);
-      this.setupNativeListener(NativeEventNames.SDK_FRAMEWORK);
-      this.setupNativeListener(NativeEventNames.SDK_DEVICE);
-      this.setupNativeListener(NativeEventNames.SDK_COMPONENT);
-    } else {
-      SDKLogger.events.warning(
-        'Native module not available. Events will only work in development mode.'
-      );
-    }
-
-    this.isSetup = true;
+  private constructor() {
+    this.ensureNativeSubscription();
   }
 
   /**
-   * Setup a listener for a specific native event type
+   * Async stream of all SDK events.
    */
-  private setupNativeListener(eventName: NativeEventName): void {
-    if (!this.emitter) return;
-
-    const subscription = this.emitter.addListener(
-      eventName,
-      (event: AnySDKEvent) => {
-        this.handleNativeEvent(eventName, event);
-      }
-    );
-
-    this.nativeSubscriptions.set(eventName, subscription);
+  get events(): AsyncIterable<SDKEventMessage> {
+    return this.stream();
   }
 
   /**
-   * Handle an event from native
+   * Publish an event through native commons, falling back to local listeners.
    */
-  private handleNativeEvent(
-    eventName: NativeEventName,
-    event: AnySDKEvent
-  ): void {
-    // Get subscribers for this event type
-    const typeSubscribers = this.subscriptions.get(eventName);
-    if (typeSubscribers) {
-      typeSubscribers.forEach((listener) => {
-        try {
-          listener(event);
-        } catch (error) {
-          SDKLogger.events.logError(error as Error, 'Error in event listener');
-        }
-      });
+  async publish(event: SDKEventMessage): Promise<boolean> {
+    const didPublish = await publishSDKEvent(event);
+    if (!didPublish) {
+      this.dispatch(event);
     }
-
-    // Also notify "all events" subscribers
-    const allSubscribers = this.subscriptions.get(
-      NativeEventNames.SDK_ALL_EVENTS
-    );
-    if (allSubscribers) {
-      allSubscribers.forEach((listener) => {
-        try {
-          listener(event);
-        } catch (error) {
-          SDKLogger.events.logError(error as Error, 'Error in event listener');
-        }
-      });
-    }
+    return didPublish;
   }
 
   /**
-   * Subscribe to events of a specific type
+   * Async stream filtered by event category.
    */
-  private subscribe<T extends AnySDKEvent>(
-    eventName: NativeEventName,
-    listener: SDKEventListener<T>
-  ): UnsubscribeFunction {
-    this.setup();
+  eventsFor(category: EventCategory): AsyncIterable<SDKEventMessage> {
+    return this.stream(category);
+  }
 
-    if (!this.subscriptions.has(eventName)) {
-      this.subscriptions.set(eventName, new Set());
+  on(handler: SDKEventHandler): EventBusCancellable;
+  on(category: EventCategory, handler: SDKEventHandler): EventBusCancellable;
+  on(
+    categoryOrHandler: EventCategory | SDKEventHandler,
+    maybeHandler?: SDKEventHandler
+  ): EventBusCancellable {
+    this.ensureNativeSubscription();
+
+    if (typeof categoryOrHandler === 'function') {
+      this.listeners.add(categoryOrHandler);
+      return () => {
+        this.listeners.delete(categoryOrHandler);
+      };
     }
 
-    const subscribers = this.subscriptions.get(eventName);
-    if (!subscribers) {
-      // Should never happen since we just set it above
-      return () => {};
+    const category = categoryOrHandler;
+    const handler = maybeHandler;
+    if (!handler) {
+      return () => undefined;
     }
-    subscribers.add(listener as SDKEventListener<AnySDKEvent>);
 
-    // Return unsubscribe function
+    let handlers = this.categoryListeners.get(category);
+    if (!handlers) {
+      handlers = new Set<SDKEventHandler>();
+      this.categoryListeners.set(category, handlers);
+    }
+    handlers.add(handler);
     return () => {
-      subscribers.delete(listener as SDKEventListener<AnySDKEvent>);
+      handlers?.delete(handler);
+      if (handlers?.size === 0) {
+        this.categoryListeners.delete(category);
+      }
     };
   }
 
-  // ============================================================================
-  // Public Subscription Methods
-  // ============================================================================
+  private ensureNativeSubscription(): void {
+    if (this.nativeSubscription) {
+      return;
+    }
 
-  /**
-   * Subscribe to all SDK events
-   */
-  onAllEvents(handler: SDKEventListener<AnySDKEvent>): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_ALL_EVENTS, handler);
-  }
-
-  /**
-   * Subscribe to initialization events
-   */
-  onInitialization(
-    handler: SDKEventListener<SDKInitializationEvent>
-  ): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_INITIALIZATION, handler);
-  }
-
-  /**
-   * Subscribe to configuration events
-   */
-  onConfiguration(
-    handler: SDKEventListener<SDKConfigurationEvent>
-  ): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_CONFIGURATION, handler);
-  }
-
-  /**
-   * Subscribe to generation events
-   */
-  onGeneration(
-    handler: SDKEventListener<SDKGenerationEvent>
-  ): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_GENERATION, handler);
-  }
-
-  /**
-   * Subscribe to model events
-   */
-  onModel(handler: SDKEventListener<SDKModelEvent>): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_MODEL, handler);
-  }
-
-  /**
-   * Subscribe to voice events
-   */
-  onVoice(handler: SDKEventListener<SDKVoiceEvent>): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_VOICE, handler);
-  }
-
-  /**
-   * Subscribe to performance events
-   */
-  onPerformance(
-    handler: SDKEventListener<SDKPerformanceEvent>
-  ): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_PERFORMANCE, handler);
-  }
-
-  /**
-   * Subscribe to network events
-   */
-  onNetwork(handler: SDKEventListener<SDKNetworkEvent>): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_NETWORK, handler);
-  }
-
-  /**
-   * Subscribe to storage events
-   */
-  onStorage(handler: SDKEventListener<SDKStorageEvent>): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_STORAGE, handler);
-  }
-
-  /**
-   * Subscribe to framework events
-   */
-  onFramework(
-    handler: SDKEventListener<SDKFrameworkEvent>
-  ): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_FRAMEWORK, handler);
-  }
-
-  /**
-   * Subscribe to device events
-   */
-  onDevice(handler: SDKEventListener<SDKDeviceEvent>): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_DEVICE, handler);
-  }
-
-  /**
-   * Subscribe to component initialization events
-   */
-  onComponentInitialization(
-    handler: SDKEventListener<ComponentInitializationEvent>
-  ): UnsubscribeFunction {
-    return this.subscribe(NativeEventNames.SDK_COMPONENT, handler);
-  }
-
-  /**
-   * Subscribe to specific component events
-   */
-  onComponent(
-    component: SDKComponent,
-    handler: SDKEventListener<ComponentInitializationEvent>
-  ): UnsubscribeFunction {
-    return this.onComponentInitialization((event) => {
-      // Filter by component if event has component property
-      if ('component' in event && event.component === component) {
-        handler(event);
+    const subscription = subscribeSDKEvents((event) => {
+      this.dispatch(event);
+    });
+    this.nativeSubscription = subscription;
+    void subscription.catch(() => {
+      if (this.nativeSubscription === subscription) {
+        this.nativeSubscription = null;
       }
     });
   }
 
-  // ============================================================================
-  // Generic Event Subscription
-  // ============================================================================
-
-  /**
-   * Generic typed event subscription
-   * Example: events.on('generation', handler)
-   */
-  on<T extends AnySDKEvent>(
-    eventType:
-      | 'initialization'
-      | 'configuration'
-      | 'generation'
-      | 'model'
-      | 'voice'
-      | 'performance'
-      | 'network'
-      | 'storage'
-      | 'framework'
-      | 'device'
-      | 'component'
-      | 'all',
-    handler: SDKEventListener<T>
-  ): UnsubscribeFunction {
-    const eventNameMap: Record<string, NativeEventName> = {
-      initialization: NativeEventNames.SDK_INITIALIZATION,
-      configuration: NativeEventNames.SDK_CONFIGURATION,
-      generation: NativeEventNames.SDK_GENERATION,
-      model: NativeEventNames.SDK_MODEL,
-      voice: NativeEventNames.SDK_VOICE,
-      performance: NativeEventNames.SDK_PERFORMANCE,
-      network: NativeEventNames.SDK_NETWORK,
-      storage: NativeEventNames.SDK_STORAGE,
-      framework: NativeEventNames.SDK_FRAMEWORK,
-      device: NativeEventNames.SDK_DEVICE,
-      component: NativeEventNames.SDK_COMPONENT,
-      all: NativeEventNames.SDK_ALL_EVENTS,
-    };
-
-    const eventName = eventNameMap[eventType];
-    if (!eventName) {
-      SDKLogger.events.warning(`Unknown event type: ${eventType}`);
-      return () => {};
+  private dispatch(event: SDKEventMessage): void {
+    for (const listener of Array.from(this.listeners)) {
+      try {
+        listener(event);
+      } catch (e) {
+        console.warn('SDK EventBus listener error:', e);
+      }
     }
-
-    return this.subscribe(eventName, handler);
+    const categoryListeners = this.categoryListeners.get(event.category);
+    if (!categoryListeners) {
+      return;
+    }
+    for (const listener of Array.from(categoryListeners)) {
+      try {
+        listener(event);
+      } catch (e) {
+        console.warn('SDK EventBus category listener error:', e);
+      }
+    }
   }
 
-  // ============================================================================
-  // Publishing (for internal/testing use)
-  // ============================================================================
+  private stream(category?: EventCategory): AsyncIterable<SDKEventMessage> {
+    return {
+      [Symbol.asyncIterator]: (): AsyncIterator<SDKEventMessage> => {
+        const queue: SDKEventMessage[] = [];
+        let resolver:
+          | ((value: IteratorResult<SDKEventMessage>) => void)
+          | null = null;
+        let isClosed = false;
 
-  /**
-   * Publish an event locally (for testing or JS-only events)
-   * Note: In production, events come from native modules
-   */
-  publish(eventType: string, event: AnySDKEvent): void {
-    const eventName = `RunAnywhere_SDK${eventType}` as NativeEventName;
-    this.handleNativeEvent(eventName, event);
-  }
+        const unsubscribe = category === undefined
+          ? this.on((event) => {
+            if (resolver) {
+              resolver({ value: event, done: false });
+              resolver = null;
+            } else {
+              queue.push(event);
+            }
+          })
+          : this.on(category, (event) => {
+            if (resolver) {
+              resolver({ value: event, done: false });
+              resolver = null;
+            } else {
+              queue.push(event);
+            }
+          });
 
-  /**
-   * Emit a model event
-   * Helper method for components to emit model-related events
-   */
-  emitModel(event: SDKModelEvent): void {
-    this.handleNativeEvent(NativeEventNames.SDK_MODEL, event);
-  }
-
-  /**
-   * Emit a voice event
-   * Helper method for components to emit voice-related events
-   */
-  emitVoice(event: SDKVoiceEvent): void {
-    this.handleNativeEvent(NativeEventNames.SDK_VOICE, event);
-  }
-
-  /**
-   * Emit a component initialization event
-   * Helper method for components to emit initialization-related events
-   */
-  emitComponentInitialization(event: ComponentInitializationEvent): void {
-    this.handleNativeEvent(NativeEventNames.SDK_COMPONENT, event);
-  }
-
-  // ============================================================================
-  // Cleanup
-  // ============================================================================
-
-  /**
-   * Remove all subscriptions
-   */
-  removeAllListeners(): void {
-    this.subscriptions.clear();
-
-    // Remove native subscriptions
-    this.nativeSubscriptions.forEach((subscription) => {
-      subscription.remove();
-    });
-    this.nativeSubscriptions.clear();
-
-    this.isSetup = false;
+        return {
+          async next(): Promise<IteratorResult<SDKEventMessage>> {
+            if (queue.length > 0) {
+              return { value: queue.shift()!, done: false };
+            }
+            if (isClosed) {
+              return {
+                value: undefined as unknown as SDKEventMessage,
+                done: true,
+              };
+            }
+            return new Promise<IteratorResult<SDKEventMessage>>((resolve) => {
+              resolver = resolve;
+            });
+          },
+          async return(): Promise<IteratorResult<SDKEventMessage>> {
+            isClosed = true;
+            unsubscribe();
+            if (resolver) {
+              resolver({
+                value: undefined as unknown as SDKEventMessage,
+                done: true,
+              });
+              resolver = null;
+            }
+            return {
+              value: undefined as unknown as SDKEventMessage,
+              done: true,
+            };
+          },
+        };
+      },
+    };
   }
 }
-
-// Singleton instance
-let instance: EventBusImpl | null = null;
-
-/**
- * Get the singleton instance of EventBus
- */
-function getInstance(): EventBusImpl {
-  if (!instance) {
-    instance = new EventBusImpl();
-  }
-  return instance;
-}
-
-// Create singleton wrapper with all methods exposed at top level
-const singletonWrapper = {
-  getInstance,
-  // Proxy all methods from getInstance() for backward compatibility
-  get onAllEvents() {
-    return getInstance().onAllEvents.bind(getInstance());
-  },
-  get onInitialization() {
-    return getInstance().onInitialization.bind(getInstance());
-  },
-  get onConfiguration() {
-    return getInstance().onConfiguration.bind(getInstance());
-  },
-  get onGeneration() {
-    return getInstance().onGeneration.bind(getInstance());
-  },
-  get onModel() {
-    return getInstance().onModel.bind(getInstance());
-  },
-  get onVoice() {
-    return getInstance().onVoice.bind(getInstance());
-  },
-  get onPerformance() {
-    return getInstance().onPerformance.bind(getInstance());
-  },
-  get onNetwork() {
-    return getInstance().onNetwork.bind(getInstance());
-  },
-  get onStorage() {
-    return getInstance().onStorage.bind(getInstance());
-  },
-  get onFramework() {
-    return getInstance().onFramework.bind(getInstance());
-  },
-  get onDevice() {
-    return getInstance().onDevice.bind(getInstance());
-  },
-  get onComponentInitialization() {
-    return getInstance().onComponentInitialization.bind(getInstance());
-  },
-  get onComponent() {
-    return getInstance().onComponent.bind(getInstance());
-  },
-  get on() {
-    return getInstance().on.bind(getInstance());
-  },
-  get publish() {
-    return getInstance().publish.bind(getInstance());
-  },
-  get emitModel() {
-    return getInstance().emitModel.bind(getInstance());
-  },
-  get emitVoice() {
-    return getInstance().emitVoice.bind(getInstance());
-  },
-  get emitComponentInitialization() {
-    return getInstance().emitComponentInitialization.bind(getInstance());
-  },
-  get removeAllListeners() {
-    return getInstance().removeAllListeners.bind(getInstance());
-  },
-};
-
-// Export singleton wrapper
-export const EventBus = singletonWrapper;
-
-// Export type for the EventBus
-export type { EventBusImpl };

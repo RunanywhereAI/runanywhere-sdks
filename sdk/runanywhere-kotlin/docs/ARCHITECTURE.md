@@ -85,7 +85,7 @@ Mirrors the iOS RunAnywhere Swift SDK exactly:
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                     Model Management API                        │   │
 │  │  • registerModel(), downloadModel()                             │   │
-│  │  • loadLLMModel(), loadSTTModel(), loadTTSVoice()               │   │
+│  │  • loadModel(RAModelLoadRequest), unloadModel(), currentModel() │   │
 │  │  • availableModels(), deleteModel()                             │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -142,7 +142,7 @@ com.runanywhere.sdk/
 │   ├── RunAnywhere.kt               # Main SDK entry point
 │   ├── events/
 │   │   ├── EventBus.kt              # Event subscription system
-│   │   └── SDKEvent.kt              # Event type definitions
+│   │   └── SDKEvent.kt              # Proto-generated event typealiases
 │   └── extensions/
 │       ├── RunAnywhere+TextGeneration.kt    # LLM APIs
 │       ├── RunAnywhere+STT.kt               # Speech-to-text APIs
@@ -151,11 +151,11 @@ com.runanywhere.sdk/
 │       ├── RunAnywhere+VoiceAgent.kt        # Voice pipeline orchestration
 │       ├── RunAnywhere+ModelManagement.kt   # Model registration/download
 │       ├── LLM/LLMTypes.kt                  # LLM type definitions
-│       ├── STT/STTTypes.kt                  # STT type definitions
-│       ├── TTS/TTSTypes.kt                  # TTS type definitions
-│       ├── VAD/VADTypes.kt                  # VAD type definitions
+│       ├── LLM/ToolCallingTypes.kt          # Tool calling type definitions
 │       ├── VoiceAgent/VoiceAgentTypes.kt    # Voice agent types
-│       └── Models/ModelTypes.kt             # Model type definitions
+│       ├── VoiceAgent/VoiceEventState.kt    # Voice event state mapping
+│       ├── Models/ModelTypes.kt             # Model type definitions
+│       └── Models/ModelPathResolution.kt    # Model path resolution
 │
 ├── core/                             # Core types and interfaces
 │   ├── types/
@@ -257,7 +257,7 @@ RunAnywhere.completeServicesInitialization()
 |-----------|--------|-------|
 | `RunAnywhere.initialize()` | Calling thread (main) | Fast, < 5ms |
 | `completeServicesInitialization()` | Calling thread | Suspending function |
-| `loadLLMModel()` / `loadSTTModel()` | Dispatchers.IO | Async, returns immediately |
+| `loadModel(RAModelLoadRequest)` | Dispatchers.IO | Async, awaits the proto lifecycle result |
 | `generate()` / `transcribe()` | Dispatchers.Default | CPU-bound inference |
 | `generateStream()` | Dispatchers.Default | Returns Flow, collects on Default |
 | `downloadModel()` | Dispatchers.IO | Network I/O |
@@ -364,14 +364,20 @@ val hasVAD = CppBridge.isCapabilityAvailable(SDKComponent.VAD)
 All feature-specific APIs are implemented as extension functions on `RunAnywhere`:
 
 ```kotlin
-// Definition (in RunAnywhere+TextGeneration.kt)
-expect suspend fun RunAnywhere.chat(prompt: String): String
+// Definition (in extensions/LLM/RunAnywhereTextGeneration.kt)
+expect suspend fun RunAnywhere.generate(
+    prompt: String,
+    options: RALLMGenerationOptions? = null,
+): RALLMGenerationResult
 
-// Implementation (in RunAnywhere+TextGeneration.jvmAndroid.kt)
-actual suspend fun RunAnywhere.chat(prompt: String): String {
+// Implementation (in extensions/LLM/RunAnywhereTextGeneration.jvmAndroid.kt)
+actual suspend fun RunAnywhere.generate(
+    prompt: String,
+    options: RALLMGenerationOptions?,
+): RALLMGenerationResult {
     requireInitialized()
     ensureServicesReady()
-    return CppBridge.nativeChat(prompt)
+    return CppBridgeLLM.generate(prompt, options)
 }
 ```
 
@@ -382,9 +388,12 @@ actual suspend fun RunAnywhere.chat(prompt: String): String {
 
 ### Result Types
 
-All operations return rich result types with metadata:
+All operations return rich result types with metadata. The canonical
+result type is the Wire-generated proto `LLMGenerationResult` (exposed
+as `RALLMGenerationResult`):
 
 ```kotlin
+// ai.runanywhere.proto.v1.LLMGenerationResult — selected fields
 data class LLMGenerationResult(
     val text: String,                    // Generated content
     val thinkingContent: String?,        // Reasoning (if model supports)
@@ -603,13 +612,18 @@ fun testRealInference() = runTest {
     // Initialize SDK
     RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
 
-    // Load a small test model
-    RunAnywhere.loadLLMModel("test-tiny-model")
+    // Load a small test model through the canonical lifecycle service.
+    RunAnywhere.loadModel(
+        RAModelLoadRequest(
+            model_id = "test-tiny-model",
+            category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        ),
+    )
 
     // Run inference
     val result = RunAnywhere.generate("2+2=")
     assertNotNull(result.text)
-    assertTrue(result.latencyMs > 0)
+    assertTrue(result.latency_ms > 0)
 }
 ```
 

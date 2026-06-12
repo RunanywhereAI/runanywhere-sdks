@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -11,7 +13,7 @@ import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
-/// VoiceAssistantView (mirroring iOS VoiceAssistantView.swift)
+/// VoiceAssistantView
 ///
 /// Main voice assistant UI with conversational interface.
 /// Orchestrates STT -> LLM -> TTS pipeline using SDK's VoiceSession API.
@@ -25,9 +27,11 @@ class VoiceAssistantView extends StatefulWidget {
 class _VoiceAssistantViewState extends State<VoiceAssistantView>
     with SingleTickerProviderStateMixin {
   // Session state
-  VoiceSessionState _sessionState = VoiceSessionState.disconnected;
-  sdk.VoiceSessionHandle? _voiceSession;
-  StreamSubscription<sdk.VoiceSessionEvent>? _eventSubscription;
+  UiVoiceSessionState _sessionState = UiVoiceSessionState.disconnected;
+
+  // Proto-event subscription owns the active stream; nothing else needs to
+  // reach the adapter.
+  StreamSubscription<sdk.VoiceEvent>? _eventSubscription;
 
   // Conversation
   final List<_ConversationTurn> _conversation = [];
@@ -39,9 +43,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   bool _isSpeechDetected = false;
 
   // Model state - tracks which models are loaded
-  AppModelLoadState _sttModelState = AppModelLoadState.notLoaded;
-  AppModelLoadState _llmModelState = AppModelLoadState.notLoaded;
-  AppModelLoadState _ttsModelState = AppModelLoadState.notLoaded;
+  UiModelLoadState _sttModelState = UiModelLoadState.notLoaded;
+  UiModelLoadState _llmModelState = UiModelLoadState.notLoaded;
+  UiModelLoadState _ttsModelState = UiModelLoadState.notLoaded;
 
   // Current model names
   String _currentSTTModel = 'Not loaded';
@@ -59,21 +63,21 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   late Animation<double> _pulseAnimation;
 
   bool get _allModelsLoaded =>
-      _sttModelState == AppModelLoadState.loaded &&
-      _llmModelState == AppModelLoadState.loaded &&
-      _ttsModelState == AppModelLoadState.loaded;
+      _sttModelState == UiModelLoadState.loaded &&
+      _llmModelState == UiModelLoadState.loaded &&
+      _ttsModelState == UiModelLoadState.loaded;
 
   bool get _isActive =>
-      _sessionState != VoiceSessionState.disconnected &&
-      _sessionState != VoiceSessionState.error;
+      _sessionState != UiVoiceSessionState.disconnected &&
+      _sessionState != UiVoiceSessionState.error;
 
   bool get _isListening =>
-      _sessionState == VoiceSessionState.listening ||
-      _sessionState == VoiceSessionState.connected;
+      _sessionState == UiVoiceSessionState.listening ||
+      _sessionState == UiVoiceSessionState.connected;
 
   bool get _isProcessing =>
-      _sessionState == VoiceSessionState.processing ||
-      _sessionState == VoiceSessionState.connecting;
+      _sessionState == UiVoiceSessionState.processing ||
+      _sessionState == UiVoiceSessionState.connecting;
 
   @override
   void initState() {
@@ -99,26 +103,25 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _refreshComponentStates();
   }
 
-  /// Refresh model states from SDK (matches Swift VoiceAgentViewModel pattern)
+  /// Refresh the UI's model readiness state from SDK component state.
   /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      // Use SDK public API to check loaded states (matches Swift pattern)
-      final currentModelId = sdk.RunAnywhere.currentModelId;
-      final sttModelId = sdk.RunAnywhere.currentSTTModelId;
-      final ttsVoiceId = sdk.RunAnywhere.currentTTSVoiceId;
+      final currentModelId = sdk.RunAnywhere.llm.currentModelId;
+      final sttModelId = sdk.RunAnywhere.stt.currentModelId;
+      final ttsVoiceId = sdk.RunAnywhere.tts.currentVoiceId;
 
       if (!mounted) return;
       setState(() {
         _sttModelState = sttModelId != null
-            ? AppModelLoadState.loaded
-            : AppModelLoadState.notLoaded;
+            ? UiModelLoadState.loaded
+            : UiModelLoadState.notLoaded;
         _llmModelState = currentModelId != null
-            ? AppModelLoadState.loaded
-            : AppModelLoadState.notLoaded;
+            ? UiModelLoadState.loaded
+            : UiModelLoadState.notLoaded;
         _ttsModelState = ttsVoiceId != null
-            ? AppModelLoadState.loaded
-            : AppModelLoadState.notLoaded;
+            ? UiModelLoadState.loaded
+            : UiModelLoadState.notLoaded;
 
         _currentSTTModel = sttModelId ?? 'Not loaded';
         _currentLLMModel = currentModelId ?? 'Not loaded';
@@ -135,109 +138,206 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         await PermissionService.shared.requestSTTPermissions(context);
     if (!hasPermission) {
       setState(() {
-        _sessionState = VoiceSessionState.error;
+        _sessionState = UiVoiceSessionState.error;
         _errorMessage = 'Microphone permission is required for voice assistant';
       });
       return;
     }
 
     setState(() {
-      _sessionState = VoiceSessionState.connecting;
+      _sessionState = UiVoiceSessionState.connecting;
       _errorMessage = null;
     });
 
     try {
-      // Check if voice agent is ready using SDK API
-      if (!sdk.RunAnywhere.isVoiceAgentReady) {
+      if (!sdk.RunAnywhere.voice.isReady) {
         setState(() {
-          _sessionState = VoiceSessionState.error;
+          _sessionState = UiVoiceSessionState.error;
           _errorMessage = 'Please load STT, LLM, and TTS models first';
         });
         return;
       }
 
-      // Use SDK's startVoiceSession API (matches Swift: RunAnywhere.startVoiceSession())
-      _voiceSession = await sdk.RunAnywhere.startVoiceSession(
-        config: const sdk.VoiceSessionConfig(),
-      );
+      // v4: voice capability owns adapter construction. Initialize
+      // against loaded models then subscribe to the proto VoiceEvent
+      // stream — symmetric with `instance.llm.generateStream(...)`.
+      final voice = sdk.RunAnywhere.voice;
+      await voice.initializeWithLoadedModels();
 
-      // Listen to session events
-      _eventSubscription = _voiceSession!.events.listen(
-        _handleSessionEvent,
+      _eventSubscription = voice.eventStream().listen(
+        _handleProtoEvent,
         onError: (Object error) {
           setState(() {
-            _sessionState = VoiceSessionState.error;
-            _errorMessage = 'Voice session error: $error';
+            _sessionState = UiVoiceSessionState.error;
+            _errorMessage = 'Voice agent error: $error';
           });
         },
       );
 
       setState(() {
-        _sessionState = VoiceSessionState.connected;
+        _sessionState = UiVoiceSessionState.connected;
       });
 
       // Start pulse animation
       unawaited(_pulseController.repeat(reverse: true));
     } catch (e) {
       setState(() {
-        _sessionState = VoiceSessionState.error;
+        _sessionState = UiVoiceSessionState.error;
         _errorMessage = 'Failed to start voice session: $e';
       });
     }
   }
 
-  void _handleSessionEvent(sdk.VoiceSessionEvent event) {
-    if (event is sdk.VoiceSessionListening) {
-      setState(() {
-        _sessionState = VoiceSessionState.listening;
-        _audioLevel = event.audioLevel;
-        // Update speech detected based on audio level threshold
-        _isSpeechDetected = event.audioLevel > 0.1;
-      });
-    } else if (event is sdk.VoiceSessionSpeechStarted) {
-      setState(() {
-        _isSpeechDetected = true;
-      });
-    } else if (event is sdk.VoiceSessionTranscribed) {
-      setState(() {
-        _currentTranscript = event.text;
-        _sessionState = VoiceSessionState.processing;
-      });
-    } else if (event is sdk.VoiceSessionResponded) {
-      setState(() {
-        _assistantResponse = event.text;
-      });
-    } else if (event is sdk.VoiceSessionSpeaking) {
-      setState(() {
-        _sessionState = VoiceSessionState.speaking;
-      });
-    } else if (event is sdk.VoiceSessionTurnCompleted) {
-      // Add completed turn to conversation
-      if (event.transcript.isNotEmpty) {
+  /// Drive UI state from canonical VoiceEvent proto messages.
+  ///
+  /// Switches on `event.whichPayload()`. Turn-completion aggregation (was
+  /// VoiceSessionTurnCompleted) is rebuilt locally from the proto state
+  /// transitions.
+  void _handleProtoEvent(sdk.VoiceEvent event) {
+    switch (event.whichPayload()) {
+      case sdk.VoiceEvent_Payload.state:
+        final state = event.state;
+        switch (state.current) {
+          case sdk.PipelineState.PIPELINE_STATE_IDLE:
+            setState(() {
+              _sessionState = UiVoiceSessionState.listening;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_LISTENING:
+            setState(() {
+              _sessionState = UiVoiceSessionState.listening;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_THINKING:
+            setState(() {
+              _sessionState = UiVoiceSessionState.processing;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
+            setState(() {
+              _sessionState = UiVoiceSessionState.speaking;
+              // Flush accumulated assistant tokens as a completed turn.
+              if (_assistantResponse.isNotEmpty) {
+                _conversation.add(_ConversationTurn(
+                  role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
+                  text: _assistantResponse,
+                ));
+                _assistantResponse = '';
+              }
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_STOPPED:
+            unawaited(_stopConversation());
+            break;
+          default:
+            break;
+        }
+        break;
+
+      case sdk.VoiceEvent_Payload.vad:
+        final vad = event.vad;
+        // VADEvent.type is VADStreamEventKind; start/end ride
+        // SPEECH_ACTIVITY with direction on the is_speech bool.
+        if (vad.type ==
+            sdk.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
+          setState(() {
+            _isSpeechDetected = vad.isSpeech;
+            if (!vad.isSpeech) {
+              _sessionState = UiVoiceSessionState.processing;
+            }
+          });
+        }
+        break;
+
+      case sdk.VoiceEvent_Payload.speechTurnDetection:
+        final turn = event.speechTurnDetection;
+        switch (turn.kind) {
+          case proto.SpeechTurnDetectionEventKind
+                .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED:
+            setState(() {
+              _isSpeechDetected = true;
+              _sessionState = UiVoiceSessionState.listening;
+            });
+            break;
+          case proto.SpeechTurnDetectionEventKind
+                .SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED:
+            setState(() {
+              _isSpeechDetected = false;
+              _sessionState = UiVoiceSessionState.processing;
+            });
+            break;
+          case proto.SpeechTurnDetectionEventKind
+                .SPEECH_TURN_DETECTION_EVENT_KIND_SPEAKER_CHANGED:
+          case proto.SpeechTurnDetectionEventKind
+                .SPEECH_TURN_DETECTION_EVENT_KIND_STATISTICS:
+          case proto.SpeechTurnDetectionEventKind
+                .SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED:
+            break;
+        }
+        break;
+
+      case sdk.VoiceEvent_Payload.wakewordDetected:
         setState(() {
-          _conversation.add(_ConversationTurn(
-            role: ConversationRole.user,
-            text: event.transcript,
-          ));
-          if (event.response.isNotEmpty) {
+          _sessionState = UiVoiceSessionState.listening;
+          _isSpeechDetected = false;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.userSaid:
+        final text = event.userSaid.text;
+        setState(() {
+          if (text.isNotEmpty) {
             _conversation.add(_ConversationTurn(
-              role: ConversationRole.assistant,
-              text: event.response,
+              role: proto.MessageRole.MESSAGE_ROLE_USER,
+              text: text,
             ));
           }
+          // Clear in-progress transcript so the committed bubble above
+          // is not double-rendered.
           _currentTranscript = '';
-          _assistantResponse = '';
-          _sessionState = VoiceSessionState.listening;
         });
-      }
-    } else if (event is sdk.VoiceSessionError) {
-      setState(() {
-        _sessionState = VoiceSessionState.error;
-        _errorMessage = event.message;
-      });
-    } else if (event is sdk.VoiceSessionStopped) {
-      // Properly clean up subscriptions and controllers instead of just setting state
-      unawaited(_stopConversation());
+        break;
+
+      case sdk.VoiceEvent_Payload.assistantToken:
+        // Streaming per-token for typewriter UX. Previously .Responded batched.
+        final token = event.assistantToken.text;
+        setState(() {
+          _assistantResponse += token;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.audio:
+        setState(() {
+          _sessionState = UiVoiceSessionState.speaking;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.error:
+        final err = event.error;
+        setState(() {
+          _sessionState = UiVoiceSessionState.error;
+          _errorMessage = err.message;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.audioLevel:
+        setState(() {
+          _audioLevel = event.audioLevel.rms.clamp(0.0, 1.0);
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.interrupted:
+      case sdk.VoiceEvent_Payload.metrics:
+      case sdk.VoiceEvent_Payload.componentStateChanged:
+      case sdk.VoiceEvent_Payload.sessionError:
+      case sdk.VoiceEvent_Payload.sessionStarted:
+      case sdk.VoiceEvent_Payload.sessionStopped:
+      case sdk.VoiceEvent_Payload.agentResponseStarted:
+      case sdk.VoiceEvent_Payload.agentResponseCompleted:
+      case sdk.VoiceEvent_Payload.turnLifecycle:
+      case sdk.VoiceEvent_Payload.componentProgress:
+      case sdk.VoiceEvent_Payload.notSet:
+        break;
     }
   }
 
@@ -248,11 +348,17 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    _voiceSession?.stop();
-    _voiceSession = null;
+    // Release native voice-agent + VAD handles (Kotlin/Android parity:
+    // RunAnywhere.cleanupVoiceAgent() on session end).
+    try {
+      sdk.RunAnywhere.voice.cleanup();
+    } catch (e) {
+      debugPrint('Voice cleanup: $e');
+    }
 
+    if (!mounted) return;
     setState(() {
-      _sessionState = VoiceSessionState.disconnected;
+      _sessionState = UiVoiceSessionState.disconnected;
       _currentTranscript = '';
       _assistantResponse = '';
       _audioLevel = 0.0;
@@ -404,6 +510,35 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               color: AppColors.primaryPurple,
               onTap: _showTTSModelSelection,
             ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            // Short-circuit row for the platform's built-in
+            // TTS engine — bypasses the model selection sheet entirely.
+            // Apple-only: the commons `platform` engine plugin is gated
+            // behind `if(APPLE AND RAC_BUILD_PLATFORM)` and
+            // `runanywhere_ai_app.dart` only seeds the `system-tts`
+            // pseudo-model on iOS/macOS, so on Android tapping the toggle
+            // would silently fail with `model not found`. Mirrors the gate
+            // applied in `features/models/model_status_components.dart`.
+            if (Platform.isIOS || Platform.isMacOS)
+              SwitchListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use system voice (no model required)'),
+                subtitle: const Text(
+                  'Routes TTS through the OS engine instead of an on-device model.',
+                ),
+                value: _currentTTSModel == 'system-tts',
+                onChanged: (enabled) async {
+                  if (enabled) {
+                    try {
+                      await sdk.RunAnywhere.tts.loadVoice('system-tts');
+                      await _refreshComponentStates();
+                    } catch (e) {
+                      debugPrint('Failed to load system-tts: $e');
+                    }
+                  }
+                },
+              ),
 
             const Spacer(),
 
@@ -437,11 +572,11 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     required IconData icon,
     required String label,
     required String modelName,
-    required AppModelLoadState state,
+    required UiModelLoadState state,
     required Color color,
     required VoidCallback onTap,
   }) {
-    final isLoaded = state == AppModelLoadState.loaded;
+    final isLoaded = state == UiModelLoadState.loaded;
 
     return InkWell(
       onTap: onTap,
@@ -681,14 +816,14 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         // Current transcription (in progress)
         if (_currentTranscript.isNotEmpty)
           _buildConversationBubble(_ConversationTurn(
-            role: ConversationRole.user,
+            role: proto.MessageRole.MESSAGE_ROLE_USER,
             text: _currentTranscript,
           )),
 
         // Current assistant response (in progress)
         if (_assistantResponse.isNotEmpty)
           _buildConversationBubble(_ConversationTurn(
-            role: ConversationRole.assistant,
+            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
             text: _assistantResponse,
           )),
       ],
@@ -696,7 +831,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   }
 
   Widget _buildConversationBubble(_ConversationTurn turn) {
-    final isUser = turn.role == ConversationRole.user;
+    final isUser = turn.role == proto.MessageRole.MESSAGE_ROLE_USER;
     final speaker = isUser ? 'You' : 'Assistant';
 
     return Padding(
@@ -889,18 +1024,18 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   Color _getStatusColor() {
     switch (_sessionState) {
-      case VoiceSessionState.disconnected:
+      case UiVoiceSessionState.disconnected:
         return AppColors.statusGray;
-      case VoiceSessionState.connecting:
+      case UiVoiceSessionState.connecting:
         return AppColors.statusBlue;
-      case VoiceSessionState.connected:
-      case VoiceSessionState.listening:
+      case UiVoiceSessionState.connected:
+      case UiVoiceSessionState.listening:
         return AppColors.statusGreen;
-      case VoiceSessionState.processing:
+      case UiVoiceSessionState.processing:
         return AppColors.statusBlue;
-      case VoiceSessionState.speaking:
+      case UiVoiceSessionState.speaking:
         return AppColors.primaryPurple;
-      case VoiceSessionState.error:
+      case UiVoiceSessionState.error:
         return AppColors.statusRed;
     }
   }
@@ -914,13 +1049,13 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   IconData _getMicButtonIcon() {
     switch (_sessionState) {
-      case VoiceSessionState.disconnected:
-      case VoiceSessionState.error:
+      case UiVoiceSessionState.disconnected:
+      case UiVoiceSessionState.error:
         return Icons.mic;
-      case VoiceSessionState.connected:
-      case VoiceSessionState.listening:
+      case UiVoiceSessionState.connected:
+      case UiVoiceSessionState.listening:
         return Icons.stop;
-      case VoiceSessionState.speaking:
+      case UiVoiceSessionState.speaking:
         return Icons.volume_up;
       default:
         return Icons.mic;
@@ -929,24 +1064,22 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   String _getInstructionText() {
     switch (_sessionState) {
-      case VoiceSessionState.disconnected:
+      case UiVoiceSessionState.disconnected:
         return 'Tap to start voice conversation';
-      case VoiceSessionState.connecting:
+      case UiVoiceSessionState.connecting:
         return 'Connecting...';
-      case VoiceSessionState.connected:
-      case VoiceSessionState.listening:
+      case UiVoiceSessionState.connected:
+      case UiVoiceSessionState.listening:
         return _isSpeechDetected ? 'Listening...' : 'Speak now';
-      case VoiceSessionState.processing:
+      case UiVoiceSessionState.processing:
         return 'Processing...';
-      case VoiceSessionState.speaking:
+      case UiVoiceSessionState.speaking:
         return 'Assistant is speaking';
-      case VoiceSessionState.error:
+      case UiVoiceSessionState.error:
         return 'Tap to retry';
     }
   }
 }
-
-// MARK: - Supporting Widgets
 
 class _ModelBadge extends StatelessWidget {
   final IconData icon;
@@ -1005,12 +1138,8 @@ class _ModelBadge extends StatelessWidget {
   }
 }
 
-// MARK: - Helper Classes
-
-enum ConversationRole { user, assistant }
-
 class _ConversationTurn {
-  final ConversationRole role;
+  final proto.MessageRole role;
   final String text;
   final DateTime timestamp;
 

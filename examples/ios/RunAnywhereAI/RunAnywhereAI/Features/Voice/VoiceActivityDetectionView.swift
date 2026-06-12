@@ -36,7 +36,7 @@ struct VoiceActivityDetectionView: View {
                 }
                 .navigationTitle(hasModelSelected ? "Voice Activity Detection" : "")
                 #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayModeCompat(.inline)
                 .navigationBarHidden(!hasModelSelected)
                 #endif
                 .toolbar {

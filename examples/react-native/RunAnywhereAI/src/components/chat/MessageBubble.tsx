@@ -154,11 +154,12 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           {/* Analytics (for assistant messages) */}
           {isAssistant &&
             message.analytics &&
-            message.analytics.averageTokensPerSecond != null &&
-            message.analytics.averageTokensPerSecond > 0 && (
+            message.analytics.performance.throughputTokensPerSec > 0 && (
               <View style={styles.analytics}>
                 <Text style={styles.analyticsText}>
-                  {formatTPS(message.analytics.averageTokensPerSecond)}
+                  {formatTPS(
+                    message.analytics.performance.throughputTokensPerSec
+                  )}
                 </Text>
               </View>
             )}

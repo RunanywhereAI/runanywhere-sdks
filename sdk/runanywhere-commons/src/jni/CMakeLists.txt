@@ -16,7 +16,8 @@
 # This mirrors the Swift SDK architecture where each backend has its own
 # XCFramework (RABackendLlamaCPP, RABackendONNX).
 
-cmake_minimum_required(VERSION 3.14)
+# Must match sdk/runanywhere-commons/VERSIONS::MIN_CMAKE_VERSION (3.24).
+cmake_minimum_required(VERSION 3.24)
 project(runanywhere_commons_jni)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -65,7 +66,22 @@ endif()
 # Source files
 set(JNI_SOURCES
     runanywhere_commons_jni.cpp
+    # OkHttp-backed rac_http_transport_ops adapter. Routes
+    # rac_http_request_* calls through Kotlin's
+    # `com.runanywhere.sdk.foundation.http.OkHttpTransport` so Android
+    # consumers get the system trust store + NetworkSecurityConfig +
+    # proxy support for free. Fixes rc=77 SSL errors permanently.
+    okhttp_transport_adapter.cpp
+    rac_hybrid_device_state_jni.cpp
+    rac_hybrid_custom_filter_jni.cpp
+    rac_cloud_stt_provider_jni.cpp
+    rac_stt_hybrid_router_jni.cpp
 )
+
+# Cloud-engine JNI thunks (e.g. cloud) are attached by each engine's own
+# CMakeLists.txt via target_sources(runanywhere_commons_jni ...) — those
+# subdirs are processed AFTER this one, so a conditional here would see the
+# per-engine RAC_BACKEND_* option undefined and silently drop the symbols.
 
 # Create shared library
 add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})
@@ -74,6 +90,12 @@ add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})
 target_include_directories(runanywhere_commons_jni PRIVATE
     ${JNI_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+)
+
+# JNI bridge is a first-party commons translation unit and can include the
+# legacy internal event headers without tripping the public-API #warning.
+target_compile_definitions(runanywhere_commons_jni PRIVATE
+    RAC_INTERNAL_TRANSLATION_UNIT=1
 )
 
 # Link against runanywhere-commons core ONLY
@@ -97,7 +119,9 @@ if(ANDROID)
     )
 
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(runanywhere_commons_jni PRIVATE -Wl,-z,max-page-size=16384)
+    target_link_options(runanywhere_commons_jni PRIVATE
+        -Wl,-z,max-page-size=16384
+        -Wl,-z,common-page-size=16384)
 endif()
 
 # Set output name to match what Kotlin expects

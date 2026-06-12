@@ -4,7 +4,7 @@ On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voi
 
 <p align="center">
   <a href="#"><img src="https://img.shields.io/badge/React%20Native-0.74+-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React Native 0.74+" /></a>
-  <a href="#"><img src="https://img.shields.io/badge/iOS-15.1+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 15.1+" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/iOS-17.0+-000000?style=flat-square&logo=apple&logoColor=white" alt="iOS 17.0+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Android-7.0+-3DDC84?style=flat-square&logo=android&logoColor=white" alt="Android 7.0+" /></a>
   <a href="#"><img src="https://img.shields.io/badge/TypeScript-5.2+-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.2+" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" /></a>
@@ -57,8 +57,8 @@ On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voi
 - Push-to-talk and hands-free modes
 
 ### Infrastructure
-- Automatic model discovery and download with progress tracking
-- Comprehensive event system via `EventBus`
+- Native model registry, download, and lifecycle APIs with progress tracking
+- Proto-byte SDK event stream decoded by the TypeScript facade
 - Built-in analytics and telemetry
 - Structured logging with multiple log levels
 - Keychain-persisted device identity (iOS) / EncryptedSharedPreferences (Android)
@@ -70,7 +70,7 @@ On-device AI for React Native. Run LLMs, Speech-to-Text, Text-to-Speech, and Voi
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
 | **React Native** | 0.71+ | 0.74+ |
-| **iOS** | 15.1+ | 17.0+ |
+| **iOS** | 17.0+ | 17.0+ |
 | **Android** | API 24 (7.0+) | API 28+ |
 | **Node.js** | 18+ | 20+ |
 | **Xcode** | 15+ | 16+ |
@@ -88,7 +88,7 @@ This SDK uses a modular multi-package architecture. Install only the packages yo
 
 | Package | Description | Required |
 |---------|-------------|----------|
-| `@runanywhere/core` | Core SDK infrastructure, public API, events, model registry | Yes |
+| `@runanywhere/core` | Core SDK facade, native lifecycle/event/model APIs, proto types | Yes |
 | `@runanywhere/llamacpp` | LlamaCPP backend for LLM text generation (GGUF models) | For LLM |
 | `@runanywhere/onnx` | ONNX Runtime backend for STT/TTS (Whisper, Piper) | For Voice |
 
@@ -133,34 +133,67 @@ No additional setup required. Native libraries are automatically downloaded duri
 ### 1. Initialize the SDK
 
 ```typescript
-import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  SDKEnvironment,
+} from '@runanywhere/core';
+import {
+  CurrentModelRequest,
+  ModelCategory,
+  InferenceFramework,
+  ModelArtifactType,
+  ModelLoadRequest,
+  ModelUnloadRequest,
+  AudioFormat,
+} from '@runanywhere/proto-ts/model_types';
+import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 import { LlamaCPP } from '@runanywhere/llamacpp';
-import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
+import { ONNX } from '@runanywhere/onnx';
 
 // Initialize SDK (development mode - no API key needed)
 await RunAnywhere.initialize({
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
-// Register LlamaCpp module and add LLM models
-LlamaCPP.register();
-await LlamaCPP.addModel({
-  id: 'smollm2-360m-q8_0',
-  name: 'SmolLM2 360M Q8_0',
-  url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-  memoryRequirement: 500_000_000,
-});
+async function drainModelDownload(modelId: string): Promise<void> {
+  const iterator = RunAnywhere.downloadModel(modelId)[Symbol.asyncIterator]();
+  let next = await iterator.next();
+  while (!next.done) {
+    const progress = next.value;
+    console.log(`${modelId}: ${(progress.progress * 100).toFixed(1)}%`);
+    next = await iterator.next();
+  }
+}
 
-// Register ONNX module and add STT/TTS models
-ONNX.register();
-await ONNX.addModel({
-  id: 'sherpa-onnx-whisper-tiny.en',
-  name: 'Sherpa Whisper Tiny (ONNX)',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-  modality: ModelCategory.SpeechRecognition,
-  artifactType: ModelArtifactType.TarGzArchive,
-  memoryRequirement: 75_000_000,
-});
+// Register LlamaCpp module and add LLM models. `register()` is async and
+// returns `Promise<boolean>` — `false` means the native backend was not
+// installed, so don't register Llama-backed models in that case.
+const llamaRegistered = await LlamaCPP.register();
+if (llamaRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'smollm2-360m-q8_0',
+    name: 'SmolLM2 360M Q8_0',
+    url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    memoryRequirement: 500_000_000,
+  });
+}
+
+// Register ONNX module and add STT/TTS models. ONNX.register() is also async
+// and returns `Promise<boolean>` — `false` means the native backend was not
+// installed, so don't register Sherpa-backed models in that case.
+const onnxRegistered = await ONNX.register();
+if (onnxRegistered) {
+  await RunAnywhere.registerModel({
+    id: 'sherpa-onnx-whisper-tiny.en',
+    name: 'Sherpa Whisper Tiny (ONNX)',
+    url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+    modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+    artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+    memoryRequirement: 75_000_000,
+  });
+}
 
 console.log('SDK initialized');
 ```
@@ -169,29 +202,31 @@ console.log('SDK initialized');
 
 ```typescript
 // Download model with progress tracking
-await RunAnywhere.downloadModel('smollm2-360m-q8_0', (progress) => {
-  console.log(`Download: ${(progress.progress * 100).toFixed(1)}%`);
-});
+await drainModelDownload('smollm2-360m-q8_0');
 
 // Load model into memory
-const modelInfo = await RunAnywhere.getModelInfo('smollm2-360m-q8_0');
-if (modelInfo?.localPath) {
-  await RunAnywhere.loadModel(modelInfo.localPath);
+const loadResult = await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'smollm2-360m-q8_0',
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+}));
+if (!loadResult.success) {
+  throw new Error(loadResult.errorMessage || 'Model load failed');
 }
 
-// Check if model is loaded
-const isLoaded = await RunAnywhere.isModelLoaded();
+// Check lifecycle state through the Swift-shaped currentModel API
+const currentModel = await RunAnywhere.currentModel(
+  CurrentModelRequest.fromPartial({
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    includeModelMetadata: false,
+  })
+);
+const isLoaded = currentModel.found && currentModel.modelId.length > 0;
 console.log('Model loaded:', isLoaded);
 ```
 
 ### 3. Generate Text
 
 ```typescript
-// Simple chat
-const response = await RunAnywhere.chat('What is the capital of France?');
-console.log(response);  // "Paris is the capital of France."
-
-// With options
 const result = await RunAnywhere.generate(
   'Explain quantum computing in simple terms',
   {
@@ -208,15 +243,22 @@ console.log('Latency:', result.latencyMs, 'ms');
 
 ### 4. Streaming Generation
 
+> Hermes caveat: `for await...of` does not work with NitroModules async iterables.
+> Use the manual-iterator pattern below. See [Hermes streaming](#hermes-streaming)
+> for details.
+
 ```typescript
 const streamResult = await RunAnywhere.generateStream(
   'Write a short poem about AI',
   { maxTokens: 150 }
 );
 
-// Display tokens in real-time
-for await (const token of streamResult.stream) {
-  process.stdout.write(token);
+// Display tokens in real-time (manual iterator — Hermes-safe)
+const iterator = streamResult.stream[Symbol.asyncIterator]();
+while (true) {
+  const { value, done } = await iterator.next();
+  if (done) break;
+  process.stdout.write(value);
 }
 
 // Get final metrics
@@ -228,13 +270,18 @@ console.log('\nSpeed:', metrics.performanceMetrics.tokensPerSecond, 'tok/s');
 
 ```typescript
 // Download and load STT model
-await RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en');
-const sttModel = await RunAnywhere.getModelInfo('sherpa-onnx-whisper-tiny.en');
-await RunAnywhere.loadSTTModel(sttModel.localPath, 'whisper');
+await drainModelDownload('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'sherpa-onnx-whisper-tiny.en',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+}));
 
-// Transcribe audio file
-const result = await RunAnywhere.transcribeFile(audioFilePath, {
-  language: 'en',
+// Transcribe PCM/base64 audio bytes. Host apps own file reading.
+const audioBase64 = await readAudioFileAsBase64(audioFilePath);
+const result = await RunAnywhere.transcribe(audioBase64, {
+  language: STTLanguage.STT_LANGUAGE_EN,
+  audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+  sampleRate: 16000,
 });
 
 console.log('Transcription:', result.text);
@@ -245,9 +292,11 @@ console.log('Confidence:', result.confidence);
 
 ```typescript
 // Download and load TTS model
-await RunAnywhere.downloadModel('vits-piper-en_US-lessac-medium');
-const ttsModel = await RunAnywhere.getModelInfo('vits-piper-en_US-lessac-medium');
-await RunAnywhere.loadTTSModel(ttsModel.localPath, 'piper');
+await drainModelDownload('vits-piper-en_US-lessac-medium');
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'vits-piper-en_US-lessac-medium',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+}));
 
 // Synthesize speech
 const output = await RunAnywhere.synthesize(
@@ -261,9 +310,49 @@ const output = await RunAnywhere.synthesize(
 
 ---
 
+## Hermes streaming
+
+React Native's default JS engine (Hermes) does not support `for await...of`
+with NitroModules-backed async iterables. Any SDK API that returns an
+`AsyncIterable` must be consumed with a manual `Symbol.asyncIterator` loop:
+
+```typescript
+const stream = RunAnywhere.generateStream(prompt);
+const iterator = stream[Symbol.asyncIterator]();
+while (true) {
+  const { value, done } = await iterator.next();
+  if (done) break;
+  // handle value
+}
+```
+
+**Affected surfaces** (every public API that yields an `AsyncIterable`):
+
+| Surface | Yields |
+|---------|--------|
+| `RunAnywhere.generateStream(prompt, options)` | `LLMStreamEvent` (`token`, `completed`, `failed`, ...) |
+| `RunAnywhere.transcribe(audio, options)` / `transcribeStream(...)` | `STTStreamEvent` |
+| `RunAnywhere.synthesize(text, options)` / `synthesizeStream(...)` | `TTSStreamEvent` (audio chunks) |
+| `RunAnywhere.processImage(request)` | `VLMStreamEvent` (vision-language tokens) |
+| `RunAnywhere.downloadModel(id, onProgress?)` (when used as an async iterable) | `DownloadProgress` |
+| `RunAnywhere.voiceAgent.start(...)` | `VoiceEvent` |
+
+`for await` only works on Node / JavaScriptCore on iOS when Hermes is disabled.
+On Hermes-enabled apps (the default since RN 0.70), use the manual-iterator
+pattern above or wrap it in a helper. Breaking from the loop with `break` or
+`return` automatically cancels the native subscription.
+
+---
+
 ## Architecture Overview
 
 The RunAnywhere SDK follows a modular, provider-based architecture with a shared C++ core:
+
+The iOS packaging and generated-code source of truth is
+[`sdk/runanywhere-swift/ARCHITECTURE.md`](../runanywhere-swift/ARCHITECTURE.md),
+especially the folder tree, generated proto code, and build/deployment
+sections. React Native mirrors that native/proto-byte ownership instead of
+owning model downloads, registry state, or native HTTP routing in JavaScript.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -271,9 +360,9 @@ The RunAnywhere SDK follows a modular, provider-based architecture with a shared
 ├─────────────────────────────────────────────────────────────────┤
 │              @runanywhere/core (TypeScript API)                  │
 │  ┌──────────────┐  ┌───────────────┐  ┌──────────────────────┐  │
-│  │ RunAnywhere  │  │  EventBus     │  │  ModelRegistry       │  │
-│  │ (public API) │  │  (events,     │  │  (model discovery,   │  │
-│  │              │  │   callbacks)  │  │   download, storage) │  │
+│  │ RunAnywhere  │  │ SDK Events    │  │ Native Model APIs    │  │
+│  │ (public API) │  │ (proto bytes) │  │ (registry/download)  │  │
+│  │              │  │               │  │                      │  │
 │  └──────────────┘  └───────────────┘  └──────────────────────┘  │
 ├────────────┬─────────────────────────────────────┬──────────────┤
 │            │                                     │              │
@@ -289,8 +378,8 @@ The RunAnywhere SDK follows a modular, provider-based architecture with a shared
 │  ┌─────────▼──────────────────────────────────────▼───────────┐ │
 │  │              runanywhere-commons (C++)                      │ │
 │  │  ┌────────────────┐  ┌────────────────┐  ┌───────────────┐ │ │
-│  │  │ RACommons      │  │ RABackend      │  │ RABackendONNX │ │ │
-│  │  │ (Core Engine)  │  │ LLAMACPP       │  │ (Sherpa-ONNX) │ │ │
+│  │  │ RACommons      │  │ RABackend      │  │ ONNX + Sherpa │ │ │
+│  │  │ (Core Engine)  │  │ LLAMACPP       │  │ backends      │ │ │
 │  │  └────────────────┘  └────────────────┘  └───────────────┘ │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
@@ -301,19 +390,20 @@ The RunAnywhere SDK follows a modular, provider-based architecture with a shared
 | Component | Description |
 |-----------|-------------|
 | **RunAnywhere** | Main SDK singleton providing all public methods |
-| **EventBus** | Event subscription system for SDK events (initialization, generation, model, voice) |
-| **ModelRegistry** | Manages model metadata, discovery, and download tracking |
+| **SDK event stream** | Native proto-byte event stream for initialization, generation, model, and voice events |
+| **Model lifecycle APIs** | TypeScript facade over native registry, download, import, delete, and load calls |
 | **ServiceContainer** | Dependency injection for internal services |
-| **FileSystem** | Cross-platform file operations for model storage |
-| **DownloadService** | Model download with progress, resume, and extraction |
+| **Storage APIs** | Native storage and cache management exposed through `RunAnywhere` |
+| **Proto adapters** | Generated protobuf types and byte adapters for cross-platform parity |
 
 ### Native Binaries
 
 | Framework | Size | Provides |
 |-----------|------|----------|
-| `RACommons.xcframework` / `librac_commons.so` | ~2MB | Core C++ commons, registries, events |
-| `RABackendLLAMACPP.xcframework` / `librunanywhere_llamacpp.so` | ~15-25MB | LLM capability (GGUF models) |
-| `RABackendONNX.xcframework` / `librunanywhere_onnx.so` | ~50-70MB | STT, TTS, VAD (ONNX models) |
+| `RACommons.xcframework` / `librac_commons.so` | package-owned | Core C++ commons, registry, storage, events, proto ABI |
+| `RABackendLLAMACPP.xcframework` / `librac_backend_llamacpp.so` | package-owned | LLM/VLM backend registration for GGUF models |
+| `RABackendONNX.xcframework` / `librac_backend_onnx.so` | package-owned | Generic ONNX backend binary |
+| `RABackendSherpa.xcframework` / `librac_backend_sherpa.so` | package-owned | Sherpa-ONNX speech backend binary |
 
 ---
 
@@ -324,14 +414,14 @@ The RunAnywhere SDK follows a modular, provider-based architecture with a shared
 ```typescript
 // Development mode (default) - no API key needed
 await RunAnywhere.initialize({
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
 // Production mode - requires API key
 await RunAnywhere.initialize({
   apiKey: '<YOUR_API_KEY>',
   baseURL: 'https://api.runanywhere.ai',
-  environment: SDKEnvironment.Production,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
 });
 ```
 
@@ -346,7 +436,7 @@ await RunAnywhere.initialize({
 ### Generation Options
 
 ```typescript
-const options: GenerationOptions = {
+const options: Partial<LLMGenerationOptions> = {
   maxTokens: 256,              // Maximum tokens to generate
   temperature: 0.7,            // Sampling temperature (0.0–2.0)
   topP: 0.95,                  // Top-p sampling parameter
@@ -359,23 +449,23 @@ const options: GenerationOptions = {
 
 ## Error Handling
 
-The SDK provides structured error handling through `SDKError`:
+The SDK provides structured error handling through `SDKException`:
 
 ```typescript
-import { SDKError, SDKErrorCode, isSDKError } from '@runanywhere/core';
+import { SDKException, ErrorCode, isSDKException } from '@runanywhere/core';
 
 try {
   const response = await RunAnywhere.generate('Hello!');
 } catch (error) {
-  if (isSDKError(error)) {
+  if (isSDKException(error)) {
     switch (error.code) {
-      case SDKErrorCode.notInitialized:
+      case ErrorCode.ERROR_CODE_NOT_INITIALIZED:
         console.log('SDK not initialized. Call RunAnywhere.initialize() first.');
         break;
-      case SDKErrorCode.modelNotFound:
+      case ErrorCode.ERROR_CODE_MODEL_NOT_FOUND:
         console.log('Model not found. Download it first.');
         break;
-      case SDKErrorCode.insufficientMemory:
+      case ErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY:
         console.log('Not enough memory. Try a smaller model.');
         break;
       default:
@@ -405,8 +495,14 @@ try {
 
 ### Configure Logging
 
+The SDK ships its own structured logger. `SDKLogger` and `LogLevel` are part of
+the internal subpath (`@runanywhere/core/internal`) and may change between
+releases; for stable user code, prefer wiring console/your own logger and
+subscribing to the EventBus stream below for observability.
+
 ```typescript
-import { LogLevel, SDKLogger } from '@runanywhere/core';
+// Internal subpath — not part of the stable root surface.
+import { LogLevel, SDKLogger } from '@runanywhere/core/internal';
 
 // Set minimum log level
 RunAnywhere.setLogLevel(LogLevel.Debug);  // debug, info, warning, error, fault
@@ -465,11 +561,16 @@ unsubscribe();
 
 ```typescript
 // Unload models when not in use
-await RunAnywhere.unloadModel();
+await RunAnywhere.unloadModel(
+  ModelUnloadRequest.fromPartial({
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    unloadAll: true,
+  })
+);
 
 // Check storage before downloading
 const storageInfo = await RunAnywhere.getStorageInfo();
-if (storageInfo.freeSpace > modelSize) {
+if ((storageInfo?.device?.freeBytes ?? 0) > modelSize) {
   // Safe to download
 }
 
@@ -507,7 +608,7 @@ await RunAnywhere.cleanTempFiles();
 
 **Solutions:**
 1. Use a smaller model (360M instead of 7B)
-2. Unload unused models first with `RunAnywhere.unloadModel()`
+2. Unload unused models first with `RunAnywhere.unloadModel(ModelUnloadRequest.fromPartial(...))`
 3. Close other memory-intensive apps
 4. Test on device with more RAM
 
@@ -526,7 +627,7 @@ await RunAnywhere.cleanTempFiles();
 **Symptoms:** `modelNotFound` error even though download completed
 
 **Solutions:**
-1. Refresh model registry: `await RunAnywhere.getAvailableModels()`
+1. Refresh model registry: `await RunAnywhere.listModels()`
 2. Check model path in storage
 3. Delete and re-download the model
 
@@ -558,7 +659,7 @@ await RunAnywhere.cleanTempFiles();
 **A:** No. All inference happens on-device. Only anonymous analytics (latency, error rates) are collected in production mode, and this can be disabled.
 
 ### Q: Which devices are supported?
-**A:** iOS 15.1+ (iPhone/iPad) and Android 7.0+ (API 24+). Modern devices with 6GB+ RAM are recommended for larger models.
+**A:** iOS 17.0+ (iPhone/iPad) and Android 7.0+ (API 24+). Modern devices with 6GB+ RAM are recommended for larger models.
 
 ### Q: Can I use custom models?
 **A:** Yes, any GGUF model works with the LlamaCPP backend. ONNX models work for STT/TTS.
@@ -581,40 +682,53 @@ Contributions are welcome. This section explains how to set up your development 
 
 ### First-Time Setup (Build from Source)
 
-The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
+The SDK depends on native C++ libraries from `runanywhere-commons`. Native artifacts are built in the owning layer (`runanywhere-commons`) and then staged into each RN package by `scripts/package-sdk.sh`.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks/sdk/runanywhere-react-native
+cd runanywhere-sdks
 
-# 2. Run first-time setup (~15-20 minutes)
-./scripts/build-react-native.sh --setup
+# 2. Build native artifacts from runanywhere-commons (from repo root)
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS XCFrameworks → build/ios/
+./scripts/build/build-core-android.sh       # Android .so files → build/android/
 
-# 3. Install JavaScript dependencies
+# 3. Stage the freshly built natives into the React Native packages
+cd sdk/runanywhere-react-native
+./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
+
+# 4. Install JavaScript dependencies (yarn workspaces)
 yarn install
 ```
 
-**What the setup script does:**
-1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
-2. Builds `RACommons.xcframework` and JNI libraries
-3. Builds `RABackendLLAMACPP` (LLM backend)
-4. Builds `RABackendONNX` (STT/TTS/VAD backend)
-5. Copies frameworks to `ios/Binaries/` and JNI libs to `android/src/main/jniLibs/`
-6. Creates `.testlocal` marker files (enables local library consumption)
+`package-sdk.sh --natives-from PATH` copies each binary into the package that owns it:
+- `RACommons.xcframework` / `librac_commons.so` → `packages/core`
+- `RABackendLLAMACPP.xcframework` / `librac_backend_llamacpp.so` → `packages/llamacpp`
+- `RABackendONNX.xcframework` + `RABackendSherpa.xcframework` / matching `.so` files → `packages/onnx`
+
+It then type-checks each package and produces `dist/sdk-rn/*.tgz` + `.sha256`.
+
+**Per-package download alternative:** if you do not need to rebuild commons from source, each package exposes a download helper that pulls pre-built natives from a GitHub release into the right package directory:
+
+```bash
+# From sdk/runanywhere-react-native/
+yarn core:download-ios          # or yarn core:download-android
+yarn llamacpp:download-ios      # or yarn llamacpp:download-android
+yarn onnx:download-ios          # or yarn onnx:download-android
+```
 
 ### Understanding testLocal
 
-The SDK has two modes:
+The SDK has two native-binary consumption modes:
 
 | Mode | Description |
 |------|-------------|
-| **Local** | Uses frameworks/JNI libs from package directories (for development) |
-| **Remote** | Downloads from GitHub releases during `pod install`/Gradle sync (for end users) |
+| **Local** | Uses frameworks/JNI libs staged into package directories for development |
+| **Packaged** | Published npm packages include package-owned natives; CocoaPods and Gradle consume them from the package directories |
 
-When you run `--setup`, the script automatically enables local mode via:
-- **iOS**: `.testlocal` marker files in `ios/` directories
-- **Android**: `RA_TEST_LOCAL=1` environment variable or `runanywhere.useLocalNatives=true` in `gradle.properties`
+Toggle local mode after staging natives:
+- **iOS**: `yarn native:local` writes the `.testlocal` marker files in each package's `ios/` directory; `yarn native:remote` removes them.
+- **Android**: set `RA_TEST_LOCAL=1` in your environment or `runanywhere.useLocalNatives=true` in `gradle.properties`.
 
 ### Testing with the React Native Sample App
 
@@ -644,7 +758,7 @@ The sample app's `package.json` uses workspace dependencies to reference the loc
 ```
 Sample App → Local RN SDK Packages → Local Frameworks/JNI libs
                                            ↑
-                          Built by build-react-native.sh --setup
+                Staged by ./scripts/package-sdk.sh --natives-from PATH
 ```
 
 ### Development Workflow
@@ -665,22 +779,24 @@ yarn build
 **After modifying runanywhere-commons (C++ code):**
 
 ```bash
+# 1. Rebuild native artifacts in the owning layer (repo root)
+./sdk/runanywhere-swift/scripts/build-core-xcframework.sh   # iOS
+./scripts/build/build-core-android.sh       # Android
+
+# 2. Re-stage them into the RN packages
 cd sdk/runanywhere-react-native
-./scripts/build-react-native.sh --local --rebuild-commons
+./scripts/package-sdk.sh --natives-from ../../build/native-artifacts
 ```
 
-### Build Script Reference
+### Packaging Reference
 
 | Command | Description |
 |---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all frameworks, enables local mode |
-| `--local` | Use local frameworks from package directories |
-| `--remote` | Use remote frameworks from GitHub releases |
-| `--rebuild-commons` | Rebuild runanywhere-commons from source |
-| `--ios` | Build for iOS only |
-| `--android` | Build for Android only |
-| `--clean` | Clean build artifacts before building |
-| `--abis=ABIS` | Android ABIs to build (default: `arm64-v8a`) |
+| `./scripts/package-sdk.sh --natives-from PATH` | Stage iOS XCFrameworks + Android `.so` files from `PATH` into each owning package, type-check, and produce `dist/sdk-rn/*.tgz` + `.sha256` |
+| `./scripts/package-sdk.sh --mode local\|ci` | Override packaging mode (default: auto-detect from `$CI`) |
+| `yarn <core\|llamacpp\|onnx>:download-ios` | Download pre-built iOS natives from GitHub releases for that package |
+| `yarn <core\|llamacpp\|onnx>:download-android` | Download pre-built Android `.so` files from GitHub releases for that package |
+| `yarn native:local` / `yarn native:remote` | Toggle iOS `.testlocal` marker files for local-vs-published native consumption |
 
 ### Code Style
 

@@ -27,6 +27,11 @@
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
+import {
+  getStoredDirectoryName,
+  rememberDirectoryName,
+  sanitizeStorageFilename,
+} from './StoragePathResolver';
 
 const logger = new SDKLogger('LocalFileStorage');
 
@@ -52,7 +57,6 @@ const DB_NAME = 'runanywhere-storage';
 const DB_VERSION = 1;
 const STORE_NAME = 'handles';
 const HANDLE_KEY = 'modelDirectory';
-const LS_DIR_NAME_KEY = 'runanywhere_storage_dir_name';
 
 // ---------------------------------------------------------------------------
 // LocalFileStorage
@@ -81,11 +85,7 @@ export class LocalFileStorage {
    * Returns the folder name only (e.g. "ai-models"), not the full path.
    */
   static get storedDirectoryName(): string | null {
-    try {
-      return localStorage.getItem(LS_DIR_NAME_KEY);
-    } catch {
-      return null;
-    }
+    return getStoredDirectoryName();
   }
 
   // -------------------------------------------------------------------------
@@ -136,7 +136,7 @@ export class LocalFileStorage {
       this._hasStoredHandle = true;
 
       // Persist directory name in localStorage for fast UI display on next visit
-      try { localStorage.setItem(LS_DIR_NAME_KEY, this.dirHandle!.name); } catch { /* non-critical */ }
+      rememberDirectoryName(this.dirHandle!.name);
 
       logger.info(`Local storage directory selected: ${this.dirHandle!.name}`);
       return true;
@@ -253,7 +253,7 @@ export class LocalFileStorage {
       throw new Error('LocalFileStorage not ready — call chooseDirectory() or restoreDirectory() first.');
     }
 
-    const filename = this.sanitizeFilename(key);
+    const filename = sanitizeStorageFilename(key);
     const fileHandle = await this.dirHandle.getFileHandle(filename, { create: true });
     const writable = await fileHandle.createWritable();
 
@@ -272,7 +272,7 @@ export class LocalFileStorage {
       throw new Error('LocalFileStorage not ready — call chooseDirectory() or restoreDirectory() first.');
     }
 
-    const filename = this.sanitizeFilename(key);
+    const filename = sanitizeStorageFilename(key);
     const fileHandle = await this.dirHandle.getFileHandle(filename, { create: true });
     const writable = await fileHandle.createWritable();
 
@@ -318,7 +318,7 @@ export class LocalFileStorage {
     if (!this.dirHandle || !this._isReady) return null;
 
     try {
-      const filename = this.sanitizeFilename(key);
+      const filename = sanitizeStorageFilename(key);
       const fileHandle = await this.dirHandle.getFileHandle(filename);
       const file = await fileHandle.getFile();
       logger.info(`Loaded model from local storage: ${filename} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
@@ -337,7 +337,7 @@ export class LocalFileStorage {
     if (!this.dirHandle || !this._isReady) return null;
 
     try {
-      const filename = this.sanitizeFilename(key);
+      const filename = sanitizeStorageFilename(key);
       const fileHandle = await this.dirHandle.getFileHandle(filename);
       const file = await fileHandle.getFile();
       logger.info(`Loading model stream from local storage: ${filename} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
@@ -356,7 +356,7 @@ export class LocalFileStorage {
     if (!this.dirHandle || !this._isReady) return null;
 
     try {
-      const filename = this.sanitizeFilename(key);
+      const filename = sanitizeStorageFilename(key);
       const fileHandle = await this.dirHandle.getFileHandle(filename);
       return await fileHandle.getFile();
     } catch {
@@ -372,7 +372,7 @@ export class LocalFileStorage {
     if (!this.dirHandle || !this._isReady) return false;
 
     try {
-      const filename = this.sanitizeFilename(key);
+      const filename = sanitizeStorageFilename(key);
       await this.dirHandle.getFileHandle(filename);
       return true;
     } catch {
@@ -388,7 +388,7 @@ export class LocalFileStorage {
     if (!this.dirHandle || !this._isReady) return;
 
     try {
-      const filename = this.sanitizeFilename(key);
+      const filename = sanitizeStorageFilename(key);
       await this.dirHandle.removeEntry(filename);
       logger.info(`Deleted model from local storage: ${filename}`);
     } catch {
@@ -404,7 +404,7 @@ export class LocalFileStorage {
     if (!this.dirHandle || !this._isReady) return null;
 
     try {
-      const filename = this.sanitizeFilename(key);
+      const filename = sanitizeStorageFilename(key);
       const fileHandle = await this.dirHandle.getFileHandle(filename);
       const file = await fileHandle.getFile();
       return file.size;
@@ -490,17 +490,4 @@ export class LocalFileStorage {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------------------
-
-  /**
-   * Sanitize a key for use as a filename.
-   * Keeps alphanumeric, dots, dashes, underscores. Replaces everything else.
-   */
-  private sanitizeFilename(key: string): string {
-    // Intentional: we want to strip C0 control characters from filenames.
-    // eslint-disable-next-line no-control-regex
-    return key.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
-  }
 }

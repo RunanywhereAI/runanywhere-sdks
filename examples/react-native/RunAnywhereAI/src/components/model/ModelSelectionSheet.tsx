@@ -20,28 +20,40 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography, FontWeight } from '../../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
-import type { DeviceInfo } from '../../types/model';
 import {
-  ModelCategory,
-  LLMFramework,
-  FrameworkDisplayNames,
-} from '../../types/model';
+  DEFAULT_INFERENCE_FRAMEWORK,
+  getFrameworkColor,
+  getFrameworkDisplayName,
+  getFrameworkIcon,
+  getModelDownloadSizeBytes,
+  getModelFormatLabel,
+  getModelFrameworks,
+  getPrimaryFramework,
+  isModelCompatibleWithFramework,
+  createModelInfoSummary,
+  SYSTEM_TTS_FRAMEWORK,
+} from '../../utils/modelDisplay';
 
 // Import SDK types and values
 // Import RunAnywhere SDK (Multi-Package Architecture)
+import { RunAnywhere } from '@runanywhere/core';
 import {
-  RunAnywhere,
+  InferenceFramework,
+  ModelCategory,
+  ModelFormat,
   type ModelInfo as SDKModelInfo,
-  LLMFramework as SDKLLMFramework,
-  ModelCategory as SDKModelCategory,
-  requireDeviceInfoModule,
-} from '@runanywhere/core';
+} from '@runanywhere/proto-ts/model_types';
+
+// Canonical SDK methods (Swift parity).
+const downloadModelHelper = RunAnywhere.downloadModel;
+const listModels = async (): Promise<SDKModelInfo[]> =>
+  (await RunAnywhere.listModels()).models?.models ?? [];
 
 /**
  * Context for filtering frameworks and models based on the current experience/modality
@@ -79,55 +91,28 @@ const getContextTitle = (context: ModelSelectionContext): string => {
 };
 
 /**
- * Get relevant categories for context (kept for reference)
- */
-const _getRelevantCategories = (
-  context: ModelSelectionContext
-): Set<ModelCategory> => {
-  switch (context) {
-    case ModelSelectionContext.LLM:
-      return new Set([ModelCategory.Language, ModelCategory.Multimodal]);
-    case ModelSelectionContext.STT:
-      return new Set([ModelCategory.SpeechRecognition]);
-    case ModelSelectionContext.TTS:
-      return new Set([ModelCategory.SpeechSynthesis]);
-    case ModelSelectionContext.Voice:
-      return new Set([
-        ModelCategory.Language,
-        ModelCategory.Multimodal,
-        ModelCategory.SpeechRecognition,
-        ModelCategory.SpeechSynthesis,
-      ]);
-    case ModelSelectionContext.VLM:
-      return new Set([ModelCategory.Multimodal, ModelCategory.Vision]);
-    case ModelSelectionContext.RagEmbedding:
-      return new Set([ModelCategory.Embedding]);
-    case ModelSelectionContext.RagLLM:
-      return new Set([ModelCategory.Language]);
-  }
-};
-
-/**
- * Get category string for SDK filtering (uses SDK's ModelCategory enum values)
+ * Get category for SDK filtering (uses SDK's `ModelCategory` proto enum).
+ * Returns the proto-canonical numeric `ModelCategory` value or `null` to mean
+ * "show all".
  */
 const getCategoryForContext = (
   context: ModelSelectionContext
-): string | null => {
+): ModelCategory | null => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return SDKModelCategory.Language; // 'language'
+      return ModelCategory.MODEL_CATEGORY_LANGUAGE;
     case ModelSelectionContext.STT:
-      return SDKModelCategory.SpeechRecognition; // 'speech-recognition'
+      return ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
     case ModelSelectionContext.TTS:
-      return SDKModelCategory.SpeechSynthesis; // 'speech-synthesis'
+      return ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
     case ModelSelectionContext.Voice:
       return null; // Show all
     case ModelSelectionContext.VLM:
-      return SDKModelCategory.Multimodal; // 'multimodal'
+      return ModelCategory.MODEL_CATEGORY_MULTIMODAL;
     case ModelSelectionContext.RagEmbedding:
-      return SDKModelCategory.Embedding; // 'embedding'
+      return ModelCategory.MODEL_CATEGORY_EMBEDDING;
     case ModelSelectionContext.RagLLM:
-      return SDKModelCategory.Language; // 'language'
+      return ModelCategory.MODEL_CATEGORY_LANGUAGE;
   }
 };
 
@@ -137,12 +122,12 @@ const getCategoryForContext = (
  */
 const getAllowedFrameworksForContext = (
   context: ModelSelectionContext
-): Set<string> | null => {
+): Set<InferenceFramework> | null => {
   switch (context) {
     case ModelSelectionContext.RagEmbedding:
-      return new Set([LLMFramework.ONNX]);
+      return new Set([InferenceFramework.INFERENCE_FRAMEWORK_ONNX]);
     case ModelSelectionContext.RagLLM:
-      return new Set([LLMFramework.LlamaCpp]);
+      return new Set([InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]);
     default:
       return null;
   }
@@ -159,7 +144,7 @@ const isRAGContext = (context: ModelSelectionContext): boolean =>
  * Framework info for display
  */
 interface FrameworkDisplayInfo {
-  framework: LLMFramework;
+  framework: InferenceFramework;
   displayName: string;
   iconName: string;
   color: string;
@@ -170,52 +155,14 @@ interface FrameworkDisplayInfo {
  * Get framework display info
  */
 const getFrameworkInfo = (
-  framework: LLMFramework,
+  framework: InferenceFramework,
   modelCount: number
 ): FrameworkDisplayInfo => {
-  const colorMap: Record<LLMFramework, string> = {
-    [LLMFramework.LlamaCpp]: Colors.frameworkLlamaCpp,
-    [LLMFramework.WhisperKit]: Colors.frameworkWhisperKit,
-    [LLMFramework.ONNX]: Colors.frameworkONNX,
-    [LLMFramework.CoreML]: Colors.frameworkCoreML,
-    [LLMFramework.FoundationModels]: Colors.frameworkFoundationModels,
-    [LLMFramework.TensorFlowLite]: Colors.frameworkTFLite,
-    [LLMFramework.PiperTTS]: Colors.frameworkPiperTTS,
-    [LLMFramework.SystemTTS]: Colors.frameworkSystemTTS,
-    [LLMFramework.MLX]: Colors.primaryPurple,
-    [LLMFramework.SwiftTransformers]: Colors.primaryBlue,
-    [LLMFramework.ExecuTorch]: Colors.primaryOrange,
-    [LLMFramework.PicoLLM]: Colors.primaryGreen,
-    [LLMFramework.MLC]: Colors.primaryBlue,
-    [LLMFramework.MediaPipe]: Colors.primaryOrange,
-    [LLMFramework.OpenAIWhisper]: Colors.primaryGreen,
-    [LLMFramework.Genie]: Colors.primaryPurple,
-  };
-
-  const iconMap: Record<LLMFramework, string> = {
-    [LLMFramework.LlamaCpp]: 'terminal-outline',
-    [LLMFramework.WhisperKit]: 'mic-outline',
-    [LLMFramework.ONNX]: 'cube-outline',
-    [LLMFramework.CoreML]: 'hardware-chip-outline',
-    [LLMFramework.FoundationModels]: 'sparkles-outline',
-    [LLMFramework.TensorFlowLite]: 'layers-outline',
-    [LLMFramework.PiperTTS]: 'volume-high-outline',
-    [LLMFramework.SystemTTS]: 'megaphone-outline',
-    [LLMFramework.MLX]: 'flash-outline',
-    [LLMFramework.SwiftTransformers]: 'code-slash-outline',
-    [LLMFramework.ExecuTorch]: 'flame-outline',
-    [LLMFramework.PicoLLM]: 'radio-outline',
-    [LLMFramework.MLC]: 'git-branch-outline',
-    [LLMFramework.MediaPipe]: 'videocam-outline',
-    [LLMFramework.OpenAIWhisper]: 'ear-outline',
-    [LLMFramework.Genie]: 'hardware-chip-outline',
-  };
-
   return {
     framework,
-    displayName: FrameworkDisplayNames[framework] || framework,
-    iconName: iconMap[framework] || 'extension-puzzle-outline',
-    color: colorMap[framework] || Colors.primaryBlue,
+    displayName: getFrameworkDisplayName(framework),
+    iconName: getFrameworkIcon(framework),
+    color: getFrameworkColor(framework),
     modelCount,
   };
 };
@@ -247,7 +194,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   // State
   const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [expandedFramework, setExpandedFramework] =
-    useState<LLMFramework | null>(null);
+    useState<InferenceFramework | null>(null);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [loadingProgress, _setLoadingProgress] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -255,23 +202,25 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const [downloadingModels, setDownloadingModels] = useState<
     Record<string, number>
   >({});
-  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   /**
-   * Load available models and device info
+   * Load available models
    */
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Load models from SDK
-      const allModels = await RunAnywhere.getAvailableModels();
+      // Single canonical SDK query — category + (optional) framework
+      // filter applied registry-side. The previous triple-fallback
+      // (category → framework → all-models) papered over the registry
+      // catalog when chosen IDs didn't match the strict combination;
+      // empty results are now surfaced via the empty-state UI so the
+      // user sees that no model is registered for the selected mode.
+      const allModels = await listModels();
       const categoryFilter = getCategoryForContext(context);
-
-      // Filter models based on context (using category field)
       const allowedFrameworks = getAllowedFrameworksForContext(context);
 
-      let filteredModels = categoryFilter
+      const filteredModels = categoryFilter
         ? allModels.filter((m: SDKModelInfo) => {
             const modelCategory = m.category;
             const categoryMatch =
@@ -280,119 +229,19 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 String(categoryFilter).toLowerCase();
             if (!categoryMatch) return false;
 
-            // Framework restriction (e.g., ONNX-only for embedding, LlamaCpp-only for RAG LLM)
+            // Framework restriction (e.g., ONNX-only for embedding,
+            // LlamaCpp-only for RAG LLM).
             if (allowedFrameworks) {
-              const fw = m.preferredFramework || m.compatibleFrameworks?.[0];
-              if (!fw || !allowedFrameworks.has(fw)) return false;
+              const frameworks = getModelFrameworks(m);
+              if (!frameworks.some((fw) => allowedFrameworks.has(fw))) {
+                return false;
+              }
             }
-
             return true;
           })
         : allModels;
 
-      // Fallback: if no models found after filtering for LLM, show models with LlamaCpp framework
-      if (
-        filteredModels.length === 0 &&
-        context === ModelSelectionContext.LLM
-      ) {
-        console.warn(
-          '[ModelSelectionSheet] No category matches, trying framework fallback'
-        );
-        filteredModels = allModels.filter((m: SDKModelInfo) => {
-          const hasLlamaFramework =
-            m.preferredFramework === SDKLLMFramework.LlamaCpp ||
-            m.compatibleFrameworks?.includes(SDKLLMFramework.LlamaCpp);
-          return hasLlamaFramework;
-        });
-        console.warn(
-          '[ModelSelectionSheet] Framework fallback models:',
-          filteredModels.length
-        );
-      }
-
-      // VLM-specific fallback: if no models found with Multimodal category, try 'vision' category
-      if (
-        filteredModels.length === 0 &&
-        context === ModelSelectionContext.VLM
-      ) {
-        console.warn(
-          '[ModelSelectionSheet] VLM: No multimodal models, trying vision category fallback'
-        );
-        filteredModels = allModels.filter((m: SDKModelInfo) => {
-          const modelCategory = m.category;
-          return (
-            modelCategory === SDKModelCategory.Vision ||
-            String(modelCategory).toLowerCase() === 'vision'
-          );
-        });
-        console.warn(
-          '[ModelSelectionSheet] Vision category fallback models:',
-          filteredModels.length
-        );
-      }
-
-      // Ultimate fallback: just show all models for LLM context if nothing else works
-      if (
-        filteredModels.length === 0 &&
-        context === ModelSelectionContext.LLM &&
-        allModels.length > 0
-      ) {
-        console.warn(
-          '[ModelSelectionSheet] Using all models as final fallback'
-        );
-        filteredModels = allModels;
-      }
-
       setAvailableModels(filteredModels);
-
-      // Load real device info from native module
-      try {
-        const deviceInfoModule = requireDeviceInfoModule();
-        const [
-          modelName,
-          chipName,
-          totalMemory,
-          availableMemory,
-          hasNeuralEngine,
-          osVersion,
-          hasGPU,
-          cpuCores,
-        ] = await Promise.all([
-          deviceInfoModule.getDeviceModel(),
-          deviceInfoModule.getChipName(),
-          deviceInfoModule.getTotalRAM(),
-          deviceInfoModule.getAvailableRAM(),
-          deviceInfoModule.hasNPU(),
-          deviceInfoModule.getOSVersion(),
-          deviceInfoModule.hasGPU(),
-          deviceInfoModule.getCPUCores(),
-        ]);
-
-        setDeviceInfo({
-          modelName,
-          chipName: chipName || 'Unknown',
-          totalMemory,
-          availableMemory,
-          hasNeuralEngine,
-          osVersion,
-          hasGPU,
-          cpuCores,
-        });
-      } catch (error) {
-        console.warn(
-          '[ModelSelectionSheet] Failed to load device info:',
-          error
-        );
-        // Fallback to basic info
-        setDeviceInfo({
-          modelName: 'Unknown Device',
-          chipName: 'Unknown',
-          totalMemory: 0,
-          availableMemory: 0,
-          hasNeuralEngine: false,
-          osVersion: 'Unknown',
-        });
-      }
     } catch (error) {
       console.error('[ModelSelectionSheet] Error loading data:', error);
     } finally {
@@ -413,29 +262,22 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   }, [visible, loadData]);
 
+  // B-RN-Sheet-Routing: clear stale lists when context changes so we don't
+  // briefly render the previous tab's models while loadData is in flight.
+  useEffect(() => {
+    setAvailableModels([]);
+    setExpandedFramework(null);
+    setSelectedModelId(null);
+  }, [context]);
+
   /**
    * Get frameworks with their model counts
    */
   const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
-    const frameworkCounts = new Map<LLMFramework, number>();
+    const frameworkCounts = new Map<InferenceFramework, number>();
 
     availableModels.forEach((model: SDKModelInfo, _index: number) => {
-      // Determine framework from model - use preferredFramework or first compatibleFramework
-      const frameworkValue =
-        model.preferredFramework || model.compatibleFrameworks?.[0];
-
-      // Map string to enum if needed
-      let framework: LLMFramework;
-      if (
-        typeof frameworkValue === 'string' &&
-        frameworkValue in LLMFramework
-      ) {
-        framework = LLMFramework[frameworkValue as keyof typeof LLMFramework];
-      } else if (Object.values(LLMFramework).includes(frameworkValue)) {
-        framework = frameworkValue as LLMFramework;
-      } else {
-        framework = LLMFramework.LlamaCpp; // Default
-      }
+      const framework = getPrimaryFramework(model, DEFAULT_INFERENCE_FRAMEWORK);
 
       const count = frameworkCounts.get(framework) || 0;
       frameworkCounts.set(framework, count + 1);
@@ -443,7 +285,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
     // Add System TTS for TTS context
     if (context === ModelSelectionContext.TTS) {
-      frameworkCounts.set(LLMFramework.SystemTTS, 1);
+      frameworkCounts.set(SYSTEM_TTS_FRAMEWORK, 1);
     }
 
     return Array.from(frameworkCounts.entries())
@@ -455,18 +297,9 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Get models for a specific framework
    */
   const getModelsForFramework = useCallback(
-    (framework: LLMFramework): SDKModelInfo[] => {
+    (framework: InferenceFramework): SDKModelInfo[] => {
       return availableModels.filter((model: SDKModelInfo) => {
-        // Check preferredFramework first, then compatibleFrameworks
-        const modelFramework =
-          (model.preferredFramework as LLMFramework) ||
-          (model.compatibleFrameworks?.[0] as LLMFramework) ||
-          LLMFramework.LlamaCpp;
-
-        // Also check if this framework is in compatibleFrameworks
-        const isCompatible = model.compatibleFrameworks?.includes(framework);
-
-        return modelFramework === framework || isCompatible;
+        return isModelCompatibleWithFramework(model, framework);
       });
     },
     [availableModels]
@@ -475,7 +308,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   /**
    * Toggle framework expansion
    */
-  const toggleFramework = (framework: LLMFramework) => {
+  const toggleFramework = (framework: InferenceFramework) => {
     setExpandedFramework(expandedFramework === framework ? null : framework);
   };
 
@@ -483,6 +316,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Handle model selection
    */
   const handleSelectModel = async (model: SDKModelInfo) => {
+    console.warn('[ModelSelectionSheet] Select tapped:', model.id);
     if (!model.isDownloaded && !model.localPath) {
       return;
     }
@@ -501,26 +335,40 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   };
 
+  useEffect(() => {
+    const testGlobal = globalThis as typeof globalThis & {
+      __testModels?: SDKModelInfo[];
+      __testOnModelSelected?: (model: SDKModelInfo) => Promise<void>;
+    };
+    testGlobal.__testModels = availableModels;
+    testGlobal.__testOnModelSelected = onModelSelected;
+  }, [availableModels, onModelSelected]);
+
   /**
    * Handle model download with real-time progress
    * Supports multiple concurrent downloads
    */
   const handleDownloadModel = async (model: SDKModelInfo) => {
+    // B-RN-3-002: log entry so a missing call is visible in metro/logcat
+    console.warn('[ModelSelectionSheet] Download tapped:', model.id);
     // Add this model to downloading set
     setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
     try {
-      // Use real download API with progress callback
-      await RunAnywhere.downloadModel(model.id, (progress) => {
-        // Update progress for this specific model
+      // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
+      const dlIter = downloadModelHelper(model.id)[Symbol.asyncIterator]();
+      let dlResult = await dlIter.next();
+      while (!dlResult.done) {
+        const progress = dlResult.value;
         setDownloadingModels((prev) => ({
           ...prev,
-          [model.id]: progress.progress,
+          [model.id]: progress.stageProgress ?? 0,
         }));
         console.warn(
-          `[Download] ${model.id}: ${Math.round(progress.progress * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
+          `[Download] ${model.id}: ${Math.round((progress.stageProgress ?? 0) * 100)}% (${formatBytes(progress.bytesDownloaded)} / ${formatBytes(progress.totalBytes)})`
         );
-      });
+        dlResult = await dlIter.next();
+      }
 
       // Refresh models after download
       await loadData();
@@ -542,18 +390,16 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const handleSelectSystemTTS = async () => {
     try {
       // Create a pseudo model for System TTS
-      const systemTTSModel = {
+      const systemTTSModel = createModelInfoSummary({
         id: 'system-tts',
         name: 'System TTS',
-        category: ModelCategory.SpeechSynthesis,
-        preferredFramework: LLMFramework.SystemTTS,
-        compatibleFrameworks: [LLMFramework.SystemTTS],
+        category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        framework: SYSTEM_TTS_FRAMEWORK,
+        format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
+        localPath: 'builtin://system-tts',
         isDownloaded: true,
         isAvailable: true,
-        downloadSize: 0,
-        memoryRequired: 0,
-        format: 'system',
-      } as unknown as SDKModelInfo;
+      });
 
       // Parent is responsible for closing the modal
       await onModelSelected(systemTTSModel);
@@ -561,113 +407,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       console.error('[ModelSelectionSheet] Error selecting System TTS:', error);
     }
   };
-
-  /**
-   * Render device status section
-   */
-  const renderDeviceStatus = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Device Status</Text>
-      {deviceInfo ? (
-        <View style={styles.card}>
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="phone-portrait-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>Model</Text>
-            </View>
-            <Text style={styles.infoValue}>{deviceInfo.modelName}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="hardware-chip-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>Chip</Text>
-            </View>
-            <Text style={styles.infoValue}>{deviceInfo.chipName}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="server-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>Memory</Text>
-            </View>
-            <Text style={styles.infoValue}>
-              {formatBytes(deviceInfo.totalMemory)}
-            </Text>
-          </View>
-
-          {deviceInfo.cpuCores != null && deviceInfo.cpuCores > 0 && (
-            <View style={styles.infoRow}>
-              <View style={styles.infoLabel}>
-                <Icon
-                  name="speedometer-outline"
-                  size={18}
-                  color={Colors.textSecondary}
-                />
-                <Text style={styles.infoLabelText}>CPU Cores</Text>
-              </View>
-              <Text style={styles.infoValue}>{deviceInfo.cpuCores}</Text>
-            </View>
-          )}
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="cube-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>GPU</Text>
-            </View>
-            <Icon
-              name={deviceInfo.hasGPU ? 'checkmark-circle' : 'close-circle'}
-              size={20}
-              color={deviceInfo.hasGPU ? Colors.statusGreen : Colors.statusRed}
-            />
-          </View>
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="flash-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>NPU/Neural Engine</Text>
-            </View>
-            <Icon
-              name={
-                deviceInfo.hasNeuralEngine ? 'checkmark-circle' : 'close-circle'
-              }
-              size={20}
-              color={
-                deviceInfo.hasNeuralEngine
-                  ? Colors.statusGreen
-                  : Colors.statusRed
-              }
-            />
-          </View>
-        </View>
-      ) : (
-        <View style={styles.card}>
-          <ActivityIndicator size="small" color={Colors.primaryBlue} />
-          <Text style={styles.loadingText}>Loading device info...</Text>
-        </View>
-      )}
-    </View>
-  );
 
   /**
    * Render framework row
@@ -712,8 +451,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   /**
    * Render expanded models for a framework
    */
-  const renderExpandedModels = (framework: LLMFramework) => {
-    if (framework === LLMFramework.SystemTTS) {
+  const renderExpandedModels = (framework: InferenceFramework) => {
+    if (framework === SYSTEM_TTS_FRAMEWORK) {
       return renderSystemTTSRow();
     }
 
@@ -781,6 +520,81 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     const downloadProgress = downloadingModels[model.id] ?? 0;
     const isSelected = selectedModelId === model.id;
     const canSelect = model.isDownloaded || model.localPath;
+    const modelInfoContent = (
+      <>
+        <Text
+          style={[styles.modelName, isSelected && styles.modelNameSelected]}
+        >
+          {model.name}
+        </Text>
+
+        <View style={styles.modelMeta}>
+          {getModelDownloadSizeBytes(model) > 0 && (
+            <View style={styles.sizeTag}>
+              <Icon
+                name="server-outline"
+                size={12}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.sizeText}>
+                {formatBytes(getModelDownloadSizeBytes(model))}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>
+              {getModelFormatLabel(model.format)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Download/Status indicator */}
+        <View style={styles.statusRow}>
+          {isDownloading ? (
+            <View style={styles.downloadProgressContainer}>
+              <View style={styles.downloadProgressRow}>
+                <ActivityIndicator size="small" color={Colors.primaryBlue} />
+                <Text style={styles.statusText}>
+                  Downloading... {Math.round(downloadProgress * 100)}%
+                </Text>
+              </View>
+              {/* Progress bar */}
+              <View style={styles.progressBarBackground}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.round(downloadProgress * 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          ) : canSelect ? (
+            <>
+              <Icon
+                name="checkmark-circle"
+                size={14}
+                color={Colors.statusGreen}
+              />
+              <Text style={[styles.statusText, { color: Colors.statusGreen }]}>
+                Downloaded
+              </Text>
+            </>
+          ) : (
+            <>
+              <Icon
+                name="cloud-download-outline"
+                size={14}
+                color={Colors.statusBlue}
+              />
+              <Text style={[styles.statusText, { color: Colors.statusBlue }]}>
+                Available for download
+              </Text>
+            </>
+          )}
+        </View>
+      </>
+    );
 
     return (
       <View
@@ -790,81 +604,18 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           isLoadingModel && !isSelected && styles.dimmed,
         ]}
       >
-        <View style={styles.modelInfo}>
-          <Text
-            style={[styles.modelName, isSelected && styles.modelNameSelected]}
+        {canSelect ? (
+          <TouchableOpacity
+            style={styles.modelInfo}
+            onPress={() => handleSelectModel(model)}
+            disabled={isLoadingModel || isSelected}
+            accessible={false}
           >
-            {model.name}
-          </Text>
-
-          <View style={styles.modelMeta}>
-            {model.downloadSize != null && model.downloadSize > 0 && (
-              <View style={styles.sizeTag}>
-                <Icon
-                  name="server-outline"
-                  size={12}
-                  color={Colors.textSecondary}
-                />
-                <Text style={styles.sizeText}>
-                  {formatBytes(model.downloadSize)}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {(model.format || 'GGUF').toUpperCase()}
-              </Text>
-            </View>
-          </View>
-
-          {/* Download/Status indicator */}
-          <View style={styles.statusRow}>
-            {isDownloading ? (
-              <View style={styles.downloadProgressContainer}>
-                <View style={styles.downloadProgressRow}>
-                  <ActivityIndicator size="small" color={Colors.primaryBlue} />
-                  <Text style={styles.statusText}>
-                    Downloading... {Math.round(downloadProgress * 100)}%
-                  </Text>
-                </View>
-                {/* Progress bar */}
-                <View style={styles.progressBarBackground}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      { width: `${Math.round(downloadProgress * 100)}%` },
-                    ]}
-                  />
-                </View>
-              </View>
-            ) : canSelect ? (
-              <>
-                <Icon
-                  name="checkmark-circle"
-                  size={14}
-                  color={Colors.statusGreen}
-                />
-                <Text
-                  style={[styles.statusText, { color: Colors.statusGreen }]}
-                >
-                  Downloaded
-                </Text>
-              </>
-            ) : (
-              <>
-                <Icon
-                  name="cloud-download-outline"
-                  size={14}
-                  color={Colors.statusBlue}
-                />
-                <Text style={[styles.statusText, { color: Colors.statusBlue }]}>
-                  Available for download
-                </Text>
-              </>
-            )}
-          </View>
-        </View>
+            {modelInfoContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.modelInfo}>{modelInfoContent}</View>
+        )}
 
         {/* Action button */}
         <View style={styles.actionButtons}>
@@ -880,14 +631,25 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               ]}
               onPress={() => handleSelectModel(model)}
               disabled={isLoadingModel || isSelected}
+              accessible={true}
+              accessibilityLabel={`Select ${model.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.selectButtonText}>Select</Text>
             </TouchableOpacity>
           ) : (
+            // B-RN-3-002: Removed `disabled={isLoadingModel}` — concurrent
+            // downloads are supported (each model has its own progress entry
+            // in `downloadingModels`), so a load-in-progress on a different
+            // model must not block downloads. Per-model `isDownloading` is
+            // managed via `downloadingModels[model.id]`.
             <TouchableOpacity
               style={styles.downloadButton}
               onPress={() => handleDownloadModel(model)}
-              disabled={isLoadingModel}
+              disabled={downloadingModels[model.id] !== undefined}
+              accessible={true}
+              accessibilityLabel={`Download ${model.name}`}
+              accessibilityRole="button"
             >
               <Text style={styles.downloadButtonText}>Download</Text>
             </TouchableOpacity>
@@ -949,7 +711,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         </View>
 
         {/* Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primaryBlue} />
@@ -957,8 +723,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             </View>
           ) : (
             <>
-              {renderDeviceStatus()}
-
               {/* Frameworks Section */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Available Frameworks</Text>
@@ -1020,6 +784,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  // B-RN-3-004: ensure the last model row's CTA button clears the
+  // bottom tab bar so users on shorter devices don't have to overscroll
+  // to reveal it.
+  contentContainer: {
+    paddingBottom: 80,
+  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
@@ -1047,28 +817,6 @@ const styles = StyleSheet.create({
     marginHorizontal: Padding.padding16,
     borderRadius: BorderRadius.medium,
     overflow: 'hidden',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Padding.padding12,
-    paddingHorizontal: Padding.padding16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-  },
-  infoLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-  },
-  infoLabelText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  infoValue: {
-    ...Typography.body,
-    color: Colors.textSecondary,
   },
   frameworkRow: {
     flexDirection: 'row',
@@ -1222,7 +970,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.overlayMedium,
     alignItems: 'center',
     justifyContent: 'center',

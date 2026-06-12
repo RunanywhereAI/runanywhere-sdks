@@ -7,7 +7,11 @@
     "declaration": true,
     "declarationMap": true,
     "baseUrl": ".",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "paths": {
+      "@runanywhere/core": ["../core/src"],
+      "@runanywhere/core/*": ["../core/src/*"],
       "@runanywhere/llamacpp": ["./src"],
       "@runanywhere/llamacpp/*": ["./src/*"]
     }

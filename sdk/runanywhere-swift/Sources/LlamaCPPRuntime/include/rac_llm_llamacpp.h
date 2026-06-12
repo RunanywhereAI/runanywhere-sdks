@@ -11,8 +11,13 @@
 #ifndef RAC_LLM_LLAMACPP_H
 #define RAC_LLM_LLAMACPP_H
 
-#include "rac_error.h"
+// Pull shared types (rac_result_t, rac_handle_t, RAC_API, error codes, LLM
+// types) from the CRACommons umbrella rather than carrying local duplicates.
+// The CRACommons Clang module is a sibling here; depending on it means any
+// drift between the SDK-local copy and `sdk/runanywhere-commons/include/rac/*`
+// becomes impossible.
 #include "rac_types.h"
+#include "rac_error.h"
 #include "rac_llm.h"
 
 #ifdef __cplusplus
@@ -84,20 +89,6 @@ static const rac_llm_llamacpp_config_t RAC_LLM_LLAMACPP_CONFIG_DEFAULT = {
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_create(const char* model_path,
                                                       const rac_llm_llamacpp_config_t* config,
                                                       rac_handle_t* out_handle);
-
-/**
- * Loads a GGUF model into an existing service.
- *
- * Mirrors Swift's LlamaCPPService.loadModel(path:config:)
- *
- * @param handle Service handle
- * @param model_path Path to the GGUF model file
- * @param config LlamaCPP configuration (can be NULL)
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle,
-                                                          const char* model_path,
-                                                          const rac_llm_llamacpp_config_t* config);
 
 /**
  * Unloads the current model.

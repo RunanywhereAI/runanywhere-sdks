@@ -12,46 +12,57 @@ topics:
   - speech-recognition
 
 environment:
-  sdk: '>=3.1.0 <4.0.0'
-  flutter: '>=3.10.0'
+  sdk: '>=3.10.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
 
 dependencies:
   flutter:
     sdk: flutter
   # FFI (Foreign Function Interface)
-  ffi: ^2.1.0
-  # HTTP and networking
-  http: ^1.2.1
-  rxdart: ^0.27.7
+  ffi: ^2.2.0
+  # Networking: HTTP transport routed through the commons C ABI
+  # (rac_http_client_*, rac_http_download_execute).
+  # Protobuf runtime — consumed by the IDL-generated bindings in
+  # `lib/generated/`.
+  # Pinned to match the pinned protoc_plugin version in
+  # scripts/setup/setup-toolchain.sh / idl/codegen/generate_dart.sh.
+  # Bumped 2026-05-19 (idl-codegen bump): ^3.1.0 -> ^6.0.0.
+  # protoc_plugin 25.0.0 (PROTOC_GEN_DART_VERSION) emits `.pb.dart` bindings
+  # against the protobuf 6.x runtime API — `protoc_plugin` 25.0.0 declares
+  # `protobuf: ^6.0.0` as its peer dep. The 4.x/5.x lines were skipped; 6.0.0
+  # supersedes them. `lib/generated/` is regenerated in lockstep.
+  protobuf: ^6.0.0
+  # `fixnum` is a transitive peer of `protobuf` — the generated bindings
+  # import it directly for `int64` field handling, so it must be declared.
+  fixnum: ^1.1.1
   # Storage
-  shared_preferences: ^2.2.3
-  path_provider: ^2.1.3
-  flutter_secure_storage: ^9.0.0
-  sqflite: ^2.3.0
-  # Device info
-  device_info_plus: ^10.0.0
+  shared_preferences: ^2.5.5
+  path_provider: ^2.1.5
+  flutter_secure_storage: ^10.2.0
+  # Device info — previous cap `<11.3.2` removed 2026-05-19 (dep bump).
+  # The cap originated when 11.3.x introduced a transient ABI/Manifest issue;
+  # 13.x is now the latest stable and the cap is no longer warranted.
+  device_info_plus: ^13.1.0
   # Utilities
-  uuid: ^4.4.0
-  logger: ^2.3.0
-  collection: ^1.18.0
-  json_annotation: ^4.9.0
-  path: ^1.9.0
-  # TTS fallback (system TTS)
-  flutter_tts: ^3.8.0
-  # Audio recording for voice sessions
-  record: '>=5.1.2 <7.0.0'
-  # Audio playback for TTS
-  audioplayers: ^6.0.0
-  # Permissions
-  permission_handler: ^11.3.1
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  build_runner: ^2.4.7
-  json_serializable: ^6.7.1
-  test: ^1.24.0
-  flutter_lints: ^3.0.0
+  # No explicit `test:` pin — flutter_test supplies a compatible test_api for
+  # the active Flutter SDK (e.g. 0.7.7 on 3.38+). Direct `test` pins conflicted
+  # with that and broke `melos bootstrap`.
+  flutter_lints: ^6.0.0
+  # Pinned (not caret) so local + CI codegen produces byte-identical output.
+  # Mirrors PROTOC_PLUGIN_DART_EXPECTED in scripts/setup/setup-toolchain.sh and
+  # the activation in idl/codegen/generate_dart.sh. Bumping requires updating
+  # this pin (the packages/runanywhere pubspec is the workspace source of
+  # truth for shared deps — see the centralization comment block in
+  # sdk/runanywhere-flutter/pubspec.yaml).
+  # Bumped 2026-05-19 (idl-codegen bump): 22.0.0 -> 25.0.0.
+  protoc_plugin: 25.0.0
 
 flutter:
   uses-material-design: true

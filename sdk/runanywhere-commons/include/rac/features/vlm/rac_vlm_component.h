@@ -4,6 +4,16 @@
  *
  * Actor-based VLM capability that owns model lifecycle and generation.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Component lifecycle/generation entry points
+ *     (rac_vlm_component_create, configure, load_model,
+ *     load_model_by_id, unload, cleanup, cancel, process,
+ *     process_stream, get_*, destroy): `delete after SDK migration`
+ *     for SDK callers — use rac_model_lifecycle_load_proto +
+ *     rac_vlm_*_proto.
+ *   - Helper rac_vlm_resolve_model_files: `internal` portable model
+ *     path resolver consumed by the component itself.
  */
 
 #ifndef RAC_VLM_COMPONENT_H
@@ -12,6 +22,7 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/vlm/rac_vlm_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -199,6 +210,22 @@ RAC_API rac_result_t rac_vlm_component_get_metrics(rac_handle_t handle,
  * @param handle Component handle
  */
 RAC_API void rac_vlm_component_destroy(rac_handle_t handle);
+
+/**
+ * @brief Load VLM artifacts from already-resolved paths in a single proto call.
+ *
+ * Replaces the legacy three-step Kotlin/JVM sequence (rac_vlm_create +
+ * rac_vlm_initialize + rac_vlm_destroy-on-error) with a single proto-backed
+ * entry point. The request must encode
+ * runanywhere.v1.VLMLoadResolvedArtifactsRequest; the response encodes
+ * runanywhere.v1.VLMLoadResolvedArtifactsResponse and carries the opaque
+ * service handle as uint64 (0 on failure). The returned handle remains a
+ * rac_vlm service handle and is passed to existing service-level proto
+ * APIs (rac_vlm_process_proto / rac_vlm_process_stream_proto /
+ * rac_vlm_cancel_proto) and is released via rac_vlm_destroy.
+ */
+RAC_API rac_result_t rac_vlm_component_load_resolved_artifacts_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size, rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

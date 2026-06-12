@@ -89,6 +89,14 @@ RAC_API rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle, con
  * - Main model file: first .gguf NOT containing "mmproj" in its name
  * - Vision projector file: first .gguf containing "mmproj" in its name
  *
+ * @note This is primarily an internal helper used by rac_vlm_component_load_model_by_id().
+ *       It is not exposed via JNI because the Kotlin/JVM layer calls loadModelById() which
+ *       invokes this function internally during C++ path resolution. Exposed as public C API
+ *       for native-only consumers (e.g., iOS Swift bridge, tests).
+ *
+ * @warning If multiple non-mmproj .gguf files exist in the directory, the "first" match
+ *          is non-deterministic (depends on OS directory iteration order).
+ *
  * @param model_dir Path to the directory containing model files
  * @param out_model_path Output buffer for the main model file path
  * @param model_path_size Size of the model path output buffer

@@ -14,8 +14,8 @@ import Combine
 class ModelListViewModel: ObservableObject {
     static let shared = ModelListViewModel()
 
-    @Published var availableModels: [ModelInfo] = []
-    @Published var currentModel: ModelInfo?
+    @Published var availableModels: [RAModelInfo] = []
+    @Published var currentModel: RAModelInfo?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -32,39 +32,33 @@ class ModelListViewModel: ObservableObject {
         }
     }
 
-    /// Subscribe to SDK events for real-time model state updates
+    /// Subscribe to the SDK's typed lifecycle stream for real-time model state
     private func subscribeToModelEvents() {
-        // Subscribe to LLM events via EventBus
-        RunAnywhere.events.events
+        RunAnywhere.events.modelLifecycle
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
+            .sink { [weak self] change in
                 guard let self = self else { return }
-                self.handleSDKEvent(event)
+                self.handleModelLifecycle(change)
             }
             .store(in: &cancellables)
     }
 
-    /// Handle SDK events to update model state
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        // Events now come from C++ via generic BridgedEvent
-        guard event.category == .llm else { return }
+    /// Apply a typed load/unload change to the current-model state
+    private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        guard change.component == .llm || change.event.category == .llm else { return }
 
-        let modelId = event.properties["model_id"] ?? ""
-
-        switch event.type {
-        case "llm_model_load_completed":
+        switch change.kind {
+        case .loaded:
             // Find the matching model and set as current
-            if let matchingModel = availableModels.first(where: { $0.id == modelId }) {
+            if let matchingModel = availableModels.first(where: { $0.id == change.modelID }) {
                 currentModel = matchingModel
-                print("✅ ModelListViewModel: Model loaded: \(matchingModel.name)")
+                print("ModelListViewModel: Model loaded: \(matchingModel.name)")
             }
-        case "llm_model_unloaded":
-            if currentModel?.id == modelId {
+        case .unloaded:
+            if currentModel?.id == change.modelID {
                 currentModel = nil
-                print("ℹ️ ModelListViewModel: Model unloaded: \(modelId)")
+                print("ModelListViewModel: Model unloaded: \(change.modelID)")
             }
-        default:
-            break
         }
     }
 
@@ -82,7 +76,15 @@ class ModelListViewModel: ObservableObject {
             // 2. Models from framework adapters
             // 3. Models from local storage
             // 4. User-added models
-            let allModels = try await RunAnywhere.availableModels()
+            let listResult = await RunAnywhere.listModels()
+            guard listResult.success else {
+                throw SDKException(
+                    code: .processingFailed,
+                    message: listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage,
+                    category: .internal
+                )
+            }
+            let allModels = listResult.models.models
 
             // Filter based on iOS version if needed
             var filteredModels = allModels
@@ -113,14 +115,15 @@ class ModelListViewModel: ObservableObject {
 
     /// Sync current model state with SDK
     private func syncCurrentModelWithSDK() async {
-        if let currentModelId = await RunAnywhere.getCurrentModelId(),
-           let matchingModel = availableModels.first(where: { $0.id == currentModelId }) {
+        let snapshot = RunAnywhere.currentModel()
+        if snapshot.found,
+           let matchingModel = availableModels.first(where: { $0.id == snapshot.modelID }) {
             currentModel = matchingModel
-            print("✅ ModelListViewModel: Restored currentModel from SDK: \(matchingModel.name)")
+            print("ModelListViewModel: Restored currentModel from SDK: \(matchingModel.name)")
         }
     }
 
-    func setCurrentModel(_ model: ModelInfo?) {
+    func setCurrentModel(_ model: RAModelInfo?) {
         currentModel = model
     }
 
@@ -132,7 +135,7 @@ class ModelListViewModel: ObservableObject {
     @Published private(set) var isLoadingModel = false
 
     /// Select and load a model
-    func selectModel(_ model: ModelInfo) async {
+    func selectModel(_ model: RAModelInfo) async {
         guard !isLoadingModel else { return }
         isLoadingModel = true
         defer { isLoadingModel = false }
@@ -140,64 +143,75 @@ class ModelListViewModel: ObservableObject {
         do {
             try await loadModel(model)
             setCurrentModel(model)
-
-            // Post notification that model was loaded successfully
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: Notification.Name("ModelLoaded"),
-                    object: model
-                )
-            }
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
             // Don't set currentModel if loading failed
         }
     }
 
-    func downloadModel(_ model: ModelInfo) async throws {
-        // Use the SDK's public download API
-        let progressStream = try await RunAnywhere.downloadModel(model.id)
-
-        // Wait for completion
-        for await progress in progressStream {
-            print("Download progress: \(Int(progress.overallProgress * 100))%")
-            if progress.stage == .completed {
-                break
-            }
+    func downloadModel(_ model: RAModelInfo) async throws {
+        try await RunAnywhere.downloadModel(model) { progress in
+            print("Download progress: \(Int(Double(progress.overallProgress) * 100))%")
         }
 
         // Reload models after download
         await loadModelsFromRegistry()
     }
 
-    func deleteModel(_ model: ModelInfo) async throws {
-        try await RunAnywhere.deleteStoredModel(model.id, framework: model.framework)
+    func deleteModel(_ model: RAModelInfo) async throws {
+        var request = RAStorageDeleteRequest()
+        request.modelIds = [model.id]
+        request.deleteFiles = true
+        request.clearRegistryPaths_p = true
+        request.unloadIfLoaded = true
+        request.allowPlatformDelete = true
+
+        let result = await RunAnywhere.deleteStorage(request)
+        guard result.success else {
+            throw NSError(
+                domain: "RunAnywhereAI.ModelListViewModel",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: result.errorMessage.isEmpty
+                        ? "Failed to delete model"
+                        : result.errorMessage
+                ]
+            )
+        }
         // Reload models after deletion
         await loadModelsFromRegistry()
     }
 
-    func loadModel(_ model: ModelInfo) async throws {
-        try await RunAnywhere.loadModel(model.id)
+    func loadModel(_ model: RAModelInfo) async throws {
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        if model.category != .unspecified {
+            request.category = model.category
+        }
+        let result = await RunAnywhere.loadModel(request)
+        guard result.success else {
+            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
+        }
         currentModel = model
     }
 
-    /// Add a custom model from URL
+    /// Add a custom model from URL via the canonical `RunAnywhere.registerModel`
+    /// public API. The SDK composes the proto import request internally via
+    /// `rac_register_model_from_url_proto`; example side only collects user
+    /// input and reloads the registry.
     func addModelFromURL(name: String, url: URL, framework: InferenceFramework, estimatedSize: Int64?) async {
-        // Use SDK's registerModel method
-        RunAnywhere.registerModel(
-            name: name,
-            url: url,
-            framework: framework,
-            memoryRequirement: estimatedSize
-        )
+        do {
+            _ = try await RunAnywhere.registerModel(
+                name: name,
+                url: url.absoluteString,
+                framework: framework,
+                memoryRequirement: estimatedSize
+            )
+        } catch {
+            print("Failed to register model: \(error.localizedDescription)")
+        }
 
         // Reload models to include the new one
-        await loadModelsFromRegistry()
-    }
-
-    /// Add an imported model to the list
-    func addImportedModel(_ model: ModelInfo) async {
-        // Just reload the models - the SDK registry will pick up the new model
         await loadModelsFromRegistry()
     }
 }

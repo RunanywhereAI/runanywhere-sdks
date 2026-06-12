@@ -1,345 +1,118 @@
-/// DartBridge+StructuredOutput
-///
-/// Structured output FFI bindings - wraps C++ rac_structured_output_* APIs.
-/// Mirrors Swift's CppBridge extensions for structured output.
-library dart_bridge_structured_output;
+// SPDX-License-Identifier: Apache-2.0
+//
+// DartBridge+StructuredOutput
+//
+// Structured-output bridge. Mirrors Swift's `CppBridge+StructuredOutput.swift`.
+// All orchestration (prompt preparation, generation, thinking-tag stripping,
+// JSON extraction, schema validation) lives in commons C++. This file only
+// packs the request proto bytes and unpacks the result proto bytes.
+library;
 
-import 'dart:ffi';
+import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/structured_output.pb.dart'
+    show
+        JSONSchema,
+        StructuredOutputOptions,
+        StructuredOutputParseRequest,
+        StructuredOutputPromptResult,
+        StructuredOutputRequest,
+        StructuredOutputResult;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
-import 'package:ffi/ffi.dart';
-
-import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/native/platform_loader.dart';
-
-/// Structured output FFI bridge for C++ interop.
-///
-/// Provides access to C++ structured output functions:
-/// - rac_structured_output_get_system_prompt
-/// - rac_structured_output_extract_json
-/// - rac_structured_output_prepare_prompt
-/// - rac_structured_output_validate
+/// Thin C ABI bridge for structured-output parse / generate / prepare-prompt.
 class DartBridgeStructuredOutput {
+  DartBridgeStructuredOutput._();
+
   static final DartBridgeStructuredOutput shared =
       DartBridgeStructuredOutput._();
 
-  DartBridgeStructuredOutput._();
-
-  final _logger = SDKLogger('DartBridge.StructuredOutput');
-
-  /// Get system prompt for structured output generation
-  /// Uses C++ rac_structured_output_get_system_prompt
-  String getSystemPrompt(String schema) {
-    final schemaPtr = schema.toNativeUtf8();
-    final promptPtrPtr = calloc<Pointer<Utf8>>();
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getSystemPromptFn = lib.lookupFunction<
-              Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>),
-              int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>)>(
-          'rac_structured_output_get_system_prompt');
-
-      final result = getSystemPromptFn(schemaPtr, promptPtrPtr);
-
-      if (result != RAC_SUCCESS) {
-        _logger.warning(
-            'getSystemPrompt failed with code $result, using fallback');
-        return _fallbackSystemPrompt(schema);
-      }
-
-      final promptPtr = promptPtrPtr.value;
-      if (promptPtr == nullptr) {
-        return _fallbackSystemPrompt(schema);
-      }
-
-      final prompt = promptPtr.toDartString();
-      lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_free')(promptPtr.cast<Void>());
-
-      return prompt;
-    } catch (e) {
-      _logger.error('getSystemPrompt exception: $e');
-      return _fallbackSystemPrompt(schema);
-    } finally {
-      calloc.free(schemaPtr);
-      calloc.free(promptPtrPtr);
-    }
-  }
-
-  /// Fallback system prompt when C++ fails
-  String _fallbackSystemPrompt(String schema) {
-    return '''
-You are a JSON generator that outputs ONLY valid JSON without any additional text.
-
-CRITICAL RULES:
-1. Your entire response must be valid JSON that can be parsed
-2. Start with { and end with }
-3. No text before the opening {
-4. No text after the closing }
-5. Follow the provided schema exactly
-6. Include all required fields
-7. Use proper JSON syntax (quotes, commas, etc.)
-
-Expected JSON Schema:
-$schema
-
-Remember: Output ONLY the JSON object, nothing else.
-''';
-  }
-
-  /// Extract JSON from generated text
-  /// Uses C++ rac_structured_output_extract_json
-  String? extractJson(String text) {
-    final textPtr = text.toNativeUtf8();
-    final jsonPtrPtr = calloc<Pointer<Utf8>>();
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final extractJsonFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>, Pointer<Void>),
-          int Function(Pointer<Utf8>, Pointer<Pointer<Utf8>>,
-              Pointer<Void>)>('rac_structured_output_extract_json');
-
-      final result = extractJsonFn(textPtr, jsonPtrPtr, nullptr);
-
-      if (result != RAC_SUCCESS) {
-        _logger.warning('extractJson failed with code $result');
-        return _fallbackExtractJson(text);
-      }
-
-      final jsonPtr = jsonPtrPtr.value;
-      if (jsonPtr == nullptr) {
-        return _fallbackExtractJson(text);
-      }
-
-      final jsonString = jsonPtr.toDartString();
-      lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_free')(jsonPtr.cast<Void>());
-
-      return jsonString;
-    } catch (e) {
-      _logger.error('extractJson exception: $e');
-      return _fallbackExtractJson(text);
-    } finally {
-      calloc.free(textPtr);
-      calloc.free(jsonPtrPtr);
-    }
-  }
-
-  /// Fallback JSON extraction when C++ fails
-  String? _fallbackExtractJson(String text) {
-    final trimmed = text.trim();
-
-    for (final pair in [
-      ('{', '}'),
-      ('[', ']'),
-    ]) {
-      final open = pair.$1;
-      final close = pair.$2;
-      final startIndex = trimmed.indexOf(open);
-      if (startIndex == -1) continue;
-
-      int depth = 0;
-      for (int i = startIndex; i < trimmed.length; i++) {
-        if (trimmed[i] == open) depth++;
-        if (trimmed[i] == close) depth--;
-        if (depth == 0) {
-          return trimmed.substring(startIndex, i + 1);
-        }
-      }
-    }
-    return null;
-  }
-
-  /// Prepare prompt with structured output instructions
-  /// Uses C++ rac_structured_output_prepare_prompt
-  String preparePrompt(String originalPrompt, String schema,
-      {bool includeSchemaInPrompt = true}) {
-    final promptPtr = originalPrompt.toNativeUtf8();
-    final schemaPtr = schema.toNativeUtf8();
-
-    // Build config struct
-    final configPtr = calloc<RacStructuredOutputConfigStruct>();
-    configPtr.ref.jsonSchema = schemaPtr;
-    configPtr.ref.includeSchemaInPrompt = includeSchemaInPrompt ? 1 : 0;
-
-    final preparedPtrPtr = calloc<Pointer<Utf8>>();
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final preparePromptFn = lib.lookupFunction<
-          Int32 Function(Pointer<Utf8>,
-              Pointer<RacStructuredOutputConfigStruct>, Pointer<Pointer<Utf8>>),
-          int Function(Pointer<Utf8>, Pointer<RacStructuredOutputConfigStruct>,
-              Pointer<Pointer<Utf8>>)>('rac_structured_output_prepare_prompt');
-
-      final result = preparePromptFn(promptPtr, configPtr, preparedPtrPtr);
-
-      if (result != RAC_SUCCESS) {
-        _logger.warning('preparePrompt failed with code $result');
-        return _fallbackPreparePrompt(originalPrompt, schema,
-            includeSchemaInPrompt: includeSchemaInPrompt);
-      }
-
-      final preparedPtr = preparedPtrPtr.value;
-      if (preparedPtr == nullptr) {
-        return _fallbackPreparePrompt(originalPrompt, schema,
-            includeSchemaInPrompt: includeSchemaInPrompt);
-      }
-
-      final prepared = preparedPtr.toDartString();
-      lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_free')(preparedPtr.cast<Void>());
-
-      return prepared;
-    } catch (e) {
-      _logger.error('preparePrompt exception: $e');
-      return _fallbackPreparePrompt(originalPrompt, schema,
-          includeSchemaInPrompt: includeSchemaInPrompt);
-    } finally {
-      calloc.free(promptPtr);
-      calloc.free(schemaPtr);
-      calloc.free(configPtr);
-      calloc.free(preparedPtrPtr);
-    }
-  }
-
-  /// Fallback prepare prompt when C++ fails
-  String _fallbackPreparePrompt(String originalPrompt, String schema,
-      {bool includeSchemaInPrompt = true}) {
-    final schemaPart =
-        includeSchemaInPrompt ? '\n\nJSON Schema:\n$schema\n' : '';
-    return '''
-System: You are a JSON generator. You must output only valid JSON.
-
-$originalPrompt
-
-CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is allowed.
-
-$schemaPart
-
-RULES:
-1. Start your response with { and end with }
-2. Include NO text before the opening {
-3. Include NO text after the closing }
-4. Follow the schema exactly
-5. All required fields must be present
-
-Remember: Output ONLY the JSON object, nothing else.
-''';
-  }
-
-  /// Validate structured output
-  /// Uses C++ rac_structured_output_validate
-  StructuredOutputValidationResult validate(String text, String schema) {
-    final textPtr = text.toNativeUtf8();
-    final schemaPtr = schema.toNativeUtf8();
-
-    final configPtr = calloc<RacStructuredOutputConfigStruct>();
-    configPtr.ref.jsonSchema = schemaPtr;
-    configPtr.ref.includeSchemaInPrompt = 1;
-
-    final validationPtr = calloc<RacStructuredOutputValidationStruct>();
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final validateFn = lib.lookupFunction<
-              Int32 Function(
-                  Pointer<Utf8>,
-                  Pointer<RacStructuredOutputConfigStruct>,
-                  Pointer<RacStructuredOutputValidationStruct>),
-              int Function(
-                  Pointer<Utf8>,
-                  Pointer<RacStructuredOutputConfigStruct>,
-                  Pointer<RacStructuredOutputValidationStruct>)>(
-          'rac_structured_output_validate');
-
-      final result = validateFn(textPtr, configPtr, validationPtr);
-
-      if (result != RAC_SUCCESS) {
-        return _fallbackValidate(text);
-      }
-
-      final validation = validationPtr.ref;
-      final isValid = validation.isValid == 1;
-      final containsJson = validation.extractedJson != nullptr;
-
-      String? errorMessage;
-      if (validation.errorMessage != nullptr) {
-        errorMessage = validation.errorMessage.toDartString();
-        lib.lookupFunction<Void Function(Pointer<Void>),
-            void Function(Pointer<Void>)>('rac_free')(
-          validation.errorMessage.cast<Void>(),
-        );
-      }
-
-      if (validation.extractedJson != nullptr) {
-        lib.lookupFunction<Void Function(Pointer<Void>),
-            void Function(Pointer<Void>)>('rac_free')(
-          validation.extractedJson.cast<Void>(),
-        );
-      }
-
-      return StructuredOutputValidationResult(
-        isValid: isValid,
-        containsJSON: containsJson,
-        error: errorMessage,
-      );
-    } catch (e) {
-      _logger.error('validate exception: $e');
-      return _fallbackValidate(text);
-    } finally {
-      calloc.free(textPtr);
-      calloc.free(schemaPtr);
-      calloc.free(configPtr);
-      calloc.free(validationPtr);
-    }
-  }
-
-  /// Fallback validation when C++ fails
-  StructuredOutputValidationResult _fallbackValidate(String text) {
-    try {
-      // Simple JSON validation
-      final trimmed = text.trim();
-      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        return const StructuredOutputValidationResult(
-          isValid: true,
-          containsJSON: true,
-          error: null,
-        );
-      }
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        return const StructuredOutputValidationResult(
-          isValid: true,
-          containsJSON: true,
-          error: null,
-        );
-      }
-      return const StructuredOutputValidationResult(
-        isValid: false,
-        containsJSON: false,
-        error: 'No valid JSON found',
-      );
-    } catch (e) {
-      return StructuredOutputValidationResult(
-        isValid: false,
-        containsJSON: false,
-        error: e.toString(),
+  /// Parse structured output from raw model text via commons.
+  StructuredOutputResult parse(StructuredOutputParseRequest request) {
+    final fn = RacNative.bindings.rac_structured_output_parse_proto;
+    if (fn == null) {
+      throw SDKException.featureNotAvailable(
+        'rac_structured_output_parse_proto is unavailable',
       );
     }
+    return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
+      request: request,
+      invoke: fn,
+      decode: StructuredOutputResult.fromBuffer,
+      symbol: 'rac_structured_output_parse_proto',
+    );
   }
-}
 
-/// Structured output validation result
-class StructuredOutputValidationResult {
-  final bool isValid;
-  final bool containsJSON;
-  final String? error;
+  /// Run full structured-output generation against the lifecycle-owned LLM via
+  /// commons. Commons handles prompt preparation, LLM generation, thinking-tag
+  /// stripping, JSON extraction, and schema validation.
+  StructuredOutputResult generate(StructuredOutputRequest request) {
+    final fn = RacNative.bindings.rac_structured_output_generate_proto;
+    if (fn == null) {
+      throw SDKException.featureNotAvailable(
+        'rac_structured_output_generate_proto is unavailable',
+      );
+    }
+    return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
+      request: request,
+      invoke: fn,
+      decode: StructuredOutputResult.fromBuffer,
+      symbol: 'rac_structured_output_generate_proto',
+    );
+  }
 
-  const StructuredOutputValidationResult({
-    required this.isValid,
-    required this.containsJSON,
-    this.error,
-  });
+  /// Build the schema-instrumented prompt for structured output via commons.
+  StructuredOutputPromptResult preparePrompt({
+    required String prompt,
+    required StructuredOutputOptions options,
+    String requestId = '',
+  }) {
+    final fn = RacNative.bindings.rac_structured_output_prepare_prompt_proto;
+    if (fn == null) {
+      throw SDKException.featureNotAvailable(
+        'rac_structured_output_prepare_prompt_proto is unavailable',
+      );
+    }
+    final request = makeGenerateRequest(
+      prompt: prompt,
+      options: options,
+      requestId: requestId,
+    );
+    return DartBridgeProtoUtils.callRequest<StructuredOutputPromptResult>(
+      request: request,
+      invoke: fn,
+      decode: StructuredOutputPromptResult.fromBuffer,
+      symbol: 'rac_structured_output_prepare_prompt_proto',
+    );
+  }
+
+  /// Build a `StructuredOutputParseRequest` for the given text + schema.
+  StructuredOutputParseRequest makeParseRequest({
+    required String text,
+    required JSONSchema schema,
+    String requestId = '',
+  }) {
+    final request = StructuredOutputParseRequest()
+      ..text = text
+      ..options = StructuredOutputOptions(schema: schema);
+    if (requestId.isNotEmpty) {
+      request.requestId = requestId;
+    }
+    return request;
+  }
+
+  /// Build a `StructuredOutputRequest` for the given prompt + options.
+  StructuredOutputRequest makeGenerateRequest({
+    required String prompt,
+    required StructuredOutputOptions options,
+    String requestId = '',
+  }) {
+    final request = StructuredOutputRequest()
+      ..prompt = prompt
+      ..options = options;
+    if (requestId.isNotEmpty) {
+      request.requestId = requestId;
+    }
+    return request;
+  }
 }

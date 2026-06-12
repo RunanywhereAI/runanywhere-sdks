@@ -1,0 +1,34 @@
+# RunAnywhere Solution — canonical voice agent.
+#
+# Matches the VAD → STT → LLM → TTS DAG built by the hand-rolled
+# voice_agent_pipeline.cpp; SolutionRunner compiles this YAML into an
+# equivalent GraphScheduler graph via PipelineExecutor.
+#
+# Consumed by rac_solution_create_from_yaml(). The top-level
+# `voice_agent:` key selects the SolutionConfig.voice_agent oneof arm;
+# field names mirror solutions.proto's VoiceAgentConfig.
+#
+# Model IDs match the canonical catalog seeded by every example app
+# (iOS, Android, Flutter, React Native, Web). This lets all 5 example
+# apps feed this file to RunAnywhere.solutions.run without rewriting
+# the model identifiers inline.
+
+voice_agent:
+  llm_model_id: "smollm2-360m-q8_0"
+  stt_model_id: "sherpa-onnx-whisper-tiny.en"
+  tts_model_id: "vits-piper-en_US-lessac-medium"
+  vad_model_id: "silero-vad"
+
+  sample_rate_hz: 16000
+  chunk_ms: 20
+  audio_source: "microphone"
+
+  enable_barge_in: true
+  barge_in_threshold_ms: 200
+
+  system_prompt: "You are a helpful voice assistant. Keep answers concise."
+  max_context_tokens: 4096
+  temperature: 0.7
+
+  emit_partials: true
+  emit_thoughts: false

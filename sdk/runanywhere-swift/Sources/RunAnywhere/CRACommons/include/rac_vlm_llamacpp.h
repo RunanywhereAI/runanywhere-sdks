@@ -65,12 +65,12 @@ typedef struct rac_vlm_llamacpp_config {
  * Default LlamaCPP VLM configuration.
  */
 static const rac_vlm_llamacpp_config_t RAC_VLM_LLAMACPP_CONFIG_DEFAULT = {
-    .context_size = 0,      // Auto-detect
-    .num_threads = 0,       // Auto-detect
-    .gpu_layers = -1,       // All layers on GPU
-    .batch_size = 512,      //
-    .vision_threads = 0,    // Auto-detect
-    .use_gpu_vision = 1     // Use GPU for vision
+    .context_size = 0,    // Auto-detect
+    .num_threads = 0,     // Auto-detect
+    .gpu_layers = -1,     // All layers on GPU
+    .batch_size = 512,    //
+    .vision_threads = 0,  // Auto-detect
+    .use_gpu_vision = 1   // Use GPU for vision
 };
 
 // =============================================================================
@@ -100,9 +100,9 @@ RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_create(const char* model_path
  * @param config LlamaCPP configuration (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_load_model(
-    rac_handle_t handle, const char* model_path, const char* mmproj_path,
-    const rac_vlm_llamacpp_config_t* config);
+RAC_LLAMACPP_VLM_API rac_result_t
+rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_path, const char* mmproj_path,
+                            const rac_vlm_llamacpp_config_t* config);
 
 /**
  * Unloads the current model.
@@ -158,9 +158,10 @@ typedef rac_bool_t (*rac_vlm_llamacpp_stream_callback_fn)(const char* token, rac
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_process_stream(
-    rac_handle_t handle, const rac_vlm_image_t* image, const char* prompt,
-    const rac_vlm_options_t* options, rac_vlm_llamacpp_stream_callback_fn callback, void* user_data);
+RAC_LLAMACPP_VLM_API rac_result_t
+rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_image_t* image,
+                                const char* prompt, const rac_vlm_options_t* options,
+                                rac_vlm_llamacpp_stream_callback_fn callback, void* user_data);
 
 /**
  * Cancels ongoing generation.
@@ -191,23 +192,11 @@ RAC_LLAMACPP_VLM_API void rac_vlm_llamacpp_destroy(rac_handle_t handle);
 // =============================================================================
 
 /**
- * Registers the LlamaCPP VLM backend with the commons module and service registries.
- *
- * Should be called once during SDK initialization.
- * This registers:
- * - Module: "llamacpp_vlm" with VISION_LANGUAGE capability
- * - Service provider: LlamaCPP VLM provider (priority 100)
- *
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_VLM_API rac_result_t rac_backend_llamacpp_vlm_register(void);
-
-/**
- * Unregisters the LlamaCPP VLM backend.
- *
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_VLM_API rac_result_t rac_backend_llamacpp_vlm_unregister(void);
+/* Note: VLM is registered as part of the unified llama.cpp plugin via
+ * rac_backend_llamacpp_register() (declared in rac_llm_llamacpp.h). There
+ * is no longer a separate VLM register function -- llama.cpp is one engine
+ * that publishes a single plugin vtable with both llm_ops and vlm_ops slots
+ * filled. */
 
 #ifdef __cplusplus
 }

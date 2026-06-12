@@ -1,0 +1,459 @@
+// RunAnywhere v2 IDL — tool-calling primitives.
+//
+// The 7 tool-calling types were
+// duplicated across all 5 SDKs (~1,500 LOC):
+//   - Swift  Public/Extensions/LLM/ToolCallingTypes.swift (411 LOC)
+//   - Kotlin commonMain/.../tool/ (multiple files)
+//   - Dart   lib/public/types/tool_calling_types.dart
+//   - RN     core/src/types/ToolCallingTypes.ts
+//   - Web    packages/core/src/tools/types.ts
+//
+// Generating from a single proto removes the duplication and locks the type
+// enums + parameter shapes across all 5 SDKs.
+//
+// Note: `arguments` and `result` payloads are carried as JSON strings in
+// the proto (rather than nested ToolValue messages) for two reasons:
+//   1. ToolValue is a recursive sum type — protobuf's `Any` requires a fully
+//      qualified type URL per leaf, which is over-engineered for our case.
+//   2. The C++ commons layer already canonicalizes tool-call payloads as
+//      JSON for the LLM tokenizer, so JSON-as-string aligns with the wire.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "ToolCallingProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// JSON-typed scalar / composite carrier for tool arguments and results.
+// Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
+// TypeScript discriminated union. Used inside ToolParameter.enum_values
+// (string-only) and as the canonical wire shape when consumers want
+// strongly-typed arguments rather than raw JSON.
+// ---------------------------------------------------------------------------
+message ToolValue {
+    oneof kind {
+        string  string_value = 1;
+        double  number_value = 2;
+        bool    bool_value   = 3;
+        ToolValueArray  array_value  = 4;
+        ToolValueObject object_value = 5;
+        bool    null_value   = 6;  // true means JSON null
+    }
+}
+
+message ToolValueArray {
+    repeated ToolValue values = 1;
+}
+
+message ToolValueObject {
+    map<string, ToolValue> fields = 1;
+}
+
+// ---------------------------------------------------------------------------
+// String wrapper used by the rac_tool_value_to_json_proto /
+// rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+// from a ToolValue, or the JSON text that should be parsed back into a
+// ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+// tool-calling round-trip stays self-contained in this proto.
+// ---------------------------------------------------------------------------
+message ToolValueJSON {
+    string json = 1;
+}
+
+// ---------------------------------------------------------------------------
+// Supported parameter types.
+// ---------------------------------------------------------------------------
+enum ToolParameterType {
+    TOOL_PARAMETER_TYPE_UNSPECIFIED = 0;
+    TOOL_PARAMETER_TYPE_STRING      = 1;
+    TOOL_PARAMETER_TYPE_NUMBER      = 2;
+    TOOL_PARAMETER_TYPE_BOOLEAN     = 3;
+    TOOL_PARAMETER_TYPE_OBJECT      = 4;
+    TOOL_PARAMETER_TYPE_ARRAY       = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Tool-call wire formats various LLM families emit. Strongly-typed counterpart
+// to `ToolCallingOptions.format_hint` (which remains a free-form string for
+// back-compat — the legacy values "default"/"lfm2"/"openai"/"auto" do not map
+// 1:1 to this enum).
+//
+// Drift across SDKs:
+//   - Swift's `ToolCallFormatName` (Public/Extensions/LLM/ToolCallingTypes.swift)
+//     today only exposes `default` and `lfm2` constants on a string-typed
+//     field — it is not yet an enum.
+//   - Kotlin/RN/Flutter/Web mirror the same string-keyed shape.
+// This enum is the union of formats LLM families actually emit; SDK frontends
+// should map their existing strings onto these values when surfacing the
+// strongly-typed field. Keep `format_hint` (string) populated for legacy
+// consumers until all SDKs migrate.
+// ---------------------------------------------------------------------------
+enum ToolCallFormatName {
+    TOOL_CALL_FORMAT_NAME_UNSPECIFIED      = 0;
+    TOOL_CALL_FORMAT_NAME_JSON             = 1;
+    TOOL_CALL_FORMAT_NAME_XML              = 2;
+    TOOL_CALL_FORMAT_NAME_NATIVE           = 3;
+    TOOL_CALL_FORMAT_NAME_PYTHONIC         = 4;
+    TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS = 5;
+    TOOL_CALL_FORMAT_NAME_HERMES           = 6;
+}
+
+enum ToolChoiceMode {
+    TOOL_CHOICE_MODE_UNSPECIFIED = 0;
+    TOOL_CHOICE_MODE_AUTO        = 1;
+    TOOL_CHOICE_MODE_NONE        = 2;
+    TOOL_CHOICE_MODE_REQUIRED    = 3;
+    TOOL_CHOICE_MODE_SPECIFIC    = 4;
+}
+
+// ---------------------------------------------------------------------------
+// A single parameter definition for a tool.
+// ---------------------------------------------------------------------------
+message ToolParameter {
+    string name                      = 1;
+    ToolParameterType type           = 2;
+    string description               = 3;
+    bool   required                  = 4;
+    // Allowed values for enum-like parameters. Empty = unconstrained.
+    repeated string enum_values      = 5;
+    optional string json_schema      = 6;
+    optional ToolValue default_value  = 7;
+}
+
+// ---------------------------------------------------------------------------
+// Definition of a tool that the LLM can call.
+// ---------------------------------------------------------------------------
+message ToolDefinition {
+    string name                      = 1;
+    string description               = 2;
+    repeated ToolParameter parameters = 3;
+    // Optional category for grouping tools in catalogs / UIs.
+    optional string category         = 4;
+    optional string json_schema      = 5;
+    map<string, string> metadata     = 6;
+}
+
+// ---------------------------------------------------------------------------
+// A tool call requested by the LLM. `arguments_json` is a JSON object
+// matching the parameter shape declared in the corresponding ToolDefinition.
+// ---------------------------------------------------------------------------
+message ToolCall {
+    // Unique ID (caller-supplied or generated). Empty = unset.
+    string id                        = 1;
+    // Tool name (matches ToolDefinition.name).
+    string name                      = 2;
+    // JSON-encoded arguments. Empty object "{}" if no args.
+    //
+    // The C++ tokenizer / tool-prompt formatter
+    // (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+    // `arguments_json` directly when building LLM prompts. It is the
+    // canonical wire shape for the prompt-formatting path.
+    string arguments_json            = 3;
+    // Discriminator for OpenAI-compatible flows ("function" is the only
+    // value at the moment). Empty = unset.
+    string type                      = 4;
+
+    // Tag 5 reserved — previously `map<string, ToolValue> arguments`.
+    // Deleted in favour of the canonical `arguments_json` field above;
+    // commons never consulted the typed map.
+    reserved 5;
+    reserved "arguments";
+
+    // Alias for id used by pre-proto SDK surfaces.
+    optional string call_id          = 6;
+
+    int64 created_at_ms              = 7;
+    optional string raw_text         = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Result of executing a tool. `result_json` is a JSON-encoded payload;
+// `error` is non-empty when the execution failed.
+// ---------------------------------------------------------------------------
+message ToolResult {
+    string tool_call_id              = 1;
+    string name                      = 2;
+    // JSON-encoded tool execution result.
+    //
+    // The C++ tool-prompt formatter
+    // (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+    // reads `result_json` directly when building follow-up LLM prompts after
+    // tool execution. It is the canonical wire shape.
+    string result_json               = 3;
+    optional string error            = 4;
+
+    // Whether execution succeeded. If unset/false and error is empty,
+    // consumers should fall back to result_json/error semantics.
+    bool success                     = 5;
+
+    // Tag 6 reserved — previously `map<string, ToolValue> result`.
+    // Deleted in favour of the canonical `result_json` field above;
+    // commons never consulted the typed map.
+    reserved 6;
+    reserved "result";
+
+    // Alias for tool_call_id used by pre-proto SDK surfaces.
+    optional string call_id          = 7;
+
+    int64 started_at_ms              = 8;
+    int64 completed_at_ms            = 9;
+}
+
+// ---------------------------------------------------------------------------
+// Options for tool-enabled generation.
+// ---------------------------------------------------------------------------
+message ToolCallingOptions {
+    // Available tools for this generation. If empty, the SDK falls back to
+    // its registered tools (per-SDK convention).
+    repeated ToolDefinition tools    = 1;
+
+    // Maximum tool-call iterations in one conversation turn. 0 = SDK default
+    // (typically 5).
+    int32  max_iterations            = 2;
+
+    // Whether to auto-execute tools or hand them back to the caller.
+    bool   auto_execute              = 3;
+
+    // Sampling temperature override (Swift: optional Float).
+    optional float temperature       = 4;
+
+    // Maximum tokens override.
+    optional int32 max_tokens        = 5;
+
+    // System prompt to use during tool-enabled generation.
+    optional string system_prompt    = 6;
+
+    // If true, replaces the system prompt entirely (no auto-injected
+    // tool instructions).
+    bool   replace_system_prompt     = 7;
+
+    // If true, keeps tool definitions available across multiple sequential
+    // tool calls in one generation.
+    bool   keep_tools_available      = 8;
+
+    // Tool-call format hint: "default" (JSON-tagged), "lfm2", "openai", "auto".
+    // Empty = SDK default.
+    string format_hint               = 9;
+
+    // Strongly-typed tool-call format. Preferred over `format_hint` when set;
+    // `format_hint` remains for legacy callers and per-SDK custom strings
+    // that don't round-trip through this enum.
+    optional ToolCallFormatName format = 10;
+
+    // Caller-supplied system prompt that fully replaces the SDK-injected
+    // tool-calling system prompt (rather than being merged with it).
+    // Distinct from `system_prompt` (field 6), which is merged unless
+    // `replace_system_prompt` is true.
+    optional string custom_system_prompt = 11;
+
+    // C ABI / SDK field name for max_iterations. 0 = use max_iterations or
+    // SDK default.
+    optional int32 max_tool_calls = 12;
+
+    ToolChoiceMode tool_choice = 13;
+    optional string forced_tool_name = 14;
+    bool parallel_tool_calls = 15;
+    bool require_json_arguments = 16;
+
+    // When true, suppress the model's thinking/reasoning phase during
+    // tool-enabled generation (commons prepends the model no-think directive
+    // at the prompt level — same contract as
+    // LLMGenerationOptions.disable_thinking). Default false.
+    optional bool disable_thinking = 17;
+}
+
+// ---------------------------------------------------------------------------
+// Result of a tool-enabled generation.
+// ---------------------------------------------------------------------------
+message ToolCallingResult {
+    // Final text response from the assistant.
+    string text                      = 1;
+    // Tool calls the LLM made.
+    repeated ToolCall tool_calls     = 2;
+    // Results of executed tools (only populated when auto_execute was true).
+    repeated ToolResult tool_results = 3;
+    // Whether the response is complete or waiting for more tool results.
+    bool   is_complete               = 4;
+    // Conversation ID for continuing with tool results.
+    optional string conversation_id  = 5;
+    // Number of tool-call iterations actually used.
+    int32  iterations_used           = 6;
+
+    optional string error_message    = 7;
+    int32 error_code                 = 8;
+    string raw_text                  = 9;
+    // Optional thinking/reasoning content extracted from the final response.
+    optional string thinking_content = 10;
+}
+
+message ToolParseRequest {
+    string text = 1;
+    optional ToolCallingOptions options = 2;
+}
+
+message ToolParseResult {
+    bool has_tool_call = 1;
+    repeated ToolCall tool_calls = 2;
+    string remaining_text = 3;
+    optional string error_message = 4;
+    int32 error_code = 5;
+}
+
+message ToolPromptFormatRequest {
+    // User prompt to merge with tool instructions. Empty means return only
+    // the tool-instruction block for the selected format.
+    string user_prompt = 1;
+
+    // Carries available tools plus format/choice/iteration constraints.
+    optional ToolCallingOptions options = 2;
+
+    // Tool results to include when formatting a follow-up prompt after host
+    // execution. Empty means an initial tool-enabled prompt.
+    repeated ToolResult tool_results = 3;
+
+    // Assistant text emitted before tool execution, when available.
+    optional string assistant_text = 4;
+}
+
+message ToolPromptFormatResult {
+    string formatted_prompt = 1;
+    ToolCallFormatName format = 2;
+    string format_hint = 3;
+    optional string error_message = 4;
+    int32 error_code = 5;
+}
+
+message ToolCallValidationRequest {
+    ToolCall tool_call = 1;
+
+    // Validation uses options.tools as the registry snapshot and honors
+    // portable flags such as require_json_arguments and forced_tool_name.
+    optional ToolCallingOptions options = 2;
+}
+
+message ToolCallValidationResult {
+    bool is_valid = 1;
+    repeated string validation_errors = 2;
+    optional ToolDefinition matched_tool = 3;
+    string normalized_arguments_json = 4;
+    optional string error_message = 5;
+    int32 error_code = 6;
+}
+
+enum ToolCallingStreamEventKind {
+    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = 1;
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = 2;
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = 3;
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = 4;
+    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = 5;
+    TOOL_CALLING_STREAM_EVENT_KIND_ERROR = 6;
+}
+
+message ToolCallingStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string conversation_id = 3;
+    ToolCallingStreamEventKind kind = 4;
+    string token = 5;
+    optional ToolCall tool_call = 6;
+    optional ToolResult tool_result = 7;
+    optional ToolCallingResult result = 8;
+    optional string error_message = 9;
+    int32 error_code = 10;
+}
+
+message ToolRegistrySnapshot {
+    repeated ToolDefinition tools = 1;
+    int64 updated_at_ms = 2;
+}
+
+// Logical tool-calling service contract. Host tool registration, permission
+// checks, execution, callbacks, browser/native APIs, and side effects remain
+// adapter-owned; this service describes only portable parsing, prompt
+// formatting, and validation semantics over generated messages.
+service ToolCalling {
+    rpc Parse(ToolParseRequest) returns (ToolParseResult);
+    rpc FormatPrompt(ToolPromptFormatRequest) returns (ToolPromptFormatResult);
+    rpc ValidateCall(ToolCallValidationRequest) returns (ToolCallValidationResult);
+}
+
+
+// ---------------------------------------------------------------------------
+// Tool-calling session state machine.
+// ---------------------------------------------------------------------------
+
+message ToolCallingSessionCreateRequest {
+    // Prompt + LLM generation options inline (avoids cross-proto import cycle).
+    string prompt = 1;
+    int32 max_tokens = 11;
+    float temperature = 12;
+    float top_p = 13;
+    string system_prompt = 14;
+    repeated ToolDefinition tools = 2;
+    string format_hint = 3;
+    uint32 max_iterations = 4;
+    bool keep_tools_available = 5;
+    // proto3 `optional` enables presence detection (has_validate_calls()).
+    // When unset, commons defaults to validate_calls=true (preserves the
+    // historical hard-coded behavior and the native run-loop / session
+    // contract that unknown tool calls short-circuit before host execution).
+    // Callers that delegate validation/authorization to their executor or
+    // use dynamic tool registries must explicitly set validate_calls=false.
+    optional bool validate_calls = 6;
+
+    // OpenAI-style tool_choice override surfaced through the high-level
+    // run-loop / session APIs. The same fields exist on ToolCallingOptions
+    // (fields 13/14); we re-publish them here so the canonical request
+    // envelope can carry the policy without forcing callers to pass an
+    // inline ToolCallingOptions. commons honors these on every
+    // format/validate primitive via build_options_snapshot.
+    optional ToolChoiceMode tool_choice = 7;
+    optional string forced_tool_name = 8;
+
+    // 9-10 reserved: remaining gap between session-control fields and
+    // inline LLM generation params (11-14). Explicitly reserving prevents
+    // two concurrent patches from racing to claim a number here with
+    // conflicting semantics — a wire-compat hazard that would silently
+    // mis-decode data once both patches land.
+    reserved 9 to 10;
+
+    // When true, suppress the model's thinking phase for every generate in
+    // the loop/session (maps from ToolCallingOptions.disable_thinking; same
+    // contract as LLMGenerationOptions.disable_thinking). Default false.
+    bool disable_thinking = 15;
+}
+
+message ToolCallingSessionCreateResult {
+    uint64 session_handle = 1;
+}
+
+message ToolCallingSessionEvent {
+    oneof kind {
+        bytes llm_stream_event_bytes = 1;  // serialized LLMStreamEvent proto
+        ToolCall tool_call = 2;
+        ToolCallingResult final_result = 3;
+        bytes error_bytes = 4;  // serialized SDKError proto
+    }
+    uint64 seq = 5;
+}
+
+message ToolCallingSessionStepWithResultRequest {
+    uint64 session_handle = 1;
+    string tool_call_id = 2;
+    string result_json = 3;
+    optional string error = 4;
+}
+
+message ToolCallingSessionDestroyRequest {
+    uint64 session_handle = 1;
+}

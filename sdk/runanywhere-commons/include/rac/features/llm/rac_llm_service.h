@@ -5,6 +5,20 @@
  * Defines the generic LLM service API and vtable for multi-backend dispatch.
  * Backends (LlamaCpp, Platform, ONNX) implement the vtable and register
  * with the service registry.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_llm_service_ops_t and rac_llm_service_t: `internal`. Engine
+ *     dispatch contract.
+ *   - Proto-byte APIs (rac_llm_generate_proto,
+ *     rac_llm_generate_stream_proto, rac_llm_cancel_proto):
+ *     `SDK-facing default` over runanywhere.v1.LLMGenerateRequest /
+ *     LLMGenerationResult / LLMStreamEvent / SDKEvent bytes.
+ *   - Struct APIs (rac_llm_create, initialize, generate,
+ *     generate_stream, get_info, cancel,
+ *     cleanup, destroy, result_free, plus the adaptive-context APIs
+ *     inject_system_prompt/append_context/generate_from_context/
+ *     clear_context): `delete after SDK migration` for SDK callers —
+ *     keep only as backend smoke-test entry points.
  */
 
 #ifndef RAC_LLM_SERVICE_H
@@ -12,7 +26,9 @@
 
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_error.h"
+#include "rac/features/llm/rac_llm_stream.h"
 #include "rac/features/llm/rac_llm_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,22 +54,6 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*generate_stream)(void* impl, const char* prompt,
                                     const rac_llm_options_t* options,
                                     rac_llm_stream_callback_fn callback, void* user_data);
-
-    /**
-     * Generate text with streaming callback and benchmark timing.
-     * Optional: backends that don't support timing can leave this NULL.
-     * If NULL, rac_llm_generate_stream_with_timing falls back to generate_stream.
-     *
-     * Backends that implement this should capture:
-     * - t2: Before prefill (llama_decode for prompt)
-     * - t3: After prefill completes
-     * - t5: When decode loop exits (last token)
-     */
-    rac_result_t (*generate_stream_with_timing)(void* impl, const char* prompt,
-                                                const rac_llm_options_t* options,
-                                                rac_llm_stream_callback_fn callback,
-                                                void* user_data,
-                                                rac_benchmark_timing_t* timing_out);
 
     /** Get service info */
     rac_result_t (*get_info)(void* impl, rac_llm_info_t* out_info);
@@ -95,6 +95,25 @@ typedef struct rac_llm_service_ops {
 
     /** Clear all KV cache state (optional, NULL if not supported) */
     rac_result_t (*clear_context)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new service instance.
+     *
+     * Replaces the legacy rac_service_provider_t::create callback from the
+     * deleted service_registry.cpp. Called by commons rac_llm_create() after
+     * rac_plugin_find picks this plugin; the returned impl is passed
+     * to every other ops method (initialize, generate, ..., destroy).
+     *
+     * @param model_id    Model ID or filesystem path. Caller-owned; copy if retaining.
+     * @param config_json Optional JSON config (NULL = backend defaults). Plugins
+     *                    that don't understand config_json MUST ignore it and
+     *                    succeed with defaults.
+     * @param out_impl    Receives heap-allocated backend handle.
+     *                    NULL on failure.
+     *
+     * @return RAC_SUCCESS on success; out_impl is NULL on failure.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_llm_service_ops_t;
 
 /**
@@ -164,32 +183,6 @@ RAC_API rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* pr
                                              rac_llm_stream_callback_fn callback, void* user_data);
 
 /**
- * @brief Stream generate text with benchmark timing
- *
- * Same as rac_llm_generate_stream but with optional benchmark timing.
- * If timing_out is non-NULL and the backend supports timing, captures:
- * - t2: Before prefill
- * - t3: After prefill
- * - t5: Last token generated
- *
- * If the backend doesn't implement generate_stream_with_timing, falls back
- * to generate_stream (timing_out will have t2/t3/t5 as zeros).
- *
- * @param handle Service handle
- * @param prompt Input prompt
- * @param options Generation options (can be NULL for defaults)
- * @param callback Callback for each token
- * @param user_data User context passed to callback
- * @param timing_out Output: Benchmark timing (can be NULL for no timing)
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
-                                                         const rac_llm_options_t* options,
-                                                         rac_llm_stream_callback_fn callback,
-                                                         void* user_data,
-                                                         rac_benchmark_timing_t* timing_out);
-
-/**
  * @brief Get service information
  *
  * @param handle Service handle
@@ -227,6 +220,70 @@ RAC_API void rac_llm_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_llm_result_free(rac_llm_result_t* result);
+
+// =============================================================================
+// GENERATED-PROTO LLM ABI - lifecycle-owned model state
+// =============================================================================
+
+/**
+ * @brief Generate text from serialized runanywhere.v1.LLMGenerateRequest bytes.
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto() and returns
+ * serialized runanywhere.v1.LLMGenerationResult bytes in out_result. Thinking
+ * blocks, token splits, and structured JSON extraction are normalized by the
+ * C++ commons layer before the result crosses the ABI.
+ *
+ * idl-abi-contract-003 / idl-002: LLMGenerateRequest is currently a reduced
+ * 25-field shape that does NOT carry tool_calling, thinking_pattern,
+ * structured_output, enable_real_time_tracking, or repeat_last_n
+ * (see idl/llm_options.proto LLMGenerationOptions for the full set), and
+ * `preferred_framework` / `execution_target` are degraded to `string`
+ * instead of the canonical InferenceFramework / ExecutionTarget enums.
+ * Until idl-002 augments LLMGenerateRequest, callers that need those
+ * options must wire them through a separate out-of-band channel; this
+ * proto entry point will silently drop them.
+ */
+RAC_API rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
+                                            size_t request_proto_size,
+                                            rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Stream text generation from serialized runanywhere.v1.LLMGenerateRequest bytes.
+ *
+ * Uses the LLM model loaded through rac_model_lifecycle_load_proto(). The
+ * callback receives one serialized runanywhere.v1.LLMStreamEvent per token and
+ * exactly one terminal event with is_final=true.
+ *
+ * idl-abi-contract-003 / idl-002: shares the same reduced LLMGenerateRequest
+ * shape as rac_llm_generate_proto above — tool_calling, thinking_pattern,
+ * structured_output, enable_real_time_tracking, and repeat_last_n cannot be
+ * carried over the streaming path either until idl-002 lands.
+ *
+ * @warning user_data ownership and lifetime (cross-SDK
+ *          contract). The C runtime may invoke
+ *          `callback(bytes, size, user_data)` on a background thread AFTER
+ *          this function has returned to its caller, because the
+ *          dispatcher copies the callback slot under its internal mutex and
+ *          releases the mutex BEFORE invoking the user callback. Callers
+ *          MUST NOT delete @p user_data inside the trampoline, MUST call
+ *          rac_llm_proto_quiesce() (declared in rac_llm_stream.h) before
+ *          freeing @p user_data, and MUST clear the slot via
+ *          rac_llm_unset_stream_proto_callback() first. See
+ *          rac_llm_stream.h for the canonical unset → quiesce → free
+ *          recipe applied across SDK fan-out adapters.
+ */
+RAC_API rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
+                                                   size_t request_proto_size,
+                                                   rac_llm_stream_proto_callback_fn callback,
+                                                   void* user_data);
+
+/**
+ * @brief Cancel the lifecycle-owned LLM generation, if one is active.
+ *
+ * Returns a serialized runanywhere.v1.SDKEvent carrying CancellationEvent in
+ * out_event and publishes the same event on the canonical SDKEvent stream.
+ */
+RAC_API rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event);
 
 // =============================================================================
 // ADAPTIVE CONTEXT API - For RAG and similar pipelines

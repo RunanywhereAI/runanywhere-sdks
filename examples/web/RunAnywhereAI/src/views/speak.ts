@@ -1,177 +1,239 @@
 /**
- * Speak Tab - Text-to-Speech synthesis
- * Mirrors iOS TTSView.
+ * Speak Tab — V2 canonical proto-byte TTS.
+ *
+ * Once `ONNX.register()` resolves, the public surface in `@runanywhere/web`
+ * (`RunAnywhere.tts.*`) dispatches synthesis
+ * through the proto-byte TTS adapter. The PCM bytes returned are played
+ * through `AudioPlayback`. Until the WASM module is rebuilt with
+ * `RAC_WASM_ONNX=ON`, registration fails with a typed
+ * `BackendNotAvailable` error and the view falls back to a diagnostics
+ * panel that surfaces the underlying status.
  */
 
 import type { TabLifecycle } from '../app';
-import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
-import { showModelSelectionSheet } from '../components/model-selection';
+import {
+  ModelCategory,
+  RunAnywhere,
+  isSDKException,
+} from '@runanywhere/web';
+import { AudioPlayback } from '@runanywhere/web/browser';
+import { ONNX } from '@runanywhere/web-onnx';
+import {
+  ensureCatalogRegistered,
+  findLoadedModelForCategory,
+  onModelStateChange,
+  openSheet,
+} from '../components/model-selection';
+import { escapeHtml } from '../services/escape-html';
+import { formatError } from '../services/format-error';
 
-let container: HTMLElement;
-
-// Funny texts for TTS "Surprise me" (matching iOS)
-const SURPRISE_TEXTS = [
-  "Why don't scientists trust atoms? Because they make up everything!",
-  "I told my wife she was drawing her eyebrows too high. She looked surprised.",
-  "Parallel lines have so much in common. It's a shame they'll never meet.",
-  "I'm reading a book on anti-gravity. It's impossible to put down!",
-  "Did you hear about the mathematician who's afraid of negative numbers? He'll stop at nothing to avoid them.",
-  "What do you call a fake noodle? An impasta!",
-  "I would tell you a construction joke, but I'm still working on it.",
+const TTS_PICKER_FILTER: readonly ModelCategory[] = [
+  ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
 ];
 
-let ttsIsSpeaking = false;
-let ttsPlayback: import('../../../../../sdk/runanywhere-web/packages/core/src/Infrastructure/AudioPlayback').AudioPlayback | null = null;
+let container: HTMLElement;
+let unmounted = false;
+let playback: AudioPlayback | null = null;
+let isSynthesizing = false;
+let lastError: string | null = null;
+let lastDurationMs: number | null = null;
+let unsubscribeState: (() => void) | null = null;
 
-// ---------------------------------------------------------------------------
-// Init
-// ---------------------------------------------------------------------------
+const DEFAULT_TEXT =
+  'Hello — this synthesis was generated entirely on-device through the ' +
+  'RunAnywhere Web SDK and the proto-byte TTS adapter.';
 
 export function initSpeakTab(el: HTMLElement): TabLifecycle {
   container = el;
-  container.innerHTML = `
-    <div class="toolbar">
-      <div class="toolbar-actions"></div>
-      <div class="toolbar-model-btn" id="tts-toolbar-model" title="Tap to change model">
-        <svg class="model-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        <span id="tts-toolbar-model-text">Select TTS Model</span>
-        <svg class="chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-      <div class="toolbar-actions"></div>
-    </div>
-    <div class="scroll-area tts-layout">
-      <textarea class="chat-input tts-textarea" id="speak-text" placeholder="Enter text to speak..." rows="5"></textarea>
-      <button class="btn btn-sm text-purple" id="speak-surprise-btn">Surprise me</button>
-      <div class="tts-speed-row">
-        <label class="tts-speed-label">Speed</label>
-        <input type="range" id="speak-speed" min="0.5" max="2" step="0.1" value="1" class="flex-1">
-        <span id="speak-speed-val" class="tts-speed-value">1.0x</span>
-      </div>
-      <div id="tts-error" class="tts-message error-text hidden"></div>
-      <div id="tts-status" class="tts-message helper-text hidden"></div>
-      <button class="btn btn-primary btn-lg tts-speak-btn" id="speak-btn">
-        Speak
-      </button>
-    </div>
-  `;
-
-  const speedSlider = container.querySelector('#speak-speed') as HTMLInputElement;
-  const speedVal = container.querySelector('#speak-speed-val')!;
-
-  speedSlider.addEventListener('input', () => {
-    speedVal.textContent = parseFloat(speedSlider.value).toFixed(1) + 'x';
+  unmounted = false;
+  ensureCatalogRegistered();
+  renderSpeak();
+  unsubscribeState = onModelStateChange(() => {
+    if (!unmounted) renderSpeak();
   });
-
-  container.querySelector('#speak-surprise-btn')!.addEventListener('click', () => {
-    (container.querySelector('#speak-text') as HTMLTextAreaElement).value =
-      SURPRISE_TEXTS[Math.floor(Math.random() * SURPRISE_TEXTS.length)];
-  });
-
-  container.querySelector('#tts-toolbar-model')!.addEventListener('click', () =>
-    showModelSelectionSheet(ModelCategory.SpeechSynthesis),
-  );
-
-  container.querySelector('#speak-btn')!.addEventListener('click', handleSpeak);
-
-  // Subscribe to model changes so the pill label stays current
-  ModelManager.onChange(onTTSModelsChanged);
-  onTTSModelsChanged(ModelManager.getModels());
-
   return {
-    onDeactivate(): void {
-      if (ttsPlayback) {
-        ttsPlayback.stop();
-        ttsIsSpeaking = false;
-        renderSpeakUI();
+    // app.ts fires onDeactivate on every tab switch (not only on panel
+    // teardown). Treat the flag as a "currently inactive" guard for
+    // in-flight async renders and reset it on re-activation so a returning
+    // user doesn't see stuck Speak / Synthesizing controls or skipped
+    // post-ONNX-register re-renders.
+    onActivate: () => {
+      unmounted = false;
+      ensureCatalogRegistered();
+      renderSpeak();
+    },
+    onDeactivate: () => {
+      unmounted = true;
+      playback?.dispose();
+      playback = null;
+      if (!container.isConnected && unsubscribeState) {
+        unsubscribeState();
+        unsubscribeState = null;
       }
     },
   };
 }
 
-// ---------------------------------------------------------------------------
-// Model Selector
-// ---------------------------------------------------------------------------
+interface SpeakStatus {
+  registered: boolean;
+  supportsProto: boolean;
+}
 
-function onTTSModelsChanged(_models: ModelInfo[]): void {
-  const loaded = ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis);
-  const textSpan = container.querySelector('#tts-toolbar-model-text');
-  if (textSpan) {
-    textSpan.textContent = loaded ? loaded.name : 'Select TTS Model';
+function inspectStatus(): SpeakStatus {
+  const registered = ONNX.isRegistered;
+  const supportsProto = RunAnywhere.tts.supportsProtoTTS();
+  return { registered, supportsProto };
+}
+
+function renderSpeak(): void {
+  const status = inspectStatus();
+  const showLive = status.registered && status.supportsProto;
+  const loadedModel = findLoadedModelForCategory(
+    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+  );
+  const modelLabel = loadedModel?.name ?? 'Select TTS Model';
+  const canRunInference = showLive && Boolean(loadedModel);
+
+  container.innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-title">Speak</div>
+      <div class="toolbar-actions">
+        <button class="btn btn-secondary" id="speak-model-btn">${escapeHtml(modelLabel)}</button>
+        <button class="btn btn-secondary" id="onnx-register-btn">${
+          status.registered ? 'Re-register ONNX' : 'Register ONNX backend'
+        }</button>
+      </div>
+    </div>
+    <div class="scroll-area">
+      <div class="docs-section">
+        <h3>Backend status</h3>
+        <ul class="feature-unavailable__list">
+          <li><code>ONNX.isRegistered</code>: <strong>${
+            status.registered ? 'yes' : 'no'
+          }</strong></li>
+          <li><code>RunAnywhere.tts.supportsProtoTTS()</code>: <strong>${
+            status.supportsProto ? 'yes' : 'no'
+          }</strong></li>
+          <li><code>TTS model loaded</code>: <strong>${loadedModel ? escapeHtml(loadedModel.id) : 'no'}</strong></li>
+        </ul>
+        <div id="onnx-register-status" class="docs-status"></div>
+      </div>
+
+      ${showLive
+        ? `
+          <div class="docs-section">
+            <h3>Synthesize</h3>
+            <p class="text-secondary">Type some text and let on-device TTS render it. Audio is decoded as PCM and played through <code>AudioPlayback</code>.</p>
+            <textarea class="chat-input" id="speak-text" rows="3" ${
+              isSynthesizing ? 'disabled' : ''
+            }>${escapeHtml(DEFAULT_TEXT)}</textarea>
+            <div class="toolbar-actions">
+              <button class="btn btn-primary" id="speak-btn" ${
+                isSynthesizing || !canRunInference ? 'disabled' : ''
+              }>${isSynthesizing ? 'Synthesizing...' : 'Speak'}</button>
+              <button class="btn btn-secondary" id="stop-btn" ${
+                isSynthesizing ? '' : 'disabled'
+              }>Stop</button>
+            </div>
+            <div id="speak-status" class="docs-status">${
+              !canRunInference ? 'Load a TTS model first.' : ''
+            }${
+              lastError ? `Error: ${escapeHtml(lastError)}` : ''
+            }${
+              lastDurationMs != null && !lastError && canRunInference
+                ? `Last synthesis: ${(lastDurationMs / 1000).toFixed(2)}s of audio.`
+                : ''
+            }</div>
+          </div>`
+        : `
+          <div class="docs-section">
+            <h3>Synthesis</h3>
+            <p class="text-secondary">
+              Real TTS calls dispatch through <code>RunAnywhere.synthesize(text, options)</code>
+              once the ONNX backend is registered against a WASM build that
+              includes <code>RAC_WASM_ONNX=ON</code>. PCM samples are played via
+              <code>AudioPlayback</code>.
+            </p>
+            <ul class="feature-unavailable__list">
+              <li><code>RunAnywhere.loadModel(...)</code></li>
+              <li><code>RunAnywhere.synthesize(text, { voicePath })</code></li>
+              <li><code>AudioPlayback.play(samples, sampleRate)</code></li>
+            </ul>
+          </div>`}
+    </div>
+  `;
+
+  container
+    .querySelector('#onnx-register-btn')!
+    .addEventListener('click', () => void registerOnnx());
+
+  container.querySelector('#speak-model-btn')?.addEventListener('click', () => {
+    openSheet({
+      title: 'Select TTS Model',
+      filterCategories: TTS_PICKER_FILTER,
+    });
+  });
+
+  if (showLive) {
+    container.querySelector('#speak-btn')?.addEventListener('click', () => {
+      void runSynthesize();
+    });
+    container.querySelector('#stop-btn')?.addEventListener('click', () => {
+      playback?.stop();
+    });
   }
 }
 
-// ---------------------------------------------------------------------------
-// Speak Logic
-// ---------------------------------------------------------------------------
-
-async function handleSpeak(): Promise<void> {
-  const textArea = container.querySelector('#speak-text') as HTMLTextAreaElement;
-  const speedSlider = container.querySelector('#speak-speed') as HTMLInputElement;
-  const errorEl = container.querySelector('#tts-error') as HTMLElement;
-  const statusEl = container.querySelector('#tts-status') as HTMLElement;
-
-  const text = textArea.value.trim();
-  if (!text) {
-    errorEl.classList.remove('hidden');
-    errorEl.textContent = 'Please enter some text to speak.';
-    return;
+async function registerOnnx(): Promise<void> {
+  const banner = container.querySelector<HTMLDivElement>('#onnx-register-status');
+  if (!banner) return;
+  banner.textContent = 'Registering ONNX backend...';
+  try {
+    await ONNX.register();
+    if (unmounted) return;
+    banner.textContent = 'ONNX backend registered.';
+    renderSpeak();
+  } catch (err) {
+    banner.textContent = `Failed to register ONNX backend: ${formatErr(err)}`;
   }
+}
 
-  if (ttsIsSpeaking && ttsPlayback) {
-    ttsPlayback.stop();
-    ttsIsSpeaking = false;
-    renderSpeakUI();
-    return;
-  }
+async function runSynthesize(): Promise<void> {
+  const textarea = container.querySelector<HTMLTextAreaElement>('#speak-text');
+  const text = (textarea?.value ?? '').trim();
+  if (!text) return;
 
-  errorEl.classList.add('hidden');
-  statusEl.classList.remove('hidden');
-  statusEl.textContent = 'Loading TTS model...';
+  isSynthesizing = true;
+  lastError = null;
+  lastDurationMs = null;
+  renderSpeak();
 
   try {
-    const ttsModel = await ModelManager.ensureLoaded(ModelCategory.SpeechSynthesis);
-    if (!ttsModel) {
-      throw new Error('No TTS model available. Tap the model button (top right) to download one.');
-    }
-
-    statusEl.textContent = 'Synthesizing speech...';
-    const speed = parseFloat(speedSlider.value);
-
-    const { AudioPlayback } = await import(
-      '../../../../../sdk/runanywhere-web/packages/core/src/index'
-    );
-    const { TTS } = await import(
-      '../../../../../sdk/runanywhere-web/packages/onnx/src/index'
-    );
-
-    if (!TTS.isVoiceLoaded) {
-      throw new Error('TTS voice not loaded. Select and load a model first.');
-    }
-
-    const result = await TTS.synthesize(text, { speed });
-
-    statusEl.textContent = `Playing (${(result.durationMs / 1000).toFixed(1)}s)...`;
-    ttsIsSpeaking = true;
-    renderSpeakUI();
-
-    if (!ttsPlayback) ttsPlayback = new AudioPlayback();
-
-    await ttsPlayback.play(result.audioData, result.sampleRate);
-
-    ttsIsSpeaking = false;
-    statusEl.textContent = `Done — ${(result.durationMs / 1000).toFixed(1)}s audio in ${(result.processingTimeMs / 1000).toFixed(1)}s`;
-    renderSpeakUI();
+    const result = await RunAnywhere.synthesize(text);
+    lastDurationMs = result.durationMs ?? 0;
+    const samples = pcmBytesToFloat32(result.audioData);
+    const sampleRate = result.sampleRate || 22050;
+    playback = playback ?? new AudioPlayback({ sampleRate });
+    await playback.play(samples, sampleRate);
   } catch (err) {
-    ttsIsSpeaking = false;
-    errorEl.classList.remove('hidden');
-    errorEl.textContent = err instanceof Error ? err.message : String(err);
-    statusEl.classList.add('hidden');
-    renderSpeakUI();
+    lastError = formatErr(err);
+  } finally {
+    isSynthesizing = false;
+    if (!unmounted) renderSpeak();
   }
 }
 
-function renderSpeakUI(): void {
-  const speakBtn = container.querySelector('#speak-btn') as HTMLButtonElement;
-  speakBtn.classList.toggle('stopping', ttsIsSpeaking);
-  speakBtn.textContent = ttsIsSpeaking ? 'Stop' : 'Speak';
+/** Decode little-endian Int16 PCM bytes into a Float32Array in [-1, 1]. */
+function pcmBytesToFloat32(bytes: Uint8Array): Float32Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const samples = new Float32Array(bytes.byteLength / 2);
+  for (let i = 0; i < samples.length; i += 1) {
+    samples[i] = view.getInt16(i * 2, true) / 0x7fff;
+  }
+  return samples;
+}
+
+function formatErr(err: unknown): string {
+  if (isSDKException(err)) return err.message;
+  return formatError(err);
 }

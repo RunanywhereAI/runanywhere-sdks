@@ -20,7 +20,7 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
@@ -35,29 +35,38 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load
+        // Load (canonical proto-request form)
         let loadStart = Date()
-        try await RunAnywhere.loadTTSModel(model.id)
+        var loadRequest = RAModelLoadRequest()
+        loadRequest.modelID = model.id
+        loadRequest.category = .speechSynthesis
+        let loadResult = await RunAnywhere.loadModel(loadRequest)
+        guard loadResult.success else {
+            throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
+        }
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
+
+        var unloadRequest = RAModelUnloadRequest()
+        unloadRequest.category = .speechSynthesis
 
         do {
             // Synthesize (not speak)
             let benchStart = Date()
-            let options = TTSOptions()
+            let options = RATTSOptions.defaults()
             let result = try await RunAnywhere.synthesize(text, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
             // processingTime is in seconds, convert to ms-context
             metrics.audioDurationSeconds = result.duration
-            metrics.charactersProcessed = result.metadata.characterCount
+            metrics.charactersProcessed = Int(result.metadata.characterCount)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            try? await RunAnywhere.unloadTTSVoice()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             return metrics
         } catch {
-            try? await RunAnywhere.unloadTTSVoice()
+            _ = await RunAnywhere.unloadModel(unloadRequest)
             throw error
         }
     }

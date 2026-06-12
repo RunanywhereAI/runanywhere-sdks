@@ -8,6 +8,18 @@
  *
  * This header defines data structures only. For the service interface,
  * see rac_llm_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_llm_config_t, rac_llm_options_t,
+ *     rac_llm_result_t, rac_llm_info_t, rac_llm_token_event_t,
+ *     rac_llm_stream_*_t, rac_thinking_tag_pattern_t,
+ *     rac_structured_output_*_t, rac_llm_stream_callback_fn,
+ *     rac_llm_token_event_callback_fn): `delete after SDK migration`.
+ *     Replaced by serialized runanywhere.v1.LLMGenerateRequest /
+ *     LLMGenerationResult / LLMStreamEvent bytes via rac_llm_*_proto and
+ *     rac_llm_set_stream_proto_callback in rac_llm_stream.h.
+ *   - rac_llm_result_free: `internal` C-side memory helper kept while the
+ *     struct callbacks remain.
  */
 
 #ifndef RAC_LLM_TYPES_H
@@ -93,10 +105,48 @@ typedef struct rac_llm_options {
 
     /** System prompt (can be NULL) */
     const char* system_prompt;
+
+    /** Top-k sampling parameter (idl/llm_options.proto:55). 0 = disabled. */
+    int32_t top_k;
+
+    /** Repetition penalty (idl/llm_options.proto:59). 1.0 = no penalty. */
+    float repetition_penalty;
+
+    /** OpenAI-style frequency penalty (idl/llm_options.proto:100). 0.0 = disabled. */
+    float frequency_penalty;
+
+    /** OpenAI-style presence penalty (idl/llm_options.proto:101). 0.0 = disabled. */
+    float presence_penalty;
+
+    /** Minimum-probability sampling (idl/llm_options.proto:107). 0.0 = disabled. */
+    float min_p;
+
+    /** Deterministic sampling seed (idl/llm_options.proto:97). 0 = backend default. */
+    int64_t seed;
+
+    /** Grammar / constrained-decoding rule text, GBNF (can be NULL). */
+    const char* grammar;
+
+    /** Per-request backend thread hint (idl/llm_options.proto:119). 0 = backend default. */
+    int32_t n_threads;
+
+    /**
+     * When RAC_TRUE, suppress the model's thinking phase for this generation
+     * (idl/llm_options.proto disable_thinking). Commons prepends the model
+     * no-think directive at the prompt level; RAC_FALSE = normal thinking.
+     * Appended at the end of the struct so zero-initialized callers default to
+     * RAC_FALSE (thinking enabled).
+     */
+    rac_bool_t disable_thinking;
 } rac_llm_options_t;
 
 /**
  * @brief Default LLM generation options
+ *
+ * The sampling fields below the legacy struct members default to the proto's
+ * documented "unset / disabled" sentinels (idl/llm_options.proto): top_k=0,
+ * repetition_penalty=1.0, frequency/presence/min_p=0.0, seed=0, no grammar,
+ * n_threads=0. Engines apply each only when its non-disabled value is present.
  */
 static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .temperature = 0.8f,
@@ -104,7 +154,16 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .stop_sequences = RAC_NULL,
                                                           .num_stop_sequences = 0,
                                                           .streaming_enabled = RAC_FALSE,
-                                                          .system_prompt = RAC_NULL};
+                                                          .system_prompt = RAC_NULL,
+                                                          .top_k = 0,
+                                                          .repetition_penalty = 1.0f,
+                                                          .frequency_penalty = 0.0f,
+                                                          .presence_penalty = 0.0f,
+                                                          .min_p = 0.0f,
+                                                          .seed = 0,
+                                                          .grammar = RAC_NULL,
+                                                          .n_threads = 0,
+                                                          .disable_thinking = RAC_FALSE};
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult

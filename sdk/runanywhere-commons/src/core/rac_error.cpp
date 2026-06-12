@@ -77,6 +77,8 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Cost limit exceeded";
         case RAC_ERROR_INFERENCE_FAILED:
             return "Inference failed";
+        case RAC_ERROR_GENERATION_CANCELLED:
+            return "Generation cancelled";
 
         // =================================================================
         // NETWORK ERRORS (-150 to -179)
@@ -191,6 +193,9 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Null pointer";
         case RAC_ERROR_BUFFER_TOO_SMALL:
             return "Buffer too small";
+        case RAC_ERROR_OUTPUT_TRUNCATED:
+            return "Output truncated: caller buffer is too small; required byte "
+                   "count written to output size field";
 
         // =================================================================
         // AUDIO ERRORS (-280 to -299)
@@ -309,6 +314,11 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Backend busy";
         case RAC_ERROR_BACKEND_UNAVAILABLE:
             return "Backend binary not installed (compiled as stub)";
+        case RAC_ERROR_RUNTIME_UNAVAILABLE:
+            return "No registered L1 runtime satisfies the engine's "
+                   "declared runtimes on this host";
+        case RAC_ERROR_BACKEND_ERROR:
+            return "Backend error";
         case RAC_ERROR_INVALID_HANDLE:
             return "Invalid handle";
 
@@ -337,6 +347,20 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Unknown error";
         case RAC_ERROR_INTERNAL:
             return "Internal error";
+
+        // =================================================================
+        // PLUGIN ERRORS (-810 to -829)
+        // =================================================================
+        case RAC_ERROR_ABI_VERSION_MISMATCH:
+            return "Plugin ABI version mismatch";
+        case RAC_ERROR_CAPABILITY_UNSUPPORTED:
+            return "Plugin capability unsupported on this host";
+        case RAC_ERROR_PLUGIN_DUPLICATE:
+            return "Plugin with this name already registered";
+        case RAC_ERROR_PLUGIN_LOAD_FAILED:
+            return "Plugin load failed";
+        case RAC_ERROR_PLUGIN_BUSY:
+            return "Plugin is busy with active sessions";
 
         default:
             return "Unknown error code";

@@ -8,8 +8,8 @@
 #ifndef RAC_RAG_H
 #define RAC_RAG_H
 
+#include "rac_proto_buffer.h"
 #include "rac_types.h"
-#include "rac_rag_pipeline.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,4 +36,4 @@ RAC_API rac_result_t rac_backend_rag_unregister(void);
 }
 #endif
 
-#endif // RAC_RAG_H
+#endif  // RAC_RAG_H

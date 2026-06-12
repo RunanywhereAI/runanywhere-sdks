@@ -20,7 +20,6 @@
  *
  * // Phase 2: Services init (async) - after HTTP is configured
  * await CppBridge.initializeServices()
- *   ├─ ModelAssignment.register()  ← Model assignment callbacks
  *   └─ Platform.register()         ← LLM/TTS service callbacks
  * ```
  *
@@ -33,10 +32,8 @@
  * - CppBridge+State.swift - SDK state management
  * - CppBridge+HTTP.swift - HTTP transport
  * - CppBridge+Auth.swift - Authentication flow
- * - CppBridge+Services.swift - Service registry
  * - CppBridge+ModelPaths.swift - Model path utilities
  * - CppBridge+ModelRegistry.swift - Model registry
- * - CppBridge+ModelAssignment.swift - Model assignment
  * - CppBridge+Download.swift - Download manager
  * - CppBridge+Platform.swift - Platform services (Foundation Models, System TTS)
  * - CppBridge+LLM/STT/TTS/VAD.swift - AI component bridges
@@ -46,6 +43,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - Main Bridge Coordinator
 
@@ -55,30 +53,26 @@ public enum CppBridge {
 
     // MARK: - Shared State
 
-    private static var _environment: SDKEnvironment = .development
-    private static var _isInitialized = false
-    private static var _servicesInitialized = false
-    private static let lock = NSLock()
-
-    /// Current SDK environment
-    static var environment: SDKEnvironment {
-        lock.lock()
-        defer { lock.unlock() }
-        return _environment
+    /// Combined synchronously-readable bridge state, guarded by a single
+    /// `OSAllocatedUnfairLock`. Replaces the prior NSLock + 3 vars layout
+    /// per AGENTS.md "Do not use NSLock as it is outdated."
+    private struct CppBridgeSharedState {
+        var environment: SDKEnvironment = .development
+        var isInitialized: Bool = false
+        var servicesInitialized: Bool = false
     }
+
+    private static let state =
+        OSAllocatedUnfairLock<CppBridgeSharedState>(initialState: CppBridgeSharedState())
 
     /// Whether core bridges are initialized (Phase 1)
     public static var isInitialized: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return _isInitialized
+        state.withLock { $0.isInitialized }
     }
 
     /// Whether service bridges are initialized (Phase 2)
     public static var servicesInitialized: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return _servicesInitialized
+        state.withLock { $0.servicesInitialized }
     }
 
     // MARK: - Phase 1: Core Initialization (Synchronous)
@@ -90,35 +84,42 @@ public enum CppBridge {
     ///
     /// - Parameter environment: SDK environment
     public static func initialize(environment: SDKEnvironment) {
-        lock.lock()
-        guard !_isInitialized else {
-            lock.unlock()
-            return
+        let alreadyInitialized = state.withLock { current -> Bool in
+            if current.isInitialized { return true }
+            current.environment = environment
+            return false
         }
-        _environment = environment
-        lock.unlock()
+        guard !alreadyInitialized else { return }
 
         // Step 1: Platform adapter FIRST (logging, file ops, keychain)
         // This must be registered before any other C++ calls
         PlatformAdapter.register()
+
+        // Step 1.1: Register the Swift URLSession HTTP transport so
+        // every subsequent `rac_http_request_*` call flows through
+        // Apple's stack (trust store, ATS, proxies, HTTP/2). Must
+        // happen before any other bridge that might trigger HTTP —
+        // e.g. Telemetry initialization below.
+        URLSessionHttpTransport.register()
 
         // Step 1.5: Configure C++ logging based on environment
         // In production: disables C++ stderr, logs only go through Swift bridge
         // In development: C++ stderr ON for debugging
         rac_configure_logging(environment.cEnvironment)
 
-        // Step 2: Events callback (for analytics routing)
-        Events.register()
-
-        // Step 3: Telemetry manager (builds JSON, calls HTTP callback)
+        // Step 2: Telemetry manager (builds JSON, calls HTTP callback).
+        // Must come before Events.register(): the events bridge attaches this
+        // manager to the C++ router as the telemetry sink, so the manager has
+        // to exist first.
         Telemetry.initialize(environment: environment)
+
+        // Step 3: Attach the telemetry manager as the C++ router's telemetry sink.
+        Events.register()
 
         // Step 4: Device registration callbacks
         Device.register()
 
-        lock.lock()
-        _isInitialized = true
-        lock.unlock()
+        state.withLock { $0.isInitialized = true }
 
         SDKLogger(category: "CppBridge").debug("Core bridges initialized for \(environment)")
     }
@@ -131,42 +132,22 @@ public enum CppBridge {
     /// network access to function.
     @MainActor
     public static func initializeServices() {
-        lock.lock()
-        guard !_servicesInitialized else {
-            lock.unlock()
-            return
+        let snapshot = state.withLock { current -> (alreadyDone: Bool, env: SDKEnvironment) in
+            (current.servicesInitialized, current.environment)
         }
-        let currentEnv = _environment
-        lock.unlock()
+        guard !snapshot.alreadyDone else { return }
+        let currentEnv = snapshot.env
 
-        // Model assignment (needs HTTP for API calls)
-        // Only auto-fetch in staging/production, not development
-        // IMPORTANT: Register WITHOUT auto-fetch first to avoid MainActor deadlock
-        // The HTTP callback uses semaphore.wait() which would block MainActor
-        // while the Task{} inside needs MainActor access
-        let shouldAutoFetch = currentEnv != .development
-        ModelAssignment.register(autoFetch: false)
-
-        // If auto-fetch is needed, trigger it asynchronously off MainActor
-        if shouldAutoFetch {
-            Task.detached {
-                do {
-                    _ = try await ModelAssignment.fetch(forceRefresh: true)
-                    SDKLogger(category: "CppBridge").info("Auto-fetched model assignments successfully")
-                } catch {
-                    SDKLogger(category: "CppBridge").warning("Auto-fetch model assignments failed: \(error.localizedDescription)")
-                }
-            }
-        }
+        // Model assignment fetch needs no Swift callbacks: commons routes it
+        // through the registered URLSession HTTP transport, and the fetch
+        // itself is owned by rac_sdk_init_phase2_proto.
 
         // Platform services (Foundation Models, System TTS)
         Platform.register()
 
-        lock.lock()
-        _servicesInitialized = true
-        lock.unlock()
+        state.withLock { $0.servicesInitialized = true }
 
-        SDKLogger(category: "CppBridge").debug("Service bridges initialized (env: \(currentEnv), autoFetch: \(shouldAutoFetch))")
+        SDKLogger(category: "CppBridge").debug("Service bridges initialized (env: \(currentEnv))")
     }
 
     // MARK: - Shutdown
@@ -177,10 +158,7 @@ public enum CppBridge {
     /// Awaiting them sequentially (instead of wrapping in `Task { ... }`)
     /// ensures Telemetry/Events teardown does not race destroy completion.
     public static func shutdown() async {
-        lock.lock()
-        let wasInitialized = _isInitialized
-        lock.unlock()
-
+        let wasInitialized = state.withLock { $0.isInitialized }
         guard wasInitialized else { return }
 
         // Destroy AI components sequentially before tearing down Telemetry/Events
@@ -192,17 +170,19 @@ public enum CppBridge {
         await VLM.shared.destroy()
 
         // Shutdown in reverse order
-        // Note: ModelAssignment and Platform callbacks remain valid (static)
+        // Note: Platform callbacks remain valid (static)
 
-        Telemetry.shutdown()
+        // Detach the router's telemetry sink BEFORE destroying the manager so
+        // the C++ router never holds a dangling manager pointer.
         Events.unregister()
+        Telemetry.shutdown()
         // PlatformAdapter callbacks remain valid (static)
         // Device callbacks remain valid (static)
 
-        lock.lock()
-        _isInitialized = false
-        _servicesInitialized = false
-        lock.unlock()
+        state.withLock {
+            $0.isInitialized = false
+            $0.servicesInitialized = false
+        }
 
         SDKLogger(category: "CppBridge").debug("All bridges shutdown")
     }

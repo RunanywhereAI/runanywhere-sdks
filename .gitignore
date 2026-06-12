@@ -4,7 +4,15 @@
 
 ## Build generated
 build/
+build-*/
+# scripts/build/ holds tracked native-build scripts (not CMake output) — keep it tracked
+!scripts/build/
 DerivedData/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+a.out.*
 
 ## Various settings
 *.pbxuser
@@ -48,6 +56,8 @@ playground.xcworkspace
 # https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
 #
 # Pods/
+.bundle/
+vendor/bundle/
 
 # Carthage
 #
@@ -78,6 +88,9 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
+# PR-local verification artifacts belong outside the repo.
+verification/
+
 # IDE - IntelliJ IDEA / Android Studio
 # User-specific stuff
 .idea/workspace.xml
@@ -87,6 +100,8 @@ iOSInjectionProject/
 .idea/shelf
 .idea/ChatHistory*.xml
 .idea/discord.xml
+.idea/editor.xml
+.idea/deviceManager.xml
 
 # Generated files
 .idea/caches/
@@ -116,15 +131,17 @@ iOSInjectionProject/
 .idea/deploymentTargetSelector.xml
 .idea/kotlinc.xml
 .idea/migrations.xml
+.idea/inspectionProfiles/
+.idea/runConfigurations.xml
 
 # Local gradle properties (machine-specific)
 gradle.properties
 
 # But keep project-level gradle properties if needed
 !gradle.properties.example
+!examples/flutter/RunAnywhereAI/android/gradle.properties
 
 # Also ignore .idea folders in subdirectories
-examples/intellij-plugin-demo/plugin/.idea/
 sdk/runanywhere-kotlin/.idea/
 
 # Other IDE files
@@ -197,6 +214,7 @@ node_modules/
 .npm
 .yarn/cache
 .yarn/install-state.gz
+.vite/
 
 # Flutter/Dart
 .dart_tool/
@@ -228,24 +246,19 @@ sdk/runanywhere-web/packages/onnx/dist/
 sdk/runanywhere-web/wasm/build/
 sdk/runanywhere-web/packages/core/wasm/
 sdk/runanywhere-web/packages/onnx/wasm/
+sdk/runanywhere-web/packages/*/wasm/*.wasm
+sdk/runanywhere-web/packages/*/wasm/*.wasm.map
+sdk/runanywhere-web/packages/*/wasm/*.data
 sdk/runanywhere-web/emsdk/
 sdk/runanywhere-web/package-lock.json
+sdk/shared/proto-ts/package-lock.json
 examples/web/RunAnywhereAI/node_modules/
 
 # External repositories and distribution
 EXTERNAL/
 dist/
-
-# MLC-LLM submodule build artifacts (submodule is inside MLC module, similar to llama.cpp)
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/build/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/*.jar
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/arm64-v8a/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/armeabi-v7a/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/x86/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/x86_64/
-
-# Keep the output README for documentation
-!sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/README.md
+!sdk/shared/proto-ts/dist/
+!sdk/shared/proto-ts/dist/**
 
 # Configuration files with real values
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.staging.json
@@ -277,11 +290,6 @@ sdk/runanywhere-kotlin/build/generated/config/
 !sdk/runanywhere-kotlin/config/*.example.json
 !sdk/runanywhere-kotlin/config/template.json
 !sdk/runanywhere-kotlin/config/README.md
-
-# Native build artifacts (llama.cpp)
-sdk/runanywhere-kotlin/native/llama-jni/build/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/androidMain/jniLibs/
-sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/native/
 
 # llama.cpp is a submodule - tracked in .gitmodules
 # Build artifacts from llama.cpp
@@ -338,14 +346,9 @@ sdk/runanywhere-react-native/packages/*/android/src/main/jniLibs/
 sdk/runanywhere-react-native/packages/*/ios/Frameworks/*.xcframework
 
 # Backup directories
-examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
 comments/
 
-# Flutter/Dart
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-pubspec.lock
+# Flutter iOS ephemeral build dir
 **/ios/Flutter/ephemeral/
 
 # Flutter auto-generated files (contain developer-specific local paths)
@@ -368,25 +371,29 @@ sdk/runanywhere-swift/Binaries/*.xcframework
 sdk/runanywhere-swift/vendor/
 
 # Kotlin SDK - Local JNI libs
-sdk/runanywhere-kotlin/src/androidMain/jniLibs/
+sdk/runanywhere-kotlin/src/main/jniLibs/
 
 # Commons - Build artifacts and third-party dependencies
 sdk/runanywhere-commons/build/
+sdk/runanywhere-commons/build_audit/
 sdk/runanywhere-commons/dist/
 sdk/runanywhere-commons/third_party/
+
+# clangd index/cache
+.cache/clangd/
+**/.cache/clangd/
 
 # React Native - Local builds
 sdk/runanywhere-react-native/packages/*/prebuilt/
 
 # Flutter - Local builds
 sdk/runanywhere-flutter/ios/*.xcframework
+sdk/runanywhere-flutter/packages/*/ios/Frameworks/*.xcframework
+sdk/runanywhere-flutter/packages/*/ios/Frameworks/*.xcframework.zip
 sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
-tools/
-sdk/runanywhere-react-native/packages/rag/ios/.testlocal
-
 
 # Python virtual environments
 .venv*/
@@ -394,10 +401,31 @@ venv*/
 __pycache__/
 *.pyc
 
-# Node
-node_modules/
-/tools/
 *.trace
+
+# Local detailed validation runs and MCP evidence
+test_workflows/
+gaps/
 
 # External starter-app clones for local reference (release.yml clones them fresh)
 external_examples/
+
+# PR-noise blocklist: planning/status docs are archived outside the repo.
+docs/release/
+docs/research/
+docs/rfcs/
+examples/SMOKE_MATRIX.md
+docs/API_PARITY_MATRIX.md
+docs/engine_plugin_authoring.md
+docs/graph_primitives.md
+docs/migrations/
+docs/plugins/
+docs/sdks/web-sdk.md
+engines/metalrt/README.md
+examples/web/RunAnywhereAI/README.md
+idl/README.md
+sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md
+sdk/runanywhere-commons/examples/solutions/README.md
+tests/streaming/README.md
+tests/streaming/cancel_parity/README.md
+tests/streaming/perf_bench/README.md

@@ -5,6 +5,13 @@ All notable changes to the RunAnywhere LlamaCpp Backend will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.13] - 2026-05-13
+
+### Changed
+- Kept the Flutter plugin as a thin backend registration adapter by removing unused template MethodChannel methods.
+- Aligned the iOS deployment target and platform claims with the Swift iOS 17.0 baseline.
+- Removed the backend plugin `uses-material-design` flag.
+
 ## [0.16.0] - 2026-02-14
 
 ### Changed
@@ -35,5 +42,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic model management and caching
 
 ### Platforms
-- iOS 13.0+ support
+- iOS 17.0+ support
 - Android API 24+ support

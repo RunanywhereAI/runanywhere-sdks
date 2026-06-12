@@ -69,8 +69,8 @@ export interface CapturedFrame {
 export class VideoCapture {
   private readonly config: Required<VideoCaptureConfig>;
   private _mediaStream: MediaStream | null = null;
-  private _videoEl: HTMLVideoElement;
-  private _canvasEl: HTMLCanvasElement;
+  private _videoEl: HTMLVideoElement | null = null;
+  private _canvasEl: HTMLCanvasElement | null = null;
   private _isCapturing = false;
   private _startPromise: Promise<void> | null = null;
 
@@ -80,14 +80,6 @@ export class VideoCapture {
       idealWidth: config.idealWidth ?? 640,
       idealHeight: config.idealHeight ?? 480,
     };
-
-    // Create internal elements (not appended to DOM by default)
-    this._videoEl = document.createElement('video');
-    this._videoEl.playsInline = true;
-    this._videoEl.autoplay = true;
-    this._videoEl.muted = true;
-
-    this._canvasEl = document.createElement('canvas');
   }
 
   // ---- Public getters ----
@@ -104,19 +96,24 @@ export class VideoCapture {
    * ```typescript
    * previewContainer.appendChild(camera.videoElement);
    * ```
+   *
+   * Only available after `start()` has been called.
    */
   get videoElement(): HTMLVideoElement {
+    if (!this._videoEl) {
+      throw new Error('VideoCapture: start() must be called before accessing videoElement');
+    }
     return this._videoEl;
   }
 
   /** Native video width from the camera (0 if not started). */
   get videoWidth(): number {
-    return this._videoEl.videoWidth;
+    return this._videoEl?.videoWidth ?? 0;
   }
 
   /** Native video height from the camera (0 if not started). */
   get videoHeight(): number {
-    return this._videoEl.videoHeight;
+    return this._videoEl?.videoHeight ?? 0;
   }
 
   // ---- Lifecycle ----
@@ -149,8 +146,21 @@ export class VideoCapture {
     }
   }
 
+  private ensureElements(): void {
+    if (this._videoEl && this._canvasEl) return;
+    this._videoEl = document.createElement('video');
+    this._videoEl.playsInline = true;
+    this._videoEl.autoplay = true;
+    this._videoEl.muted = true;
+    this._canvasEl = document.createElement('canvas');
+  }
+
   private async _doStart(): Promise<void> {
     logger.info(`Starting video capture (${this.config.facingMode}, ${this.config.idealWidth}x${this.config.idealHeight})`);
+
+    this.ensureElements();
+    // ensureElements() guarantees both fields are non-null; narrow for TS
+    const videoEl = this._videoEl!;
 
     try {
       this._mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -162,19 +172,19 @@ export class VideoCapture {
         audio: false,
       });
 
-      this._videoEl.srcObject = this._mediaStream;
+      videoEl.srcObject = this._mediaStream;
 
       // Wait for video metadata to load so videoWidth/videoHeight are available
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Video stream timeout')), 10000);
-        this._videoEl.onloadedmetadata = () => {
+        videoEl.onloadedmetadata = () => {
           clearTimeout(timeout);
           resolve();
         };
       });
 
       this._isCapturing = true;
-      logger.info(`Camera started (${this._videoEl.videoWidth}x${this._videoEl.videoHeight})`);
+      logger.info(`Camera started (${videoEl.videoWidth}x${videoEl.videoHeight})`);
     } catch (error) {
       this.cleanupResources();
       const message = error instanceof Error ? error.message : String(error);
@@ -207,7 +217,7 @@ export class VideoCapture {
    * @returns CapturedFrame or null if the video stream isn't ready.
    */
   captureFrame(maxDimension = 512): CapturedFrame | null {
-    if (!this._isCapturing || !this._videoEl.videoWidth || !this._videoEl.videoHeight) {
+    if (!this._isCapturing || !this._videoEl?.videoWidth || !this._videoEl?.videoHeight) {
       return null;
     }
 
@@ -217,6 +227,7 @@ export class VideoCapture {
       maxDimension,
     );
 
+    if (!this._canvasEl) return null;
     this._canvasEl.width = w;
     this._canvasEl.height = h;
     const ctx = this._canvasEl.getContext('2d');
@@ -275,6 +286,8 @@ export class VideoCapture {
       this._mediaStream.getTracks().forEach((track) => track.stop());
       this._mediaStream = null;
     }
-    this._videoEl.srcObject = null;
+    if (this._videoEl) {
+      this._videoEl.srcObject = null;
+    }
   }
 }

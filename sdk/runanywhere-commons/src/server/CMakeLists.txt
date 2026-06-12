@@ -49,12 +49,6 @@ target_link_libraries(rac_server PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-# If backends are built, link them
-if(TARGET rac_backend_llamacpp)
-    target_link_libraries(rac_server PUBLIC rac_backend_llamacpp)
-    target_compile_definitions(rac_server PRIVATE RAC_HAS_LLAMACPP=1)
-endif()
-
 # Threading support
 find_package(Threads REQUIRED)
 target_link_libraries(rac_server PUBLIC Threads::Threads)

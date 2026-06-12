@@ -7,6 +7,16 @@
  *
  * Actor-based STT capability that owns model lifecycle and transcription.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs (rac_stt_component_transcribe_proto,
+ *     rac_stt_component_transcribe_stream_proto): `SDK-facing default`
+ *     over runanywhere.v1.STTOptions / STTOutput / STTStreamEvent bytes.
+ *   - Struct APIs (rac_stt_component_create, configure, load_model,
+ *     unload, cleanup, transcribe, transcribe_stream, get_*,
+ *     get_supported_languages, detect_language, destroy):
+ *     `delete after SDK migration` for SDK callers — use proto-byte
+ *     APIs and the model lifecycle proto contract.
  */
 
 #ifndef RAC_STT_COMPONENT_H
@@ -15,6 +25,7 @@
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/features/stt/rac_stt_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -114,7 +125,11 @@ RAC_API rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const voi
 RAC_API rac_bool_t rac_stt_component_supports_streaming(rac_handle_t handle);
 
 /**
- * @brief Transcribe audio with streaming
+ * @brief Transcribe audio with the low-level raw partial/final callback.
+ *
+ * This remains the backend-facing C callback path. SDK-facing generated-proto
+ * callers should use rac_stt_component_transcribe_stream_proto so commons emits
+ * runanywhere.v1.STTStreamEvent envelopes.
  *
  * @param handle Component handle
  * @param audio_data Audio chunk data
@@ -154,6 +169,124 @@ RAC_API rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
  * @param handle Component handle
  */
 RAC_API void rac_stt_component_destroy(rac_handle_t handle);
+
+/**
+ * @brief Get supported languages for the loaded STT model as a JSON array string.
+ *
+ * Forwards to the underlying service/backend. Returns RAC_ERROR_BACKEND_NOT_READY
+ * if no model is loaded, or RAC_ERROR_NOT_SUPPORTED if the backend cannot enumerate.
+ *
+ * @param handle    Component handle
+ * @param out_json  Output: malloc'd JSON string (e.g. "[\"en\",\"es\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_stt_component_get_supported_languages(rac_handle_t handle,
+                                                               char** out_json);
+
+/**
+ * @brief Detect spoken language for a short audio clip.
+ *
+ * Forwards to the underlying service/backend. Returns RAC_ERROR_BACKEND_NOT_READY
+ * if no model is loaded, or RAC_ERROR_NOT_SUPPORTED if the backend does not
+ * expose language detection.
+ *
+ * @param handle        Component handle
+ * @param audio_data    PCM audio buffer (Int16 mono, sample rate per component config)
+ * @param audio_size    Size of audio_data in bytes
+ * @param out_language  Output: malloc'd NUL-terminated language code. Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_stt_component_detect_language(rac_handle_t handle, const void* audio_data,
+                                                       size_t audio_size, char** out_language);
+
+// =============================================================================
+// GENERATED-PROTO C ABI
+// =============================================================================
+
+/**
+ * @brief Callback fired for serialized runanywhere.v1.STTStreamEvent bytes.
+ *
+ * The byte buffer is valid only for the duration of the callback.
+ */
+typedef void (*rac_stt_proto_stream_event_callback_fn)(const uint8_t* event_proto_bytes,
+                                                       size_t event_proto_size, void* user_data);
+
+/**
+ * @brief Transcribe audio using serialized runanywhere.v1.STTOptions bytes.
+ *
+ * Returns serialized runanywhere.v1.STTOutput bytes in out_result.
+ */
+RAC_API rac_result_t rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data,
+                                                        size_t audio_size,
+                                                        const uint8_t* options_proto_bytes,
+                                                        size_t options_proto_size,
+                                                        rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Stream transcription as generated runanywhere.v1.STTStreamEvent bytes.
+ */
+RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
+    rac_handle_t handle, const void* audio_data, size_t audio_size,
+    const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_stt_proto_stream_event_callback_fn callback, void* user_data);
+
+// =============================================================================
+// Persistent per-session streaming handles.
+//
+// Commons exposes these thin wrappers so `rac_stt_stream.cpp` can reach the
+// backend vtable without hard-coding knowledge of the service struct layout.
+// Each returns RAC_ERROR_NOT_SUPPORTED if the loaded backend does not
+// implement the matching vtable slot; the commons stream dispatcher then
+// falls back to the per-chunk transcribe_stream path.
+// =============================================================================
+
+/**
+ * @brief Allocate a backend-specific streaming session bound to the loaded STT model.
+ *
+ * @param handle            STT component handle.
+ * @param options           Transcription options (may be NULL for backend defaults).
+ * @param out_stream_handle Output: opaque backend stream handle; NULL on failure.
+ *
+ * @retval RAC_SUCCESS               Session created.
+ * @retval RAC_ERROR_NOT_INITIALIZED No model is loaded.
+ * @retval RAC_ERROR_NOT_SUPPORTED   Backend does not advertise per-session streams.
+ */
+RAC_API rac_result_t rac_stt_component_stream_create(rac_handle_t handle,
+                                                     const rac_stt_options_t* options,
+                                                     rac_handle_t* out_stream_handle);
+
+/**
+ * @brief Feed one chunk of Int16 mono PCM samples into an active backend stream.
+ *
+ * Partials / finals produced by the backend are pushed to @p callback
+ * synchronously during the call. @p callback uses the same
+ * rac_stt_stream_callback_t signature the legacy transcribe_stream path
+ * exposes so commons can route both through the same bridge.
+ *
+ * @param handle        STT component handle.
+ * @param stream_handle Stream handle returned by rac_stt_component_stream_create.
+ * @param samples       Int16 mono PCM samples (non-null when count > 0).
+ * @param count         Number of samples at @p samples.
+ * @param callback      Partial / final emission callback.
+ * @param user_data     Opaque pointer forwarded to @p callback.
+ *
+ * @retval RAC_SUCCESS             Chunk accepted.
+ * @retval RAC_ERROR_NOT_SUPPORTED Backend does not advertise per-session streams.
+ */
+RAC_API rac_result_t rac_stt_component_stream_feed_audio_chunk(rac_handle_t handle,
+                                                               rac_handle_t stream_handle,
+                                                               const int16_t* samples, size_t count,
+                                                               rac_stt_stream_callback_t callback,
+                                                               void* user_data);
+
+/**
+ * @brief Destroy a backend-specific streaming session.
+ *
+ * Safe to call with @p stream_handle == NULL (no-op). Backends that don't
+ * implement the stream_destroy slot return RAC_ERROR_NOT_SUPPORTED.
+ */
+RAC_API rac_result_t rac_stt_component_stream_destroy(rac_handle_t handle,
+                                                      rac_handle_t stream_handle);
 
 #ifdef __cplusplus
 }

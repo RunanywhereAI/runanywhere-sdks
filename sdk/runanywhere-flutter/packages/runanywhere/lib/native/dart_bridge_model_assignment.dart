@@ -4,12 +4,14 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
@@ -39,7 +41,8 @@ class DartBridgeModelAssignment {
   static String? _baseURL;
   static String? _accessToken;
   // ignore: unused_field
-  static SDKEnvironment _environment = SDKEnvironment.development;
+  static SDKEnvironment _environment =
+      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 
   // ============================================================================
   // Registration
@@ -107,7 +110,9 @@ class DartBridgeModelAssignment {
   // ============================================================================
 
   /// Fetch model assignments from backend
-  Future<List<ModelInfo>> fetchAssignments({bool forceRefresh = false}) async {
+  Future<List<model_pb.ModelInfo>> fetchAssignments({
+    bool forceRefresh = false,
+  }) async {
     try {
       final lib = PlatformLoader.loadCommons();
       final fetchFn = lib.lookupFunction<
@@ -130,7 +135,7 @@ class DartBridgeModelAssignment {
         final count = outCountPtr.value;
         if (count == 0) return [];
 
-        final models = <ModelInfo>[];
+        final models = <model_pb.ModelInfo>[];
         final modelsArray = outModelsPtr.value;
 
         for (var i = 0; i < count; i++) {
@@ -159,7 +164,7 @@ class DartBridgeModelAssignment {
   }
 
   /// Get assignments by framework
-  Future<List<ModelInfo>> getByFramework(int framework) async {
+  Future<List<model_pb.ModelInfo>> getByFramework(int framework) async {
     try {
       final lib = PlatformLoader.loadCommons();
       final getByFn = lib.lookupFunction<
@@ -178,7 +183,7 @@ class DartBridgeModelAssignment {
         final count = outCountPtr.value;
         if (count == 0) return [];
 
-        final models = <ModelInfo>[];
+        final models = <model_pb.ModelInfo>[];
         final modelsArray = outModelsPtr.value;
 
         for (var i = 0; i < count; i++) {
@@ -200,7 +205,7 @@ class DartBridgeModelAssignment {
   }
 
   /// Get assignments by category
-  Future<List<ModelInfo>> getByCategory(int category) async {
+  Future<List<model_pb.ModelInfo>> getByCategory(int category) async {
     try {
       final lib = PlatformLoader.loadCommons();
       final getByFn = lib.lookupFunction<
@@ -219,7 +224,7 @@ class DartBridgeModelAssignment {
         final count = outCountPtr.value;
         if (count == 0) return [];
 
-        final models = <ModelInfo>[];
+        final models = <model_pb.ModelInfo>[];
         final modelsArray = outModelsPtr.value;
 
         for (var i = 0; i < count; i++) {
@@ -244,25 +249,24 @@ class DartBridgeModelAssignment {
   // Helpers
   // ============================================================================
 
-  ModelInfo _structToModelInfo(Pointer<RacModelInfoStruct> struct) {
-    return ModelInfo(
-      id: struct.ref.id.toDartString(),
-      name: struct.ref.name.toDartString(),
-      category: struct.ref.category,
-      format: struct.ref.format,
-      framework: struct.ref.framework,
-      source: struct.ref.source,
-      sizeBytes: struct.ref.sizeBytes,
-      contextLength: struct.ref.contextLength,
-      downloadURL: struct.ref.downloadURL != nullptr
-          ? struct.ref.downloadURL.toDartString()
-          : null,
-      localPath: struct.ref.localPath != nullptr
-          ? struct.ref.localPath.toDartString()
-          : null,
-      version: struct.ref.version != nullptr
-          ? struct.ref.version.toDartString()
-          : null,
+  model_pb.ModelInfo _structToModelInfo(Pointer<RacModelInfoStruct> struct) {
+    return DartBridgeModelFormat.shared.applyInferredArtifact(
+      protoModelInfoFromCFields(
+        id: struct.ref.id.toDartString(),
+        name: struct.ref.name.toDartString(),
+        category: struct.ref.category,
+        format: struct.ref.format,
+        framework: struct.ref.framework,
+        source: struct.ref.source,
+        downloadSizeBytes: struct.ref.sizeBytes,
+        contextLength: struct.ref.contextLength,
+        downloadUrl: struct.ref.downloadURL != nullptr
+            ? struct.ref.downloadURL.toDartString()
+            : null,
+        localPath: struct.ref.localPath != nullptr
+            ? struct.ref.localPath.toDartString()
+            : null,
+      ),
     );
   }
 }
@@ -293,7 +297,7 @@ int _httpGetCallback(
   }
 }
 
-/// Perform HTTP GET (simplified)
+/// Perform HTTP GET via the commons FFI client.
 void _performHttpGet(
   String endpoint,
   bool requiresAuth,
@@ -301,7 +305,7 @@ void _performHttpGet(
 ) {
   final baseURL =
       DartBridgeModelAssignment._baseURL ?? 'https://api.runanywhere.ai';
-  final url = Uri.parse('$baseURL$endpoint');
+  final url = '$baseURL$endpoint';
 
   final headers = <String, String>{
     'Accept': 'application/json',
@@ -314,18 +318,22 @@ void _performHttpGet(
 
   unawaited(Future.microtask(() async {
     try {
-      final response = await http.get(url, headers: headers);
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'GET',
+        url: url,
+        headers: headers,
+      );
 
-      outResponse.ref.result =
-          response.statusCode >= 200 && response.statusCode < 300
-              ? RacResultCode.success
-              : RacResultCode.errorNetworkError;
+      outResponse.ref.result = response.isSuccess
+          ? RacResultCode.success
+          : RacResultCode.errorNetworkError;
       outResponse.ref.statusCode = response.statusCode;
 
-      if (response.body.isNotEmpty) {
-        final bodyPtr = response.body.toNativeUtf8();
+      final body = response.body;
+      if (body.isNotEmpty) {
+        final bodyPtr = body.toNativeUtf8();
         outResponse.ref.responseBody = bodyPtr;
-        outResponse.ref.responseLength = response.body.length;
+        outResponse.ref.responseLength = body.length;
       }
     } catch (e) {
       outResponse.ref.result = RacResultCode.errorNetworkError;

@@ -2,30 +2,33 @@
 ///
 /// TTS component bridge - manages C++ TTS component lifecycle.
 /// Mirrors Swift's CppBridge+TTS.swift pattern.
-library dart_bridge_tts;
+library;
 
+import 'dart:async';
 import 'dart:ffi';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:runanywhere/features/tts/tts_configuration.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/generated/tts_options.pb.dart'
+    show
+        TTSOptions,
+        TTSOutput,
+        TTSServiceState,
+        TTSStreamEvent,
+        TTSSynthesisRequest,
+        TTSVoiceInfo;
+import 'package:runanywhere/generated/tts_options.pbenum.dart'
+    show TTSStreamEventKind;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
-import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// TTS component bridge for C++ interop.
 ///
 /// Provides thread-safe access to the C++ TTS component.
 /// Handles voice loading, synthesis, and streaming.
-///
-/// Usage:
-/// ```dart
-/// final tts = DartBridgeTTS.shared;
-/// await tts.loadVoice('/path/to/voice', 'voice-id', 'Voice Name');
-/// final audio = await tts.synthesize('Hello world');
-/// ```
 class DartBridgeTTS {
   // MARK: - Singleton
 
@@ -39,6 +42,44 @@ class DartBridgeTTS {
   RacHandle? _handle;
   String? _loadedVoiceId;
   final _logger = SDKLogger('DartBridge.TTS');
+  static TTSOutput Function(TTSSynthesisRequest)?
+      _synthesizeLifecycleProtoForTesting;
+
+  static void setSynthesizeLifecycleProtoForTesting(
+    TTSOutput Function(TTSSynthesisRequest)? override,
+  ) {
+    _synthesizeLifecycleProtoForTesting = override;
+  }
+
+  // Streaming test seam. Symmetric to
+  // `setSynthesizeLifecycleProtoForTesting` but for the streaming path —
+  // tests use this to drive `synthesizeStreamLifecycleProto` without a real
+  // FFI binding. The override receives the same `dispatch` closure the
+  // production NativeCallable would invoke, so the real wrapper's drain loop
+  // + `controller.onCancel -> stopLifecycleProto()` path stays in-circuit.
+  static TTSStreamFakeFFI? _synthesizeStreamLifecycleProtoForTesting;
+  // Type matches production `stopLifecycleProto()` return type
+  // (`TTSServiceState`) so the seam contract is identical to the real call.
+  // The override's return value is discarded at the call site today, but
+  // aligning the type eliminates refactor friction when commons-side stop
+  // state is propagated.
+  static TTSServiceState Function()? _stopLifecycleProtoForTesting;
+
+  /// Inject a fake native-stream driver. Pass `null` to clear.
+  static void setSynthesizeStreamLifecycleProtoForTesting(
+    TTSStreamFakeFFI? override,
+  ) {
+    _synthesizeStreamLifecycleProtoForTesting = override;
+  }
+
+  /// Inject a fake `stopLifecycleProto` invocation that
+  /// `synthesizeStreamLifecycleProto.onCancel` should call instead of the
+  /// real FFI binding. Pass `null` to clear.
+  static void setStopLifecycleProtoForTesting(
+    TTSServiceState Function()? override,
+  ) {
+    _stopLifecycleProtoForTesting = override;
+  }
 
   // MARK: - Handle Management
 
@@ -88,57 +129,6 @@ class DartBridgeTTS {
   /// Get the currently loaded voice ID.
   String? get currentVoiceId => _loadedVoiceId;
 
-  // MARK: - Voice Lifecycle
-
-  /// Load a TTS voice.
-  ///
-  /// [voicePath] - Full path to the voice model.
-  /// [voiceId] - Unique identifier for the voice.
-  /// [voiceName] - Human-readable name.
-  ///
-  /// Throws on failure.
-  Future<void> loadVoice(
-    String voicePath,
-    String voiceId,
-    String voiceName,
-  ) async {
-    final handle = getHandle();
-
-    final pathPtr = voicePath.toNativeUtf8();
-    final idPtr = voiceId.toNativeUtf8();
-    final namePtr = voiceName.toNativeUtf8();
-
-    try {
-      final result = NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
-
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to load TTS voice: ${RacResultCode.getMessage(result)}',
-        );
-      }
-
-      _loadedVoiceId = voiceId;
-      _logger.info('TTS voice loaded: $voiceId');
-    } finally {
-      calloc.free(pathPtr);
-      calloc.free(idPtr);
-      calloc.free(namePtr);
-    }
-  }
-
-  /// Unload the current voice.
-  void unload() {
-    if (_handle == null) return;
-
-    try {
-      NativeFunctions.ttsCleanup(_handle!);
-      _loadedVoiceId = null;
-      _logger.info('TTS voice unloaded');
-    } catch (e) {
-      _logger.error('Failed to unload TTS voice: $e');
-    }
-  }
-
   /// Stop ongoing synthesis.
   void stop() {
     if (_handle == null) return;
@@ -153,164 +143,375 @@ class DartBridgeTTS {
 
   // MARK: - Synthesis
 
-  /// Synthesize speech from text.
-  ///
-  /// [text] - Text to synthesize.
-  /// [rate] - Speech rate (0.5 to 2.0, 1.0 is normal).
-  /// [pitch] - Speech pitch (0.5 to 2.0, 1.0 is normal).
-  /// [volume] - Speech volume (0.0 to 1.0).
-  ///
-  /// Returns audio data and metadata.
-  /// Runs in a background isolate to prevent UI blocking.
-  Future<TTSComponentResult> synthesize(
-    String text, {
-    double rate = 1.0,
-    double pitch = 1.0,
-    double volume = 1.0,
-  }) async {
-    TTSConfiguration(
-      speakingRate: rate,
-      pitch: pitch,
-      volume: volume,
-    ).validate();
+  /// Synthesize speech through the lifecycle-owned generated-proto TTS ABI.
+  TTSOutput synthesizeLifecycleProto(TTSSynthesisRequest request) {
+    _validateLifecycleRequest(request);
 
-    final handle = getHandle();
-
-    if (!isLoaded) {
-      throw StateError('No TTS voice loaded. Call loadVoice() first.');
+    final override = _synthesizeLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
     }
 
-    _logger.debug(
-        'Synthesizing "${text.substring(0, text.length.clamp(0, 50))}..." in background isolate');
+    final fn = RacNative.bindings.rac_tts_synthesize_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_tts_synthesize_lifecycle_proto is unavailable',
+      );
+    }
 
-    // Run synthesis in background isolate
-    final result = await Isolate.run(() => _synthesizeInIsolate(
-          handle.address,
-          text,
-          rate,
-          pitch,
-          volume,
-        ));
-
-    _logger.info(
-        'Synthesis complete: ${result.samples.length} samples, ${result.sampleRate} Hz, ${result.durationMs}ms');
-
-    return result;
+    return DartBridgeProtoUtils.callRequest<TTSOutput>(
+      request: request,
+      invoke: fn,
+      decode: TTSOutput.fromBuffer,
+      symbol: 'rac_tts_synthesize_lifecycle_proto',
+    );
   }
 
-  /// Static helper to perform FFI synthesis in isolate.
-  /// Must be static/top-level for Isolate.run().
-  static TTSComponentResult _synthesizeInIsolate(
-    int handleAddress,
-    String text,
-    double rate,
-    double pitch,
-    double volume,
+  /// Stream TTSStreamEvent chunks via the lifecycle-owned generated-proto ABI.
+  ///
+  /// Mirrors STT's `transcribeStreamLifecycleProto`. Requires commons to have
+  /// the TTS model loaded through model lifecycle.
+  Stream<TTSStreamEvent> synthesizeStreamLifecycleProto(
+    TTSSynthesisRequest request,
   ) {
-    final lib = PlatformLoader.loadCommons();
-    final handle = RacHandle.fromAddress(handleAddress);
+    _validateLifecycleRequest(request);
 
-    // Allocate native memory
-    final textPtr = text.toNativeUtf8();
-    final optionsPtr = calloc<RacTtsOptionsStruct>();
-    final resultPtr = calloc<RacTtsResultStruct>();
+    final streamOverride = _synthesizeStreamLifecycleProtoForTesting;
+    // Defer the FFI lookup when a test seam is installed — accessing
+    // `RacNative.bindings` triggers a `dlopen` of librac_commons, which fails
+    // in the unit-test harness where no native library is staged. The test
+    // group `DartBridgeTTS.synthesizeStreamLifecycleProto — real wrapper, fake
+    // FFI` covers the production wrapper without the FFI.
+    final fn = streamOverride == null
+        ? RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto
+        : null;
+    if (streamOverride == null && fn == null) {
+      return Stream<TTSStreamEvent>.error(
+        UnsupportedError(
+          'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
+        ),
+      );
+    }
+
+    final controller = StreamController<TTSStreamEvent>(sync: false);
+    NativeCallable<RacTtsStreamEventCallbackNative>? callback;
+    var sawTerminalEvent = false;
+
+    // Shared dispatch closure — used by both the real NativeCallable.listener
+    // and the test-injected fake FFI. Centralizing this guarantees the test
+    // path exercises the same listener-body behavior (closed-controller
+    // guard, terminal-kind tracking) as production.
+    void dispatchEvent(TTSStreamEvent event) {
+      if (controller.isClosed) return;
+      sawTerminalEvent = sawTerminalEvent ||
+          event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED ||
+          event.kind == TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
+      controller.add(event);
+    }
+
+    Future<void> run() async {
+      // Test seam: skip FFI entirely; let the fake drive `dispatchEvent`
+      // synchronously then return an rc. Same drain + close semantics as
+      // the real path.
+      if (streamOverride != null) {
+        try {
+          final rc = await streamOverride(
+            request,
+            dispatchEvent,
+            () => sawTerminalEvent,
+          );
+          await drainPendingStreamCallbacks(() => sawTerminalEvent);
+          if (rc != RAC_SUCCESS && !controller.isClosed) {
+            controller.addError(StateError(
+              'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
+              '${RacResultCode.getMessage(rc)}',
+            ));
+          }
+          if (!controller.isClosed) {
+            await controller.close();
+          }
+        } catch (e, st) {
+          if (!controller.isClosed) {
+            controller.addError(e, st);
+            await controller.close();
+          }
+        }
+        return;
+      }
+
+      final bytes = request.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
+
+      try {
+        // Mirrors DartBridgeLLM.generateStreamProto:
+        // use `isolateLocal` (not `.listener`) so the callback runs
+        // synchronously on the same thread that invoked
+        // `rac_tts_synthesize_stream_lifecycle_proto`. The commons producer
+        // (`emit_event` / `chunk_bridge` in rac_nonllm_lifecycle_proto_abi.cpp)
+        // serializes each event into a stack-local `std::vector<uint8_t>` and
+        // calls the callback with that buffer's pointer inline. With
+        // `.listener` the callback is queued onto the isolate's event loop and
+        // runs ASYNCHRONOUSLY — by then the producing call has returned and the
+        // stack buffer is gone, so `bytesPtr.asTypedList` reads freed memory
+        // (use-after-free → malformed/empty TTSStreamEvent bytes).
+        // `isolateLocal` is safe because the ABI runs synchronously on the
+        // Dart isolate that created the callback, so it always fires on that
+        // isolate and cannot be re-entered after `fn()` returns.
+        callback = NativeCallable<RacTtsStreamEventCallbackNative>.isolateLocal((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (bytesPtr == nullptr || bytesLen <= 0) return;
+          try {
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            dispatchEvent(TTSStreamEvent.fromBuffer(copy));
+          } catch (e, st) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+        });
+        final rc = fn!(
+          requestPtr,
+          bytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_tts_synthesize_stream_lifecycle_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+        }
+        if (!controller.isClosed) {
+          await controller.close();
+        }
+      } finally {
+        calloc.free(requestPtr);
+        // Drain in-flight TTS chunk dispatches before
+        // closing the NativeCallable. `rac_tts_synthesize_stream_lifecycle_proto`
+        // may post the terminal COMPLETED/ERROR callback from a worker
+        // thread that copies the user_data slot under commons' internal
+        // mutex and releases it BEFORE invoking the callback (see
+        // `rac/features/tts/rac_tts_stream.h` warning). Without
+        // `rac_tts_proto_quiesce()` the C side can invoke the trampoline
+        // backed by NativeCallable user_data after `callback.close()` —
+        // UAF on the proto scratch buffer. Best-effort — if the commons
+        // binary predates the export (or, in unit-test harnesses, the
+        // native library is not staged) the call is skipped.
+        _quiesceBestEffort();
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      // Best-effort: ask commons to stop lifecycle synthesis so native CPU
+      // isn't burned for a Dart subscriber that has already gone away.
+      // RunAnywhereTTS.stopSynthesis() routes through the same ABI; mirror
+      // its semantics here so cancelling the public stream subscription
+      // also stops the underlying lifecycle work. Errors are swallowed so
+      // cancellation remains best-effort.
+      try {
+        final stopOverride = _stopLifecycleProtoForTesting;
+        if (stopOverride != null) {
+          stopOverride();
+        } else {
+          stopLifecycleProto();
+        }
+      } catch (e) {
+        _logger.debug('stopLifecycleProto on stream cancel failed: $e');
+      }
+      // Same ordering as the run() teardown — quiesce first.
+      _quiesceBestEffort();
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
+    return controller.stream;
+  }
+
+  /// Stop the lifecycle-loaded TTS synthesis. Returns post-stop service state.
+  TTSServiceState stopLifecycleProto() {
+    final fn = RacNative.bindings.rac_tts_stop_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_tts_stop_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<TTSServiceState>(
+      invoke: fn,
+      decode: TTSServiceState.fromBuffer,
+      symbol: 'rac_tts_stop_lifecycle_proto',
+    );
+  }
+
+  /// Enumerate voices via the generated-proto ABI.
+  Future<List<TTSVoiceInfo>> listVoicesProto() async {
+    final handle = getHandle();
+    final fn = RacNative.bindings.rac_tts_component_list_voices_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_tts_component_list_voices_proto is unavailable');
+    }
+
+    final voices = <TTSVoiceInfo>[];
+    NativeCallable<RacTtsProtoVoiceCallbackNative>? callback;
 
     try {
-      // Set up options (matches Swift's TTSOptions)
-      final languagePtr = 'en-US'.toNativeUtf8();
-      optionsPtr.ref.voice = nullptr; // Use default voice
-      optionsPtr.ref.language = languagePtr;
-      optionsPtr.ref.rate = rate;
-      optionsPtr.ref.pitch = pitch;
-      optionsPtr.ref.volume = volume;
-      optionsPtr.ref.audioFormat = racAudioFormatPcm;
-      optionsPtr.ref.sampleRate = 22050; // Piper default
-      optionsPtr.ref.useSsml = RAC_FALSE;
-
-      // Get synthesize function
-      final synthesizeFn = lib.lookupFunction<
-          Int32 Function(
-            RacHandle,
-            Pointer<Utf8>,
-            Pointer<RacTtsOptionsStruct>,
-            Pointer<RacTtsResultStruct>,
-          ),
-          int Function(
-            RacHandle,
-            Pointer<Utf8>,
-            Pointer<RacTtsOptionsStruct>,
-            Pointer<RacTtsResultStruct>,
-          )>('rac_tts_component_synthesize');
-
-      final status = synthesizeFn(
-        handle,
-        textPtr,
-        optionsPtr,
-        resultPtr,
-      );
-
-      // Free the language string
-      calloc.free(languagePtr);
-
-      if (status != RAC_SUCCESS) {
+      // `isolateLocal` (not `.listener`): `rac_tts_component_list_voices_proto`
+      // is a single synchronous enumeration on the calling thread — it invokes
+      // the callback inline once per voice (tts_component.cpp) and returns. With
+      // `.listener` the callbacks queue onto the event loop and run on a future
+      // microtask, so `return voices` below captures an empty list (and the
+      // stack-local proto buffer is freed by then). `isolateLocal` fires inline
+      // so voices accumulate synchronously before `fn(...)` returns.
+      callback = NativeCallable<RacTtsProtoVoiceCallbackNative>.isolateLocal((
+        Pointer<Uint8> bytesPtr,
+        int bytesLen,
+        Pointer<Void> _,
+      ) {
+        if (bytesPtr == nullptr || bytesLen <= 0) return;
+        final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+        voices.add(TTSVoiceInfo.fromBuffer(copy));
+      });
+      final rc = fn(handle, callback.nativeFunction, nullptr);
+      if (rc != RAC_SUCCESS) {
         throw StateError(
-          'TTS synthesis failed: ${RacResultCode.getMessage(status)}',
+          'rac_tts_component_list_voices_proto failed: '
+          '${RacResultCode.getMessage(rc)}',
         );
       }
-
-      // Extract result before freeing
-      final result = resultPtr.ref;
-      final audioSize = result.audioSize;
-      final sampleRate = result.sampleRate;
-      final durationMs = result.durationMs;
-
-      // Convert audio data to Float32List
-      // The audio data is PCM float samples
-      Float32List samples;
-      if (audioSize > 0 && result.audioData != nullptr) {
-        // Audio size is in bytes, each float is 4 bytes
-        final numSamples = audioSize ~/ 4;
-        final floatPtr = result.audioData.cast<Float>();
-        samples = Float32List.fromList(floatPtr.asTypedList(numSamples));
-      } else {
-        samples = Float32List(0);
-      }
-
-      return TTSComponentResult(
-        samples: samples,
-        sampleRate: sampleRate,
-        durationMs: durationMs,
-      );
+      return voices;
     } finally {
-      calloc.free(textPtr);
-      calloc.free(optionsPtr);
-      calloc.free(resultPtr);
+      callback?.close();
     }
   }
 
-  /// Synthesize with streaming.
-  ///
-  /// Returns a stream of audio chunks.
-  Stream<TTSStreamResult> synthesizeStream(String text) async* {
-    // For now, generate all audio and emit in chunks
-    final result = await synthesize(text);
-
-    // Emit in ~100ms chunks
-    final samplesPerChunk = (result.sampleRate * 0.1).round();
-    var offset = 0;
-
-    while (offset < result.samples.length) {
-      final end = (offset + samplesPerChunk).clamp(0, result.samples.length);
-      final chunk = result.samples.sublist(offset, end);
-
-      yield TTSStreamResult(
-        samples: chunk,
-        sampleRate: result.sampleRate,
-        isFinal: end >= result.samples.length,
+  /// Synthesize speech with serialized runanywhere.v1.TTSOptions.
+  Future<TTSOutput> synthesizeProto(String text, TTSOptions options) async {
+    final handle = getHandle();
+    if (!isLoaded) {
+      throw UnsupportedError(
+        'No TTS component handle is loaded. Public TTS uses '
+        'synthesizeLifecycleProto instead of Dart-held component handles.',
       );
-
-      offset = end;
     }
+
+    final fn = RacNative.bindings.rac_tts_component_synthesize_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+          'rac_tts_component_synthesize_proto is unavailable');
+    }
+
+    final textPtr = text.toNativeUtf8();
+    final optionBytes = options.writeToBuffer();
+    final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
+    final out = calloc<RacProtoBuffer>();
+    final bindings = RacNative.bindings;
+
+    try {
+      bindings.rac_proto_buffer_init(out);
+      final code = fn(handle, textPtr, optionPtr, optionBytes.length, out);
+      DartBridgeProtoUtils.ensureSuccess(
+        out,
+        code,
+        'rac_tts_component_synthesize_proto',
+      );
+      return DartBridgeProtoUtils.decodeBuffer(out, TTSOutput.fromBuffer);
+    } finally {
+      bindings.rac_proto_buffer_free(out);
+      calloc.free(textPtr);
+      calloc.free(optionPtr);
+      calloc.free(out);
+    }
+  }
+
+  /// Stream synthesized speech chunks through serialized TTSOutput messages.
+  Stream<TTSOutput> synthesizeStreamProto(String text, TTSOptions options) {
+    if (!isLoaded) {
+      return Stream<TTSOutput>.error(
+        UnsupportedError(
+          'No TTS component handle is loaded. Public TTS streaming remains '
+          'unavailable until a lifecycle-owned stream ABI exists.',
+        ),
+      );
+    }
+    final fn = RacNative.bindings.rac_tts_component_synthesize_stream_proto;
+    if (fn == null) {
+      return Stream<TTSOutput>.error(
+        UnsupportedError(
+            'rac_tts_component_synthesize_stream_proto is unavailable'),
+      );
+    }
+
+    final controller = StreamController<TTSOutput>(sync: false);
+    NativeCallable<RacTtsProtoChunkCallbackNative>? callback;
+
+    Future<void> run() async {
+      final textPtr = text.toNativeUtf8();
+      final optionBytes = options.writeToBuffer();
+      final optionPtr = DartBridgeProtoUtils.copyBytes(optionBytes);
+
+      try {
+        // Same root cause as
+        // synthesizeStreamLifecycleProto: `isolateLocal` so the callback runs
+        // inline on the synchronous-FFI thread. `rac_tts_component_synthesize_
+        // stream_proto`'s `bridge` (tts_component.cpp) serializes each chunk
+        // into a stack-local buffer and invokes the callback inline; with
+        // `.listener` the deferred callback reads that freed buffer (UAF).
+        callback = NativeCallable<RacTtsProtoChunkCallbackNative>.isolateLocal((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+            return;
+          }
+          try {
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            controller.add(TTSOutput.fromBuffer(copy));
+          } catch (e, st) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+        });
+        final rc = fn(
+          getHandle(),
+          textPtr,
+          optionPtr,
+          optionBytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_tts_component_synthesize_stream_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+        }
+        if (!controller.isClosed) {
+          await controller.close();
+        }
+      } finally {
+        calloc.free(textPtr);
+        calloc.free(optionPtr);
+        // Same quiesce-before-close ordering as the
+        // lifecycle-owned stream wrapper above. See
+        // `synthesizeStreamLifecycleProto`.
+        _quiesceBestEffort();
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      _quiesceBestEffort();
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
+    return controller.stream;
   }
 
   // MARK: - Cleanup
@@ -328,100 +529,38 @@ class DartBridgeTTS {
       }
     }
   }
+
+  void _validateLifecycleRequest(TTSSynthesisRequest request) {
+    if (request.text.isEmpty && (!request.hasSsml() || request.ssml.isEmpty)) {
+      throw ArgumentError(
+        'TTSSynthesisRequest.text or ssml is required for lifecycle TTS',
+      );
+    }
+  }
+
+  /// Best-effort quiesce. Wraps the FFI lookup in a try/catch
+  /// so the unit-test harness (which can't `dlopen` librac_commons via the
+  /// test seams' `streamOverride` path) does not crash when the production
+  /// onCancel / finally cleanup runs without a native library staged.
+  void _quiesceBestEffort() {
+    try {
+      RacNative.bindings.rac_tts_proto_quiesce?.call();
+    } catch (e) {
+      _logger.debug('rac_tts_proto_quiesce skipped: $e');
+    }
+  }
 }
 
-/// Result from TTS synthesis.
-class TTSComponentResult {
-  final Float32List samples;
-  final int sampleRate;
-  final int durationMs;
-
-  const TTSComponentResult({
-    required this.samples,
-    required this.sampleRate,
-    required this.durationMs,
-  });
-
-  /// Duration in seconds.
-  double get durationSeconds => durationMs / 1000.0;
-}
-
-/// Streaming result from TTS synthesis.
-class TTSStreamResult {
-  final Float32List samples;
-  final int sampleRate;
-  final bool isFinal;
-
-  const TTSStreamResult({
-    required this.samples,
-    required this.sampleRate,
-    required this.isFinal,
-  });
-}
-
-// =============================================================================
-// FFI Structs
-// =============================================================================
-
-/// Audio format constants (matches rac_audio_format_enum_t)
-const int racAudioFormatPcm = 0;
-const int racAudioFormatWav = 1;
-
-/// FFI struct for TTS options (matches rac_tts_options_t)
-final class RacTtsOptionsStruct extends Struct {
-  /// Voice to use for synthesis (can be NULL for default)
-  external Pointer<Utf8> voice;
-
-  /// Language for synthesis (BCP-47 format, e.g., "en-US")
-  external Pointer<Utf8> language;
-
-  /// Speech rate (0.0 to 2.0, 1.0 is normal)
-  @Float()
-  external double rate;
-
-  /// Speech pitch (0.0 to 2.0, 1.0 is normal)
-  @Float()
-  external double pitch;
-
-  /// Speech volume (0.0 to 1.0)
-  @Float()
-  external double volume;
-
-  /// Audio format for output
-  @Int32()
-  external int audioFormat;
-
-  /// Sample rate for output audio in Hz
-  @Int32()
-  external int sampleRate;
-
-  /// Whether to use SSML markup
-  @Int32()
-  external int useSsml;
-}
-
-/// FFI struct for TTS result (matches rac_tts_result_t)
-final class RacTtsResultStruct extends Struct {
-  /// Audio data (PCM float samples)
-  external Pointer<Void> audioData;
-
-  /// Size of audio data in bytes
-  @IntPtr()
-  external int audioSize;
-
-  /// Audio format
-  @Int32()
-  external int audioFormat;
-
-  /// Sample rate
-  @Int32()
-  external int sampleRate;
-
-  /// Duration in milliseconds
-  @Int64()
-  external int durationMs;
-
-  /// Processing time in milliseconds
-  @Int64()
-  external int processingTimeMs;
-}
+/// Test seam type for [DartBridgeTTS.synthesizeStreamLifecycleProto].
+/// The override receives:
+///   - [request]: the TTSSynthesisRequest the production code received.
+///   - [dispatch]: the same closure the production NativeCallable invokes —
+///     pass a `TTSStreamEvent` to deliver it through the real wrapper's
+///     listener body (drain loop + closed-controller guard intact).
+///   - [terminalObserved]: closure the fake can check to short-circuit.
+/// Returning a non-zero result code drives the wrapper's error branch.
+typedef TTSStreamFakeFFI = Future<int> Function(
+  TTSSynthesisRequest request,
+  void Function(TTSStreamEvent) dispatch,
+  bool Function() terminalObserved,
+);

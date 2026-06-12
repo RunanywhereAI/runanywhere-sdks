@@ -1,8 +1,7 @@
 // RunAnywhere Core SDK - Android
 //
 // This plugin bundles RACommons native libraries (.so files) for Android.
-// RACommons provides the core infrastructure for on-device AI capabilities,
-// including the RAG pipeline (compiled directly into librac_commons.so).
+// RACommons provides the core infrastructure for on-device AI capabilities.
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
@@ -12,7 +11,7 @@
 // Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
 
 group 'ai.runanywhere.sdk'
-version '0.15.8'
+version '0.19.13'
 
 // Load binary configuration
 apply from: 'binary_config.gradle'
@@ -29,19 +28,27 @@ buildscript {
     }
 }
 
+// Repositories for module-level dependencies (OkHttp, kotlin-stdlib)
+repositories {
+    google()
+    mavenCentral()
+}
+
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
     namespace 'ai.runanywhere.sdk'
-    compileSdk 34
+    compileSdk 36
 
-    // Use NDK for native library support
-    ndkVersion "25.2.9519653"
+    // NDK pin: canonical version from sdk/runanywhere-commons/VERSIONS (NDK_VERSION=27.3.13750724).
+    // 27.3.13750724 is r27d (LTS); required for Android 15+ 16 KiB page-alignment.
+    // External apps may override via racFlutterNdkVersion in their root gradle.properties.
+    ndkVersion rootProject.hasProperty("racFlutterNdkVersion") ? rootProject.property("racFlutterNdkVersion") : "27.3.13750724"
 
     defaultConfig {
         minSdk 24
-        targetSdk 34
+        targetSdk 36
 
         // ABI filters for native libraries
         ndk {
@@ -50,21 +57,6 @@ android {
 
         // Consumer proguard rules
         consumerProguardFiles 'proguard-rules.pro'
-
-        // C++ RAG bridge compilation
-        externalNativeBuild {
-            cmake {
-                cppFlags '-std=c++17'
-                arguments '-DANDROID_STL=c++_shared'
-            }
-        }
-    }
-
-    // CMake build for the C++ RAG bridge
-    externalNativeBuild {
-        cmake {
-            path 'CMakeLists.txt'
-        }
     }
 
     compileOptions {
@@ -91,13 +83,23 @@ android {
 
     packaging {
         jniLibs {
-            pickFirsts += ['**/libc++_shared.so']
+            // Each Flutter plugin stages its own copy of libc++_shared.so and
+            // librac_commons.so (the latter because downstream backends link
+            // against it at runtime). pickFirsts lets AGP keep one copy in the
+            // final APK instead of failing with a duplicate-file error.
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
         }
     }
 }
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+
+    // OkHttp backs the platform HTTP transport. Routes `rac_http_request_*`
+    // through the system trust store + HTTP/2 + proxies + NetworkSecurityConfig
+    // instead of libcurl (deleted in Stage 5). Version must match the Kotlin
+    // SDK and React Native core.
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }
 
 // =============================================================================

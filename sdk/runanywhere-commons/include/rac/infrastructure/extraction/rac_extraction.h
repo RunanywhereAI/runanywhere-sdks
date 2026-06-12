@@ -18,6 +18,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef __cplusplus
@@ -83,6 +84,15 @@ typedef struct rac_extraction_result {
     int32_t entries_skipped;
 } rac_extraction_result_t;
 
+/**
+ * @brief Combined result for archive extraction followed by model path resolution.
+ */
+typedef struct rac_model_extraction_result {
+    rac_extraction_result_t extraction;
+    rac_model_path_resolution_t resolution;
+    rac_archive_type_t archive_type;
+} rac_model_extraction_result_t;
+
 // =============================================================================
 // EXTRACTION PROGRESS CALLBACK
 // =============================================================================
@@ -129,6 +139,36 @@ RAC_API rac_result_t rac_extract_archive_native(const char* archive_path,
                                                 rac_extraction_progress_fn progress_callback,
                                                 void* user_data,
                                                 rac_extraction_result_t* out_result);
+
+/**
+ * @brief Extract a model archive and resolve the final model/companion paths.
+ *
+ * This is the native one-stop path SDKs should bind for archive artifacts:
+ * archive validation/detection, extraction, expected-file validation, companion
+ * discovery, optional primary-file checksum validation, and final model path
+ * selection all happen in C++.
+ *
+ * @param archive_path Path to the downloaded archive
+ * @param destination_dir Directory to extract into
+ * @param model_info Model metadata describing expected framework/format/files
+ * @param expected_primary_sha256 Optional SHA-256 for the selected primary file
+ * @param options Extraction options (NULL for defaults)
+ * @param progress_callback Progress callback (can be NULL)
+ * @param user_data Context for progress callback
+ * @param out_result Output combined result; free with
+ *        rac_model_extraction_result_free()
+ * @return RAC_SUCCESS on extraction and validation success
+ */
+RAC_API rac_result_t rac_extract_model_archive_native(
+    const char* archive_path, const char* destination_dir, const rac_model_info_t* model_info,
+    const char* expected_primary_sha256, const rac_extraction_options_t* options,
+    rac_extraction_progress_fn progress_callback, void* user_data,
+    rac_model_extraction_result_t* out_result);
+
+/**
+ * @brief Release memory owned by a combined model extraction result.
+ */
+RAC_API void rac_model_extraction_result_free(rac_model_extraction_result_t* result);
 
 /**
  * @brief Detect archive type from file magic bytes.

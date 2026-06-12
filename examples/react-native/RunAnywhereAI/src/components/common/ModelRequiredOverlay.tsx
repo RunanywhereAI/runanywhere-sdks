@@ -18,11 +18,12 @@ import {
   IconSize,
   ButtonHeight,
 } from '../../theme/spacing';
-import { ModelModality } from '../../types/model';
+
+export type RequiredModelKind = 'llm' | 'stt' | 'tts' | 'vlm';
 
 interface ModelRequiredOverlayProps {
   /** Modality context for icon and text */
-  modality: ModelModality;
+  modality: RequiredModelKind;
   /** Title text */
   title?: string;
   /** Description text */
@@ -34,15 +35,15 @@ interface ModelRequiredOverlayProps {
 /**
  * Get icon name based on modality
  */
-const getModalityIcon = (modality: ModelModality): string => {
+const getModalityIcon = (modality: RequiredModelKind): string => {
   switch (modality) {
-    case ModelModality.LLM:
+    case 'llm':
       return 'chatbubble-ellipses-outline';
-    case ModelModality.STT:
+    case 'stt':
       return 'mic-outline';
-    case ModelModality.TTS:
+    case 'tts':
       return 'volume-high-outline';
-    case ModelModality.VLM:
+    case 'vlm':
       return 'eye-outline';
     default:
       return 'cube-outline';
@@ -52,15 +53,15 @@ const getModalityIcon = (modality: ModelModality): string => {
 /**
  * Get default title based on modality
  */
-const getDefaultTitle = (modality: ModelModality): string => {
+const getDefaultTitle = (modality: RequiredModelKind): string => {
   switch (modality) {
-    case ModelModality.LLM:
+    case 'llm':
       return 'No Language Model Selected';
-    case ModelModality.STT:
+    case 'stt':
       return 'No Speech Model Selected';
-    case ModelModality.TTS:
+    case 'tts':
       return 'No Voice Model Selected';
-    case ModelModality.VLM:
+    case 'vlm':
       return 'No Vision Model Selected';
     default:
       return 'No Model Selected';
@@ -70,15 +71,15 @@ const getDefaultTitle = (modality: ModelModality): string => {
 /**
  * Get default description based on modality
  */
-const getDefaultDescription = (modality: ModelModality): string => {
+const getDefaultDescription = (modality: RequiredModelKind): string => {
   switch (modality) {
-    case ModelModality.LLM:
+    case 'llm':
       return 'Select a language model to start chatting with AI on your device.';
-    case ModelModality.STT:
+    case 'stt':
       return 'Select a speech recognition model to transcribe audio.';
-    case ModelModality.TTS:
+    case 'tts':
       return 'Select a text-to-speech model to generate audio.';
-    case ModelModality.VLM:
+    case 'vlm':
       return 'Select a vision model to analyze images.';
     default:
       return 'Select a model to get started.';
@@ -96,8 +97,13 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
   const displayDescription = description || getDefaultDescription(modality);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
+    // B-RN-8-001 fix: pointerEvents="box-none" lets the absolutely-positioned
+    // overlay container pass touches through empty regions, so the parent
+    // ChatScreen header (rendered as a sibling beneath the overlay) still
+    // receives the History / New / Info icon taps. The inner button captures
+    // its own touch via pointerEvents="auto".
+    <View style={styles.container} pointerEvents="box-none">
+      <View style={styles.content} pointerEvents="auto">
         {/* Icon */}
         <View style={styles.iconContainer}>
           <Icon
@@ -118,6 +124,9 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
           style={styles.button}
           onPress={onSelectModel}
           activeOpacity={0.8}
+          accessible={true}
+          accessibilityLabel="Select a Model"
+          accessibilityRole="button"
         >
           <Icon name="add-circle" size={20} color={Colors.textWhite} />
           <Text style={styles.buttonText}>Select a Model</Text>
@@ -129,7 +138,7 @@ export const ModelRequiredOverlay: React.FC<ModelRequiredOverlayProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: Colors.backgroundPrimary,
     justifyContent: 'center',
     alignItems: 'center',

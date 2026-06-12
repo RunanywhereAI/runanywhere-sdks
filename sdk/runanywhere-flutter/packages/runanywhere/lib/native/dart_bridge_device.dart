@@ -9,8 +9,9 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -19,7 +20,6 @@ import 'package:uuid/uuid.dart';
 // Exceptional return constants for FFI callbacks
 // =============================================================================
 
-const int _exceptionalReturnNull = 0;
 const int _exceptionalReturnInt32 = -1;
 
 // =============================================================================
@@ -51,7 +51,8 @@ class DartBridgeDevice {
   static SharedPreferences? _prefs;
 
   /// SDK environment for HTTP calls
-  static SDKEnvironment _environment = SDKEnvironment.development;
+  static SDKEnvironment _environment =
+      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 
   /// Base URL for HTTP calls
   static String? _baseURL;
@@ -67,10 +68,10 @@ class DartBridgeDevice {
   // Swift uses DispatchSemaphore, Kotlin uses blocking HttpURLConnection —
   // neither is available in Dart.
   //
-  // Solution: The C++ http_post callback captures the request and returns
-  // immediate success. registerIfNeeded() then executes the real HTTP POST
-  // asynchronously after the C++ call returns. On failure, registration
-  // is rolled back so it retries on next launch.
+  // Solution: the C++ http_post callback captures the request and returns
+  // immediate success. DartBridge.initializeServices() drains the captured
+  // request after commons Phase 2 returns. On failure, registration is rolled
+  // back so it retries on next launch.
 
   static String? _pendingEndpoint;
   static String? _pendingBody;
@@ -100,32 +101,41 @@ class DartBridgeDevice {
       // Set callback function pointers
       callbacks.ref.getDeviceInfo =
           Pointer.fromFunction<RacDeviceGetInfoCallbackNative>(
-              _getDeviceInfoCallback);
+            _getDeviceInfoCallback,
+          );
       callbacks.ref.getDeviceId =
           Pointer.fromFunction<RacDeviceGetIdCallbackNative>(
-              _getDeviceIdCallback, _exceptionalReturnNull);
+            _getDeviceIdCallback,
+          );
       callbacks.ref.isRegistered =
           Pointer.fromFunction<RacDeviceIsRegisteredCallbackNative>(
-              _isRegisteredCallback, _exceptionalReturnInt32);
+            _isRegisteredCallback,
+            _exceptionalReturnInt32,
+          );
       callbacks.ref.setRegistered =
           Pointer.fromFunction<RacDeviceSetRegisteredCallbackNative>(
-              _setRegisteredCallback);
+            _setRegisteredCallback,
+          );
       callbacks.ref.httpPost =
           Pointer.fromFunction<RacDeviceHttpPostCallbackNative>(
-              _httpPostCallback, _exceptionalReturnInt32);
+            _httpPostCallback,
+            _exceptionalReturnInt32,
+          );
       callbacks.ref.userData = nullptr;
 
       // Register with C++
-      final setCallbacks = lib.lookupFunction<
-          Int32 Function(Pointer<RacDeviceCallbacksStruct>),
-          int Function(
-              Pointer<RacDeviceCallbacksStruct>)>('rac_device_set_callbacks');
+      final setCallbacks = lib
+          .lookupFunction<
+            Int32 Function(Pointer<RacDeviceCallbacksStruct>),
+            int Function(Pointer<RacDeviceCallbacksStruct>)
+          >('rac_device_set_callbacks');
 
       final result = setCallbacks(callbacks);
       if (result != RacResultCode.success) {
-        _logger.warning('Failed to set device callbacks', metadata: {
-          'error_code': result,
-        });
+        _logger.warning(
+          'Failed to set device callbacks',
+          metadata: {'error_code': result},
+        );
         calloc.free(callbacks);
         _callbacksPtr = null;
         return;
@@ -134,7 +144,10 @@ class DartBridgeDevice {
       _callbacksRegistered = true;
       _logger.debug('Device callbacks registered (sync)');
     } catch (e) {
-      _logger.debug('registerCallbacks error: $e');
+      // librac_commons.so may not export rac_device_set_callbacks in some
+      // configurations (B-FL-1-002). Log at warning so it's visible in
+      // non-debug builds; SDK falls back to no device callbacks.
+      _logger.warning('registerCallbacks unavailable: $e');
     }
   }
 
@@ -182,24 +195,28 @@ class DartBridgeDevice {
       }
 
       // Register with C++ device manager
-      final setCallbacks = lib.lookupFunction<
-              Int32 Function(Pointer<RacDeviceCallbacksStruct>),
-              int Function(Pointer<RacDeviceCallbacksStruct>)>(
-          'rac_device_manager_set_callbacks');
+      final setCallbacks = lib
+          .lookupFunction<
+            Int32 Function(Pointer<RacDeviceCallbacksStruct>),
+            int Function(Pointer<RacDeviceCallbacksStruct>)
+          >('rac_device_manager_set_callbacks');
 
       final result = setCallbacks(callbacks);
       if (result != RacResultCode.success) {
-        _logger.warning('Failed to register device callbacks',
-            metadata: {'code': result});
+        _logger.warning(
+          'Failed to register device callbacks',
+          metadata: {'code': result},
+        );
         return;
       }
 
       _isRegistered = true;
       _logger.debug('Device callbacks registered successfully');
     } catch (e, stack) {
-      _logger.debug('Device registration not available: $e', metadata: {
-        'stack': stack.toString(),
-      });
+      _logger.debug(
+        'Device registration not available: $e',
+        metadata: {'stack': stack.toString()},
+      );
       _isRegistered = true; // Mark as registered to avoid retry loops
     }
   }
@@ -209,49 +226,10 @@ class DartBridgeDevice {
     _accessToken = token;
   }
 
-  /// Register device with backend if not already registered.
-  ///
-  /// Flow:
-  /// 1. C++ orchestrates: checks is_registered, gathers device info, builds JSON
-  /// 2. C++ calls our http_post callback which CAPTURES the request (can't block)
-  /// 3. C++ sees success, calls set_registered(true), returns
-  /// 4. We execute the real HTTP POST asynchronously here
-  /// 5. On HTTP failure, we roll back set_registered so it retries next launch
-  ///
-  /// This matches the Swift/Kotlin behavior (device gets registered with backend)
-  /// while working within Dart's async-only I/O constraint.
-  Future<void> registerIfNeeded() async {
-    if (!_isRegistered) {
-      _logger.warning('Device callbacks not registered');
-      return;
-    }
-
-    // Clear any previous captured request
-    _pendingEndpoint = null;
-    _pendingBody = null;
-    _pendingRequiresAuth = false;
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final registerFn = lib.lookupFunction<
-          Int32 Function(Int32, Pointer<Utf8>),
-          int Function(
-              int, Pointer<Utf8>)>('rac_device_manager_register_if_needed');
-
-      final envValue = _environmentToInt(_environment);
-      final buildTokenPtr = nullptr; // Build token not used in Flutter
-
-      final result = registerFn(envValue, buildTokenPtr.cast<Utf8>());
-      if (result != RacResultCode.success) {
-        _logger.debug('Device registration returned: $result');
-        return;
-      }
-    } catch (e) {
-      _logger.debug('rac_device_manager_register_if_needed not available: $e');
-      return;
-    }
-
-    // Execute the captured HTTP request asynchronously
+  /// Execute the device-registration HTTP request captured by the C callback.
+  /// Commons owns the `rac_device_manager_register_if_needed` call; Flutter
+  /// only drains the request because Dart FFI callbacks cannot await network I/O.
+  static Future<void> flushPendingRegistrationPost() async {
     await _executePendingHttpPost();
   }
 
@@ -278,16 +256,17 @@ class DartBridgeDevice {
     // Build full URL: baseURL + endpoint path
     // Matches Kotlin: baseUrl.trimEnd('/') + finalEndpoint
     final baseURL = _baseURL ?? 'https://api.runanywhere.ai';
-    final trimmedBase =
-        baseURL.endsWith('/') ? baseURL.substring(0, baseURL.length - 1) : baseURL;
+    final trimmedBase = baseURL.endsWith('/')
+        ? baseURL.substring(0, baseURL.length - 1)
+        : baseURL;
 
     // For dev mode (Supabase), add ?on_conflict=device_id for UPSERT
     // Matches Swift/Kotlin behavior
-    final isDev = _environment == SDKEnvironment.development;
+    final isDev = _environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     final finalEndpoint = isDev
         ? (endpoint.contains('?')
-            ? '$endpoint&on_conflict=device_id'
-            : '$endpoint?on_conflict=device_id')
+              ? '$endpoint&on_conflict=device_id'
+              : '$endpoint?on_conflict=device_id')
         : endpoint;
     final fullUrl = '$trimmedBase$finalEndpoint';
 
@@ -301,8 +280,10 @@ class DartBridgeDevice {
       headers['Prefer'] = 'resolution=merge-duplicates';
     }
 
-    if (requiresAuth && _accessToken != null) {
-      headers['Authorization'] = 'Bearer $_accessToken';
+    final accessToken =
+        _accessToken ?? DartBridgeAuth.instance.getAccessToken();
+    if (requiresAuth && accessToken != null && accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
     }
 
     logger.debug('Device registration POST to: $fullUrl');
@@ -316,8 +297,8 @@ class DartBridgeDevice {
       request.write(body);
 
       final response = await request.close().timeout(
-            const Duration(seconds: 30),
-          );
+        const Duration(seconds: 30),
+      );
 
       final statusCode = response.statusCode;
       final isSuccess =
@@ -327,8 +308,7 @@ class DartBridgeDevice {
         logger.debug('Device registration successful (status=$statusCode)');
       } else {
         // Read error body for logging
-        final responseBody =
-            await response.transform(utf8.decoder).join();
+        final responseBody = await response.transform(utf8.decoder).join();
         logger.warning(
           'Device registration failed (status=$statusCode): $responseBody',
         );
@@ -359,19 +339,6 @@ class DartBridgeDevice {
     return _prefs?.getBool(_keyIsRegistered) ?? false;
   }
 
-  /// Clear device registration (for testing)
-  Future<void> clearRegistration() async {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final clearFn = lib.lookupFunction<Void Function(), void Function()>(
-          'rac_device_manager_clear_registration');
-      clearFn();
-    } catch (e) {
-      // Also clear locally
-      await _prefs?.setBool(_keyIsRegistered, false);
-    }
-  }
-
   /// Get the cached or generated device ID
   Future<String> getDeviceId() async {
     return _cachedDeviceId ?? await _getOrCreateDeviceId();
@@ -392,7 +359,7 @@ class DartBridgeDevice {
   /// - iOS: Keychain (survives app reinstalls)
   /// - Android: EncryptedSharedPreferences (survives app reinstalls)
   static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
 
@@ -441,7 +408,7 @@ class DartBridgeDevice {
       return _cachedDeviceId!;
     } catch (e) {
       _logger.warning('Failed to get device ID from secure storage: $e');
-      
+
       // Fallback: try SharedPreferences (less secure, doesn't survive reinstalls)
       try {
         _prefs ??= await SharedPreferences.getInstance();
@@ -455,7 +422,7 @@ class DartBridgeDevice {
           } catch (_) {}
           return _cachedDeviceId!;
         }
-        
+
         final newUUID = _generateUUID();
         _cachedDeviceId = newUUID;
         await _prefs?.setString(_keyDeviceUUID, newUUID);
@@ -492,17 +459,6 @@ class DartBridgeDevice {
     }
     return true;
   }
-
-  static int _environmentToInt(SDKEnvironment env) {
-    switch (env) {
-      case SDKEnvironment.development:
-        return 0;
-      case SDKEnvironment.staging:
-        return 1;
-      case SDKEnvironment.production:
-        return 2;
-    }
-  }
 }
 
 // =============================================================================
@@ -511,7 +467,9 @@ class DartBridgeDevice {
 
 /// Get device info callback
 void _getDeviceInfoCallback(
-    Pointer<RacDeviceRegistrationInfoStruct> outInfo, Pointer<Void> userData) {
+  Pointer<RacDeviceRegistrationInfoStruct> outInfo,
+  Pointer<Void> userData,
+) {
   if (outInfo == nullptr) return;
 
   try {
@@ -528,10 +486,10 @@ void _getDeviceInfoCallback(
     final deviceType = Platform.isIOS
         ? 'iphone'
         : Platform.isAndroid
-            ? 'android'
-            : Platform.isMacOS
-                ? 'macos'
-                : 'unknown';
+        ? 'android'
+        : Platform.isMacOS
+        ? 'macos'
+        : 'unknown';
     final deviceTypePtr = deviceType.toNativeUtf8();
     _cachedDeviceInfoPtrs.add(deviceTypePtr);
     outInfo.ref.deviceType = deviceTypePtr;
@@ -549,7 +507,7 @@ void _getDeviceInfoCallback(
     outInfo.ref.osVersion = osVersionPtr;
 
     // SDK version
-    const sdkVersion = '0.1.4';
+    const sdkVersion = '0.19.13';
     final sdkVersionPtr = sdkVersion.toNativeUtf8();
     _cachedDeviceInfoPtrs.add(sdkVersionPtr);
     outInfo.ref.sdkVersion = sdkVersionPtr;
@@ -581,11 +539,11 @@ List<Pointer<Utf8>> _cachedDeviceInfoPtrs = [];
 Pointer<Utf8>? _cachedDeviceIdPtr;
 
 /// Get device ID callback
-int _getDeviceIdCallback(Pointer<Void> userData) {
+Pointer<Utf8> _getDeviceIdCallback(Pointer<Void> userData) {
   try {
     final deviceId = DartBridgeDevice._cachedDeviceId;
     if (deviceId == null) {
-      return 0;
+      return nullptr;
     }
 
     // Free previous pointer if exists
@@ -595,9 +553,9 @@ int _getDeviceIdCallback(Pointer<Void> userData) {
 
     // Allocate and cache new pointer
     _cachedDeviceIdPtr = deviceId.toNativeUtf8();
-    return _cachedDeviceIdPtr!.address;
+    return _cachedDeviceIdPtr!;
   } catch (e) {
-    return 0;
+    return nullptr;
   }
 }
 
@@ -606,7 +564,7 @@ int _isRegisteredCallback(Pointer<Void> userData) {
   try {
     final isReg =
         DartBridgeDevice._prefs?.getBool(DartBridgeDevice._keyIsRegistered) ??
-            false;
+        false;
     return isReg ? RAC_TRUE : RAC_FALSE;
   } catch (e) {
     return RAC_FALSE;
@@ -616,8 +574,12 @@ int _isRegisteredCallback(Pointer<Void> userData) {
 /// Set device registered status callback
 void _setRegisteredCallback(int registered, Pointer<Void> userData) {
   try {
-    unawaited(DartBridgeDevice._prefs
-        ?.setBool(DartBridgeDevice._keyIsRegistered, registered != 0));
+    unawaited(
+      DartBridgeDevice._prefs?.setBool(
+        DartBridgeDevice._keyIsRegistered,
+        registered != 0,
+      ),
+    );
   } catch (e) {
     SDKLogger('DartBridge.Device').error('Error setting registration: $e');
   }
@@ -628,8 +590,9 @@ void _setRegisteredCallback(int registered, Pointer<Void> userData) {
 /// Dart FFI callbacks cannot block for async work (unlike Swift's
 /// DispatchSemaphore or Kotlin's blocking HttpURLConnection).
 /// Instead, we capture the request and return immediate success.
-/// The real HTTP POST is executed asynchronously by registerIfNeeded()
-/// after the C++ call returns.
+/// The real HTTP POST is executed asynchronously by
+/// DartBridgeDevice.flushPendingRegistrationPost() after commons Phase 2
+/// returns.
 int _httpPostCallback(
   Pointer<Utf8> endpoint,
   Pointer<Utf8> jsonBody,
@@ -642,15 +605,16 @@ int _httpPostCallback(
   }
 
   try {
-    // Capture request for deferred async execution in registerIfNeeded()
+    // Capture request for deferred async execution after commons Phase 2.
     // We must copy the strings now — C++ will free its buffers after we return
     DartBridgeDevice._pendingEndpoint = endpoint.toDartString();
-    DartBridgeDevice._pendingBody =
-        jsonBody != nullptr ? jsonBody.toDartString() : '';
+    DartBridgeDevice._pendingBody = jsonBody != nullptr
+        ? jsonBody.toDartString()
+        : '';
     DartBridgeDevice._pendingRequiresAuth = requiresAuth != 0;
 
     // Return success so C++ proceeds with set_registered(true).
-    // registerIfNeeded() will roll back if the real HTTP fails.
+    // The post-Phase-2 drain rolls back if the real HTTP fails.
     outResponse.ref.result = RacResultCode.success;
     outResponse.ref.statusCode = 200;
     outResponse.ref.responseBody = nullptr;
@@ -668,32 +632,38 @@ int _httpPostCallback(
 // =============================================================================
 
 /// Callback type: void (*get_device_info)(rac_device_registration_info_t*, void*)
-typedef RacDeviceGetInfoCallbackNative = Void Function(
-    Pointer<RacDeviceRegistrationInfoStruct>, Pointer<Void>);
+typedef RacDeviceGetInfoCallbackNative =
+    Void Function(Pointer<RacDeviceRegistrationInfoStruct>, Pointer<Void>);
 
 /// Callback type: const char* (*get_device_id)(void*)
-typedef RacDeviceGetIdCallbackNative = IntPtr Function(Pointer<Void>);
+typedef RacDeviceGetIdCallbackNative = Pointer<Utf8> Function(Pointer<Void>);
 
 /// Callback type: rac_bool_t (*is_registered)(void*)
 typedef RacDeviceIsRegisteredCallbackNative = Int32 Function(Pointer<Void>);
 
 /// Callback type: void (*set_registered)(rac_bool_t, void*)
-typedef RacDeviceSetRegisteredCallbackNative = Void Function(
-    Int32, Pointer<Void>);
+typedef RacDeviceSetRegisteredCallbackNative =
+    Void Function(Int32, Pointer<Void>);
 
 /// Callback type: rac_result_t (*http_post)(const char*, const char*, rac_bool_t, rac_device_http_response_t*, void*)
-typedef RacDeviceHttpPostCallbackNative = Int32 Function(Pointer<Utf8>,
-    Pointer<Utf8>, Int32, Pointer<RacDeviceHttpResponseStruct>, Pointer<Void>);
+typedef RacDeviceHttpPostCallbackNative =
+    Int32 Function(
+      Pointer<Utf8>,
+      Pointer<Utf8>,
+      Int32,
+      Pointer<RacDeviceHttpResponseStruct>,
+      Pointer<Void>,
+    );
 
 /// Device callbacks struct matching rac_device_callbacks_t
 base class RacDeviceCallbacksStruct extends Struct {
   external Pointer<NativeFunction<RacDeviceGetInfoCallbackNative>>
-      getDeviceInfo;
+  getDeviceInfo;
   external Pointer<NativeFunction<RacDeviceGetIdCallbackNative>> getDeviceId;
   external Pointer<NativeFunction<RacDeviceIsRegisteredCallbackNative>>
-      isRegistered;
+  isRegistered;
   external Pointer<NativeFunction<RacDeviceSetRegisteredCallbackNative>>
-      setRegistered;
+  setRegistered;
   external Pointer<NativeFunction<RacDeviceHttpPostCallbackNative>> httpPost;
   external Pointer<Void> userData;
 }

@@ -65,16 +65,47 @@ class ToolCallIndicator extends StatelessWidget {
               color: accentColor,
             ),
             const SizedBox(width: 6),
-            Text(
-              toolCallInfo.toolName,
-              style: AppTypography.caption2(context).copyWith(
-                color: AppColors.textSecondary(context),
+            // B-FL-6-002: render `name(args) = result` so the chip is
+            // self-explanatory without requiring the user to tap into
+            // the detail sheet for typical short responses.
+            Flexible(
+              child: Text(
+                _composeChipLabel(toolCallInfo),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption2(context).copyWith(
+                  color: AppColors.textSecondary(context),
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Build a one-line summary like `get_weather(location=Tokyo) = 18°C`.
+  /// Falls back to just the tool name for long arg/result blobs so the
+  /// chip stays compact.
+  String _composeChipLabel(ToolCallInfo info) {
+    const argsLimit = 40;
+    const resultLimit = 40;
+
+    String compactArgs = info.arguments.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (compactArgs.length > argsLimit) {
+      compactArgs = '${compactArgs.substring(0, argsLimit)}…';
+    }
+
+    final result = info.result?.replaceAll(RegExp(r'\s+'), ' ').trim();
+    String? compactResult = result;
+    if (compactResult != null && compactResult.length > resultLimit) {
+      compactResult = '${compactResult.substring(0, resultLimit)}…';
+    }
+
+    final base = '${info.toolName}($compactArgs)';
+    return compactResult != null && compactResult.isNotEmpty
+        ? '$base = $compactResult'
+        : base;
   }
 }
 

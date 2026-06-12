@@ -7,6 +7,11 @@
  *
  * IMPORTANT: This is a direct translation of the Swift implementation.
  * Do NOT add features not present in the Swift code.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Built-in CPU VAD used by the voice agent and tests. SDK-facing speech
+ * detection results cross via VAD proto APIs (rac_vad_component_*_proto)
+ * over runanywhere.v1.VADResult / VADStreamEvent bytes.
  */
 
 #ifndef RAC_VAD_ENERGY_H

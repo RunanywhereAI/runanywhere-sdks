@@ -2,8 +2,8 @@
 //  DeviceInfo.swift
 //  RunAnywhere SDK
 //
-//  Core device hardware information for telemetry and API requests
-//  Matches backend schemas/device.py DeviceInfo schema
+//  Apple-platform factory that populates the generated, cross-SDK
+//  `RADeviceInfo` telemetry schema from sysctl / UIKit / ProcessInfo.
 //
 
 import Foundation
@@ -14,88 +14,14 @@ import UIKit
 import WatchKit
 #endif
 
-/// Core device hardware information
-/// Matches backend schemas/device.py DeviceInfo schema
-public struct DeviceInfo: Codable, Sendable, Equatable {
-
-    // MARK: - Required Fields (backend schema)
-
-    public let deviceModel: String
-    public let deviceName: String
-    public let platform: String
-    public let osVersion: String
-    public let formFactor: String
-    public let architecture: String
-    public let chipName: String
-    public let totalMemory: Int
-    public let availableMemory: Int
-    public let hasNeuralEngine: Bool
-    public let neuralEngineCores: Int
-    public let gpuFamily: String
-    public let batteryLevel: Double?
-    public let batteryState: String?
-    public let isLowPowerMode: Bool
-    public let coreCount: Int
-    public let performanceCores: Int
-    public let efficiencyCores: Int
-    public let deviceFingerprint: String?
-
-    // MARK: - Coding Keys (snake_case for backend)
-
-    enum CodingKeys: String, CodingKey {
-        case deviceModel = "device_model"
-        case deviceName = "device_name"
-        case platform
-        case osVersion = "os_version"
-        case formFactor = "form_factor"
-        case architecture
-        case chipName = "chip_name"
-        case totalMemory = "total_memory"
-        case availableMemory = "available_memory"
-        case hasNeuralEngine = "has_neural_engine"
-        case neuralEngineCores = "neural_engine_cores"
-        case gpuFamily = "gpu_family"
-        case batteryLevel = "battery_level"
-        case batteryState = "battery_state"
-        case isLowPowerMode = "is_low_power_mode"
-        case coreCount = "core_count"
-        case performanceCores = "performance_cores"
-        case efficiencyCores = "efficiency_cores"
-        case deviceFingerprint = "device_fingerprint"
-    }
-
-    // MARK: - Computed Properties
-
-    public var cleanOSVersion: String {
-        // Extract version number from "Version 17.2 (Build 21C52)" -> "17.2"
-        if let match = osVersion.range(of: #"\d+\.\d+(\.\d+)?"#, options: .regularExpression) {
-            return String(osVersion[match])
-        }
-        return osVersion
-    }
-
-    /// Device type derived from form factor (for API compatibility)
-    public var deviceType: String {
-        switch formFactor {
-        case "phone": return "mobile"
-        case "tablet": return "tablet"
-        case "laptop", "desktop": return "desktop"
-        case "tv": return "tv"
-        case "watch": return "watch"
-        case "headset": return "vr"
-        default: return "mobile"
-        }
-    }
-
-    /// Alias for backwards compatibility
-    public var modelName: String { deviceModel }
-
-    /// Alias for backwards compatibility
-    public var deviceId: String { deviceFingerprint ?? "" }
+/// Builds the canonical `RADeviceInfo` (generated proto) for the current
+/// Apple device. The proto is the wire-canonical shape shared with
+/// Kotlin / Dart / TS; this enum is just the Apple-specific population.
+public enum DeviceInfoFactory {
 
     // MARK: - Current Device Info
 
-    public static var current: DeviceInfo {
+    public static var current: RADeviceInfo {
         let processInfo = ProcessInfo.processInfo
         let coreCount = processInfo.processorCount
 
@@ -124,7 +50,7 @@ public struct DeviceInfo: Codable, Sendable, Equatable {
 
         // Battery info
         device.isBatteryMonitoringEnabled = true
-        let batteryLevel: Double? = device.batteryLevel >= 0 ? Double(device.batteryLevel) : nil
+        let batteryLevel: Float? = device.batteryLevel >= 0 ? Float(device.batteryLevel) : nil
         let batteryState: String? = {
             switch device.batteryState {
             case .charging: return "charging"
@@ -138,7 +64,7 @@ public struct DeviceInfo: Codable, Sendable, Equatable {
         let deviceName = Host.current().localizedName ?? "Mac"
         let platform = "macos"
         let formFactor = modelId.contains("MacBook") ? "laptop" : "desktop"
-        let batteryLevel: Double? = nil
+        let batteryLevel: Float? = nil
         let batteryState: String? = nil
         #elseif os(tvOS)
         let device = UIDevice.current
@@ -146,7 +72,7 @@ public struct DeviceInfo: Codable, Sendable, Equatable {
         let deviceName = device.name
         let platform = "ios"
         let formFactor = "tv"
-        let batteryLevel: Double? = nil
+        let batteryLevel: Float? = nil
         let batteryState: String? = nil
         #elseif os(watchOS)
         let device = WKInterfaceDevice.current()
@@ -154,49 +80,50 @@ public struct DeviceInfo: Codable, Sendable, Equatable {
         let deviceName = device.name
         let platform = "ios"
         let formFactor = "watch"
-        let batteryLevel: Double? = nil
+        let batteryLevel: Float? = nil
         let batteryState: String? = nil
         #elseif os(visionOS)
         let deviceModel = "Apple Vision Pro"
         let deviceName = "Vision Pro"
         let platform = "ios"
         let formFactor = "headset"
-        let batteryLevel: Double? = nil
+        let batteryLevel: Float? = nil
         let batteryState: String? = nil
         #else
         let deviceModel = "Unknown"
         let deviceName = "Unknown"
         let platform = "web"
         let formFactor = "unknown"
-        let batteryLevel: Double? = nil
+        let batteryLevel: Float? = nil
         let batteryState: String? = nil
         #endif
 
         // Get available memory and clean OS version
         let availableMemory = getAvailableMemory()
         let osVersion = cleanVersion(processInfo.operatingSystemVersionString)
+        let hasNeuralEngine = architecture == "arm64"
 
-        return DeviceInfo(
-            deviceModel: deviceModel,
-            deviceName: deviceName,
-            platform: platform,
-            osVersion: osVersion,
-            formFactor: formFactor,
-            architecture: architecture,
-            chipName: chipName,
-            totalMemory: Int(processInfo.physicalMemory),
-            availableMemory: availableMemory,
-            hasNeuralEngine: architecture == "arm64",
-            neuralEngineCores: architecture == "arm64" ? 16 : 0,
-            gpuFamily: "apple",
-            batteryLevel: batteryLevel,
-            batteryState: batteryState,
-            isLowPowerMode: processInfo.isLowPowerModeEnabled,
-            coreCount: coreCount,
-            performanceCores: perfCores,
-            efficiencyCores: effCores,
-            deviceFingerprint: DeviceIdentity.persistentUUID
-        )
+        var info = RADeviceInfo()
+        info.deviceModel = deviceModel
+        info.deviceName = deviceName
+        info.platform = platform
+        info.osVersion = osVersion
+        info.formFactor = formFactor
+        info.architecture = architecture
+        info.chipName = chipName
+        info.totalMemory = Int64(processInfo.physicalMemory)
+        info.availableMemory = Int64(availableMemory)
+        info.hasNeuralEngine_p = hasNeuralEngine
+        info.neuralEngineCores = hasNeuralEngine ? 16 : 0
+        info.gpuFamily = "apple"
+        if let batteryLevel { info.batteryLevel = batteryLevel }
+        if let batteryState { info.batteryState = batteryState }
+        info.isLowPowerMode = processInfo.isLowPowerModeEnabled
+        info.coreCount = Int32(coreCount)
+        info.performanceCores = Int32(perfCores)
+        info.efficiencyCores = Int32(effCores)
+        info.deviceFingerprint = CppBridge.Device.persistentId
+        return info
     }
 
     // MARK: - System Helpers

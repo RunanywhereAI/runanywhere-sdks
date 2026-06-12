@@ -1,0 +1,1085 @@
+/**
+ * OkHttp Platform HTTP Transport Adapter
+ *
+ * JNI bridge between the C `rac_http_transport_ops` vtable and Kotlin's
+ * `com.runanywhere.sdk.foundation.http.OkHttpTransport`. When registered,
+ * every `rac_http_request_*` call from native code is routed through
+ * OkHttp on the Kotlin side — which gives Android consumers:
+ *
+ *   - system CA trust store (fixes rc=77 SSL on corporate / rooted devices)
+ *   - user-installed CAs via NetworkSecurityConfig
+ *   - proxy support (including Charles/mitmproxy/debug proxies)
+ *   - HTTP/2 multiplexing
+ *   - cert pinning and automatic TLS session caching
+ *   - pluggable client for app-specific interceptors / custom certs /
+ *     WorkManager-friendly timeouts
+ *
+ * Threading: OkHttp is thread-safe; this adapter can be invoked
+ * concurrently from any native thread. Each call does its own
+ * AttachCurrentThread / DetachCurrentThread pair via the helper below.
+ *
+ * Streaming (R3): `request_stream` calls Kotlin's
+ * `executeStreamingRequest`, which drains the response body through
+ * OkHttp's source() in 32KB chunks. Each chunk is handed back to C++
+ * via the `deliverChunkNative` JNI entry point, which forwards to the
+ * `rac_http_body_chunk_fn` captured in the stream context. When the
+ * callback returns false the Kotlin side calls `Call.cancel()` and we
+ * surface `RAC_ERROR_CANCELLED`.
+ *
+ * Resume: routes through Kotlin's `executeResumeRequest`, which attaches
+ * the canonical `Range: bytes=N-` header and surfaces
+ * `X-RAC-Range-Honored` so the C++ download manager can detect when the
+ * server replayed the full payload (HTTP 200 instead of 206). Matches the
+ * Swift URLSessionHttpTransport vtable wiring.
+ */
+
+#include <jni.h>
+
+#include <chrono>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_types.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+
+// =============================================================================
+// AttachCurrentThread signature shim (same rationale as the core JNI file).
+// =============================================================================
+#ifdef __ANDROID__
+#define RAC_JNI_ATTACH_ENVPP(envpp) (envpp)
+#else
+#define RAC_JNI_ATTACH_ENVPP(envpp) (reinterpret_cast<void**>(envpp))
+#endif
+
+static const char* OKHTTP_TAG = "OkHttpTransport";
+#define LOGi(...) RAC_LOG_INFO(OKHTTP_TAG, __VA_ARGS__)
+#define LOGe(...) RAC_LOG_ERROR(OKHTTP_TAG, __VA_ARGS__)
+#define LOGw(...) RAC_LOG_WARNING(OKHTTP_TAG, __VA_ARGS__)
+
+// =============================================================================
+// Cached JVM handles. Populated in `okhttp_transport_register`.
+// =============================================================================
+namespace {
+
+struct OkHttpTransportGlobals {
+    JavaVM* jvm = nullptr;
+    jclass transport_cls = nullptr;  // global ref to OkHttpTransport
+    jmethodID execute_request_mid = nullptr;
+    jmethodID execute_streaming_request_mid = nullptr;
+    jmethodID execute_resume_request_mid = nullptr;
+    jclass response_cls = nullptr;  // global ref to OkHttpTransport$HttpResponse
+    jfieldID f_status_code = nullptr;
+    jfieldID f_headers = nullptr;
+    jfieldID f_body_bytes = nullptr;
+    jfieldID f_error_message = nullptr;
+    jclass stream_response_cls = nullptr;  // global ref to OkHttpTransport$StreamResponse
+    jfieldID f_sr_status_code = nullptr;
+    jfieldID f_sr_headers = nullptr;
+    jfieldID f_sr_error_message = nullptr;
+    jfieldID f_sr_cancelled = nullptr;
+    std::mutex mu;
+    bool initialized = false;
+};
+
+OkHttpTransportGlobals& globals() {
+    static OkHttpTransportGlobals g;
+    return g;
+}
+
+// Snapshot the JNI handles the request entry
+// points need under `g.mu` so destroy() (which clears them, also under
+// `g.mu`) cannot race with a concurrent send/stream/resume. The
+// snapshot is a copy of the cached jclass / jmethodID / jfieldID
+// values; the underlying global refs stay valid for the call's
+// duration because destroy() can only run AFTER
+// `rac_http_transport_register` retires the slot (and the slot's
+// refcount drops to zero — see rac_http_transport.cpp). Even with that registry-level guarantee,
+// the per-handle reads themselves must be locked to satisfy TSAN +
+// CheckJNI: a torn read of a 64-bit jmethodID would surface as an
+// undefined-method dereference, not a clean RAC_ERROR_INTERNAL.
+struct OkHttpHandlesSnapshot {
+    bool ok = false;
+    JavaVM* jvm = nullptr;
+    jclass transport_cls = nullptr;
+    jmethodID execute_request_mid = nullptr;
+    jmethodID execute_streaming_request_mid = nullptr;
+    jmethodID execute_resume_request_mid = nullptr;
+    jfieldID f_status_code = nullptr;
+    jfieldID f_headers = nullptr;
+    jfieldID f_body_bytes = nullptr;
+    jfieldID f_error_message = nullptr;
+    jfieldID f_sr_status_code = nullptr;
+    jfieldID f_sr_headers = nullptr;
+    jfieldID f_sr_error_message = nullptr;
+    jfieldID f_sr_cancelled = nullptr;
+};
+
+OkHttpHandlesSnapshot snapshot_globals_locked() {
+    OkHttpHandlesSnapshot s;
+    auto& g = globals();
+    std::lock_guard<std::mutex> lock(g.mu);
+    if (!g.initialized || g.jvm == nullptr || g.transport_cls == nullptr) {
+        return s;
+    }
+    s.ok = true;
+    s.jvm = g.jvm;
+    s.transport_cls = g.transport_cls;
+    s.execute_request_mid = g.execute_request_mid;
+    s.execute_streaming_request_mid = g.execute_streaming_request_mid;
+    s.execute_resume_request_mid = g.execute_resume_request_mid;
+    s.f_status_code = g.f_status_code;
+    s.f_headers = g.f_headers;
+    s.f_body_bytes = g.f_body_bytes;
+    s.f_error_message = g.f_error_message;
+    s.f_sr_status_code = g.f_sr_status_code;
+    s.f_sr_headers = g.f_sr_headers;
+    s.f_sr_error_message = g.f_sr_error_message;
+    s.f_sr_cancelled = g.f_sr_cancelled;
+    return s;
+}
+
+// RAII helper — attaches the current thread on construction (if not
+// already attached), and detaches only if WE were the attacher. Safe
+// to nest: nested attaches become no-ops.
+class ScopedJniEnv {
+   public:
+    explicit ScopedJniEnv(JavaVM* vm) : vm_(vm) {
+        if (vm_ == nullptr)
+            return;
+        int status = vm_->GetEnv(reinterpret_cast<void**>(&env_), JNI_VERSION_1_6);
+        if (status == JNI_EDETACHED) {
+            if (vm_->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env_), nullptr) == JNI_OK) {
+                did_attach_ = true;
+            } else {
+                env_ = nullptr;
+            }
+        } else if (status != JNI_OK) {
+            env_ = nullptr;
+        }
+    }
+
+    ~ScopedJniEnv() {
+        if (did_attach_ && vm_ != nullptr) {
+            vm_->DetachCurrentThread();
+        }
+    }
+
+    JNIEnv* env() const { return env_; }
+
+    ScopedJniEnv(const ScopedJniEnv&) = delete;
+    ScopedJniEnv& operator=(const ScopedJniEnv&) = delete;
+
+   private:
+    JavaVM* vm_ = nullptr;
+    JNIEnv* env_ = nullptr;
+    bool did_attach_ = false;
+};
+
+// Helper: turn a std::string pair list into a jobjectArray<String> for
+// `OkHttpTransport.executeRequest(headersFlat=[k1,v1,...])`.
+jobjectArray build_headers_flat(JNIEnv* env, const rac_http_header_kv_t* headers,
+                                size_t header_count) {
+    jclass strCls = env->FindClass("java/lang/String");
+    if (strCls == nullptr)
+        return nullptr;
+
+    jsize total = static_cast<jsize>(header_count * 2);
+    jobjectArray arr = env->NewObjectArray(total, strCls, nullptr);
+    if (arr == nullptr) {
+        env->DeleteLocalRef(strCls);
+        return nullptr;
+    }
+    for (size_t i = 0; i < header_count; ++i) {
+        jstring k = env->NewStringUTF(headers[i].name ? headers[i].name : "");
+        jstring v = env->NewStringUTF(headers[i].value ? headers[i].value : "");
+        env->SetObjectArrayElement(arr, static_cast<jsize>(i * 2), k);
+        env->SetObjectArrayElement(arr, static_cast<jsize>(i * 2 + 1), v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+    }
+    env->DeleteLocalRef(strCls);
+    return arr;
+}
+
+// Guard the empty-headers fallback. FindClass can fail under
+// JVM shutdown / classloader pressure, so never hand a null class to
+// NewObjectArray (which throws NPE and would ship a malformed request).
+rac_result_t ensure_headers_array(JNIEnv* env, jobjectArray* headers) {
+    if (*headers != nullptr)
+        return RAC_SUCCESS;
+
+    jclass strCls = env->FindClass("java/lang/String");
+    if (strCls == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        return RAC_ERROR_INTERNAL;
+    }
+
+    *headers = env->NewObjectArray(0, strCls, nullptr);
+    env->DeleteLocalRef(strCls);
+    if (*headers == nullptr) {
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    return RAC_SUCCESS;
+}
+
+// Helper: copy a jbyteArray into a freshly-malloced buffer. `*out_ptr`
+// is NULL when the array is empty; `*out_len` is always set.
+// Returns RAC_SUCCESS on success, RAC_ERROR_OUT_OF_MEMORY otherwise.
+rac_result_t copy_jbytes_to_malloc(JNIEnv* env, jbyteArray arr, uint8_t** out_ptr,
+                                   size_t* out_len) {
+    *out_ptr = nullptr;
+    *out_len = 0;
+    if (arr == nullptr)
+        return RAC_SUCCESS;
+
+    jsize n = env->GetArrayLength(arr);
+    if (n <= 0)
+        return RAC_SUCCESS;
+
+    auto* buf = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(n)));
+    if (buf == nullptr)
+        return RAC_ERROR_OUT_OF_MEMORY;
+
+    env->GetByteArrayRegion(arr, 0, n, reinterpret_cast<jbyte*>(buf));
+    *out_ptr = buf;
+    *out_len = static_cast<size_t>(n);
+    return RAC_SUCCESS;
+}
+
+// Helper: walk the flat String[] headers returned by Kotlin and copy
+// them into a malloced rac_http_header_kv_t[] with each name/value
+// duped via strdup. Caller owns the array (freed by rac_http_response_free).
+rac_result_t copy_jstring_headers(JNIEnv* env, jobjectArray arr, rac_http_header_kv_t** out,
+                                  size_t* out_count) {
+    *out = nullptr;
+    *out_count = 0;
+    if (arr == nullptr)
+        return RAC_SUCCESS;
+
+    jsize len = env->GetArrayLength(arr);
+    if (len <= 0)
+        return RAC_SUCCESS;
+
+    // len must be even (flat k,v pairs); drop trailing odd entry defensively.
+    size_t pairs = static_cast<size_t>(len / 2);
+    if (pairs == 0)
+        return RAC_SUCCESS;
+
+    auto* kvs =
+        static_cast<rac_http_header_kv_t*>(std::malloc(pairs * sizeof(rac_http_header_kv_t)));
+    if (kvs == nullptr)
+        return RAC_ERROR_OUT_OF_MEMORY;
+    std::memset(kvs, 0, pairs * sizeof(rac_http_header_kv_t));
+
+    for (size_t i = 0; i < pairs; ++i) {
+        auto k =
+            reinterpret_cast<jstring>(env->GetObjectArrayElement(arr, static_cast<jsize>(i * 2)));
+        auto v = reinterpret_cast<jstring>(
+            env->GetObjectArrayElement(arr, static_cast<jsize>(i * 2 + 1)));
+        if (k != nullptr) {
+            const char* chars = env->GetStringUTFChars(k, nullptr);
+            if (chars != nullptr) {
+                kvs[i].name = strdup(chars);
+                env->ReleaseStringUTFChars(k, chars);
+            }
+            env->DeleteLocalRef(k);
+        }
+        if (v != nullptr) {
+            const char* chars = env->GetStringUTFChars(v, nullptr);
+            if (chars != nullptr) {
+                kvs[i].value = strdup(chars);
+                env->ReleaseStringUTFChars(v, chars);
+            }
+            env->DeleteLocalRef(v);
+        }
+    }
+    *out = kvs;
+    *out_count = pairs;
+    return RAC_SUCCESS;
+}
+
+// Map transport failures by inspecting the Kotlin-side error
+// message prefix. OkHttpHttpTransport formats errorMessage as
+// `${e.javaClass.simpleName}: ${e.message}`, so the leading token is the
+// JVM exception class. SocketTimeoutException and InterruptedIOException
+// signal a timeout (timeout_ms ceiling, connect timeout, read timeout);
+// every other Throwable collapses to a generic network error. Mirrors
+// Swift URLSessionHttpTransport.mapTransportError NSURLErrorTimedOut →
+// RAC_ERROR_TIMEOUT case so cross-SDK retry policies see the same signal.
+rac_result_t map_kotlin_transport_error(const std::string& msg) {
+    if (msg.rfind("SocketTimeoutException", 0) == 0 ||
+        msg.rfind("InterruptedIOException", 0) == 0) {
+        return RAC_ERROR_TIMEOUT;
+    }
+    return RAC_ERROR_NETWORK_ERROR;
+}
+
+// Wall-clock for `rac_http_response_t.elapsed_ms`. OkHttp's
+// per-call timing isn't exposed across JNI without DTO changes, so we
+// time the dispatch boundary (JNI call → response received) which is the
+// same envelope Swift's URLSessionHttpTransport.elapsedMilliseconds(since:)
+// measures.
+inline uint64_t elapsed_ms_since(std::chrono::steady_clock::time_point start) {
+    auto now = std::chrono::steady_clock::now();
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count());
+}
+
+// =============================================================================
+// Vtable callbacks
+// =============================================================================
+
+rac_result_t okhttp_request_send(void* /*user_data*/, const rac_http_request_t* req,
+                                 rac_http_response_t* out_resp) {
+    if (req == nullptr || out_resp == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (req->method == nullptr || req->url == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    // Snapshot the JNI globals under the
+    // adapter's mutex so a concurrent destroy() can't tear the reads.
+    OkHttpHandlesSnapshot g = snapshot_globals_locked();
+    if (!g.ok || g.execute_request_mid == nullptr) {
+        LOGe("okhttp_request_send: adapter not fully initialized");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    ScopedJniEnv scope(g.jvm);
+    JNIEnv* env = scope.env();
+    if (env == nullptr) {
+        LOGe("okhttp_request_send: AttachCurrentThread failed");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Build jstring / jobjectArray / jbyteArray args. Always pass a
+    // non-null headers array so Kotlin's executeRequest(headersFlat) loop
+    // can do a plain `headersFlat.size` check.
+    jstring j_method = env->NewStringUTF(req->method);
+    jstring j_url = env->NewStringUTF(req->url);
+    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
+    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    if (headers_rc != RAC_SUCCESS) {
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        return headers_rc;
+    }
+
+    jbyteArray j_body = nullptr;
+    if (req->body_bytes != nullptr && req->body_len > 0) {
+        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
+        if (j_body != nullptr) {
+            env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
+                                    reinterpret_cast<const jbyte*>(req->body_bytes));
+        }
+    }
+
+    jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
+
+    // Dispatch-boundary timing for `out_resp->elapsed_ms`.
+    auto t_start = std::chrono::steady_clock::now();
+
+    // Call into Kotlin. OkHttpTransport.executeRequest returns a non-null
+    // HttpResponse on any transport outcome (including errors) — a null
+    // return only happens on catastrophic JVM state.
+    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_request_mid, j_method,
+                                                 j_url, j_headers, j_body, j_timeout_ms);
+
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        if (j_headers)
+            env->DeleteLocalRef(j_headers);
+        if (j_body)
+            env->DeleteLocalRef(j_body);
+        LOGe("okhttp_request_send: executeRequest threw");
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
+    if (j_method)
+        env->DeleteLocalRef(j_method);
+    if (j_url)
+        env->DeleteLocalRef(j_url);
+    if (j_headers)
+        env->DeleteLocalRef(j_headers);
+    if (j_body)
+        env->DeleteLocalRef(j_body);
+
+    if (j_resp == nullptr) {
+        LOGe("okhttp_request_send: null response object");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Unpack fields.
+    jint status_code = env->GetIntField(j_resp, g.f_status_code);
+    auto j_headers_out = reinterpret_cast<jobjectArray>(env->GetObjectField(j_resp, g.f_headers));
+    auto j_body_bytes = reinterpret_cast<jbyteArray>(env->GetObjectField(j_resp, g.f_body_bytes));
+    auto j_error_msg = reinterpret_cast<jstring>(env->GetObjectField(j_resp, g.f_error_message));
+
+    // Transport-level failure: Kotlin sets statusCode=0 + non-null errorMessage.
+    if (status_code == 0 && j_error_msg != nullptr) {
+        const char* chars = env->GetStringUTFChars(j_error_msg, nullptr);
+        std::string msg = chars ? chars : "";
+        if (chars)
+            env->ReleaseStringUTFChars(j_error_msg, chars);
+        LOGe("okhttp_request_send: transport error: %s", msg.c_str());
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_body_bytes)
+            env->DeleteLocalRef(j_body_bytes);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return map_kotlin_transport_error(msg);
+    }
+
+    // Populate out_resp. All allocations must be freed by the caller via
+    // rac_http_response_free(out_resp) — same contract as libcurl default.
+    std::memset(out_resp, 0, sizeof(*out_resp));
+    out_resp->status = static_cast<int32_t>(status_code);
+    out_resp->elapsed_ms = elapsed_ms_since(t_start);
+
+    rac_result_t rc =
+        copy_jbytes_to_malloc(env, j_body_bytes, &out_resp->body_bytes, &out_resp->body_len);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_body_bytes)
+            env->DeleteLocalRef(j_body_bytes);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return rc;
+    }
+
+    rc = copy_jstring_headers(env, j_headers_out, &out_resp->headers, &out_resp->header_count);
+    if (rc != RAC_SUCCESS) {
+        if (out_resp->body_bytes) {
+            std::free(out_resp->body_bytes);
+            out_resp->body_bytes = nullptr;
+            out_resp->body_len = 0;
+        }
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_body_bytes)
+            env->DeleteLocalRef(j_body_bytes);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return rc;
+    }
+
+    env->DeleteLocalRef(j_resp);
+    if (j_headers_out)
+        env->DeleteLocalRef(j_headers_out);
+    if (j_body_bytes)
+        env->DeleteLocalRef(j_body_bytes);
+    if (j_error_msg)
+        env->DeleteLocalRef(j_error_msg);
+    return RAC_SUCCESS;
+}
+
+// R3: real streaming implementation. Invokes Kotlin's
+// `executeStreamingRequest` which drains the body through Okio and hands
+// each chunk back to us via `deliverChunkNative` (see below). The chunk
+// callback + user-data pointers travel end-to-end as `jlong` opaque
+// values — Kotlin never dereferences them.
+rac_result_t okhttp_request_stream(void* /*user_data*/, const rac_http_request_t* req,
+                                   rac_http_body_chunk_fn cb, void* cb_user_data,
+                                   rac_http_response_t* out_resp_meta) {
+    if (req == nullptr || out_resp_meta == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (req->method == nullptr || req->url == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    // Snapshot the JNI globals under the
+    // adapter's mutex so a concurrent destroy() can't tear the reads.
+    OkHttpHandlesSnapshot g = snapshot_globals_locked();
+    if (!g.ok || g.execute_streaming_request_mid == nullptr) {
+        LOGe("okhttp_request_stream: adapter not fully initialized");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    ScopedJniEnv scope(g.jvm);
+    JNIEnv* env = scope.env();
+    if (env == nullptr) {
+        LOGe("okhttp_request_stream: AttachCurrentThread failed");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    jstring j_method = env->NewStringUTF(req->method);
+    jstring j_url = env->NewStringUTF(req->url);
+    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
+    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    if (headers_rc != RAC_SUCCESS) {
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        return headers_rc;
+    }
+
+    jbyteArray j_body = nullptr;
+    if (req->body_bytes != nullptr && req->body_len > 0) {
+        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
+        if (j_body != nullptr) {
+            env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
+                                    reinterpret_cast<const jbyte*>(req->body_bytes));
+        }
+    }
+
+    jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
+    // Encode the native callback + user_data as jlongs. Safe: both are
+    // just opaque machine words to Kotlin; they'll come back unchanged
+    // in deliverChunkNative.
+    jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
+    jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
+
+    // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
+    auto t_start = std::chrono::steady_clock::now();
+
+    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_streaming_request_mid,
+                                                 j_method, j_url, j_headers, j_body, j_timeout_ms,
+                                                 j_native_cb, j_native_ud);
+
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        if (j_headers)
+            env->DeleteLocalRef(j_headers);
+        if (j_body)
+            env->DeleteLocalRef(j_body);
+        LOGe("okhttp_request_stream: executeStreamingRequest threw");
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
+    if (j_method)
+        env->DeleteLocalRef(j_method);
+    if (j_url)
+        env->DeleteLocalRef(j_url);
+    if (j_headers)
+        env->DeleteLocalRef(j_headers);
+    if (j_body)
+        env->DeleteLocalRef(j_body);
+
+    if (j_resp == nullptr) {
+        LOGe("okhttp_request_stream: null response object");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    jint status_code = env->GetIntField(j_resp, g.f_sr_status_code);
+    auto j_headers_out =
+        reinterpret_cast<jobjectArray>(env->GetObjectField(j_resp, g.f_sr_headers));
+    auto j_error_msg = reinterpret_cast<jstring>(env->GetObjectField(j_resp, g.f_sr_error_message));
+    jboolean j_cancelled = env->GetBooleanField(j_resp, g.f_sr_cancelled);
+
+    // Cancellation short-circuits everything else — caller signalled
+    // stop via the chunk callback, Kotlin called Call.cancel().
+    if (j_cancelled == JNI_TRUE) {
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return RAC_ERROR_CANCELLED;
+    }
+
+    // Transport-level failure path (connect/TLS/DNS/etc).
+    if (status_code == 0 && j_error_msg != nullptr) {
+        const char* chars = env->GetStringUTFChars(j_error_msg, nullptr);
+        std::string msg = chars ? chars : "";
+        if (chars)
+            env->ReleaseStringUTFChars(j_error_msg, chars);
+        LOGe("okhttp_request_stream: transport error: %s", msg.c_str());
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return map_kotlin_transport_error(msg);
+    }
+
+    // Populate metadata. body_bytes stays NULL — the body was already
+    // delivered chunk-by-chunk through the native callback.
+    std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
+    out_resp_meta->status = static_cast<int32_t>(status_code);
+    out_resp_meta->elapsed_ms = elapsed_ms_since(t_start);
+
+    rac_result_t rc = copy_jstring_headers(env, j_headers_out, &out_resp_meta->headers,
+                                           &out_resp_meta->header_count);
+
+    env->DeleteLocalRef(j_resp);
+    if (j_headers_out)
+        env->DeleteLocalRef(j_headers_out);
+    if (j_error_msg)
+        env->DeleteLocalRef(j_error_msg);
+
+    return rc;
+}
+
+// R3: resume implementation. Mirrors the Swift
+// URLSessionHttpTransport.cRequestResume contract: forwards
+// resume_from_byte plus the native chunk callback into Kotlin's
+// `executeResumeRequest`, which attaches the canonical `Range: bytes=N-`
+// header and emits `X-RAC-Range-Honored` so the C++ download manager can
+// detect full-body replays. Body delivery and cancellation follow the
+// same path as okhttp_request_stream via deliverChunkNative.
+rac_result_t okhttp_request_resume(void* /*user_data*/, const rac_http_request_t* req,
+                                   uint64_t resume_from_byte, rac_http_body_chunk_fn cb,
+                                   void* cb_user_data, rac_http_response_t* out_resp_meta) {
+    if (req == nullptr || out_resp_meta == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+    if (req->method == nullptr || req->url == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    // Snapshot the JNI globals under the
+    // adapter's mutex so a concurrent destroy() can't tear the reads.
+    OkHttpHandlesSnapshot g = snapshot_globals_locked();
+    if (!g.ok || g.execute_resume_request_mid == nullptr) {
+        LOGe("okhttp_request_resume: adapter not fully initialized");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    ScopedJniEnv scope(g.jvm);
+    JNIEnv* env = scope.env();
+    if (env == nullptr) {
+        LOGe("okhttp_request_resume: AttachCurrentThread failed");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    jstring j_method = env->NewStringUTF(req->method);
+    jstring j_url = env->NewStringUTF(req->url);
+    jobjectArray j_headers = build_headers_flat(env, req->headers, req->header_count);
+    rac_result_t headers_rc = ensure_headers_array(env, &j_headers);
+    if (headers_rc != RAC_SUCCESS) {
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        return headers_rc;
+    }
+
+    jbyteArray j_body = nullptr;
+    if (req->body_bytes != nullptr && req->body_len > 0) {
+        j_body = env->NewByteArray(static_cast<jsize>(req->body_len));
+        if (j_body != nullptr) {
+            env->SetByteArrayRegion(j_body, 0, static_cast<jsize>(req->body_len),
+                                    reinterpret_cast<const jbyte*>(req->body_bytes));
+        }
+    }
+
+    jlong j_timeout_ms = static_cast<jlong>(req->timeout_ms);
+    jlong j_resume_from = static_cast<jlong>(resume_from_byte);
+    jlong j_native_cb = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb));
+    jlong j_native_ud = static_cast<jlong>(reinterpret_cast<uintptr_t>(cb_user_data));
+
+    // Dispatch-boundary timing for `out_resp_meta->elapsed_ms`.
+    auto t_start = std::chrono::steady_clock::now();
+
+    jobject j_resp = env->CallStaticObjectMethod(g.transport_cls, g.execute_resume_request_mid,
+                                                 j_method, j_url, j_headers, j_body, j_timeout_ms,
+                                                 j_resume_from, j_native_cb, j_native_ud);
+
+    if (env->ExceptionCheck() == JNI_TRUE) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        if (j_method)
+            env->DeleteLocalRef(j_method);
+        if (j_url)
+            env->DeleteLocalRef(j_url);
+        if (j_headers)
+            env->DeleteLocalRef(j_headers);
+        if (j_body)
+            env->DeleteLocalRef(j_body);
+        LOGe("okhttp_request_resume: executeResumeRequest threw");
+        return RAC_ERROR_NETWORK_ERROR;
+    }
+
+    if (j_method)
+        env->DeleteLocalRef(j_method);
+    if (j_url)
+        env->DeleteLocalRef(j_url);
+    if (j_headers)
+        env->DeleteLocalRef(j_headers);
+    if (j_body)
+        env->DeleteLocalRef(j_body);
+
+    if (j_resp == nullptr) {
+        LOGe("okhttp_request_resume: null response object");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    jint status_code = env->GetIntField(j_resp, g.f_sr_status_code);
+    auto j_headers_out =
+        reinterpret_cast<jobjectArray>(env->GetObjectField(j_resp, g.f_sr_headers));
+    auto j_error_msg = reinterpret_cast<jstring>(env->GetObjectField(j_resp, g.f_sr_error_message));
+    jboolean j_cancelled = env->GetBooleanField(j_resp, g.f_sr_cancelled);
+
+    if (j_cancelled == JNI_TRUE) {
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return RAC_ERROR_CANCELLED;
+    }
+
+    if (status_code == 0 && j_error_msg != nullptr) {
+        const char* chars = env->GetStringUTFChars(j_error_msg, nullptr);
+        std::string msg = chars ? chars : "";
+        if (chars)
+            env->ReleaseStringUTFChars(j_error_msg, chars);
+        LOGe("okhttp_request_resume: transport error: %s", msg.c_str());
+        env->DeleteLocalRef(j_resp);
+        if (j_headers_out)
+            env->DeleteLocalRef(j_headers_out);
+        if (j_error_msg)
+            env->DeleteLocalRef(j_error_msg);
+        return map_kotlin_transport_error(msg);
+    }
+
+    std::memset(out_resp_meta, 0, sizeof(*out_resp_meta));
+    out_resp_meta->status = static_cast<int32_t>(status_code);
+    out_resp_meta->elapsed_ms = elapsed_ms_since(t_start);
+
+    rac_result_t rc = copy_jstring_headers(env, j_headers_out, &out_resp_meta->headers,
+                                           &out_resp_meta->header_count);
+
+    env->DeleteLocalRef(j_resp);
+    if (j_headers_out)
+        env->DeleteLocalRef(j_headers_out);
+    if (j_error_msg)
+        env->DeleteLocalRef(j_error_msg);
+
+    return rc;
+}
+
+void okhttp_destroy(void* /*user_data*/) {
+    auto& g = globals();
+    std::lock_guard<std::mutex> lock(g.mu);
+    if (!g.initialized)
+        return;
+
+    JNIEnv* env = nullptr;
+    if (g.jvm != nullptr) {
+        int status = g.jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+        bool did_attach = false;
+        if (status == JNI_EDETACHED) {
+            if (g.jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
+                did_attach = true;
+            } else {
+                env = nullptr;
+            }
+        }
+        if (env != nullptr) {
+            if (g.transport_cls != nullptr) {
+                env->DeleteGlobalRef(g.transport_cls);
+                g.transport_cls = nullptr;
+            }
+            if (g.response_cls != nullptr) {
+                env->DeleteGlobalRef(g.response_cls);
+                g.response_cls = nullptr;
+            }
+            if (g.stream_response_cls != nullptr) {
+                env->DeleteGlobalRef(g.stream_response_cls);
+                g.stream_response_cls = nullptr;
+            }
+        }
+        if (did_attach)
+            g.jvm->DetachCurrentThread();
+    }
+    g.execute_request_mid = nullptr;
+    g.execute_streaming_request_mid = nullptr;
+    g.execute_resume_request_mid = nullptr;
+    g.f_status_code = nullptr;
+    g.f_headers = nullptr;
+    g.f_body_bytes = nullptr;
+    g.f_error_message = nullptr;
+    g.f_sr_status_code = nullptr;
+    g.f_sr_headers = nullptr;
+    g.f_sr_error_message = nullptr;
+    g.f_sr_cancelled = nullptr;
+    g.initialized = false;
+    LOGi("okhttp_transport: destroyed");
+}
+
+// Static vtable. Lives for the lifetime of the process.
+rac_http_transport_ops_t kOps = {
+    /*request_send*/ okhttp_request_send,
+    /*request_stream*/ okhttp_request_stream,
+    /*request_resume*/ okhttp_request_resume,
+    /*init*/ nullptr,
+    /*destroy*/ okhttp_destroy,
+};
+
+}  // namespace
+
+// =============================================================================
+// JNI entry points
+// =============================================================================
+//
+// Called from Kotlin's `RunAnywhereBridge.racHttpTransportRegisterOkHttp()`
+// during SDK init. Caches all the JVM handles we need, then installs the
+// `kOps` vtable via `rac_http_transport_register`.
+extern "C" {
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegisterOkHttp(
+    JNIEnv* env, jclass /*clazz*/) {
+    if (env == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto& g = globals();
+    std::lock_guard<std::mutex> lock(g.mu);
+
+    if (g.initialized) {
+        LOGi("racHttpTransportRegisterOkHttp: already registered");
+        return RAC_SUCCESS;
+    }
+
+    if (env->GetJavaVM(&g.jvm) != JNI_OK || g.jvm == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: GetJavaVM failed");
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Look up the Kotlin class + method we need to call.
+    jclass local_cls = env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport");
+    if (local_cls == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: OkHttpTransport class not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        return RAC_ERROR_INTERNAL;
+    }
+    g.transport_cls = reinterpret_cast<jclass>(env->NewGlobalRef(local_cls));
+    env->DeleteLocalRef(local_cls);
+    if (g.transport_cls == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: NewGlobalRef(transport_cls) failed");
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Signature: (Ljava/lang/String; Ljava/lang/String; [Ljava/lang/String; [B J)
+    //            Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;
+    g.execute_request_mid = env->GetStaticMethodID(
+        g.transport_cls, "executeRequest",
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJ)"
+        "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;");
+    if (g.execute_request_mid == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: executeRequest method not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        g.transport_cls = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Signature: (String, String, String[], byte[], long, long, long)
+    //            -> OkHttpTransport$StreamResponse
+    g.execute_streaming_request_mid = env->GetStaticMethodID(
+        g.transport_cls, "executeStreamingRequest",
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJ)"
+        "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse;");
+    if (g.execute_streaming_request_mid == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: executeStreamingRequest method not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        g.transport_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Signature: (String, String, String[], byte[], long, long, long, long)
+    //            -> OkHttpHttpTransport$StreamResponse
+    // Same StreamResponse shape as executeStreamingRequest plus the extra
+    // resume_from_byte long argument. This slot was
+    // previously left NULL, which caused rac_http_download_execute to fail
+    // with RAC_ERROR_FEATURE_NOT_AVAILABLE on Android resumes.
+    g.execute_resume_request_mid = env->GetStaticMethodID(
+        g.transport_cls, "executeResumeRequest",
+        "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJJ)"
+        "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse;");
+    if (g.execute_resume_request_mid == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: executeResumeRequest method not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        g.transport_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Cache the HttpResponse class + field IDs.
+    jclass local_resp_cls =
+        env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse");
+    if (local_resp_cls == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: HttpResponse class not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        g.transport_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+    g.response_cls = reinterpret_cast<jclass>(env->NewGlobalRef(local_resp_cls));
+    env->DeleteLocalRef(local_resp_cls);
+
+    g.f_status_code = env->GetFieldID(g.response_cls, "statusCode", "I");
+    g.f_headers = env->GetFieldID(g.response_cls, "headers", "[Ljava/lang/String;");
+    g.f_body_bytes = env->GetFieldID(g.response_cls, "bodyBytes", "[B");
+    g.f_error_message = env->GetFieldID(g.response_cls, "errorMessage", "Ljava/lang/String;");
+
+    if (g.f_status_code == nullptr || g.f_headers == nullptr || g.f_body_bytes == nullptr ||
+        g.f_error_message == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: HttpResponse fields not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        env->DeleteGlobalRef(g.response_cls);
+        g.transport_cls = nullptr;
+        g.response_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+
+    // Cache the StreamResponse class + field IDs (R3: streaming path).
+    jclass local_sr_cls =
+        env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse");
+    if (local_sr_cls == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: StreamResponse class not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        env->DeleteGlobalRef(g.response_cls);
+        g.transport_cls = nullptr;
+        g.response_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+    g.stream_response_cls = reinterpret_cast<jclass>(env->NewGlobalRef(local_sr_cls));
+    env->DeleteLocalRef(local_sr_cls);
+
+    g.f_sr_status_code = env->GetFieldID(g.stream_response_cls, "statusCode", "I");
+    g.f_sr_headers = env->GetFieldID(g.stream_response_cls, "headers", "[Ljava/lang/String;");
+    g.f_sr_error_message =
+        env->GetFieldID(g.stream_response_cls, "errorMessage", "Ljava/lang/String;");
+    g.f_sr_cancelled = env->GetFieldID(g.stream_response_cls, "cancelled", "Z");
+
+    if (g.f_sr_status_code == nullptr || g.f_sr_headers == nullptr ||
+        g.f_sr_error_message == nullptr || g.f_sr_cancelled == nullptr) {
+        LOGe("racHttpTransportRegisterOkHttp: StreamResponse fields not found");
+        if (env->ExceptionCheck() == JNI_TRUE)
+            env->ExceptionClear();
+        env->DeleteGlobalRef(g.transport_cls);
+        env->DeleteGlobalRef(g.response_cls);
+        env->DeleteGlobalRef(g.stream_response_cls);
+        g.transport_cls = nullptr;
+        g.response_cls = nullptr;
+        g.stream_response_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
+
+    g.initialized = true;
+
+    // Install the vtable. Subsequent rac_http_request_* calls go through
+    // kOps → Kotlin → OkHttp instead of libcurl.
+    rac_result_t rc = rac_http_transport_register(&kOps, nullptr);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racHttpTransportRegisterOkHttp: rac_http_transport_register failed: %d", rc);
+        // Roll back the cached refs; the adapter can't service calls.
+        env->DeleteGlobalRef(g.transport_cls);
+        env->DeleteGlobalRef(g.response_cls);
+        env->DeleteGlobalRef(g.stream_response_cls);
+        g.transport_cls = nullptr;
+        g.response_cls = nullptr;
+        g.stream_response_cls = nullptr;
+        g.execute_request_mid = nullptr;
+        g.execute_streaming_request_mid = nullptr;
+        g.execute_resume_request_mid = nullptr;
+        g.initialized = false;
+        return rc;
+    }
+
+    LOGi("racHttpTransportRegisterOkHttp: OkHttp transport installed (streaming-capable)");
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportUnregisterOkHttp(
+    JNIEnv* /*env*/, jclass /*clazz*/) {
+    // Unregister → the router falls back to libcurl for future calls.
+    rac_result_t rc = rac_http_transport_register(nullptr, nullptr);
+    if (rc != RAC_SUCCESS) {
+        LOGw("racHttpTransportUnregisterOkHttp: rac_http_transport_register(NULL) returned %d", rc);
+    }
+    // destroy() will clear the JNI globals.
+    return static_cast<jint>(rc);
+}
+
+// -----------------------------------------------------------------------------
+// R3: deliverChunkNative — invoked by OkHttpTransport.executeStreamingRequest
+// for each chunk Okio reads off the wire. We translate the opaque jlongs
+// back into the real `rac_http_body_chunk_fn` + user-data pointers and
+// forward the bytes. Return false to tell Kotlin to cancel the call.
+// -----------------------------------------------------------------------------
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_httptransport_OkHttpHttpTransport_deliverChunkNative(
+    JNIEnv* env, jclass /*clazz*/, jlong native_callback, jlong native_user_data, jbyteArray chunk,
+    jint chunk_len, jlong total_written, jlong content_length) {
+    if (native_callback == 0 || chunk == nullptr || chunk_len <= 0) {
+        // Nothing to forward: don't cancel the call, just skip this chunk.
+        return JNI_TRUE;
+    }
+    // jlong opaque handles round-trip C function/user-data pointers across the JNI ABI.
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+    auto cb = reinterpret_cast<rac_http_body_chunk_fn>(static_cast<uintptr_t>(native_callback));
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+    auto ud = reinterpret_cast<void*>(static_cast<uintptr_t>(native_user_data));
+
+    // Pull the bytes into a stack-free heap buffer so the callback can
+    // memcpy / stream them without worrying about JNI references.
+    auto* buf = static_cast<uint8_t*>(std::malloc(static_cast<size_t>(chunk_len)));
+    if (buf == nullptr) {
+        LOGe("deliverChunkNative: OOM allocating %d-byte chunk buffer", chunk_len);
+        return JNI_FALSE;
+    }
+    env->GetByteArrayRegion(chunk, 0, chunk_len, reinterpret_cast<jbyte*>(buf));
+
+    rac_bool_t keep_going =
+        cb(buf, static_cast<size_t>(chunk_len), static_cast<uint64_t>(total_written),
+           static_cast<uint64_t>(content_length), ud);
+    std::free(buf);
+
+    return (keep_going == RAC_FALSE) ? JNI_FALSE : JNI_TRUE;
+}
+
+}  // extern "C"

@@ -58,8 +58,8 @@ public struct ToolCallInfo: Codable, Sendable {
 
     public init(
         toolName: String,
-        arguments: [String: ToolValue],
-        result: [String: ToolValue]? = nil,
+        arguments: [String: RAToolValue],
+        result: [String: RAToolValue]? = nil,
         success: Bool,
         error: String? = nil
     ) {
@@ -67,12 +67,12 @@ public struct ToolCallInfo: Codable, Sendable {
         self.success = success
         self.error = error
 
-        // Convert arguments to JSON string using ToolValue
-        self.arguments = ToolValue.object(arguments).toJSONString(pretty: true) ?? "{}"
+        // Convert arguments to JSON string using RAToolValue.
+        self.arguments = RAToolValue.object(arguments).toJSONString(pretty: true) ?? "{}"
 
-        // Convert result to JSON string using ToolValue
+        // Convert result to JSON string using RAToolValue.
         if let result = result {
-            self.result = ToolValue.object(result).toJSONString(pretty: true)
+            self.result = RAToolValue.object(result).toJSONString(pretty: true)
         } else {
             self.result = nil
         }
@@ -86,9 +86,9 @@ public struct MessageModelInfo: Codable, Sendable {
     public let modelName: String
     public let framework: String
 
-    public init(from modelInfo: ModelInfo) {
+    public init(from modelInfo: RAModelInfo) {
         self.modelId = modelInfo.id
         self.modelName = modelInfo.name
-        self.framework = modelInfo.framework.rawValue
+        self.framework = modelInfo.framework.wireString
     }
 }

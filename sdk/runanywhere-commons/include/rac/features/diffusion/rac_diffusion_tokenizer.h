@@ -10,6 +10,11 @@
  * - URL resolution for predefined tokenizer sources
  * - Automatic download of missing tokenizer files
  * - Support for custom tokenizer URLs
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Apple CoreML support code consumed by the diffusion backend. SDK
+ * download/storage state crosses via the generated download/storage
+ * proto APIs.
  */
 
 #ifndef RAC_DIFFUSION_TOKENIZER_H

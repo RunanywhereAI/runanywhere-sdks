@@ -1,0 +1,180 @@
+// RunAnywhere v2 IDL — chat conversation primitives.
+//
+// Phase 3 of v2 IDL Exhaustiveness migration. ChatMessage + MessageRole were
+// duplicated across:
+//   - Swift  ChatMessage.swift / MessageRole.swift (TBD location)
+//   - Kotlin main/kotlin/.../ChatMessage.kt
+//   - Dart   lib/public/types/message_types.dart (MessageRole)
+//   - RN     core/src/types/chat.ts
+//   - Web    packages/core/src/chat/types.ts
+//
+// Generating from a single proto removes ~200 LOC and locks the role enum
+// across all 5 SDKs.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "tool_calling.proto";
+import "llm_options.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "ChatProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Conversational role of a ChatMessage.
+// ---------------------------------------------------------------------------
+enum MessageRole {
+    MESSAGE_ROLE_UNSPECIFIED = 0;
+    MESSAGE_ROLE_USER        = 1;
+    MESSAGE_ROLE_ASSISTANT   = 2;
+    MESSAGE_ROLE_SYSTEM      = 3;
+    // Tool-result messages injected back into the conversation after a
+    // tool call has been executed. Required for OpenAI-style tool flows.
+    MESSAGE_ROLE_TOOL        = 4;
+    MESSAGE_ROLE_DEVELOPER   = 5;
+}
+
+enum ChatMessageStatus {
+    CHAT_MESSAGE_STATUS_UNSPECIFIED = 0;
+    CHAT_MESSAGE_STATUS_PENDING     = 1;
+    CHAT_MESSAGE_STATUS_STREAMING   = 2;
+    CHAT_MESSAGE_STATUS_COMPLETE    = 3;
+    CHAT_MESSAGE_STATUS_FAILED      = 4;
+    CHAT_MESSAGE_STATUS_CANCELLED   = 5;
+}
+
+message ChatAttachment {
+    string id = 1;
+    string media_type = 2;   // MIME type or SDK-known media class.
+
+    oneof source {
+        bytes  data = 3;
+        string uri = 4;
+        string adapter_handle = 5;
+    }
+
+    optional string name = 6;
+    int64 size_bytes = 7;
+    map<string, string> metadata = 8;
+}
+
+// ---------------------------------------------------------------------------
+// A single message in a chat conversation.
+// ---------------------------------------------------------------------------
+message ChatMessage {
+    // Unique identifier for the message (caller-supplied or generated).
+    // Empty = unset (proto3 scalar default).
+    string id                  = 1;
+
+    // Role (user / assistant / system / tool).
+    MessageRole role           = 2;
+
+    // Message text content. May be empty for messages that only carry tool
+    // calls (assistant role) or tool results (tool role).
+    string content             = 3;
+
+    // Wall-clock timestamp the message was authored, in microseconds since
+    // Unix epoch. 0 = unset; consumers may stamp at receive-time.
+    int64  timestamp_us        = 4;
+
+    // Optional human-readable display name. Used by some chat UIs to
+    // distinguish multiple users in a multi-party conversation.
+    optional string name       = 5;
+
+    // Tag 6 reserved — previously `repeated string tool_calls_json` (legacy).
+    // Deleted in favour of the typed `tool_calls` field below.
+    reserved 6;
+    reserved "tool_calls_json";
+
+    // Optional tool-call ID this message is responding to (only set when
+    // role == MESSAGE_ROLE_TOOL).
+    optional string tool_call_id = 7;
+
+    // Typed tool calls embedded in this assistant message.
+    repeated ToolCall tool_calls = 8;
+
+    // Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
+    optional ToolResult tool_result = 9;
+
+    // Optional threading and delivery metadata.
+    optional string parent_id = 10;
+    ChatMessageStatus status = 11;
+    optional string error_message = 12;
+    map<string, string> metadata = 13;
+
+    // Opaque attachments normalized by platform adapters. Capture, picker,
+    // and permission flows remain native/Web-owned.
+    repeated ChatAttachment attachments = 14;
+}
+
+message ChatGenerationRequest {
+    string request_id = 1;
+    string conversation_id = 2;
+    repeated ChatMessage messages = 3;
+    optional LLMGenerationOptions options = 4;
+    optional ToolCallingOptions tool_calling = 5;
+    map<string, string> metadata = 6;
+}
+
+message ChatGenerationResult {
+    string conversation_id = 1;
+    ChatMessage message = 2;
+    optional LLMGenerationResult generation = 3;
+    repeated ToolCall tool_calls = 4;
+    repeated ToolResult tool_results = 5;
+    optional string error_message = 6;
+    int32 error_code = 7;
+}
+
+enum ChatStreamEventKind {
+    CHAT_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED = 1;
+    CHAT_STREAM_EVENT_KIND_TOKEN = 2;
+    CHAT_STREAM_EVENT_KIND_TOOL_CALL = 3;
+    CHAT_STREAM_EVENT_KIND_TOOL_RESULT = 4;
+    CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED = 5;
+    CHAT_STREAM_EVENT_KIND_ERROR = 6;
+}
+
+message ChatStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    string conversation_id = 4;
+    ChatStreamEventKind kind = 5;
+    optional string token = 6;
+    optional ChatMessage message = 7;
+    optional ToolCall tool_call = 8;
+    optional ToolResult tool_result = 9;
+    optional LLMGenerationResult final_result = 10;
+    optional string error_message = 11;
+    int32 error_code = 12;
+}
+
+message ChatConversationState {
+    string conversation_id = 1;
+    repeated ChatMessage messages = 2;
+    int64 created_at_ms = 3;
+    int64 updated_at_ms = 4;
+    map<string, string> metadata = 5;
+}
+
+// Logical chat service contract. Host conversation state, UI rendering, and
+// backend execution remain adapter-owned; this service describes only the
+// portable Generate / Stream entry points over generated messages.
+service Chat {
+    // Non-streaming generation: returns the completed assistant message and
+    // optional LLMGenerationResult/ToolCall aggregates in one response.
+    rpc Generate(ChatGenerationRequest) returns (ChatGenerationResult);
+
+    // Server-streaming generation: emits per-token, tool-call, tool-result,
+    // and completion events until the turn terminates.
+    rpc Stream(ChatGenerationRequest) returns (stream ChatStreamEvent);
+}

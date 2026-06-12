@@ -1,13 +1,22 @@
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
 
-extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> 
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex ->
     ex.autolinkLibrariesFromCommand()
 }
 
 rootProject.name = 'RunAnywhereAI'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+
+def localGradleProperties = new Properties()
+def localGradlePropertiesFile = new File(settingsDir, "gradle.properties")
+if (localGradlePropertiesFile.exists()) {
+    localGradlePropertiesFile.withInputStream { localGradleProperties.load(it) }
+}
+def enableRunAnywhereGenie = (gradle.startParameter.projectProperties["runanywhere.enableGenie"]
+    ?: localGradleProperties.getProperty("runanywhere.enableGenie")
+    ?: "false").toBoolean()
 
 // Manually include nitro-modules (excluded from autolinking to avoid Turbo codegen)
 include ':react-native-nitro-modules'
@@ -23,5 +32,7 @@ project(':runanywhere_llamacpp').projectDir = new File(rootProject.projectDir, '
 include ':runanywhere_onnx'
 project(':runanywhere_onnx').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/onnx/android')
 
-include ':runanywhere_genie'
-project(':runanywhere_genie').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/genie/android')
+if (enableRunAnywhereGenie) {
+    include ':runanywhere_genie'
+    project(':runanywhere_genie').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/genie/android')
+}

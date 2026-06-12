@@ -10,9 +10,10 @@ import { initVisionTab } from './views/vision';
 import { initVoiceTab } from './views/voice';
 import { initTranscribeTab } from './views/transcribe';
 import { initSpeakTab } from './views/speak';
+import { initDocumentsTab } from './views/documents';
 import { initStorageTab } from './views/storage';
+import { initSolutionsTab } from './views/solutions';
 import { initSettingsTab } from './views/settings';
-import { ModelManager, ModelCategory } from './services/model-manager';
 
 // ---------------------------------------------------------------------------
 // Tab Lifecycle
@@ -65,9 +66,19 @@ const TABS: TabDef[] = [
     icon: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
   },
   {
+    id: 'documents',
+    label: 'Docs',
+    icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+  },
+  {
     id: 'storage',
     label: 'Storage',
     icon: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  },
+  {
+    id: 'solutions',
+    label: 'Solutions',
+    icon: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
   },
   {
     id: 'settings',
@@ -82,8 +93,8 @@ const TABS: TabDef[] = [
 
 let activeTab = 0;
 
-/** Per-tab lifecycle callbacks (indexed same as TABS). */
-const tabLifecycles: (TabLifecycle | undefined)[] = new Array(TABS.length).fill(undefined);
+/** Per-tab lifecycle callbacks keyed by tab id. */
+const tabLifecycles: Record<string, TabLifecycle | undefined> = {};
 
 function buildSvgIcon(paths: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
@@ -120,33 +131,25 @@ export function buildAppShell(): void {
   app.appendChild(tabContent);
   app.appendChild(tabBar);
 
-  // Initialize all tab views, capturing lifecycle callbacks
-  tabLifecycles[0] = initChatTab(document.getElementById('tab-chat')!);
-  tabLifecycles[1] = initVisionTab(document.getElementById('tab-vision')!);
-  tabLifecycles[2] = initVoiceTab(document.getElementById('tab-voice')!);
-  tabLifecycles[3] = initTranscribeTab(document.getElementById('tab-transcribe')!);
-  tabLifecycles[4] = initSpeakTab(document.getElementById('tab-speak')!);
-  tabLifecycles[5] = initStorageTab(document.getElementById('tab-storage')!);
-  initSettingsTab(document.getElementById('tab-settings')!);
+  // Initialize all tab views, capturing lifecycle callbacks keyed by tab id.
+  const tabInitializers: Record<string, (el: HTMLElement) => TabLifecycle | undefined> = {
+    chat: (el) => initChatTab(el),
+    vision: (el) => initVisionTab(el),
+    voice: (el) => initVoiceTab(el),
+    transcribe: (el) => initTranscribeTab(el),
+    speak: (el) => initSpeakTab(el),
+    documents: (el) => initDocumentsTab(el),
+    storage: (el) => initStorageTab(el),
+    solutions: (el) => initSolutionsTab(el),
+    settings: (el) => { initSettingsTab(el); return undefined; },
+  };
+  for (const tab of TABS) {
+    tabLifecycles[tab.id] = tabInitializers[tab.id]?.(document.getElementById(`tab-${tab.id}`)!);
+  }
 
   // Activate default tab
   switchTab(0);
 }
-
-/**
- * Map tab IDs to the ModelCategory they primarily use.
- * When switching from a tab that uses one category to a tab that uses
- * a different category, we show an info banner.
- */
-const TAB_MODEL_CATEGORY: Record<string, ModelCategory | null> = {
-  chat: ModelCategory.Language,
-  vision: ModelCategory.Multimodal,
-  voice: ModelCategory.Language,        // voice agent uses LLM + STT + TTS
-  transcribe: ModelCategory.SpeechRecognition,
-  speak: ModelCategory.SpeechSynthesis,
-  storage: null,
-  settings: null,
-};
 
 function switchTab(index: number): void {
   const previousTab = activeTab;
@@ -154,10 +157,11 @@ function switchTab(index: number): void {
 
   // Notify the outgoing tab so it can release resources (camera, mic, etc.)
   if (previousTab !== index) {
+    const previousId = TABS[previousTab].id;
     try {
-      tabLifecycles[previousTab]?.onDeactivate?.();
+      tabLifecycles[previousId]?.onDeactivate?.();
     } catch (err) {
-      console.warn(`[App] Tab ${TABS[previousTab].id} onDeactivate error:`, err);
+      console.warn(`[App] Tab ${previousId} onDeactivate error:`, err);
     }
   }
 
@@ -171,67 +175,14 @@ function switchTab(index: number): void {
     item.classList.toggle('active', i === index);
   });
 
-  // Show model-switch banner if the new tab needs a different model category
-  if (previousTab !== index) {
-    showModelSwitchBanner(previousTab, index);
-  }
-
   // Notify the incoming tab so it can resume if needed
   if (previousTab !== index) {
+    const incomingId = TABS[index].id;
     try {
-      tabLifecycles[index]?.onActivate?.();
+      tabLifecycles[incomingId]?.onActivate?.();
     } catch (err) {
-      console.warn(`[App] Tab ${TABS[index].id} onActivate error:`, err);
+      console.warn(`[App] Tab ${incomingId} onActivate error:`, err);
     }
-  }
-}
-
-/**
- * Show an informational banner when switching to a tab that uses a different
- * model category, so the user understands that the previous model will be
- * released from memory.
- */
-function showModelSwitchBanner(fromIndex: number, toIndex: number): void {
-  // Remove any existing banner
-  document.querySelector('.model-switch-banner')?.remove();
-
-  const fromCategory = TAB_MODEL_CATEGORY[TABS[fromIndex].id];
-  const toCategory = TAB_MODEL_CATEGORY[TABS[toIndex].id];
-
-  // No banner needed if destination tab doesn't need a model
-  if (!toCategory) return;
-  // No banner needed if categories are the same
-  if (fromCategory === toCategory) return;
-
-  // Check if there's actually a model loaded that would be released
-  const loadedModel = ModelManager.getLoadedModel();
-  if (!loadedModel) return;
-
-  const fromLabel = TABS[fromIndex].label;
-  const toLabel = TABS[toIndex].label;
-
-  const panel = document.getElementById(`tab-${TABS[toIndex].id}`);
-  if (!panel) return;
-
-  const banner = document.createElement('div');
-  banner.className = 'model-switch-banner';
-  banner.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-    <span>Switching from <strong>${fromLabel}</strong> to <strong>${toLabel}</strong> will release the current model from memory. You can reload it when you switch back.</span>
-    <button class="banner-dismiss" aria-label="Dismiss">&times;</button>
-  `;
-
-  banner.querySelector('.banner-dismiss')!.addEventListener('click', () => banner.remove());
-
-  // Auto-dismiss after 6 seconds
-  setTimeout(() => banner.remove(), 6000);
-
-  // Insert at the top of the tab panel (after toolbar if present)
-  const toolbar = panel.querySelector('.toolbar');
-  if (toolbar && toolbar.nextSibling) {
-    panel.insertBefore(banner, toolbar.nextSibling);
-  } else {
-    panel.prepend(banner);
   }
 }
 

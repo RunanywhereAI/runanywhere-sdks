@@ -5,7 +5,7 @@
  * WebGPU, SharedArrayBuffer (for pthreads), WASM SIMD, etc.
  */
 
-import type { DeviceInfoData } from '../types/models';
+import type { DeviceInfo } from '@runanywhere/proto-ts/device_info';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import type { AccelerationMode } from '../Foundation/WASMBridge';
 
@@ -94,19 +94,36 @@ export async function detectCapabilities(): Promise<WebCapabilities> {
 }
 
 /**
- * Build a DeviceInfoData from detected capabilities.
+ * Build a proto-ts {@link DeviceInfo} from detected browser capabilities.
+ *
+ * Generic fields map directly onto the cross-SDK proto shape; the two
+ * browser-only flags (`has_webgpu`, `has_shared_array_buffer`) are carried in
+ * `platformExtras` per the proto's documented web convention.
  */
-export async function getDeviceInfo(): Promise<DeviceInfoData> {
+export async function getDeviceInfo(): Promise<DeviceInfo> {
   const caps = await detectCapabilities();
 
   return {
-    model: 'Browser',
-    name: getBrowserName(caps.userAgent),
+    deviceModel: 'Browser',
+    deviceName: getBrowserName(caps.userAgent),
+    platform: 'web',
     osVersion: getOSVersion(caps.userAgent),
-    totalMemory: caps.deviceMemoryGB * 1024 * 1024 * 1024,
+    formFactor: 'desktop',
     architecture: 'wasm32',
-    hasWebGPU: caps.hasWebGPU,
-    hasSharedArrayBuffer: caps.hasSharedArrayBuffer,
+    chipName: '',
+    totalMemory: caps.deviceMemoryGB * 1024 * 1024 * 1024,
+    availableMemory: 0,
+    hasNeuralEngine: false,
+    neuralEngineCores: 0,
+    gpuFamily: caps.gpuAdapterInfo?.architecture ?? '',
+    isLowPowerMode: false,
+    coreCount: caps.hardwareConcurrency,
+    performanceCores: 0,
+    efficiencyCores: 0,
+    platformExtras: {
+      has_webgpu: String(caps.hasWebGPU),
+      has_shared_array_buffer: String(caps.hasSharedArrayBuffer),
+    },
   };
 }
 

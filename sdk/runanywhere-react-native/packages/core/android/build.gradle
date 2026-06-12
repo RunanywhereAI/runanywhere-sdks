@@ -13,7 +13,7 @@ def findNodeBinary() {
             return nodePath
         }
     }
-    
+
     // Check common node installation paths
     def homeDir = System.getProperty("user.home")
     def nodePaths = [
@@ -29,7 +29,7 @@ def findNodeBinary() {
             return path
         }
     }
-    
+
     // Fallback to 'node' (works if PATH is set correctly in terminal builds)
     return "node"
 }
@@ -107,6 +107,80 @@ def includeDir = file("src/main/include")
 
 // Local runanywhere-commons path (for local builds)
 def runAnywhereCommonsDir = file("../../../../runanywhere-commons")
+
+def androidNdkHomeForRuntime() {
+    def explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
+    if (explicitNdk) {
+        return file(explicitNdk)
+    }
+
+    def androidSdk = System.getenv("ANDROID_HOME") ?:
+        System.getenv("ANDROID_SDK_ROOT") ?:
+        "${System.getProperty('user.home')}/Library/Android/sdk"
+    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.0.12077973"
+    return file("${androidSdk}/ndk/${ndkVersion}")
+}
+
+def androidNdkHostTag() {
+    def osName = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+    if (osName.contains("mac")) return "darwin-x86_64"
+    if (osName.contains("linux")) return "linux-x86_64"
+    throw new GradleException("Unsupported host for Android NDK runtime lookup: ${System.getProperty('os.name')}")
+}
+
+def androidNdkTripleForAbi(String abi) {
+    switch (abi) {
+        case 'arm64-v8a': return 'aarch64-linux-android'
+        case 'armeabi-v7a': return 'arm-linux-androideabi'
+        case 'x86_64': return 'x86_64-linux-android'
+        default: throw new GradleException("Unsupported Android ABI for libc++ runtime lookup: ${abi}")
+    }
+}
+
+def androidNdkOmpArchForAbi(String abi) {
+    switch (abi) {
+        case 'arm64-v8a': return 'aarch64'
+        case 'armeabi-v7a': return 'arm'
+        case 'x86_64': return 'x86_64'
+        default: throw new GradleException("Unsupported Android ABI for libomp runtime lookup: ${abi}")
+    }
+}
+
+def latestAndroidClangDir(File prebuiltDir) {
+    def clangRoot = new File(prebuiltDir, "lib/clang")
+    def clangDirs = clangRoot.listFiles()?.findAll { it.isDirectory() }?.sort { a, b -> a.name <=> b.name }
+    if (!clangDirs) {
+        throw new GradleException("No Clang runtime directory found under ${clangRoot}")
+    }
+    return clangDirs.last()
+}
+
+def syncAndroidNdkRuntimeLibs(File outputDir, boolean includeLibcxx, boolean includeLibomp) {
+    def ndkHome = androidNdkHomeForRuntime()
+    def prebuiltDir = new File(ndkHome, "toolchains/llvm/prebuilt/${androidNdkHostTag()}")
+    if (!prebuiltDir.isDirectory()) {
+        throw new GradleException("Android NDK prebuilt directory not found: ${prebuiltDir}")
+    }
+
+    def clangDir = includeLibomp ? latestAndroidClangDir(prebuiltDir) : null
+    ['arm64-v8a', 'armeabi-v7a', 'x86_64'].each { abi ->
+        def abiDir = new File(outputDir, abi)
+        def hasNativeLibs = abiDir.isDirectory() && abiDir.listFiles()?.any { it.name.endsWith(".so") }
+        if (!hasNativeLibs) return
+
+        if (includeLibcxx) {
+            def libcxx = new File(prebuiltDir, "sysroot/usr/lib/${androidNdkTripleForAbi(abi)}/libc++_shared.so")
+            if (!libcxx.isFile()) throw new GradleException("libc++_shared.so not found for ${abi} at ${libcxx}")
+            copy { from libcxx; into abiDir }
+        }
+
+        if (includeLibomp) {
+            def libomp = new File(clangDir, "lib/linux/${androidNdkOmpArchForAbi(abi)}/libomp.so")
+            if (!libomp.isFile()) throw new GradleException("libomp.so not found for ${abi} at ${libomp}")
+            copy { from libomp; into abiDir }
+        }
+    }
+}
 
 android {
     namespace "com.margelo.nitro.runanywhere.core"
@@ -193,7 +267,8 @@ android {
                     jniLibs.srcDirs = [commonsDistDir]
                     logger.lifecycle("[RunAnywhereCore] Using LOCAL native libraries from: $commonsDistDir")
                 } else {
-                    logger.warn("[RunAnywhereCore] Local commons dist not found at: $commonsDistDir")
+                    jniLibs.srcDirs = [jniLibsDir]
+                    logger.lifecycle("[RunAnywhereCore] Using staged LOCAL native libraries from: $jniLibsDir")
                 }
             } else {
                 jniLibs.srcDirs = [jniLibsDir]
@@ -223,6 +298,12 @@ task downloadNativeLibs {
         if (useLocalBuild) {
             logger.lifecycle("[RunAnywhereCore] Skipping download - using local build mode")
             return
+        }
+
+        fileTree(dir: jniLibsDir, include: "**/libc++_shared.so").files.each { staleStdlib ->
+            if (staleStdlib.delete()) {
+                logger.lifecycle("[RunAnywhereCore] Removed bundled libc++_shared.so: ${staleStdlib}")
+            }
         }
 
         // Check if libs are already bundled for ALL requested ABIs (npm install case)
@@ -396,6 +477,20 @@ task downloadNativeLibs {
     }
 }
 
+task syncAndroidRuntimeLibs {
+    description = "Stages 16 KB-aligned Android NDK runtime libraries"
+    group = "build setup"
+
+    if (!useLocalBuild) {
+        dependsOn downloadNativeLibs
+    }
+
+    doLast {
+        syncAndroidNdkRuntimeLibs(jniLibsDir, true, true)
+        logger.lifecycle("[RunAnywhereCore] Synced 16 KB-aligned Android NDK runtime libs into ${jniLibsDir}")
+    }
+}
+
 if (!useLocalBuild) {
     preBuild.dependsOn downloadNativeLibs
 
@@ -407,6 +502,8 @@ if (!useLocalBuild) {
         }
     }
 }
+
+preBuild.dependsOn syncAndroidRuntimeLibs
 
 // NOTE: cleanNativeLibs is NOT attached to clean task because npm-bundled libs should persist
 // Only use this task manually when needed during development
@@ -432,4 +529,11 @@ dependencies {
 
     // AndroidX Security for EncryptedSharedPreferences (device identity persistence)
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
+
+    // OkHttp for the platform HTTP transport.
+    // Routes rac_http_request_* through the system trust store + HTTP/2
+    // + proxies + NetworkSecurityConfig instead of libcurl. React Native
+    // pulls OkHttp transitively but does NOT expose it to library modules,
+    // so we declare it explicitly.
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
 }

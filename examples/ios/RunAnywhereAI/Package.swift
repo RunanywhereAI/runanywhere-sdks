@@ -6,8 +6,7 @@
 // This example app demonstrates how to use the RunAnywhere SDK.
 //
 // SETUP (first time):
-//   cd ../../sdk/runanywhere-swift
-//   ./scripts/build-swift.sh --setup
+//   ./sdk/runanywhere-swift/scripts/build-core-xcframework.sh
 //
 // Then open this project in Xcode and build.
 //
@@ -19,8 +18,12 @@ let package = Package(
     name: "RunAnywhereAI",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14)
+        // Must be ≥ the root Package.swift platform floor so the local-path
+        // dependency on RunAnywhere / RunAnywhereONNX / RunAnywhereLlamaCPP
+        // resolves cleanly (root manifest was bumped to iOS 17.5 / macOS
+        // 14.5 in T5.4).
+        .iOS("17.5"),
+        .macOS("14.5")
     ],
     products: [
         .library(
@@ -46,9 +49,8 @@ let package = Package(
                 .product(name: "RunAnywhere", package: "runanywhere-sdks"),
 
                 // Optional modules - pick what you need:
-                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),         // STT/TTS/VAD (CPU via ONNX)
+                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),         // STT/TTS/VAD (CPU via ONNX/Sherpa)
                 .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),     // LLM
-                .product(name: "RunAnywhereWhisperKit", package: "runanywhere-sdks"),   // STT (Apple Neural Engine)
             ],
             path: "RunAnywhereAI",
             exclude: [

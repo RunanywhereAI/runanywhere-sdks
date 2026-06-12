@@ -6,9 +6,7 @@ module.exports = {
         packageImportPath: 'import com.margelo.nitro.runanywhere.llama.RunAnywhereLlamaPackage;',
         packageInstance: 'new RunAnywhereLlamaPackage()',
       },
-      ios: {
-        podspecPath: './RunAnywhereLlama.podspec',
-      },
+      ios: {},
     },
   },
 };

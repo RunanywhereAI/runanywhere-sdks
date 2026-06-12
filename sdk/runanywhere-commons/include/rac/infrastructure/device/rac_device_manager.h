@@ -9,7 +9,7 @@
  * - Registration persistence (UserDefaults/SharedPreferences)
  * - HTTP transport (URLSession/OkHttp)
  *
- * Events are emitted via rac_analytics_event_emit().
+ * Events are emitted as canonical proto SDKEvents via rac::events::publish_*.
  */
 
 #ifndef RAC_DEVICE_MANAGER_H
@@ -123,6 +123,14 @@ typedef struct rac_device_callbacks {
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* callbacks);
+
+/**
+ * @brief Backward-compatible alias for rac_device_manager_set_callbacks.
+ *
+ * Some FFI bindings use the shorter device callback symbol while the canonical
+ * C++ device manager API uses rac_device_manager_set_callbacks().
+ */
+RAC_API rac_result_t rac_device_set_callbacks(const rac_device_callbacks_t* callbacks);
 
 /**
  * @brief Register device with backend if not already registered

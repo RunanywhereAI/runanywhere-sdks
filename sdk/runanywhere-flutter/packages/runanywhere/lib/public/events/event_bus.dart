@@ -1,84 +1,87 @@
 import 'dart:async';
 
-import 'package:runanywhere/public/events/sdk_event.dart';
+import 'package:runanywhere/generated/component_types.pbenum.dart';
+import 'package:runanywhere/generated/sdk_events.pb.dart';
 
-/// Central event bus for SDK-wide event distribution
-/// Thread-safe event bus using Dart Streams
+/// Central event bus for generated SDKEvent proto distribution.
 class EventBus {
   /// Shared instance - thread-safe singleton
   static final EventBus shared = EventBus._();
 
   EventBus._();
 
-  // Event controllers for each event type
-  final _initializationController =
-      StreamController<SDKInitializationEvent>.broadcast();
-  final _configurationController =
-      StreamController<SDKConfigurationEvent>.broadcast();
-  final _generationController =
-      StreamController<SDKGenerationEvent>.broadcast();
-  final _modelController = StreamController<SDKModelEvent>.broadcast();
-  final _voiceController = StreamController<SDKVoiceEvent>.broadcast();
-  final _storageController = StreamController<SDKStorageEvent>.broadcast();
-  final _deviceController = StreamController<SDKDeviceEvent>.broadcast();
-  final _ragController = StreamController<SDKRAGEvent>.broadcast();
   final _allEventsController = StreamController<SDKEvent>.broadcast();
 
-  /// Public streams for subscribing to events
-  Stream<SDKInitializationEvent> get initializationEvents =>
-      _initializationController.stream;
+  /// Native publish hook injected by [DartBridgeEvents] during SDK init.
+  ///
+  /// When set, [publish] delegates to this callback first and falls back to
+  /// the local stream only when it returns false. Avoids a circular import
+  /// between event_bus.dart and dart_bridge_events.dart.
+  Future<bool> Function(SDKEvent)? _nativePublish;
 
-  Stream<SDKConfigurationEvent> get configurationEvents =>
-      _configurationController.stream;
+  /// Inject the native publish callback. Called once by [DartBridgeEvents]
+  /// after the C++ commons bridge is available.
+  void setNativePublish(Future<bool> Function(SDKEvent) fn) {
+    _nativePublish = fn;
+  }
 
-  Stream<SDKGenerationEvent> get generationEvents =>
-      _generationController.stream;
+  /// Public streams for subscribing to generated proto events.
+  Stream<SDKEvent> get initializationEvents =>
+      _where(EventCategory.EVENT_CATEGORY_INITIALIZATION);
 
-  Stream<SDKModelEvent> get modelEvents => _modelController.stream;
+  Stream<SDKEvent> get generationEvents =>
+      _where(EventCategory.EVENT_CATEGORY_LLM);
 
-  Stream<SDKVoiceEvent> get voiceEvents => _voiceController.stream;
+  Stream<SDKEvent> get modelEvents =>
+      _where(EventCategory.EVENT_CATEGORY_MODEL);
 
-  Stream<SDKStorageEvent> get storageEvents => _storageController.stream;
+  Stream<SDKEvent> get voiceEvents =>
+      _where(EventCategory.EVENT_CATEGORY_VOICE_AGENT);
 
-  Stream<SDKDeviceEvent> get deviceEvents => _deviceController.stream;
+  Stream<SDKEvent> get storageEvents =>
+      _where(EventCategory.EVENT_CATEGORY_STORAGE);
 
-  Stream<SDKRAGEvent> get ragEvents => _ragController.stream;
+  Stream<SDKEvent> get deviceEvents =>
+      _where(EventCategory.EVENT_CATEGORY_DEVICE);
+
+  Stream<SDKEvent> get ragEvents => _where(EventCategory.EVENT_CATEGORY_RAG);
 
   Stream<SDKEvent> get allEvents => _allEventsController.stream;
 
-  /// Generic event publisher - dispatches to appropriate stream
-  void publish(SDKEvent event) {
-    _allEventsController.add(event);
+  /// Subscribe to events filtered by [category]. Mirrors Swift's
+  /// `EventBus.events(for:)` API surface — useful when callers want
+  /// dynamic category selection instead of using a named getter.
+  Stream<SDKEvent> onCategory(EventCategory category) => _where(category);
 
-    if (event is SDKInitializationEvent) {
-      _initializationController.add(event);
-    } else if (event is SDKConfigurationEvent) {
-      _configurationController.add(event);
-    } else if (event is SDKGenerationEvent) {
-      _generationController.add(event);
-    } else if (event is SDKModelEvent) {
-      _modelController.add(event);
-    } else if (event is SDKVoiceEvent) {
-      _voiceController.add(event);
-    } else if (event is SDKStorageEvent) {
-      _storageController.add(event);
-    } else if (event is SDKDeviceEvent) {
-      _deviceController.add(event);
-    } else if (event is SDKRAGEvent) {
-      _ragController.add(event);
+  /// Publish [event] through the C++ commons event pipeline first; fall back
+  /// to the local broadcast stream only when native publish is unavailable.
+  ///
+  /// Mirrors Swift's `if !CppBridge.Events.publishSDKEvent(event) { subject.send(event) }`.
+  Future<void> publish(SDKEvent event) async {
+    if (_allEventsController.isClosed) return;
+    final nativePublish = _nativePublish;
+    if (nativePublish != null) {
+      final published = await nativePublish(event);
+      if (published) return;
     }
+    _allEventsController.add(event);
+  }
+
+  /// Fan-out an event that has already been delivered by the native layer.
+  ///
+  /// Used exclusively by [DartBridgeEvents.emit] so that events received from
+  /// C++ commons are broadcast to Dart subscribers without triggering a
+  /// redundant [rac_sdk_event_publish_proto] round-trip back to native.
+  void addFromNative(SDKEvent event) {
+    if (_allEventsController.isClosed) return;
+    _allEventsController.add(event);
   }
 
   /// Dispose all controllers
   Future<void> dispose() async {
-    await _initializationController.close();
-    await _configurationController.close();
-    await _generationController.close();
-    await _modelController.close();
-    await _voiceController.close();
-    await _storageController.close();
-    await _deviceController.close();
-    await _ragController.close();
     await _allEventsController.close();
   }
+
+  Stream<SDKEvent> _where(EventCategory category) =>
+      _allEventsController.stream.where((event) => event.category == category);
 }

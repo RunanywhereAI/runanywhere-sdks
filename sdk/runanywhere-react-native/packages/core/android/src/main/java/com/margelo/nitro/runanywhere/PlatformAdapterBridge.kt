@@ -1,15 +1,18 @@
 /**
  * PlatformAdapterBridge.kt
  *
- * JNI bridge for platform-specific operations (secure storage).
+ * JNI bridge for platform-specific operations (secure storage, device info,
+ * and platform-adapter download fallback).
  * Called from C++ via JNI.
  *
- * Reference: sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
+ * Reference: sdk/runanywhere-kotlin/src/main/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
  */
 
 package com.margelo.nitro.runanywhere
 
+import android.content.Context
 import android.util.Log
+import com.margelo.nitro.NitroModules
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -53,12 +56,20 @@ object PlatformAdapterBridge {
             }
         }
 
+    private fun applicationContext(): Context? {
+        SecureStorageManager.getContext()?.let { return it }
+        val context = NitroModules.applicationContext ?: return null
+        SecureStorageManager.initialize(context.applicationContext)
+        return SecureStorageManager.getContext()
+    }
+
     /**
      * Called from C++ to set a secure value
      */
     @JvmStatic
     fun secureSet(key: String, value: String): Boolean {
         Log.d(TAG, "secureSet key=$key")
+        applicationContext()
         return SecureStorageManager.set(key, value)
     }
 
@@ -68,6 +79,7 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun secureGet(key: String): String? {
         Log.d(TAG, "secureGet key=$key")
+        applicationContext()
         return SecureStorageManager.get(key)
     }
 
@@ -77,6 +89,7 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun secureDelete(key: String): Boolean {
         Log.d(TAG, "secureDelete key=$key")
+        applicationContext()
         return SecureStorageManager.delete(key)
     }
 
@@ -85,6 +98,7 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun secureExists(key: String): Boolean {
+        applicationContext()
         return SecureStorageManager.exists(key)
     }
 
@@ -94,110 +108,28 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun getPersistentDeviceUUID(): String {
         Log.d(TAG, "getPersistentDeviceUUID")
+        applicationContext()
         return SecureStorageManager.getPersistentDeviceUUID()
     }
 
-    // ========================================================================
-    // HTTP POST for Device Registration (Synchronous)
-    // Matches Kotlin SDK's CppBridgeDevice.httpPost
-    // ========================================================================
-
     /**
-     * HTTP response data class
-     */
-    data class HttpResponse(
-        val success: Boolean,
-        val statusCode: Int,
-        val responseBody: String?,
-        val errorMessage: String?
-    )
-
-    /**
-     * Synchronous HTTP POST for device registration
-     * Called from C++ device manager callbacks via JNI
-     *
-     * @param url Full URL to POST to
-     * @param jsonBody JSON body string
-     * @param supabaseKey Supabase API key (for dev mode, can be null)
-     * @return HttpResponse with result
+     * Return the native app files directory used as the model-path base.
      */
     @JvmStatic
-    fun httpPostSync(url: String, jsonBody: String, supabaseKey: String?): HttpResponse {
-        Log.d(TAG, "httpPostSync to: $url")
-        // Log first 300 chars of JSON body for debugging
-        Log.d(TAG, "httpPostSync body (first 300 chars): ${jsonBody.take(300)}")
-
-        // For Supabase device registration, add ?on_conflict=device_id for UPSERT
-        // This matches Swift's HTTPService.swift logic
-        var finalUrl = url
-        if (url.contains("/rest/v1/sdk_devices") && !url.contains("on_conflict=")) {
-            val separator = if (url.contains("?")) "&" else "?"
-            finalUrl = "$url${separator}on_conflict=device_id"
-            Log.d(TAG, "Added on_conflict for UPSERT: $finalUrl")
-        }
-
-        return try {
-            val urlConnection = java.net.URL(finalUrl).openConnection() as java.net.HttpURLConnection
-            urlConnection.requestMethod = "POST"
-            urlConnection.connectTimeout = 30000
-            urlConnection.readTimeout = 30000
-            urlConnection.doOutput = true
-
-            // Headers
-            urlConnection.setRequestProperty("Content-Type", "application/json")
-            urlConnection.setRequestProperty("Accept", "application/json")
-
-            // Supabase headers (for device registration UPSERT)
-            if (!supabaseKey.isNullOrEmpty()) {
-                urlConnection.setRequestProperty("apikey", supabaseKey)
-                urlConnection.setRequestProperty("Authorization", "Bearer $supabaseKey")
-                urlConnection.setRequestProperty("Prefer", "resolution=merge-duplicates")
-            }
-
-            // Write body
-            urlConnection.outputStream.use { os ->
-                os.write(jsonBody.toByteArray(Charsets.UTF_8))
-            }
-
-            val statusCode = urlConnection.responseCode
-            val responseBody = try {
-                urlConnection.inputStream.bufferedReader().use { it.readText() }
-            } catch (e: Exception) {
-                urlConnection.errorStream?.bufferedReader()?.use { it.readText() }
-            }
-
-            // 2xx or 409 (conflict/already exists) = success for device registration
-            val isSuccess = statusCode in 200..299 || statusCode == 409
-
-            Log.d(TAG, "httpPostSync completed: status=$statusCode success=$isSuccess")
-            if (!isSuccess) {
-                Log.e(TAG, "httpPostSync error response: $responseBody")
-            }
-
-            HttpResponse(
-                success = isSuccess,
-                statusCode = statusCode,
-                responseBody = responseBody,
-                errorMessage = if (!isSuccess) "HTTP $statusCode" else null
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "httpPostSync error", e)
-            HttpResponse(
-                success = false,
-                statusCode = 0,
-                responseBody = null,
-                errorMessage = e.message ?: "Unknown error"
-            )
-        }
+    fun getModelBaseDirectory(): String? {
+        val context = applicationContext()
+        val path = context?.filesDir?.absolutePath
+        Log.d(TAG, "getModelBaseDirectory path=$path")
+        return path
     }
 
     // ========================================================================
-    // HTTP Download (Async, Platform Adapter)
+    // HTTP Download (Async, Platform Adapter Fallback)
     // ========================================================================
 
     /**
-     * Start an HTTP download (async).
-     * Called from C++ platform adapter with a provided taskId.
+     * Start an HTTP download for RACommons platform-adapter-only callers.
+     * Public RN model downloads use native C++ rac_http_download_execute.
      */
     @JvmStatic
     fun httpDownload(url: String, destinationPath: String, taskId: String): Int {
@@ -411,7 +343,7 @@ object PlatformAdapterBridge {
                 Log.w(TAG, "getTotalMemory via ActivityManager failed: ${e.message}")
             }
         }
-        
+
         // Fallback: Read from /proc/meminfo (works without Context)
         try {
             val memInfoFile = java.io.File("/proc/meminfo")
@@ -430,7 +362,7 @@ object PlatformAdapterBridge {
         } catch (e: Exception) {
             Log.w(TAG, "getTotalMemory via /proc/meminfo failed: ${e.message}")
         }
-        
+
         // Last resort: Return a reasonable default for modern phones (4GB)
         return 4L * 1024 * 1024 * 1024
     }
@@ -454,7 +386,7 @@ object PlatformAdapterBridge {
                 Log.w(TAG, "getAvailableMemory via ActivityManager failed: ${e.message}")
             }
         }
-        
+
         // Fallback: Read from /proc/meminfo (works without Context)
         try {
             val memInfoFile = java.io.File("/proc/meminfo")
@@ -476,7 +408,7 @@ object PlatformAdapterBridge {
         } catch (e: Exception) {
             Log.w(TAG, "getAvailableMemory via /proc/meminfo failed: ${e.message}")
         }
-        
+
         // Last resort: Return half of total as estimate
         return getTotalMemory() / 2
     }
@@ -512,7 +444,7 @@ object PlatformAdapterBridge {
     fun getGPUFamily(): String {
         val chipName = getChipName().lowercase()
         val manufacturer = android.os.Build.MANUFACTURER.lowercase()
-        
+
         return when {
             // Google Pixel codenames (all use Mali GPUs from Samsung/Google Tensor)
             chipName == "bluejay" -> "mali"      // Pixel 6a (Tensor)
@@ -529,19 +461,19 @@ object PlatformAdapterBridge {
             chipName == "komodo" -> "mali"       // Pixel 9 Pro (Tensor G4)
             chipName == "comet" -> "mali"        // Pixel 9 Pro XL (Tensor G4)
             chipName == "tokay" -> "mali"        // Pixel 9 Pro Fold (Tensor G4)
-            
+
             // Google Tensor generic patterns
             chipName.contains("tensor") -> "mali"
             chipName.contains("gs1") -> "mali"   // GS101 (Tensor)
             chipName.contains("gs2") -> "mali"   // GS201 (Tensor G2)
             chipName.contains("zuma") -> "mali"  // Zuma (Tensor G3)
             manufacturer == "google" -> "mali"   // Default for Google devices
-            
+
             // Samsung Exynos uses Mali GPUs
             chipName.contains("exynos") -> "mali"
             chipName.startsWith("s5e") -> "mali" // Samsung internal naming (e.g., s5e8535)
             chipName.contains("samsung") -> "mali"
-            
+
             // Qualcomm Snapdragon uses Adreno GPUs
             chipName.contains("snapdragon") -> "adreno"
             chipName.contains("qualcomm") -> "adreno"
@@ -556,25 +488,25 @@ object PlatformAdapterBridge {
             chipName.contains("kalama") -> "adreno" // Snapdragon 8 Gen 2
             chipName.contains("pineapple") -> "adreno" // Snapdragon 8 Gen 3
             manufacturer == "qualcomm" -> "adreno"
-            
+
             // MediaTek uses Mali GPUs (mostly)
             chipName.contains("mediatek") -> "mali"
             chipName.contains("mt6") -> "mali"   // MT6xxx series
             chipName.contains("mt8") -> "mali"   // MT8xxx series
             chipName.contains("dimensity") -> "mali"
             chipName.contains("helio") -> "mali"
-            
+
             // HiSilicon Kirin uses Mali GPUs
             chipName.contains("kirin") -> "mali"
             chipName.contains("hisilicon") -> "mali"
-            
+
             // Intel/x86 GPUs
             chipName.contains("intel") -> "intel"
-            
+
             // NVIDIA (rare on mobile)
             chipName.contains("nvidia") -> "nvidia"
             chipName.contains("tegra") -> "nvidia"
-            
+
             else -> "unknown"
         }
     }
@@ -588,11 +520,92 @@ object PlatformAdapterBridge {
     fun isTablet(): Boolean {
         val context = SecureStorageManager.getContext()
         if (context != null) {
-            val screenLayout = context.resources.configuration.screenLayout and 
+            val screenLayout = context.resources.configuration.screenLayout and
                 android.content.res.Configuration.SCREENLAYOUT_SIZE_MASK
             return screenLayout >= android.content.res.Configuration.SCREENLAYOUT_SIZE_LARGE
         }
         // Fallback: Check display metrics if context unavailable
         return false
+    }
+
+    // ========================================================================
+    // Directory Enumeration (Platform Adapter Slots)
+    //
+    // Cross-SDK parity with the Kotlin SDK sibling and Swift / Flutter /
+    // Web. The C++
+    // model-registry refresh path (rescan_local) and
+    // rac_model_info_make_proto's is_downloaded probe for multi-file
+    // artifacts read these via JNI from InitBridge.cpp.
+    // ========================================================================
+
+    /**
+     * Directory entry surface mirroring `rac_directory_entry_t` field-for-field
+     * so the C++ side can populate `rac_directory_entry_t` arrays via FieldID
+     * reflection without an additional marshalling layer.
+     */
+    data class RacDirectoryEntry(
+        val name: String,
+        val isDir: Boolean,
+        val sizeBytes: Long,
+    )
+
+    /**
+     * Maximum entry name length (incl. NUL) per `RAC_DIRECTORY_ENTRY_NAME_MAX`.
+     * Oversized entries are skipped per the truncation contract in
+     * `rac_platform_adapter.h::rac_directory_entry_t::name`.
+     */
+    private const val DIRECTORY_ENTRY_NAME_MAX = 512
+
+    /**
+     * Enumerate directory entries via java.io.File.listFiles().
+     *
+     * @return Array of RacDirectoryEntry or null if the path does not exist /
+     *         is not a directory. Oversized names (UTF-8 + NUL > 512) are
+     *         filtered out with a single WARN summary; the C++ layer enforces
+     *         the same contract defensively.
+     */
+    @JvmStatic
+    fun fileListDirectory(dirPath: String): Array<RacDirectoryEntry>? {
+        val dir = File(dirPath)
+        if (!dir.exists() || !dir.isDirectory) {
+            return null
+        }
+        val children = dir.listFiles() ?: return emptyArray()
+
+        var skipped = 0
+        val entries = ArrayList<RacDirectoryEntry>(children.size)
+        for (child in children) {
+            val name = child.name
+            val utf8Bytes = name.toByteArray(Charsets.UTF_8)
+            if (utf8Bytes.size + 1 > DIRECTORY_ENTRY_NAME_MAX) {
+                skipped++
+                continue
+            }
+            entries.add(
+                RacDirectoryEntry(
+                    name = name,
+                    isDir = child.isDirectory,
+                    sizeBytes = if (child.isFile) child.length() else 0L,
+                ),
+            )
+        }
+        if (skipped > 0) {
+            Log.w(TAG, "fileListDirectory: skipped $skipped oversized entry name(s) in $dirPath")
+        }
+        return entries.toTypedArray()
+    }
+
+    /**
+     * Cheap directory-probe used by rac_model_info_make_proto's is_downloaded
+     * gating for multi-file artifacts.
+     */
+    @JvmStatic
+    fun isNonEmptyDirectory(path: String): Boolean {
+        val dir = File(path)
+        if (!dir.exists() || !dir.isDirectory) {
+            return false
+        }
+        val children = dir.list() ?: return false
+        return children.isNotEmpty()
     }
 }

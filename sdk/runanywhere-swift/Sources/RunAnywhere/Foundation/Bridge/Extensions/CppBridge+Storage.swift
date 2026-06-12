@@ -7,8 +7,28 @@
 
 import CRACommons
 import Foundation
+import SwiftProtobuf
 
 // MARK: - Storage Bridge
+
+private enum StorageProtoABI {
+    typealias StorageProtoFunction = @convention(c) (
+        rac_storage_analyzer_handle_t?,
+        rac_model_registry_handle_t?,
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let info = NativeProtoABI.load(
+        "rac_storage_analyzer_info_proto",
+        as: StorageProtoFunction.self
+    )
+    static let delete = NativeProtoABI.load(
+        "rac_storage_analyzer_delete_proto",
+        as: StorageProtoFunction.self
+    )
+}
 
 extension CppBridge {
 
@@ -31,6 +51,9 @@ extension CppBridge {
             callbacks.path_exists = storagePathExistsCallback
             callbacks.get_available_space = storageGetAvailableSpaceCallback
             callbacks.get_total_space = storageGetTotalSpaceCallback
+            callbacks.delete_path = storageDeletePathCallback
+            callbacks.is_model_loaded = nil  // C++ treats missing callback as "loaded state unavailable"
+            callbacks.unload_model = nil     // C++ refuses to unload-then-delete when callback is NULL
             callbacks.user_data = nil  // We use global FileManager
 
             var handlePtr: rac_storage_analyzer_handle_t?
@@ -51,114 +74,34 @@ extension CppBridge {
 
         // MARK: - Public API
 
-        /// Analyze overall storage
-        /// C++ iterates models, calculates paths, calls Swift for sizes
-        public func analyzeStorage() async -> StorageInfo {
-            guard let handle = handle else {
-                return .empty
-            }
-
-            // Get registry handle from CppBridge.ModelRegistry
-            // Note: We need access to the registry's handle
-            let registryHandle = await getRegistryHandle()
-            guard let regHandle = registryHandle else {
-                return .empty
-            }
-
-            var cInfo = rac_storage_info_t()
-            let result = rac_storage_analyzer_analyze(handle, regHandle, &cInfo)
-
-            guard result == RAC_SUCCESS else {
-                logger.error("Storage analysis failed: \(result)")
-                return .empty
-            }
-
-            defer { rac_storage_info_free(&cInfo) }
-
-            // Convert C++ result to Swift types
-            return StorageInfo(from: cInfo)
-        }
-
-        /// Get storage metrics for a specific model
-        public func getModelStorageMetrics(
-            modelId: String,
-            framework: InferenceFramework
-        ) async -> ModelStorageMetrics? {
-            guard let handle = handle else { return nil }
-
-            let registryHandle = await getRegistryHandle()
-            guard let regHandle = registryHandle else { return nil }
-
-            var cMetrics = rac_model_storage_metrics_t()
-            let result = modelId.withCString { mid in
-                rac_storage_analyzer_get_model_metrics(
-                    handle, regHandle, mid, framework.toCFramework(), &cMetrics
+        public func info(_ request: RAStorageInfoRequest = RAStorageInfoRequest()) async -> RAStorageInfoResult {
+            do {
+                return try await invokeProto(
+                    request,
+                    symbol: StorageProtoABI.info,
+                    responseType: RAStorageInfoResult.self
                 )
+            } catch {
+                var result = RAStorageInfoResult()
+                result.success = false
+                result.errorMessage = String(describing: error)
+                return result
             }
-
-            guard result == RAC_SUCCESS else { return nil }
-
-            // Get full ModelInfo from registry for complete data
-            guard let modelInfo = await CppBridge.ModelRegistry.shared.get(modelId: modelId) else {
-                return nil
-            }
-
-            return ModelStorageMetrics(model: modelInfo, sizeOnDisk: cMetrics.size_on_disk)
         }
 
-        /// Check if storage is available for a download
-        /// Note: nonisolated because it only calls C functions and doesn't need actor state
-        public nonisolated func checkStorageAvailable(
-            modelSize: Int64,
-            safetyMargin: Double = 0.1
-        ) -> StorageAvailability {
-            // Use C callbacks directly for synchronous check
-            let available = storageGetAvailableSpaceCallback(userData: nil)
-            let required = Int64(Double(modelSize) * (1.0 + safetyMargin))
-
-            let isAvailable = available > required
-            let hasWarning = available < required * 2
-
-            let recommendation: String?
-            if !isAvailable {
-                let shortfall = required - available
-                let formatter = ByteCountFormatter()
-                formatter.countStyle = .memory
-                recommendation = "Need \(formatter.string(fromByteCount: shortfall)) more space."
-            } else if hasWarning {
-                recommendation = "Storage space is getting low."
-            } else {
-                recommendation = nil
+        public func delete(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
+            do {
+                return try await invokeProto(
+                    request,
+                    symbol: StorageProtoABI.delete,
+                    responseType: RAStorageDeleteResult.self
+                )
+            } catch {
+                var result = RAStorageDeleteResult()
+                result.success = false
+                result.errorMessage = String(describing: error)
+                return result
             }
-
-            return StorageAvailability(
-                isAvailable: isAvailable,
-                requiredSpace: required,
-                availableSpace: available,
-                hasWarning: hasWarning,
-                recommendation: recommendation
-            )
-        }
-
-        /// Calculate size at a path
-        public func calculateSize(at path: URL) throws -> Int64 {
-            guard let handle = handle else {
-                throw SDKError.general(.initializationFailed, "Storage analyzer not initialized")
-            }
-
-            var size: Int64 = 0
-            let result = path.path.withCString { pathPtr in
-                rac_storage_analyzer_calculate_size(handle, pathPtr, &size)
-            }
-
-            guard result == RAC_SUCCESS else {
-                if result == RAC_ERROR_NOT_FOUND {
-                    throw SDKError.fileManagement(.fileNotFound, "Path not found: \(path.path)")
-                }
-                throw SDKError.general(.processingFailed, "Failed to calculate size")
-            }
-
-            return size
         }
 
         // MARK: - Private
@@ -168,6 +111,31 @@ extension CppBridge {
             // Note: We need to expose this from CppBridge.ModelRegistry
             return await CppBridge.ModelRegistry.shared.getHandle()
         }
+
+        private func invokeProto<Request: Message, Response: Message>(
+            _ request: Request,
+            symbol: StorageProtoABI.StorageProtoFunction?,
+            responseType: Response.Type
+        ) async throws -> Response {
+            guard let symbol, NativeProtoABI.canReceiveProtoBuffer else {
+                throw SDKException(code: .notSupported, message: NativeProtoABI.unavailableMessage, category: .internal)
+            }
+            guard let handle = handle, let registryHandle = await getRegistryHandle() else {
+                throw SDKException(code: .initializationFailed, message: "Storage analyzer not initialized", category: .internal)
+            }
+
+            var outBuffer = rac_proto_buffer_t()
+            defer { NativeProtoABI.free(&outBuffer) }
+
+            let status = try NativeProtoABI.withSerializedBytes(request) { bytes, size in
+                symbol(handle, registryHandle, bytes, size, &outBuffer)
+            }
+            guard status == RAC_SUCCESS else {
+                throw SDKException(code: .processingFailed, message: "Storage proto request failed: \(status)", category: .internal)
+            }
+            return try NativeProtoABI.decode(responseType, from: outBuffer)
+        }
+
     }
 }
 
@@ -230,45 +198,21 @@ private func storageGetTotalSpaceCallback(userData _: UnsafeMutableRawPointer?) 
     }
 }
 
-// MARK: - Swift Type Conversions
-
-extension StorageInfo {
-    /// Initialize from C++ storage info
-    init(from cInfo: rac_storage_info_t) {
-        // Convert app storage
-        let appStorage = AppStorageInfo(
-            documentsSize: cInfo.app_storage.documents_size,
-            cacheSize: cInfo.app_storage.cache_size,
-            appSupportSize: cInfo.app_storage.app_support_size,
-            totalSize: cInfo.app_storage.total_size
-        )
-
-        // Convert device storage
-        let deviceStorage = DeviceStorageInfo(
-            totalSpace: cInfo.device_storage.total_space,
-            freeSpace: cInfo.device_storage.free_space,
-            usedSpace: cInfo.device_storage.used_space
-        )
-
-        // Convert model metrics - need to get full ModelInfo from registry
-        var models: [ModelStorageMetrics] = []
-        if let cModels = cInfo.models {
-            for i in 0..<cInfo.model_count {
-                let cMetrics = cModels[i]
-                // Create minimal ModelInfo from C++ data
-                let modelInfo = ModelInfo(
-                    id: cMetrics.model_id.map { String(cString: $0) } ?? "",
-                    name: cMetrics.model_name.map { String(cString: $0) } ?? "",
-                    category: .language,  // Will be enriched if needed
-                    format: ModelFormat(from: cMetrics.format),
-                    framework: InferenceFramework(from: cMetrics.framework),
-                    localPath: cMetrics.local_path.map { URL(fileURLWithPath: String(cString: $0)) }
-                )
-                models.append(ModelStorageMetrics(model: modelInfo, sizeOnDisk: cMetrics.size_on_disk))
-            }
-        }
-
-        self.init(appStorage: appStorage, deviceStorage: deviceStorage, models: models)
+private func storageDeletePathCallback(
+    path: UnsafePointer<CChar>?,
+    recursive _: CInt,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    guard let path else { return RAC_ERROR_INVALID_PATH }
+    let url = URL(fileURLWithPath: String(cString: path))
+    guard Foundation.FileManager.default.fileExists(atPath: url.path) else {
+        return RAC_ERROR_FILE_NOT_FOUND
+    }
+    do {
+        try Foundation.FileManager.default.removeItem(at: url)
+        return RAC_SUCCESS
+    } catch {
+        return RAC_ERROR_FILE_DELETE_FAILED
     }
 }
 

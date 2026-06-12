@@ -12,7 +12,7 @@ name: Release
 # distribution channel.
 #
 # Pre-flight (engineer runs locally before tagging):
-#   scripts/sync-versions.sh 1.2.3
+#   scripts/release/sync-versions.sh 1.2.3
 #   git add -u && git commit -m "chore: release 1.2.3"
 #   git tag v1.2.3
 #   git push origin main v1.2.3
@@ -58,7 +58,7 @@ jobs:
           PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
-            echo "::error::Run scripts/sync-versions.sh $V before tagging."
+            echo "::error::Run scripts/release/sync-versions.sh $V before tagging."
             exit 1
           fi
 
@@ -68,26 +68,25 @@ jobs:
 
   native_ios:
     needs: validate
-    runs-on: macos-14
+    # T5.7: macos-15 ships Xcode 16+ / Swift 6; the iOS/macOS native build
+    # consumes Swift 6.3.2 and brew formulas (swift-protobuf, grpc-swift v2)
+    # that require Xcode 16+. macos-14 only ships Xcode 15.x.
+    runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: ios
-      - name: Build all backends for iOS + macOS (Release)
-        working-directory: sdk/runanywhere-commons
-        run: ./scripts/build-ios.sh --backend all --release --include-macos --package
-      - name: Compute checksums
-        # build-ios.sh --package writes zips to dist/packages/, not dist/.
-        # Checksum each packaged zip and keep them in the same directory so
-        # they upload as one bundle.
-        working-directory: sdk/runanywhere-commons/dist/packages
-        run: |
-          for f in *.zip; do
-            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
-          done
-          ls -la
+      - name: Build + package XCFrameworks (commons + backends)
+        # build-ios.sh delegates the build to build-core-xcframework.sh (the
+        # same script pr-build.yml uses, so PR-time and tag-time take identical
+        # build paths), then stages the versioned RACommons*-ios-v<version>.zip
+        # + .sha256 sidecars into dist/packages/ — the layout sync-checksums.sh
+        # and the Package.swift binary targets expect.
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-commons/scripts/build-ios.sh
       - name: Upload iOS/macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -104,29 +103,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        abi: [arm64-v8a, armeabi-v7a, x86_64, x86]
+        # scripts/build/build-core-android.sh maps these to the canonical
+        # android-{arm64,armv7,x86_64} CMake presets. (Legacy 32-bit `x86`
+        # was never wired into the new build path and is dropped here.)
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: android
-      - name: Build all backends for Android (${{ matrix.abi }})
-        working-directory: sdk/runanywhere-commons
-        run: ./scripts/build-android.sh all ${{ matrix.abi }}
-      - name: Stage and zip per-ABI outputs
-        working-directory: sdk/runanywhere-commons
-        run: |
-          mkdir -p dist/android-staging/${{ matrix.abi }}
-          # Best-effort copy of standard layouts; tolerate missing dirs since some backends may not produce in this layout
-          for sub in jni unified llamacpp onnx; do
-            if [ -d "dist/android/$sub/${{ matrix.abi }}" ]; then
-              cp -R "dist/android/$sub/${{ matrix.abi }}/." "dist/android-staging/${{ matrix.abi }}/"
-            fi
-          done
-          (cd dist/android-staging && zip -r "../RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip" "${{ matrix.abi }}")
-          shasum -a 256 "dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip" \
-            > "dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256"
+      - name: Build + package commons for Android (${{ matrix.abi }})
+        # build-android.sh delegates the build to build-core-android.sh (the
+        # same script pr-build.yml uses), then stages the per-ABI .so set
+        # (commons + llamacpp + onnx, from src/main/jniLibs) into the versioned
+        # RACommons-android-<abi>-v<version>.zip + .sha256 under dist/.
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-commons/scripts/build-android.sh ${{ matrix.abi }}
       - name: Upload Android ABI artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -146,19 +140,13 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: linux
-      - name: Build commons + backends for Linux x86_64
-        working-directory: sdk/runanywhere-commons
-        run: ./scripts/build-linux.sh
-      - name: Package Linux outputs
-        working-directory: sdk/runanywhere-commons
-        run: |
-          if [ -d dist/linux ]; then
-            (cd dist/linux && tar czf "../RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" .)
-            shasum -a 256 "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" \
-              > "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
-          else
-            echo "::warning::dist/linux missing; build-linux.sh may have used a different output path"
-          fi
+      - name: Build + package commons for Linux x86_64
+        # build-linux.sh drives the linux-release CMake preset (same as PR-time),
+        # then stages the .so set + headers and packs the versioned
+        # RACommons-linux-x86_64-v<version>.tar.gz + .sha256 under dist/.
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-commons/scripts/build-linux.sh
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -167,7 +155,66 @@ jobs:
             sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz
             sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz.sha256
           retention-days: 7
-          if-no-files-found: warn
+          # Strict: matches iOS/Android/Web uploads + the `== 'success'`
+          # publish gate (pass3-syn-007). A missing tarball blocks publish.
+          if-no-files-found: error
+
+  native_rcli_macos:
+    needs: validate
+    # macos-14 pin: the rcli preset builds llama.cpp with GGML_METAL=ON, which
+    # Xcode 16's strict ARC rejects (same reason as pr-build macos jobs).
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install ninja protobuf
+      - name: Build rcli (macOS arm64, Metal)
+        run: |
+          cmake --preset rcli-macos-release
+          cmake --build --preset rcli-macos-release
+      - name: Package rcli tarball
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-macos-release macos-arm64
+      - name: Upload rcli macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcli-macos
+          path: |
+            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz
+            sdk/runanywhere-cli/dist/rcli-macos-arm64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_rcli_linux:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: linux
+      - run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev
+      - name: Sherpa-ONNX prebuilts
+        run: ./sdk/runanywhere-commons/scripts/linux/download-sherpa-onnx.sh
+      - name: Build rcli (Linux x86_64)
+        run: |
+          cmake --preset rcli-linux-release
+          cmake --build --preset rcli-linux-release
+      - name: Package rcli tarball
+        env:
+          RAC_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: bash sdk/runanywhere-cli/scripts/package-rcli.sh build/rcli-linux-release linux-x86_64
+      - name: Upload rcli Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcli-linux
+          path: |
+            sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz
+            sdk/runanywhere-cli/dist/rcli-linux-x86_64-v*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
 
   native_windows:
     needs: validate
@@ -186,13 +233,23 @@ jobs:
         working-directory: sdk/runanywhere-commons
         shell: bash
         run: |
-          if [ -d dist/windows ]; then
-            (cd dist/windows && 7z a "../RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" .)
-            sha256sum "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
-              > "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
-          else
-            echo "::warning::dist/windows missing; build-windows.bat may have used a different output path"
+          set -euo pipefail
+          # Hard-fail when dist/windows is missing. Previously this branch
+          # emitted a warning and exited 0, allowing the upload step
+          # (`if-no-files-found: warn`) and publish gate (`!= 'failure'`) to
+          # ship a release with no Windows artifact at all. Now symmetric
+          # with the iOS/Android/Web policy via pass3-syn-007 + pass3-syn-010.
+          if [ ! -d dist/windows ]; then
+            echo "::error::dist/windows missing — build-windows.bat may have failed or used a different output path"
+            exit 1
           fi
+          (cd dist/windows && 7z a "../RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" .)
+          if [ ! -f "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" ]; then
+            echo "::error::Windows zip not produced — refusing to publish without artifact"
+            exit 1
+          fi
+          sha256sum "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
+            > "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -201,7 +258,9 @@ jobs:
             sdk/runanywhere-commons/dist/RACommons-windows-*.zip
             sdk/runanywhere-commons/dist/RACommons-windows-*.zip.sha256
           retention-days: 7
-          if-no-files-found: warn
+          # Strict: matches iOS/Android/Web uploads + the `== 'success'`
+          # publish gate (pass3-syn-007). A missing zip blocks publish.
+          if-no-files-found: error
 
   native_web:
     needs: validate
@@ -212,16 +271,18 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: web
-      - name: Build WASM (all backends)
+      - name: Build WASM (CPU, llama.cpp + VLM)
         working-directory: sdk/runanywhere-web
-        run: ./scripts/build-web.sh --build-wasm --all-backends
+        run: npm run build:wasm -- --llamacpp --vlm
+      - name: Build WASM (WebGPU, llama.cpp + VLM)
+        working-directory: sdk/runanywhere-web
+        run: npm run build:wasm -- --llamacpp --vlm --webgpu
       - name: Package Web/WASM outputs
-        # build-web.sh puts every WASM variant (CPU, WebGPU, sherpa) under
-        # packages/llamacpp/wasm (see WASM_OUTPUT_DIR in scripts/build-web.sh).
-        # Also include packages/core/wasm if present (sherpa-onnx artifacts
-        # sometimes land here). Package only directories that actually exist
-        # so a missing optional variant (e.g. WebGPU on older emsdk) doesn't
-        # break the release.
+        # The new wasm/scripts/build.sh emits every WASM variant (CPU, WebGPU)
+        # under packages/llamacpp/wasm. Also include packages/core/wasm and
+        # packages/onnx/wasm if present (vendored sherpa-onnx / ONNX Runtime
+        # artifacts). Package only directories that actually exist so a
+        # missing optional variant doesn't break the release.
         working-directory: sdk/runanywhere-web
         run: |
           set -euo pipefail
@@ -231,7 +292,7 @@ jobs:
             [ -d "packages/$d" ] && tar_inputs+=("$d")
           done
           if [ ${#tar_inputs[@]} -eq 0 ]; then
-            echo "::error::No WASM output directories produced by build-web.sh"
+            echo "::error::No WASM output directories produced by npm run build:wasm"
             exit 1
           fi
           echo "Packaging: ${tar_inputs[*]}"
@@ -272,50 +333,20 @@ jobs:
         with:
           pattern: native-android-*
           path: native-android-staging
-      - name: Stage natives into Kotlin SDK
-        run: |
-          mkdir -p sdk/runanywhere-kotlin/src/androidMain/jniLibs
-          for abi_dir in native-android-staging/*; do
-            [ -d "$abi_dir" ] || continue
-            for zip in "$abi_dir"/*.zip; do
-              [ -f "$zip" ] || continue
-              echo "Extracting $zip"
-              unzip -o "$zip" -d sdk/runanywhere-kotlin/src/androidMain/jniLibs/
-            done
-          done
-          ls -la sdk/runanywhere-kotlin/src/androidMain/jniLibs/ || true
-      - name: Build Kotlin AAR + JAR
-        # useLocalNatives=true: use the JNI libs staged above from native_android
-        # artifacts, not the release-asset URLs which don't exist until this
-        # workflow uploads them at the end.
-        #
-        # Skip `build` (which transitively compiles tests) and `test`; call
-        # only the packaging tasks directly. Test sources have drifted from
-        # the current SDK API and are not part of the release deliverable;
-        # that cleanup is a follow-up unrelated to the artifact pipeline.
-        #
-        # SDK_VERSION is consumed by build.gradle.kts (line ~52) to name the
-        # JVM JAR artifact. Without it, it falls back to "0.1.5-SNAPSHOT".
-        working-directory: sdk/runanywhere-kotlin
+          merge-multiple: true
+      - name: Package Kotlin SDK (AAR + JAR + checksums)
+        # Unified packaging contract: stage per-ABI natives → build release
+        # AAR + JVM JAR → checksum. SDK_VERSION names the JVM JAR.
         env:
           SDK_VERSION: ${{ needs.validate.outputs.version }}
-        run: ./gradlew -Prunanywhere.useLocalNatives=true assembleRelease jvmJar --no-daemon
-      - name: Collect Kotlin SDK artifacts
-        run: |
-          mkdir -p sdk-staging/kotlin
-          find sdk/runanywhere-kotlin/build/outputs/aar -name "*.aar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
-          find sdk/runanywhere-kotlin/build/libs -name "*.jar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
-          ls -la sdk-staging/kotlin/ || true
-          for f in sdk-staging/kotlin/*; do
-            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
-          done
+        run: bash sdk/runanywhere-kotlin/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-android-staging"
       - name: Upload Kotlin SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-kotlin
-          path: sdk-staging/kotlin/**
+          path: sdk/runanywhere-kotlin/dist/sdk-kotlin/**
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
 
   sdk_web:
     needs: [validate, native_web]
@@ -331,51 +362,110 @@ jobs:
         with:
           name: native-web
           path: native-web-staging
-      - name: Stage WASM into Web SDK
-        run: |
-          for tar in native-web-staging/*.tar.gz; do
-            [ -f "$tar" ] && tar xzf "$tar" -C sdk/runanywhere-web/packages/
-          done
-      - name: Install + build Web SDK
-        working-directory: sdk/runanywhere-web
-        run: |
-          npm install
-          npm run build:ts
-      - name: npm pack each Web package
-        working-directory: sdk/runanywhere-web
-        run: |
-          mkdir -p ../../sdk-staging/web
-          for pkg in packages/core packages/llamacpp packages/onnx; do
-            (cd "$pkg" && npm pack --pack-destination ../../../../sdk-staging/web/)
-          done
-          ls -la ../../sdk-staging/web/ || true
-          for f in ../../sdk-staging/web/*.tgz; do
-            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
-          done
+      - name: Package Web SDK (npm tarballs + checksums)
+        # Unified packaging contract: extract the WASM tarball into the npm
+        # workspaces → npm install + build:ts → npm pack each package → checksum.
+        # The script packs @runanywhere/proto-ts alongside the SDK packages (it
+        # tracks the SDK version, bumped by scripts/release/sync-versions.sh).
+        run: bash sdk/runanywhere-web/scripts/package-sdk.sh --mode ci --natives-from "$GITHUB_WORKSPACE/native-web-staging"
       - name: Upload Web SDK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sdk-web
-          path: sdk-staging/web/**
+          path: sdk/runanywhere-web/dist/sdk-web/**
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: error
+
+  sdk_react_native:
+    needs: [validate, native_ios, native_android]
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      # The RN tree pins `packageManager: yarn@3.6.1` (Yarn Berry). Activate it
+      # via Corepack at the workflow level so package-sdk.sh (and any later
+      # `yarn` invocation against the RN workspace) doesn't silently fall back
+      # to the runner's global yarn 1.x.
+      - name: Enable Corepack (yarn@3.6.1)
+        run: |
+          corepack enable
+          corepack prepare yarn@3.6.1 --activate
+      - name: Download iOS natives
+        uses: actions/download-artifact@v4
+        with:
+          name: native-ios-macos
+          path: native-ios-staging
+      - name: Download Android natives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-android-*
+          path: native-android-staging
+      - name: Stage natives into a single layout for package-sdk.sh
+        run: |
+          STAGING="$GITHUB_WORKSPACE/rn-natives-staging"
+          rm -rf "$STAGING"
+          mkdir -p "$STAGING"
+          # iOS: unzip every xcframework into the staging root so
+          # package-sdk.sh sees <Framework>.xcframework directories.
+          for zip in native-ios-staging/*.zip; do
+            [ -f "$zip" ] || continue
+            echo "Extracting iOS $zip"
+            unzip -o "$zip" -d "$STAGING"
+          done
+          # Android: each native-android-<abi> bundle contains a per-ABI zip
+          # of .so files; unpack into $STAGING/<abi>/.
+          for abi_dir in native-android-staging/*; do
+            [ -d "$abi_dir" ] || continue
+            for zip in "$abi_dir"/*.zip; do
+              [ -f "$zip" ] || continue
+              echo "Extracting Android $zip"
+              unzip -o "$zip" -d "$STAGING"
+            done
+          done
+          ls -la "$STAGING" || true
+      - name: Package RN SDK tarballs
+        env:
+          RAC_ALLOW_NPM_FALLBACK: "1"
+        run: |
+          bash sdk/runanywhere-react-native/scripts/package-sdk.sh \
+            --mode ci \
+            --natives-from "$GITHUB_WORKSPACE/rn-natives-staging"
+      - name: Upload RN SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-react-native
+          path: sdk/runanywhere-react-native/dist/sdk-rn/**
+          retention-days: 7
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------------
   # Consumer validation — clone each starter-app repo in RunanywhereAI org
   # and build it against the freshly-produced artifacts. Catches "looked
   # right, actually broken" regressions before the release goes out.
   #
-  # These are BEST-EFFORT: they warn on failure rather than failing the
-  # release, because starter repos evolve independently and a transient
-  # break shouldn't block a native-library release.
+  # Policy: STRICT. Every consumer-validation job must succeed for `publish`
+  # to fire (the gate at publish.if asserts `result == 'success'` on each).
+  # The prior mixed BEST-EFFORT/STRICT mode let starter-app regressions ship
+  # silently while one job (validate_consumer_flutter) blocked releases on
+  # unrelated lint drift. Unify on strict: a starter-app break holds the
+  # release until the starter is fixed. If a starter is intentionally
+  # mid-flight, gate that job with a workflow_dispatch input rather than
+  # a blanket `|| true`. See pass3-syn-008.
   # ---------------------------------------------------------------------------
 
   validate_consumer_swift:
-    needs: [validate, native_ios, sdk_kotlin]  # native_ios produces the iOS artifact this job downloads
+    # native_ios produces the iOS artifact this job downloads. Do NOT add
+    # sdk_kotlin here — the Swift consumer doesn't touch any Kotlin AAR/JAR
+    # and serializing macos-15 Swift validation behind ubuntu Kotlin
+    # packaging (~15-25 min on the release-day critical path) is wasteful.
+    # See pass3-syn-008.
+    needs: [validate, native_ios]
     if: always() && needs.validate.result == 'success'
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - name: Clone swift-starter-example
         uses: actions/checkout@v4
@@ -388,7 +478,9 @@ jobs:
           path: native-ios-staging
       - name: Build swift-starter-example against local artifacts
         run: |
+          set -euo pipefail
           cd consumer-swift
+          # Policy: STRICT (see comment block above validate_consumer_swift).
           # If the starter has an obvious build script, prefer it.
           if [ -x scripts/build.sh ]; then
             scripts/build.sh
@@ -396,9 +488,10 @@ jobs:
             swift package resolve
             swift build
           elif ls *.xcodeproj >/dev/null 2>&1 || ls *.xcworkspace >/dev/null 2>&1; then
-            xcodebuild -scheme "$(ls -d *.xcodeproj *.xcworkspace 2>/dev/null | head -1 | sed 's/\.xc[a-z]*$//')" -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build || true
+            xcodebuild -scheme "$(ls -d *.xcodeproj *.xcworkspace 2>/dev/null | head -1 | sed 's/\.xc[a-z]*$//')" -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
           else
-            echo "::warning::no recognizable Swift project in swift-starter-example"
+            echo "::error::no recognizable Swift project in swift-starter-example"
+            exit 1
           fi
 
   validate_consumer_kotlin:
@@ -406,7 +499,6 @@ jobs:
     if: always() && needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-toolchain
@@ -424,13 +516,16 @@ jobs:
           path: sdk-kotlin-staging
       - name: Build kotlin-starter-example
         run: |
+          set -euo pipefail
           cd consumer-kotlin
-          # Point the starter at our locally-packaged AAR via flatDir (best effort)
+          # Policy: STRICT (see comment block above validate_consumer_swift).
+          # Point the starter at our locally-packaged AAR via flatDir.
           if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
             ls -la ../sdk-kotlin-staging/ || true
-            ./gradlew build --no-daemon || echo "::warning::kotlin-starter-example build failed"
+            ./gradlew build --no-daemon
           else
-            echo "::warning::no Gradle project in kotlin-starter-example"
+            echo "::error::no Gradle project in kotlin-starter-example"
+            exit 1
           fi
 
   validate_consumer_web:
@@ -438,7 +533,6 @@ jobs:
     if: always() && needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-toolchain
@@ -455,16 +549,24 @@ jobs:
           path: sdk-web-staging
       - name: Install starter with locally-packed tarballs
         run: |
+          set -euo pipefail
           cd consumer-web
+          # Policy: STRICT (see comment block above validate_consumer_swift).
           if [ -f package.json ]; then
-            # Install each locally-packed tarball into the starter
+            # Install each locally-packed tarball into the starter.
             for tgz in ../sdk-web-staging/*.tgz; do
-              [ -f "$tgz" ] && npm install --no-save "$tgz" || true
+              [ -f "$tgz" ] || continue
+              npm install --no-save "$tgz"
             done
             npm install
-            npm run build || npm run typecheck || echo "::warning::web-starter-app build failed"
+            if npm run | grep -q '^  build$'; then
+              npm run build
+            else
+              npm run typecheck
+            fi
           else
-            echo "::warning::no package.json in web-starter-app"
+            echo "::error::no package.json in web-starter-app"
+            exit 1
           fi
 
   validate_consumer_flutter:
@@ -472,32 +574,83 @@ jobs:
     if: always() && needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
-      - uses: subosito/flutter-action@v2
+      # Check out THIS repo so the local Flutter SDK packages under
+      # sdk/runanywhere-flutter/ are present and can be staged with the
+      # freshly-built native artifacts from native_ios / native_android.
+      - uses: actions/checkout@v4
+      # FLUTTER_VERSION sourced from sdk/runanywhere-commons/VERSIONS.
+      - uses: ./.github/actions/setup-toolchain
         with:
-          channel: stable
+          platform: flutter
+      - name: Download iOS natives
+        uses: actions/download-artifact@v4
+        with:
+          name: native-ios-macos
+          path: native-ios-staging
+      - name: Download Android natives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-android-*
+          path: native-android-staging
+      - name: Stage natives into Flutter SDK plugin layouts
+        run: |
+          set -euo pipefail
+          # iOS: unzip xcframeworks into the Flutter plugin Binaries dirs so
+          # the local Flutter packages can resolve them.
+          IOS_DEST="$GITHUB_WORKSPACE/sdk/runanywhere-flutter/packages/runanywhere/ios/Binaries"
+          mkdir -p "$IOS_DEST"
+          for zip in native-ios-staging/*.zip; do
+            [ -f "$zip" ] || continue
+            echo "Extracting iOS $zip into $IOS_DEST"
+            unzip -o "$zip" -d "$IOS_DEST"
+          done
+          # Android: extract per-ABI .so layouts into each backend package's
+          # jniLibs dir.
+          ANDROID_DEST="$GITHUB_WORKSPACE/sdk/runanywhere-flutter/packages/runanywhere/android/src/main/jniLibs"
+          mkdir -p "$ANDROID_DEST"
+          for abi_dir in native-android-staging/*; do
+            [ -d "$abi_dir" ] || continue
+            for zip in "$abi_dir"/*.zip; do
+              [ -f "$zip" ] || continue
+              echo "Extracting Android $zip into $ANDROID_DEST"
+              unzip -o "$zip" -d "$ANDROID_DEST"
+            done
+          done
       - name: Clone flutter-starter-example
         uses: actions/checkout@v4
         with:
           repository: RunanywhereAI/flutter-starter-example
           path: consumer-flutter
-      - name: Analyze flutter-starter-example
+      - name: Apply local pubspec_overrides so the starter resolves in-tree packages
+        run: |
+          set -euo pipefail
+          if [ ! -f consumer-flutter/pubspec.yaml ]; then
+            echo "::error::no pubspec.yaml in flutter-starter-example"
+            exit 1
+          fi
+          cat > consumer-flutter/pubspec_overrides.yaml <<EOF
+          dependency_overrides:
+            runanywhere:
+              path: ../sdk/runanywhere-flutter/packages/runanywhere
+            runanywhere_llamacpp:
+              path: ../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
+            runanywhere_onnx:
+              path: ../sdk/runanywhere-flutter/packages/runanywhere_onnx
+            runanywhere_genie:
+              path: ../sdk/runanywhere-flutter/packages/runanywhere_genie
+          EOF
+      - name: Analyze flutter-starter-example against in-tree SDK
         run: |
           cd consumer-flutter
-          if [ -f pubspec.yaml ]; then
-            flutter pub get || echo "::warning::pub get failed"
-            flutter analyze || echo "::warning::flutter analyze failed"
-          else
-            echo "::warning::no pubspec.yaml in flutter-starter-example"
-          fi
+          flutter pub get
+          flutter analyze
 
   validate_consumer_react_native:
-    needs: [validate, native_ios, native_android]
+    needs: [validate, sdk_react_native]
     if: always() && needs.validate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-toolchain
@@ -508,14 +661,30 @@ jobs:
         with:
           repository: RunanywhereAI/react-native-starter-app
           path: consumer-rn
-      - name: Install RN starter
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-react-native
+          path: sdk-rn-staging
+      - name: Install RN starter with locally-packed tarballs
         run: |
+          set -euo pipefail
           cd consumer-rn
+          # Policy: STRICT (see comment block above validate_consumer_swift).
           if [ -f package.json ]; then
-            npm install --legacy-peer-deps || yarn install || echo "::warning::install failed"
-            npx tsc --noEmit 2>/dev/null || echo "::warning::RN typecheck failed"
+            # Install each locally-packed tarball into the starter so we
+            # validate the release candidates produced by this workflow,
+            # not whatever the registry happens to resolve.
+            for tgz in ../sdk-rn-staging/*.tgz; do
+              [ -f "$tgz" ] || continue
+              npm install --no-save --legacy-peer-deps "$tgz"
+            done
+            if ! npm install --legacy-peer-deps; then
+              yarn install
+            fi
+            npx tsc --noEmit
           else
-            echo "::warning::no package.json in react-native-starter-app"
+            echo "::error::no package.json in react-native-starter-app"
+            exit 1
           fi
 
   # ---------------------------------------------------------------------------
@@ -528,19 +697,35 @@ jobs:
       - native_ios
       - native_android
       - native_linux
+      - native_rcli_macos
+      - native_rcli_linux
       - native_windows
       - native_web
       - sdk_kotlin
       - sdk_web
+      - sdk_react_native
+      - validate_consumer_swift
+      - validate_consumer_kotlin
+      - validate_consumer_web
+      - validate_consumer_flutter
+      - validate_consumer_react_native
     if: >-
       needs.validate.result == 'success' &&
       needs.native_ios.result == 'success' &&
       needs.native_android.result == 'success' &&
-      needs.native_linux.result != 'failure' &&
-      needs.native_windows.result != 'failure' &&
+      needs.native_linux.result == 'success' &&
+      needs.native_rcli_macos.result == 'success' &&
+      needs.native_rcli_linux.result == 'success' &&
+      needs.native_windows.result == 'success' &&
       needs.native_web.result == 'success' &&
-      needs.sdk_kotlin.result != 'failure' &&
-      needs.sdk_web.result != 'failure'
+      needs.sdk_kotlin.result == 'success' &&
+      needs.sdk_web.result == 'success' &&
+      needs.sdk_react_native.result == 'success' &&
+      needs.validate_consumer_swift.result == 'success' &&
+      needs.validate_consumer_kotlin.result == 'success' &&
+      needs.validate_consumer_web.result == 'success' &&
+      needs.validate_consumer_flutter.result == 'success' &&
+      needs.validate_consumer_react_native.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -549,32 +734,112 @@ jobs:
         with:
           path: release-artifacts
       - name: Flatten + index assets
+        # Collision-detecting flatten. The previous `find ... -exec cp` form
+        # silently overwrote same-basename files coming from different artifact
+        # bundles (e.g. a future backend AAR rename or RN package layout
+        # change could drop assets with no CI signal). Use `cp -n` (no-clobber)
+        # and fail fast when any destination would be overwritten. See
+        # pass3-syn-070 / pass3-syn-071.
         run: |
+          set -euo pipefail
           mkdir -p release-flat
-          find release-artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.aar" -o -name "*.jar" -o -name "*.tgz" -o -name "*.sha256" \) -exec cp {} release-flat/ \;
+          collisions=0
+          while IFS= read -r -d '' src; do
+            dest="release-flat/$(basename "$src")"
+            if [ -e "$dest" ]; then
+              echo "::error::flatten collision: $dest already exists (incoming $src)"
+              collisions=$((collisions + 1))
+              continue
+            fi
+            cp "$src" "$dest"
+          done < <(find release-artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.aar" -o -name "*.jar" -o -name "*.tgz" -o -name "*.sha256" \) -print0)
+          if [ "$collisions" -ne 0 ]; then
+            echo "::error::Refusing to publish — $collisions filename collision(s) detected during flatten"
+            exit 1
+          fi
           (cd release-flat && ls -la > MANIFEST.txt)
           cat release-flat/MANIFEST.txt
+      - name: Assert release manifest contains every required client-SDK family
+        # Hard gate: every release MUST ship at least one AAR (Kotlin), one
+        # Web .tgz, one RN .tgz, the iOS XCFramework zips, the Android per-ABI
+        # zips, and the Web WASM tar. Without this assertion, a silent regression
+        # in any sdk_* packaging step (path glob drift, working-directory
+        # mistake, env-var miss) can publish a half-empty Release. See
+        # pass2-syn-037.
+        run: |
+          set -euo pipefail
+          MANIFEST="release-flat/MANIFEST.txt"
+          fail=0
+          assert_present() {
+            local label="$1"; shift
+            local pattern="$1"; shift
+            if ls release-flat/$pattern >/dev/null 2>&1; then
+              echo "  OK: $label ($pattern)"
+            else
+              echo "::error::Missing $label — no file matching '$pattern' in release-flat/"
+              fail=1
+            fi
+          }
+          assert_present "iOS XCFramework zip"      "RACommons-ios-v*.zip"
+          assert_present "Android per-ABI zip"      "RACommons-android-*-v*.zip"
+          assert_present "Web WASM tar"             "RACommons-web-v*.tar.gz"
+          assert_present "rcli macOS tarball"       "rcli-macos-arm64-v*.tar.gz"
+          assert_present "rcli Linux tarball"       "rcli-linux-x86_64-v*.tar.gz"
+          assert_present "Kotlin SDK AAR"           "*.aar"
+          # Kotlin JVM JAR
+          assert_present "Kotlin SDK JAR"           "*.jar"
+          # Web tarballs cover proto-ts + core + llamacpp + onnx (4 .tgz min).
+          web_tgz=$(ls release-flat/*.tgz 2>/dev/null | wc -l | tr -d ' ')
+          if [ "${web_tgz}" -lt 1 ]; then
+            echo "::error::No Web/RN .tgz tarballs in release-flat/"
+            fail=1
+          else
+            echo "  OK: client-SDK .tgz count=${web_tgz}"
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Release manifest assertion failed — aborting before publish."
+            exit 1
+          fi
+          echo "All required client-SDK families present in release manifest."
       - name: Sync Package.swift checksums from freshly-built XCFrameworks
         # Updates the SHA-256 checksum lines in Package.swift so SPM consumers
         # who pin to v${VERSION} can resolve the binary targets against the
         # zips we're attaching to this Release. The iOS zips are suffixed
         # `-ios-` since v0.19.0.
+        #
+        # This step is HARD-FAIL: a missing iOS zip (e.g. a rename regression
+        # in native_ios) combined with the all-zero placeholder checksums in
+        # Package.swift would otherwise let a draft Release ship with an
+        # unresolvable SPM manifest. We catch the failure here, before
+        # action-gh-release fires, rather than after external consumers try
+        # `swift package resolve`.
         run: |
-          if ls release-flat/RACommons-ios-v*.zip >/dev/null 2>&1; then
-            ./scripts/sync-checksums.sh release-flat
-            if ! git diff --quiet Package.swift; then
-              echo "Package.swift checksums updated:"
-              git diff Package.swift | head -40
-              # Attach the updated Package.swift as a release asset so
-              # consumers can see the correct checksums for this tag; also
-              # attach it locally so the next step can open a PR that folds
-              # these checksums back into main.
-              cp Package.swift release-flat/Package.swift.updated
-            else
-              echo "Package.swift checksums already match (no changes)"
-            fi
+          set -euo pipefail
+          if ! ls release-flat/RACommons-ios-v*.zip >/dev/null 2>&1; then
+            echo "::error::No RACommons-ios-v*.zip in release-flat — release would ship Package.swift with placeholder checksums"
+            ls -la release-flat/ || true
+            exit 1
+          fi
+          ./sdk/runanywhere-swift/scripts/sync-checksums.sh release-flat
+          if ! git diff --quiet Package.swift; then
+            echo "Package.swift checksums updated:"
+            git diff Package.swift | head -40
+            # Attach the updated Package.swift as a release asset so
+            # consumers can see the correct checksums for this tag; also
+            # attach it locally so the next step can open a PR that folds
+            # these checksums back into main.
+            cp Package.swift release-flat/Package.swift.updated
           else
-            echo "::warning::No RACommons-ios-v*.zip in release-flat — skipping checksum sync"
+            echo "Package.swift checksums already match (no changes)"
+          fi
+          # Refuse to publish if any binaryTarget.checksum still equals the
+          # all-zero sentinel — that means sync-checksums.sh didn't see a
+          # matching zip for that target, which is the exact failure mode
+          # this assertion exists to catch (see swift-runtimes-pass2-001).
+          ZERO_SENTINEL='checksum: "0000000000000000000000000000000000000000000000000000000000000000"'
+          if grep -F "$ZERO_SENTINEL" Package.swift; then
+            echo "::error::Package.swift still contains all-zero placeholder checksum lines after sync — refusing to publish"
+            exit 1
           fi
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
@@ -585,6 +850,6 @@ jobs:
           generate_release_notes: true
           files: |
             release-flat/*
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

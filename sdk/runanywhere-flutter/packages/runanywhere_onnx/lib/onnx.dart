@@ -22,27 +22,20 @@
 /// // Register the module (matches Swift: ONNX.register())
 /// await Onnx.register();
 ///
-/// // Add STT model
-/// Onnx.addModel(
-///   name: 'Sherpa Whisper Tiny',
-///   url: 'https://github.com/.../sherpa-onnx-whisper-tiny.en.tar.gz',
-///   modality: ModelCategory.speechRecognition,
-/// );
+/// // Register models through RunAnywhere.models.
+/// // The commons registry/router owns framework selection and routing.
 /// ```
-library runanywhere_onnx;
+library;
 
 import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
-import 'package:runanywhere/core/types/model_types.dart';
-import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/public/runanywhere.dart' show RunAnywhere;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show InferenceFramework;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_onnx/native/onnx_bindings.dart';
-
-// Re-export for backward compatibility
-export 'onnx_download_strategy.dart';
 
 /// ONNX Runtime module for STT, TTS, and VAD services.
 ///
@@ -81,27 +74,26 @@ class Onnx implements RunAnywhereModule {
 
   @override
   Set<SDKComponent> get capabilities => {
-        SDKComponent.stt,
-        SDKComponent.tts,
-        SDKComponent.vad,
+        SDKComponent.SDK_COMPONENT_STT,
+        SDKComponent.SDK_COMPONENT_TTS,
+        SDKComponent.SDK_COMPONENT_VAD,
       };
 
   @override
   int get defaultPriority => 100;
 
   @override
-  InferenceFramework get inferenceFramework => InferenceFramework.onnx;
+  InferenceFramework get inferenceFramework =>
+      InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
 
   // ============================================================================
   // Registration State
   // ============================================================================
 
   static bool _isRegistered = false;
+  static bool _isSherpaRegistered = false;
   static OnnxBindings? _bindings;
   static final _logger = SDKLogger('Onnx');
-
-  /// Internal model registry for models added via addModel
-  static final List<ModelInfo> _registeredModels = [];
 
   // ============================================================================
   // Registration (matches Swift ONNX.register() exactly)
@@ -109,8 +101,13 @@ class Onnx implements RunAnywhereModule {
 
   /// Register ONNX backend with the C++ service registry.
   ///
-  /// This calls `rac_backend_onnx_register()` to register all ONNX
-  /// service providers (STT, TTS, VAD) with the C++ commons layer.
+  /// This calls `rac_backend_onnx_register()` to register the generic ONNX
+  /// backend (embeddings + Silero VAD) and then registers the Sherpa-ONNX
+  /// engine plugin so STT (Whisper/Zipformer/Paraformer), TTS (Piper/VITS),
+  /// and Sherpa-backed VAD models with `framework == .sherpa` can resolve
+  /// through the unified plugin router. The two plugins are peers: "onnx"
+  /// owns embeddings, "sherpa" owns speech primitives. Mirrors Swift
+  /// `ONNX.register()` (ONNXRuntime/ONNX.swift).
   ///
   /// Safe to call multiple times - subsequent calls are no-ops.
   static Future<void> register({int priority = 100}) async {
@@ -139,14 +136,47 @@ class Onnx implements RunAnywhereModule {
       }
 
       _isRegistered = true;
-      _logger.info('ONNX backend registered successfully (STT + TTS + VAD)');
+      _logger.info('ONNX backend registered successfully (embeddings + plugin)');
+
+      _registerSherpa();
     } catch (e) {
       _logger.error('OnnxBindings not available: $e');
     }
   }
 
+  /// Register the Sherpa-ONNX engine plugin so the commons plugin router can
+  /// resolve `framework == .sherpa` models. Mirrors Swift
+  /// `ONNX.registerSherpaPlugin()`.
+  static void _registerSherpa() {
+    if (_isSherpaRegistered) return;
+    final bindings = _bindings;
+    if (bindings == null) return;
+
+    final result = bindings.registerSherpa();
+    if (result == RacResultCode.success ||
+        result == RacResultCode.errorModuleAlreadyRegistered) {
+      _isSherpaRegistered = true;
+      _logger.info(
+        'Sherpa engine plugin registered (STT + TTS + VAD via Sherpa-ONNX)',
+      );
+    } else if (result == RacResultCode.errorNotSupported) {
+      _logger.warning(
+        'Sherpa engine plugin entry not exported by this build '
+        '— Sherpa STT/TTS/VAD will not route',
+      );
+    } else {
+      _logger.error('Sherpa plugin registration failed: $result');
+    }
+  }
+
   /// Unregister the ONNX backend from C++ registry.
   static void unregister() {
+    if (_isSherpaRegistered) {
+      _bindings?.unregisterSherpa();
+      _isSherpaRegistered = false;
+      _logger.info('Sherpa engine plugin unregistered');
+    }
+
     if (!_isRegistered) return;
 
     _bindings?.unregister();
@@ -154,83 +184,11 @@ class Onnx implements RunAnywhereModule {
     _logger.info('ONNX backend unregistered');
   }
 
-  // ============================================================================
-  // Model Handling (matches Swift exactly)
-  // ============================================================================
-
   /// Check if the native backend is available on this platform.
   ///
   /// On iOS: Checks DynamicLibrary.process() for statically linked symbols
   /// On Android: Checks if librac_backend_onnx_jni.so can be loaded
   static bool get isAvailable => OnnxBindings.checkAvailability();
-
-  /// Check if ONNX can handle a given model for STT.
-  static bool canHandleSTT(String? modelId) {
-    if (modelId == null) return false;
-    final lowercased = modelId.toLowerCase();
-    return lowercased.contains('whisper') ||
-        lowercased.contains('zipformer') ||
-        lowercased.contains('paraformer');
-  }
-
-  /// Check if ONNX can handle a given model for TTS.
-  static bool canHandleTTS(String? modelId) {
-    if (modelId == null) return false;
-    final lowercased = modelId.toLowerCase();
-    return lowercased.contains('piper') || lowercased.contains('vits');
-  }
-
-  /// Check if ONNX can handle VAD (always true for Silero VAD).
-  static bool canHandleVAD(String? modelId) {
-    return true; // ONNX Silero VAD is the default
-  }
-
-  // ============================================================================
-  // Model Registration (convenience API)
-  // ============================================================================
-
-  /// Add an ONNX model to the registry.
-  ///
-  /// This is a convenience method that registers a model with the SDK.
-  /// The model will be associated with the ONNX backend.
-  ///
-  /// Matches Swift pattern - models are registered globally via RunAnywhere.
-  static void addModel({
-    String? id,
-    required String name,
-    required String url,
-    ModelCategory modality = ModelCategory.language,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _logger.error('Invalid URL for model: $name');
-      return;
-    }
-
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    // Register with the global SDK registry (matches Swift pattern)
-    final model = RunAnywhere.registerModel(
-      id: modelId,
-      name: name,
-      url: uri,
-      framework: InferenceFramework.onnx,
-      modality: modality,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-
-    // Keep local reference for convenience
-    _registeredModels.add(model);
-    _logger.info('Added ONNX model: $name ($modelId) [$modality]');
-  }
-
-  /// Get all models registered with this module
-  static List<ModelInfo> get registeredModels =>
-      List.unmodifiable(_registeredModels);
 
   // ============================================================================
   // Cleanup
@@ -239,8 +197,8 @@ class Onnx implements RunAnywhereModule {
   /// Dispose of resources
   static void dispose() {
     _bindings = null;
-    _registeredModels.clear();
     _isRegistered = false;
+    _isSherpaRegistered = false;
     _logger.info('ONNX disposed');
   }
 

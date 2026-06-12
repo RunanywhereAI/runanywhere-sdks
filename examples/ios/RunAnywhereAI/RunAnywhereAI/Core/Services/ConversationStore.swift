@@ -145,8 +145,9 @@ class ConversationStore: ObservableObject {
             return
         }
 
-        // Check if Foundation Models is available
-        guard SystemLanguageModel.default.isAvailable else { return }
+        // Use the SDK's platform capability gate so simulator and unsupported
+        // devices keep the deterministic fallback title.
+        guard SystemFoundationModels.isAvailable else { return }
 
         // Create conversation text from first few messages
         let conversationText = conversation.messages
@@ -374,7 +375,7 @@ struct ConversationListView: View {
                 ForEach(filteredConversations) { conversation in
                     ConversationRow(conversation: conversation, searchQuery: searchQuery)
                         .onTapGesture {
-                            store.loadConversation(conversation.id)
+                            _ = store.loadConversation(conversation.id)
                             NotificationCenter.default.post(
                                 name: Self.conversationSelectedNotification,
                                 object: conversation
@@ -394,7 +395,7 @@ struct ConversationListView: View {
             .searchable(text: $searchQuery, prompt: "Search conversations")
             .navigationTitle("Conversations")
             #if os(iOS)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayModeCompat(.large)
             #endif
             .toolbar {
                 #if os(iOS)

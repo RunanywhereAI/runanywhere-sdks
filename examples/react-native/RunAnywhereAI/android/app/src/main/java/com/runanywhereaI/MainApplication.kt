@@ -9,10 +9,6 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.soloader.SoLoader
 import com.facebook.react.soloader.OpenSourceMergedSoMapping
 import com.margelo.nitro.NitroModulesPackage
-import com.margelo.nitro.runanywhere.RunAnywhereCorePackage
-import com.margelo.nitro.runanywhere.llama.RunAnywhereLlamaPackage
-import com.margelo.nitro.runanywhere.onnx.RunAnywhereONNXPackage
-import com.margelo.nitro.runanywhere.genie.RunAnywhereGeniePackage
 
 class MainApplication : Application(), ReactApplication {
   override val reactHost: ReactHost by lazy {
@@ -20,11 +16,9 @@ class MainApplication : Application(), ReactApplication {
       context = applicationContext,
       packageList =
         PackageList(this).packages.apply {
+          // react-native-nitro-modules is intentionally excluded from RN
+          // autolinking, while @runanywhere packages are already in PackageList.
           add(NitroModulesPackage())
-          add(RunAnywhereCorePackage())
-          add(RunAnywhereLlamaPackage())
-          add(RunAnywhereONNXPackage())
-          add(RunAnywhereGeniePackage())
           add(DocumentServicePackage())
         },
     )

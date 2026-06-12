@@ -1,4 +1,5 @@
 require "json"
+require "pathname"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
@@ -10,42 +11,41 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = "RunAnywhere AI"
 
-  s.platforms    = { :ios => "15.1" }
+  s.platforms    = { :ios => "17.0" }
   s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
   # =============================================================================
   # ONNX Backend - xcframeworks are bundled in npm package
-  # No downloads needed - frameworks are included in ios/Frameworks/
+  # No downloads needed - frameworks are included in ios/Binaries/
   # =============================================================================
   puts "[RunAnywhereONNX] Using bundled xcframeworks from npm package"
   s.vendored_frameworks = [
-    "ios/Frameworks/RABackendONNX.xcframework",
-    "ios/Frameworks/onnxruntime.xcframework"
+    "ios/Binaries/RABackendONNX.xcframework",
+    "ios/Binaries/RABackendSherpa.xcframework"
   ]
 
   # Source files
   s.source_files = [
     "cpp/HybridRunAnywhereONNX.cpp",
     "cpp/HybridRunAnywhereONNX.hpp",
-    "cpp/bridges/**/*.{cpp,hpp}",
   ]
+
+  rac_headers_root = File.expand_path("../core/ios/Binaries/RACommons.xcframework/ios-arm64/Headers", __dir__)
+  rac_header_dirs = Dir.glob(File.join(rac_headers_root, "**", "*.h"))
+                       .map { |f| File.dirname(f) }
+                       .uniq
+                       .map { |d| "$(PODS_TARGET_SRCROOT)/" + Pathname.new(d).relative_path_from(Pathname.new(__dir__)).to_s }
 
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
-    "HEADER_SEARCH_PATHS" => [
+    "HEADER_SEARCH_PATHS" => ([
       "$(PODS_TARGET_SRCROOT)/cpp",
-      "$(PODS_TARGET_SRCROOT)/cpp/bridges",
-      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendONNX.xcframework/ios-arm64/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendONNX.xcframework/ios-arm64_x86_64-simulator/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/onnxruntime.xcframework/ios-arm64/onnxruntime.framework/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Frameworks/onnxruntime.xcframework/ios-arm64_x86_64-simulator/onnxruntime.framework/Headers",
-      "$(PODS_TARGET_SRCROOT)/../core/ios/Binaries/RACommons.xcframework/ios-arm64/Headers",
-      "$(PODS_TARGET_SRCROOT)/../core/ios/Binaries/RACommons.xcframework/ios-x86_64-simulator/Headers",
       "$(PODS_ROOT)/Headers/Public",
-    ].join(" "),
+    ] + rac_header_dirs).join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_ONNX=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
+    "OTHER_LDFLAGS" => "$(inherited) -lc++ -larchive -lbz2 -lz",
   }
 
   s.libraries = "c++"

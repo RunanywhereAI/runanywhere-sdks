@@ -1,0 +1,17 @@
+{
+  "name": "runanywhere-sdks-root",
+  "version": "0.0.0",
+  "private": true,
+  "_workspaces_note": "Three workspace roots reference sdk/shared/proto-ts (@runanywhere/proto-ts) by different relative paths: (1) this repo-root yarn workspace covers proto-ts + RN packages + RN example; (2) sdk/runanywhere-react-native/package.json is a yarn workspace root for standalone RN dev (`../shared/proto-ts`); (3) sdk/runanywhere-web/package.json is an npm workspace root for the web SDK (`../shared/proto-ts`). All three resolve proto-ts via workspace:* when `install` is run from their respective roots; this lets each SDK lane operate standalone in CI without dragging in the others. Future consolidation: move web SDK into this yarn workspace once npm-vs-yarn lockfile policy is decided.",
+  "workspaces": [
+    "sdk/shared/proto-ts",
+    "sdk/runanywhere-react-native/packages/core",
+    "sdk/runanywhere-react-native/packages/llamacpp",
+    "sdk/runanywhere-react-native/packages/onnx",
+    "examples/react-native/RunAnywhereAI"
+  ],
+  "packageManager": "yarn@3.6.1",
+  "resolutions": {
+    "react": "19.0.0"
+  }
+}

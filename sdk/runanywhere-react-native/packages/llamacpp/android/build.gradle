@@ -13,7 +13,7 @@ def findNodeBinary() {
             return nodePath
         }
     }
-    
+
     // Check common node installation paths
     def homeDir = System.getProperty("user.home")
     def nodePaths = [
@@ -29,7 +29,7 @@ def findNodeBinary() {
             return path
         }
     }
-    
+
     // Fallback to 'node' (works if PATH is set correctly in terminal builds)
     return "node"
 }
@@ -82,10 +82,14 @@ def getExtOrIntegerDefault(name) {
 }
 
 // =============================================================================
-// Version Constants (MUST match Swift Package.swift and iOS Podspec)
+// Version Constants — read from sdk/runanywhere-commons/VERSION (single source of truth)
 // RABackendLlamaCPP from runanywhere-sdks
 // =============================================================================
-def coreVersion = "0.1.4"
+// Resolve through canonicalPath so the relative lookup survives the node_modules
+// symlink (node_modules/@runanywhere/llamacpp -> ../../sdk/runanywhere-react-native/packages/llamacpp);
+// fall back to the pinned version if the commons VERSION file can't be located.
+def coreVersionFile = file("${projectDir.canonicalPath}/../../../../runanywhere-commons/VERSION")
+def coreVersion = coreVersionFile.exists() ? coreVersionFile.text.trim() : "0.19.13"
 
 // =============================================================================
 // Binary Source - RABackendLlamaCPP from runanywhere-sdks
@@ -103,6 +107,53 @@ def useLocalBuild = project.findProperty("runanywhere.useLocalNatives")?.toBoole
 // Native libraries directory
 def jniLibsDir = file("src/main/jniLibs")
 def downloadedLibsDir = file("build/downloaded-libs")
+
+def androidNdkHomeForRuntime() {
+    def explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
+    if (explicitNdk) {
+        return file(explicitNdk)
+    }
+
+    def androidSdk = System.getenv("ANDROID_HOME") ?:
+        System.getenv("ANDROID_SDK_ROOT") ?:
+        "${System.getProperty('user.home')}/Library/Android/sdk"
+    def ndkVersion = rootProject.ext.has("ndkVersion") ? rootProject.ext.ndkVersion : "27.0.12077973"
+    return file("${androidSdk}/ndk/${ndkVersion}")
+}
+
+def androidNdkHostTag() {
+    def osName = System.getProperty("os.name").toLowerCase(Locale.ROOT)
+    if (osName.contains("mac")) return "darwin-x86_64"
+    if (osName.contains("linux")) return "linux-x86_64"
+    throw new GradleException("Unsupported host for Android NDK runtime lookup: ${System.getProperty('os.name')}")
+}
+
+def androidNdkTripleForAbi(String abi) {
+    switch (abi) {
+        case 'arm64-v8a': return 'aarch64-linux-android'
+        case 'armeabi-v7a': return 'arm-linux-androideabi'
+        case 'x86_64': return 'x86_64-linux-android'
+        default: throw new GradleException("Unsupported Android ABI for libc++ runtime lookup: ${abi}")
+    }
+}
+
+def syncAndroidNdkRuntimeLibs(File outputDir) {
+    def ndkHome = androidNdkHomeForRuntime()
+    def prebuiltDir = new File(ndkHome, "toolchains/llvm/prebuilt/${androidNdkHostTag()}")
+    if (!prebuiltDir.isDirectory()) {
+        throw new GradleException("Android NDK prebuilt directory not found: ${prebuiltDir}")
+    }
+
+    ['arm64-v8a', 'armeabi-v7a', 'x86_64'].each { abi ->
+        def abiDir = new File(outputDir, abi)
+        def hasNativeLibs = abiDir.isDirectory() && abiDir.listFiles()?.any { it.name.endsWith(".so") }
+        if (!hasNativeLibs) return
+
+        def libcxx = new File(prebuiltDir, "sysroot/usr/lib/${androidNdkTripleForAbi(abi)}/libc++_shared.so")
+        if (!libcxx.isFile()) throw new GradleException("libc++_shared.so not found for ${abi} at ${libcxx}")
+        copy { from libcxx; into abiDir }
+    }
+}
 
 android {
     namespace "com.margelo.nitro.runanywhere.llama"
@@ -210,6 +261,12 @@ task downloadNativeLibs {
         if (useLocalBuild) {
             logger.lifecycle("[RunAnywhereLlama] Skipping download - using local build mode")
             return
+        }
+
+        fileTree(dir: jniLibsDir, include: "**/libc++_shared.so").files.each { staleStdlib ->
+            if (staleStdlib.delete()) {
+                logger.lifecycle("[RunAnywhereLlama] Removed bundled libc++_shared.so: ${staleStdlib}")
+            }
         }
 
         // Check if libs are already bundled for ALL requested ABIs (npm install case)
@@ -383,6 +440,20 @@ task downloadNativeLibs {
     }
 }
 
+task syncAndroidRuntimeLibs {
+    description = "Stages 16 KB-aligned Android NDK libc++"
+    group = "build setup"
+
+    if (!useLocalBuild) {
+        dependsOn downloadNativeLibs
+    }
+
+    doLast {
+        syncAndroidNdkRuntimeLibs(jniLibsDir)
+        logger.lifecycle("[RunAnywhereLlama] Synced 16 KB-aligned Android NDK libc++ into ${jniLibsDir}")
+    }
+}
+
 if (!useLocalBuild) {
     preBuild.dependsOn downloadNativeLibs
 
@@ -394,6 +465,8 @@ if (!useLocalBuild) {
         }
     }
 }
+
+preBuild.dependsOn syncAndroidRuntimeLibs
 
 // NOTE: cleanNativeLibs is NOT attached to clean task because npm-bundled libs should persist
 // Only use this task manually when needed during development

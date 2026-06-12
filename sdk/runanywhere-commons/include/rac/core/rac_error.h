@@ -2,13 +2,14 @@
  * @file rac_error.h
  * @brief RunAnywhere Commons - Error Codes and Error Handling
  *
- * C port of Swift's ErrorCode enum from Foundation/Errors/ErrorCode.swift.
+ * Canonical C ABI error codes. The cross-SDK proto `ErrorCode` enum
+ * (`idl/errors.proto`, generated as `errors.pb.swift` / Kotlin / Dart / TS)
+ * mirrors the absolute magnitude of each code defined here; every new code
+ * added must also appear in that proto enum and in `rac_error_message()`
+ * inside `src/core/rac_error.cpp`.
  *
  * Error codes for runanywhere-commons use the range -100 to -999 to avoid
  * collision with runanywhere-core error codes (0 to -99).
- *
- * IMPORTANT: This is a direct translation of the Swift implementation.
- * Do NOT add error codes not present in the Swift code.
  */
 
 #ifndef RAC_ERROR_H
@@ -44,8 +45,10 @@ extern "C" {
 //   - Platform adapter errors:  -500 to -599
 //   - Backend errors:           -600 to -699
 //   - Event errors:             -700 to -799
-//   - Other errors:             -800 to -899
-//   - Reserved:                 -900 to -999
+//   - Other errors:             -800 to -809
+//   - Engine plugin errors:     -810 to -829
+//   - Reserved:                 -830 to -899
+//   - Reserved (future):        -900 to -999
 
 // =============================================================================
 // INITIALIZATION ERRORS (-100 to -109)
@@ -104,6 +107,8 @@ extern "C" {
 #define RAC_ERROR_COST_LIMIT_EXCEEDED ((rac_result_t) - 134)
 /** Inference failed */
 #define RAC_ERROR_INFERENCE_FAILED ((rac_result_t) - 135)
+/** Generation cancelled by the caller */
+#define RAC_ERROR_GENERATION_CANCELLED ((rac_result_t) - 136)
 
 // =============================================================================
 // NETWORK ERRORS (-150 to -179)
@@ -232,6 +237,11 @@ extern "C" {
 #define RAC_ERROR_NULL_POINTER ((rac_result_t) - 260)
 /** Buffer too small */
 #define RAC_ERROR_BUFFER_TOO_SMALL ((rac_result_t) - 261)
+/** Output was truncated: caller-provided output capacity is insufficient to
+ *  hold the produced bytes. The runtime populates the output size field with
+ *  the required byte count so the caller can re-allocate and retry; no partial
+ *  data is written to the caller's buffer. */
+#define RAC_ERROR_OUTPUT_TRUNCATED ((rac_result_t) - 262)
 
 // =============================================================================
 // AUDIO ERRORS (-280 to -299)
@@ -367,6 +377,14 @@ extern "C" {
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
 /** Backend unavailable: backend compiled as stub, engine binary not installed */
 #define RAC_ERROR_BACKEND_UNAVAILABLE ((rac_result_t) - 604)
+/** Reserved (currently not produced). Was returned by the removed scoring
+ *  EngineRouter when an engine's declared L1 runtimes (Metal / CoreML / CUDA /
+ *  QNN / WebGPU / …) were all unregistered on the host. Selection is now plain
+ *  priority order (`rac_plugin_find`) with no runtime filtering, so nothing
+ *  emits this code today; kept for ABI stability. */
+#define RAC_ERROR_RUNTIME_UNAVAILABLE ((rac_result_t) - 605)
+/** Generic backend failure (no more specific backend code applies) */
+#define RAC_ERROR_BACKEND_ERROR ((rac_result_t) - 606)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 
@@ -398,6 +416,32 @@ extern "C" {
 #define RAC_ERROR_UNKNOWN ((rac_result_t) - 804)
 /** Internal error */
 #define RAC_ERROR_INTERNAL ((rac_result_t) - 805)
+
+// =============================================================================
+// ENGINE PLUGIN ERRORS (-810 to -829)
+// Mirrors generated proto `ErrorCode` enum cases `abiVersionMismatch`,
+// `capabilityUnsupported`, `pluginDuplicate`, `pluginLoadFailed`, `pluginBusy`
+// (see `idl/errors.proto` and `errors.pb.swift`). The Swift / Kotlin / Dart /
+// Web SDKs surface these via the generated enum; `rac_error_message()` in
+// `src/core/rac_error.cpp` provides the human-readable strings.
+// =============================================================================
+
+/* ─────────── engine plugin errors ─────────── */
+/** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
+#define RAC_ERROR_ABI_VERSION_MISMATCH ((rac_result_t) - 810)
+/** Plugin's `capability_check()` returned non-zero (silent reject; engine
+ *  does not run on this host — e.g. MetalRT on Linux). */
+#define RAC_ERROR_CAPABILITY_UNSUPPORTED ((rac_result_t) - 811)
+/** Plugin registration rejected due to duplicate `metadata.name`. */
+#define RAC_ERROR_PLUGIN_DUPLICATE ((rac_result_t) - 812)
+
+/* ─────────── dynamic plugin loader errors ─────────── */
+/** dlopen / dlsym failed (file not found, missing entry symbol, arch mismatch,
+ *  unresolved dependency). Use `dlerror()` for details on POSIX hosts. */
+#define RAC_ERROR_PLUGIN_LOAD_FAILED ((rac_result_t) - 820)
+/** Plugin cannot be unloaded because outstanding sessions still hold its
+ *  primitive. */
+#define RAC_ERROR_PLUGIN_BUSY ((rac_result_t) - 821)
 
 // =============================================================================
 // ERROR MESSAGE API

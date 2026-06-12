@@ -11,38 +11,80 @@
     ".": {
       "types": "./dist/types/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./internal": {
+      "types": "./dist/types/internal.d.ts",
+      "import": "./dist/internal.js"
+    },
+    "./browser": {
+      "types": "./dist/types/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./wasm/*": "./wasm/*"
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "wasm/racommons.js",
+    "wasm/racommons.wasm",
+    "README.md"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
-    "lint": "eslint src --max-warnings 0",
-"lint:ts": "tsc --noEmit",
+    "lint": "eslint src tests --max-warnings 0",
+    "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test:types": "tsd",
-    "test": "tsd",
+    "test:unit": "vitest run",
+    "test": "vitest run",
     "test:e2e": "npm run build && (cd ../../../../examples/web/RunAnywhereAI && npm run build)",
     "clean": "rm -rf dist",
-    "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1)"
+    "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1); test -f wasm/racommons.js || (echo 'ERROR: wasm/racommons.js missing. Run npm run build:wasm -- --core from sdk/runanywhere-web.' && exit 1); test -f wasm/racommons.wasm || (echo 'ERROR: wasm/racommons.wasm missing. Run npm run build:wasm -- --core from sdk/runanywhere-web.' && exit 1)"
   },
-  "keywords": ["runanywhere", "ai", "llm", "stt", "tts", "vad", "wasm", "webgpu", "on-device", "browser", "inference"],
+  "keywords": [
+    "runanywhere",
+    "ai",
+    "llm",
+    "stt",
+    "tts",
+    "vad",
+    "wasm",
+    "webgpu",
+    "on-device",
+    "browser",
+    "inference"
+  ],
   "author": "RunAnywhere AI",
   "license": "MIT",
-  "repository": {"type": "git", "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git", "directory": "sdk/runanywhere-web/packages/core"},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-web/packages/core"
+  },
   "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web",
-  "bugs": {"url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"},
-  "publishConfig": {"access": "public"},
-  "engines": {"node": ">=18.0.0"},
-  "peerDependencies": {},
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@runanywhere/proto-ts": "workspace:*",
+    "long": "^5.3.2",
+    "protobufjs": "^7.5.8"
+  },
   "tsd": {
-    "directory": "src/__tests__"
+    "directory": "tests/types"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
     "tsd": "^0.33.0",
-    "eslint": "^9.0.0",
-    "@eslint/js": "^9.0.0",
-    "typescript-eslint": "^8.0.0"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^3.2.4"
   }
 }

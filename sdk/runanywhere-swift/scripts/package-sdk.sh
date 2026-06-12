@@ -27,7 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 # Load the shared build-mode detection
-source "${REPO_ROOT}/scripts/detect-mode.sh"
+source "${REPO_ROOT}/scripts/setup/detect-mode.sh"
 
 NATIVES_FROM=""
 
@@ -82,4 +82,4 @@ fi
 echo ""
 echo ">> Swift SDK build OK. No tarball produced — SPM consumers reference"
 echo "   this repo at a git tag. Package.swift checksums must match the"
-echo "   freshly-released zips (run scripts/sync-checksums.sh on release)."
+echo "   freshly-released zips (run sdk/runanywhere-swift/scripts/sync-checksums.sh on release)."

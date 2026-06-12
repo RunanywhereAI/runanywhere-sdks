@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <tuple>
+#include <vector>
 
 // RACommons headers
 #include "rac_core.h"
@@ -51,15 +52,6 @@ struct PlatformCallbacks {
 };
 
 /**
- * @brief SDK Environment enum matching Swift's SDKEnvironment
- */
-enum class SDKEnvironment {
-    Development = 0,
-    Staging = 1,
-    Production = 2
-};
-
-/**
  * @brief SDK initialization bridge singleton
  *
  * Manages the lifecycle of the runanywhere-commons SDK.
@@ -85,16 +77,55 @@ public:
      * 2. Configures logging for environment
      * 3. Initializes SDK state
      *
-     * @param environment SDK environment (development, staging, production)
+     * @param environment SDK environment (RAC_ENV_DEVELOPMENT/STAGING/PRODUCTION)
      * @param apiKey API key for authentication
      * @param baseURL Base URL for API requests
      * @param deviceId Persistent device identifier
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t initialize(SDKEnvironment environment,
+    rac_result_t initialize(rac_environment_t environment,
                            const std::string& apiKey,
                            const std::string& baseURL,
-                           const std::string& deviceId);
+                           const std::string& deviceId,
+                           const std::string& platform,
+                           const std::string& sdkVersion,
+                           const std::string& buildToken,
+                           bool forceRefreshAssignments,
+                           bool flushTelemetry,
+                           bool discoverDownloadedModels,
+                           bool rescanLocalModels);
+
+    /**
+     * @brief Complete deferred services initialization
+     *
+     * Registers native device callbacks and then drives commons Phase 2 through
+     * rac_sdk_init_phase2_proto when bundled commons exposes it.
+     *
+     * @param outHttpConfigured Set to has_completed_http_setup || http_configured.
+     * @return RAC_SUCCESS or error code
+     */
+    rac_result_t completeServicesInitialization(bool& outHttpConfigured);
+
+    /**
+     * @brief Retry HTTP/auth setup after an offline initialization.
+     *
+     * Drives the commons idempotency guard `rac_sdk_retry_http_proto`, which
+     * re-checks usable external config and reports whether HTTP is configured.
+     * Mirrors Swift CppBridge.SdkInit.retryHTTP().
+     *
+     * @param outHttpConfigured Set to has_completed_http_setup || http_configured.
+     * @return RAC_SUCCESS (incl. the feature-unavailable downgrade) or error.
+     */
+    rac_result_t retryHTTPSetup(bool& outHttpConfigured);
+
+    /**
+     * @brief Register device manager callbacks for commons services init
+     *
+     * Safe to call multiple times; callback storage is refreshed each call.
+     *
+     * @return RAC_SUCCESS or error code
+     */
+    rac_result_t registerDeviceCallbacks();
 
     /**
      * @brief Set base directory for model paths
@@ -102,10 +133,19 @@ public:
      * Must be called after initialize() and before using model path utilities.
      * Mirrors Swift's CppBridge.ModelPaths.setBaseDirectory().
      *
-     * @param documentsPath Path to Documents directory
+     * @param baseDirectory Native model base directory
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t setBaseDirectory(const std::string& documentsPath);
+    rac_result_t setBaseDirectory(const std::string& baseDirectory);
+
+    /**
+     * @brief Resolve the native default model base directory
+     *
+     * iOS returns the app Documents directory. Android returns app filesDir.
+     *
+     * @return Absolute directory path, or empty string if unavailable
+     */
+    std::string getDefaultModelBaseDirectory();
 
     /**
      * @brief Shutdown the SDK
@@ -120,12 +160,7 @@ public:
     /**
      * @brief Get current environment
      */
-    SDKEnvironment getEnvironment() const { return environment_; }
-
-    /**
-     * @brief Convert SDK environment to RAC environment
-     */
-    static rac_environment_t toRacEnvironment(SDKEnvironment env);
+    rac_environment_t getEnvironment() const { return environment_; }
 
     // =========================================================================
     // Secure Storage Methods
@@ -247,22 +282,26 @@ public:
 
     /**
      * @brief Get SDK version
-     * Returns centralized version passed from TypeScript SDKConstants
+     *
+     * Defaults to commons' canonical version and is overridden during init by
+     * the generated TypeScript Phase 1 request envelope.
      */
-    std::string getSdkVersion() const { return sdkVersion_.empty() ? "0.2.0" : sdkVersion_; }
+    std::string getSdkVersion() const {
+        return sdkVersion_.empty() ? std::string(rac_sdk_get_version()) : sdkVersion_;
+    }
 
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
     // =========================================================================
-    // HTTP Methods for Device Registration
+    // HTTP Methods for Device Registration / Telemetry
     // Matches Swift: CppBridge+Device.swift http_post callback
     // =========================================================================
 
     /**
-     * @brief Synchronous HTTP POST for device registration
+     * @brief Synchronous HTTP POST for device registration / telemetry
      *
-     * Uses native URLSession (iOS) or HttpURLConnection (Android).
-     * Required by C++ rac_device_manager which expects synchronous HTTP.
+     * Uses the shared native rac_http_client_* transport. Required by C++
+     * rac_device_manager, whose callback API expects synchronous HTTP.
      *
      * @param url Full URL to POST to
      * @param jsonBody JSON body string
@@ -287,13 +326,15 @@ private:
 
     bool initialized_ = false;
     bool adapterRegistered_ = false;
-    SDKEnvironment environment_ = SDKEnvironment::Development;
+    rac_environment_t environment_ = RAC_ENV_DEVELOPMENT;
 
     // Configuration stored at initialization
     std::string apiKey_;
     std::string baseURL_;
     std::string deviceId_;
+    std::string platform_;
     std::string sdkVersion_;  // SDK version from TypeScript SDKConstants
+    std::vector<uint8_t> phase2RequestBytes_;
 
     // Platform adapter - must persist for C++ to call
     rac_platform_adapter_t adapter_{};

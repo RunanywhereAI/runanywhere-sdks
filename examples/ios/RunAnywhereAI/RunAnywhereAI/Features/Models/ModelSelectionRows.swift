@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhere
+import os
 
 // MARK: - System TTS Row
 
@@ -140,7 +141,17 @@ struct LoadingDeviceRow: View {
 
 /// A model row designed for flat list display with prominent framework badge
 struct FlatModelRow: View {
-    let model: ModelInfo
+    private let logger = Logger(
+        subsystem: "com.runanywhere.RunAnywhereAI",
+        category: "ModelDownload"
+    )
+    private let catalogLogger = Logger(
+        subsystem: "com.runanywhere",
+        category: "Download"
+    )
+
+    let model: RAModelInfo
+    let availabilityReason: String?
     let isSelected: Bool
     let isLoading: Bool
     let onDownloadCompleted: () -> Void
@@ -149,7 +160,8 @@ struct FlatModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
-    @State private var downloadStage: DownloadStage = .downloading
+    @State private var downloadStage: RADownloadStage = .downloading
+    @State private var downloadErrorMessage: String?
 
     private var frameworkColor: Color {
         switch model.framework {
@@ -165,27 +177,31 @@ struct FlatModelRow: View {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
-        case .systemTTS: return "System"
+        case .systemTts: return "System"
         default: return model.framework.displayName
         }
     }
 
     /// Check if any LoRA adapters are compatible with this model
     private var hasLoRAAdapters: Bool {
-        LoRAAdapterCatalog.adapters.contains { $0.compatibleModelIds.contains(model.id) }
+        model.supportsLora
     }
 
-    /// Check if this is a built-in model that doesn't require download
-    private var isBuiltIn: Bool {
-        model.framework == .foundationModels ||
-        model.framework == .systemTTS ||
-        model.artifactType == .builtIn
+    private var downloadAccessibilityLabel: String {
+        let size = model.downloadSizeBytes
+        if size > 0 {
+            let formatted = ByteCountFormatter.string(fromByteCount: size, countStyle: .memory)
+            return "Get \(formatted)"
+        }
+        return "Get"
     }
 
     private var statusIcon: String {
-        if isBuiltIn {
+        if availabilityReason != nil || downloadErrorMessage != nil {
+            return "exclamationmark.triangle.fill"
+        } else if model.isBuiltIn {
             return "checkmark.circle.fill"
-        } else if model.localPath != nil {
+        } else if model.localPathURL != nil {
             return "checkmark.circle.fill"
         } else {
             return "arrow.down.circle"
@@ -193,7 +209,9 @@ struct FlatModelRow: View {
     }
 
     private var statusColor: Color {
-        if isBuiltIn || model.localPath != nil {
+        if availabilityReason != nil || downloadErrorMessage != nil {
+            return AppColors.statusOrange
+        } else if model.isBuiltIn || model.localPathURL != nil {
             return AppColors.statusGreen
         } else {
             return AppColors.primaryAccent
@@ -201,9 +219,13 @@ struct FlatModelRow: View {
     }
 
     private var statusText: String {
-        if isBuiltIn {
+        if let availabilityReason {
+            return availabilityReason
+        } else if let downloadErrorMessage {
+            return downloadErrorMessage
+        } else if model.isBuiltIn {
             return "Built-in"
-        } else if model.localPath != nil {
+        } else if model.localPathURL != nil {
             return "Ready"
         } else {
             return ""  // Removed "Download" text
@@ -277,6 +299,8 @@ struct FlatModelRow: View {
                     Text(statusText)
                         .font(AppTypography.caption2)
                         .foregroundColor(statusColor)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -311,7 +335,14 @@ struct FlatModelRow: View {
     }
 
     @ViewBuilder private var actionButton: some View {
-        if isBuiltIn {
+        if availabilityReason != nil {
+            Button("Unavailable") {}
+                .font(AppTypography.caption)
+                .fontWeight(.semibold)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(true)
+        } else if model.isBuiltIn {
             // Built-in models (Foundation Models, System TTS) - always ready
             Button("Use") {
                 onSelectModel()
@@ -322,7 +353,7 @@ struct FlatModelRow: View {
             .tint(AppColors.primaryAccent)
             .controlSize(.small)
             .disabled(isLoading || isSelected)
-        } else if model.localPath == nil {
+        } else if model.localPathURL == nil {
             // Model needs to be downloaded
             if isDownloading {
                 ProgressView()
@@ -336,7 +367,8 @@ struct FlatModelRow: View {
                     HStack(spacing: AppSpacing.xxSmall) {
                         Image(systemName: "arrow.down.circle.fill")
                         // Show file size instead of "Get"
-                        if let size = model.downloadSize, size > 0 {
+                        let size = model.downloadSizeBytes
+                        if size > 0 {
                             Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))
                         } else {
                             Text("Get")
@@ -348,6 +380,8 @@ struct FlatModelRow: View {
                 .buttonStyle(.bordered)
                 .tint(AppColors.primaryAccent)
                 .controlSize(.small)
+                .accessibilityIdentifier("model-download-\(model.id)")
+                .accessibilityLabel(downloadAccessibilityLabel)
                 .disabled(isLoading)
             }
         } else {
@@ -369,43 +403,41 @@ struct FlatModelRow: View {
             isDownloading = true
             downloadProgress = 0.0
             downloadStage = .downloading
+            downloadErrorMessage = nil
         }
 
+        logger.info("Starting download for \(model.id, privacy: .public)")
+        catalogLogger.info("Starting download for \(model.id, privacy: .public)")
+
         do {
-            let progressStream = try await RunAnywhere.downloadModel(model.id)
-
-            for await progress in progressStream {
-                switch progress.state {
-                case .completed:
-                    await MainActor.run {
-                        self.downloadProgress = 1.0
-                        self.isDownloading = false
-                        self.downloadStage = .downloading
-                        onDownloadCompleted()
-                    }
-                    return
-
-                case .failed:
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                        self.downloadStage = .downloading
-                    }
-                    return
-
-                default:
-                    await MainActor.run {
-                        self.downloadProgress = progress.overallProgress
-                        self.downloadStage = progress.stage
-                    }
-                    continue
+            try await RunAnywhere.downloadModel(model) { progress in
+                await MainActor.run {
+                    self.downloadProgress = Double(progress.overallProgress)
+                    self.downloadStage = progress.stage
                 }
             }
+
+            logger.info("Download completed for \(model.id, privacy: .public)")
+            catalogLogger.info("Download completed for \(model.id, privacy: .public)")
+
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloading = false
+                self.downloadStage = .downloading
+                self.downloadErrorMessage = nil
+                onDownloadCompleted()
+            }
         } catch {
+            let message = (error as? SDKException)?.message ?? error.localizedDescription
+            logger.error(
+                "Download failed for \(model.id, privacy: .public): \(message, privacy: .public)"
+            )
+
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
                 downloadStage = .downloading
+                downloadErrorMessage = message.isEmpty ? "Download failed" : message
             }
         }
     }

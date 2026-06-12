@@ -12,11 +12,11 @@ extension LLMViewModel {
     // MARK: - Analytics Creation
 
     func createAnalytics(
-        from result: LLMGenerationResult,
+        from result: RALLMGenerationResult,
         messageId: String,
         conversationId: String,
         wasInterrupted: Bool,
-        options: LLMGenerationOptions
+        options: RALLMGenerationOptions
     ) -> MessageAnalytics? {
         guard let modelName = loadedModelName,
               let currentModel = ModelListViewModel.shared.currentModel else {
@@ -36,18 +36,18 @@ extension LLMViewModel {
 
     // swiftlint:disable:next function_parameter_count
     func buildMessageAnalytics(
-        result: LLMGenerationResult,
+        result: RALLMGenerationResult,
         messageId: String,
         conversationId: String,
         modelName: String,
-        currentModel: ModelInfo,
+        currentModel: RAModelInfo,
         wasInterrupted: Bool,
-        options: LLMGenerationOptions
+        options: RALLMGenerationOptions
     ) -> MessageAnalytics {
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
         let generationParameters = MessageAnalytics.GenerationParameters(
             temperature: Double(options.temperature),
-            maxTokens: options.maxTokens,
+            maxTokens: Int(options.maxTokens),
             topP: nil,
             topK: nil
         )
@@ -57,25 +57,23 @@ extension LLMViewModel {
             conversationId: conversationId,
             modelId: currentModel.id,
             modelName: modelName,
-            framework: result.framework ?? currentModel.framework.rawValue,
+            framework: result.framework.isEmpty ? currentModel.framework.wireString : result.framework,
             timestamp: Date(),
             timeToFirstToken: nil,
             totalGenerationTime: result.latencyMs / 1000.0,
             thinkingTime: nil,
             responseTime: nil,
-            inputTokens: result.inputTokens,
+            inputTokens: Int(result.inputTokens),
             outputTokens: result.tokensUsed,
-            thinkingTokens: result.thinkingTokens,
-            responseTokens: result.responseTokens,
+            thinkingTokens: result.thinkingTokens > 0 ? Int(result.thinkingTokens) : nil,
+            responseTokens: result.responseTokens > 0 ? Int(result.responseTokens) : result.tokensUsed,
             averageTokensPerSecond: result.tokensPerSecond,
             messageLength: result.text.count,
-            wasThinkingMode: result.thinkingContent != nil,
+            wasThinkingMode: result.hasThinkingContent,
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,
-            tokensPerSecondHistory: [],
             generationMode: .nonStreaming,
-            contextWindowUsage: 0.0,
             generationParameters: generationParameters
         )
     }

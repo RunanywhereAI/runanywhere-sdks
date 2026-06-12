@@ -131,6 +131,7 @@ find include src \
     ! -path "*/build*/*" \
     ! -path "*/dist/*" \
     ! -path "*/.git/*" \
+    ! -path "*src/generated/*" \
     | sort > "$FILE_LIST"
 
 FILES=()
@@ -210,14 +211,29 @@ if [[ "$RUN_TIDY" == "true" ]]; then
         # modernize-use-scoped-lock: known crash in LLVM 21.1.x
         tidy_disabled_checks='-modernize-use-scoped-lock'
 
+        # On macOS, Homebrew clang-tidy doesn't pick up the Xcode SDK automatically
+        # (compile_commands.json invokes /usr/bin/c++ which has implicit SDK paths).
+        # Prepend -isysroot via --extra-arg-before so <cstring>, <atomic>, <chrono> resolve.
+        tidy_extra_args=()
+        if [[ "$(uname -s)" == "Darwin" ]] && command -v xcrun >/dev/null 2>&1; then
+            sdk_path="$(xcrun --show-sdk-path 2>/dev/null || true)"
+            if [[ -n "$sdk_path" ]]; then
+                tidy_extra_args+=(--extra-arg-before=-isysroot --extra-arg-before="$sdk_path")
+            fi
+        fi
+
         if [[ "$MODE" == "fix" ]]; then
             tidy_args=(-p="$tidy_build_dir" --fix --fix-errors --quiet
                        --checks="$tidy_disabled_checks"
-                       --header-filter='.*rac_.*\.h$')
+                       --header-filter='.*rac_.*\.h$'
+                       --exclude-header-filter='.*/src/generated/.*\.pb\.h$'
+                       "${tidy_extra_args[@]}")
         else
             tidy_args=(-p="$tidy_build_dir" --quiet
                        --checks="$tidy_disabled_checks"
-                       --header-filter='.*rac_.*\.h$')
+                       --header-filter='.*rac_.*\.h$'
+                       --exclude-header-filter='.*/src/generated/.*\.pb\.h$'
+                       "${tidy_extra_args[@]}")
         fi
 
         # Only run on .cpp files (headers covered via HeaderFilterRegex)
@@ -231,12 +247,13 @@ if [[ "$RUN_TIDY" == "true" ]]; then
         for f in "${CPP_FILES[@]}"; do
             "$CLANG_TIDY" "${tidy_args[@]}" "$f" 2>/dev/null >>"$tidy_log" || true
         done
-        # Count project warnings only (strip those originating in system/_deps headers)
+        # Count project warnings only (strip those originating in system/_deps/generated headers)
         tidy_issues="$(grep -E 'warning:|error:' "$tidy_log" \
             | grep -v '^/opt/' \
             | grep -v '^/Applications/' \
             | grep -v '/_deps/' \
             | grep -v '/third_party/' \
+            | grep -v '/src/generated/' \
             | grep -c '' || true)"
         if [[ "$tidy_issues" -eq 0 ]]; then
             echo -e "${GREEN}  clang-tidy: no project issues${RESET}"
@@ -248,6 +265,7 @@ if [[ "$RUN_TIDY" == "true" ]]; then
                 | grep -v '^/Applications/' \
                 | grep -v '/_deps/' \
                 | grep -v '/third_party/' \
+                | grep -v '/src/generated/' \
                 | awk 'NR<=30 {print "    " $0}'
         fi
         rm -f "$tidy_log"

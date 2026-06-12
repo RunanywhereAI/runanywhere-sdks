@@ -17,7 +17,7 @@
 #ifndef RAC_TELEMETRY_MANAGER_H
 #define RAC_TELEMETRY_MANAGER_H
 
-#include "rac_analytics_events.h"
+#include "rac_error.h"
 #include "rac_types.h"
 #include "rac_environment.h"
 #include "rac_telemetry_types.h"
@@ -119,13 +119,16 @@ RAC_API rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manage
                                                  const rac_telemetry_payload_t* payload);
 
 /**
- * @brief Track from analytics event data
+ * @brief Track from a serialized canonical runanywhere.v1.SDKEvent.
  *
- * Converts analytics event to telemetry payload and queues it.
+ * Parses the SDKEvent bytes, extracts every telemetry metric per oneof case
+ * + envelope (component/category/session_id/error), builds the telemetry
+ * payload and queues it (completion events trigger an immediate flush). This is
+ * the canonical telemetry ingestion path fed by the destination router. Proto-
+ * free C ABI so this header stays C-includable.
  */
-RAC_API rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* manager,
-                                                           rac_event_type_t event_type,
-                                                           const rac_analytics_event_data_t* data);
+RAC_API rac_result_t rac_telemetry_manager_track_proto(rac_telemetry_manager_t* manager,
+                                                       const uint8_t* sdk_event_bytes, size_t len);
 
 /**
  * @brief Flush queued events immediately

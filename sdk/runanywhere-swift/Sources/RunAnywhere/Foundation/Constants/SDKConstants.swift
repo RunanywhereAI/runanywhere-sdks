@@ -1,4 +1,4 @@
-import Foundation
+import CRACommons
 
 /// SDK-wide constants (metadata only)
 /// Capability-specific constants are in their respective capabilities:
@@ -8,9 +8,10 @@ import Foundation
 /// - LifecycleConstants (Lifecycle capability)
 /// - RegistryConstants (Registry capability)
 public enum SDKConstants {
-    /// SDK version - must match the VERSION file in the repository root
-    /// Update this when bumping the SDK version
-    public static let version = "0.16.0"
+    /// SDK version. Single source of truth is `sdk/runanywhere-commons/VERSION`,
+    /// exposed through `rac_sdk_get_version()`, so the value reported here can
+    /// never drift from the version commons reports in telemetry / auth headers.
+    public static let version = String(cString: rac_sdk_get_version())
 
     /// SDK name
     public static let name = "RunAnywhere SDK"

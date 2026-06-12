@@ -10,6 +10,7 @@
 #define RAC_MODEL_COMPATIBILITY_H
 
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #ifdef __cplusplus
@@ -59,6 +60,28 @@ RAC_API rac_result_t rac_model_check_compatibility(rac_model_registry_handle_t r
                                                    const char* model_id, int64_t available_ram,
                                                    int64_t available_storage,
                                                    rac_model_compatibility_result_t* out_result);
+
+/**
+ * @brief Compatibility check from serialized
+ *        runanywhere.v1.ModelCompatibilityRequest bytes.
+ *
+ * Replaces the per-SDK CompatibilityBridge / checkCompatibility JSON paths
+ * (RN, Web, Kotlin) with a canonical proto-byte ABI. Implementation routes
+ * through the same registry lookup + RAM/storage comparison that
+ * rac_model_check_compatibility() performs, then encodes the result as
+ * runanywhere.v1.ModelCompatibilityResult bytes (canRun / canFit /
+ * isCompatible / required vs. available memory & storage / human-readable
+ * reasons).
+ *
+ * @param request_bytes Serialized ModelCompatibilityRequest bytes
+ * @param request_size  Byte count
+ * @param out_result    Receives serialized ModelCompatibilityResult
+ *                      bytes on success or an error envelope on failure.
+ * @return RAC_SUCCESS or a negative rac_result_t.
+ */
+RAC_API rac_result_t rac_model_compatibility_check_proto(const uint8_t* request_bytes,
+                                                         size_t request_size,
+                                                         rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

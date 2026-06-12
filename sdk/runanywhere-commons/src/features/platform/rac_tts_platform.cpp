@@ -27,6 +27,25 @@ std::mutex g_callbacks_mutex;
 rac_platform_tts_callbacks_t g_callbacks = {};
 bool g_callbacks_set = false;
 
+// commons-035: value-copy the callback table under the registration mutex so
+// callers can release the lock before invoking the Swift callback. Holding
+// g_callbacks_mutex across the callback would (a) make rac_tts_platform_stop
+// queue behind an in-flight synthesize, (b) stall rac_platform_tts_is_available
+// / set_callbacks during long synthesize calls, and (c) deadlock if the Swift
+// callback re-enters any rac_platform_tts_* function. Mirrors the pattern in
+// rac_voice_event_abi.cpp:dispatch_proto_voice_event.
+bool snapshot_callbacks(rac_platform_tts_callbacks_t* out) {
+    if (out == nullptr) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
+    if (!g_callbacks_set) {
+        return false;
+    }
+    *out = g_callbacks;
+    return true;
+}
+
 }  // namespace
 
 // =============================================================================
@@ -75,15 +94,15 @@ rac_result_t rac_tts_platform_create(const rac_tts_platform_config_t* config,
 
     *out_handle = nullptr;
 
-    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
-    if (!g_callbacks_set || g_callbacks.create == nullptr) {
+    rac_platform_tts_callbacks_t cb;
+    if (!snapshot_callbacks(&cb) || cb.create == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "Swift callbacks not registered");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     RAC_LOG_DEBUG(LOG_CAT, "Creating platform TTS via Swift");
 
-    rac_handle_t handle = g_callbacks.create(config, g_callbacks.user_data);
+    rac_handle_t handle = cb.create(config, cb.user_data);
     if (handle == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
         return RAC_ERROR_INTERNAL;
@@ -99,14 +118,14 @@ void rac_tts_platform_destroy(rac_tts_platform_handle_t handle) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
-    if (!g_callbacks_set || g_callbacks.destroy == nullptr) {
+    rac_platform_tts_callbacks_t cb;
+    if (!snapshot_callbacks(&cb) || cb.destroy == nullptr) {
         RAC_LOG_WARNING(LOG_CAT, "Cannot destroy: Swift callbacks not registered");
         return;
     }
 
     RAC_LOG_DEBUG(LOG_CAT, "Destroying platform TTS via Swift");
-    g_callbacks.destroy(handle, g_callbacks.user_data);
+    cb.destroy(handle, cb.user_data);
 }
 
 rac_result_t rac_tts_platform_synthesize(rac_tts_platform_handle_t handle, const char* text,
@@ -115,14 +134,14 @@ rac_result_t rac_tts_platform_synthesize(rac_tts_platform_handle_t handle, const
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
-    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
-    if (!g_callbacks_set || g_callbacks.synthesize == nullptr) {
+    rac_platform_tts_callbacks_t cb;
+    if (!snapshot_callbacks(&cb) || cb.synthesize == nullptr) {
         RAC_LOG_ERROR(LOG_CAT, "Swift callbacks not registered");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     RAC_LOG_DEBUG(LOG_CAT, "Synthesizing via platform TTS");
-    return g_callbacks.synthesize(handle, text, options, g_callbacks.user_data);
+    return cb.synthesize(handle, text, options, cb.user_data);
 }
 
 void rac_tts_platform_stop(rac_tts_platform_handle_t handle) {
@@ -130,14 +149,14 @@ void rac_tts_platform_stop(rac_tts_platform_handle_t handle) {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(g_callbacks_mutex);
-    if (!g_callbacks_set || g_callbacks.stop == nullptr) {
+    rac_platform_tts_callbacks_t cb;
+    if (!snapshot_callbacks(&cb) || cb.stop == nullptr) {
         RAC_LOG_WARNING(LOG_CAT, "Cannot stop: Swift callbacks not registered");
         return;
     }
 
     RAC_LOG_DEBUG(LOG_CAT, "Stopping platform TTS via Swift");
-    g_callbacks.stop(handle, g_callbacks.user_data);
+    cb.stop(handle, cb.user_data);
 }
 
 }  // extern "C"

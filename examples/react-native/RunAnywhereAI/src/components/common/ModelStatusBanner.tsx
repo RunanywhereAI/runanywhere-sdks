@@ -18,13 +18,18 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
-import { LLMFramework, FrameworkDisplayNames } from '../../types/model';
+import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+import {
+  getFrameworkColor,
+  getFrameworkDisplayName,
+  getFrameworkIcon,
+} from '../../utils/modelDisplay';
 
 interface ModelStatusBannerProps {
   /** Model name if loaded */
   modelName?: string;
   /** Framework being used */
-  framework?: LLMFramework;
+  framework?: InferenceFramework;
   /** Whether model is loading */
   isLoading?: boolean;
   /** Loading progress (0-1) */
@@ -34,50 +39,6 @@ interface ModelStatusBannerProps {
   /** Placeholder text when no model */
   placeholder?: string;
 }
-
-/**
- * Get framework-specific icon name
- */
-const getFrameworkIcon = (framework: LLMFramework): string => {
-  switch (framework) {
-    case LLMFramework.LlamaCpp:
-      return 'cube-outline';
-    case LLMFramework.WhisperKit:
-      return 'mic-outline';
-    case LLMFramework.PiperTTS:
-      return 'volume-high-outline';
-    case LLMFramework.FoundationModels:
-      return 'sparkles-outline';
-    case LLMFramework.CoreML:
-      return 'hardware-chip-outline';
-    case LLMFramework.ONNX:
-      return 'git-network-outline';
-    default:
-      return 'cube-outline';
-  }
-};
-
-/**
- * Get framework-specific color
- */
-const getFrameworkColor = (framework: LLMFramework): string => {
-  switch (framework) {
-    case LLMFramework.LlamaCpp:
-      return Colors.frameworkLlamaCpp;
-    case LLMFramework.WhisperKit:
-      return Colors.frameworkWhisperKit;
-    case LLMFramework.PiperTTS:
-      return Colors.frameworkPiperTTS;
-    case LLMFramework.FoundationModels:
-      return Colors.frameworkFoundationModels;
-    case LLMFramework.CoreML:
-      return Colors.frameworkCoreML;
-    case LLMFramework.ONNX:
-      return Colors.frameworkONNX;
-    default:
-      return Colors.primaryBlue;
-  }
-};
 
 export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
   modelName,
@@ -137,7 +98,7 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
   // Model loaded state
   const frameworkColor = getFrameworkColor(framework);
   const frameworkIcon = getFrameworkIcon(framework);
-  const frameworkName = FrameworkDisplayNames[framework] || framework;
+  const frameworkName = getFrameworkDisplayName(framework);
 
   return (
     <View style={styles.container}>

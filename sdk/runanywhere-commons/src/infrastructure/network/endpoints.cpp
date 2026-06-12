@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <utility>
 
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/network/rac_endpoints.h"
@@ -52,12 +53,12 @@ int rac_build_url(const char* base_url, const char* endpoint, char* out_buffer,
     if (*ep != '/') {
         // Shouldn't happen with our constants, but handle it
         int written = snprintf(out_buffer, buffer_size, "%.*s/%s", (int)base_len, base_url, ep);
-        return (written < 0 || (size_t)written >= buffer_size) ? -1 : written;
+        return (written < 0 || std::cmp_greater_equal(written, buffer_size)) ? -1 : written;
     }
 
     int written = snprintf(out_buffer, buffer_size, "%.*s%s", (int)base_len, base_url, ep);
 
-    if (written < 0 || (size_t)written >= buffer_size) {
+    if (written < 0 || std::cmp_greater_equal(written, buffer_size)) {
         return -1;
     }
 

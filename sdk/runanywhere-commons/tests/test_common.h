@@ -64,8 +64,8 @@ inline int print_summary(const std::vector<TestResult>& results) {
         }
     }
     std::cout << "\n========================================\n";
-    std::cout << "Results: " << passed << " passed, " << failed << " failed, "
-              << results.size() << " total\n";
+    std::cout << "Results: " << passed << " passed, " << failed << " failed, " << results.size()
+              << " total\n";
     std::cout << "========================================\n";
     return (failed > 0) ? 1 : 0;
 }
@@ -117,7 +117,8 @@ inline bool read_wav(const std::string& path, WavFile& wav) {
         file.read(chunk_id, 4);
         file.read(reinterpret_cast<char*>(&chunk_size), 4);
 
-        if (!file.good()) break;
+        if (!file.good())
+            break;
 
         if (std::strncmp(chunk_id, "fmt ", 4) == 0) {
             // fmt chunk layout (16 bytes minimum):
@@ -143,15 +144,15 @@ inline bool read_wav(const std::string& path, WavFile& wav) {
 
         } else if (std::strncmp(chunk_id, "data", 4) == 0) {
             if (wav.bits_per_sample != 16) {
-                std::cerr << "read_wav: only 16-bit PCM supported (got "
-                          << wav.bits_per_sample << ")\n";
+                std::cerr << "read_wav: only 16-bit PCM supported (got " << wav.bits_per_sample
+                          << ")\n";
                 return false;
             }
 
             size_t num_samples_total = chunk_size / sizeof(int16_t);
             std::vector<int16_t> raw(num_samples_total);
             file.read(reinterpret_cast<char*>(raw.data()),
-                       static_cast<std::streamsize>(chunk_size));
+                      static_cast<std::streamsize>(chunk_size));
 
             if (wav.channels == 1) {
                 wav.samples = std::move(raw);
@@ -184,8 +185,8 @@ inline bool read_wav(const std::string& path, WavFile& wav) {
     return true;
 }
 
-inline bool write_wav(const std::string& path, const int16_t* samples,
-                      size_t count, uint32_t sample_rate) {
+inline bool write_wav(const std::string& path, const int16_t* samples, size_t count,
+                      uint32_t sample_rate) {
     std::ofstream file(path, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "write_wav: cannot open " << path << "\n";
@@ -208,7 +209,7 @@ inline bool write_wav(const std::string& path, const int16_t* samples,
     file.write("fmt ", 4);
     uint32_t fmt_size = 16;
     file.write(reinterpret_cast<const char*>(&fmt_size), 4);
-    uint16_t audio_format = 1; // PCM
+    uint16_t audio_format = 1;  // PCM
     file.write(reinterpret_cast<const char*>(&audio_format), 2);
     file.write(reinterpret_cast<const char*>(&channels), 2);
     file.write(reinterpret_cast<const char*>(&sample_rate), 4);
@@ -219,8 +220,7 @@ inline bool write_wav(const std::string& path, const int16_t* samples,
     // data chunk
     file.write("data", 4);
     file.write(reinterpret_cast<const char*>(&data_size), 4);
-    file.write(reinterpret_cast<const char*>(samples),
-               static_cast<std::streamsize>(data_size));
+    file.write(reinterpret_cast<const char*>(samples), static_cast<std::streamsize>(data_size));
 
     return file.good();
 }
@@ -262,8 +262,8 @@ inline std::vector<float> generate_silence(size_t num_samples) {
     return std::vector<float>(num_samples, 0.0f);
 }
 
-inline std::vector<float> generate_sine_wave(float freq_hz, float duration_sec,
-                                              int sample_rate, float amplitude = 0.5f) {
+inline std::vector<float> generate_sine_wave(float freq_hz, float duration_sec, int sample_rate,
+                                             float amplitude = 0.5f) {
     size_t num_samples = static_cast<size_t>(duration_sec * sample_rate);
     std::vector<float> out(num_samples);
     const float two_pi = 2.0f * static_cast<float>(M_PI);
@@ -291,8 +291,8 @@ inline std::vector<float> generate_white_noise(size_t num_samples, float amplitu
  * Resample float audio from one sample rate to another using linear interpolation.
  * Used for TTS→STT/VAD round-trip tests (22050Hz → 16000Hz).
  */
-inline std::vector<float> resample_linear(const float* input, size_t input_len,
-                                           int from_rate, int to_rate) {
+inline std::vector<float> resample_linear(const float* input, size_t input_len, int from_rate,
+                                          int to_rate) {
     if (from_rate == to_rate || input_len == 0) {
         return std::vector<float>(input, input + input_len);
     }
@@ -303,11 +303,11 @@ inline std::vector<float> resample_linear(const float* input, size_t input_len,
         double src_idx = static_cast<double>(i) * ratio;
         size_t idx0 = static_cast<size_t>(src_idx);
         size_t idx1 = idx0 + 1;
-        if (idx1 >= input_len) idx1 = input_len - 1;
+        if (idx1 >= input_len)
+            idx1 = input_len - 1;
         double frac = src_idx - static_cast<double>(idx0);
-        output[i] = static_cast<float>(
-            static_cast<double>(input[idx0]) * (1.0 - frac) +
-            static_cast<double>(input[idx1]) * frac);
+        output[i] = static_cast<float>(static_cast<double>(input[idx0]) * (1.0 - frac) +
+                                       static_cast<double>(input[idx1]) * frac);
     }
     return output;
 }
@@ -317,7 +317,8 @@ inline std::vector<float> resample_linear(const float* input, size_t input_len,
 // =============================================================================
 
 inline bool contains_ci(const std::string& haystack, const std::string& needle) {
-    if (needle.empty()) return true;
+    if (needle.empty())
+        return true;
     std::string h = haystack, n = needle;
     std::transform(h.begin(), h.end(), h.begin(), ::tolower);
     std::transform(n.begin(), n.end(), n.begin(), ::tolower);
@@ -329,7 +330,7 @@ inline bool contains_ci(const std::string& haystack, const std::string& needle) 
 // =============================================================================
 
 class ScopedTimer {
-public:
+   public:
     explicit ScopedTimer(const std::string& label)
         : label_(label), start_(std::chrono::steady_clock::now()) {}
 
@@ -342,7 +343,7 @@ public:
     ScopedTimer(const ScopedTimer&) = delete;
     ScopedTimer& operator=(const ScopedTimer&) = delete;
 
-private:
+   private:
     std::string label_;
     std::chrono::steady_clock::time_point start_;
 };
@@ -372,7 +373,7 @@ inline int parse_test_args(int argc, char** argv,
         if (arg == "--run-all") {
             run_all = true;
         } else if (arg.rfind("--test-", 0) == 0) {
-            std::string name = arg.substr(7); // strip "--test-"
+            std::string name = arg.substr(7);  // strip "--test-"
             selected.push_back(name);
         }
     }
@@ -410,28 +411,31 @@ inline int parse_test_args(int argc, char** argv,
 // Assertion Macros (return early from test function on failure)
 // =============================================================================
 
-#define ASSERT_EQ(_a, _e, _m)                                                  \
-    do {                                                                        \
-        auto _av = (_a);                                                        \
-        auto _ev = (_e);                                                        \
-        if (_av != _ev) {                                                       \
-            TestResult _fail_result;                                            \
-            _fail_result.passed = false;                                        \
-            _fail_result.expected = std::to_string(_ev);                        \
-            _fail_result.actual = std::to_string(_av);                          \
-            _fail_result.details = (_m);                                        \
-            return _fail_result;                                                \
-        }                                                                       \
+#define ASSERT_EQ(_a, _e, _m)                            \
+    do {                                                 \
+        auto _av = (_a);                                 \
+        auto _ev = (_e);                                 \
+        if (_av != _ev) {                                \
+            TestResult _fail_result;                     \
+            _fail_result.passed = false;                 \
+            _fail_result.expected = std::to_string(_ev); \
+            _fail_result.actual = std::to_string(_av);   \
+            _fail_result.details = (_m);                 \
+            return _fail_result;                         \
+        }                                                \
     } while (0)
 
-#define ASSERT_TRUE(_cond, _m)                                                  \
-    do {                                                                        \
-        if (!(_cond)) {                                                         \
-            TestResult _fail_result;                                            \
-            _fail_result.passed = false;                                        \
-            _fail_result.details = (_m);                                        \
-            return _fail_result;                                                \
-        }                                                                       \
+#define ASSERT_TRUE(_cond, _m)                                \
+    do {                                                      \
+        const bool _assert_result = static_cast<bool>(_cond); \
+        if (_assert_result) {                                 \
+            /* passed */                                      \
+        } else {                                              \
+            TestResult _fail_result;                          \
+            _fail_result.passed = false;                      \
+            _fail_result.details = (_m);                      \
+            return _fail_result;                              \
+        }                                                     \
     } while (0)
 
 inline TestResult make_pass_result() {
@@ -447,7 +451,7 @@ inline TestResult make_pass_result() {
 // =============================================================================
 
 class TestSuite {
-public:
+   public:
     explicit TestSuite(const std::string& name) : suite_name_(name) {}
 
     void add(const std::string& test_name, std::function<TestResult()> fn) {
@@ -459,8 +463,7 @@ public:
         std::vector<TestResult> results;
 
         if (argc < 2) {
-            std::cout << "Usage: " << argv[0]
-                      << " --run-all | --test-<name> [--test-<name> ...]\n";
+            std::cout << "Usage: " << argv[0] << " --run-all | --test-<name> [--test-<name> ...]\n";
             std::cout << "Available tests in suite '" << suite_name_ << "':\n";
             for (const auto& name : order_) {
                 std::cout << "  --test-" << name << "\n";
@@ -492,7 +495,8 @@ public:
             }
             std::cout << "\n--- Running: " << name << " ---\n";
             TestResult r = it->second();
-            if (r.test_name.empty()) r.test_name = name;
+            if (r.test_name.empty())
+                r.test_name = name;
             print_result(r);
             results.push_back(r);
         };
@@ -510,10 +514,10 @@ public:
         return print_summary(results);
     }
 
-private:
+   private:
     std::string suite_name_;
     std::map<std::string, std::function<TestResult()>> tests_;
     std::vector<std::string> order_;
 };
 
-#endif // TEST_COMMON_H
+#endif  // TEST_COMMON_H

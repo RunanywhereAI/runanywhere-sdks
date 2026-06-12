@@ -5,6 +5,38 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.13] - 2026-05-18
+
+### Removed (BREAKING)
+- **VAD callback API**: Removed `RunAnywhereVAD.activityStream`,
+  `setSpeechActivityCallback`, `setAudioBufferCallback`, and
+  `setStatisticsCallback`. Subscribe to `RunAnywhere.vad.streamVAD(audio)`
+  instead. This brings the Flutter VAD surface in line with the Swift
+  capability (`RunAnywhere+VAD.swift`).
+
+### Changed
+- **v2 architecture**: All public capability surfaces (`RunAnywhere.llm`,
+  `.stt`, `.tts`, `.vad`, `.vlm`, `.voice`, `.embeddings`, `.tools`, `.rag`,
+  `.models`, `.modelLifecycle`, `.downloads`, `.hardware`, `.solutions`,
+  `.lora`) are now namespaced accessors on the `RunAnywhere` static entry
+  point, mirroring the Swift/Kotlin/RN/Web SDKs.
+- **Lifecycle-owned LLM/STT/TTS/VLM loads**: Model loading now routes
+  through commons model lifecycle via the generated proto ABIs
+  (`rac_*_lifecycle_proto`). Per-component handle ownership has moved
+  into C++.
+- **Public Voice `eventStream()`**: Voice agent surface now exposes a
+  proto-typed `eventStream` mirroring Swift's `RunAnywhere.voice.events`.
+- **Tool-calling session ABIs**: Tool-calling now uses session-based proto
+  requests (`rac_tool_calling_*_proto`) for parity with Swift/Kotlin.
+- **Plugin loader capability**: New `RunAnywherePluginLoader` surface for
+  registering backend plugins (LlamaCpp/ONNX/Genie) from Dart.
+- **Model lifecycle / registry split**: `RunAnywhereModels` (registry) and
+  `RunAnywhereModelLifecycle` (load/unload/current) are now separate
+  capability classes.
+- **Convenience codegen**: Added generated `*.defaults()` factories
+  (`VADConfiguration.defaults()`, `LLMOptions.defaults()`, etc.) so callers
+  no longer hand-construct proto messages with magic defaults.
+
 ## [0.17.0] - 2026-03-09
 
 ### Added

@@ -1,65 +1,68 @@
 /**
- * ONNX - Module facade for @runanywhere/web-onnx
+ * ONNX - Public facade for `@runanywhere/web-onnx`.
  *
- * Provides a high-level API matching the React Native SDK's module pattern.
+ * Loads `racommons-onnx-sherpa.{js,wasm}` (the dedicated ONNX/Sherpa
+ * Emscripten module) and registers the ONNX runtime + Sherpa speech
+ * vtables with the C++ plugin registry. After `ONNX.register()` resolves,
+ * STT/TTS/VAD operations flow entirely through the proto-byte adapters
+ * in `@runanywhere/web` core into that WASM module.
  *
  * Usage:
+ *   ```ts
+ *   import { RunAnywhere } from '@runanywhere/web';
  *   import { ONNX } from '@runanywhere/web-onnx';
  *
+ *   await RunAnywhere.initialize();
  *   await ONNX.register();
+ *   const vad = await RunAnywhere.detectVoiceActivity(silence);
+ *   ```
  */
 
+import { SDKLogger } from '@runanywhere/web/internal';
 import { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
-import { ONNXProvider } from './ONNXProvider';
-
-/** Options for `ONNX.register()`. */
-export interface ONNXRegisterOptions {
-  /** Override URL to the sherpa-onnx-glue.js glue file. */
-  wasmUrl?: string;
-  /**
-   * Override base URL for sherpa-onnx helper files (sherpa-onnx-asr.js, -tts.js, -vad.js).
-   * Must end with a trailing `/`.
-   */
-  helperBaseUrl?: string;
-}
 
 const MODULE_ID = 'onnx';
+const logger = new SDKLogger('ONNX');
+
+export interface ONNXRegisterOptions {
+  /** Override URL to the `racommons-onnx-sherpa.js` glue file. */
+  wasmUrl?: string;
+}
 
 export const ONNX = {
   get moduleId(): string {
     return MODULE_ID;
   },
 
+  /** `true` when the ONNX/Sherpa plugin registration succeeded. */
   get isRegistered(): boolean {
-    return ONNXProvider.isRegistered;
+    return SherpaONNXBridge.shared.isBackendRegistered;
   },
 
   /**
-   * Register the sherpa-onnx backend.
-   * Call after `RunAnywhere.initialize()`.
+   * Register the ONNX Runtime + Sherpa speech backends.
    *
-   * @param options - Optional WASM URL overrides.
-   *                  Use `wasmUrl` / `helperBaseUrl` when the default
-   *                  `import.meta.url`-based resolution doesn't work (e.g. bundled apps).
+   * Loads the dedicated `racommons-onnx-sherpa.{js,wasm}` artifact, calls
+   * `rac_init()`, registers the ONNX runtime and Sherpa speech vtables,
+   * then installs the module on every core proto-byte adapter so
+   * STT/TTS/VAD calls in `@runanywhere/web` core route through it.
    */
   async register(options?: ONNXRegisterOptions): Promise<void> {
     const bridge = SherpaONNXBridge.shared;
     if (options?.wasmUrl) bridge.wasmUrl = options.wasmUrl;
-    if (options?.helperBaseUrl) {
-      bridge.helperBaseUrl = options.helperBaseUrl.endsWith('/')
-        ? options.helperBaseUrl
-        : `${options.helperBaseUrl}/`;
-    }
-    return ONNXProvider.register();
+    await bridge.ensureLoaded(options);
+    logger.info('ONNX/Sherpa backends registered (STT/TTS/VAD vtables installed)');
   },
 
+  /** Unregister the proto-byte plugins and release the WASM module. */
   unregister(): void {
-    ONNXProvider.unregister();
+    SherpaONNXBridge.shared.unregister();
   },
 };
 
-export function autoRegister(): void {
-  ONNXProvider.register().catch(() => {
-    // Silently handle registration failure during auto-registration
+/** Best-effort registration helper for apps that import the package eagerly. */
+export function autoRegister(options?: ONNXRegisterOptions): Promise<void> {
+  return ONNX.register(options).catch(() => {
+    // Suppress — callers should use `ONNX.register()` directly to inspect failures.
   });
 }

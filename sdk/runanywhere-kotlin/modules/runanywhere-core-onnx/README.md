@@ -89,9 +89,11 @@ output.wordTimestamps?.forEach { word ->
 ### Streaming STT
 
 ```kotlin
-RunAnywhere.transcribeStream(audioData) { partial ->
-    // Update UI with partial results
-    println("Partial: ${partial.transcript}")
+RunAnywhere.transcribeStream(audioData).collect { event ->
+    val text = event.final_output?.text ?: event.partial?.text.orEmpty()
+    if (text.isNotBlank()) {
+        println("STT event: $text")
+    }
 }
 ```
 

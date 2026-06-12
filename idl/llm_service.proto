@@ -1,0 +1,217 @@
+// RunAnywhere IDL — LLM token streaming service.
+//
+// Server-streaming rpc returning per-token deltas during
+// LLM generation. Replaces the 5 hand-written token-stream implementations
+// (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
+// RN Nitro callback, Web tokenQueue) with one schema + 5 thin adapters.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "voice_events.proto";
+// hotspot-idl-002: ToolCall / ToolResult are needed on the LLM streaming
+// event path (event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL is meaningless
+// without a structured tool-call payload). tool_calling.proto has no
+// upstream imports today so adding it here does NOT reintroduce any
+// historical concern about an llm_options ↔ sdk_events package cycle.
+import "tool_calling.proto";
+// idl-005: import the canonical LLMGenerationOptions definition so new
+// callers can populate `LLMGenerateRequest.options` instead of the legacy
+// inline scalar fields. The previous justification for inlining fields
+// (a "Square Wire / sdk_events package cycle") does not hold: sdk_events
+// has no dependency on llm_options.proto in either direction (verified by
+// proto-import graph). The inline scalar fields below are kept for
+// backwards compatibility but are deprecated; consumers SHOULD prefer
+// `options.*`.
+import "llm_options.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LLMServiceProto";
+option objc_class_prefix     = "RAV1";
+option csharp_namespace      = "Runanywhere.V1";
+option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// pass3-syn-025: the inline scalar fields below historically existed to avoid
+// importing llm_options.proto. The cycle-avoidance rationale no longer holds
+// (sdk_events.proto has no transitive dependency on llm_options.proto), so
+// idl-005 introduces the canonical `LLMGenerationOptions options` embedded
+// message at field 26. The inline scalar fields are RETAINED for wire-format
+// backwards compatibility but are deprecated; new code SHOULD populate
+// `options.*` and consumers SHOULD prefer `options.*` when set (falling back
+// to the inline fields for legacy callers). The companion fix for
+// VoiceAgentConfig.tts_voice_id (the actual content of syn-025's "VoiceAgent
+// proto carries tts_model_id but not tts_voice_id" issue) lives in
+// idl/solutions.proto where VoiceAgentConfig is declared.
+message LLMGenerateRequest {
+    string prompt           = 1;
+    int32  max_tokens       = 2 [deprecated = true];
+    float  temperature      = 3 [deprecated = true];
+    float  top_p            = 4 [deprecated = true];
+    int32  top_k            = 5 [deprecated = true];
+    string system_prompt    = 6 [deprecated = true];
+    bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
+
+    // Inline LLMGenerationOptions fields — DEPRECATED, prefer `options` (field 26).
+    //
+    // Streaming gaps below remain intentional: a streaming consumer that
+    // requires these advanced knobs MUST set them on `options.*` rather than
+    // inline (no inline duplicate exists):
+    //   - thinking_pattern (LLMGenerationOptions field 11)
+    //   - structured_output (LLMGenerationOptions field 13)
+    //   - enable_real_time_tracking (LLMGenerationOptions field 14)
+    //   - repeat_last_n (LLMGenerationOptions field 18)
+    //   - tool_calling (LLMGenerationOptions field 24) — tool-driven streaming
+    //     is not yet supported on the LLM.Generate rpc; tool sessions must
+    //     use the non-streaming generation path with LLMGenerationOptions.
+    // Note the inline `preferred_framework` (field 11) and `execution_target`
+    // (field 13) are degraded to `string` for backwards compatibility;
+    // `options.preferred_framework` and `options.execution_target` carry the
+    // canonical InferenceFramework / ExecutionTarget enums.
+    float  repetition_penalty = 8 [deprecated = true];
+    repeated string stop_sequences = 9 [deprecated = true];
+    bool   streaming_enabled = 10 [deprecated = true];
+    string preferred_framework = 11 [deprecated = true];
+    string json_schema = 12 [deprecated = true];
+    string execution_target = 13 [deprecated = true];
+    string request_id = 14;
+    string model_id = 15;
+    string conversation_id = 16;
+    int64  seed = 17 [deprecated = true];
+    float  frequency_penalty = 18 [deprecated = true];
+    float  presence_penalty = 19 [deprecated = true];
+    float  min_p = 20 [deprecated = true];
+    string grammar = 21 [deprecated = true];
+    string response_format = 22 [deprecated = true];
+    bool   echo_prompt = 23 [deprecated = true];
+    int32  n_threads = 24 [deprecated = true];
+    map<string, string> metadata = 25;
+
+    // idl-005: canonical generation options. When set, consumers SHOULD use
+    // the values here in preference to the legacy inline scalar fields above.
+    // The wire schema retains the inline fields to avoid breaking existing
+    // serialized requests; new callers should only populate `options`.
+    optional LLMGenerationOptions options = 26;
+}
+
+// Aggregate result carried on the terminal LLMStreamEvent. This intentionally
+// duplicates the scalar result fields instead of importing llm_options.proto:
+// Square Wire treats files with/without go_package as different Kotlin
+// packages, and that import creates a package cycle through sdk_events.
+message LLMStreamFinalResult {
+    string text = 1;
+    optional string thinking_content = 2;
+    int32 prompt_tokens = 3;
+    int32 completion_tokens = 4;
+    int32 total_tokens = 5;
+    int64 total_time_ms = 6;
+    int64 time_to_first_token_ms = 7;
+    float tokens_per_second = 8;
+    string finish_reason = 9;
+    int32 error_code = 10;
+    string error_message = 11;
+    int64 prompt_eval_time_ms = 12;
+    int64 decode_time_ms = 13;
+
+    // hotspot-idl-002: tool calls actually executed during the streaming
+    // session (mirrors LLMGenerationResult.tool_calls / .tool_results in
+    // llm_options.proto). Populated only on terminal events when the
+    // backend completed at least one tool call.
+    repeated ToolCall tool_calls = 14;
+    repeated ToolResult tool_results = 15;
+}
+
+enum LLMStreamEventKind {
+    LLM_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    LLM_STREAM_EVENT_KIND_STARTED = 1;
+    LLM_STREAM_EVENT_KIND_TOKEN = 2;
+    LLM_STREAM_EVENT_KIND_THINKING = 3;
+    LLM_STREAM_EVENT_KIND_TOOL_CALL = 4;
+    LLM_STREAM_EVENT_KIND_PROGRESS = 5;
+    LLM_STREAM_EVENT_KIND_COMPLETED = 6;
+    LLM_STREAM_EVENT_KIND_ERROR = 7;
+}
+
+// Unified per-token streaming event. Replaces
+// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
+// callbackFlow / StreamController / tokenQueue. One serialized event
+// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
+// from voice_events.proto so frontends can reuse gap-detection logic.
+message LLMStreamEvent {
+    // Monotonic per-process sequence number. Useful for frontends that
+    // need to detect gaps or out-of-order delivery.
+    uint64 seq             = 1;
+
+    // Wall-clock timestamp captured at the C++ edge, in microseconds
+    // since Unix epoch. Frontends may re-timestamp for UI display.
+    int64  timestamp_us    = 2;
+
+    // Generated token text. Empty on terminal events where only
+    // finish_reason or error_message is populated.
+    string token           = 3;
+
+    // True on the last event of a generation.
+    bool   is_final        = 4;
+
+    // Token semantic category (answer / thought / tool-call).
+    // Canonical TokenKind from voice_events.proto.
+    TokenKind kind         = 5;
+
+    // Backend-provided token id when the engine exposes it; 0 = unset
+    // (proto3 scalar default).
+    uint32 token_id        = 6;
+
+    // Per-token log-probability when supported; 0.0 = unset.
+    float  logprob         = 7;
+
+    // Reason the stream stopped: "stop", "length", "cancelled", "error",
+    // "" = unset (proto3 scalar default). Only populated when is_final.
+    string finish_reason   = 8;
+
+    // Error message on failure events (kind may be unset, is_final true).
+    // Empty on success.
+    string error_message   = 9;
+
+    // Final aggregate result. Only populated on terminal events
+    // (is_final=true) when the backend can report result metrics.
+    optional LLMStreamFinalResult result = 10;
+
+    // Numeric backend status code when the terminal event represents a
+    // failure. 0 = unset/success.
+    int32 error_code = 11;
+
+    // Event classification distinct from token semantic kind.
+    LLMStreamEventKind event_kind = 12;
+
+    // Request/session correlation fields.
+    string request_id = 13;
+    string conversation_id = 14;
+
+    // Running counters for progress UIs.
+    int32 prompt_tokens_processed = 15;
+    int32 completion_tokens_generated = 16;
+    int64 elapsed_ms = 17;
+
+    // hotspot-idl-002: structured tool-call payload emitted alongside an
+    // event with event_kind=LLM_STREAM_EVENT_KIND_TOOL_CALL. Without this
+    // field the tool-call event kind carries no proto-typed payload and
+    // SDK consumers must fall back to JSON-parsing the raw `token` text.
+    optional ToolCall tool_call = 18;
+}
+
+service LLM {
+    // Server-streaming: emits one LLMStreamEvent per generated token
+    // until is_final=true. Cancellation aborts the underlying generation
+    // via the existing rac_llm_cancel() C ABI.
+    //
+    // idl-002: tool-calling generation is NOT supported on this streaming
+    // entry point. LLMGenerateRequest does not carry ToolCallingOptions
+    // (see comment on LLMGenerateRequest). Use the non-streaming
+    // generation path that carries LLMGenerationOptions when a session
+    // requires tools / structured output / thinking-tag patterns /
+    // repeat_last_n / enable_real_time_tracking.
+    rpc Generate(LLMGenerateRequest) returns (stream LLMStreamEvent);
+}

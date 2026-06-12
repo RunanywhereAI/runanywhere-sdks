@@ -6,6 +6,9 @@
  * For better separation of concerns, prefer including:
  * - rac_vad_types.h for data structures only
  * - rac_vad_service.h for the service interface
+ *
+ * Classification: pure include aggregator. See classification headers
+ * on rac_vad_types.h and rac_vad_service.h.
  */
 
 #ifndef RAC_VAD_H

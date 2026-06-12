@@ -171,28 +171,32 @@ static int64_t posixGetFileSize(const char* path, void* /*userData*/) {
     return static_cast<int64_t>(st.st_size);
 }
 
-static int64_t posixGetAvailableSpace(void* /*userData*/) {
-    // Use root "/" on iOS, "/data" on Android
+// Resolve a mount point statvfs() can query on the current platform.
+//
+// iOS sandboxing blocks `statvfs("/")` (returns 0), so we query the app's
+// HOME directory — this is what NSFileManager.attributesOfFileSystem(forPath:)
+// does internally when called with NSHomeDirectory(), and produces identical
+// systemSize / systemFreeSize values.
+static const char* fsMountPointForStatvfs() {
 #if defined(ANDROID) || defined(__ANDROID__)
-    const char* mountPoint = "/data";
+    return "/data";
+#elif defined(__APPLE__)
+    const char* home = getenv("HOME");
+    return (home && *home) ? home : "/";
 #else
-    const char* mountPoint = "/";
+    return "/";
 #endif
+}
 
+static int64_t posixGetAvailableSpace(void* /*userData*/) {
     struct statvfs vfs;
-    if (statvfs(mountPoint, &vfs) != 0) return 0;
+    if (statvfs(fsMountPointForStatvfs(), &vfs) != 0) return 0;
     return static_cast<int64_t>(vfs.f_bavail) * static_cast<int64_t>(vfs.f_frsize);
 }
 
 static int64_t posixGetTotalSpace(void* /*userData*/) {
-#if defined(ANDROID) || defined(__ANDROID__)
-    const char* mountPoint = "/data";
-#else
-    const char* mountPoint = "/";
-#endif
-
     struct statvfs vfs;
-    if (statvfs(mountPoint, &vfs) != 0) return 0;
+    if (statvfs(fsMountPointForStatvfs(), &vfs) != 0) return 0;
     return static_cast<int64_t>(vfs.f_blocks) * static_cast<int64_t>(vfs.f_frsize);
 }
 

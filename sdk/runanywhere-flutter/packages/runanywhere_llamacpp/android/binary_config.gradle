@@ -9,15 +9,10 @@
 // =============================================================================
 
 ext {
-    // Set this to true for local development/testing
-    // Set to false for production builds (downloads from GitHub releases)
-    useLocalNatives = false
-    testLocal = useLocalNatives  // legacy alias
-
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    coreVersion = "0.1.6"
+    coreVersion = "0.19.13"
 
     // =============================================================================
     // Remote binary URLs
@@ -28,14 +23,13 @@ ext {
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
-    llamacppAndroidUrl = "${binariesBaseUrl}/commons-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
+    llamacppAndroidUrl = "${binariesBaseUrl}/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
 
-    // Helper method to check if we should download
-    shouldDownloadAndroidLibs = { ->
-        return !testLocal
-    }
-
-    // Helper method to check if local libs exist
+    // Helper method to check if local libs exist.
+    // The engines CMake may emit either `librac_backend_llamacpp.so` (always)
+    // and/or `librac_backend_llamacpp_jni.so` (Android JNI entry point, emitted
+    // only when RAC_BUILD_SHARED=ON). Treat either as a valid indicator so we
+    // don't fail the build when the JNI suffix isn't generated on every preset.
     checkLocalLibsExist = { ->
         def jniLibsDir = project.file('src/main/jniLibs')
         def arm64Dir = new File(jniLibsDir, 'arm64-v8a')
@@ -44,8 +38,32 @@ ext {
             return false
         }
 
-        // Check for LlamaCPP backend library
-        def llamacppLib = new File(arm64Dir, 'librac_backend_llamacpp_jni.so')
-        return llamacppLib.exists()
+        def backendLib = new File(arm64Dir, 'librac_backend_llamacpp.so')
+        def backendJniLib = new File(arm64Dir, 'librac_backend_llamacpp_jni.so')
+        return backendLib.exists() || backendJniLib.exists()
+    }
+
+    // Canonical name (matches Swift/Kotlin/RN and the runanywhere core plugin).
+    //
+    // Default selection rules (applied in order):
+    //   1. Explicit override: respect `runanywhere.useLocalNatives` Gradle
+    //      property when set (true/false).
+    //   2. Otherwise auto-detect: use local .so files when monorepo's
+    //      `scripts/build/build-core-android.sh` has staged them under
+    //      `android/src/main/jniLibs/` (the only location the local branch
+    //      consumes). Fall back to the remote download branch otherwise so
+    //      clean Flutter Android consumer builds (which have no plugin-local
+    //      jniLibs and don't know about the override) work out of the box.
+    def localNativesProp = project.findProperty("runanywhere.useLocalNatives")
+    if (localNativesProp != null) {
+        useLocalNatives = localNativesProp.toString().toBoolean()
+    } else {
+        useLocalNatives = checkLocalLibsExist()
+    }
+    testLocal = useLocalNatives  // legacy alias
+
+    // Helper method to check if we should download
+    shouldDownloadAndroidLibs = { ->
+        return !testLocal
     }
 }

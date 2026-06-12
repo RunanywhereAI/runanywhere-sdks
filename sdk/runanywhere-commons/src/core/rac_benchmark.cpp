@@ -46,10 +46,4 @@ int64_t rac_monotonic_now_ms(void) {
     return MonotonicEpoch::instance().elapsed_ms();
 }
 
-void rac_benchmark_timing_init(rac_benchmark_timing_t* timing) {
-    if (timing != nullptr) {
-        std::memset(timing, 0, sizeof(rac_benchmark_timing_t));
-    }
-}
-
 }  // extern "C"

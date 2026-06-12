@@ -8,6 +8,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import "PlatformDownloadBridge.h"
+#import "PlatformAdapterBridge.h"  // own header: PlatformDirectoryEntry + PlatformAdapter_listDirectory decls
 
 // Import the generated Swift header from the pod
 #if __has_include(<RunAnywhereCore/RunAnywhereCore-Swift.h>)
@@ -27,11 +28,18 @@
 @interface PlatformAdapter : NSObject
 + (PlatformAdapter * _Nonnull)shared;
 - (NSString * _Nonnull)getPersistentDeviceUUID;
+- (NSString * _Nullable)getModelBaseDirectory;
 @end
 #endif
 
 // =============================================================================
-// HTTP Download (Platform Adapter)
+// HTTP Download (Platform Adapter Fallback)
+//
+// Public RN model downloads bypass this Objective-C path and call
+// HybridRunAnywhereCore::downloadModel -> rac_http_download_execute. This
+// fallback remains registered on the RACommons platform adapter for
+// platform-adapter-only consumers that request an async download before going
+// through the Nitro public API.
 // =============================================================================
 
 static const int RAC_SUCCESS = 0;
@@ -396,6 +404,40 @@ bool PlatformAdapter_getPersistentDeviceUUID(char** outValue) {
 }
 
 // ============================================================================
+// Native Directories
+// ============================================================================
+
+bool PlatformAdapter_getModelBaseDirectory(char** outValue) {
+    @autoreleasepool {
+        if (outValue == NULL) {
+            return false;
+        }
+
+        *outValue = NULL;
+
+        @try {
+            NSString* path = [[PlatformAdapter shared] getModelBaseDirectory];
+            if (path == nil || path.length == 0) {
+                NSLog(@"[PlatformAdapterBridge] getModelBaseDirectory: Documents directory unavailable");
+                return false;
+            }
+
+            const char* utf8Value = [path UTF8String];
+            if (utf8Value == NULL) {
+                return false;
+            }
+
+            *outValue = strdup(utf8Value);
+            NSLog(@"[PlatformAdapterBridge] getModelBaseDirectory: %@", path);
+            return *outValue != NULL;
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] getModelBaseDirectory exception: %@", exception);
+            return false;
+        }
+    }
+}
+
+// ============================================================================
 // Device Info (Synchronous)
 // ============================================================================
 
@@ -439,7 +481,7 @@ static NSString* getDeviceModelName(NSString* identifier) {
         @"x86_64": @"Simulator",
         @"arm64": @"Simulator",
     };
-    
+
     NSString* name = models[identifier];
     return name ?: identifier;
 }
@@ -470,7 +512,7 @@ static NSString* getChipNameForModel(NSString* identifier) {
         @"iPad14,1": @"M2",
         @"iPad14,2": @"M2",
     };
-    
+
     NSString* chip = chips[identifier];
     return chip ?: @"Apple Silicon";
 }
@@ -479,10 +521,10 @@ bool PlatformAdapter_getDeviceModel(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             NSString* identifier = getMachineIdentifier();
-            
+
             // Check for simulator
             #if TARGET_OS_SIMULATOR
             NSDictionary* env = [[NSProcessInfo processInfo] environment];
@@ -491,7 +533,7 @@ bool PlatformAdapter_getDeviceModel(char** outValue) {
                 identifier = simModelId;
             }
             #endif
-            
+
             NSString* modelName = getDeviceModelName(identifier);
             *outValue = strdup([modelName UTF8String]);
             return *outValue != NULL;
@@ -505,7 +547,7 @@ bool PlatformAdapter_getOSVersion(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             NSString* version = [[UIDevice currentDevice] systemVersion];
             *outValue = strdup([version UTF8String]);
@@ -520,10 +562,10 @@ bool PlatformAdapter_getChipName(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             NSString* identifier = getMachineIdentifier();
-            
+
             // Check for simulator
             #if TARGET_OS_SIMULATOR
             NSDictionary* env = [[NSProcessInfo processInfo] environment];
@@ -532,7 +574,7 @@ bool PlatformAdapter_getChipName(char** outValue) {
                 identifier = simModelId;
             }
             #endif
-            
+
             NSString* chipName = getChipNameForModel(identifier);
             *outValue = strdup([chipName UTF8String]);
             return *outValue != NULL;
@@ -554,11 +596,11 @@ uint64_t PlatformAdapter_getAvailableMemory(void) {
     if (result != KERN_SUCCESS) {
         return 0;
     }
-    
+
     uint64_t pageSize = vm_page_size;
     uint64_t freeMemory = vmStats.free_count * pageSize;
     uint64_t inactiveMemory = vmStats.inactive_count * pageSize;
-    
+
     return freeMemory + inactiveMemory;
 }
 
@@ -570,7 +612,7 @@ bool PlatformAdapter_getArchitecture(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             #if __arm64__
             *outValue = strdup("arm64");
@@ -590,7 +632,7 @@ bool PlatformAdapter_getGPUFamily(char** outValue) {
     @autoreleasepool {
         if (!outValue) return false;
         *outValue = NULL;
-        
+
         @try {
             // All iOS/macOS devices use Apple's custom GPUs
             *outValue = strdup("apple");
@@ -619,158 +661,7 @@ bool PlatformAdapter_isTablet(void) {
 }
 
 // ============================================================================
-// HTTP POST for Device Registration (Synchronous)
-// Matches Swift's CppBridge+Device.swift http_post callback
-// ============================================================================
-
-/**
- * Synchronous HTTP POST for device registration
- * Called from C++ device manager callbacks
- *
- * @param url Full URL to POST to
- * @param jsonBody JSON body string
- * @param supabaseKey Supabase API key (for dev mode, can be NULL)
- * @param outStatusCode Pointer to store HTTP status code
- * @param outResponseBody Pointer to store response body (must be freed by caller)
- * @param outErrorMessage Pointer to store error message (must be freed by caller)
- * @return true if request succeeded (2xx or 409)
- */
-bool PlatformAdapter_httpPostSync(
-    const char* url,
-    const char* jsonBody,
-    const char* supabaseKey,
-    int* outStatusCode,
-    char** outResponseBody,
-    char** outErrorMessage
-) {
-    @autoreleasepool {
-        if (!url || !jsonBody || !outStatusCode) {
-            if (outErrorMessage) *outErrorMessage = strdup("Invalid arguments");
-            return false;
-        }
-
-        *outStatusCode = 0;
-        if (outResponseBody) *outResponseBody = NULL;
-        if (outErrorMessage) *outErrorMessage = NULL;
-
-        NSString* urlStr = [NSString stringWithUTF8String:url];
-        NSString* bodyStr = [NSString stringWithUTF8String:jsonBody];
-        NSString* apiKey = supabaseKey ? [NSString stringWithUTF8String:supabaseKey] : nil;
-
-        if (!urlStr || !bodyStr) {
-            if (outErrorMessage) *outErrorMessage = strdup("Invalid URL or body");
-            return false;
-        }
-
-        NSURL* nsUrl = [NSURL URLWithString:urlStr];
-        if (!nsUrl) {
-            if (outErrorMessage) *outErrorMessage = strdup("Invalid URL format");
-            return false;
-        }
-
-        NSLog(@"[PlatformAdapterBridge] HTTP POST to: %@", urlStr);
-
-        // For Supabase device registration, add ?on_conflict=device_id for UPSERT
-        // This matches Swift's HTTPService.swift logic
-        if ([urlStr containsString:@"/rest/v1/sdk_devices"]) {
-            if (![urlStr containsString:@"on_conflict="]) {
-                NSString* separator = [urlStr containsString:@"?"] ? @"&" : @"?";
-                urlStr = [NSString stringWithFormat:@"%@%@on_conflict=device_id", urlStr, separator];
-                nsUrl = [NSURL URLWithString:urlStr];
-                NSLog(@"[PlatformAdapterBridge] Added on_conflict for UPSERT: %@", urlStr);
-            }
-        }
-
-        // Create request
-        NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsUrl];
-        request.HTTPMethod = @"POST";
-        request.HTTPBody = [bodyStr dataUsingEncoding:NSUTF8StringEncoding];
-        request.timeoutInterval = 30.0;
-
-        // Headers
-        [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-        [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-
-        // Supabase headers (for device registration UPSERT)
-        if (apiKey) {
-            [request setValue:apiKey forHTTPHeaderField:@"apikey"];
-            [request setValue:[NSString stringWithFormat:@"Bearer %@", apiKey] forHTTPHeaderField:@"Authorization"];
-            [request setValue:@"resolution=merge-duplicates" forHTTPHeaderField:@"Prefer"];
-        }
-
-        // Synchronous request using semaphore (like Swift SDK)
-        __block NSData* responseData = nil;
-        __block NSHTTPURLResponse* httpResponse = nil;
-        __block NSError* error = nil;
-
-        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-
-        NSURLSessionDataTask* task = [[NSURLSession sharedSession]
-            dataTaskWithRequest:request
-            completionHandler:^(NSData* data, NSURLResponse* response, NSError* err) {
-                responseData = data;
-                httpResponse = (NSHTTPURLResponse*)response;
-                error = err;
-                dispatch_semaphore_signal(semaphore);
-            }];
-
-        [task resume];
-
-        // Wait with 30 second timeout
-        dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC);
-        long result = dispatch_semaphore_wait(semaphore, timeout);
-
-        if (result != 0) {
-            if (outErrorMessage) *outErrorMessage = strdup("Request timed out");
-            NSLog(@"[PlatformAdapterBridge] HTTP POST timed out");
-            return false;
-        }
-
-        if (error) {
-            if (outErrorMessage) *outErrorMessage = strdup([[error localizedDescription] UTF8String]);
-            NSLog(@"[PlatformAdapterBridge] HTTP POST error: %@", error);
-            return false;
-        }
-
-        *outStatusCode = (int)httpResponse.statusCode;
-
-        // Store response body
-        if (responseData && outResponseBody) {
-            NSString* bodyString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-            if (bodyString) {
-                *outResponseBody = strdup([bodyString UTF8String]);
-            }
-        }
-
-        // 2xx or 409 (conflict/already exists) = success for device registration
-        BOOL isSuccess = (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) ||
-                         httpResponse.statusCode == 409;
-
-        // Log response body for debugging (especially on errors)
-        NSString* responseBodyStr = nil;
-        if (responseData) {
-            responseBodyStr = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-        }
-        
-        if (!isSuccess) {
-            NSLog(@"[PlatformAdapterBridge] HTTP POST failed with status=%ld, response: %@",
-                  (long)httpResponse.statusCode, responseBodyStr ?: @"(empty)");
-            if (outErrorMessage) {
-                NSString* errorMsg = [NSString stringWithFormat:@"HTTP %ld: %@", 
-                    (long)httpResponse.statusCode, responseBodyStr ?: @"Unknown error"];
-                *outErrorMessage = strdup([errorMsg UTF8String]);
-            }
-        }
-
-        NSLog(@"[PlatformAdapterBridge] HTTP POST completed: status=%d success=%d",
-              *outStatusCode, isSuccess);
-
-        return isSuccess;
-    }
-}
-
-// ============================================================================
-// HTTP Download (Async)
+// HTTP Download (Async Platform Adapter Fallback)
 // ============================================================================
 
 int PlatformAdapter_httpDownload(
@@ -809,5 +700,160 @@ bool PlatformAdapter_httpDownloadCancel(const char* taskId) {
         }
 
         return [[RunAnywhereHttpDownloadManager shared] cancelDownload:taskStr];
+    }
+}
+
+// ============================================================================
+// Directory Enumeration (Platform Adapter Slots)
+//
+// Cross-SDK parity with Swift CppBridge+PlatformAdapter (the source of truth)
+// and the Kotlin / Flutter siblings. The same logic
+// powers the C++ model-registry refresh path (rescan_local) and the
+// rac_model_info_make_proto is_downloaded probe for multi-file artifacts.
+// ============================================================================
+
+#define PLATFORM_DIRECTORY_ENTRY_NAME_MAX 512  // RAC_DIRECTORY_ENTRY_NAME_MAX
+
+void PlatformAdapter_listDirectory(const char* dirPath,
+                                   PlatformDirectoryEntry* outEntries,
+                                   size_t* inOutCount,
+                                   int* outResult) {
+    @autoreleasepool {
+        if (!outResult) {
+            return;
+        }
+        if (!dirPath || !inOutCount) {
+            *outResult = -106;  // RAC_ERROR_INVALID_ARGUMENT
+            return;
+        }
+
+        NSString* pathStr = [NSString stringWithUTF8String:dirPath];
+        if (!pathStr) {
+            *outResult = -106;
+            return;
+        }
+
+        NSFileManager* fm = [NSFileManager defaultManager];
+        BOOL isDirectory = NO;
+        if (![fm fileExistsAtPath:pathStr isDirectory:&isDirectory] || !isDirectory) {
+            *outResult = -183;  // RAC_ERROR_FILE_NOT_FOUND
+            return;
+        }
+
+        NSError* error = nil;
+        NSArray<NSString*>* entries = [fm contentsOfDirectoryAtPath:pathStr error:&error];
+        if (!entries) {
+            NSLog(@"[PlatformAdapterBridge] listDirectory error: %@", error);
+            *outResult = -805;  // RAC_ERROR_INTERNAL
+            return;
+        }
+
+        if (!outEntries) {
+            *inOutCount = entries.count;
+            *outResult = 0;
+            return;
+        }
+
+        const size_t capacity = *inOutCount;
+        const size_t total = entries.count;
+        const size_t writeCount = total < capacity ? total : capacity;
+        size_t written = 0;
+        size_t skipped = 0;
+
+        for (size_t i = 0; i < writeCount; i++) {
+            NSString* entryName = entries[i];
+            const char* utf8Name = [entryName UTF8String];
+            if (!utf8Name) {
+                continue;
+            }
+            size_t nameLen = strlen(utf8Name);
+            // Truncation contract (rac_directory_entry_t::name): skip oversized
+            // names rather than emit a half-name. Mirrors Kotlin / Flutter siblings.
+            if (nameLen + 1 > PLATFORM_DIRECTORY_ENTRY_NAME_MAX) {
+                skipped++;
+                continue;
+            }
+
+            memset(outEntries[written].name, 0, PLATFORM_DIRECTORY_ENTRY_NAME_MAX);
+            memcpy(outEntries[written].name, utf8Name, nameLen);
+
+            NSString* fullPath = [pathStr stringByAppendingPathComponent:entryName];
+            BOOL entryIsDir = NO;
+            BOOL exists = [fm fileExistsAtPath:fullPath isDirectory:&entryIsDir];
+            outEntries[written].is_dir = (exists && entryIsDir) ? true : false;
+
+            if (exists && !entryIsDir) {
+                NSDictionary* attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+                outEntries[written].size_bytes = attrs ? (int64_t)[attrs fileSize] : 0;
+            } else {
+                outEntries[written].size_bytes = 0;
+            }
+            written++;
+        }
+
+        if (skipped > 0) {
+            NSLog(@"[PlatformAdapterBridge] listDirectory: skipped %zu oversized entry name(s) in %@",
+                  skipped, pathStr);
+        }
+
+        *inOutCount = written;
+        *outResult = 0;
+    }
+}
+
+bool PlatformAdapter_isNonEmptyDirectory(const char* path) {
+    @autoreleasepool {
+        if (!path) {
+            return false;
+        }
+        NSString* pathStr = [NSString stringWithUTF8String:path];
+        if (!pathStr) {
+            return false;
+        }
+
+        NSFileManager* fm = [NSFileManager defaultManager];
+        BOOL isDirectory = NO;
+        if (![fm fileExistsAtPath:pathStr isDirectory:&isDirectory] || !isDirectory) {
+            return false;
+        }
+
+        NSError* error = nil;
+        NSArray<NSString*>* entries = [fm contentsOfDirectoryAtPath:pathStr error:&error];
+        if (!entries) {
+            return false;
+        }
+        return entries.count > 0;
+    }
+}
+
+int PlatformAdapter_getVendorId(char* outBuffer, size_t bufferSize) {
+    @autoreleasepool {
+        if (!outBuffer) {
+            return -101;  // RAC_ERROR_NULL_POINTER
+        }
+        if (bufferSize < 37) {
+            return -261;  // RAC_ERROR_BUFFER_TOO_SMALL
+        }
+
+        @try {
+            NSUUID* vendorId = [[UIDevice currentDevice] identifierForVendor];
+            if (!vendorId) {
+                return -423;  // RAC_ERROR_NOT_FOUND
+            }
+            NSString* uuidString = [vendorId UUIDString];
+            const char* utf8 = [uuidString UTF8String];
+            if (!utf8) {
+                return -805;  // RAC_ERROR_INTERNAL
+            }
+            size_t len = strlen(utf8);
+            if (len + 1 > bufferSize) {
+                return -261;
+            }
+            memcpy(outBuffer, utf8, len + 1);
+            return 0;  // RAC_SUCCESS
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] getVendorId exception: %@", exception);
+            return -805;
+        }
     }
 }

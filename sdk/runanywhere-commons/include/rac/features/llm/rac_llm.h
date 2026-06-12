@@ -6,6 +6,9 @@
  * For better separation of concerns, prefer including:
  * - rac_llm_types.h for data structures only
  * - rac_llm_service.h for the service interface
+ *
+ * Classification: pure include aggregator. See classification headers
+ * on rac_llm_types.h and rac_llm_service.h.
  */
 
 #ifndef RAC_LLM_H

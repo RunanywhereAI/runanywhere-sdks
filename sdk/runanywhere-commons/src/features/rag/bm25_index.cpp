@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 #include <unordered_set>
 
 #include "rac/core/rac_logger.h"
@@ -15,8 +16,7 @@
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
-namespace runanywhere {
-namespace rag {
+namespace runanywhere::rag {
 
 // =============================================================================
 // Tokenizer — split on whitespace, strip leading/trailing punctuation, lowercase
@@ -29,7 +29,7 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
     size_t i = 0;
     while (i < text.size()) {
         // Skip whitespace
-        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) {
+        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i])) != 0) {
             ++i;
         }
         if (i >= text.size())
@@ -37,19 +37,20 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
 
         // Collect non-whitespace run
         size_t start = i;
-        while (i < text.size() && !std::isspace(static_cast<unsigned char>(text[i]))) {
+        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i])) == 0) {
             ++i;
         }
 
         // Strip leading punctuation
         size_t tok_start = start;
-        while (tok_start < i && std::ispunct(static_cast<unsigned char>(text[tok_start]))) {
+        while (tok_start < i && std::ispunct(static_cast<unsigned char>(text[tok_start])) != 0) {
             ++tok_start;
         }
 
         // Strip trailing punctuation
         size_t tok_end = i;
-        while (tok_end > tok_start && std::ispunct(static_cast<unsigned char>(text[tok_end - 1]))) {
+        while (tok_end > tok_start &&
+               std::ispunct(static_cast<unsigned char>(text[tok_end - 1])) != 0) {
             --tok_end;
         }
 
@@ -76,7 +77,7 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
 void BM25Index::add_chunk(const std::string& chunk_id, const std::string& text) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (chunk_term_freqs_.count(chunk_id)) {
+    if (chunk_term_freqs_.count(chunk_id) != 0U) {
         LOGE("Duplicate chunk ID: %s", chunk_id.c_str());
         return;
     }
@@ -108,7 +109,7 @@ void BM25Index::add_chunks_batch(const std::vector<std::pair<std::string, std::s
     std::lock_guard<std::mutex> lock(mutex_);
 
     for (const auto& [chunk_id, text] : chunks) {
-        if (chunk_term_freqs_.count(chunk_id)) {
+        if (chunk_term_freqs_.count(chunk_id) != 0U) {
             LOGE("Duplicate chunk ID in batch: %s", chunk_id.c_str());
             continue;
         }
@@ -151,7 +152,7 @@ void BM25Index::remove_chunk(const std::string& chunk_id) {
         auto inv_it = inverted_index_.find(term);
         if (inv_it != inverted_index_.end()) {
             auto& ids = inv_it->second;
-            ids.erase(std::remove(ids.begin(), ids.end(), chunk_id), ids.end());
+            ids.erase(std::ranges::remove(ids, chunk_id).begin(), ids.end());
             if (ids.empty()) {
                 inverted_index_.erase(inv_it);
             }
@@ -264,8 +265,7 @@ std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& 
     }
 
     // Sort descending by score
-    std::sort(scored.begin(), scored.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
+    std::ranges::sort(scored, [](const auto& a, const auto& b) { return a.second > b.second; });
 
     // Return top_k
     if (scored.size() > top_k) {
@@ -275,5 +275,4 @@ std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& 
     return scored;
 }
 
-}  // namespace rag
-}  // namespace runanywhere
+}  // namespace runanywhere::rag

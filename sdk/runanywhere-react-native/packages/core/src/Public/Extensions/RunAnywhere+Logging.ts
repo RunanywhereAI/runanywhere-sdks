@@ -5,10 +5,11 @@
  * Matches iOS: RunAnywhere+Logging.swift
  */
 
-import type { LogLevel } from '../../Foundation/Logging/Models/LogLevel';
-import type {
-  LogEventCallback,
-  LogDestination,
+import {
+  LogLevel,
+  LoggingManager,
+  type LoggingConfiguration,
+  type LogDestination,
 } from '../../Foundation/Logging';
 
 // ============================================================================
@@ -16,21 +17,35 @@ import type {
 // ============================================================================
 
 /**
+ * Configure SDK logging
+ * Matches iOS: static func configureLogging(_ config: LoggingConfiguration)
+ */
+export function configureLogging(config: LoggingConfiguration): void {
+  LoggingManager.shared.configure(config);
+}
+
+/**
+ * Enable or disable local console logging
+ * Matches iOS: static func setLocalLoggingEnabled(_ enabled: Bool)
+ */
+export function setLocalLoggingEnabled(enabled: boolean): void {
+  LoggingManager.shared.setLocalLoggingEnabled(enabled);
+}
+
+/**
  * Set SDK log level
  * Matches iOS: static func setLogLevel(_ level: LogLevel)
  */
 export function setLogLevel(level: LogLevel): void {
-  const { LoggingManager } = require('../../Foundation/Logging');
-  LoggingManager.shared.setLogLevel(level);
+  LoggingManager.shared.setMinLogLevel(level);
 }
 
 /**
- * Subscribe to all SDK log events
- * Matches iOS pattern of exposing log events publicly.
+ * Enable or disable Sentry error tracking
+ * Matches iOS: static func setSentryLoggingEnabled(_ enabled: Bool)
  */
-export function onLog(callback: LogEventCallback): () => void {
-  const { LoggingManager } = require('../../Foundation/Logging');
-  return LoggingManager.shared.onLog(callback);
+export function setSentryLoggingEnabled(enabled: boolean): void {
+  LoggingManager.shared.setSentryLoggingEnabled(enabled);
 }
 
 /**
@@ -38,14 +53,22 @@ export function onLog(callback: LogEventCallback): () => void {
  * Matches iOS: static func addLogDestination(_ destination: LogDestination)
  */
 export function addLogDestination(destination: LogDestination): void {
-  const { LoggingManager } = require('../../Foundation/Logging');
   LoggingManager.shared.addDestination(destination);
 }
 
 /**
- * Remove a log destination by identifier
+ * Enable verbose debugging mode
+ * Matches iOS: static func setDebugMode(_ enabled: Bool)
  */
-export function removeLogDestination(identifier: string): void {
-  const { LoggingManager } = require('../../Foundation/Logging');
-  LoggingManager.shared.removeDestination(identifier);
+export function setDebugMode(enabled: boolean): void {
+  setLogLevel(enabled ? LogLevel.LOG_LEVEL_DEBUG : LogLevel.LOG_LEVEL_INFO);
+  setLocalLoggingEnabled(enabled);
+}
+
+/**
+ * Force flush all pending logs to destinations
+ * Matches iOS: static func flushLogs()
+ */
+export function flushLogs(): void {
+  LoggingManager.shared.flush();
 }

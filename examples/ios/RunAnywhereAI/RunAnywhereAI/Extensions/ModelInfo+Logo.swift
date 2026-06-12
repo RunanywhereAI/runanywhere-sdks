@@ -1,5 +1,5 @@
 //
-//  ModelInfo+Logo.swift
+//  RAModelInfo+Logo.swift
 //  RunAnywhereAI
 //
 //  Model logo asset name mapping extension
@@ -7,14 +7,14 @@
 
 import RunAnywhere
 
-extension ModelInfo {
+extension RAModelInfo {
     /// Returns the asset name for the model's logo
     /// Falls back to Hugging Face logo if no specific logo is available
     var logoAssetName: String {
         let modelName = name.lowercased()
 
         // Check framework first for built-in models
-        if framework == .foundationModels || framework == .systemTTS {
+        if framework == .foundationModels || framework == .systemTts {
             return "foundation_models_logo"
         }
 

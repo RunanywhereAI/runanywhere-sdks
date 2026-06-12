@@ -1,8 +1,9 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/native/types/core_function_types.dart';
 
 /// Minimal LlamaCPP backend FFI bindings.
 ///
@@ -22,15 +23,13 @@ import 'package:runanywhere/native/platform_loader.dart';
 ///
 /// This Dart code just:
 /// 1. Calls `rac_backend_llamacpp_register()` to register the backend
-/// 2. The core SDK's `NativeBackend` handles all LLM operations via `rac_llm_component_*`
+/// 2. The core SDK handles all LLM operations via `rac_llm_component_*` FFI calls
 class LlamaCppBindings {
   final DynamicLibrary _lib;
 
   // Function pointers - only registration functions
   late final RacBackendLlamacppRegisterDart? _register;
   late final RacBackendLlamacppUnregisterDart? _unregister;
-  late final RacBackendLlamacppVlmRegisterDart? _registerVlm;
-  late final RacBackendLlamacppVlmUnregisterDart? _unregisterVlm;
 
   /// Create bindings using the appropriate library for each platform.
   ///
@@ -68,6 +67,7 @@ class LlamaCppBindings {
 
       // Try different naming conventions for the backend library
       final libraryNames = [
+        'librac_backend_llamacpp.so',
         'librac_backend_llamacpp_jni.so',
         'librunanywhere_llamacpp.so',
       ];
@@ -118,21 +118,6 @@ class LlamaCppBindings {
     } catch (_) {
       _unregister = null;
     }
-
-    // VLM backend registration - from RABackendLlamaCPP
-    try {
-      _registerVlm = _lib.lookupFunction<RacBackendLlamacppVlmRegisterNative,
-          RacBackendLlamacppVlmRegisterDart>('rac_backend_llamacpp_vlm_register');
-    } catch (_) {
-      _registerVlm = null;
-    }
-
-    try {
-      _unregisterVlm = _lib.lookupFunction<RacBackendLlamacppVlmUnregisterNative,
-          RacBackendLlamacppVlmUnregisterDart>('rac_backend_llamacpp_vlm_unregister');
-    } catch (_) {
-      _unregisterVlm = null;
-    }
   }
 
   /// Check if bindings are available.
@@ -147,7 +132,7 @@ class LlamaCppBindings {
     if (_register == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _register!();
+    return _register();
   }
 
   /// Unregister the LlamaCPP backend from C++ registry.
@@ -155,26 +140,6 @@ class LlamaCppBindings {
     if (_unregister == null) {
       return RacResultCode.errorNotSupported;
     }
-    return _unregister!();
-  }
-
-  /// Register the LlamaCPP VLM (Vision Language Model) backend.
-  ///
-  /// Returns RAC_SUCCESS (0) on success, or an error code.
-  /// Safe to call multiple times - returns RAC_ERROR_MODULE_ALREADY_REGISTERED
-  /// if already registered.
-  int registerVlm() {
-    if (_registerVlm == null) {
-      return RacResultCode.errorNotSupported;
-    }
-    return _registerVlm!();
-  }
-
-  /// Unregister the LlamaCPP VLM backend from C++ registry.
-  int unregisterVlm() {
-    if (_unregisterVlm == null) {
-      return RacResultCode.errorNotSupported;
-    }
-    return _unregisterVlm!();
+    return _unregister();
   }
 }

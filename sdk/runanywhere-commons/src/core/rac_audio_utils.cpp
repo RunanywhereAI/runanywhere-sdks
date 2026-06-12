@@ -8,6 +8,7 @@
 #include "rac/core/rac_audio_utils.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -212,4 +213,24 @@ rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_size, int32
 
 size_t rac_audio_wav_header_size(void) {
     return WAV_HEADER_SIZE;
+}
+
+rac_result_t rac_audio_compute_level_db(const float* samples, size_t count, float* out_db) {
+    if (!samples || count == 0 || !out_db) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    // Accumulate squared samples in double precision to avoid loss-of-significance
+    // on long buffers (e.g. 4096-sample taps at 16 kHz).
+    double sum_sq = 0.0;
+    for (size_t i = 0; i < count; ++i) {
+        sum_sq += static_cast<double>(samples[i]) * static_cast<double>(samples[i]);
+    }
+
+    const double rms = std::sqrt(sum_sq / static_cast<double>(count));
+
+    // Silence floor: clamp -inf to -100 dB (well below the -60 dB normalisation
+    // bottom used by audio meters in the platform SDKs).
+    *out_db = (rms <= 1e-10) ? -100.0f : static_cast<float>(20.0 * std::log10(rms));
+    return RAC_SUCCESS;
 }
