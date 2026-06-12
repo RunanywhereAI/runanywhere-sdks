@@ -8028,13 +8028,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-native-live-audio-stream@npm:^1.1.1":
-  version: 1.1.1
-  resolution: "react-native-live-audio-stream@npm:1.1.1"
-  checksum: 1503fb1d9e2df58bf31bfa9ee3cf5167802a659ec64e3a6ca8ba2401b6388af158f9e04895699152e91eec66bcc949a3f35ae38fb63435ae28959b5be56bbd2e
-  languageName: node
-  linkType: hard
-
 "react-native-monorepo-config@npm:^0.3.0":
   version: 0.3.3
   resolution: "react-native-monorepo-config@npm:0.3.3"
@@ -8470,7 +8463,6 @@ __metadata:
     react-native: 0.85.3
     react-native-fs: ^2.20.0
     react-native-image-picker: ^8.2.1
-    react-native-live-audio-stream: ^1.1.1
     react-native-monorepo-config: ^0.3.0
     react-native-nitro-modules: ^0.33.9
     react-native-permissions: ^5.4.4

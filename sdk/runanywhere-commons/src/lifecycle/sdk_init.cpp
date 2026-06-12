@@ -431,6 +431,7 @@ rac_result_t discover_downloaded_models(SdkInitResult* result) {
 
 extern "C" {
 
+#if defined(RAC_HAVE_PROTOBUF)
 namespace {
 
 /**
@@ -450,6 +451,7 @@ rac_result_t phase1_failure(rac_result_t code, const char* message, int64_t star
 }
 
 }  // namespace
+#endif  // RAC_HAVE_PROTOBUF
 
 rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t in_size,
                                        rac_proto_buffer_t* out_RASdkInitResult) {
