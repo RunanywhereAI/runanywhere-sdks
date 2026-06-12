@@ -17,12 +17,12 @@
 
 #include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
+#include "hybrid_router.pb.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
-
-#include "hybrid_router.pb.h"
 
 #include "rac/core/rac_audio_utils.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -35,8 +35,7 @@ namespace v1 = ::runanywhere::v1;
 
 namespace {
 
-void parse_descriptor(const uint8_t* bytes, size_t size,
-                      rac_hybrid_model_descriptor_t& out) {
+void parse_descriptor(const uint8_t* bytes, size_t size, rac_hybrid_model_descriptor_t& out) {
     std::memset(&out, 0, sizeof(out));
     if (bytes == nullptr || size == 0) {
         return;
@@ -94,8 +93,7 @@ bool parse_filter(const v1::HybridFilter& f, rac_hybrid_filter_t& out) {
     }
 }
 
-void parse_policy(const uint8_t* bytes, size_t size,
-                  std::vector<rac_hybrid_filter_t>& filters,
+void parse_policy(const uint8_t* bytes, size_t size, std::vector<rac_hybrid_filter_t>& filters,
                   rac_hybrid_routing_policy_t& policy) {
     filters.clear();
     std::memset(&policy, 0, sizeof(policy));
@@ -123,7 +121,7 @@ void parse_policy(const uint8_t* bytes, size_t size,
 }
 
 void build_context(const v1::HybridRoutingContext& /*proto_ctx*/,
-                   rac_hybrid_routing_context_t&   out) {
+                   rac_hybrid_routing_context_t& out) {
     std::memset(&out, 0, sizeof(out));
     rac_hybrid_device_state_snapshot_t snap{};
     if (rac_hybrid_get_device_state_snapshot(&snap) == RAC_SUCCESS) {
@@ -154,10 +152,8 @@ bool is_wav_container(const std::string& audio) {
  * Returns a malloc'd WAV buffer (caller frees with rac_free) and updates
  * options in place, or nullptr when the payload passes through as-is.
  */
-void* normalize_audio_payload(const std::string& audio,
-                              rac_stt_options_t& options,
-                              const uint8_t**    out_data,
-                              size_t*            out_size) {
+void* normalize_audio_payload(const std::string& audio, rac_stt_options_t& options,
+                              const uint8_t** out_data, size_t* out_size) {
     *out_data = reinterpret_cast<const uint8_t*>(audio.data());
     *out_size = audio.size();
     const bool is_compressed = options.audio_format > RAC_AUDIO_FORMAT_WAV;
@@ -165,10 +161,10 @@ void* normalize_audio_payload(const std::string& audio,
         return nullptr;
     }
     const int32_t sample_rate = options.sample_rate > 0 ? options.sample_rate : 16000;
-    void*  wav_data = nullptr;
+    void* wav_data = nullptr;
     size_t wav_size = 0;
-    if (rac_audio_int16_to_wav(audio.data(), audio.size(), sample_rate, &wav_data,
-                               &wav_size) != RAC_SUCCESS ||
+    if (rac_audio_int16_to_wav(audio.data(), audio.size(), sample_rate, &wav_data, &wav_size) !=
+            RAC_SUCCESS ||
         wav_data == nullptr) {
         return nullptr;  // fail open: dispatch the raw payload unchanged
     }
@@ -179,11 +175,10 @@ void* normalize_audio_payload(const std::string& audio,
     return wav_data;
 }
 
-rac_result_t build_response_bytes(const rac_stt_result_t&             result,
+rac_result_t build_response_bytes(const rac_stt_result_t& result,
                                   const rac_hybrid_routed_metadata_t& meta,
-                                  rac_result_t                        transcribe_rc,
-                                  uint8_t**                           out_bytes,
-                                  size_t*                             out_size) {
+                                  rac_result_t transcribe_rc, uint8_t** out_bytes,
+                                  size_t* out_size) {
     v1::HybridSttTranscribeResponse msg;
     msg.set_rc(static_cast<int32_t>(transcribe_rc));
     msg.set_text(result.text != nullptr ? result.text : "");
@@ -216,44 +211,49 @@ rac_result_t build_response_bytes(const rac_stt_result_t&             result,
 
 extern "C" {
 
-rac_result_t rac_stt_hybrid_router_set_offline_service_proto(
-    rac_handle_t handle, rac_stt_service_t* service,
-    const uint8_t* descriptor_bytes, size_t descriptor_size) {
+rac_result_t rac_stt_hybrid_router_set_offline_service_proto(rac_handle_t handle,
+                                                             rac_stt_service_t* service,
+                                                             const uint8_t* descriptor_bytes,
+                                                             size_t descriptor_size) {
     if (handle == RAC_INVALID_HANDLE) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     rac_hybrid_model_descriptor_t desc{};
     parse_descriptor(descriptor_bytes, descriptor_size, desc);
-    return rac_stt_hybrid_router_set_offline_service(
-        handle, service, service != nullptr ? &desc : nullptr);
+    return rac_stt_hybrid_router_set_offline_service(handle, service,
+                                                     service != nullptr ? &desc : nullptr);
 }
 
-rac_result_t rac_stt_hybrid_router_set_online_service_proto(
-    rac_handle_t handle, rac_stt_service_t* service,
-    const uint8_t* descriptor_bytes, size_t descriptor_size) {
+rac_result_t rac_stt_hybrid_router_set_online_service_proto(rac_handle_t handle,
+                                                            rac_stt_service_t* service,
+                                                            const uint8_t* descriptor_bytes,
+                                                            size_t descriptor_size) {
     if (handle == RAC_INVALID_HANDLE) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     rac_hybrid_model_descriptor_t desc{};
     parse_descriptor(descriptor_bytes, descriptor_size, desc);
-    return rac_stt_hybrid_router_set_online_service(
-        handle, service, service != nullptr ? &desc : nullptr);
+    return rac_stt_hybrid_router_set_online_service(handle, service,
+                                                    service != nullptr ? &desc : nullptr);
 }
 
-rac_result_t rac_stt_hybrid_router_set_policy_proto(
-    rac_handle_t handle, const uint8_t* policy_bytes, size_t policy_size) {
+rac_result_t rac_stt_hybrid_router_set_policy_proto(rac_handle_t handle,
+                                                    const uint8_t* policy_bytes,
+                                                    size_t policy_size) {
     if (handle == RAC_INVALID_HANDLE) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
     std::vector<rac_hybrid_filter_t> filters;
-    rac_hybrid_routing_policy_t      policy{};
+    rac_hybrid_routing_policy_t policy{};
     parse_policy(policy_bytes, policy_size, filters, policy);
     return rac_stt_hybrid_router_set_policy(handle, &policy);
 }
 
-rac_result_t rac_stt_hybrid_router_transcribe_proto(
-    rac_handle_t handle, const uint8_t* request_bytes, size_t request_size,
-    uint8_t** out_response_bytes, size_t* out_response_size) {
+rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t handle,
+                                                    const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    uint8_t** out_response_bytes,
+                                                    size_t* out_response_size) {
     if (out_response_bytes == nullptr || out_response_size == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -289,20 +289,18 @@ rac_result_t rac_stt_hybrid_router_transcribe_proto(
     }
 
     const std::string& audio = req.audio_bytes();
-    const uint8_t*     audio_data = nullptr;
-    size_t             audio_size = 0;
+    const uint8_t* audio_data = nullptr;
+    size_t audio_size = 0;
     void* owned_wav = normalize_audio_payload(audio, options, &audio_data, &audio_size);
 
-    rac_stt_result_t             result{};
+    rac_stt_result_t result{};
     rac_hybrid_routed_metadata_t meta{};
-    const rac_result_t           transcribe_rc = rac_stt_hybrid_router_transcribe(
-        handle, &ctx,
-        audio_data, audio_size,
-        &options, &result, &meta);
+    const rac_result_t transcribe_rc = rac_stt_hybrid_router_transcribe(
+        handle, &ctx, audio_data, audio_size, &options, &result, &meta);
     rac_free(owned_wav);
 
-    const rac_result_t encode_rc = build_response_bytes(
-        result, meta, transcribe_rc, out_response_bytes, out_response_size);
+    const rac_result_t encode_rc =
+        build_response_bytes(result, meta, transcribe_rc, out_response_bytes, out_response_size);
     rac_stt_result_free(&result);
     if (encode_rc != RAC_SUCCESS) {
         return encode_rc;

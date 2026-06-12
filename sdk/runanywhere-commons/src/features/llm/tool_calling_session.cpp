@@ -83,8 +83,8 @@ void split_display_text_and_thinking(const std::string& raw_text, std::string* o
         *out_text = response ? std::string(response, response_len) : std::string();
     }
     if (out_thinking) {
-        *out_thinking = (thinking && thinking_len > 0) ? std::string(thinking, thinking_len)
-                                                       : std::string();
+        *out_thinking =
+            (thinking && thinking_len > 0) ? std::string(thinking, thinking_len) : std::string();
     }
 }
 

@@ -22,8 +22,8 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
-#include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"

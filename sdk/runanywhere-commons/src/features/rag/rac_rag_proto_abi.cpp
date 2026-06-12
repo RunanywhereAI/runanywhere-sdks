@@ -36,9 +36,10 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "foundation/rac_proto_marshal_internal.h"
 #include "rag.pb.h"
 #include "sdk_events.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
 #endif
 
 #define LOG_TAG "RAG.ProtoABI"
@@ -207,18 +208,17 @@ bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
                                 std::string* out_message) {
     const RAGBackendConfig defaults;
 
-    const int64_t top_k =
-        proto.has_top_k() ? static_cast<int64_t>(proto.top_k())
-                          : static_cast<int64_t>(defaults.top_k);
+    const int64_t top_k = proto.has_top_k() ? static_cast<int64_t>(proto.top_k())
+                                            : static_cast<int64_t>(defaults.top_k);
     if (top_k < 1) {
         if (out_message)
             *out_message = "RAGConfiguration.top_k must be >= 1";
         return false;
     }
 
-    const float similarity_threshold =
-        proto.has_similarity_threshold() ? proto.similarity_threshold()
-                                         : defaults.similarity_threshold;
+    const float similarity_threshold = proto.has_similarity_threshold()
+                                           ? proto.similarity_threshold()
+                                           : defaults.similarity_threshold;
     if (!std::isfinite(similarity_threshold) || similarity_threshold < 0.0f ||
         similarity_threshold > 1.0f) {
         if (out_message)
@@ -226,18 +226,17 @@ bool validate_rag_configuration(const runanywhere::v1::RAGConfiguration& proto,
         return false;
     }
 
-    const int64_t chunk_size =
-        proto.has_chunk_size() ? static_cast<int64_t>(proto.chunk_size())
-                               : static_cast<int64_t>(defaults.chunk_size);
+    const int64_t chunk_size = proto.has_chunk_size() ? static_cast<int64_t>(proto.chunk_size())
+                                                      : static_cast<int64_t>(defaults.chunk_size);
     if (chunk_size < 1) {
         if (out_message)
             *out_message = "RAGConfiguration.chunk_size must be >= 1";
         return false;
     }
 
-    const int64_t chunk_overlap =
-        proto.has_chunk_overlap() ? static_cast<int64_t>(proto.chunk_overlap())
-                                  : static_cast<int64_t>(defaults.chunk_overlap);
+    const int64_t chunk_overlap = proto.has_chunk_overlap()
+                                      ? static_cast<int64_t>(proto.chunk_overlap())
+                                      : static_cast<int64_t>(defaults.chunk_overlap);
     if (chunk_overlap < 0) {
         if (out_message)
             *out_message = "RAGConfiguration.chunk_overlap must be >= 0";
@@ -345,9 +344,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
     // the request would let callers ship "reranked" RAG that is plain RRF
     // fusion. Fail fast so misconfiguration surfaces at session-create instead
     // of looking exactly like a working baseline.
-    const bool rerank_requested =
-        proto.rerank_results() ||
-        (proto.has_reranker_model_id() && !proto.reranker_model_id().empty());
+    const bool rerank_requested = proto.rerank_results() || (proto.has_reranker_model_id() &&
+                                                             !proto.reranker_model_id().empty());
     if (rerank_requested) {
         const char* msg =
             "reranking is not yet implemented; unset rerank_results and reranker_model_id";
@@ -422,9 +420,8 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
                      backend_config.embedding_dimension);
             }
         }
-        session->backend =
-            std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
-                                         /*owns_services=*/true);
+        session->backend = std::make_unique<RAGBackend>(backend_config, llm_handle, embed_handle,
+                                                        /*owns_services=*/true);
         if (!session->backend->is_initialized()) {
             publish_failure(RAC_ERROR_INITIALIZATION_FAILED, "rag.sessionCreate",
                             "RAG pipeline failed to initialize");

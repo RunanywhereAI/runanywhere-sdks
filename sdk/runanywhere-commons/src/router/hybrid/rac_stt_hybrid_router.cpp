@@ -39,41 +39,40 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/plugin/rac_engine_vtable.h"
-#include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 #include "rac/router/hybrid/rac_hybrid_custom_filter.h"
 #include "rac/router/hybrid/rac_hybrid_types.h"
 
 namespace {
 
 struct Candidate {
-    rac_stt_service_t*            service;
+    rac_stt_service_t* service;
     rac_hybrid_model_descriptor_t descriptor;
 };
 
 struct RouterImpl {
-    std::mutex                       mutex;
-    rac_stt_service_t*               offline_service = nullptr;
-    rac_hybrid_model_descriptor_t    offline_descriptor{};
-    bool                             has_offline = false;
-    rac_stt_service_t*               online_service = nullptr;
-    rac_hybrid_model_descriptor_t    online_descriptor{};
-    bool                             has_online = false;
+    std::mutex mutex;
+    rac_stt_service_t* offline_service = nullptr;
+    rac_hybrid_model_descriptor_t offline_descriptor{};
+    bool has_offline = false;
+    rac_stt_service_t* online_service = nullptr;
+    rac_hybrid_model_descriptor_t online_descriptor{};
+    bool has_online = false;
     std::vector<rac_hybrid_filter_t> filters;
-    rac_hybrid_cascade_t             cascade{};
-    rac_hybrid_rank_t                rank = RAC_HYBRID_RANK_UNSPECIFIED;
+    rac_hybrid_cascade_t cascade{};
+    rac_hybrid_rank_t rank = RAC_HYBRID_RANK_UNSPECIFIED;
     // Set to the service currently executing transcribe so
     // rac_stt_hybrid_router_cancel can forward to its ops->cancel without
     // taking the (possibly contended) mutex.
-    std::atomic<rac_stt_service_t*>  active_call_service{nullptr};
+    std::atomic<rac_stt_service_t*> active_call_service{nullptr};
 };
 
 inline RouterImpl* impl_of(rac_handle_t h) {
     return static_cast<RouterImpl*>(h);
 }
 
-bool evaluate_filter(const rac_hybrid_filter_t&          f,
-                     const Candidate&                    c,
+bool evaluate_filter(const rac_hybrid_filter_t& f, const Candidate& c,
                      const rac_hybrid_routing_context_t& ctx) {
     switch (f.kind) {
         case RAC_HYBRID_FILTER_NONE:
@@ -133,7 +132,7 @@ bool rank_less(const Candidate& a, const Candidate& b, rac_hybrid_rank_t rank) {
     }
 }
 
-std::vector<Candidate> collect_eligible(const RouterImpl&                   r,
+std::vector<Candidate> collect_eligible(const RouterImpl& r,
                                         const rac_hybrid_routing_context_t& ctx) {
     std::vector<Candidate> out;
     out.reserve(2);
@@ -144,19 +143,18 @@ std::vector<Candidate> collect_eligible(const RouterImpl&                   r,
         out.push_back({r.online_service, r.online_descriptor});
     }
     out.erase(std::remove_if(out.begin(), out.end(),
-                              [&](const Candidate& c) {
-                                  for (const auto& f : r.filters) {
-                                      if (!evaluate_filter(f, c, ctx)) {
-                                          return true;
-                                      }
-                                  }
-                                  return false;
-                              }),
+                             [&](const Candidate& c) {
+                                 for (const auto& f : r.filters) {
+                                     if (!evaluate_filter(f, c, ctx)) {
+                                         return true;
+                                     }
+                                 }
+                                 return false;
+                             }),
               out.end());
-    std::stable_sort(out.begin(), out.end(),
-                     [&](const Candidate& a, const Candidate& b) {
-                         return rank_less(a, b, r.rank);
-                     });
+    std::stable_sort(out.begin(), out.end(), [&](const Candidate& a, const Candidate& b) {
+        return rank_less(a, b, r.rank);
+    });
     return out;
 }
 
@@ -178,11 +176,8 @@ void copy_message_into(char (&dst)[256], const char* src) {
     dst[sizeof(dst) - 1] = '\0';
 }
 
-rac_result_t invoke_candidate(const Candidate&         c,
-                              const void*              audio_data,
-                              size_t                   audio_size,
-                              const rac_stt_options_t* options,
-                              rac_stt_result_t*        out) {
+rac_result_t invoke_candidate(const Candidate& c, const void* audio_data, size_t audio_size,
+                              const rac_stt_options_t* options, rac_stt_result_t* out) {
     if (c.service == nullptr || c.service->ops == nullptr ||
         c.service->ops->transcribe == nullptr) {
         return RAC_ERROR_NOT_INITIALIZED;
@@ -214,10 +209,9 @@ void rac_stt_hybrid_router_destroy(rac_handle_t handle) {
     delete impl_of(handle);
 }
 
-rac_result_t rac_stt_hybrid_router_set_offline_service(
-    rac_handle_t                         handle,
-    rac_stt_service_t*                   service,
-    const rac_hybrid_model_descriptor_t* descriptor) {
+rac_result_t
+rac_stt_hybrid_router_set_offline_service(rac_handle_t handle, rac_stt_service_t* service,
+                                          const rac_hybrid_model_descriptor_t* descriptor) {
     auto* r = impl_of(handle);
     if (r == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
@@ -234,10 +228,9 @@ rac_result_t rac_stt_hybrid_router_set_offline_service(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_hybrid_router_set_online_service(
-    rac_handle_t                         handle,
-    rac_stt_service_t*                   service,
-    const rac_hybrid_model_descriptor_t* descriptor) {
+rac_result_t
+rac_stt_hybrid_router_set_online_service(rac_handle_t handle, rac_stt_service_t* service,
+                                         const rac_hybrid_model_descriptor_t* descriptor) {
     auto* r = impl_of(handle);
     if (r == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
@@ -254,9 +247,8 @@ rac_result_t rac_stt_hybrid_router_set_online_service(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_hybrid_router_set_policy(
-    rac_handle_t                       handle,
-    const rac_hybrid_routing_policy_t* policy) {
+rac_result_t rac_stt_hybrid_router_set_policy(rac_handle_t handle,
+                                              const rac_hybrid_routing_policy_t* policy) {
     auto* r = impl_of(handle);
     if (r == nullptr || policy == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
@@ -274,14 +266,12 @@ rac_result_t rac_stt_hybrid_router_set_policy(
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_stt_hybrid_router_transcribe(
-    rac_handle_t                        handle,
-    const rac_hybrid_routing_context_t* ctx,
-    const void*                         audio_data,
-    size_t                              audio_size,
-    const rac_stt_options_t*            options,
-    rac_stt_result_t*                   out_result,
-    rac_hybrid_routed_metadata_t*       out_metadata) {
+rac_result_t rac_stt_hybrid_router_transcribe(rac_handle_t handle,
+                                              const rac_hybrid_routing_context_t* ctx,
+                                              const void* audio_data, size_t audio_size,
+                                              const rac_stt_options_t* options,
+                                              rac_stt_result_t* out_result,
+                                              rac_hybrid_routed_metadata_t* out_metadata) {
     if (out_metadata != nullptr) {
         std::memset(out_metadata, 0, sizeof(*out_metadata));
     }
@@ -295,7 +285,7 @@ rac_result_t rac_stt_hybrid_router_transcribe(
     }
 
     std::vector<Candidate> ordered;
-    rac_hybrid_cascade_t   cascade{};
+    rac_hybrid_cascade_t cascade{};
     {
         std::lock_guard<std::mutex> lock(r->mutex);
         ordered = collect_eligible(*r, *ctx);
@@ -315,7 +305,7 @@ rac_result_t rac_stt_hybrid_router_transcribe(
 
     rac_stt_result_t primary_result{};
     r->active_call_service.store(primary.service, std::memory_order_release);
-    rac_result_t     primary_rc =
+    rac_result_t primary_rc =
         invoke_candidate(primary, audio_data, audio_size, options, &primary_result);
     r->active_call_service.store(nullptr, std::memory_order_release);
 
@@ -328,20 +318,17 @@ rac_result_t rac_stt_hybrid_router_transcribe(
         // real (non-NaN) confidence below the policy's threshold AND a
         // secondary candidate exists. NaN means "no signal" — accept the
         // primary. With no cascade configured the primary result stands.
-        const bool confidence_cascade_enabled =
-            cascade.kind == RAC_HYBRID_CASCADE_CONFIDENCE;
-        const bool low_confidence =
-            confidence_cascade_enabled &&
-            !std::isnan(primary_conf) &&
-            primary_conf < cascade.data.confidence.threshold;
+        const bool confidence_cascade_enabled = cascade.kind == RAC_HYBRID_CASCADE_CONFIDENCE;
+        const bool low_confidence = confidence_cascade_enabled && !std::isnan(primary_conf) &&
+                                    primary_conf < cascade.data.confidence.threshold;
 
         if (low_confidence && has_secondary) {
             rac_stt_result_t secondary_result{};
             const Candidate& secondary = ordered[1];
             out_metadata->attempt_count = 2;
             r->active_call_service.store(secondary.service, std::memory_order_release);
-            rac_result_t secondary_rc = invoke_candidate(
-                secondary, audio_data, audio_size, options, &secondary_result);
+            rac_result_t secondary_rc =
+                invoke_candidate(secondary, audio_data, audio_size, options, &secondary_result);
             r->active_call_service.store(nullptr, std::memory_order_release);
             if (secondary_rc == RAC_SUCCESS) {
                 copy_id_into(out_metadata->chosen_model_id, secondary.descriptor.model_id);
@@ -376,8 +363,7 @@ rac_result_t rac_stt_hybrid_router_transcribe(
             copy_id_into(out_metadata->chosen_model_id, secondary.descriptor.model_id);
             out_metadata->was_fallback = true;
             out_metadata->primary_error_code = static_cast<int32_t>(primary_rc);
-            copy_message_into(out_metadata->primary_error_message,
-                              rac_error_message(primary_rc));
+            copy_message_into(out_metadata->primary_error_message, rac_error_message(primary_rc));
             out_metadata->confidence = secondary_result.confidence;
             *out_result = secondary_result;
             return RAC_SUCCESS;
@@ -421,7 +407,7 @@ rac_stt_service_t* rac_stt_hybrid_router_create_service(const char* engine_hint,
         return nullptr;
     }
 
-    void*              impl = nullptr;
+    void* impl = nullptr;
     const rac_result_t create_rc = vt->stt_ops->create(model_id_or_path, config_json, &impl);
     if (create_rc != RAC_SUCCESS || impl == nullptr) {
         return nullptr;

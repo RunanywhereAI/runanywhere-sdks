@@ -22,8 +22,8 @@
 #include <string>
 #include <vector>
 
-#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/rac_nonllm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -39,8 +39,9 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "diffusion_options.pb.h"
-#include "foundation/rac_proto_marshal_internal.h"
 #include "sdk_events.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
 #endif
 
 // =============================================================================

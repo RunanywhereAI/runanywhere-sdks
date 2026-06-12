@@ -57,12 +57,13 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "foundation/rac_proto_marshal_internal.h"
-#include "infrastructure/events/sdk_event_publish.h"
 #include "llm_options.pb.h"
 #include "llm_service.pb.h"
 #include "sdk_events.pb.h"
 #include "tool_calling.pb.h"
+
+#include "foundation/rac_proto_marshal_internal.h"
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 extern "C" void rac_lora_forget_component_state(rac_handle_t handle);
@@ -156,8 +157,8 @@ void emit_llm_model_load(runanywhere::v1::ModelEventKind kind, const char* model
         m.set_duration_ms(static_cast<int64_t>(duration_ms));
     if (error)
         m.set_error(error);
-    rac::events::publish(runanywhere::v1::SDK_COMPONENT_LLM,
-                         runanywhere::v1::EVENT_CATEGORY_MODEL, std::move(m));
+    rac::events::publish(runanywhere::v1::SDK_COMPONENT_LLM, runanywhere::v1::EVENT_CATEGORY_MODEL,
+                         std::move(m));
 }
 
 void emit_llm_generation_started(const char* generation_id, const char* model_id,
@@ -646,7 +647,8 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
 
         // Emit generation failed event
 #if defined(RAC_HAVE_PROTOBUF)
-        emit_llm_generation_failed(generation_id.c_str(), model_id, model_name, "Generation failed");
+        emit_llm_generation_failed(generation_id.c_str(), model_id, model_name,
+                                   "Generation failed");
 #endif
 
         return result;
@@ -689,12 +691,11 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
     // (some backends return actual tokenized count including chat template,
     // others return 0 - estimation ensures consistent user-facing metrics)
 #if defined(RAC_HAVE_PROTOBUF)
-    emit_llm_generation_completed(generation_id.c_str(), model_id, model_name,
-                                  estimate_tokens(prompt), out_result->completion_tokens,
-                                  static_cast<double>(total_time_ms), tokens_per_second,
-                                  /*is_streaming=*/false, /*time_to_first_token_ms=*/0,
-                                  component->actual_framework, effective_options->temperature,
-                                  effective_options->max_tokens, context_length);
+    emit_llm_generation_completed(
+        generation_id.c_str(), model_id, model_name, estimate_tokens(prompt),
+        out_result->completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
+        /*is_streaming=*/false, /*time_to_first_token_ms=*/0, component->actual_framework,
+        effective_options->temperature, effective_options->max_tokens, context_length);
 #endif
 
     return RAC_SUCCESS;
@@ -1013,12 +1014,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 
     // Emit generation completed event
 #if defined(RAC_HAVE_PROTOBUF)
-    emit_llm_generation_completed(generation_id.c_str(), model_id, model_name,
-                                  final_result.prompt_tokens, final_result.completion_tokens,
-                                  static_cast<double>(total_time_ms), tokens_per_second,
-                                  /*is_streaming=*/true, ttft_ms, component->actual_framework,
-                                  effective_options->temperature, effective_options->max_tokens,
-                                  context_length);
+    emit_llm_generation_completed(
+        generation_id.c_str(), model_id, model_name, final_result.prompt_tokens,
+        final_result.completion_tokens, static_cast<double>(total_time_ms), tokens_per_second,
+        /*is_streaming=*/true, ttft_ms, component->actual_framework, effective_options->temperature,
+        effective_options->max_tokens, context_length);
 #endif
 
     // Terminal success event on the proto stream.
@@ -1425,8 +1425,7 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     options.min_p = has_options ? opts.min_p() : request.min_p();
     options.seed = has_options ? opts.seed() : request.seed();
     options.n_threads = has_options ? opts.n_threads() : request.n_threads();
-    options.disable_thinking =
-        (has_options && opts.disable_thinking()) ? RAC_TRUE : RAC_FALSE;
+    options.disable_thinking = (has_options && opts.disable_thinking()) ? RAC_TRUE : RAC_FALSE;
 
     grammar_storage = has_options ? opts.grammar() : request.grammar();
     options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
@@ -1794,9 +1793,8 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
         final_result.set_time_to_first_token_ms(ctx->first_token_ms - ctx->started_ms);
     }
     if (total_time_ms > 0 && ctx->token_count > 0) {
-        final_result.set_tokens_per_second(
-            static_cast<float>(static_cast<double>(ctx->token_count) /
-                               (static_cast<double>(total_time_ms) / 1000.0)));
+        final_result.set_tokens_per_second(static_cast<float>(
+            static_cast<double>(ctx->token_count) / (static_cast<double>(total_time_ms) / 1000.0)));
     }
     final_result.set_finish_reason(
         (finish_reason != nullptr) && finish_reason[0] != '\0' ? finish_reason : "stop");

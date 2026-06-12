@@ -28,8 +28,9 @@
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "hardware_profile.pb.h"
-#include "infrastructure/events/sdk_event_publish.h"
 #include "sdk_events.pb.h"
+
+#include "infrastructure/events/sdk_event_publish.h"
 #endif
 
 // =============================================================================

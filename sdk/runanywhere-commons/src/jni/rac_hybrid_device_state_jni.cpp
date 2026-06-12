@@ -22,8 +22,8 @@
 namespace {
 
 struct DeviceStateAdapter {
-    JavaVM*   vm = nullptr;
-    jobject   provider = nullptr;  // GlobalRef
+    JavaVM* vm = nullptr;
+    jobject provider = nullptr;  // GlobalRef
     jmethodID mid_is_online = nullptr;
     jmethodID mid_battery_percent = nullptr;
     jmethodID mid_is_thermal_throttled = nullptr;
@@ -48,7 +48,7 @@ inline jint attach_current_thread(JavaVM* vm, JNIEnv** out_env) {
 struct EnvScope {
     JavaVM* vm;
     JNIEnv* env = nullptr;
-    bool    attached = false;
+    bool attached = false;
 
     explicit EnvScope(JavaVM* v) : vm(v) {
         if (vm == nullptr) {
@@ -93,8 +93,7 @@ int32_t device_state_battery_percent(void* user_data) {
     if (scope.env == nullptr) {
         return 100;
     }
-    return static_cast<int32_t>(
-        scope.env->CallIntMethod(a->provider, a->mid_battery_percent));
+    return static_cast<int32_t>(scope.env->CallIntMethod(a->provider, a->mid_battery_percent));
 }
 
 bool device_state_is_thermal_throttled(void* user_data) {
@@ -127,8 +126,9 @@ void clear_device_state_adapter() {
 extern "C" {
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridSetDeviceState(
-    JNIEnv* env, jclass /*clazz*/, jobject provider) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridSetDeviceState(JNIEnv* env,
+                                                                                 jclass /*clazz*/,
+                                                                                 jobject provider) {
     if (provider == nullptr) {
         clear_device_state_adapter();
         return static_cast<jint>(RAC_SUCCESS);
@@ -138,12 +138,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridSetDeviceState
     if (clazz == nullptr) {
         return static_cast<jint>(RAC_ERROR_INVALID_PARAMETER);
     }
-    const jmethodID mid_is_online =
-        env->GetMethodID(clazz, "isOnline", "()Z");
-    const jmethodID mid_battery_percent =
-        env->GetMethodID(clazz, "batteryPercent", "()I");
-    const jmethodID mid_is_thermal_throttled =
-        env->GetMethodID(clazz, "isThermalThrottled", "()Z");
+    const jmethodID mid_is_online = env->GetMethodID(clazz, "isOnline", "()Z");
+    const jmethodID mid_battery_percent = env->GetMethodID(clazz, "batteryPercent", "()I");
+    const jmethodID mid_is_thermal_throttled = env->GetMethodID(clazz, "isThermalThrottled", "()Z");
     env->DeleteLocalRef(clazz);
     if (mid_is_online == nullptr || mid_battery_percent == nullptr ||
         mid_is_thermal_throttled == nullptr) {

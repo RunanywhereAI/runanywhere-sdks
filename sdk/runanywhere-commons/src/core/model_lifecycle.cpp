@@ -278,9 +278,9 @@ using rac::core::model_lifecycle::detail::feature_unavailable;
 // occupant without destroying it would leak the displaced backend impl. The
 // caller destroys the returned entry OUTSIDE the lock —
 // destroy_loaded_model() re-acquires g_lifecycle_mutex to drain active_refs.
-std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel> install_loaded_entry(
-    runanywhere::v1::SDKComponent component,
-    std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel> entry) {
+std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel>
+install_loaded_entry(runanywhere::v1::SDKComponent component,
+                     std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel> entry) {
     namespace detail = rac::core::model_lifecycle::detail;
     std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
     std::shared_ptr<detail::LoadedModel> displaced = std::move(detail::g_loaded[component]);

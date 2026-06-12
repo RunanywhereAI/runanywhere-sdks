@@ -14,9 +14,9 @@
 #include <cstring>
 #include <string>
 
+#include "../common/rac_service_factory_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
-#include "../common/rac_service_factory_internal.h"
 
 // B-AK-17-003: mirror JNI.RAG and use __android_log_print directly so the
 // embeddings creation path is always visible in logcat — the platform
@@ -59,14 +59,14 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
     RAC_LOG_INFO(LOG_CAT, "Creating embeddings service for: %s", model_id);
 
     rac::features::ResolvedModelReference model_ref;
-    rac_result_t result = rac::features::resolve_model_reference(
-        model_id,
-        {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_LLAMACPP,
-         .allow_null_model_id = false,
-         .lookup_last_path_component = true,
-         .prefer_input_path_when_contains = nullptr},
-        &model_ref);
+    rac_result_t result =
+        rac::features::resolve_model_reference(model_id,
+                                               {.log_cat = LOG_CAT,
+                                                .default_framework = RAC_FRAMEWORK_LLAMACPP,
+                                                .allow_null_model_id = false,
+                                                .lookup_last_path_component = true,
+                                                .prefer_input_path_when_contains = nullptr},
+                                               &model_ref);
     if (result != RAC_SUCCESS) {
         EMBED_LOGE("Model reference resolution failed: result=%d", result);
         return result;
@@ -80,21 +80,20 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
                 model_ref.framework = RAC_FRAMEWORK_ONNX;
             }
         }
-        RAC_LOG_WARNING(LOG_CAT,
-                        "Model NOT found in registry, inferred framework=%d from path",
+        RAC_LOG_WARNING(LOG_CAT, "Model NOT found in registry, inferred framework=%d from path",
                         static_cast<int>(model_ref.framework));
     }
 
     rac_embeddings_service_t* service = nullptr;
-    result =
-        rac::features::create_plugin_service<rac_embeddings_service_t, rac_embeddings_service_ops_t>(
-            {.log_cat = LOG_CAT,
-             .primitive = RAC_PRIMITIVE_EMBED,
-             .select_ops = embedding_ops,
-             .model_create_id = model_ref.path.c_str(),
-             .model_id_for_service = model_id,
-             .config_json = config_json},
-            &service);
+    result = rac::features::create_plugin_service<rac_embeddings_service_t,
+                                                  rac_embeddings_service_ops_t>(
+        {.log_cat = LOG_CAT,
+         .primitive = RAC_PRIMITIVE_EMBED,
+         .select_ops = embedding_ops,
+         .model_create_id = model_ref.path.c_str(),
+         .model_id_for_service = model_id,
+         .config_json = config_json},
+        &service);
     if (result != RAC_SUCCESS) {
         EMBED_LOGE("Plugin create failed: result=%d", result);
         return result;

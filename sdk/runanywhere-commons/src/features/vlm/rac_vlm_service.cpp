@@ -13,10 +13,10 @@
 #include <cstring>
 #include <string>
 
+#include "../common/rac_service_factory_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
-#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "VLM.Service";
 
@@ -73,14 +73,14 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
     RAC_LOG_INFO(LOG_CAT, "Creating VLM service for: %s", model_id);
 
     rac::features::ResolvedModelReference model_ref;
-    rac_result_t result = rac::features::resolve_model_reference(
-        model_id,
-        {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_LLAMACPP,
-         .allow_null_model_id = false,
-         .lookup_last_path_component = true,
-         .prefer_input_path_when_contains = nullptr},
-        &model_ref);
+    rac_result_t result =
+        rac::features::resolve_model_reference(model_id,
+                                               {.log_cat = LOG_CAT,
+                                                .default_framework = RAC_FRAMEWORK_LLAMACPP,
+                                                .allow_null_model_id = false,
+                                                .lookup_last_path_component = true,
+                                                .prefer_input_path_when_contains = nullptr},
+                                               &model_ref);
     if (result != RAC_SUCCESS) {
         return result;
     }
@@ -90,9 +90,9 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
 
     if (model_ref.found && model_ref.model_info) {
         rac_model_path_resolution_t resolution = {};
-        rac_result_t path_rc = rac_model_paths_resolve_artifact(
-            model_ref.model_info.get(), model_path_owned.c_str(),
-            /*expected_primary_sha256=*/nullptr, &resolution);
+        rac_result_t path_rc =
+            rac_model_paths_resolve_artifact(model_ref.model_info.get(), model_path_owned.c_str(),
+                                             /*expected_primary_sha256=*/nullptr, &resolution);
         if (path_rc == RAC_SUCCESS) {
             if (resolution.primary_model_path) {
                 model_path_owned = resolution.primary_model_path;

@@ -18,10 +18,9 @@
  *   allocations     → malloc/rac_strdup so rac_http_response_free() releases
  */
 
-#include <curl/curl.h>
-
 #include <cstdlib>
 #include <cstring>
+#include <curl/curl.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -71,8 +70,8 @@ size_t header_callback(char* buffer, size_t size, size_t nitems, void* user_data
         std::string name = line.substr(0, colon);
         std::string value = line.substr(colon + 1);
         const auto trim = [](std::string& s) {
-            while (!s.empty() && (s.back() == '\r' || s.back() == '\n' || s.back() == ' ' ||
-                                  s.back() == '\t')) {
+            while (!s.empty() &&
+                   (s.back() == '\r' || s.back() == '\n' || s.back() == ' ' || s.back() == '\t')) {
                 s.pop_back();
             }
             size_t start = 0;
@@ -353,7 +352,7 @@ void curl_transport_destroy(void* /*user_data*/) {
 
 // Static lifetime: rac_http_transport_register keeps the pointer.
 const rac_http_transport_ops_t kCurlTransportOps = {
-    curl_request_send, curl_request_stream, curl_request_resume,
+    curl_request_send,   curl_request_stream,    curl_request_resume,
     curl_transport_init, curl_transport_destroy,
 };
 

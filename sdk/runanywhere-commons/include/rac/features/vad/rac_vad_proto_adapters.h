@@ -27,9 +27,7 @@ class VADStatistics;
 class SpeechActivityEvent;
 }  // namespace runanywhere::v1
 
-namespace rac::foundation {
-
-}  // namespace rac::foundation
+namespace rac::foundation {}  // namespace rac::foundation
 
 #endif  // __cplusplus
 

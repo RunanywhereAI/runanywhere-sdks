@@ -225,9 +225,9 @@ rac_result_t run_rag_query(const RAGGraphInputs& inputs, RAGTokenSink on_token,
         return out_result.status;
     }
 
-    std::vector<float> query_embedding(
-        embedding_result.embeddings[0].data,
-        embedding_result.embeddings[0].data + embedding_result.embeddings[0].dimension);
+    std::vector<float> query_embedding(embedding_result.embeddings[0].data,
+                                       embedding_result.embeddings[0].data +
+                                           embedding_result.embeddings[0].dimension);
     rac_embeddings_result_free(&embedding_result);
 
     if (query_embedding.size() != embed_dim) {

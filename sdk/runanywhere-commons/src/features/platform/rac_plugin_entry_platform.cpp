@@ -109,7 +109,7 @@ static const rac_engine_vtable_t g_platform_engine_vtable = {
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
 
-    /* llm_ops          */
+/* llm_ops          */
 #if defined(__APPLE__)
     &g_platform_llm_ops,
 #else
@@ -120,7 +120,7 @@ static const rac_engine_vtable_t g_platform_engine_vtable = {
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,
     /* vlm_ops          */ nullptr,
-    /* diffusion_ops    */
+/* diffusion_ops    */
 #if defined(__APPLE__)
     &g_platform_diffusion_ops,
 #else

@@ -51,9 +51,10 @@ RAC_API rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t 
  * canonical artifact resolution (the same logic the lifecycle loader uses)
  * before driving a per-handle component directly.
  */
-RAC_API rac_result_t rac_model_lifecycle_resolve_paths_proto(
-    rac_model_registry_handle_t registry, const uint8_t* request_proto_bytes,
-    size_t request_proto_size, rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_model_lifecycle_resolve_paths_proto(rac_model_registry_handle_t registry,
+                                                             const uint8_t* request_proto_bytes,
+                                                             size_t request_proto_size,
+                                                             rac_proto_buffer_t* out_result);
 
 /**
  * @brief Unload model(s) from serialized runanywhere.v1.ModelUnloadRequest bytes.
