@@ -28,7 +28,11 @@ import os
 /// Implementations MUST be thread-safe / reentrant: commons may invoke these
 /// from multiple request threads concurrently (see the @warning in
 /// rac_hybrid_device_state.h).
-public protocol HybridDeviceStateProvider: AnyObject, Sendable {
+///
+/// Class-bound by design: providers are long-lived stateful hosts (battery /
+/// network monitors) retained once in the C user_data box; reference semantics
+/// match the Kotlin DeviceStateProvider interface.
+public protocol HybridDeviceStateProvider: AnyObject, Sendable {  // swiftlint:disable:this avoid_any_object
     /// True iff the host has a usable internet connection right now.
     func isOnline() -> Bool
     /// Battery level in `[0, 100]`; return 100 on hosts without a battery.

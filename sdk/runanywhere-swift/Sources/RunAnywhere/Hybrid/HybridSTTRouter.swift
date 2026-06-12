@@ -152,16 +152,13 @@ public final class HybridSTTRouter: @unchecked Sendable {
         // with a different policy doesn't leave stale named filters registered
         // in commons.
         clearAndDestroyServices(handle: handle)
-        let previousFilterNames: [String] = state.withLock { current in
-            let old = current.customFilterNames
-            current.customFilterNames = []
-            return old
-        }
-        for name in previousFilterNames { HybridCustomFilter.unregister(name: name) }
+        retirePreviousCustomFilters()
 
         let rcOff = rac_stt_hybrid_router_set_offline_service_proto(
-            handle, offlineService.servicePtr,
-            offlineDescriptor, offlineDescriptor.count
+            handle,
+            offlineService.servicePtr,
+            offlineDescriptor,
+            offlineDescriptor.count
         )
         guard rcOff == RAC_SUCCESS else {
             destroy(offlineService); destroy(onlineService)
@@ -172,8 +169,10 @@ public final class HybridSTTRouter: @unchecked Sendable {
             )
         }
         let rcOn = rac_stt_hybrid_router_set_online_service_proto(
-            handle, onlineService.servicePtr,
-            onlineDescriptor, onlineDescriptor.count
+            handle,
+            onlineService.servicePtr,
+            onlineDescriptor,
+            onlineDescriptor.count
         )
         guard rcOn == RAC_SUCCESS else {
             _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
@@ -413,7 +412,8 @@ public final class HybridSTTRouter: @unchecked Sendable {
         guard let modelIdCStr = strdup(model.id) else {
             sttOps.pointee.destroy?(impl)
             throw SDKException(
-                code: .serviceNotAvailable, message: "strdup(model id) failed",
+                code: .serviceNotAvailable,
+                message: "strdup(model id) failed",
                 category: .internal
             )
         }
@@ -476,6 +476,18 @@ public final class HybridSTTRouter: @unchecked Sendable {
             }
         if let offline = services.offline { destroy(offline) }
         if let online = services.online { destroy(online) }
+    }
+
+    /// Retire the previous policy's custom-filter predicates so re-pairing
+    /// with a different policy doesn't leave stale named filters registered
+    /// in commons. Verbatim extraction from `setPair` (lint body-length).
+    private func retirePreviousCustomFilters() {
+        let previousFilterNames: [String] = state.withLock { current in
+            let old = current.customFilterNames
+            current.customFilterNames = []
+            return old
+        }
+        for name in previousFilterNames { HybridCustomFilter.unregister(name: name) }
     }
 
     /// Destroy one backend service (engine `destroy(impl)`) and free its

@@ -140,7 +140,7 @@ extension CppBridge {
         /// router as the telemetry sink (`rac_events_set_telemetry_sink`).
         /// `fileprivate` because `ManagerHandle` is a private file-scoped type;
         /// `register()` lives in this same file.
-        fileprivate static var handle: ManagerHandle? {
+        fileprivate static var handle: ManagerHandle? { // swiftlint:disable:this strict_fileprivate
             manager.withLock { $0 }
         }
 

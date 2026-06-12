@@ -145,7 +145,7 @@ private final class TTSStreamSessionContext: @unchecked Sendable {
         case .error:
             let message = event.hasErrorMessage ? event.errorMessage : "TTS stream failed"
             yieldFailure(message, code: rac_result_t(event.errorCode))
-        case .started, .progress, .phoneme, .unspecified, .UNRECOGNIZED(_):
+        case .started, .progress, .phoneme, .unspecified, .UNRECOGNIZED:
             break
         }
     }

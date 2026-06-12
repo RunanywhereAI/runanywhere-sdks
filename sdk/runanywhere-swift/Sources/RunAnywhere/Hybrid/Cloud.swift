@@ -177,19 +177,44 @@ public enum Cloud {
                 category: .configuration
             )
         }
-        // snake_case keys: the cloud_stt engine reads snake_case out of the
-        // config_json blob (provider / api_key / model / language_code /
-        // base_url / timeout_ms). Built by hand — NOT via a camelCase encoder.
-        var json: [String: Any] = [
-            "provider": entry.provider,
-            "api_key": entry.apiKey,
-            "model": entry.model,
-        ]
-        if !entry.languageCode.isEmpty { json["language_code"] = entry.languageCode }
-        if !entry.baseURL.isEmpty { json["base_url"] = entry.baseURL }
-        if entry.timeoutMs != 0 { json["timeout_ms"] = Int(entry.timeoutMs) }
+        var payload = CloudConfigPayload(provider: entry.provider, apiKey: entry.apiKey, model: entry.model)
+        if !entry.languageCode.isEmpty { payload.languageCode = entry.languageCode }
+        if !entry.baseURL.isEmpty { payload.baseURL = entry.baseURL }
+        if entry.timeoutMs != 0 { payload.timeoutMs = Int(entry.timeoutMs) }
 
-        let data = try JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
-        return String(decoding: data, as: UTF8.self)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data = try encoder.encode(payload)
+        guard let json = String(bytes: data, encoding: .utf8) else {
+            throw SDKException(
+                code: .processingFailed,
+                message: "Cloud config JSON for '\(id)' is not valid UTF-8",
+                category: .configuration
+            )
+        }
+        return json
+    }
+}
+
+/// Wire shape of the config blob the routed "cloud" plugin's `create`
+/// expects. snake_case keys: the cloud_stt engine reads snake_case out of
+/// the config_json blob, so the keys are pinned explicitly — NOT derived
+/// via a camelCase key-encoding strategy. Optional fields are omitted when
+/// unset, matching the engine's defaults.
+private struct CloudConfigPayload: Encodable {
+    let provider: String
+    let apiKey: String
+    let model: String
+    var languageCode: String?
+    var baseURL: String?
+    var timeoutMs: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case provider
+        case apiKey = "api_key"
+        case model
+        case languageCode = "language_code"
+        case baseURL = "base_url"
+        case timeoutMs = "timeout_ms"
     }
 }
