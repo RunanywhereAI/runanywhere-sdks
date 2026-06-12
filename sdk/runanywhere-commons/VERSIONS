@@ -71,7 +71,6 @@ FLUTTER_VERSION=3.44.0
 #   - scripts/setup/setup-toolchain.sh    (installs the pinned versions)
 #   - idl/codegen/generate_*.sh     (verifies the pinned versions at runtime)
 #   - gradle/libs.versions.toml     (Wire runtime, mirrored by hand)
-#   - Mintfile                      (swift-protobuf, mirrored by hand)
 #   - .syncpackrc.json              (ts-proto if added to centralized npm pins)
 #
 # When bumping any of these, update ALL mirrors in the same commit and
