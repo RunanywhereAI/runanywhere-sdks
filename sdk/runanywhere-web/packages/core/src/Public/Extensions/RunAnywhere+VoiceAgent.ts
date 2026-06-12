@@ -386,6 +386,7 @@ function assertNativeHandle(handle: number, feature: string): number {
  * agent is not ready (RunAnywhere+VoiceAgent.swift:213-225). The reason is
  * logged for debuggability but never synthesized into the event stream.
  */
+// eslint-disable-next-line require-yield -- intentionally yields nothing: the stream must finish empty (Swift parity)
 async function* emptyVoiceEventStream(reason: string): AsyncIterable<VoiceEvent> {
   logger.warning(`streamVoiceAgent finished empty: ${reason}`);
 }

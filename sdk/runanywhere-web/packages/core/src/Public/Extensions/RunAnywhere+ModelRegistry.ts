@@ -4,10 +4,10 @@ import type {
   ModelInfo,
   ModelInfoList,
   ModelQuery,
-} from '@runanywhere/proto-ts/model_types';
+
+  ModelCategory} from '@runanywhere/proto-ts/model_types';
 import {
-  InferenceFramework,
-  ModelCategory,
+  InferenceFramework
 } from '@runanywhere/proto-ts/model_types';
 import {
   ModelRegistryAdapter,

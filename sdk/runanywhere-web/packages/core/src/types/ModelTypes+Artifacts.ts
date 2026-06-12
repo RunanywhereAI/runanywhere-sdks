@@ -22,12 +22,13 @@
  *   `rac_artifact_expected_files_proto`).
  */
 
+import type {
+  ModelCategory} from '@runanywhere/proto-ts/model_types';
 import {
   ArchiveStructure,
   ArchiveType,
   InferenceFramework,
   ModelArtifactType,
-  ModelCategory,
   ModelFileRole,
   ModelFormat,
   ModelInfo,
