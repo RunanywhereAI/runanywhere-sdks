@@ -29,7 +29,7 @@ dependencies:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
   # Int64 proto scalars (LoRA catalog sizeBytes) — already transitive via
   # protobuf; declared directly because the app constructs proto messages.
-  fixnum: ^1.1.0
+  fixnum: ^1.1.1
   flutter_markdown: ^0.6.18
   permission_handler: ^11.1.0
   shared_preferences: ^2.5.5
