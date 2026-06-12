@@ -15,9 +15,49 @@
 // includeSourceLocation / includeDeviceMetadata); the console logger only acts
 // on the three fields it supported before and ignores the rest.
 import { LogLevel, type LoggingConfiguration } from '@runanywhere/proto-ts/logging';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 export { LogLevel };
 export type { LoggingConfiguration };
+
+/**
+ * Environment presets — Swift parity: `RALoggingConfiguration.development /
+ * .staging / .production` (SDKLogger.swift:41-66). Dev logs at debug with
+ * local logging on; production logs warnings only with local logging off.
+ */
+export function loggingConfigurationForEnvironment(
+  environment: SDKEnvironment,
+): LoggingConfiguration {
+  switch (environment) {
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+      return {
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_INFO,
+        includeSourceLocation: false,
+        includeDeviceMetadata: true,
+        enableRemoteLogging: false,
+        enableSentryLogging: false,
+      };
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return {
+        enableLocalLogging: false,
+        minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+        includeSourceLocation: false,
+        includeDeviceMetadata: true,
+        enableRemoteLogging: false,
+        enableSentryLogging: false,
+      };
+    default:
+      return {
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
+        includeSourceLocation: false,
+        includeDeviceMetadata: false,
+        enableRemoteLogging: false,
+        enableSentryLogging: true,
+      };
+  }
+}
 
 /** Map LogLevel to RACommons rac_log_level_t values. Values are already
  * C-ABI-aligned, so this is the identity mapping. */
@@ -83,6 +123,14 @@ export class SDKLogger {
     SDKLogger._enabled = config.enableLocalLogging;
     SDKLogger._level = config.minLogLevel;
     SDKLogger._sentryEnabled = config.enableSentryLogging;
+  }
+
+  /**
+   * Apply configuration based on SDK environment. Mirrors Swift
+   * `Logging.shared.applyEnvironmentConfiguration(_:)` (SDKLogger.swift:300).
+   */
+  static applyEnvironmentConfiguration(environment: SDKEnvironment): void {
+    SDKLogger.configure(loggingConfigurationForEnvironment(environment));
   }
 
   /** Enable or disable local console output. Mirrors Swift `Logging.shared.setLocalLoggingEnabled(_:)`. */

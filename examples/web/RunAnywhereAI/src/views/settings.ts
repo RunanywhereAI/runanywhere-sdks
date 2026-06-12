@@ -1,23 +1,98 @@
 /**
- * Settings Tab - Generation params, tool calling, API config, logging, about
- * Matches iOS CombinedSettingsView.
+ * Settings Tab - Generation params, API config, logging, about.
+ *
+ * Mirrors iOS SettingsViewModel.swift (Features/Settings/SettingsViewModel.swift):
+ * generation settings (temperature / maxTokens / systemPrompt / thinkingMode)
+ * persist across sessions and are read by the Chat tab at send time; API
+ * credentials are read by `main.ts` before `RunAnywhere.initialize()`.
+ *
+ * Persistence: localStorage is the Web counterpart of iOS UserDefaults +
+ * Keychain (see AGENTS.md cross-SDK alignment table — "Secure storage: Web =
+ * localStorage").
  */
 
 import { RunAnywhere } from '@runanywhere/web';
+import { escapeHtml } from '../services/escape-html';
 
 let container: HTMLElement;
 
-// Settings state — apiKey is kept in-memory only and never persisted.
-const settings = {
+const STORAGE_KEY = 'runanywhere-settings';
+
+// Defaults mirror iOS SettingsViewModel.swift:20-24
+// (temperature 0.7, maxTokens 10000, default system prompt, thinking off).
+const DEFAULT_SYSTEM_PROMPT = 'You are a helpful, concise AI assistant.';
+
+interface AppSettings {
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+  thinkingModeEnabled: boolean;
+  apiKey: string;
+  baseURL: string;
+  analytics: boolean;
+}
+
+const settings: AppSettings = {
   temperature: 0.7,
-  maxTokens: 2048,
+  maxTokens: 10000,
+  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  thinkingModeEnabled: false,
   apiKey: '',
   baseURL: '',
   analytics: true,
 };
 
+let loaded = false;
+
+/**
+ * Generation settings consumed by the Chat tab — typed counterpart of iOS
+ * `SettingsViewModel.getGenerationConfiguration()` (SettingsViewModel.swift:262-269).
+ */
+export interface GenerationSettings {
+  temperature: number;
+  maxTokens: number;
+  systemPrompt: string;
+  thinkingModeEnabled: boolean;
+}
+
+export function getGenerationSettings(): GenerationSettings {
+  loadSettings();
+  return {
+    temperature: settings.temperature,
+    maxTokens: settings.maxTokens,
+    systemPrompt: settings.systemPrompt,
+    thinkingModeEnabled: settings.thinkingModeEnabled,
+  };
+}
+
+/**
+ * Stored API key for app launch — iOS parity:
+ * `SettingsViewModel.getStoredApiKey()` (SettingsViewModel.swift:65-72).
+ */
+export function getStoredApiKey(): string | null {
+  loadSettings();
+  const value = settings.apiKey.trim();
+  return value.length > 0 ? value : null;
+}
+
+/**
+ * Stored base URL for app launch, normalized with an https:// prefix when no
+ * scheme is present — iOS parity: `SettingsViewModel.getStoredBaseURL()`
+ * (SettingsViewModel.swift:76-88).
+ */
+export function getStoredBaseURL(): string | null {
+  loadSettings();
+  const trimmed = settings.baseURL.trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+}
+
 export function initSettingsTab(el: HTMLElement): void {
   container = el;
+  loadSettings();
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Settings</div>
@@ -25,7 +100,7 @@ export function initSettingsTab(el: HTMLElement): void {
     </div>
     <div class="settings-form">
 
-      <!-- Generation -->
+      <!-- Generation (iOS parity: SettingsViewModel.swift:20-24 defaults) -->
       <div class="settings-section">
         <div class="settings-section-title">Generation</div>
         <div class="setting-row">
@@ -43,19 +118,33 @@ export function initSettingsTab(el: HTMLElement): void {
             <button class="btn btn-sm" id="settings-tokens-plus">+</button>
           </div>
         </div>
+        <div class="setting-row setting-row--stacked">
+          <label class="label">System Prompt</label>
+          <textarea class="text-input w-full" id="settings-system-prompt" rows="3"
+            placeholder="${escapeHtml(DEFAULT_SYSTEM_PROMPT)}">${escapeHtml(settings.systemPrompt)}</textarea>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Thinking Mode</span>
+          <div class="toggle ${settings.thinkingModeEnabled ? 'on' : ''}" id="settings-thinking-toggle"></div>
+        </div>
+        <p class="setting-hint">
+          When off, thinking-capable models (e.g. Qwen3) are asked to answer
+          directly without a reasoning phase.
+        </p>
       </div>
 
-      <!-- API Configuration -->
+      <!-- API Configuration (read at startup by main.ts; iOS parity:
+           RunAnywhereAIApp.swift:113-138 runSDKInitialize) -->
       <div class="settings-section">
         <div class="settings-section-title">API Configuration</div>
         <div class="setting-row setting-row--stacked">
           <label class="label">API Key</label>
-          <input type="password" class="text-input w-full" id="settings-api-key" placeholder="Enter API key..." value="${settings.apiKey}">
-          <p class="setting-hint">API key is held in memory only and not persisted — re-enter on each session.</p>
+          <input type="password" class="text-input w-full" id="settings-api-key" placeholder="Enter API key..." value="${escapeHtml(settings.apiKey)}">
         </div>
         <div class="setting-row setting-row--stacked">
           <label class="label">Base URL</label>
-          <input type="url" class="text-input w-full" id="settings-base-url" placeholder="https://api.runanywhere.ai" value="${settings.baseURL}">
+          <input type="url" class="text-input w-full" id="settings-base-url" placeholder="https://api.runanywhere.ai" value="${escapeHtml(settings.baseURL)}">
+          <p class="setting-hint">Reload the page after changing credentials so the SDK re-initializes with them.</p>
         </div>
       </div>
 
@@ -110,7 +199,18 @@ export function initSettingsTab(el: HTMLElement): void {
     saveSettings();
   });
 
+  // System prompt (iOS parity: SettingsViewModel.swift:251-254 saveSystemPrompt)
+  const systemPromptInput = container.querySelector('#settings-system-prompt') as HTMLTextAreaElement;
+  systemPromptInput.addEventListener('change', () => {
+    settings.systemPrompt = systemPromptInput.value;
+    saveSettings();
+  });
+
   // Toggles
+  setupToggle('settings-thinking-toggle', (on) => {
+    settings.thinkingModeEnabled = on;
+    saveSettings();
+  });
   setupToggle('settings-analytics-toggle', (on) => {
     settings.analytics = on;
     saveSettings();
@@ -132,9 +232,6 @@ export function initSettingsTab(el: HTMLElement): void {
   container.querySelector('#settings-docs-link')!.addEventListener('click', () => {
     window.open('https://docs.runanywhere.ai', '_blank');
   });
-
-  // Load saved settings
-  loadSettings();
 }
 
 function setupToggle(id: string, onChange: (on: boolean) => void): void {
@@ -147,31 +244,24 @@ function setupToggle(id: string, onChange: (on: boolean) => void): void {
 
 function saveSettings(): void {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { apiKey: _apiKey, ...persistable } = settings;
-    localStorage.setItem('runanywhere-settings', JSON.stringify(persistable));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch { /* storage may not be available */ }
 }
 
 function loadSettings(): void {
+  if (loaded) return;
+  loaded = true;
   try {
-    const saved = localStorage.getItem('runanywhere-settings');
+    const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved) as Record<string, unknown>;
-      // apiKey is never persisted; omit it during restore so in-memory state stays empty.
-      const { apiKey: _apiKey, ...safe } = parsed;
-      Object.assign(settings, safe);
-      // Update UI
-      (container.querySelector('#settings-temp') as HTMLInputElement).value = String(settings.temperature);
-      container.querySelector('#settings-temp-val')!.textContent = settings.temperature.toFixed(1);
-      container.querySelector('#settings-tokens-val')!.textContent = String(settings.maxTokens);
-      container.querySelector('#settings-analytics-toggle')!.classList.toggle('on', settings.analytics);
-      (container.querySelector('#settings-api-key') as HTMLInputElement).value = '';
-      (container.querySelector('#settings-base-url') as HTMLInputElement).value = settings.baseURL;
+      const parsed = JSON.parse(saved) as Partial<AppSettings>;
+      if (typeof parsed.temperature === 'number') settings.temperature = parsed.temperature;
+      if (typeof parsed.maxTokens === 'number' && parsed.maxTokens > 0) settings.maxTokens = parsed.maxTokens;
+      if (typeof parsed.systemPrompt === 'string') settings.systemPrompt = parsed.systemPrompt;
+      if (typeof parsed.thinkingModeEnabled === 'boolean') settings.thinkingModeEnabled = parsed.thinkingModeEnabled;
+      if (typeof parsed.apiKey === 'string') settings.apiKey = parsed.apiKey;
+      if (typeof parsed.baseURL === 'string') settings.baseURL = parsed.baseURL;
+      if (typeof parsed.analytics === 'boolean') settings.analytics = parsed.analytics;
     }
   } catch { /* storage may not be available */ }
-}
-
-export function getSettings(): typeof settings {
-  return { ...settings };
 }

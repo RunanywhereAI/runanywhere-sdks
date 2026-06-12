@@ -250,17 +250,23 @@ class NativeRAGSessionProvider implements RAGProvider {
     options: RAGQueryOverrides = {},
   ): Promise<RAGResult> {
     const session = await this.ensureSession();
+    // Swift parity: RAG verbs throw on misconfiguration/failure — no
+    // synthetic error-shaped results.
     if (!this.config.llmModelId.trim()) {
-      return unavailableRAGResult(
-        question,
-        'Native Web RAG query requires RAGConfiguration.llmModelId. A session without an LLM model id can ingest but cannot generate answers.',
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'Native Web RAG query requires RAGConfiguration.llmModelId',
+        'A session without an LLM model id can ingest but cannot generate answers.',
       );
     }
     const result = this.adapter.query(session, makeRAGQuery(question, this.config, options));
-    return result ?? unavailableRAGResult(
-      question,
-      'Native RAG query returned no result.',
-    );
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'RAG.query',
+        'Native RAG query returned no result.',
+      );
+    }
+    return result;
   }
 
   async ragClearDocuments(): Promise<void> {
@@ -275,7 +281,8 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   async ragGetDocumentCount(): Promise<number> {
-    return (await this.statistics()).indexedDocuments;
+    // Swift parity: RunAnywhere+RAG.swift reports indexedChunks.
+    return (await this.statistics()).indexedChunks;
   }
 
   async ragGetStatistics(): Promise<RAGStatistics> {
@@ -299,15 +306,24 @@ class NativeRAGSessionProvider implements RAGProvider {
   }
 
   private async statistics(): Promise<RAGStatistics> {
+    // Swift parity: failures throw — no synthetic error-shaped statistics.
     if (this.session == null) {
       if (this.config.persistIndex) {
-        return unavailableRAGStatistics(NATIVE_RAG_PERSISTENCE_UNAVAILABLE);
+        throw SDKException.backendNotAvailable(
+          'RAG.statistics',
+          NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
+        );
       }
       return emptyRAGStatistics(this.config);
     }
-    return this.adapter.statistics(this.session) ?? unavailableRAGStatistics(
-      'Native RAG statistics returned no result.',
-    );
+    const stats = this.adapter.statistics(this.session);
+    if (!stats) {
+      throw SDKException.backendNotAvailable(
+        'RAG.statistics',
+        'Native RAG statistics returned no result.',
+      );
+    }
+    return stats;
   }
 }
 
@@ -405,6 +421,13 @@ interface ParsedMetadata {
   metadata: Record<string, string>;
 }
 
+function createId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
+
 function parseMetadata(metadataJson?: string): ParsedMetadata {
   const metadata = parseMetadataJson(metadataJson);
   const docId = metadata.docId ?? metadata.id ?? createId('rag-doc');
@@ -451,38 +474,6 @@ function emptyRAGStatistics(config: RAGConfiguration): RAGStatistics {
     errorMessage: undefined,
     errorCode: 0,
   };
-}
-
-export function unavailableRAGStatistics(reason?: string): RAGStatistics {
-  return {
-    ...emptyRAGStatistics(createDefaultRAGConfiguration()),
-    errorMessage: reason ?? getRAGAvailability().reason,
-    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-  };
-}
-
-export function unavailableRAGResult(question = '', reason?: string): RAGResult {
-  return {
-    answer: '',
-    retrievedChunks: [],
-    contextUsed: '',
-    retrievalTimeMs: 0,
-    generationTimeMs: 0,
-    totalTimeMs: 0,
-    promptTokens: 0,
-    completionTokens: 0,
-    totalTokens: 0,
-    errorMessage: reason ?? getRAGAvailability().reason,
-    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-    requestId: createId(question ? 'rag-query-unavailable' : 'rag-unavailable'),
-  };
-}
-
-function createId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -658,15 +649,63 @@ export async function ragGetDocumentCount(): Promise<number> {
 export async function ragQuery(
   question: string,
   options?: RAGQueryOverrides,
+): Promise<RAGResult>;
+/**
+ * Full-options overload: query with a complete generated `RAGQueryOptions`
+ * (question rides inside the options). Mirrors Swift
+ * `ragQuery(_ options:)` (RunAnywhere+RAG.swift:190); the
+ * question+optional-options variant (RunAnywhere+RAG.swift:181) maps onto
+ * the `(question, overrides)` overload above.
+ */
+export async function ragQuery(options: RAGQueryOptions): Promise<RAGResult>;
+export async function ragQuery(
+  questionOrOptions: string | RAGQueryOptions,
+  options?: RAGQueryOverrides,
 ): Promise<RAGResult> {
-  const provider = activeProvider();
-  if (!provider) return unavailableRAGResult(question);
-  return provider.ragQuery(question, options);
+  // Swift parity (RunAnywhere+RAG.swift:190-196): throws `.notInitialized`
+  // instead of returning a synthetic error-shaped result.
+  if (typeof questionOrOptions === 'string') {
+    return requireProvider('RAG.query').ragQuery(questionOrOptions, options);
+  }
+  const { question, ...overrides } = questionOrOptions;
+  return requireProvider('RAG.query').ragQuery(question, overrides);
+}
+
+// ---------------------------------------------------------------------------
+// RAG proto helpers — Swift parity: RAGProto+Helpers.swift
+// ---------------------------------------------------------------------------
+
+/**
+ * Generated defaults with a required question string. Question is excluded
+ * from the proto annotation because it has no semantic default
+ * (caller-supplied). Swift parity: `RARAGQueryOptions.defaults(question:)`
+ * (RAGProto+Helpers.swift:72).
+ */
+export function ragQueryOptionsWithQuestion(question: string): RAGQueryOptions {
+  return { ...rAGQueryOptionsDefaults(), question };
+}
+
+/**
+ * Total end-to-end query time in seconds (from `totalTimeMs`).
+ * Swift parity: `RARAGResult.totalTime` (RAGProto+Helpers.swift:82).
+ */
+export function ragResultTotalTime(result: RAGResult): number {
+  return result.totalTimeMs / 1000;
+}
+
+/**
+ * Last index update as a `Date`, or null when the index has never been
+ * updated. Swift parity: `RARAGStatistics.lastUpdated` (RAGProto+Helpers.swift:88).
+ */
+export function ragStatisticsLastUpdated(statistics: RAGStatistics): Date | null {
+  if (statistics.lastUpdatedMs <= 0) return null;
+  return new Date(statistics.lastUpdatedMs);
 }
 
 export async function ragGetStatistics(): Promise<RAGStatistics> {
-  const p = activeProvider();
-  if (!p) return unavailableRAGStatistics();
+  // Swift parity (RunAnywhere+RAG.swift:142-150): throws `.notInitialized`
+  // instead of returning a synthetic error-shaped result.
+  const p = requireProvider('RAG.getStatistics');
   if (p.ragGetStatistics) return p.ragGetStatistics();
   const indexedDocuments = await p.ragGetDocumentCount();
   return {

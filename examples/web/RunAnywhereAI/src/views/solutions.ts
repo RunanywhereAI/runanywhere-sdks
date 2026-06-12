@@ -3,58 +3,16 @@
  *
  * Two buttons run the canonical voice_agent.yaml + rag.yaml solutions
  * shipped at sdk/runanywhere-commons/examples/solutions/. The YAMLs are
- * embedded inline as string constants (no asset bundling). Each lifecycle
- * transition is appended to a simple scrolling log.
+ * synced from the canonical commons files into a generated module via
+ * `scripts/sync-solutions.mjs` (iOS parity:
+ * examples/ios/RunAnywhereAI/scripts/sync-solutions-yamls.sh) so the view
+ * never embeds drift-prone inline copies. Each lifecycle transition is
+ * appended to a simple scrolling log.
  */
 import { RunAnywhere, type RAGAvailability } from '@runanywhere/web';
-import { ONNX } from '@runanywhere/web-onnx';
 import type { TabLifecycle } from '../app';
 import { formatError } from '../services/format-error';
-
-// Use model IDs that are actually registered by services/model-catalog.ts;
-// the placeholder IDs from sdk/runanywhere-commons/examples/solutions/*.yaml
-// (whisper-base, kokoro, silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3,
-// qwen3-4b-q4_k_m) are not present in any example catalog, so handing them
-// to RunAnywhere.solutions.run produces a "model not found in registry"
-// failure as soon as the operators load. rerank_model_id is omitted because
-// no example app seeds a reranker model.
-const VOICE_AGENT_YAML = `voice_agent:
-  llm_model_id: "smollm2-360m-q8_0"
-  stt_model_id: "sherpa-onnx-whisper-tiny.en"
-  tts_model_id: "vits-piper-en_US-lessac-medium"
-  vad_model_id: "silero-vad"
-
-  sample_rate_hz: 16000
-  chunk_ms: 20
-  audio_source: "microphone"
-
-  enable_barge_in: true
-  barge_in_threshold_ms: 200
-
-  system_prompt: "You are a helpful voice assistant. Keep answers concise."
-  max_context_tokens: 4096
-  temperature: 0.7
-
-  emit_partials: true
-  emit_thoughts: false
-`;
-
-const RAG_YAML = `rag:
-  embed_model_id: "all-minilm-l6-v2"
-  llm_model_id: "smollm2-360m-q8_0"
-
-  vector_store: "usearch"
-  vector_store_path: "/tmp/ra-rag.usearch"
-
-  retrieve_k: 24
-  rerank_top: 6
-
-  bm25_k1: 1.2
-  bm25_b: 0.75
-  rrf_k: 60
-
-  prompt_template: "Use the context below to answer.\\n\\nContext:\\n{{context}}\\n\\nQuestion: {{query}}"
-`;
+import { RAG_YAML, VOICE_AGENT_YAML } from '../services/solutions-config';
 
 export function initSolutionsTab(host: HTMLElement): TabLifecycle {
   host.innerHTML = `
@@ -91,17 +49,6 @@ export function initSolutionsTab(host: HTMLElement): TabLifecycle {
 
   const runSolution = async (name: string, yaml: string) => {
     if (running) return;
-
-    if (name === 'Voice Agent') {
-      if (!ONNX.isRegistered) {
-        try {
-          await ONNX.register();
-        } catch (err) {
-          append(`N/A Voice Agent: ONNX register failed: ${formatError(err)}`);
-          return;
-        }
-      }
-    }
 
     if (name === 'RAG') {
       // `rag.ensureReady` owns the bootstrap: when the RAG WASM exports are

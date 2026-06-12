@@ -13,7 +13,11 @@
  * RunAnywhere+*.swift extension files augmenting the same RunAnywhere enum.
  */
 
-import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
+import type {
+  ModelImportRequest,
+  ModelImportResult,
+  ModelInfo,
+} from '@runanywhere/proto-ts/model_types';
 import type { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import { WebModelLifecycle as ModelLifecycleCapability } from './RunAnywhere+ModelLifecycle';
 import {
@@ -34,7 +38,7 @@ import {
 } from './RunAnywhere+StructuredOutput';
 import { ToolCalling as ToolCallingCapability } from './RunAnywhere+ToolCalling';
 import { STT as STTCapability } from './RunAnywhere+STT';
-import { TTS as TTSCapability } from './RunAnywhere+TTS';
+import { TTS as TTSCapability, stopTTSPlayback as stopTTSPlaybackImpl } from './RunAnywhere+TTS';
 import { VAD as VADCapability } from './RunAnywhere+VAD';
 import {
   ragAddDocumentsBatch as ragAddDocumentsBatchImpl,
@@ -138,8 +142,21 @@ export const flatFacade = {
     return ModelRegistryCapability.refresh(options);
   },
 
-  importModel(model: ModelInfo): boolean {
-    return ModelRegistryCapability.registerModel(model);
+  /**
+   * Import a model through the commons import path. Swift parity:
+   * `RunAnywhere.importModel(_ request: RAModelImportRequest)`
+   * (RunAnywhere+Storage.swift:286-291) — C++ owns import semantics
+   * (merge, overwrite, validation), not a registerModel alias.
+   */
+  importModel(request: ModelImportRequest): ModelImportResult {
+    const result = ModelRegistryCapability.importModel(request);
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'importModel',
+        'rac_model_registry_import_proto returned no ModelImportResult bytes.',
+      );
+    }
+    return result;
   },
 
   /**
@@ -259,10 +276,17 @@ export const flatFacade = {
     return TTSCapability.stop(handle);
   },
 
+  /**
+   * Stop current speech playback. Swift parity
+   * (RunAnywhere+TTS.swift:133-136): stops the shared `speak()` browser
+   * playback first, then stops in-flight synthesis. The handle is optional —
+   * pass it only when using the handle-owning `RunAnywhere.tts.*` namespace.
+   */
   stopSpeaking(
-    handle: Parameters<typeof TTSCapability.stop>[0],
-  ): ReturnType<typeof TTSCapability.stop> {
-    return TTSCapability.stop(handle);
+    handle?: Parameters<typeof TTSCapability.stop>[0],
+  ): boolean {
+    stopTTSPlaybackImpl();
+    return handle !== undefined ? TTSCapability.stop(handle) : true;
   },
 
   // -------------------------------------------------------------------------

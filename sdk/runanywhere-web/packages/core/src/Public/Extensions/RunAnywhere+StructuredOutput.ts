@@ -10,6 +10,7 @@ import type {
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import {
+  JSONSchema as JSONSchemaMessage,
   StructuredOutputMode,
   StructuredOutputOptions as StructuredOutputOptionsMessage,
   StructuredOutputPromptResult as StructuredOutputPromptResultMessage,
@@ -17,6 +18,8 @@ import {
   StructuredOutputStreamEventKind,
   StructuredOutputValidation as StructuredOutputValidationMessage,
   StructuredOutputValidationRequest as StructuredOutputValidationRequestMessage,
+  type JSONSchema,
+  type NamedEntity,
   type StructuredOutputOptions,
   type StructuredOutputPromptResult,
   type StructuredOutputRequest,
@@ -38,6 +41,8 @@ import {
 } from './RunAnywhere+TextGeneration';
 
 export type {
+  JSONSchema,
+  NamedEntity,
   StructuredOutputOptions,
   StructuredOutputPromptResult,
   StructuredOutputRequest,
@@ -50,7 +55,8 @@ const logger = new SDKLogger('StructuredOutput');
 
 type StructuredOutputExport =
   | '_rac_structured_output_prepare_prompt_proto'
-  | '_rac_structured_output_validate_proto';
+  | '_rac_structured_output_validate_proto'
+  | '_rac_structured_output_schema_to_json_proto';
 
 // Schema accepted by the structured-output verbs. Composed from the canonical
 // `JSONSchemaDescriptor` (jsonSchema + parse) so there is a single source of
@@ -200,6 +206,79 @@ function readStructuredOutputValidation(
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Structured output proto helpers — Swift parity: StructuredOutputProto+Helpers.swift
+// ---------------------------------------------------------------------------
+
+/**
+ * JSON Schema text consumed by the commons structured-output C ABI.
+ *
+ * Delegates to `rac_structured_output_schema_to_json_proto` so every SDK
+ * shares the same byte-exact, key-sorted, compact serializer. Returns `"{}"`
+ * on any serialization or ABI failure to preserve the previous fallback
+ * contract. Swift parity: `RAJSONSchema.jsonSchemaString`
+ * (StructuredOutputProto+Helpers.swift:38).
+ */
+export function jsonSchemaString(schema: JSONSchema): string {
+  const module = getModuleForCapability('structured-output');
+  if (!module || typeof module._rac_structured_output_schema_to_json_proto !== 'function') {
+    return '{}';
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  if (!bridge.hasProtoBufferExports()) return '{}';
+  try {
+    const schemaBytes = JSONSchemaMessage.encode(JSONSchemaMessage.fromPartial(schema)).finish();
+    // The result buffer carries raw UTF-8 JSON text, not proto bytes, so the
+    // raw `readResultProto` byte path is decoded with TextDecoder.
+    const jsonBytes = bridge.withHeapBytes(schemaBytes, (ptr, size) => (
+      bridge.readResultProto(
+        (outResult) => module._rac_structured_output_schema_to_json_proto!(ptr, size, outResult),
+        'rac_structured_output_schema_to_json_proto',
+      )
+    ));
+    if (!jsonBytes || jsonBytes.length === 0) return '{}';
+    return new TextDecoder().decode(jsonBytes);
+  } catch {
+    return '{}';
+  }
+}
+
+/**
+ * Canonical options factory for a typed schema: stamps the schema, the
+ * commons-serialized `jsonSchema` text, and JSON-schema mode.
+ * Swift parity: `RAStructuredOutputOptions.defaults(schema:includeSchemaInPrompt:strict:)`
+ * (StructuredOutputProto+Helpers.swift:14).
+ */
+export function structuredOutputOptionsWithSchema(
+  schema: JSONSchema,
+  includeSchemaInPrompt = true,
+  strict = false,
+): StructuredOutputOptions {
+  return StructuredOutputOptionsMessage.fromPartial({
+    schema,
+    includeSchemaInPrompt,
+    strictMode: strict,
+    jsonSchema: jsonSchemaString(schema),
+    mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+  });
+}
+
+/**
+ * Whether the structured-output result validated successfully.
+ * Swift parity: `RAStructuredOutputResult.success` (StructuredOutputProto+Helpers.swift:76).
+ */
+export function structuredOutputResultSuccess(result: StructuredOutputResult): boolean {
+  return result.validation?.isValid ?? false;
+}
+
+/**
+ * Character length of a named entity span (never negative).
+ * Swift parity: `RANamedEntity.length` (StructuredOutputProto+Helpers.swift:97).
+ */
+export function namedEntityLength(entity: NamedEntity): number {
+  return Math.max(0, entity.endOffset - entity.startOffset);
+}
+
 function preparePrompt(
   request: StructuredOutputRequest,
 ): StructuredOutputPromptResult;
@@ -238,15 +317,16 @@ function validate(
  * `RunAnywhere.generateStructured(...)` (mirrors
  * `RunAnywhere+StructuredOutput.swift` `generateStructured(prompt:schema:options:)`).
  *
- * Drives the token stream to completion and returns the validated result
- * carried by the terminal `.completed` event (token events are ignored here —
- * this is the non-streaming convenience wrapper).
+ * Drives the token stream to completion and returns the
+ * `StructuredOutputResult` carried by the terminal `.completed` event —
+ * Swift parity: the caller inspects `result.validation` rather than the SDK
+ * throwing on validation failure.
  */
-export async function generateStructured<T = unknown>(
+export async function generateStructured(
   prompt: string,
-  schema: StructuredOutputSchema<T>,
+  schema: StructuredOutputSchema,
   options?: Partial<LLMGenerationOptions>,
-): Promise<T> {
+): Promise<StructuredOutputResult> {
   let result: StructuredOutputResult | undefined;
   for await (const event of generateStructuredStream(prompt, schema, options)) {
     if (
@@ -260,22 +340,7 @@ export async function generateStructured<T = unknown>(
   if (!result) {
     throw SDKException.processingFailed('Structured output did not return a result');
   }
-  if (result.validation && !result.validation.isValid) {
-    throw SDKException.processingFailed(
-      result.validation.errorMessage ?? 'Structured output validation failed',
-    );
-  }
-  const jsonText = new TextDecoder().decode(result.parsedJson);
-  if (typeof schema.parse === 'function') {
-    return schema.parse(jsonText);
-  }
-  try {
-    return JSON.parse(jsonText) as T;
-  } catch (error) {
-    throw SDKException.processingFailed(
-      `Structured output deserialization failed: ${(error as Error).message}`,
-    );
-  }
+  return result;
 }
 
 /**

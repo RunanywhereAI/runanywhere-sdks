@@ -12,6 +12,8 @@
  *   - ProtoSDKError = { category, code, c_abi_code, message, nested_message?, ... }
  */
 import {
+  errorCategoryToJSON,
+  errorCodeToJSON,
   ErrorCategory as ProtoErrorCategory,
   ErrorCode as ProtoErrorCode,
   ErrorSeverity as ProtoErrorSeverity,
@@ -19,7 +21,7 @@ import {
   type SDKError as ProtoSDKError,
 } from '@runanywhere/proto-ts/errors';
 import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
-import type { SDKLogger } from './SDKLogger';
+import { SDKLogger } from './SDKLogger';
 
 /**
  * Map a signed-negative `rac_result_t` code to the matching proto-ts `ErrorCategory`.
@@ -191,6 +193,52 @@ export class SDKException extends Error {
     }
   }
 
+  /**
+   * Log this exception to all configured destinations.
+   *
+   * Mirrors Swift `SDKException.log(file:line:function:)`
+   * (SDKException.swift:362-393): cancellation logs at INFO, everything else
+   * at ERROR; metadata carries error_code / error_category / failure_reason /
+   * underlying_error plus the top SDK stack frames. Swift's `#file` / `#line`
+   * / `#function` source-location metadata has no JS equivalent and is
+   * omitted; the JS `Error.stack` replaces `Thread.callStackSymbols`.
+   */
+  log(): void {
+    const metadata: Record<string, unknown> = {
+      error_code: errorCodeToJSON(this.proto.code),
+      error_category: errorCategoryToJSON(this.proto.category),
+    };
+
+    if (this.proto.nestedMessage) {
+      metadata.underlying_error = this.proto.nestedMessage;
+    }
+    // Swift `failureReason` (SDKException.swift:83-85): "[category] code".
+    metadata.failure_reason =
+      `[${errorCategoryToJSON(this.proto.category)}] ${errorCodeToJSON(this.proto.code)}`;
+
+    // Top SDK frames only (cheap and useful) — Swift filters
+    // `Thread.callStackSymbols` for "RunAnywhere"; JS bundles carry the
+    // package path in lowercase, so match case-insensitively.
+    const sdkFrames = (this.stack ?? '')
+      .split('\n')
+      .filter((frame) => frame.toLowerCase().includes('runanywhere'))
+      .slice(0, 5);
+    if (sdkFrames.length > 0) {
+      metadata.stack_trace = sdkFrames.join('\n');
+    }
+
+    const suffix = Object.entries(metadata)
+      .map(([key, value]) => `${key}=${String(value)}`)
+      .join(', ');
+    const logger = new SDKLogger(errorCategoryToJSON(this.proto.category));
+    const line = `${this.proto.message} | ${suffix}`;
+    if (this.proto.code === ProtoErrorCode.ERROR_CODE_CANCELLED) {
+      logger.info(line);
+    } else {
+      logger.error(line);
+    }
+  }
+
   /** Whether the result code indicates success (code === 0). */
   static isSuccess(resultCode: number): boolean {
     return resultCode === 0;
@@ -273,6 +321,85 @@ export class SDKException extends Error {
   // ---------------------------------------------------------------------------
   // Convenience constructors.
   // ---------------------------------------------------------------------------
+
+  /**
+   * Generic factory; auto-logs unexpected errors.
+   *
+   * Mirrors Swift `SDKException.make(code:message:category:underlying:shouldLog:)`
+   * (SDKException.swift:154-166): builds the proto envelope with the pinned
+   * category, round-trips the C ABI code (positive proto code ↔ negative
+   * rac_result_t, capped at raw <= 899), and calls {@link log} unless the
+   * code is expected/routine (cancellation) or `shouldLog` is false.
+   */
+  static make(
+    code: ProtoErrorCode,
+    message: string,
+    category: ProtoErrorCategory = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+    underlying?: Error,
+    shouldLog = true,
+  ): SDKException {
+    const proto: ProtoSDKError = {
+      category,
+      code,
+      // Round-trip C ABI code: positive proto code ↔ negative rac_result_t
+      // (Swift caps at raw > 0 && raw <= 899, SDKException.swift:48-51).
+      cAbiCode: code > 0 && code <= 899 ? -code : 0,
+      message,
+      nestedMessage: underlying ? String(underlying) : undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: severityForCode(-code),
+      component: componentForCode(-code),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    const ex = new SDKException(proto);
+    if (shouldLog && !isExpected(code)) {
+      ex.log();
+    }
+    return ex;
+  }
+
+  /**
+   * Common shortcut: invalid configuration.
+   * Mirrors Swift `SDKException.invalidConfiguration(_:)`
+   * (SDKException.swift:183-185): code=.invalidConfiguration,
+   * category=.configuration.
+   */
+  static invalidConfiguration(message: string): SDKException {
+    return SDKException.make(
+      ProtoErrorCode.ERROR_CODE_INVALID_CONFIGURATION,
+      message,
+      ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
+    );
+  }
+
+  /**
+   * Common shortcut: timeout.
+   * Mirrors Swift `SDKException.timeout(_:)` (SDKException.swift:235-237):
+   * code=.timeout, category=.network.
+   */
+  static timeout(message: string): SDKException {
+    return SDKException.make(
+      ProtoErrorCode.ERROR_CODE_TIMEOUT,
+      message,
+      ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+    );
+  }
+
+  /**
+   * Common shortcut: network error.
+   * Mirrors Swift `SDKException.networkError(_:)` (SDKException.swift:240-242):
+   * code=.networkError, category=.network.
+   */
+  static networkError(message: string): SDKException {
+    return SDKException.make(
+      ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
+      message,
+      ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+    );
+  }
 
   static notInitialized(message = 'SDK not initialized'): SDKException {
     // Swift canonical: notInitialized uses category=COMPONENT (SDKException.swift:178-179).

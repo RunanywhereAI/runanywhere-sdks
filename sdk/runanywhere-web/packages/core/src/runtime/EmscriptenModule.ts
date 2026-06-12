@@ -311,6 +311,22 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
   /**
+   * ToolValue <-> JSON bridge — the recursive walk lives in commons so every
+   * SDK shares one source of truth (Swift parity: ToolValueJSONABI,
+   * ToolCallingTypes.swift). Request/response are serialized
+   * `runanywhere.v1.ToolValueJSON` / `runanywhere.v1.ToolValue` protos.
+   */
+  _rac_tool_value_to_json_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_tool_value_from_json_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  /**
    * Session-based tool-calling ABI. The Web SDK uses these
    * (instead of the synchronous `_rac_tool_calling_run_loop_proto`) so that
    * TypeScript executors returning `Promise<ToolResult>` can be awaited
@@ -369,6 +385,19 @@ export interface EmscriptenRunanywhereModule {
     outResult: number,
   ): number;
   _rac_structured_output_validate_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  /**
+   * `rac_result_t rac_structured_output_schema_to_json_proto(
+   *    const uint8_t* schema_bytes, size_t size, rac_proto_buffer_t* out);`
+   *
+   * Request: serialized `JSONSchema` bytes; result buffer carries the raw
+   * UTF-8 JSON Schema text (NOT proto bytes). Backs the Web port of Swift's
+   * `RAJSONSchema.jsonSchemaString` (StructuredOutputProto+Helpers.swift:38).
+   */
+  _rac_structured_output_schema_to_json_proto?(
     requestBytes: number,
     requestSize: number,
     outResult: number,

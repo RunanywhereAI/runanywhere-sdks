@@ -27,15 +27,9 @@ import type {
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import {
-  AudioEncoding,
-  VoicePipelineComponent,
   type VoiceAgentComponentStates,
   type VoiceEvent,
 } from '@runanywhere/proto-ts/voice_events';
-// VoiceEventCategory/VoiceEventSeverity/ComponentLoadState were
-// consolidated into EventCategory/ErrorSeverity/ComponentLifecycleState.
-import { EventCategory, ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
-import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule';
 
 const logger = new SDKLogger('VoiceAgent');
@@ -276,15 +270,28 @@ class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
   }
 
   getVoiceAgentComponentStates(): VoiceAgentComponentStates {
-    return this.adapter.componentStates(this.handle)
-      ?? unavailableComponentStates('Native voice-agent component state is unavailable.');
+    const states = this.adapter.componentStates(this.handle);
+    if (!states) {
+      // Swift parity: CppBridge.VoiceAgent.componentStatesProto throws —
+      // no synthetic error-shaped result.
+      throw SDKException.backendNotAvailable(
+        'getVoiceAgentComponentStates',
+        'Native voice-agent component state is unavailable.',
+      );
+    }
+    return states;
   }
 
   async processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult> {
     const result = this.adapter.processVoiceTurn(this.handle, toUint8Audio(audio));
-    return result ?? unavailableVoiceAgentResult(
-      'Native voice-agent processVoiceTurn returned no result.',
-    );
+    if (!result) {
+      // Swift parity: processVoiceTurnProto throws — no synthetic result.
+      throw SDKException.backendNotAvailable(
+        'processVoiceTurn',
+        'Native voice-agent processVoiceTurn returned no result.',
+      );
+    }
+    return result;
   }
 
   async voiceAgentTranscribe(): Promise<string> {
@@ -374,67 +381,13 @@ function assertNativeHandle(handle: number, feature: string): number {
   return handle;
 }
 
-function unavailableComponentStates(reason: string): VoiceAgentComponentStates {
-  return {
-    sttState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    llmState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    ttsState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    vadState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_ERROR,
-    ready: false,
-    anyLoading: false,
-    wakewordState: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
-    errorMessage: reason,
-  };
-}
-
-export function unavailableVoiceAgentResult(reason?: string): VoiceAgentResult {
-  const message = reason ?? getVoiceAgentAvailability().reason;
-  return {
-    speechDetected: false,
-    transcription: undefined,
-    assistantResponse: undefined,
-    thinkingContent: undefined,
-    synthesizedAudio: undefined,
-    finalState: unavailableComponentStates(message),
-    synthesizedAudioSampleRateHz: 0,
-    synthesizedAudioChannels: 0,
-    synthesizedAudioEncoding: AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-    sessionId: '',
-    turnId: createId('voice-turn-unavailable'),
-    sttTimeMs: 0,
-    llmTimeMs: 0,
-    ttsTimeMs: 0,
-    totalTimeMs: 0,
-    errorMessage: message,
-    errorCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-  };
-}
-
-function unavailableVoiceEvent(reason?: string): VoiceEvent {
-  const message = reason ?? getVoiceAgentAvailability().reason;
-  return {
-    seq: 0,
-    timestampUs: nowUs(),
-    category: EventCategory.EVENT_CATEGORY_ERROR,
-    severity: ErrorSeverity.ERROR_SEVERITY_ERROR,
-    component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT,
-    error: {
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
-      message,
-      component: 'voice-agent',
-      isRecoverable: false,
-      operation: 'streamVoiceAgent',
-      detailsJson: '',
-    },
-    sessionId: '',
-    turnId: '',
-    requestId: '',
-    metadata: {},
-  };
-}
-
-async function* unavailableVoiceEventStream(reason?: string): AsyncIterable<VoiceEvent> {
-  yield unavailableVoiceEvent(reason);
+/**
+ * Swift parity: `streamVoiceAgent()` finishes the stream silently when the
+ * agent is not ready (RunAnywhere+VoiceAgent.swift:213-225). The reason is
+ * logged for debuggability but never synthesized into the event stream.
+ */
+async function* emptyVoiceEventStream(reason: string): AsyncIterable<VoiceEvent> {
+  logger.warning(`streamVoiceAgent finished empty: ${reason}`);
 }
 
 function toUint8Audio(audio: Float32Array | Uint8Array): Uint8Array {
@@ -442,17 +395,6 @@ function toUint8Audio(audio: Float32Array | Uint8Array): Uint8Array {
   return new Uint8Array(
     audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
   );
-}
-
-function nowUs(): number {
-  return Math.floor(Date.now() * 1000);
-}
-
-function createId(prefix: string): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -511,10 +453,9 @@ export async function isVoiceAgentReady(): Promise<boolean> {
 }
 
 export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
-  const provider = activeProvider();
-  return provider
-    ? Promise.resolve(provider.getVoiceAgentComponentStates())
-    : unavailableComponentStates(getVoiceAgentAvailability().reason);
+  // Swift parity (RunAnywhere+VoiceAgent.swift:177-185): throws when the SDK /
+  // voice agent is not initialized instead of returning an error-shaped state.
+  return requireProvider('getVoiceAgentComponentStates').getVoiceAgentComponentStates();
 }
 
 export async function areAllVoiceComponentsReady(): Promise<boolean> {
@@ -524,8 +465,12 @@ export async function areAllVoiceComponentsReady(): Promise<boolean> {
 export async function processVoiceTurn(
   audio: Float32Array | Uint8Array,
 ): Promise<VoiceAgentResult> {
+  // Swift parity (RunAnywhere+VoiceAgent.swift:188-196): throws
+  // `.notInitialized` ("Voice agent not ready") — no synthetic result.
   const provider = activeProvider();
-  if (!provider) return unavailableVoiceAgentResult();
+  if (!provider) {
+    throw SDKException.notInitialized('Voice agent not ready');
+  }
   return provider.processVoiceTurn(audio);
 }
 
@@ -559,22 +504,25 @@ export function streamVoiceAgent(
   },
   signal?: AbortSignal,
 ): AsyncIterable<VoiceEvent> {
+  // Swift parity (RunAnywhere+VoiceAgent.swift:208-238): when the SDK or the
+  // voice agent is not ready, the stream simply finishes empty — no synthetic
+  // error events on the iterator.
   const provider = activeProvider();
-  if (!provider) return unavailableVoiceEventStream();
+  if (!provider) return emptyVoiceEventStream('no voice-agent provider is registered');
   if (typeof provider.getVoiceAgentStream !== 'function') {
-    return unavailableVoiceEventStream(
-      'Voice-agent provider does not expose a generated proto event stream.',
+    return emptyVoiceEventStream(
+      'voice-agent provider does not expose a generated proto event stream',
     );
   }
   const src = provider.getVoiceAgentStream();
   if (src == null) {
-    return unavailableVoiceEventStream(
-      'Voice-agent provider has not constructed a stream source yet.',
+    return emptyVoiceEventStream(
+      'voice-agent provider has not constructed a stream source yet',
     );
   }
   if ('handle' in src && (!Number.isFinite(src.handle) || src.handle <= 0)) {
-    return unavailableVoiceEventStream(
-      'Voice-agent provider returned a missing native handle.',
+    return emptyVoiceEventStream(
+      'voice-agent provider returned a missing native handle',
     );
   }
   const adapter = 'transport' in src

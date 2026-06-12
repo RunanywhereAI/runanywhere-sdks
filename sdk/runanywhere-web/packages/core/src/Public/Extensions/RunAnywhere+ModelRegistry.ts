@@ -1,4 +1,6 @@
 import type {
+  ModelImportRequest,
+  ModelImportResult,
   ModelInfo,
   ModelInfoList,
   ModelQuery,
@@ -12,6 +14,15 @@ import {
   type ModelRegistryAvailability,
   type RefreshOptions,
 } from '../../Adapters/ModelRegistryAdapter';
+import {
+  getModuleForCapability,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule';
+
+interface DefaultFrameworkModule extends EmscriptenRunanywhereModule {
+  /** Proto-int wrapper over rac_model_category_default_framework (wasm_exports.cpp). */
+  _rac_model_category_default_framework_proto?(protoCategory: number): number;
+}
 
 export type { ModelRegistryAvailability } from '../../Adapters/ModelRegistryAdapter';
 
@@ -38,6 +49,15 @@ export const ModelRegistry = {
 
   registerModel(model: ModelInfo): boolean {
     return requireAdapter().register(model);
+  },
+
+  /**
+   * Import a model via `rac_model_registry_import_proto` — commons owns
+   * import semantics. Swift parity: `RunAnywhere.importModel(request)`
+   * (RunAnywhere+Storage.swift:286-291).
+   */
+  importModel(request: ModelImportRequest): ModelImportResult | null {
+    return requireAdapter().importModel(request);
   },
 
   updateModel(model: ModelInfo): boolean {
@@ -71,17 +91,16 @@ export const ModelRegistry = {
    * and Swift's `RAModelCategory.defaultFramework`.
    */
   defaultFramework(category: ModelCategory): InferenceFramework {
-    switch (category) {
-      case ModelCategory.MODEL_CATEGORY_LANGUAGE:
-      case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
-        return InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
-      case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-      case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-      case ModelCategory.MODEL_CATEGORY_EMBEDDING:
-      case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-        return InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
-      default:
-        return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+    // Routed through commons' `rac_model_category_default_framework` (the
+    // table Swift's `RAModelCategory.defaultFramework` reads) via the
+    // proto-int WASM wrapper — no TS switch table.
+    const module = getModuleForCapability('commons') as DefaultFrameworkModule | null;
+    if (!module || typeof module._rac_model_category_default_framework_proto !== 'function') {
+      return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
     }
+    const protoFramework = module._rac_model_category_default_framework_proto(category);
+    return (protoFramework in InferenceFramework
+      ? protoFramework
+      : InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN) as InferenceFramework;
   },
 };

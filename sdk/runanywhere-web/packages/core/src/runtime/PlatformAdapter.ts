@@ -1,10 +1,17 @@
 /**
- * PlatformAdapter — registers `rac_platform_adapter_t` callbacks with the
- * loaded WASM module.
+ * PlatformAdapter — registers `rac_platform_adapter_t` callbacks with a
+ * loaded RACommons WASM module.
  *
  * The C struct is a flat list of function pointers. JavaScript provides
  * implementations via Emscripten's `addFunction()`, then writes the resulting
  * function-table indices into the struct in WASM memory.
+ *
+ * Shared by every WASM-owning bridge (the core Commons module and the
+ * backend packages) so the browser platform services — MEMFS file I/O,
+ * localStorage "secure" storage, console logging, Date.now, memory info,
+ * vendor id — are populated once, identically, for each module.
+ * `rac_init` enforces that the mandatory slots are non-NULL, so a
+ * zero-filled stub adapter is NOT a valid substitute.
  *
  * IMPORTANT: every field offset comes from a runtime
  * `_rac_wasm_offsetof_platform_adapter_<field>()` helper compiled into
@@ -14,8 +21,7 @@
  * it in.
  */
 
-import { SDKLogger } from '@runanywhere/web/internal';
-import type { LlamaCppModule } from './LlamaCppBridge';
+import { SDKLogger } from '../Foundation/SDKLogger';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -26,6 +32,25 @@ const RAC_ERROR_FILE_WRITE_FAILED = -185;
 const RAC_ERROR_PLATFORM = -180;
 const RAC_ERROR_INVALID_ARGUMENT = -259;
 const RAC_DIRECTORY_ENTRY_NAME_MAX = 512;
+
+/**
+ * Structural Emscripten-module surface the adapter needs. Any RACommons
+ * WASM module (core, llamacpp, onnx) satisfies this.
+ */
+export interface PlatformAdapterModule {
+  _malloc(size: number): number;
+  _free(ptr: number): void;
+  addFunction(fn: (...args: never[]) => unknown, signature: string): number;
+  removeFunction(ptr: number): void;
+  setValue(ptr: number, value: number, type: string): void;
+  getValue(ptr: number, type: string): number;
+  UTF8ToString(ptr: number, maxBytesToRead?: number): string;
+  stringToUTF8(str: string, ptr: number, maxBytesToWrite: number): void | number;
+  lengthBytesUTF8(str: string): number;
+  HEAPU8?: Uint8Array;
+  FS?: unknown;
+  _rac_wasm_sizeof_platform_adapter?(): number;
+}
 
 interface CallbackPtrs {
   fileExists: number;
@@ -47,7 +72,7 @@ export class PlatformAdapter {
   private callbacks: CallbackPtrs | null = null;
   private adapterPtr = 0;
 
-  constructor(private readonly m: LlamaCppModule) {}
+  constructor(private readonly m: PlatformAdapterModule) {}
 
   /**
    * Allocate the rac_platform_adapter_t struct, install JS callbacks via
@@ -100,7 +125,7 @@ export class PlatformAdapter {
       if (typeof fn !== 'function') {
         throw new Error(
           `WASM module missing _rac_wasm_offsetof_platform_adapter_${name} export; ` +
-          `rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.`,
+          'rebuild the RACommons WASM from wasm/src/wasm_exports.cpp.',
         );
       }
       return (fn as () => number)();
@@ -168,7 +193,7 @@ export class PlatformAdapter {
     return m.addFunction((pathPtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        const exists = m.FS?.analyzePath(path).exists ?? false;
+        const exists = fsOf(m)?.analyzePath(path).exists ?? false;
         return exists ? 1 : 0;
       } catch {
         return 0;
@@ -182,8 +207,9 @@ export class PlatformAdapter {
     return m.addFunction((pathPtr: number, outDataPtr: number, outSizePtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        if (!m.FS) return RAC_ERROR_FILE_NOT_FOUND;
-        const data = m.FS.readFile(path);
+        const fs = fsOf(m);
+        if (!fs) return RAC_ERROR_FILE_NOT_FOUND;
+        const data = fs.readFile(path);
         const wasmPtr = m._malloc(data.length);
         writeBytes(m, data, wasmPtr);
         m.setValue(outDataPtr, wasmPtr, '*');
@@ -201,9 +227,10 @@ export class PlatformAdapter {
     return m.addFunction((pathPtr: number, dataPtr: number, size: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        if (!m.FS) return RAC_ERROR_FILE_WRITE_FAILED;
+        const fs = fsOf(m);
+        if (!fs) return RAC_ERROR_FILE_WRITE_FAILED;
         const data = readBytes(m, dataPtr, size);
-        m.FS.writeFile(path, data);
+        fs.writeFile(path, data);
         return RAC_OK;
       } catch {
         return RAC_ERROR_FILE_WRITE_FAILED;
@@ -217,7 +244,7 @@ export class PlatformAdapter {
     return m.addFunction((pathPtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        m.FS?.unlink(path);
+        fsOf(m)?.unlink(path);
         return RAC_OK;
       } catch {
         return RAC_ERROR_FILE_NOT_FOUND;
@@ -322,8 +349,8 @@ export class PlatformAdapter {
         const jsHeapAvailable = Math.max(0, jsHeapTotal - jsHeapUsed);
 
         // rac_memory_info_t: { uint64_t total, available, used } — 8 bytes each.
-        setI64(m, outInfoPtr,      jsHeapTotal);
-        setI64(m, outInfoPtr + 8,  jsHeapAvailable);
+        setI64(m, outInfoPtr, jsHeapTotal);
+        setI64(m, outInfoPtr + 8, jsHeapAvailable);
         setI64(m, outInfoPtr + 16, jsHeapUsed);
         return RAC_OK;
       } catch {
@@ -340,7 +367,7 @@ export class PlatformAdapter {
     const m = this.m;
     return m.addFunction((dirPathPtr: number, outEntriesPtr: number, countPtr: number, _userData: number) => {
       try {
-        if (!m.FS || !countPtr) return RAC_ERROR_INVALID_ARGUMENT;
+        if (!fsOf(m) || !countPtr) return RAC_ERROR_INVALID_ARGUMENT;
         const dirPath = m.UTF8ToString(dirPathPtr);
         const entries = listDirectoryEntries(m, dirPath);
         if (!entries) return RAC_ERROR_FILE_NOT_FOUND;
@@ -376,7 +403,7 @@ export class PlatformAdapter {
     const m = this.m;
     return m.addFunction((pathPtr: number, _userData: number) => {
       try {
-        if (!m.FS) return 0;
+        if (!fsOf(m)) return 0;
         const path = m.UTF8ToString(pathPtr);
         const entries = listDirectoryEntries(m, path);
         return entries && entries.length > 0 ? 1 : 0;
@@ -407,7 +434,7 @@ export class PlatformAdapter {
 // HEAP views can be stale; always re-read off the module.
 // ---------------------------------------------------------------------------
 
-function writeBytes(m: LlamaCppModule, src: Uint8Array, destPtr: number): void {
+function writeBytes(m: PlatformAdapterModule, src: Uint8Array, destPtr: number): void {
   if (m.HEAPU8) {
     m.HEAPU8.set(src, destPtr);
     return;
@@ -415,7 +442,7 @@ function writeBytes(m: LlamaCppModule, src: Uint8Array, destPtr: number): void {
   for (let i = 0; i < src.length; i++) m.setValue(destPtr + i, src[i], 'i8');
 }
 
-function readBytes(m: LlamaCppModule, srcPtr: number, length: number): Uint8Array {
+function readBytes(m: PlatformAdapterModule, srcPtr: number, length: number): Uint8Array {
   if (m.HEAPU8) return m.HEAPU8.slice(srcPtr, srcPtr + length);
   const out = new Uint8Array(length);
   for (let i = 0; i < length; i++) out[i] = m.getValue(srcPtr + i, 'i8') & 0xff;
@@ -446,7 +473,7 @@ interface EmscriptenFS {
   isDir?(mode: number): boolean;
 }
 
-function fsOf(m: LlamaCppModule): EmscriptenFS | undefined {
+function fsOf(m: PlatformAdapterModule): EmscriptenFS | undefined {
   return m.FS as EmscriptenFS | undefined;
 }
 
@@ -455,7 +482,7 @@ function joinPath(parent: string, name: string): string {
   return `${parent}/${name}`;
 }
 
-function listDirectoryEntries(m: LlamaCppModule, dirPath: string): DirectoryEntryInfo[] | null {
+function listDirectoryEntries(m: PlatformAdapterModule, dirPath: string): DirectoryEntryInfo[] | null {
   const fs = fsOf(m);
   if (!fs?.readdir) return null;
   const analyzed = fs.analyzePath(dirPath);
@@ -475,7 +502,7 @@ function listDirectoryEntries(m: LlamaCppModule, dirPath: string): DirectoryEntr
   });
 }
 
-function directoryEntryLayout(m: LlamaCppModule): DirectoryEntryLayout {
+function directoryEntryLayout(m: PlatformAdapterModule): DirectoryEntryLayout {
   const record = m as unknown as Record<string, unknown>;
   const required = (name: string): number => {
     const fn = record[name];
@@ -492,7 +519,7 @@ function directoryEntryLayout(m: LlamaCppModule): DirectoryEntryLayout {
   };
 }
 
-function setI64(m: LlamaCppModule, ptr: number, value: number): void {
+function setI64(m: PlatformAdapterModule, ptr: number, value: number): void {
   const low = value >>> 0;
   const high = Math.floor(value / 0x100000000) >>> 0;
   m.setValue(ptr, low, 'i32');

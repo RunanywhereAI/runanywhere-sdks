@@ -49,7 +49,14 @@ test.describe('Web SDK smoke test', () => {
   test('example app initializes and exposes RunAnywhere public surface', async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
+      if (msg.type() === 'error') {
+        // Append the source URL: the browser's generic "Failed to load
+        // resource" text omits the file, which the missing-WASM filter
+        // below needs to recognize (e.g. racommons-onnx-sherpa.js 404 in a
+        // checkout without the ONNX artifact staged).
+        const url = msg.location().url;
+        consoleErrors.push(url ? `${msg.text()} (${url})` : msg.text());
+      }
     });
 
     await page.goto('/');
@@ -122,7 +129,13 @@ test.describe('Web SDK smoke test', () => {
       !err.includes('WASM') &&
       !err.includes('wasm') &&
       !err.includes('sherpa-onnx') &&
-      !err.includes('racommons-llamacpp'),
+      !err.includes('racommons-llamacpp') &&
+      !err.includes('racommons-onnx-sherpa') &&
+      // Credential-less dev init: commons logs the model-assignment fetch
+      // at ERROR ("base URL is not configured"); the SDK's Phase 2 already
+      // downgrades it to a deferred-fetch warning, so it is expected noise
+      // in development — same on iOS, where commons emits the same line.
+      !err.includes('model assignment base URL is not configured'),
     );
     expect(fatalErrors, `unexpected console errors:\n${fatalErrors.join('\n')}`).toHaveLength(0);
   });

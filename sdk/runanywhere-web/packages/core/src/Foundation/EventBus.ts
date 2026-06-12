@@ -195,6 +195,40 @@ export class EventBus {
     this.attachTransport();
   }
 
+  // ---------------------------------------------------------------------------
+  // Native subscription lifecycle — mirrors Swift EventBus.swift:58-76.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Start the native SDK event subscription. Idempotent: calling twice is a
+   * no-op. Mirrors Swift `EventBus.start()` (EventBus.swift:58-65), invoked
+   * after the commons core is brought up so native lifecycle/model/error
+   * events flow into the bus.
+   *
+   * Subscribing before `start()` is safe, but events emitted before the
+   * native subscription is wired are not delivered. (On Web, `on()` /
+   * `publish()` also lazy-attach the transport, so explicit `start()` is
+   * only needed to force early wiring.)
+   */
+  start(): void {
+    this.ensureTransport();
+  }
+
+  /**
+   * Stop the native SDK event subscription. Idempotent: calling twice is a
+   * no-op. Mirrors Swift `EventBus.stop()` (EventBus.swift:70-76), invoked
+   * during shutdown before the WASM commons core is torn down so the
+   * unsubscribe call still has a working native ABI surface.
+   *
+   * The transport reference is kept so a later `start()` (or any lazy
+   * `on()` / `publish()`) can re-attach.
+   */
+  stop(): void {
+    if (!this.transportUnsubscribe) return;
+    this.transportUnsubscribe();
+    this.transportUnsubscribe = null;
+  }
+
   /**
    * Subscribe to events of a specific type. Returns an unsubscribe fn.
    */
@@ -269,6 +303,55 @@ export class EventBus {
    */
   eventsFor(category: EventCategory): AsyncIterable<ProtoSDKEvent> {
     return EventBus.iterableFromSubscription((listener) => this.onCategory(category, listener));
+  }
+
+  /**
+   * Async iterable of every raw proto `SDKEvent`, unfiltered.
+   * Mirrors Swift's all-events publisher `EventBus.events`
+   * (EventBus.swift:36-38) — the substrate the model-lifecycle helpers
+   * (`EventBus+ModelLifecycle.ts`) decode from.
+   */
+  get protoEvents(): AsyncIterable<ProtoSDKEvent> {
+    return EventBus.iterableFromSubscription((listener) => this.onProtoEvent(listener));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Category convenience streams — mirror Swift EventBus.swift:141-173.
+  // ---------------------------------------------------------------------------
+
+  /** Get LLM events. Mirrors Swift `EventBus.llmEvents` (EventBus.swift:141-143). */
+  get llmEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_LLM);
+  }
+
+  /** Get STT events. Mirrors Swift `EventBus.sttEvents` (EventBus.swift:146-148). */
+  get sttEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_STT);
+  }
+
+  /** Get TTS events. Mirrors Swift `EventBus.ttsEvents` (EventBus.swift:151-153). */
+  get ttsEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_TTS);
+  }
+
+  /** Get model events. Mirrors Swift `EventBus.modelEvents` (EventBus.swift:156-158). */
+  get modelEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_MODEL);
+  }
+
+  /** Get error events. Mirrors Swift `EventBus.errorEvents` (EventBus.swift:161-163). */
+  get errorEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_ERROR);
+  }
+
+  /** Get SDK lifecycle events. Mirrors Swift `EventBus.sdkEvents` (EventBus.swift:166-168). */
+  get sdkEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_SDK);
+  }
+
+  /** Get RAG events. Mirrors Swift `EventBus.ragEvents` (EventBus.swift:171-173). */
+  get ragEvents(): AsyncIterable<ProtoSDKEvent> {
+    return this.eventsFor(EventCategory.EVENT_CATEGORY_RAG);
   }
 
   // ---------------------------------------------------------------------------

@@ -12,7 +12,10 @@ import type {
   VLMResult,
   VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
-import { VLMModelFamily } from '@runanywhere/proto-ts/vlm_options';
+import {
+  VLMGenerationOptions as VLMGenerationOptionsMessage,
+  VLMModelFamily,
+} from '@runanywhere/proto-ts/vlm_options';
 import {
   ModelCategory,
   type CurrentModelResult,
@@ -46,6 +49,41 @@ function requireProvider(feature: string): VisionLanguageProvider {
   );
 }
 
+async function processImageStream(
+  image: VLMImage,
+  options: VLMGenerationOptions,
+): Promise<AsyncIterable<VLMStreamEvent>>;
+/**
+ * Ergonomic overload mirroring Swift/React Native: the prompt is applied
+ * onto `options.prompt` before streaming. When `options` is omitted, the
+ * remaining knobs fall back to the canonical defaults
+ * (`RAVLMGenerationOptions.defaults()` — applied by
+ * `normalizeVLMGenerationOptions`). Swift parity:
+ * `processImageStream(_:prompt:options:)` (RunAnywhere+VisionLanguage.swift:71-79).
+ */
+async function processImageStream(
+  image: VLMImage,
+  prompt: string,
+  options?: VLMGenerationOptions,
+): Promise<AsyncIterable<VLMStreamEvent>>;
+async function processImageStream(
+  image: VLMImage,
+  optionsOrPrompt: VLMGenerationOptions | string,
+  maybeOptions?: VLMGenerationOptions,
+): Promise<AsyncIterable<VLMStreamEvent>> {
+  const options = typeof optionsOrPrompt === 'string'
+    ? { ...(maybeOptions ?? VLMGenerationOptionsMessage.fromPartial({})), prompt: optionsOrPrompt }
+    : optionsOrPrompt;
+  const active = requireProvider('visionLanguage.processImageStream');
+  if (!active.processImageStream) {
+    throw SDKException.backendNotAvailable(
+      'visionLanguage.processImageStream',
+      'The active Web vision-language provider does not expose streaming.',
+    );
+  }
+  return active.processImageStream(image, normalizeVLMGenerationOptions(options, true));
+}
+
 export const VisionLanguage = {
   get isInitialized(): boolean {
     return provider?.isInitialized ?? false;
@@ -56,12 +94,19 @@ export const VisionLanguage = {
   },
 
   async loadCurrentModel(): Promise<void> {
+    // Swift parity (RunAnywhere+VisionLanguage.swift): VLM accepts both
+    // `.multimodal` and `.vision` — try `.multimodal` first (the canonical
+    // category), fall back to `.vision`. No any-category fallback: a loaded
+    // LLM/STT model must not satisfy the VLM guard.
     const current =
       WebModelLifecycle.currentModel({
         category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         includeModelMetadata: true,
       }) ??
-      WebModelLifecycle.currentModel({ includeModelMetadata: true });
+      WebModelLifecycle.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_VISION,
+        includeModelMetadata: true,
+      });
 
     if (!current?.modelId) {
       // Swift parity: RunAnywhere+VisionLanguage.swift:40 throws `.notInitialized` ("VLM model not loaded").
@@ -93,19 +138,12 @@ export const VisionLanguage = {
     );
   },
 
-  async processImageStream(
-    image: VLMImage,
-    options: VLMGenerationOptions,
-  ): Promise<AsyncIterable<VLMStreamEvent>> {
-    const active = requireProvider('visionLanguage.processImageStream');
-    if (!active.processImageStream) {
-      throw SDKException.backendNotAvailable(
-        'visionLanguage.processImageStream',
-        'The active Web vision-language provider does not expose streaming.',
-      );
-    }
-    return active.processImageStream(image, normalizeVLMGenerationOptions(options, true));
-  },
+  /**
+   * Typed VLM event stream. Also accepts the `(image, prompt, options?)`
+   * convenience overload — Swift parity:
+   * `processImageStream(_:prompt:options:)` (RunAnywhere+VisionLanguage.swift:71-79).
+   */
+  processImageStream,
 
   async cancelVLMGeneration(): Promise<void> {
     await requireProvider('visionLanguage.cancelVLMGeneration').cancelVLMGeneration();

@@ -4,8 +4,8 @@
  * Web binding for the cross-SDK named cloud STT provider table
  * (rac_cloud_stt_provider.h). The `cloud` engine ships static adapters for
  * built-in providers (e.g. "sarvam"). For any other vendor, register a
- * handler by name via `CloudSTT.registerProvider` and tie a model to it with
- * `CloudSTT.register({ id, provider, ... })` (same `provider` string). The
+ * handler by name via `Cloud.registerProvider` and tie a model to it with
+ * `Cloud.register({ id, provider, ... })` (same `provider` string). The
  * cloud engine then delegates the ENTIRE request — build, HTTP, and response
  * parse — to the handler, so a developer supports any cloud STT API (key,
  * URL, request and response shape) without a native adapter or a recompile.
@@ -26,7 +26,7 @@ import {
   RAC_ERROR_NULL_POINTER,
   RAC_ERROR_OUT_OF_MEMORY,
 } from '../../../Foundation/RACErrors';
-import { CloudSTT, cloudCapableModule } from './CloudSTT';
+import { Cloud, cloudCapableModule } from './Cloud';
 import type { EmscriptenRunanywhereModule } from '../../../runtime/EmscriptenModule';
 
 const logger = new SDKLogger('Cloud.SttProvider');
@@ -49,7 +49,7 @@ export enum CloudAudioFormat {
 export interface CloudSttRequest {
   /** The provider name this entry was registered under. */
   provider: string;
-  /** The provider model id from `CloudSTT.register`. */
+  /** The provider model id from `Cloud.register`. */
   model: string;
   /** The API key from registration. Sensitive; never log. */
   apiKey: string;
@@ -209,13 +209,13 @@ function serializeResultJSON(result: {
  * Register (or replace) a developer-defined cloud STT provider handler. The
  * handler performs the whole request host-side (build + HTTP + parse), so any
  * vendor works without a native adapter. Tie a model to it by calling
- * `CloudSTT.register` with the same `provider` string. Built-in providers
+ * `Cloud.register` with the same `provider` string. Built-in providers
  * (e.g. "sarvam") cannot be shadowed — a static adapter always wins over a
  * host callback of the same name.
  *
  * Returns `false` (with an actionable log) when the loaded WASM build does
  * not export the provider-table ABI — same degradation contract as
- * `CloudSTT.registerBackend()`.
+ * `Cloud.registerBackend()`.
  *
  * Mirrors Swift `Cloud.registerProvider(_:_:)` (CloudSttProvider.swift:145).
  */
@@ -230,7 +230,7 @@ export function registerCloudSttProvider(
 
   // Ensure the cloud engine plugin is in the registry (idempotent), mirroring
   // Swift's `register()` call (CloudSttProvider.swift:153).
-  CloudSTT.registerBackend();
+  Cloud.registerBackend();
 
   const module = cloudCapableModule() as CloudProviderModule | null;
   if (!module || typeof module._rac_cloud_register_stt_provider !== 'function') {

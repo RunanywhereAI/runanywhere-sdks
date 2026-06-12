@@ -118,6 +118,11 @@ export class TTSProtoAdapter {
           bridge.free(textPtr);
         }
       },
+      undefined,
+      undefined,
+      // Swift parity (ModalityProtoABI+Generated.swift:448-455): terminal
+      // timestamp-only output instead of rejecting the iterator.
+      () => TTSOutput.fromPartial({ timestampMs: Date.now() }),
     );
   }
 

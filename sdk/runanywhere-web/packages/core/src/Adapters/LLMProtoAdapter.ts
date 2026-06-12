@@ -14,6 +14,7 @@ import {
 } from '@runanywhere/proto-ts/sdk_events';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
+import { SDKException } from '../Foundation/SDKException';
 import {
   adapterState,
   ensureExports,
@@ -88,6 +89,19 @@ export class LLMProtoAdapter {
       () => {
         this.cancel();
       },
+      // Swift parity (ModalityProtoABI+Generated.swift:308-316): non-success
+      // rc synthesizes a terminal error event instead of rejecting the
+      // iterator.
+      (rc) => LLMStreamEvent.fromPartial({
+        isFinal: true,
+        finishReason: 'error',
+        errorCode: rc,
+        errorMessage: SDKException.fromRACResult(
+          rc,
+          `LLM stream failed: ${rc}`,
+          { module: this.module, logger },
+        ).message,
+      }),
     );
   }
 

@@ -142,6 +142,10 @@ export class VLMProtoAdapter {
       () => {
         this.cancel(handle);
       },
+      // Swift parity (CppBridge+ModalityProtoABI.swift VLM stream): no
+      // synthetic terminal event — a non-success rc finishes the stream
+      // silently.
+      undefined,
       true,
     );
   }

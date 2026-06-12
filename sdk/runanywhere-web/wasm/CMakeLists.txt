@@ -427,6 +427,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_info_free"
     "_rac_model_info_array_free"
     "_rac_model_info_copy"
+    # Canonical ModelInfo factory (Swift RAModelInfo.make parity) so the Web
+    # SDK never hand-assembles ModelInfo defaults in TS.
+    "_rac_model_info_make_proto"
+    # Expected-files derivation for an artifact (Swift
+    # RAModelInfo.expectedArtifactFiles parity).
+    "_rac_artifact_expected_files_proto"
     "_rac_model_registry_discover_downloaded"
     "_rac_discovery_result_free"
 
@@ -529,6 +535,10 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_tool_call_normalize_json"
     "_rac_tool_call_definitions_to_json"
     "_rac_tool_call_result_to_json"
+    # ToolValue <-> JSON bridge (Swift ToolValueJSONABI parity) — backs the
+    # Web executeTool argument parsing / result serialization.
+    "_rac_tool_value_to_json_proto"
+    "_rac_tool_value_from_json_proto"
     "_rac_tool_calling_run_loop_proto"
     # Session-based orchestration so the Web SDK can delegate
     # the tool-calling run loop to commons even when TS executors are async
@@ -735,6 +745,15 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     # cleanTempFiles parity for the Web flat API.
     "_rac_wasm_file_manager_clear_cache"
     "_rac_wasm_file_manager_clear_temp"
+
+    # Model-category / framework capability wrappers (wasm_exports.cpp) —
+    # proto-int ABI over rac_model_category_requires_context_length /
+    # supports_thinking / default_framework and rac_framework_display_name,
+    # so the capability/display tables stay in commons (Swift parity).
+    "_rac_model_category_requires_context_length_proto"
+    "_rac_model_category_supports_thinking_proto"
+    "_rac_model_category_default_framework_proto"
+    "_rac_framework_display_name_proto"
 
     # VLM service
     "_rac_vlm_get_builtin_template"

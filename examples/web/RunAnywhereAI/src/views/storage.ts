@@ -1,20 +1,32 @@
 /**
- * Storage Tab — storage location switcher plus a minimal model catalog view
- * that surfaces registry state via proto-byte adapters.
+ * Storage Tab — storage info header + maintenance actions + a model catalog
+ * view that surfaces registry state via proto-byte adapters.
  *
- * The model browser half is intentionally read-only: it lists everything
- * the app has registered via `services/model-catalog.ts` plus anything the
- * SDK reports as downloaded/loaded. Downloading + loading lives in
- * `components/model-selection.ts` — the chat toolbar pill is the single
- * canonical entry point for that.
+ * Mirrors iOS `StorageViewModel` (StorageViewModel.swift:28-103):
+ *   - `RunAnywhere.getStorageInfo(request)` drives the used/free header.
+ *   - Clear Cache / Clean Temp delegate to the SDK verbs.
+ *   - Per-model Delete goes through `RunAnywhere.deleteStorage(request)`.
+ *
+ * The storage-location switcher (OPFS vs local folder) is justified web
+ * platform code — browsers expose two storage backends, iOS has one.
+ * Downloading + loading lives in `components/model-selection.ts`.
  */
 
 import type { TabLifecycle } from '../app';
 import { showToast } from '../components/dialogs';
-import { RunAnywhere } from '@runanywhere/web';
-import type { ModelInfo } from '@runanywhere/web';
 import {
-  ensureCatalogRegistered,
+  RunAnywhere,
+  deviceStorageUsagePercentage,
+  storageInfoAppStorage,
+  storageInfoDeviceStorage,
+  storageInfoTotalModelsSize,
+} from '@runanywhere/web';
+import type { ModelInfo, StorageInfo } from '@runanywhere/web';
+import {
+  StorageDeleteRequest,
+  StorageInfoRequest,
+} from '@runanywhere/proto-ts/storage_types';
+import {
   onModelStateChange,
   openSheet as openModelSheet,
 } from '../components/model-selection';
@@ -29,15 +41,22 @@ import {
 
 let container: HTMLElement;
 let unsubscribeState: (() => void) | null = null;
+let lastStorageInfo: StorageInfo | null = null;
+let storageInfoError: string | null = null;
 
 export function initStorageTab(el: HTMLElement): TabLifecycle {
   container = el;
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Storage</div>
-      <div class="toolbar-actions"></div>
+      <div class="toolbar-actions">
+        <button class="btn btn-secondary" id="storage-clear-cache-btn" style="font-size: 0.8rem;">Clear Cache</button>
+        <button class="btn btn-secondary" id="storage-clean-temp-btn" style="font-size: 0.8rem;">Clean Temp</button>
+      </div>
     </div>
     <div class="scroll-area" id="storage-scroll">
+      <div id="storage-info-header" style="padding: 12px 16px; margin-bottom: 12px; border-radius: 8px; background: var(--surface-secondary, #1a1a2e);"></div>
+
       <div
         class="storage-location"
         id="storage-location"
@@ -63,6 +82,28 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     </div>
   `;
 
+  container.querySelector('#storage-clear-cache-btn')!.addEventListener('click', async () => {
+    // iOS parity: StorageViewModel.swift:68-75 `clearCache()`.
+    try {
+      await RunAnywhere.clearCache();
+      showToast('Cache cleared', 'success');
+    } catch (err) {
+      showToast(`Failed to clear cache: ${formatError(err)}`, 'warning');
+    }
+    refreshStorageInfo();
+  });
+
+  container.querySelector('#storage-clean-temp-btn')!.addEventListener('click', async () => {
+    // iOS parity: StorageViewModel.swift:77-84 `cleanTempFiles()`.
+    try {
+      await RunAnywhere.cleanTempFiles();
+      showToast('Temporary files cleaned', 'success');
+    } catch (err) {
+      showToast(`Failed to clean temporary files: ${formatError(err)}`, 'warning');
+    }
+    refreshStorageInfo();
+  });
+
   container.querySelector('#storage-choose-dir-btn')!.addEventListener('click', async () => {
     try {
       const ok = await RunAnywhere.storage.chooseLocalStorageDirectory();
@@ -86,16 +127,18 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#storage-open-selection-btn')!.addEventListener('click', () => {
     openModelSheet();
   });
-
-  ensureCatalogRegistered();
+  refreshStorageInfo();
   updateStorageLocationUI();
   renderModelList();
 
-  unsubscribeState = onModelStateChange(() => renderModelList());
+  unsubscribeState = onModelStateChange(() => {
+    refreshStorageInfo();
+    renderModelList();
+  });
 
   return {
     onActivate(): void {
-      ensureCatalogRegistered();
+      refreshStorageInfo();
       updateStorageLocationUI();
       renderModelList();
     },
@@ -109,6 +152,68 @@ export function initStorageTab(el: HTMLElement): TabLifecycle {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Storage info header (iOS parity: StorageViewModel.swift:28-62 loadData)
+// ---------------------------------------------------------------------------
+
+function refreshStorageInfo(): void {
+  storageInfoError = null;
+  lastStorageInfo = null;
+  try {
+    const result = RunAnywhere.getStorageInfo(StorageInfoRequest.fromPartial({
+      includeDevice: true,
+      includeApp: true,
+      includeModels: true,
+      includeCache: true,
+    }));
+    if (!result.success) {
+      storageInfoError = result.errorMessage || 'Failed to load storage data';
+    } else {
+      lastStorageInfo = result.info ?? null;
+    }
+  } catch (err) {
+    storageInfoError = formatError(err);
+  }
+  renderStorageInfoHeader();
+}
+
+function renderStorageInfoHeader(): void {
+  const host = container.querySelector<HTMLElement>('#storage-info-header');
+  if (!host) return;
+
+  if (storageInfoError) {
+    host.innerHTML = `<div class="docs-status">Storage info unavailable: ${escapeHtml(storageInfoError)}</div>`;
+    return;
+  }
+  if (!lastStorageInfo) {
+    host.innerHTML = '<div class="docs-status">Loading storage info...</div>';
+    return;
+  }
+
+  const app = storageInfoAppStorage(lastStorageInfo);
+  const device = storageInfoDeviceStorage(lastStorageInfo);
+  const modelsSize = storageInfoTotalModelsSize(lastStorageInfo);
+  const usedPct = deviceStorageUsagePercentage(device);
+
+  host.innerHTML = `
+    <div style="font-size: 0.75rem; opacity: 0.6; margin-bottom: 6px;">Storage</div>
+    <div style="display: flex; gap: 24px; flex-wrap: wrap; font-size: 0.85rem;">
+      <div><strong>App used:</strong> ${formatBytes(app.totalBytes)}</div>
+      <div><strong>Models:</strong> ${formatBytes(modelsSize)}</div>
+      <div><strong>Device free:</strong> ${formatBytes(device.freeBytes)}</div>
+    </div>
+    ${device.totalBytes > 0
+      ? `<div class="progress-bar" style="margin-top: 8px;">
+          <div class="progress-fill" style="width:${Math.min(100, Math.round(usedPct))}%"></div>
+        </div>`
+      : ''}
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Storage location switcher (web platform code)
+// ---------------------------------------------------------------------------
 
 function updateStorageLocationUI(): void {
   const label = container.querySelector('#storage-location-label') as HTMLElement;
@@ -134,6 +239,10 @@ function updateStorageLocationUI(): void {
     reauthBtn.style.display = 'none';
   }
 }
+
+// ---------------------------------------------------------------------------
+// Model list (read-only registry view + per-model Delete)
+// ---------------------------------------------------------------------------
 
 function renderModelList(): void {
   const host = container.querySelector('#storage-model-list') as HTMLElement | null;
@@ -180,9 +289,41 @@ function renderModelList(): void {
             ${statusLabel}
           </div>
         </div>
+        ${isDownloaded
+          ? `<button class="btn btn-secondary btn-sm storage-delete-btn" data-model-id="${escapeHtml(entry.id)}" style="font-size: 0.75rem;">Delete</button>`
+          : ''}
       </div>
     `;
   }).join('');
+
+  host.querySelectorAll<HTMLButtonElement>('.storage-delete-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const modelId = btn.dataset.modelId;
+      if (modelId) void deleteModel(modelId);
+    });
+  });
+}
+
+/** iOS parity: StorageViewModel.swift:86-103 `deleteModel(_:)`. */
+async function deleteModel(modelId: string): Promise<void> {
+  try {
+    const result = RunAnywhere.deleteStorage(StorageDeleteRequest.fromPartial({
+      modelIds: [modelId],
+      deleteFiles: true,
+      clearRegistryPaths: true,
+      unloadIfLoaded: true,
+      allowPlatformDelete: true,
+    }));
+    if (!result.success) {
+      showToast(result.errorMessage || 'Failed to delete model', 'warning');
+      return;
+    }
+    showToast(`Deleted ${modelId}`, 'success');
+  } catch (err) {
+    showToast(`Failed to delete model: ${formatError(err)}`, 'warning');
+  }
+  refreshStorageInfo();
+  renderModelList();
 }
 
 function lookupModelInfo(modelId: string): ModelInfo | null {

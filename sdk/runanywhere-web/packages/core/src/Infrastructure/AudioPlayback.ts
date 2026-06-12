@@ -120,6 +120,27 @@ export class AudioPlayback {
   }
 
   /**
+   * Pause playback (suspends the AudioContext so the current buffer can be
+   * resumed). Swift parity: `AudioPlaybackManager.pause()`.
+   */
+  pause(): void {
+    if (!this._isPlaying) return;
+    if (this.audioContext && this.audioContext.state === 'running') {
+      void this.audioContext.suspend();
+    }
+  }
+
+  /**
+   * Resume playback previously paused with `pause()`. Swift parity:
+   * `AudioPlaybackManager.resume()`.
+   */
+  resume(): void {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      void this.audioContext.resume();
+    }
+  }
+
+  /**
    * Set playback volume.
    */
   setVolume(volume: number): void {

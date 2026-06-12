@@ -57,7 +57,7 @@ import {
   RAC_PRIMITIVE_TRANSCRIBE,
   type HybridWasmModule,
 } from './HybridWasmModule';
-import { CloudSTT } from './CloudSTT';
+import { Cloud } from './Cloud';
 import {
   registerHybridCustomFilter,
   unregisterHybridCustomFilter,
@@ -92,8 +92,8 @@ function pinnedEngineName(backend: HybridBackendKind): string {
  *
  * Usage:
  * ```ts
- * CloudSTT.registerBackend();
- * CloudSTT.register({ id: 'saaras', provider: 'sarvam', model: 'saaras:v2.5', apiKey: '…' });
+ * Cloud.registerBackend();
+ * Cloud.register({ id: 'saaras', provider: 'sarvam', model: 'saaras:v2.5', apiKey: '…' });
  * setHybridDeviceStateProvider(browserDeviceStateProvider());  // optional
  *
  * const router = await HybridSttRouter.create();
@@ -192,13 +192,27 @@ export class HybridSttRouter {
       throw error;
     }
 
+    // Serialize all proto bytes (descriptors + policy) up-front, BEFORE
+    // mutating any installed state — Swift parity (HybridSTTRouter.swift
+    // setPair): an encode failure only destroys the freshly created services
+    // and leaves the previously installed pair / filters untouched.
+    let offDescriptor: Uint8Array;
+    let onDescriptor: Uint8Array;
+    let policyBytes: Uint8Array;
+    try {
+      offDescriptor = encodeModelDescriptor(offline);
+      onDescriptor = encodeModelDescriptor(online);
+      policyBytes = encodeRoutingPolicy(policy);
+    } catch (error) {
+      this.destroyService(offlineService);
+      this.destroyService(onlineService);
+      throw error;
+    }
+
     // Detach + destroy any previously attached services (clear slots first —
     // header UAF note) and retire the previous policy's custom filters.
     this.clearAndDestroyServices();
     this.retireCustomFilters();
-
-    const offDescriptor = encodeModelDescriptor(offline);
-    const onDescriptor = encodeModelDescriptor(online);
 
     const rcOff = bridge.withHeapBytes(offDescriptor, (ptr, size) =>
       mod._rac_stt_hybrid_router_set_offline_service_proto!(
@@ -232,7 +246,6 @@ export class HybridSttRouter {
     }
     const customNames = customs.map((f) => f.name);
 
-    const policyBytes = encodeRoutingPolicy(policy);
     const rcPolicy = bridge.withHeapBytes(policyBytes, (ptr, size) =>
       mod._rac_stt_hybrid_router_set_policy_proto!(this.handle, ptr, size),
     );
@@ -355,13 +368,13 @@ export class HybridSttRouter {
         'hybrid.stt',
         `No '${engineName}' STT plugin registered for RAC_PRIMITIVE_TRANSCRIBE. ` +
           `Register the backend first ` +
-          `(load the ONNX/sherpa backend for sherpa; CloudSTT.registerBackend() for cloud).`,
+          `(load the ONNX/sherpa backend for sherpa; Cloud.registerBackend() for cloud).`,
       );
     }
 
     // cloud config JSON (provider/api_key/model/...); sherpa = no config.
     const configJSON = model.backend === HybridBackendKind.HYBRID_BACKEND_CLOUD
-      ? CloudSTT.configJSON(model.id)
+      ? Cloud.configJSON(model.id)
       : null;
     // cloud takes everything via config_json; no model path. sherpa resolves
     // its model from the registry by id.

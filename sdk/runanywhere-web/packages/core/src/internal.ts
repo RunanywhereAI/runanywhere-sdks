@@ -25,6 +25,12 @@ export {
 } from './runtime/SpeechBackendExports';
 export type { SpeechBackendModule } from './runtime/SpeechBackendExports';
 
+// Shared browser rac_platform_adapter_t populator (MEMFS / localStorage /
+// console / Date.now) — used by the core Commons module and every backend
+// bridge so the mandatory-slot guard in rac_init is satisfied identically.
+export { PlatformAdapter } from './runtime/PlatformAdapter';
+export type { PlatformAdapterModule } from './runtime/PlatformAdapter';
+
 export {
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
@@ -165,8 +171,6 @@ export {
   isRAGAvailable,
   setRAGProvider,
   setRAGSessionHandle,
-  unavailableRAGResult,
-  unavailableRAGStatistics,
 } from './Public/Extensions/RunAnywhere+RAG';
 export type {
   RAGAvailability,
@@ -182,7 +186,6 @@ export {
   isVoiceAgentAvailable,
   setVoiceAgentHandle,
   setVoiceAgentProvider,
-  unavailableVoiceAgentResult,
 } from './Public/Extensions/RunAnywhere+VoiceAgent';
 export type {
   VoiceAgentAvailability,

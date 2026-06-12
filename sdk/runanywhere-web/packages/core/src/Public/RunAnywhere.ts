@@ -47,7 +47,6 @@ import { SDKLogger } from '../Foundation/SDKLogger';
 import { requestPersistentStorage } from '../Infrastructure/BrowserStorage';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSBridge } from '../Infrastructure/OPFSBridge';
-import { AudioPlayback } from '../Infrastructure/AudioPlayback';
 import {
   frameworkOPFSDir,
   primaryFilenameFromModel,
@@ -68,10 +67,16 @@ import { StructuredOutput as StructuredOutputCapability } from './Extensions/Run
 import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
 import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
 import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
-import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
+import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywhere+TTS';
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
+import type {
+  VLMGenerationOptions,
+  VLMImage,
+  VLMResult,
+  VLMStreamEvent,
+} from '@runanywhere/proto-ts/vlm_options';
 import { Hybrid as HybridCapability } from './Extensions/RunAnywhere+Hybrid';
 import { Backends as BackendsCapability } from './Extensions/Backends/onnxStatus';
 import {
@@ -129,12 +134,6 @@ let _initializingPromise: Promise<void> | null = null;
 let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 let _hasCompletedNativePhase1 = false;
-/** True once the commons WASM loaded successfully during initialize(). When
- * false, `isInitialized` reflects TS-layer readiness only; WASM-backed APIs
- * will fail until a backend module registers and calls
- * `completeNativePhase1ForModule`. This flag has the same semantics as
- * Swift's `isInitializedFlag` combined with the Phase 1 proto success path. */
-let _jsOnlyInit = false;
 
 // Phase 2 (services) init state — mirrors Swift's
 // `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
@@ -535,7 +534,27 @@ function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string)
     isAvailable: true,
     updatedAtUnixMs: Date.now(),
   };
-  ModelRegistryCapability.registerModel(importedModel);
+  // Swift parity (RunAnywhere+Storage.swift persistDownloadCompletion):
+  // route through the commons import path (ModelImportRequest →
+  // rac_model_registry_import_proto) so C++ owns import semantics instead
+  // of a bare registerModel write.
+  const result = ModelRegistryCapability.importModel({
+    model: importedModel,
+    sourcePath: localPath,
+    copyIntoManagedStorage: false,
+    overwriteExisting: true,
+    validateBeforeRegister: false,
+    files: importedModel.multiFile?.files ?? [],
+  });
+  if (!result?.success) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      result?.errorMessage
+        ? result.errorMessage
+        : 'Downloaded model could not be imported into the registry',
+      'downloadModel',
+    );
+  }
 }
 
 /**
@@ -691,12 +710,9 @@ export const RunAnywhere = {
     return _isInitialized;
   },
 
-  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete).
-   * Returns false when commons WASM failed to load during initialize() so
-   * callers know native Phase 1 was deferred and WASM-backed APIs are not yet
-   * available, even though `isInitialized` is true. */
+  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete). */
   get areServicesReady(): boolean {
-    return _hasCompletedServicesInit && !_jsOnlyInit;
+    return _hasCompletedServicesInit;
   },
 
   /** Mirror Swift `RunAnywhere.isActive`. */
@@ -808,6 +824,11 @@ export const RunAnywhere = {
         const env = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         _initOptions = { ...options, environment: env };
 
+        // Swift parity (RunAnywhere.swift performCoreInitSerial): set the
+        // environment first so logging boots with the correct config
+        // (dev=debug, prod=warning/local-off).
+        SDKLogger.applyEnvironmentConfiguration(env);
+
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
         if (typeof ReadableStream === 'undefined') {
@@ -829,24 +850,10 @@ export const RunAnywhere = {
 
         // Load the core commons WASM so the SDK facade (init, environment,
         // auth, model registry, lifecycle, proto events) has its native
-        // backing. Failure is non-fatal — backend packages (LlamaCPP, ONNX)
-        // load their own WASM modules and install them via
-        // `setRunanywhereModule`, so apps that only need backend-specific
-        // operations can still proceed if the core artifact is missing.
-        // When it fails, `_jsOnlyInit = true` so `areServicesReady` accurately
-        // reflects that native Phase 1 was deferred (mirrors Swift's
-        // `isInitializedFlag = false` on Phase 1 failure, adapted to Web's
-        // intentional non-fatal policy).
-        try {
-          await CommonsModule.shared.ensureLoaded();
-        } catch (err) {
-          logger.warning(
-            `Failed to load core Commons WASM (non-fatal — backend packages can still install their own modules): ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          );
-          _jsOnlyInit = true;
-        }
+        // backing. Swift parity (RunAnywhere.swift performCoreInitSerial):
+        // Phase 1 failure is fatal — initialize() rethrows and
+        // `isInitialized` stays false.
+        await CommonsModule.shared.ensureLoaded();
 
         _isInitialized = true;
 
@@ -887,6 +894,18 @@ export const RunAnywhere = {
             `Initial model registry hydrate failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
           );
         }
+      } catch (error) {
+        // Swift parity (RunAnywhere.swift performCoreInitSerial error path):
+        // reset init state fully and rethrow so callers observe the failure.
+        logger.error(
+          `Initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        _isInitialized = false;
+        _initOptions = null;
+        _hasCompletedServicesInit = false;
+        _hasCompletedHTTPSetup = false;
+        _servicesInitPromise = null;
+        throw error;
       } finally {
         _initializingPromise = null;
       }
@@ -1133,6 +1152,11 @@ export const RunAnywhere = {
 
   /** Vision-language model inference — `RunAnywhere.visionLanguage.processImage(...)`. */
   visionLanguage: VisionLanguageCapability,
+
+  /** Model-registry proto bridge — `RunAnywhere.modelRegistry.registerModel(model)`
+   * etc. (documented public namespace; the flat Swift-named verbs
+   * `registerModel`/`listModels`/`refreshModelRegistry` delegate to it). */
+  modelRegistry: ModelRegistryCapability,
 
   /** Hybrid STT router — `RunAnywhere.hybrid.createSttRouter()` etc. Per-request
    * offline(sherpa)↔online(cloud) dispatch; commons owns all routing. */
@@ -1619,14 +1643,12 @@ export const RunAnywhere = {
       try {
         const samples = decodeTTSAudioToFloat32(output);
         if (samples && samples.length > 0) {
-          const playback = new AudioPlayback({
-            sampleRate: output.sampleRate > 0 ? output.sampleRate : 22050,
-          });
-          try {
-            await playback.play(samples, output.sampleRate || undefined);
-          } finally {
-            playback.dispose();
-          }
+          // Shared playback instance (Swift parity: `ttsAudioPlayback`
+          // singleton) so `stopSpeaking()` can stop in-flight speech.
+          await sharedTTSPlayback().play(
+            samples,
+            output.sampleRate > 0 ? output.sampleRate : 22050,
+          );
         }
       } catch (err) {
         logger.warning(
@@ -1656,10 +1678,10 @@ export const RunAnywhere = {
   },
 
   async processImage(
-    image: Parameters<typeof VisionLanguageCapability.processImage>[0],
-    options: Parameters<typeof VisionLanguageCapability.processImage>[1],
+    image: VLMImage,
+    options: VLMGenerationOptions,
     extra: CancellableCall = {},
-  ): Promise<Awaited<ReturnType<typeof VisionLanguageCapability.processImage>>> {
+  ): Promise<VLMResult> {
     throwIfAborted(extra.signal, 'processImage');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
@@ -1671,16 +1693,30 @@ export const RunAnywhere = {
     return VisionLanguageCapability.processImage(image, options).finally(detach);
   },
 
+  // Explicit overloads (the capability function is overloaded; deriving the
+  // param types via Parameters<> would collapse to the LAST overload and
+  // reject VLMGenerationOptions at the facade).
   async processImageStream(
-    image: Parameters<typeof VisionLanguageCapability.processImageStream>[0],
-    options: Parameters<typeof VisionLanguageCapability.processImageStream>[1],
-    extra: CancellableCall = {},
-  ): ReturnType<typeof VisionLanguageCapability.processImageStream> {
+    image: VLMImage,
+    optionsOrPrompt: VLMGenerationOptions | string,
+    maybeOptionsOrExtra?: VLMGenerationOptions | CancellableCall,
+    maybeExtra: CancellableCall = {},
+  ): Promise<AsyncIterable<VLMStreamEvent>> {
+    const promptForm = typeof optionsOrPrompt === 'string';
+    const extra: CancellableCall = promptForm
+      ? maybeExtra
+      : ((maybeOptionsOrExtra as CancellableCall | undefined) ?? {});
     throwIfAborted(extra.signal, 'processImageStream');
     if (!VisionLanguageCapability.isModelLoaded) {
       await VisionLanguageCapability.loadCurrentModel();
     }
-    const stream = await VisionLanguageCapability.processImageStream(image, options);
+    const stream = promptForm
+      ? await VisionLanguageCapability.processImageStream(
+        image,
+        optionsOrPrompt,
+        maybeOptionsOrExtra as VLMGenerationOptions | undefined,
+      )
+      : await VisionLanguageCapability.processImageStream(image, optionsOrPrompt);
     attachSignalToCancel(
       extra.signal,
       () => { void VisionLanguageCapability.cancelVLMGeneration(); },
@@ -1726,7 +1762,6 @@ export const RunAnywhere = {
     EventBus.reset();
 
     _isInitialized = false;
-    _jsOnlyInit = false;
     _initOptions = null;
     _initializingPromise = null;
     _localFileStorage = null;

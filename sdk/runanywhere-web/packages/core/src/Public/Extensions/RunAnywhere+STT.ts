@@ -12,13 +12,13 @@
  * example app and external consumers never have to touch raw exports.
  */
 
-import { AudioFormat, ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
-  STTLanguage,
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
 } from '@runanywhere/proto-ts/stt_options';
+import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
 import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
@@ -73,24 +73,12 @@ function requireSTTModule(feature: string): STTComponentModule {
   return module;
 }
 
+// Proto-rac_default-derived defaults — byte-identical to Swift's RASTTOptions.defaults().
 function defaultSTTOptions(overrides?: Partial<STTOptions>): STTOptions {
   return {
-    language: STTLanguage.STT_LANGUAGE_AUTO,
-    enablePunctuation: true,
-    enableDiarization: false,
-    maxSpeakers: 0,
-    vocabularyList: [],
-    enableWordTimestamps: false,
-    beamSize: 0,
-    languageCode: undefined,
-    detectLanguage: true,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: 16000,
-    maxAlternatives: 0,
-    chunkDurationMs: 0,
-    endpointSilenceMs: 0,
+    ...sTTOptionsDefaults(),
     ...(overrides ?? {}),
-  } as STTOptions;
+  };
 }
 
 /**

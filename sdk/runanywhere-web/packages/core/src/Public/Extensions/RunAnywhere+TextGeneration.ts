@@ -10,9 +10,10 @@
  */
 
 import type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
-import type {
-  LLMGenerationOptions,
-  LLMGenerationResult,
+import {
+  LLMGenerationOptions as LLMGenerationOptionsMessage,
+  type LLMGenerationOptions,
+  type LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
 import type { ToolCall } from '@runanywhere/proto-ts/tool_calling';
 import {
@@ -111,6 +112,10 @@ function buildLLMGenerateRequest(
       ?? structuredOutputResponseFormat(options.structuredOutput),
     echoPrompt: options.echoPrompt ?? false,
     nThreads: options.nThreads ?? 0,
+    // Canonical knob channel (llm_service.proto field 26): the inline scalar
+    // fields above are DEPRECATED; advanced knobs (disableThinking,
+    // thinkingPattern, …) only reach commons through `options.*`.
+    options: LLMGenerationOptionsMessage.fromPartial(options),
     metadata: {},
   };
 }

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ProtoErrorCode, SDKException } from '../../../../src/Foundation/SDKException';
 import { ModalityProtoAdapter, type ModalityProtoModule } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
+import type { RAGResult } from '@runanywhere/proto-ts/rag_service';
 import {
   RAG,
   createRAGNativeProvider,
@@ -11,7 +12,6 @@ import {
   ragQuery,
   setRAGProvider,
   setRAGSessionHandle,
-  unavailableRAGResult,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
 import {
   VoiceAgent,
@@ -28,49 +28,40 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     clearRunanywhereModule();
   });
 
-  it('returns a typed voice-agent unavailable result instead of composed fallback success', async () => {
+  it('throws notInitialized from processVoiceTurn when no provider is registered (Swift parity)', async () => {
     expect(VoiceAgent.availability().available).toBe(false);
 
-    const result = await processVoiceTurn(new Float32Array([0, 0, 0, 0]));
-
-    expect(result.speechDetected).toBe(false);
-    expect(result.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
-    expect(result.errorMessage).toContain('No voice-agent provider or native handle');
-    expect(result.finalState?.ready).toBe(false);
+    await expect(processVoiceTurn(new Float32Array([0, 0, 0, 0]))).rejects.toMatchObject({
+      code: ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED,
+      message: expect.stringContaining('Voice agent not ready'),
+    });
   });
 
-  it('emits a typed voice-agent error event when no stream provider is registered', async () => {
+  it('finishes the voice-agent stream empty when no stream provider is registered (Swift parity)', async () => {
     const iterator = streamVoiceAgent()[Symbol.asyncIterator]();
     const first = await iterator.next();
 
-    expect(first.done).toBe(false);
-    expect(first.value.error?.code).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
-    expect(first.value.error?.component).toBe('voice-agent');
+    expect(first.done).toBe(true);
   });
 
-  it('returns typed RAG unavailable query/statistics results without local vector fallback', async () => {
+  it('throws from RAG query/statistics when no provider is registered (Swift parity)', async () => {
     expect(RAG.availability().available).toBe(false);
 
-    const query = await ragQuery('What is indexed?');
-    const stats = await ragGetStatistics();
-
-    expect(query.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
-    expect(query.retrievedChunks).toEqual([]);
-    expect(stats.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
-    expect(stats.indexedDocuments).toBe(0);
+    await expect(ragQuery('What is indexed?')).rejects.toBeInstanceOf(SDKException);
+    await expect(ragGetStatistics()).rejects.toBeInstanceOf(SDKException);
   });
 
   it('keeps RAG unavailable when native exports exist but no provider/session is registered', async () => {
     ModalityProtoAdapter.setDefaultModule(fakeRAGModule());
 
     const availability = RAG.availability();
-    const query = await ragQuery('What is indexed?');
 
     expect(availability.available).toBe(false);
     expect(availability.source).toBe('wasm-exports');
     expect(availability.reason).toContain('no RAG provider or session handle');
-    expect(query.errorCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE);
-    expect(query.errorMessage).toContain('no RAG provider or session handle');
+    await expect(ragQuery('What is indexed?')).rejects.toMatchObject({
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+    });
   });
 
   it('rejects missing native RAG and voice-agent handles instead of marking them available', () => {
@@ -145,7 +136,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       async ragDestroyPipeline() {},
       async ragIngest() {},
       async ragQuery(question) {
-        return unavailableRAGResult(question);
+        return emptyRAGResult(question);
       },
       async ragClearDocuments() {},
       async ragGetDocumentCount() {
@@ -181,7 +172,7 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       async ragDestroyPipeline() {},
       async ragIngest() {},
       async ragQuery(question) {
-        return unavailableRAGResult(question);
+        return emptyRAGResult(question);
       },
       async ragClearDocuments() {},
       async ragGetDocumentCount() {
@@ -210,6 +201,23 @@ describe('VoiceAgent and RAG provider-required facades', () => {
     });
   });
 });
+
+function emptyRAGResult(question: string): RAGResult {
+  return {
+    answer: `no-op answer for: ${question}`,
+    retrievedChunks: [],
+    contextUsed: '',
+    retrievalTimeMs: 0,
+    generationTimeMs: 0,
+    totalTimeMs: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    errorMessage: undefined,
+    errorCode: 0,
+    requestId: 'test-rag-query',
+  };
+}
 
 function fakeRAGModule(): ModalityProtoModule {
   const heap = new Uint8Array(4096);

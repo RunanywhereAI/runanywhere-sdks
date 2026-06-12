@@ -1,16 +1,16 @@
 /**
- * CloudSTT.ts
+ * Cloud.ts
  *
  * Generic cloud-STT backend registration + credential/model registry for the
- * Web SDK. Mirrors Swift's `CloudSTT.swift` and Kotlin's `BACKEND.CLOUD`.
+ * Web SDK. Mirrors Swift's `Cloud.swift` and Kotlin's `BACKEND.CLOUD`.
  *
- * `CloudSTT.register({ id, provider, model, apiKey })` records a cloud-STT
+ * `Cloud.register({ id, provider, model, apiKey })` records a cloud-STT
  * model under an app-chosen id; the hybrid router refers to it by id from the
  * ONLINE side (`onlineCloud(id)`). The concrete HTTP provider (Sarvam first)
  * is data carried in the entry — there is no provider-specific TS type; it is
  * forwarded to the unified "cloud" engine via `config_json["provider"]`.
  *
- * `CloudSTT.registerBackend()` folds the cloud engine plugin into the
+ * `Cloud.registerBackend()` folds the cloud engine plugin into the
  * WASM module's plugin registry by calling `rac_backend_cloud_register`
  * (the mirror of ONNX.register() / LlamaCPP.register()). On WASM the cloud
  * engine is its own static library that must be linked + exported — see
@@ -41,13 +41,13 @@ import {
   unregisterCloudSttProvider,
 } from './CloudSttProvider';
 
-const logger = new SDKLogger('CloudSTT');
+const logger = new SDKLogger('Cloud');
 
 /** A registered cloud-STT model entry: the app-chosen registry `id` plus the
  * generated `CloudSttBackendConfig` (provider/model/apiKey/languageCode/baseUrl/
  * timeoutMs). The backend config carries exactly the fields the cloud engine
  * reads out of `config_json`, so it is reused directly instead of re-declaring
- * those fields here. Mirrors Swift's `CloudSTT.ModelEntry` / Kotlin's
+ * those fields here. Mirrors Swift's `Cloud.ModelEntry` / Kotlin's
  * `CloudModelEntry`. */
 export interface CloudModelEntry {
   /** App-chosen registry id (becomes the online HybridModel id). */
@@ -56,7 +56,7 @@ export interface CloudModelEntry {
   backend: CloudSttBackendConfig;
 }
 
-/** Options accepted by `CloudSTT.register` / the `cloud({...})` config helper. */
+/** Options accepted by `Cloud.register` / the `cloud({...})` config helper. */
 export interface CloudSTTConfig {
   /** App-chosen registry id (becomes the online HybridModel id). */
   id: string;
@@ -80,14 +80,14 @@ let backendRegistered = false;
 /**
  * Build a cloud-STT registry entry from a generic provider config. The
  * `cloud({ provider, apiKey, model })` ergonomic shape — provider as DATA, not
- * a distinct backend. Does NOT register it; pair with `CloudSTT.register`.
+ * a distinct backend. Does NOT register it; pair with `Cloud.register`.
  */
 export function cloud(config: CloudSTTConfig): CloudModelEntry {
-  if (!config.id) throw new Error('CloudSTT cloud(): id must be non-empty');
-  if (!config.model) throw new Error('CloudSTT cloud(): model must be non-empty');
-  if (!config.apiKey) throw new Error('CloudSTT cloud(): apiKey must be non-empty');
+  if (!config.id) throw new Error('Cloud cloud(): id must be non-empty');
+  if (!config.model) throw new Error('Cloud cloud(): model must be non-empty');
+  if (!config.apiKey) throw new Error('Cloud cloud(): apiKey must be non-empty');
   const provider = config.provider ?? DEFAULT_CLOUD_PROVIDER;
-  if (!provider) throw new Error('CloudSTT cloud(): provider must be non-empty');
+  if (!provider) throw new Error('Cloud cloud(): provider must be non-empty');
   return {
     id: config.id,
     backend: CloudSttBackendConfig.fromPartial({
@@ -101,9 +101,12 @@ export function cloud(config: CloudSTTConfig): CloudModelEntry {
   };
 }
 
-export const CloudSTT = {
+export const Cloud = {
   /** Default cloud STT provider when a caller omits one. */
   defaultProvider: DEFAULT_CLOUD_PROVIDER,
+
+  /** cloud engine module version (binding side) — Swift parity: Cloud.swift:36. */
+  version: '2.0.0',
 
   /**
    * Register the cloud backend plugin with the WASM module's registry.
@@ -142,6 +145,22 @@ export const CloudSTT = {
     return true;
   },
 
+  /**
+   * Unregister the cloud backend from the WASM module's plugin registry.
+   * Swift parity: `Cloud.unregister()` (Cloud.swift:84-94). No-op when the
+   * backend was never registered or the export is absent.
+   */
+  unregister(): void {
+    if (!backendRegistered) return;
+    backendRegistered = false;
+    const module = (getModuleForCapability('stt') ??
+      getModuleForCapability('commons')) as HybridWasmModule | null;
+    const unregisterFn = module?._rac_backend_cloud_unregister;
+    if (typeof unregisterFn !== 'function') return;
+    unregisterFn();
+    logger.info('cloud backend unregistered');
+  },
+
   /** Register a cloud-STT model under `id` so the router can refer to it by id
    * from `onlineCloud(id)`. Accepts either a `CloudSTTConfig` or a pre-built
    * `CloudModelEntry` from `cloud(...)`. */
@@ -174,7 +193,7 @@ export const CloudSTT = {
   /**
    * Register (or replace) a developer-defined cloud STT provider handler
    * under `name`. The handler performs the whole request host-side; tie a
-   * model to it with `CloudSTT.register({ provider: name, ... })`. Mirrors
+   * model to it with `Cloud.register({ provider: name, ... })`. Mirrors
    * Swift `Cloud.registerProvider(_:_:)` (CloudSttProvider.swift:145).
    */
   registerProvider: registerCloudSttProvider,
@@ -200,8 +219,8 @@ export const CloudSTT = {
     const entry = registry.get(id);
     if (!entry) {
       throw new Error(
-        `CloudSTT model id '${id}' not registered. Call ` +
-          `CloudSTT.register({ id, provider, model, apiKey }) at app startup.`,
+        `Cloud model id '${id}' not registered. Call ` +
+          `Cloud.register({ id, provider, model, apiKey }) at app startup.`,
       );
     }
     // The cloud engine parses snake_case keys out of config_json

@@ -930,4 +930,59 @@ int rac_wasm_file_manager_clear_temp(void) {
   return static_cast<int>(rac_file_manager_clear_temp(&cb));
 }
 
+// ── Model-category / framework capability wrappers (proto-int ABI) ──────────
+// The proto enums and the C enums use different numeric values, so these
+// wrappers convert via rac_*_from_proto / _to_proto before delegating. They
+// back the Web SDK's ModelTypes helpers — the same C helpers Swift routes
+// through (RAModelCategory.requiresContextLength / .supportsThinking,
+// rac_model_category_default_framework, rac_framework_display_name) — so the
+// capability/display tables live in commons, not in each SDK's TS.
+
+EMSCRIPTEN_KEEPALIVE
+int rac_model_category_requires_context_length_proto(int proto_category) {
+  rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+  if (rac_model_category_from_proto(static_cast<int32_t>(proto_category), &category) !=
+      RAC_SUCCESS) {
+    return 0;
+  }
+  return rac_model_category_requires_context_length(category) == RAC_TRUE ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int rac_model_category_supports_thinking_proto(int proto_category) {
+  rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+  if (rac_model_category_from_proto(static_cast<int32_t>(proto_category), &category) !=
+      RAC_SUCCESS) {
+    return 0;
+  }
+  return rac_model_category_supports_thinking(category) == RAC_TRUE ? 1 : 0;
+}
+
+/** Returns the proto InferenceFramework value for a proto ModelCategory. */
+EMSCRIPTEN_KEEPALIVE
+int rac_model_category_default_framework_proto(int proto_category) {
+  rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+  if (rac_model_category_from_proto(static_cast<int32_t>(proto_category), &category) !=
+      RAC_SUCCESS) {
+    return 0;
+  }
+  const rac_inference_framework_t framework = rac_model_category_default_framework(category);
+  int32_t proto_framework = 0;
+  if (rac_inference_framework_to_proto(framework, &proto_framework) != RAC_SUCCESS) {
+    return 0;
+  }
+  return static_cast<int>(proto_framework);
+}
+
+/** Display name for a proto InferenceFramework value (static literal — do not free). */
+EMSCRIPTEN_KEEPALIVE
+const char* rac_framework_display_name_proto(int proto_framework) {
+  rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+  if (rac_inference_framework_from_proto(static_cast<int32_t>(proto_framework), &framework) !=
+      RAC_SUCCESS) {
+    return "";
+  }
+  return rac_framework_display_name(framework);
+}
+
 } // extern "C"

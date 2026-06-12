@@ -25,6 +25,7 @@
 
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { ProtoErrorCode, SDKException } from '../Foundation/SDKException';
+import { PlatformAdapter, type PlatformAdapterModule } from './PlatformAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import {
@@ -103,9 +104,12 @@ export class CommonsModule {
   private _module: CoreCommonsModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
-  /** Stub `rac_platform_adapter_t` pointer — see `_initRACommons` for the
-   * non-null-but-zero-callbacks contract. Lifetime matches the module. */
-  private _stubAdapterPtr = 0;
+  /** Browser platform adapter installed into this module's `rac_init`
+   * config. `rac_init` enforces non-NULL mandatory slots (file/secure/log/
+   * now_ms), so a zero stub is not valid — the shared `PlatformAdapter`
+   * populates the same MEMFS/localStorage/console callbacks the backend
+   * bridges use. Lifetime matches the module. */
+  private _platformAdapter: PlatformAdapter | null = null;
 
   /** Override the default URL to the racommons.js glue file. */
   wasmUrl: string | null = null;
@@ -155,11 +159,11 @@ export class CommonsModule {
         this._module._rac_shutdown?.();
       } catch { /* ignore */ }
     }
-    if (this._module && this._stubAdapterPtr) {
+    if (this._platformAdapter) {
       try {
-        this._module._free(this._stubAdapterPtr);
+        this._platformAdapter.cleanup();
       } catch { /* ignore */ }
-      this._stubAdapterPtr = 0;
+      this._platformAdapter = null;
     }
     HTTPAdapter.clearDefaultModule();
     if (this._module) {
@@ -268,25 +272,16 @@ export class CommonsModule {
       throw new Error('WASM module missing rac_init / rac_wasm_sizeof_config exports');
     }
 
-    // Allocate a zero-initialised `rac_platform_adapter_t` stub so
-    // `config->platform_adapter` is non-null when `rac_init` checks it.
-    // The core WASM owns no platform-service callbacks (file/secure/log/
-    // now_ms all stay NULL), but the C++ side null-checks every callback
-    // before invoking it, so the stub is safe. Mirrors the same fix used
-    // by `SherpaONNXBridge._initCommons` for ONNX/Sherpa.
-    const sizeofAdapter = m._rac_wasm_sizeof_platform_adapter;
-    if (typeof sizeofAdapter !== 'function') {
-      throw new Error(
-        'WASM module missing _rac_wasm_sizeof_platform_adapter export; ' +
-        'rebuild racommons.wasm from wasm/src/wasm_exports.cpp.',
-      );
-    }
-    const adapterSize = sizeofAdapter();
-    const adapterPtr = m._malloc(adapterSize);
-    for (let i = 0; i < adapterSize; i++) {
-      m.setValue(adapterPtr + i, 0, 'i8');
-    }
-    this._stubAdapterPtr = adapterPtr;
+    // Install the full browser platform adapter (MEMFS file I/O,
+    // localStorage secure storage, console log, Date.now, memory info,
+    // vendor id). `rac_init` enforces that the mandatory adapter slots are
+    // non-NULL, so the previous zero-callback stub is rejected with
+    // "Platform adapter missing mandatory slot". Shared implementation with
+    // the backend bridges (runtime/PlatformAdapter.ts).
+    const adapter = new PlatformAdapter(m as unknown as PlatformAdapterModule);
+    adapter.register();
+    this._platformAdapter = adapter;
+    const adapterPtr = adapter.getAdapterPtr();
 
     const configSize = sizeofConfig();
     const configPtr = m._malloc(configSize);
@@ -326,10 +321,10 @@ export class CommonsModule {
       )) as number;
 
       if (result !== 0) {
-        // Free the stub adapter — rac_init didn't take ownership.
-        if (this._stubAdapterPtr) {
-          m._free(this._stubAdapterPtr);
-          this._stubAdapterPtr = 0;
+        // Release the adapter — rac_init didn't take ownership.
+        if (this._platformAdapter) {
+          this._platformAdapter.cleanup();
+          this._platformAdapter = null;
         }
         const errPtr = m._rac_error_message?.(result) ?? 0;
         const errMsg = errPtr ? m.UTF8ToString(errPtr) : `rac_init failed with code ${result}`;

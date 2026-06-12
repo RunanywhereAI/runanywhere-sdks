@@ -1,36 +1,31 @@
 /**
- * Vision Tab — V2 canonical VLM camera description.
+ * Vision Tab — VLM camera description over the canonical streaming facade.
  *
- * Re-landed against the Swift-shaped `RunAnywhere.processImage(...)` facade
- * and the core `VideoCapture` helper. Flow is:
+ * Mirrors iOS VLMViewModel (Features/Vision/VLMViewModel.swift):
  *
- *   1. User downloads + loads a VLM (e.g. SmolVLM2 256M) via the shared
- *      model selection sheet (download + `modelLifecycle.load`).
+ *   1. User downloads + loads any multimodal model via the shared model
+ *      selection sheet (`RunAnywhere.downloadModel` + `loadModel`). Loading a
+ *      multimodal model syncs the Web vision-language provider inside the
+ *      SDK — no app-side bridging.
  *   2. User starts the camera — `VideoCapture` attaches its `<video>` to
  *      the preview container.
- *   3. User clicks "Capture & analyze" — the latest frame is extracted as
- *      RGB pixels, wrapped in a `VLMImage` proto message, and dispatched
- *      through `RunAnywhere.processImage(image, options)`.
- *
- * The Web provider reads C++ lifecycle-resolved primary GGUF and mmproj
- * artifacts from the active WASM filesystem.
+ *   3. User clicks "Capture & analyze" — the latest frame streams through
+ *      `RunAnywhere.processImageStream(image, options)`, rendering TOKEN
+ *      events as they arrive (iOS parity: VLMViewModel.swift:148-194
+ *      consumeVLMStream/describeCurrentFrame), with cancel support.
  */
 
 import type { TabLifecycle } from '../app';
 import {
   ModelCategory,
-  ProtoErrorCode,
   RunAnywhere,
-  VLMImageFormat,
   VLMModelFamily,
-  isSDKException,
+  VLMStreamEventKind,
+  vlmImageFromRawRGB,
   type VLMGenerationOptions,
-  type VLMImage,
-  type VLMResult,
 } from '@runanywhere/web';
 import { VideoCapture } from '@runanywhere/web/browser';
 import {
-  ensureCatalogRegistered,
   onModelStateChange,
   openSheet,
 } from '../components/model-selection';
@@ -42,7 +37,6 @@ const VLM_PICKER_FILTER: readonly ModelCategory[] = [
   ModelCategory.MODEL_CATEGORY_VISION,
 ];
 
-const VLM_MODEL_ID = 'smolvlm2-256m-video-instruct-q8_0';
 const DEFAULT_PROMPT = 'Describe what you see in this image.';
 const CAPTURE_DIMENSION = 384;
 
@@ -52,24 +46,17 @@ let latestFrame: { rgbPixels: Uint8Array; width: number; height: number } | null
 let lastResult: string | null = null;
 let status = '';
 let isBusy = false;
+let cancelAnalyze: (() => void) | null = null;
 let unsubscribeState: (() => void) | null = null;
 
 export function initVisionTab(el: HTMLElement): TabLifecycle {
   container = el;
 
-  ensureCatalogRegistered();
-  void syncVisionLanguageProvider();
   renderView();
 
   // Re-render when the shared model state changes so the "Load model"
-  // button reflects real state without manual refresh. Also bridge the
-  // C++ lifecycle current-model into the Web VLM provider; without this
-  // call, RunAnywhere.processImage throws "No VLM model has been loaded
-  // through RunAnywhere.loadModel()." even after a successful load.
-  unsubscribeState = onModelStateChange(() => {
-    void syncVisionLanguageProvider();
-    renderView();
-  });
+  // button reflects real state without manual refresh.
+  unsubscribeState = onModelStateChange(() => renderView());
 
   // Tear down the model-state subscription if the panel element ever
   // detaches (e.g. a full app-shell re-render).
@@ -87,43 +74,13 @@ export function initVisionTab(el: HTMLElement): TabLifecycle {
 
   return {
     onActivate: () => {
-      ensureCatalogRegistered();
-      void syncVisionLanguageProvider();
       renderView();
     },
     onDeactivate: () => {
+      cancelAnalyze?.();
       stopCamera();
     },
   };
-}
-
-/**
- * Mirror the C++ lifecycle's current VLM into the Web vision-language
- * provider's private _modelLoaded flag. The shared model picker only loads
- * the model into the C++ lifecycle; without this bridge call, the Web
- * provider stays in its own unloaded state and rejects processImage even
- * though the lifecycle reports a loaded multimodal model. Symmetric
- * unloadModel keeps the provider state in sync when the active VLM is
- * unloaded or replaced through the picker.
- */
-async function syncVisionLanguageProvider(): Promise<void> {
-  try {
-    if (isVLMModelLoaded()) {
-      if (!RunAnywhere.visionLanguage.isModelLoaded) {
-        await RunAnywhere.visionLanguage.loadCurrentModel();
-        renderView();
-      }
-    } else if (RunAnywhere.visionLanguage.isModelLoaded) {
-      await RunAnywhere.visionLanguage.unloadModel();
-      renderView();
-    }
-  } catch (err) {
-    // Provider not registered yet (LlamaCPP backend missing or still
-    // initializing) is expected; surface real failures via status panel
-    // so the user can see why Analyze keeps rejecting.
-    if (isSDKException(err) && err.code === ProtoErrorCode.ERROR_CODE_BACKEND_NOT_FOUND) return;
-    setStatus(`VLM provider sync failed: ${formatErr(err)}`);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -132,7 +89,6 @@ async function syncVisionLanguageProvider(): Promise<void> {
 
 function renderView(): void {
   const modelLoaded = isVLMModelLoaded();
-  const providerLoaded = RunAnywhere.visionLanguage.isModelLoaded;
   const captureReady = camera?.isCapturing ?? false;
   const canAnalyze = modelLoaded && captureReady && !isBusy;
 
@@ -141,17 +97,15 @@ function renderView(): void {
       <div class="toolbar-title">Vision</div>
       <div class="toolbar-actions">
         <button class="btn btn-secondary" id="vision-model-btn">
-          ${modelLoaded ? 'Change Model' : 'Load SmolVLM'}
+          ${modelLoaded ? 'Change Model' : 'Load Vision Model'}
         </button>
       </div>
     </div>
     <div class="scroll-area">
       <div class="docs-section">
-        <h3>Backend status</h3>
+        <h3>Status</h3>
         <ul class="feature-unavailable__list">
           <li><code>VLM model loaded</code>: <strong>${modelLoaded ? 'yes' : 'no'}</strong></li>
-          <li><code>RunAnywhere.visionLanguage.isInitialized</code>: <strong>${RunAnywhere.visionLanguage.isInitialized ? 'yes' : 'no'}</strong></li>
-          <li><code>RunAnywhere.visionLanguage.isModelLoaded</code>: <strong>${providerLoaded ? 'yes' : 'no'}</strong></li>
           <li><code>camera.isCapturing</code>: <strong>${captureReady ? 'yes' : 'no'}</strong></li>
         </ul>
       </div>
@@ -174,8 +128,8 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Analyze</h3>
         <p class="text-secondary">
-          Runs <code>RunAnywhere.processImage(image, options)</code> on the last
-          captured frame.
+          Streams <code>RunAnywhere.processImageStream(image, options)</code>
+          on the last captured frame, rendering tokens as they arrive.
         </p>
         <label class="form-label" for="vision-prompt">Prompt</label>
         <textarea id="vision-prompt" class="chat-input" rows="2"
@@ -184,6 +138,9 @@ function renderView(): void {
         <div class="toolbar-actions">
           <button class="btn btn-primary" id="vision-analyze-btn" ${canAnalyze ? '' : 'disabled'}>
             ${isBusy ? 'Analyzing…' : 'Capture & analyze'}
+          </button>
+          <button class="btn btn-secondary" id="vision-cancel-btn" ${isBusy ? '' : 'disabled'}>
+            Cancel
           </button>
         </div>
         <div id="vision-status" class="docs-status">${escapeHtml(status)}</div>
@@ -211,6 +168,9 @@ function renderView(): void {
   container
     .querySelector('#vision-analyze-btn')!
     .addEventListener('click', () => void onAnalyze());
+  container
+    .querySelector('#vision-cancel-btn')!
+    .addEventListener('click', () => cancelAnalyze?.());
 }
 
 function reattachCameraPreview(): void {
@@ -251,7 +211,7 @@ async function startCamera(): Promise<void> {
     await camera.start();
     setStatus('Camera ready.');
   } catch (err) {
-    setStatus(`Camera error: ${formatErr(err)}`);
+    setStatus(`Camera error: ${formatError(err)}`);
     camera = null;
   } finally {
     isBusy = false;
@@ -289,9 +249,11 @@ async function onAnalyze(): Promise<void> {
     return;
   }
 
+  // Gate on the lifecycle's loaded multimodal model — iOS parity:
+  // VLMViewModel.swift:58-62 checkModelStatus() (currentModel(.multimodal)).
   if (!isVLMModelLoaded()) {
     setStatus(
-      'No VLM model is loaded. Load SmolVLM from the model picker, then re-run Analyze.',
+      'No VLM model is loaded. Load a vision model from the model picker, then re-run Analyze.',
     );
     renderView();
     return;
@@ -308,33 +270,21 @@ async function onAnalyze(): Promise<void> {
   const promptEl = container.querySelector<HTMLTextAreaElement>('#vision-prompt');
   const prompt = (promptEl?.value ?? DEFAULT_PROMPT).trim() || DEFAULT_PROMPT;
 
-  const image: VLMImage = {
-    filePath: undefined,
-    encoded: undefined,
-    rawRgb: frame.rgbPixels,
-    base64: undefined,
-    width: frame.width,
-    height: frame.height,
-    format: VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
-    mediaType: 'image/rgb',
-    name: 'camera-frame',
-    sizeBytes: frame.rgbPixels.byteLength,
-    metadata: {},
-  };
+  const image = vlmImageFromRawRGB(frame.rgbPixels, frame.width, frame.height);
 
   const options: VLMGenerationOptions = {
     prompt,
-    maxTokens: 128,
+    maxTokens: 200,
     temperature: 0.7,
     topP: 0.9,
     topK: 40,
     stopSequences: [],
-    streamingEnabled: false,
+    streamingEnabled: true,
     systemPrompt: undefined,
     maxImageSize: CAPTURE_DIMENSION,
     nThreads: 0,
     useGpu: false,
-    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_SMOLVLM,
+    modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
     customChatTemplate: undefined,
     imageMarkerOverride: undefined,
     seed: 0,
@@ -343,22 +293,48 @@ async function onAnalyze(): Promise<void> {
     emitImageEmbeddings: false,
   };
 
+  // Cancel maps to the SDK's native cancel verb — iOS parity:
+  // VLMViewModel.swift:244-246 (`RunAnywhere.cancelVLMGeneration()`).
+  cancelAnalyze = () => {
+    void RunAnywhere.visionLanguage.cancelVLMGeneration();
+  };
+
   isBusy = true;
-  setStatus('Running VLM inference off-thread…');
-  lastResult = null;
+  setStatus('Running VLM inference…');
+  lastResult = '';
   renderView();
 
   try {
-    const result: VLMResult = await RunAnywhere.processImage(image, options);
-    lastResult = result.text || '(empty response)';
-    const tokLine =
-      result.tokensPerSecond > 0
-        ? ` — ${result.completionTokens} tokens in ${Math.round(result.processingTimeMs)}ms (${result.tokensPerSecond.toFixed(1)} tok/s)`
-        : '';
-    setStatus(`Done${tokLine}.`);
+    // Typed stream: STARTED → TOKEN* → terminal COMPLETED/ERROR — iOS parity:
+    // VLMViewModel.swift:148-169 consumeVLMStream.
+    const stream = await RunAnywhere.visionLanguage.processImageStream(image, options);
+    for await (const event of stream) {
+      switch (event.kind) {
+        case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN:
+          if (event.token) {
+            lastResult = (lastResult ?? '') + event.token;
+            updateOutput(lastResult);
+          }
+          break;
+        case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED: {
+          const result = event.result;
+          const tokLine = result && result.tokensPerSecond > 0
+            ? ` — ${result.completionTokens} tokens in ${Math.round(result.processingTimeMs)}ms (${result.tokensPerSecond.toFixed(1)} tok/s)`
+            : '';
+          setStatus(`Done${tokLine}.`);
+          break;
+        }
+        case VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR:
+          throw new Error(event.errorMessage || 'VLM stream failed');
+        default:
+          break;
+      }
+    }
+    if (!lastResult) lastResult = '(empty response)';
   } catch (err) {
-    setStatus(`VLM inference failed: ${formatErr(err)}`);
+    setStatus(`VLM inference failed: ${formatError(err)}`);
   } finally {
+    cancelAnalyze = null;
     isBusy = false;
     renderView();
   }
@@ -368,10 +344,21 @@ async function onAnalyze(): Promise<void> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * True when the C++ lifecycle reports a loaded MULTIMODAL (or VISION) model —
+ * iOS parity: VLMViewModel.swift:58-62 (currentModel with category filter).
+ * No model-id allowlist: any loaded vision-capable model enables Analyze.
+ */
 function isVLMModelLoaded(): boolean {
   try {
-    const current = RunAnywhere.currentModel();
-    return current?.modelId === VLM_MODEL_ID;
+    for (const category of VLM_PICKER_FILTER) {
+      const current = RunAnywhere.currentModel({
+        category,
+        includeModelMetadata: false,
+      });
+      if (current?.found || current?.modelId) return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -383,7 +370,8 @@ function setStatus(text: string): void {
   if (banner) banner.textContent = text;
 }
 
-function formatErr(err: unknown): string {
-  if (isSDKException(err)) return err.message;
-  return formatError(err);
+function updateOutput(text: string): void {
+  const output = container.querySelector<HTMLPreElement>('#vision-output');
+  if (output) output.textContent = text;
 }
+

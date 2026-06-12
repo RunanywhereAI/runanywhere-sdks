@@ -22,6 +22,7 @@ import {
   type VADStatistics,
   type SpeechActivityEvent,
 } from '@runanywhere/proto-ts/vad_options';
+import { vADConfigurationDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
@@ -75,17 +76,12 @@ function requireVADModule(feature: string): VADComponentModule {
   return module;
 }
 
+// Proto-rac_default-derived defaults — byte-identical to Swift's RAVADConfiguration.defaults().
 function defaultVADConfig(overrides?: Partial<VADConfiguration>): VADConfiguration {
   return {
-    modelId: '',
-    sampleRate: 16000,
-    frameLengthMs: 100,
-    threshold: 0.015,
-    enableAutoCalibration: false,
-    calibrationMultiplier: 1.5,
-    preferredFramework: undefined,
+    ...vADConfigurationDefaults(),
     ...(overrides ?? {}),
-  } as VADConfiguration;
+  };
 }
 
 function defaultVADOptions(overrides?: Partial<VADOptions>): VADOptions {

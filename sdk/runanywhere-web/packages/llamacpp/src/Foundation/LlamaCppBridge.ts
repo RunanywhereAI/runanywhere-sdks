@@ -16,6 +16,9 @@
 import {
   completeNativePhase1ForModule,
   HTTPAdapter,
+  // Shared browser rac_platform_adapter_t populator — single implementation
+  // for core + every backend bridge (was a per-package copy).
+  PlatformAdapter,
   ProtoErrorCode,
   RAC_ERROR_MODULE_ALREADY_REGISTERED,
   SDKException,
@@ -24,10 +27,9 @@ import {
   unregisterWasmModule,
   type AccelerationMode,
   type EmscriptenRunanywhereModule,
+  type PlatformAdapterModule,
   type WasmCapability,
 } from '@runanywhere/web/internal';
-
-import { PlatformAdapter } from './PlatformAdapter';
 
 const logger = new SDKLogger('LlamaCppBridge');
 
@@ -278,7 +280,9 @@ export class LlamaCppBridge {
       }
 
       // Register platform adapter (browser callbacks for log/file/secure/etc.)
-      this._platformAdapter = new PlatformAdapter(this._module);
+      this._platformAdapter = new PlatformAdapter(
+        this._module as unknown as PlatformAdapterModule,
+      );
       this._platformAdapter.register();
 
       // Initialize RACommons core within this WASM module.

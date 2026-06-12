@@ -35,6 +35,7 @@ import type {
 import { SDKException } from '../../Foundation/SDKException';
 import { StorageAdapter } from '../../Adapters/StorageAdapter';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
+import { categoryRequiresContextLength } from '../../types/ModelTypes+Artifacts';
 
 function requireNativeStorage(operation: string): StorageAdapter {
   const adapter = StorageAdapter.tryDefault();
@@ -267,16 +268,20 @@ function buildSingleFileModelInfo(
   const now = Date.now();
   const id = options.id ?? deriveIdFromUrlFallback(url);
   const downloadSize = options.downloadSizeBytes ?? options.memoryRequirement ?? 0;
+  const category = options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
   return {
     id,
     name,
-    category: options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    category,
     format: options.format ?? ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     framework,
     downloadUrl: url,
     localPath: '',
     downloadSizeBytes: downloadSize,
-    contextLength: options.contextLength ?? 0,
+    // Swift parity: `contextLength: modality.requiresContextLength ? 2048 : nil`
+    // (RunAnywhere+Storage.swift:44).
+    contextLength: options.contextLength
+      ?? (categoryRequiresContextLength(category) ? 2048 : 0),
     supportsThinking: options.supportsThinking ?? false,
     supportsLora: options.supportsLora ?? false,
     description: options.description ?? '',
@@ -294,6 +299,7 @@ function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
   expected.rootDirectory = options.id;
   expected.description = `${options.name} primary model and companion artifacts`;
   const downloadSize = options.downloadSizeBytes ?? totalFileSize(options.files);
+  const category = options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
   // Pick the first PRIMARY_MODEL url for downloadUrl (or first file) so the
   // existing single-URL planners can still resolve a head pointer.
   const primary = options.files.find((f) => f.role === ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL)
@@ -301,13 +307,16 @@ function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
   return {
     id: options.id,
     name: options.name,
-    category: options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    category,
     format: options.format ?? ModelFormat.MODEL_FORMAT_UNSPECIFIED,
     framework: options.framework,
     downloadUrl: primary?.url ?? '',
     localPath: '',
     downloadSizeBytes: downloadSize,
-    contextLength: options.contextLength ?? 0,
+    // Swift parity: `contextLength: modality.requiresContextLength ? 2048 : nil`
+    // (RunAnywhere+Storage.swift:110).
+    contextLength: options.contextLength
+      ?? (categoryRequiresContextLength(category) ? 2048 : 0),
     supportsThinking: options.supportsThinking ?? false,
     supportsLora: options.supportsLora ?? false,
     description: options.description ?? '',
