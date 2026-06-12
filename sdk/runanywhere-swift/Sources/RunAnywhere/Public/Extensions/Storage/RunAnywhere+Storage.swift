@@ -298,6 +298,21 @@ public extension RunAnywhere {
         await CppBridge.Storage.shared.delete(request)
     }
 
+    /// Delete one downloaded model end-to-end: unload it if loaded, remove its
+    /// files through the platform adapter, and clear its registry path so the
+    /// entry returns to registered-not-downloaded (re-downloadable).
+    /// Convenience over `deleteStorage(_:)` with the canonical flag set.
+    @discardableResult
+    static func deleteModel(_ modelId: String) async -> RAStorageDeleteResult {
+        var request = RAStorageDeleteRequest()
+        request.modelIds = [modelId]
+        request.deleteFiles = true
+        request.clearRegistryPaths_p = true
+        request.unloadIfLoaded = true
+        request.allowPlatformDelete = true
+        return await deleteStorage(request)
+    }
+
     /// Clear the SDK's Cache directory. Forwards to `CppBridge.FileManager.clearCache()`,
     /// matching Kotlin's top-level `RunAnywhere.clearCache()` entry point.
     static func clearCache() async throws {

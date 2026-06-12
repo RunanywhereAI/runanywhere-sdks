@@ -270,6 +270,24 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
 
 namespace {
 using rac::core::model_lifecycle::detail::feature_unavailable;
+
+#if defined(RAC_HAVE_PROTOBUF)
+// Install `entry` as the slot occupant for `component`, returning whatever a
+// concurrent load installed in the meantime (artifact resolve, auto-download,
+// and backend create all run outside g_lifecycle_mutex). Overwriting that
+// occupant without destroying it would leak the displaced backend impl. The
+// caller destroys the returned entry OUTSIDE the lock —
+// destroy_loaded_model() re-acquires g_lifecycle_mutex to drain active_refs.
+std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel> install_loaded_entry(
+    runanywhere::v1::SDKComponent component,
+    std::shared_ptr<rac::core::model_lifecycle::detail::LoadedModel> entry) {
+    namespace detail = rac::core::model_lifecycle::detail;
+    std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
+    std::shared_ptr<detail::LoadedModel> displaced = std::move(detail::g_loaded[component]);
+    detail::g_loaded[component] = std::move(entry);
+    return displaced;
+}
+#endif  // RAC_HAVE_PROTOBUF
 }  // namespace
 
 extern "C" {
@@ -424,26 +442,26 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         return detail::copy_proto(result, out_result);
     }
 
-    {
-        std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
-        auto existing = detail::g_loaded.find(component);
-        if (existing != detail::g_loaded.end() && !request.force_reload() &&
-            existing->second->model_id == request.model_id() &&
-            existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
-            ModelLoadResult result = detail::make_load_result(
-                true, existing->second->model_id, existing->second->category,
-                existing->second->framework, existing->second->resolved_path,
-                existing->second->resolved_artifacts, existing->second->loaded_at_ms, "");
-            return detail::copy_proto(result, out_result);
-        }
-    }
-
+    // The same-model READY fast path and the eviction of the previous slot
+    // occupant must observe the same g_loaded state — two separate lock
+    // acquisitions would let a concurrent load slip in between and be evicted
+    // (or returned) incorrectly. The destroy itself stays outside the lock
+    // because destroy_loaded_model() re-acquires g_lifecycle_mutex to wait
+    // for active_refs to drain.
     std::shared_ptr<detail::LoadedModel> previous_loaded;
     ComponentLifecycleState previous_state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
     {
         std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
         auto existing = detail::g_loaded.find(component);
         if (existing != detail::g_loaded.end()) {
+            if (!request.force_reload() && existing->second->model_id == request.model_id() &&
+                existing->second->state == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY) {
+                ModelLoadResult result = detail::make_load_result(
+                    true, existing->second->model_id, existing->second->category,
+                    existing->second->framework, existing->second->resolved_path,
+                    existing->second->resolved_artifacts, existing->second->loaded_at_ms, "");
+                return detail::copy_proto(result, out_result);
+            }
             previous_state = existing->second->state;
             previous_loaded = existing->second;
             detail::g_loaded.erase(existing);
@@ -463,22 +481,19 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
                                      artifact_resolution.artifacts, 0, error);
-        {
-            std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
-            auto failed = std::make_shared<detail::LoadedModel>();
-            failed->component = component;
-            failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
-            failed->model_id = request.model_id();
-            failed->resolved_path = resolved_path;
-            failed->mmproj_path = artifact_resolution.mmproj_path;
-            failed->resolved_artifacts = artifact_resolution.artifacts;
-            failed->category = category;
-            failed->framework = framework;
-            failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
-            failed->updated_at_ms = detail::now_ms();
-            failed->error_message = error;
-            detail::g_loaded[component] = std::move(failed);
-        }
+        auto failed = std::make_shared<detail::LoadedModel>();
+        failed->component = component;
+        failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
+        failed->model_id = request.model_id();
+        failed->resolved_path = resolved_path;
+        failed->mmproj_path = artifact_resolution.mmproj_path;
+        failed->resolved_artifacts = artifact_resolution.artifacts;
+        failed->category = category;
+        failed->framework = framework;
+        failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
+        failed->updated_at_ms = detail::now_ms();
+        failed->error_message = error;
+        detail::destroy_loaded_model(install_loaded_entry(component, std::move(failed)));
         detail::publish_component_event(
             component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
@@ -494,22 +509,19 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
                                      artifact_resolution.artifacts, 0, rac_error_message(rc));
-        {
-            std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
-            auto failed = std::make_shared<detail::LoadedModel>();
-            failed->component = component;
-            failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
-            failed->model_id = request.model_id();
-            failed->resolved_path = resolved_path;
-            failed->mmproj_path = artifact_resolution.mmproj_path;
-            failed->resolved_artifacts = artifact_resolution.artifacts;
-            failed->category = category;
-            failed->framework = framework;
-            failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
-            failed->updated_at_ms = detail::now_ms();
-            failed->error_message = result.error_message();
-            detail::g_loaded[component] = std::move(failed);
-        }
+        auto failed = std::make_shared<detail::LoadedModel>();
+        failed->component = component;
+        failed->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
+        failed->model_id = request.model_id();
+        failed->resolved_path = resolved_path;
+        failed->mmproj_path = artifact_resolution.mmproj_path;
+        failed->resolved_artifacts = artifact_resolution.artifacts;
+        failed->category = category;
+        failed->framework = framework;
+        failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
+        failed->updated_at_ms = detail::now_ms();
+        failed->error_message = result.error_message();
+        detail::destroy_loaded_model(install_loaded_entry(component, std::move(failed)));
         detail::publish_component_event(
             component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
@@ -518,41 +530,38 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     }
 
     int64_t loaded_at_ms = detail::now_ms();
-    {
-        std::lock_guard<std::mutex> lock(detail::g_lifecycle_mutex);
-        auto loaded = std::make_shared<detail::LoadedModel>();
-        loaded->component = component;
-        loaded->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
-        loaded->model_id = request.model_id();
-        loaded->resolved_path = resolved_path;
-        loaded->mmproj_path = artifact_resolution.mmproj_path;
-        loaded->resolved_artifacts = artifact_resolution.artifacts;
-        loaded->framework = framework;
-        loaded->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
-        loaded->category = category;
-        loaded->primitive = primitive;
-        if (primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
-            loaded->llm_ops = vt->llm_ops;
-        } else if (primitive == RAC_PRIMITIVE_TRANSCRIBE) {
-            loaded->stt_ops = vt->stt_ops;
-        } else if (primitive == RAC_PRIMITIVE_SYNTHESIZE) {
-            loaded->tts_ops = vt->tts_ops;
-        } else if (primitive == RAC_PRIMITIVE_DETECT_VOICE) {
-            loaded->vad_ops = vt->vad_ops;
-        } else if (primitive == RAC_PRIMITIVE_EMBED) {
-            loaded->embeddings_ops = vt->embedding_ops;
-        } else if (primitive == RAC_PRIMITIVE_VLM) {
-            loaded->vlm_ops = vt->vlm_ops;
-        } else if (primitive == RAC_PRIMITIVE_DIFFUSION) {
-            loaded->diffusion_ops = vt->diffusion_ops;
-        }
-        loaded->impl = impl;
-        loaded->model.CopyFrom(model);
-        loaded->loaded_at_ms = loaded_at_ms;
-        loaded->updated_at_ms = loaded->loaded_at_ms;
-        loaded->destroy = std::move(destroy);
-        detail::g_loaded[component] = std::move(loaded);
+    auto loaded = std::make_shared<detail::LoadedModel>();
+    loaded->component = component;
+    loaded->state = runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
+    loaded->model_id = request.model_id();
+    loaded->resolved_path = resolved_path;
+    loaded->mmproj_path = artifact_resolution.mmproj_path;
+    loaded->resolved_artifacts = artifact_resolution.artifacts;
+    loaded->framework = framework;
+    loaded->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
+    loaded->category = category;
+    loaded->primitive = primitive;
+    if (primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
+        loaded->llm_ops = vt->llm_ops;
+    } else if (primitive == RAC_PRIMITIVE_TRANSCRIBE) {
+        loaded->stt_ops = vt->stt_ops;
+    } else if (primitive == RAC_PRIMITIVE_SYNTHESIZE) {
+        loaded->tts_ops = vt->tts_ops;
+    } else if (primitive == RAC_PRIMITIVE_DETECT_VOICE) {
+        loaded->vad_ops = vt->vad_ops;
+    } else if (primitive == RAC_PRIMITIVE_EMBED) {
+        loaded->embeddings_ops = vt->embedding_ops;
+    } else if (primitive == RAC_PRIMITIVE_VLM) {
+        loaded->vlm_ops = vt->vlm_ops;
+    } else if (primitive == RAC_PRIMITIVE_DIFFUSION) {
+        loaded->diffusion_ops = vt->diffusion_ops;
     }
+    loaded->impl = impl;
+    loaded->model.CopyFrom(model);
+    loaded->loaded_at_ms = loaded_at_ms;
+    loaded->updated_at_ms = loaded->loaded_at_ms;
+    loaded->destroy = std::move(destroy);
+    detail::destroy_loaded_model(install_loaded_entry(component, std::move(loaded)));
 
     ModelLoadResult result =
         detail::make_load_result(true, request.model_id(), category, framework, resolved_path,
