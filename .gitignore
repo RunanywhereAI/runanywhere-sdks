@@ -212,8 +212,8 @@ hs_err_pid*
 # Node.js / NPM / Yarn
 node_modules/
 .npm
-.yarn/cache
-.yarn/install-state.gz
+# Root-anchored: sdk/runanywhere-react-native/.yarn/plugins must stay committable
+/.yarn/
 .vite/
 
 # Flutter/Dart
