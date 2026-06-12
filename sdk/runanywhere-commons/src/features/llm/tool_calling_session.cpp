@@ -812,6 +812,10 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
 }
 
 extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_handle) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session_handle;
+    return RAC_SUCCESS;  // idempotent — protobuf-less builds never create a session
+#else
     if (session_handle == 0) {
         return RAC_SUCCESS;
     }
@@ -872,6 +876,7 @@ extern "C" rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_
     // the ToolCallingSession is freed and any leftover pending_dispatches
     // bytes are released along with it. The host can now safely free user_data.
     return RAC_SUCCESS;
+#endif  // RAC_HAVE_PROTOBUF
 }
 
 // Public quiesce helper. Spin-waits until every

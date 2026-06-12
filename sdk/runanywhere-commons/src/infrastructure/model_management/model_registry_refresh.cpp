@@ -208,7 +208,10 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
             // file" heuristic, so a partial or corrupted folder is left
             // unlinked and a re-download can heal it. The resolver walks
             // std::filesystem, so only apply where the folder is visible to
-            // it (native + hydrated MEMFS).
+            // it (native + hydrated MEMFS). The snapshot type is a generated
+            // proto, so protobuf-less builds (wasm preset) keep the
+            // pre-existing "any regular file" heuristic.
+#if defined(RAC_HAVE_PROTOBUF)
             {
                 ModelInfo snapshot;
                 std::error_code fs_ec;
@@ -224,6 +227,7 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                     }
                 }
             }
+#endif  // RAC_HAVE_PROTOBUF
 
             rac_result_t update_rc = rac_model_registry_update_download_status(
                 handle, model_id.c_str(), model_path.c_str());

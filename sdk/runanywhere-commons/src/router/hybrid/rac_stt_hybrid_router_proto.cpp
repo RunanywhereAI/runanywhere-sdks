@@ -17,6 +17,58 @@
 
 #include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
+#if !defined(RAC_HAVE_PROTOBUF)
+// Protobuf-less builds (e.g. the wasm preset) keep the exported proto ABI
+// surface as unavailable stubs, matching the repo-wide
+// RAC_ENABLE_PROTOBUF=OFF contract ("exported proto ABI functions use
+// unavailable stubs").
+
+#include <cstdlib>
+
+extern "C" {
+
+rac_result_t rac_stt_hybrid_router_set_offline_service_proto(rac_handle_t /*handle*/,
+                                                             rac_stt_service_t* /*service*/,
+                                                             const uint8_t* /*descriptor_bytes*/,
+                                                             size_t /*descriptor_size*/) {
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+rac_result_t rac_stt_hybrid_router_set_online_service_proto(rac_handle_t /*handle*/,
+                                                            rac_stt_service_t* /*service*/,
+                                                            const uint8_t* /*descriptor_bytes*/,
+                                                            size_t /*descriptor_size*/) {
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+rac_result_t rac_stt_hybrid_router_set_policy_proto(rac_handle_t /*handle*/,
+                                                    const uint8_t* /*policy_bytes*/,
+                                                    size_t /*policy_size*/) {
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t /*handle*/,
+                                                    const uint8_t* /*request_bytes*/,
+                                                    size_t /*request_size*/,
+                                                    uint8_t** out_response_bytes,
+                                                    size_t* out_response_size) {
+    if (out_response_bytes != nullptr) {
+        *out_response_bytes = nullptr;
+    }
+    if (out_response_size != nullptr) {
+        *out_response_size = 0;
+    }
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes) {
+    std::free(response_bytes);
+}
+
+}  // extern "C"
+
+#else  // RAC_HAVE_PROTOBUF
+
 #include "hybrid_router.pb.h"
 
 #include <cstdlib>
@@ -313,3 +365,5 @@ void rac_stt_hybrid_router_proto_buffer_free(uint8_t* response_bytes) {
 }
 
 }  // extern "C"
+
+#endif  // RAC_HAVE_PROTOBUF
