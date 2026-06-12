@@ -753,11 +753,12 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_registry_proto.cpp
     src/infrastructure/model_management/model_registry_discovery.cpp
     src/infrastructure/model_management/model_registry_refresh.cpp
+    src/infrastructure/model_management/model_registry_manifest.cpp
+    src/infrastructure/model_management/hf_resolver.cpp
     src/infrastructure/model_management/lora_registry.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_types_mappers.cpp
     src/infrastructure/model_management/model_paths.cpp
-    src/infrastructure/model_management/model_strategy.cpp
     src/infrastructure/model_management/model_assignment.cpp
     src/infrastructure/model_management/model_compatibility.cpp
     src/infrastructure/model_management/model_compatibility_proto.cpp

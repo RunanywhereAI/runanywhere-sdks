@@ -38,6 +38,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("getModelInfoProto", &HybridRunAnywhereCoreSpec::getModelInfoProto);
       prototype.registerHybridMethod("registerModelProto", &HybridRunAnywhereCoreSpec::registerModelProto);
       prototype.registerHybridMethod("registerModelFromUrlProto", &HybridRunAnywhereCoreSpec::registerModelFromUrlProto);
+      prototype.registerHybridMethod("registerMultiFileModelProto", &HybridRunAnywhereCoreSpec::registerMultiFileModelProto);
       prototype.registerHybridMethod("updateModelProto", &HybridRunAnywhereCoreSpec::updateModelProto);
       prototype.registerHybridMethod("removeModelProto", &HybridRunAnywhereCoreSpec::removeModelProto);
       prototype.registerHybridMethod("queryModelsProto", &HybridRunAnywhereCoreSpec::queryModelsProto);

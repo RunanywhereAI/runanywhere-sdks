@@ -43,6 +43,8 @@ import {
   ModelQuery,
   ModelSource,
   InferenceFramework,
+  RegisterModelFromUrlRequest,
+  RegisterMultiFileModelRequest,
 } from '@runanywhere/proto-ts/model_types';
 import { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
@@ -138,39 +140,39 @@ export async function registerModel(
     input.memoryRequirement !== undefined && input.memoryRequirement > 0
       ? input.memoryRequirement
       : undefined;
-  const supportsThinking = input.supportsThinking ?? false;
-  const supportsLora = input.supportsLora ?? false;
 
-  const model = ModelInfoCodec.fromPartial({
-    id: input.id ?? deriveModelIdFromUrl(input.url, input.name),
+  // Canonical commons factory: rac_register_model_from_url_proto derives
+  // id/name/format/artifact, resolves hf.co/org/repo[:quant] refs (quant
+  // selection, mmproj pairing, sharded GGUF sets, checksums), and preserves
+  // prior download state when a catalog re-seeds on launch.
+  const request = RegisterModelFromUrlRequest.fromPartial({
+    url: input.url,
     name: input.name,
-    category: modality,
     framework: input.framework,
-    preferredFramework: input.framework,
-    format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
-    downloadUrl: input.url,
+    category: modality,
     source: ModelSource.MODEL_SOURCE_REMOTE,
-    supportsThinking,
-    supportsLora,
+    ...(input.id !== undefined ? { id: input.id } : {}),
     ...(memoryHint !== undefined
       ? { downloadSizeBytes: memoryHint, memoryRequiredBytes: memoryHint }
       : {}),
-    ...(supportsThinking ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) } : {}),
+    ...(input.supportsThinking ? { supportsThinking: true } : {}),
+    ...(input.supportsLora ? { supportsLora: true } : {}),
     ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
   });
 
-  const accepted = await native.registerModelProto(
-    encodeProtoMessage(model, ModelInfoCodec),
+  const saved = arrayBufferToBytes(
+    await native.registerModelFromUrlProto(
+      encodeProtoMessage(request, RegisterModelFromUrlRequest),
+    ),
   );
-  if (!accepted) {
+  if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
-      `Model registry rejected '${model.id}'. Ensure the SDK is initialized before calling registerModel().`,
+      `Model registry rejected '${input.id ?? input.url}'. Ensure the SDK is initialized before calling registerModel().`,
       { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
     );
   }
-
-  return model;
+  return ModelInfoCodec.decode(saved);
 }
 
 /**
@@ -320,40 +322,43 @@ export async function registerMultiFileModel(
   if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
   const category = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
-  const message = ModelInfoCodec.fromPartial({
+  // Canonical commons factory: rac_register_multi_file_model_proto builds
+  // the MultiFileArtifact ModelInfo and persists it with merge-on-reseed
+  // semantics. Role inference stays commons-owned (rac_infer_model_file_role)
+  // so tokenizer/config/vocab/mmproj sidecars resolve identically everywhere.
+  const message = RegisterMultiFileModelRequest.fromPartial({
     id: input.id,
     name: input.name,
-    category,
     framework: input.framework,
-    preferredFramework: input.framework,
+    category,
     format: ModelFormat.MODEL_FORMAT_GGUF,
     ...(input.memoryRequirement !== undefined && input.memoryRequirement > 0
-      ? { memoryRequiredBytes: input.memoryRequirement }
+      ? {
+          memoryRequiredBytes: input.memoryRequirement,
+          downloadSizeBytes: input.memoryRequirement,
+        }
       : {}),
-    multiFile: {
-      // Role inference lives in commons (rac_infer_model_file_role) so
-      // tokenizer/config/vocab sidecars resolve correctly — Swift parity
-      // (RAModelFileRole+Inference.swift).
-      files: input.files.map((file) => ({
-        role: native.inferModelFileRole(file.filename, category) as ModelFileRole,
-        url: file.url,
-        filename: file.filename,
-        relativePath: file.filename,
-        isRequired: file.isRequired,
-      })),
-    },
+    files: input.files.map((file) => ({
+      role: native.inferModelFileRole(file.filename, category) as ModelFileRole,
+      url: file.url,
+      filename: file.filename,
+      isRequired: file.isRequired,
+    })),
   });
-  const bytes = encodeProtoMessage(message, ModelInfoCodec);
-  const accepted = await native.registerModelProto(bytes);
-  if (!accepted) {
+  const saved = arrayBufferToBytes(
+    await native.registerMultiFileModelProto(
+      encodeProtoMessage(message, RegisterMultiFileModelRequest),
+    ),
+  );
+  if (saved.byteLength === 0) {
     throw SDKException.of(
       ErrorCode.ERROR_CODE_INVALID_STATE,
       `Model registry rejected multi-file model '${message.id}'.`,
       { category: ErrorCategory.ERROR_CATEGORY_INTERNAL },
     );
   }
-  // Swift parity: registerModel(multiFile:) returns the registered RAModelInfo.
-  return message;
+  // Swift parity: registerModel(multiFile:) returns the saved RAModelInfo.
+  return ModelInfoCodec.decode(saved);
 }
 
 // ---------------------------------------------------------------------------

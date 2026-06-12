@@ -16,32 +16,26 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ArchiveStructure
 import ai.runanywhere.proto.v1.ArchiveType
-import ai.runanywhere.proto.v1.ExpectedModelFiles
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
-import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelImportResult
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelSource
-import ai.runanywhere.proto.v1.MultiFileArtifact
+import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
+import ai.runanywhere.proto.v1.RegisterMultiFileModelRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import ai.runanywhere.proto.v1.StorageInfoResult
-import ai.runanywhere.proto.v1.ThinkingTagPattern
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.archiveArtifact
-import com.runanywhere.sdk.public.extensions.Models.make
 import com.runanywhere.sdk.public.extensions.Models.setArchiveArtifact
-import com.runanywhere.sdk.public.extensions.Models.setMultiFileArtifact
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
@@ -76,38 +70,31 @@ suspend fun RunAnywhere.registerModel(
 ): RAModelInfo {
     requireStorageInitialized(this)
 
-    // Build a complete ModelInfo locally with every caller-supplied capability
-    // field already set, then persist it through the registry's proto save
-    // path ONCE. The plain save (rac_model_registry_register_proto) persists
-    // every capability field (id, memory_required_bytes, supports_thinking +
-    // thinking_pattern, supports_lora, artifact_type, download_size_bytes,
-    // …), so no from-url-then-patch-then-resave round trip is needed.
-    var model =
-        ModelInfo.make(
-            id = id ?: generatedModelId(url, name),
+    // Canonical commons factory: rac_register_model_from_url_proto derives
+    // id/name/format/artifact, resolves hf.co/org/repo[:quant] refs (quant
+    // selection, mmproj pairing, sharded GGUF sets, checksums), and preserves
+    // prior download state when a catalog re-seeds on launch.
+    val request =
+        RegisterModelFromUrlRequest(
+            url = url,
             name = name,
-            category = modality,
-            format = ModelFormat.MODEL_FORMAT_UNSPECIFIED,
             framework = framework,
-            downloadURL = url,
-            downloadSizeBytes = memoryRequirement,
-            supportsThinking = supportsThinking,
-            thinkingPattern = if (supportsThinking) ThinkingTagPattern() else null,
+            category = modality,
             source = ModelSource.MODEL_SOURCE_REMOTE,
+            id = id,
+            memory_required_bytes = memoryRequirement,
+            download_size_bytes = memoryRequirement,
+            supports_thinking = if (supportsThinking) true else null,
+            supports_lora = if (supportsLora) true else null,
+            artifact_type = artifactType,
         )
 
-    if (memoryRequirement != null) {
-        model = model.copy(memory_required_bytes = memoryRequirement)
-    }
-    if (supportsLora) {
-        model = model.copy(supports_lora = true)
-    }
-    if (artifactType != null && artifactType != model.artifact_type) {
-        model = model.copy(artifact_type = artifactType)
-    }
-
-    CppBridgeModelRegistry.save(model)
-    return model
+    val saved =
+        CppBridgeModelRegistry.registerModelFromUrl(request)
+            ?: throw SDKException.storage(
+                "Native registry proto ABI unavailable for registerModelFromUrl",
+            )
+    return saved
 }
 
 suspend fun RunAnywhere.registerModel(
@@ -172,28 +159,29 @@ suspend fun RunAnywhere.registerModel(
 ): RAModelInfo {
     requireStorageInitialized(this)
 
-    val artifact = MultiFileArtifact(files = multiFile)
-    var model =
-        ModelInfo
-            .make(
-                id = id,
-                name = name,
-                category = modality,
-                format = ModelFormat.MODEL_FORMAT_UNSPECIFIED,
-                framework = framework,
-                downloadSizeBytes = memoryRequirement,
-                contextLength = contextLength,
-                supportsThinking = supportsThinking,
-                source = source,
-            ).setMultiFileArtifact(artifact)
-            .copy(expected_files = ExpectedModelFiles(files = multiFile))
+    // Canonical commons factory: rac_register_multi_file_model_proto builds
+    // the MultiFileArtifact ModelInfo (descriptors carry url/filename/
+    // size/checksum/role) and persists it with merge-on-reseed semantics.
+    val request =
+        RegisterMultiFileModelRequest(
+            id = id,
+            name = name,
+            framework = framework,
+            category = modality,
+            memory_required_bytes = memoryRequirement,
+            download_size_bytes = memoryRequirement,
+            context_length = contextLength,
+            supports_thinking = if (supportsThinking) true else null,
+            source = source,
+            files = multiFile,
+        )
 
-    if (memoryRequirement != null) {
-        model = model.copy(memory_required_bytes = memoryRequirement)
-    }
-
-    CppBridgeModelRegistry.save(model)
-    return model
+    val saved =
+        CppBridgeModelRegistry.registerMultiFileModel(request)
+            ?: throw SDKException.storage(
+                "Native registry proto ABI unavailable for registerMultiFileModel",
+            )
+    return saved
 }
 
 // MARK: - Model Import
@@ -237,13 +225,3 @@ suspend fun RunAnywhere.cleanTempFiles() {
 }
 
 // MARK: - Helpers
-
-/**
- * Derive a stable model id from a download URL via commons'
- * `rac_model_id_from_url` (the same extension-stripping logic Swift's
- * `generatedModelID(from:name:)` delegates to). Falls back to the
- * human-readable name when the URL yields nothing usable or the native
- * library is unavailable.
- */
-private fun generatedModelId(url: String, name: String): String =
-    runCatching { RunAnywhereBridge.racModelIdFromUrl(url) }.getOrNull() ?: name

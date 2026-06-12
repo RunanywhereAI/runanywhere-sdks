@@ -551,6 +551,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racRegisterModelFromUrlProto(requestBytes: ByteArray): ByteArray?
 
+    external fun racRegisterMultiFileModelProto(requestBytes: ByteArray): ByteArray?
+
     /**
      * Infer a ModelFormat from a portable URL/file-path string.
      *

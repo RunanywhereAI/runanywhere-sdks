@@ -1663,6 +1663,13 @@ class RacBindings {
             'rac_register_model_from_url_proto',
           ),
         ),
+        rac_register_multi_file_model_proto =
+            _lookupOptional<RacRegisterModelFromUrlProtoDart>(
+          () => lib.lookupFunction<RacRegisterModelFromUrlProtoNative,
+              RacRegisterModelFromUrlProtoDart>(
+            'rac_register_multi_file_model_proto',
+          ),
+        ),
         rac_model_registry_import_proto =
             _lookupOptional<RacModelRegistryImportProtoDart>(
           () => lib.lookupFunction<RacModelRegistryImportProtoNative,
@@ -2267,6 +2274,7 @@ class RacBindings {
   /// `registerModel(...)` entry point. Builds and persists a ModelInfo from a
   /// `RegisterModelFromUrlRequest`.
   final RacRegisterModelFromUrlProtoDart? rac_register_model_from_url_proto;
+  final RacRegisterModelFromUrlProtoDart? rac_register_multi_file_model_proto;
 
   /// `rac_model_registry_import_proto` — local-import entry point used by
   /// file-picker / bookmark flows after the platform has handled sandbox

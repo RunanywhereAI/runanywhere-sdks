@@ -3,16 +3,12 @@
 // runanywhere_downloads.dart — v4 Downloads capability. Owns model
 // download lifecycle, delete, and storage inspection.
 
-import 'dart:io';
 
-import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
-import 'package:runanywhere/generated/errors.pbenum.dart'
-    show ErrorCategory, ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart'
-    show ModelImportRequest, ModelInfo;
+    show ModelInfo;
 import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
@@ -41,47 +37,6 @@ class RunAnywhereDownloads {
       throw SDKException.notInitialized();
     }
     return DartBridgeDownload.instance.planProto(request);
-  }
-
-  /// Plan a download and retry once after clearing oversize partial bytes.
-  ///
-  /// Mirrors Swift `RunAnywhere+Storage.planDownload(_:)`: when a prior
-  /// interrupted download left more bytes on disk than the new plan expects
-  /// (e.g. the server reported a smaller Content-Length after a CDN swap),
-  /// delete the oversize partials and re-plan instead of surfacing
-  /// `existing partial bytes exceed` to the caller as a hard error.
-  Future<DownloadPlanResult> _planWithSelfHeal(
-    DownloadPlanRequest request,
-  ) async {
-    final planResult = await plan(request);
-    if (planResult.canStart ||
-        planResult.failureReason !=
-            DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES) {
-      return planResult;
-    }
-
-    final logger = SDKLogger('RunAnywhere.Download');
-    for (final file in planResult.files) {
-      final destinationPath = file.destinationPath;
-      if (destinationPath.isEmpty) continue;
-      final partial = File(destinationPath);
-      if (partial.existsSync()) {
-        try {
-          partial.deleteSync();
-          logger.warning(
-            'Removed oversize partial download at $destinationPath '
-            'for ${request.modelId}',
-          );
-        } catch (e) {
-          logger.warning(
-            'Failed to remove oversize partial download at $destinationPath '
-            'for ${request.modelId}: $e',
-          );
-        }
-      }
-    }
-
-    return plan(request);
   }
 
   /// Start a generated download plan in C++.
@@ -128,10 +83,14 @@ class RunAnywhereDownloads {
       return;
     }
 
-    final planResult = await _planWithSelfHeal(DownloadPlanRequest(
+    final planResult = await plan(DownloadPlanRequest(
       modelId: modelId,
       model: model,
       resumeExisting: true,
+      // Commons self-heals oversize partials at plan time and verifies
+      // declared checksums during transfer (Swift parity).
+      validateExistingBytes: true,
+      verifyChecksums: model.checksumSha256.isNotEmpty,
       allowMeteredNetwork: true,
     ));
     if (!planResult.canStart) {
@@ -154,6 +113,11 @@ class RunAnywhereDownloads {
       modelId: modelId,
       plan: planResult,
       resume: planResult.canResume,
+      // Commons owns the completion registry mutation: the orchestrator's
+      // self-heal calls rac_model_registry_update_download_status, which
+      // also persists the durable .rac-manifest.binpb sidecar restored on
+      // the next cold launch.
+      updateRegistryOnCompletion: true,
     ));
     if (!startResult.accepted) {
       yield DownloadProgress(
@@ -173,10 +137,6 @@ class RunAnywhereDownloads {
     if (startResult.hasInitialProgress()) {
       yield startResult.initialProgress;
       if (_isTerminalState(startResult.initialProgress.state)) {
-        if (startResult.initialProgress.state ==
-            DownloadState.DOWNLOAD_STATE_COMPLETED) {
-          await _persistDownloadCompletion(model, startResult.initialProgress);
-        }
         _activeTaskIdsByModel.remove(modelId);
         return;
       }
@@ -208,9 +168,6 @@ class RunAnywhereDownloads {
 
         if (_isTerminalState(progress.state)) {
           reachedTerminal = true;
-          if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
-            await _persistDownloadCompletion(model, progress);
-          }
           break;
         }
       }
@@ -240,58 +197,6 @@ class RunAnywhereDownloads {
     return state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
         state == DownloadState.DOWNLOAD_STATE_FAILED ||
         state == DownloadState.DOWNLOAD_STATE_CANCELLED;
-  }
-
-  /// Persist a completed download into the model registry through the
-  /// generated model-import contract.
-  ///
-  /// Mirrors Swift `RunAnywhere.persistDownloadCompletion(model:progress:)`
-  /// (RunAnywhere+Storage.swift): builds an explicit [ModelImportRequest]
-  /// (overwrite, downloaded, local path from the completed download) and
-  /// throws when the import fails. Commons owns the download events; no
-  /// SDK-side event emission happens here.
-  Future<void> _persistDownloadCompletion(
-    ModelInfo model,
-    DownloadProgress progress,
-  ) async {
-    final localPath =
-        progress.localPath.isEmpty ? model.localPath : progress.localPath;
-    if (localPath.isEmpty) {
-      throw SDKException.make(
-        code: ErrorCode.ERROR_CODE_INVALID_STATE,
-        message: 'Download completed without a local_path; cannot import '
-            'completion into the model registry',
-        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
-      );
-    }
-
-    final importedModel = model.deepCopy()
-      ..localPath = localPath
-      ..isDownloaded = true
-      ..isAvailable = true
-      ..updatedAtUnixMs = fixnum.Int64(DateTime.now().millisecondsSinceEpoch);
-
-    final result = await DartBridgeModelRegistry.instance.importModel(
-      ModelImportRequest(
-        model: importedModel,
-        sourcePath: localPath,
-        overwriteExisting: true,
-        copyIntoManagedStorage: false,
-        validateBeforeRegister: false,
-        files: importedModel.hasMultiFile()
-            ? importedModel.multiFile.files
-            : null,
-      ),
-    );
-    if (!result.success) {
-      throw SDKException.make(
-        code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-        message: result.errorMessage.isEmpty
-            ? 'Downloaded model could not be imported into the registry'
-            : result.errorMessage,
-        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
-      );
-    }
   }
 
   /// Cancel an active model download if the adapter still owns it.

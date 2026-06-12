@@ -155,12 +155,13 @@ rac_result_t serialize_proto_to_owned_buffer(const ProtoMessage& message, uint8_
         return RAC_ERROR_UNKNOWN;
     }
 
-    return rac_proto_buffer_copy_to_raw(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(),
-                                        proto_bytes_out, proto_size_out);
+    return rac_proto_buffer_copy_to_raw(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                        bytes.size(), proto_bytes_out, proto_size_out);
 }
 
 template <typename ProtoMessage>
-rac_result_t serialize_proto_to_buffer(const ProtoMessage& message, rac_proto_buffer_t* out_buffer) {
+rac_result_t serialize_proto_to_buffer(const ProtoMessage& message,
+                                       rac_proto_buffer_t* out_buffer) {
     if (!out_buffer) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -215,7 +216,8 @@ rac_result_t store_proto_snapshot_locked(rac_model_registry_handle_t handle,
                                          bool preserve_proto_only_fields,
                                          bool overwrite_registry_state);
 rac_result_t store_parsed_proto_snapshot_locked(rac_model_registry_handle_t handle,
-                                                const std::string& model_id, const ModelInfo& parsed);
+                                                const std::string& model_id,
+                                                const ModelInfo& parsed);
 ModelInfo model_snapshot_locked(rac_model_registry_handle_t handle, const std::string& model_id,
                                 const rac_model_info_t* model);
 rac_result_t model_to_proto_bytes_locked(rac_model_registry_handle_t handle,
@@ -255,6 +257,35 @@ std::string strip_known_model_extension(const std::string& basename);
 int32_t reconcile_registry_with_filesystem_locked(rac_model_registry_handle_t handle);
 bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
                                            const std::string& model_id, rac_model_info_t* model);
+
+// -----------------------------------------------------------------------------
+// Model-folder manifest sidecar (defined in model_registry_manifest.cpp)
+// -----------------------------------------------------------------------------
+
+// True when the entry carries explicit artifact descriptors (expected_files or
+// multi-file descriptors) — i.e. completeness can be validated strictly.
+bool model_has_artifact_descriptors(const rac_model_info_t* model);
+
+// Per-artifact-type folder completeness via rac_model_paths_resolve_artifact
+// (the single validation authority for every modality).
+bool model_folder_is_complete_struct(const rac_model_info_t* model, const std::string& folder);
+bool model_folder_is_complete(const ModelInfo& model, const std::string& folder);
+
+// Write the durable sidecar for a downloaded model in the canonical layout.
+// Best-effort; caller holds the registry mutex.
+void maybe_write_model_folder_manifest_locked(rac_model_registry_handle_t handle,
+                                              const std::string& model_id);
+
+// Cold-launch restore of un-seeded models from their folder manifests.
+// Locks internally — must NOT be called with the registry mutex held.
+int32_t restore_models_from_folder_manifests(rac_model_registry_handle_t handle);
+
+// Targeted lookup-miss restore: probe the canonical layout for {fw}/{id}/ with
+// a manifest and restore just that entry. Used by the registry get paths so
+// ad-hoc pulls resolve immediately after relaunch, before any discovery sweep.
+// Locks internally — must NOT be called with the registry mutex held.
+bool try_restore_model_manifest_by_id(rac_model_registry_handle_t handle,
+                                      const std::string& model_id);
 
 // -----------------------------------------------------------------------------
 // Adapter directory listing (defined in model_registry_refresh.cpp)

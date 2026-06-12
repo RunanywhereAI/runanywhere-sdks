@@ -10,7 +10,6 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.DownloadCancelRequest
-import ai.runanywhere.proto.v1.DownloadFailureReason
 import ai.runanywhere.proto.v1.DownloadPlanRequest
 import ai.runanywhere.proto.v1.DownloadPlanResult
 import ai.runanywhere.proto.v1.DownloadProgress
@@ -21,10 +20,8 @@ import ai.runanywhere.proto.v1.DownloadSubscribeRequest
 import ai.runanywhere.proto.v1.ErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.ModelGetRequest
-import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelListRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
@@ -34,7 +31,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
-import java.io.File
 
 private val downloadLogger = SDKLogger("RunAnywhere.Download")
 
@@ -85,10 +81,11 @@ suspend fun RunAnywhere.downloadModel(
             plan = plan,
             resume = plan.can_resume,
             resume_token = plan.resume_token,
-            // Commons currently owns planning/progress but not the final registry
-            // mutation behind this flag. Persist completion explicitly through the
-            // generated model import contract below.
-            update_registry_on_completion = false,
+            // Commons owns the completion registry mutation: the orchestrator's
+            // self-heal calls rac_model_registry_update_download_status, which
+            // also persists the durable .rac-manifest.binpb sidecar restored on
+            // the next cold launch.
+            update_registry_on_completion = true,
         )
 
     val startResult = CppBridgeDownload.start(startRequest)
@@ -107,7 +104,7 @@ suspend fun RunAnywhere.downloadModel(
 
     startResult.initial_progress?.let { initial ->
         if (reportDownloadProgress(initial, onProgress)) {
-            return persistDownloadCompletion(resolvedModel, initial)
+            return initial
         }
     }
 
@@ -128,7 +125,7 @@ suspend fun RunAnywhere.downloadModel(
             val progress = CppBridgeDownload.pollProgress(subscribeRequest) ?: continue
             if (reportDownloadProgress(progress, onProgress)) {
                 reachedTerminal = true
-                return persistDownloadCompletion(resolvedModel, progress)
+                return progress
             }
         }
     } finally {
@@ -188,35 +185,15 @@ private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAM
     return model
 }
 
-private fun planDownload(request: DownloadPlanRequest): DownloadPlanResult? {
-    val plan = CppBridgeDownload.plan(request) ?: return null
-    if (plan.can_start ||
-        plan.failure_reason != DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES
-    ) {
-        return plan
-    }
-
-    for (filePlan in plan.files) {
-        val destinationPath = filePlan.destination_path
-        if (destinationPath.isBlank()) continue
-
-        val partialFile = File(destinationPath)
-        if (partialFile.exists()) {
-            if (partialFile.delete()) {
-                downloadLogger.warn("Removed oversize partial download at $destinationPath for ${request.model_id}")
-            } else {
-                downloadLogger.warn("Failed to remove oversize partial download at $destinationPath for ${request.model_id}")
-            }
-        }
-    }
-
-    return CppBridgeDownload.plan(request)
-}
+// Oversize-partial self-healing happens inside the commons planner
+// (validate_existing_bytes deletes stale partials and replans as a fresh
+// download), so no Kotlin-side retry loop is needed.
+private fun planDownload(request: DownloadPlanRequest): DownloadPlanResult? = CppBridgeDownload.plan(request)
 
 /**
  * Mirrors Swift `RunAnywhere+Storage.swift:reportDownloadProgress(_:onProgress:)`.
  * Invokes the progress callback, then returns true when the progress is
- * terminal-completed (so the caller can branch to [persistDownloadCompletion])
+ * terminal-completed (commons persists completion + the manifest sidecar)
  * and throws on failure or cancellation.
  */
 private suspend fun reportDownloadProgress(
@@ -241,58 +218,4 @@ private suspend fun reportDownloadProgress(
             )
         else -> progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED
     }
-}
-
-/**
- * Mirrors Swift `RunAnywhere+Storage.swift:persistDownloadCompletion(model:progress:)`.
- *
- * After a successful download the C++ side has the bytes on disk but the
- * registry's `local_path`/`is_downloaded` flags are not yet set. We patch them
- * via `CppBridgeModelRegistry.importModel(...)` using the proto-canonical
- * `ModelImportRequest` so the next `listModels()` reflects the completed state.
- * Returns the terminal [DownloadProgress] so callers can surface it as the
- * function's return value, matching Swift's shape.
- */
-private fun persistDownloadCompletion(model: RAModelInfo, progress: DownloadProgress): DownloadProgress {
-    val localPath =
-        if (progress.local_path.isNotBlank()) {
-            progress.local_path
-        } else {
-            model.local_path
-        }
-    if (localPath.isBlank()) {
-        throw SDKException.make(
-            code = ErrorCode.ERROR_CODE_INVALID_STATE,
-            message = "Download completed without a local_path; cannot import completion into the model registry",
-            category = ErrorCategory.ERROR_CATEGORY_NETWORK,
-            shouldLog = false,
-        )
-    }
-    val nowMs = System.currentTimeMillis()
-    val importedModel =
-        model.copy(
-            local_path = localPath,
-            is_downloaded = true,
-            is_available = true,
-            updated_at_unix_ms = nowMs,
-        )
-    val request =
-        ModelImportRequest(
-            model = importedModel,
-            source_path = localPath,
-            overwrite_existing = true,
-            copy_into_managed_storage = false,
-            validate_before_register = false,
-            files = importedModel.multi_file?.files.orEmpty(),
-        )
-    val result = CppBridgeModelRegistry.importModel(request)
-    if (!result.success) {
-        throw SDKException.make(
-            code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-            message = result.error_message.ifBlank { "Downloaded model could not be imported into the registry" },
-            category = ErrorCategory.ERROR_CATEGORY_NETWORK,
-            shouldLog = false,
-        )
-    }
-    return progress
 }

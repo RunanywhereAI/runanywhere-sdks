@@ -118,6 +118,18 @@ typedef struct rac_model_file_descriptor {
      * drop the URL set by SDK callers via registerMultiFileModel.
      */
     const char* url;
+
+    /**
+     * Exact expected size in bytes (0 = unknown). Preserved through registry
+     * round-trips so completeness validation can reject partial files.
+     */
+    int64_t size_bytes;
+
+    /**
+     * Lowercase hex SHA-256 for this file (can be NULL). Preserved through
+     * registry round-trips; recorded automatically for Hugging Face pulls.
+     */
+    const char* checksum_sha256;
 } rac_model_file_descriptor_t;
 
 // =============================================================================
@@ -228,10 +240,10 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     // Value 9 (WHISPERKIT_COREML) intentionally retired — leave the gap to keep ABI stable.
-    RAC_FRAMEWORK_METALRT = 10,          /**< MetalRT (custom Metal GPU kernels, Apple only) */
-    RAC_FRAMEWORK_GENIE = 11,            /**< Qualcomm Genie (Hexagon NPU LLM) */
-    RAC_FRAMEWORK_SHERPA = 12,           /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
-    RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
+    RAC_FRAMEWORK_METALRT = 10, /**< MetalRT (custom Metal GPU kernels, Apple only) */
+    RAC_FRAMEWORK_GENIE = 11,   /**< Qualcomm Genie (Hexagon NPU LLM) */
+    RAC_FRAMEWORK_SHERPA = 12,  /**< Sherpa-ONNX speech engine (STT/TTS/VAD/wakeword) */
+    RAC_FRAMEWORK_UNKNOWN = 99  /**< Unknown framework */
 } rac_inference_framework_t;
 
 // =============================================================================
@@ -379,8 +391,8 @@ RAC_API rac_model_category_t rac_model_category_from_framework(rac_inference_fra
  *         for speech recognition / synthesis / embedding / VAD, otherwise
  *         RAC_FRAMEWORK_UNKNOWN.
  */
-RAC_API rac_inference_framework_t rac_model_category_default_framework(
-    rac_model_category_t category);
+RAC_API rac_inference_framework_t
+rac_model_category_default_framework(rac_model_category_t category);
 
 /**
  * @brief Get supported formats for a framework.

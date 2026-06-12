@@ -21,7 +21,6 @@ set(RCLI_SOURCES
     src/bootstrap.cpp
     src/catalog/catalog.cpp
     src/catalog/model_ref.cpp
-    src/catalog/url_registry.cpp
     src/commands/cmd_version.cpp
     src/commands/cmd_info.cpp
     src/commands/cmd_backends.cpp

@@ -190,6 +190,21 @@ export interface RunAnywhereCore extends HybridObject<{
   registerModelFromUrlProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
+   * Canonical multi-file registration (VLM gguf+mmproj pairs, embedding
+   * model+vocab sets).
+   *
+   * Routes a serialized runanywhere.v1.RegisterMultiFileModelRequest through
+   * the commons `rac_register_multi_file_model_proto` C ABI, which builds the
+   * MultiFileArtifact ModelInfo (descriptors carry url/filename/size/
+   * checksum/role) and persists it with merge-on-reseed semantics. Returns
+   * the saved runanywhere.v1.ModelInfo bytes (empty buffer when the ABI is
+   * unavailable on the staged native artifact). Mirrors Swift
+   * `CppBridge.ModelRegistry.registerMultiFile` and Kotlin
+   * `CppBridgeModelRegistry.registerMultiFileModel`.
+   */
+  registerMultiFileModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
    * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
    */
   updateModelProto(modelInfoBytes: ArrayBuffer): Promise<boolean>;

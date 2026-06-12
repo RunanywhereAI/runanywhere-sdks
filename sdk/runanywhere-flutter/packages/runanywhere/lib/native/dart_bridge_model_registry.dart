@@ -413,6 +413,33 @@ class DartBridgeModelRegistry {
     }
   }
 
+  /// Register a multi-file model (VLM gguf+mmproj pairs, embedding
+  /// model+vocab sets) via `rac_register_multi_file_model_proto`.
+  ///
+  /// Mirrors Swift's `RunAnywhere.registerModel(multiFile:...)` — commons
+  /// builds the MultiFileArtifact ModelInfo and persists it with
+  /// merge-on-reseed semantics.
+  Future<model_pb.ModelInfo?> registerMultiFileModel(
+    model_pb.RegisterMultiFileModelRequest request,
+  ) async {
+    final fn = RacNative.bindings.rac_register_multi_file_model_proto;
+    if (fn == null) {
+      _logger.debug('rac_register_multi_file_model_proto unavailable');
+      return null;
+    }
+    try {
+      return DartBridgeProtoUtils.callRequest<model_pb.ModelInfo>(
+        request: request,
+        invoke: fn,
+        decode: model_pb.ModelInfo.fromBuffer,
+        symbol: 'rac_register_multi_file_model_proto',
+      );
+    } catch (e) {
+      _logger.debug('rac_register_multi_file_model_proto error: $e');
+      return null;
+    }
+  }
+
   /// Import a local model into the registry via
   /// `rac_model_registry_import_proto`.
   ///

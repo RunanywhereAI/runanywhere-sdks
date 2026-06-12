@@ -9,6 +9,8 @@
  * No behaviour change.
  */
 
+#include "model_registry_internal.h"
+
 #include <cctype>
 #include <cstdint>
 #include <cstring>
@@ -22,8 +24,6 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-
-#include "model_registry_internal.h"
 
 using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
@@ -260,11 +260,26 @@ bool try_reconcile_model_local_path_locked(rac_model_registry_handle_t handle,
         return false;
     }
     const std::filesystem::path folder = canonical_model_folder_for(model->id, model->framework);
-    if (folder.empty() || !directory_contains_recognizable_model_file(folder.generic_string())) {
+    if (folder.empty()) {
         return false;
     }
-
     const std::string folder_str = folder.generic_string();
+
+    // Entries that declare artifact descriptors get the strict per-artifact
+    // completeness check (single validation authority in
+    // rac_model_paths_resolve_artifact) so a partial/corrupt folder is never
+    // relinked as downloaded. The resolver walks std::filesystem, so only
+    // apply it where std::filesystem can actually see the folder (native +
+    // hydrated MEMFS); otherwise — and for descriptor-less entries — keep the
+    // adapter-based recognizable-file heuristic.
+    std::error_code fs_ec;
+    if (model_has_artifact_descriptors(model) && std::filesystem::exists(folder, fs_ec)) {
+        if (!model_folder_is_complete_struct(model, folder_str)) {
+            return false;
+        }
+    } else if (!directory_contains_recognizable_model_file(folder_str)) {
+        return false;
+    }
 
     // Update legacy struct
     if (model->local_path) {
@@ -306,6 +321,10 @@ int32_t reconcile_registry_with_filesystem_locked(rac_model_registry_handle_t ha
     for (auto& pair : handle->models) {
         if (try_reconcile_model_local_path_locked(handle, pair.first, pair.second)) {
             ++linked;
+            // Migrate pre-manifest downloads: relinked folders gain the
+            // durable sidecar so the next cold launch can restore them even
+            // without a catalog re-seed.
+            maybe_write_model_folder_manifest_locked(handle, pair.first);
         }
     }
     return linked;
@@ -339,6 +358,15 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
         request_proto_bytes, request_proto_size, &request, "ModelDiscoveryRequest", out_result);
     if (parse_rc != RAC_SUCCESS) {
         return parse_rc;
+    }
+
+    // Restore un-seeded models from their durable folder manifests BEFORE the
+    // reconcile sweep so ad-hoc registrations (direct URL / Hugging Face
+    // pulls) survive process restarts without any SDK-side persistence.
+    // Locks internally — must run outside the lock below.
+    int32_t restored = 0;
+    if (request.include_user_imports()) {
+        restored = restore_models_from_folder_manifests(handle);
     }
 
     int32_t reconciled = 0;
@@ -390,7 +418,7 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
     result.set_scanned_count(scanned);
     result.set_linked_count(result.discovered_models_size());
     result.set_purged_count(0);
-    result.set_imported_count(0);
+    result.set_imported_count(restored);
     return serialize_proto_to_buffer(result, out_result);
 #endif
 }

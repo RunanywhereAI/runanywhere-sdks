@@ -415,6 +415,12 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_model_registry_get_model_proto"
     "_rac_model_registry_list_models_proto"
     "_rac_model_registry_import_proto"
+    # Canonical registration factories: single/HF-ref URL form and multi-file
+    # form. Exporting them keeps the commons HF resolver + merge-on-reseed
+    # registration reachable from TS (and prevents the linker from GC'ing
+    # the whole chain).
+    "_rac_register_model_from_url_proto"
+    "_rac_register_multi_file_model_proto"
     "_rac_model_registry_discover_proto"
     "_rac_model_registry_refresh_proto"
     "_rac_model_registry_proto_free"

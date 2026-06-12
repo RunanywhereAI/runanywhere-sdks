@@ -168,8 +168,8 @@ class RunAnywhereStorage {
   }
 
   /// Register a multi-file model (e.g., VLMs with a separate `mmproj`,
-  /// MiniLM embedding with `vocab.txt`). Builds a [ModelInfo] in-place and
-  /// persists through the registry's proto save path — no URL is involved at
+  /// MiniLM embedding with `vocab.txt`) through the canonical commons
+  /// factory (`rac_register_multi_file_model_proto`) — no URL is involved at
   /// the model level because each [ModelFileDescriptor] carries its own URL.
   ///
   /// Mirrors Swift `RunAnywhere.registerModel(multiFile:id:name:framework:
@@ -189,28 +189,35 @@ class RunAnywhereStorage {
       throw SDKException.notInitialized();
     }
 
-    final model = ModelInfo(
+    // Canonical commons factory: rac_register_multi_file_model_proto builds
+    // the MultiFileArtifact ModelInfo (descriptors carry url/filename/size/
+    // checksum/role) and persists it with merge-on-reseed semantics.
+    final request = RegisterMultiFileModelRequest(
       id: id,
       name: name,
-      category: modality,
-      format: ModelFormat.MODEL_FORMAT_UNSPECIFIED,
       framework: framework,
-      multiFile: MultiFileArtifact(files: files),
-      artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
-      downloadSizeBytes: Int64(memoryRequirement ?? 0),
-      memoryRequiredBytes: Int64(memoryRequirement ?? 0),
-      // Mirrors Swift RunAnywhere+Storage.swift:156 —
-      // `contextLength ?? (modality.requiresContextLength ? 2048 : nil)`;
-      // the requires-context-length table is owned by commons.
-      contextLength:
-          contextLength ?? (modality.requiresContextLength ? 2048 : 0),
+      category: modality,
       supportsThinking: supportsThinking,
       source: source,
-      createdAtUnixMs: Int64(DateTime.now().millisecondsSinceEpoch),
-      updatedAtUnixMs: Int64(DateTime.now().millisecondsSinceEpoch),
+      files: files,
     );
+    if (memoryRequirement != null) {
+      request.memoryRequiredBytes = Int64(memoryRequirement);
+      request.downloadSizeBytes = Int64(memoryRequirement);
+    }
+    final resolvedContextLength =
+        contextLength ?? (modality.requiresContextLength ? 2048 : null);
+    if (resolvedContextLength != null) {
+      request.contextLength = resolvedContextLength;
+    }
 
-    await DartBridgeModelRegistry.instance.saveProtoModel(model);
+    final model =
+        await DartBridgeModelRegistry.instance.registerMultiFileModel(request);
+    if (model == null) {
+      throw SDKException.internalError(
+        'rac_register_multi_file_model_proto failed for model "$name"',
+      );
+    }
     return model;
   }
 

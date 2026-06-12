@@ -951,71 +951,86 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
                                  const proto_plan_file& file, size_t i, int64_t total_expected,
                                  uint64_t file_resume_from, int64_t& completed_before_file,
                                  std::string& final_path) {
-    proto_download_callback_ctx cb_ctx;
-    cb_ctx.task = task;
-    cb_ctx.file_index = static_cast<int>(i);
-    cb_ctx.completed_before_file = completed_before_file;
-    cb_ctx.total_expected = total_expected;
-    cb_ctx.storage_key = file.storage_key;
-    cb_ctx.destination_path = file.destination_path;
-
-    rac_http_download_request_t req{};
-    req.url = file.url.c_str();
-    req.destination_path = file.destination_path.c_str();
-    req.timeout_ms = 0;
-    req.follow_redirects = RAC_TRUE;
-    req.resume_from_byte = file_resume_from;
-    req.expected_sha256_hex =
-        file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
-
-    int32_t http_status = 0;
-    rac_http_download_status_t status =
-        rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
-
-    if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
-        int64_t file_partial = file_size_or_zero(file.destination_path);
-        int64_t deleted = 0;
-        bool delete_partial = false;
-        {
-            std::lock_guard<std::mutex> lock(task->mutex);
-            delete_partial = task->delete_partial_on_cancel;
-        }
-        if (delete_partial) {
-            deleted = delete_partial_file(file.destination_path);
-            file_partial = 0;
-        }
-        {
-            std::lock_guard<std::mutex> lock(task->mutex);
-            task->last_deleted_bytes = deleted;
-            task->last_partial_bytes = completed_before_file + file_partial;
-        }
-        set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
-                          rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                          completed_before_file + file_partial, total_expected,
-                          static_cast<int32_t>(i), file.storage_key, "", "download cancelled");
-        mark_task_stopped(task);
-        emit_progress(task);
-        return plan_file_step::STOP;
+    // A previous attempt may already have landed this file completely (e.g. a
+    // size-guard refusal caused by a stale catalog size estimate, or a re-pull
+    // after an interrupted finalize). Re-fetching would resume from EOF and
+    // draw HTTP 416 from range-aware servers, failing a download whose bytes
+    // are already correct. When the on-disk size matches the plan's expected
+    // size exactly, skip the network and fall through to extraction/finalize.
+    const bool already_complete =
+        file.expected_bytes > 0 && file_size_or_zero(file.destination_path) == file.expected_bytes;
+    if (already_complete) {
+        RAC_LOG_INFO(LOG_TAG,
+                     "File %zu (%s) already complete on disk (%lld bytes) — skipping fetch", i,
+                     file.storage_key.c_str(), static_cast<long long>(file.expected_bytes));
     }
 
-    if (status != RAC_HTTP_DL_OK) {
-        std::string error = http_status_message(status, http_status);
-        int64_t partial = completed_before_file + file_size_or_zero(file.destination_path);
-        {
-            std::lock_guard<std::mutex> lock(task->mutex);
-            task->last_partial_bytes = partial;
+    if (!already_complete) {
+        proto_download_callback_ctx cb_ctx;
+        cb_ctx.task = task;
+        cb_ctx.file_index = static_cast<int>(i);
+        cb_ctx.completed_before_file = completed_before_file;
+        cb_ctx.total_expected = total_expected;
+        cb_ctx.storage_key = file.storage_key;
+        cb_ctx.destination_path = file.destination_path;
+
+        rac_http_download_request_t req{};
+        req.url = file.url.c_str();
+        req.destination_path = file.destination_path.c_str();
+        req.timeout_ms = 0;
+        req.follow_redirects = RAC_TRUE;
+        req.resume_from_byte = file_resume_from;
+        req.expected_sha256_hex =
+            file.checksum_sha256.empty() ? nullptr : file.checksum_sha256.c_str();
+
+        int32_t http_status = 0;
+        rac_http_download_status_t status =
+            rac::http::execute_stream(req, proto_http_progress, &cb_ctx, &http_status);
+
+        if (task->cancel_requested.load() || status == RAC_HTTP_DL_CANCELLED) {
+            int64_t file_partial = file_size_or_zero(file.destination_path);
+            int64_t deleted = 0;
+            bool delete_partial = false;
+            {
+                std::lock_guard<std::mutex> lock(task->mutex);
+                delete_partial = task->delete_partial_on_cancel;
+            }
+            if (delete_partial) {
+                deleted = delete_partial_file(file.destination_path);
+                file_partial = 0;
+            }
+            {
+                std::lock_guard<std::mutex> lock(task->mutex);
+                task->last_deleted_bytes = deleted;
+                task->last_partial_bytes = completed_before_file + file_partial;
+            }
+            set_task_progress(task, rav1::DOWNLOAD_STATE_CANCELLED,
+                              rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                              completed_before_file + file_partial, total_expected,
+                              static_cast<int32_t>(i), file.storage_key, "", "download cancelled");
+            mark_task_stopped(task);
+            emit_progress(task);
+            return plan_file_step::STOP;
         }
-        set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
-                          partial, total_expected, static_cast<int32_t>(i), file.storage_key,
-                          "", error);
-        mark_task_stopped(task);
-        emit_progress(task);
-        return plan_file_step::STOP;
+
+        if (status != RAC_HTTP_DL_OK) {
+            std::string error = http_status_message(status, http_status);
+            int64_t partial = completed_before_file + file_size_or_zero(file.destination_path);
+            {
+                std::lock_guard<std::mutex> lock(task->mutex);
+                task->last_partial_bytes = partial;
+            }
+            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_DOWNLOADING,
+                              partial, total_expected, static_cast<int32_t>(i), file.storage_key,
+                              "", error);
+            mark_task_stopped(task);
+            emit_progress(task);
+            return plan_file_step::STOP;
+        }
     }
 
     if (file.requires_extraction) {
-        set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING,
-                          rav1::DOWNLOAD_STAGE_EXTRACTING,
+        set_task_progress(task, rav1::DOWNLOAD_STATE_EXTRACTING, rav1::DOWNLOAD_STAGE_EXTRACTING,
                           total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
                           total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
         emit_progress(task);
@@ -1031,11 +1046,10 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
             file.destination_path.c_str(), task->model_folder_path.c_str(), nullptr, nullptr,
             nullptr, &extraction_result);
         if (extract_rc != RAC_SUCCESS) {
-            set_task_progress(
-                task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
-                total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
-                total_expected, static_cast<int32_t>(i), file.storage_key, "",
-                "archive extraction failed");
+            set_task_progress(task, rav1::DOWNLOAD_STATE_FAILED, rav1::DOWNLOAD_STAGE_EXTRACTING,
+                              total_expected > 0 ? completed_before_file + file.expected_bytes : 0,
+                              total_expected, static_cast<int32_t>(i), file.storage_key, "",
+                              "archive extraction failed");
             mark_task_stopped(task);
             emit_progress(task);
             return plan_file_step::STOP;
@@ -1052,8 +1066,8 @@ plan_file_step process_plan_file(const std::shared_ptr<proto_download_task>& tas
         // `espeak-ng-data/`.
         char resolved_path[4096];
         rac_result_t find_rc = rac_find_model_path_after_extraction(
-            task->model_folder_path.c_str(), task->archive_structure, task->framework,
-            task->format, resolved_path, sizeof(resolved_path));
+            task->model_folder_path.c_str(), task->archive_structure, task->framework, task->format,
+            resolved_path, sizeof(resolved_path));
         if (find_rc == RAC_SUCCESS && resolved_path[0] != '\0') {
             final_path = resolved_path;
         } else {
@@ -1118,12 +1132,11 @@ bool validate_downloaded_sizes(const std::shared_ptr<proto_download_task>& task,
             sanity_error = "post-finalize size guard tripped: file " + file.filename + " is " +
                            std::to_string(actual) + " bytes on disk but expected " +
                            std::to_string(file.expected_bytes) + " bytes (< 80% threshold)";
-            RAC_LOG_ERROR(
-                LOG_TAG,
-                "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
-                "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
-                task->task_id.c_str(), i, static_cast<long long>(actual),
-                static_cast<long long>(file.expected_bytes));
+            RAC_LOG_ERROR(LOG_TAG,
+                          "Post-finalize size guard FAILED for task %s file %zu: actual=%lld "
+                          "expected=%lld (< 80%% threshold; refusing to register downloaded:true)",
+                          task->task_id.c_str(), i, static_cast<long long>(actual),
+                          static_cast<long long>(file.expected_bytes));
             return false;
         }
     }
@@ -1363,17 +1376,36 @@ void append_planned_file(rav1::DownloadPlanResult* result,
 }
 
 // Seed is_resume_candidate on a just-appended plan entry from on-disk partial
-// bytes. Returns true iff existing bytes exceed the declared expected size while
-// validate_existing_bytes was requested (caller sets invalid_existing_bytes).
+// bytes. Oversized partials (existing > declared expected size) are
+// SELF-HEALED here when validate_existing_bytes was requested: the stale
+// partial is deleted and the entry replanned as a fresh download. This used
+// to be per-SDK filesystem logic (Swift/Kotlin/Flutter each carried an
+// identical delete-and-replan loop); planning owns it now so every consumer
+// gets the heal for free. Returns true only when an oversized partial could
+// NOT be removed (caller fails the plan with OVERSIZE_PARTIAL_BYTES).
 bool seed_resume_candidate(rav1::DownloadFilePlan* planned, int64_t expected_bytes,
                            bool resume_existing, bool validate_existing_bytes) {
     if (!resume_existing)
         return false;
     int64_t existing_bytes = file_size_or_zero(planned->destination_path());
+    if (validate_existing_bytes && expected_bytes > 0 && existing_bytes > expected_bytes) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "Existing partial '%s' is %lld bytes but %lld are expected — deleting "
+                        "the stale partial and replanning as a fresh download",
+                        planned->destination_path().c_str(), static_cast<long long>(existing_bytes),
+                        static_cast<long long>(expected_bytes));
+        std::error_code ec;
+        fs::remove(planned->destination_path(), ec);
+        existing_bytes = file_size_or_zero(planned->destination_path());
+        if (existing_bytes > expected_bytes) {
+            planned->set_is_resume_candidate(false);
+            return true;  // deletion failed — surface OVERSIZE_PARTIAL_BYTES
+        }
+    }
     bool candidate =
         existing_bytes > 0 && (expected_bytes <= 0 || existing_bytes <= expected_bytes);
     planned->set_is_resume_candidate(candidate);
-    return validate_existing_bytes && expected_bytes > 0 && existing_bytes > expected_bytes;
+    return false;
 }
 
 // security-privacy-storage-network-001: defensive check
@@ -1416,14 +1448,26 @@ bool path_has_unsafe_components(const std::string& path) {
     return false;
 }
 
-// Returns true if `path` is lexically rooted under `root` after both have
-// been normalized. Empty `root` makes this vacuously false (we never accept
-// a bypass-plan path when we couldn't resolve a containment root).
+// Returns true if `path` is rooted under `root` after both have been
+// normalized AND symlink-resolved for their existing prefixes
+// (weakly_canonical). Pure lexical comparison breaks on macOS where /tmp is a
+// symlink to /private/tmp: a resume plan whose existing partial file
+// canonicalized to /private/tmp/... must still count as contained under a
+// /tmp/... root (and canonicalizing both sides also closes symlink-escape
+// holes the lexical check could not see). Empty `root` is vacuously false (we
+// never accept a bypass-plan path when we couldn't resolve a containment
+// root).
 bool path_is_under_root(const std::string& path, const std::string& root) {
     if (path.empty() || root.empty())
         return false;
-    fs::path norm_path = fs::path(path).lexically_normal();
-    fs::path norm_root = fs::path(root).lexically_normal();
+    std::error_code path_ec;
+    std::error_code root_ec;
+    fs::path norm_path = fs::weakly_canonical(path, path_ec);
+    fs::path norm_root = fs::weakly_canonical(root, root_ec);
+    if (path_ec || norm_path.empty())
+        norm_path = fs::path(path).lexically_normal();
+    if (root_ec || norm_root.empty())
+        norm_root = fs::path(root).lexically_normal();
     auto root_it = norm_root.begin();
     auto path_it = norm_path.begin();
     for (; root_it != norm_root.end() && path_it != norm_path.end(); ++root_it, ++path_it) {
@@ -1799,8 +1843,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         append_planned_file(&result, descriptor, model_folder, model_id, url, expected_bytes,
                             model_checksum, any_extraction, false);
         result.mutable_files(0)->set_destination_path(destination);
-        if (seed_resume_candidate(result.mutable_files(0), expected_bytes, request.resume_existing(),
-                                  request.validate_existing_bytes())) {
+        if (seed_resume_candidate(result.mutable_files(0), expected_bytes,
+                                  request.resume_existing(), request.validate_existing_bytes())) {
             invalid_existing_bytes = true;
         }
     }
@@ -2088,6 +2132,14 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         *result.mutable_initial_progress() = task->progress;
     }
 
+    // Persist the durable folder manifest BEFORE bytes flow so a process
+    // death mid-download still leaves a restorable identity on disk: the
+    // cold-launch / lookup-miss restore re-registers the entry as incomplete
+    // and a pull/download by id resumes from the partial bytes. Best-effort —
+    // a metadata write must never block the download itself.
+    (void)rac_model_registry_persist_folder_manifest(rac_get_model_registry(),
+                                                     task->model_id.c_str());
+
     start_proto_download_worker(task, resume_from);
 
     emit_progress(task);
@@ -2149,8 +2201,8 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
         // and the worker may still race ahead to delete the partial file
         // after we returned `partial_bytes_preserved=true`. Surface the
         // failure to the caller instead of lying about a clean cancel.
-        worker_observed_stop = task->cv.wait_for(lock, std::chrono::seconds(2),
-                                                 [&task] { return !task->running; });
+        worker_observed_stop =
+            task->cv.wait_for(lock, std::chrono::seconds(2), [&task] { return !task->running; });
         if (worker_observed_stop) {
             deleted = task->last_deleted_bytes;
             preserved_bytes = task->last_partial_bytes;
@@ -2269,7 +2321,8 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
             result.set_model_id(task->model_id);
             result.set_resume_token(task->resume_token);
             result.set_error_message("existing partial bytes exceed expected byte count");
-            result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
+            result.set_failure_reason(
+                runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
             return serialize_proto_to_buffer(result, out_result);
         }
         resume_from = actual_size;
