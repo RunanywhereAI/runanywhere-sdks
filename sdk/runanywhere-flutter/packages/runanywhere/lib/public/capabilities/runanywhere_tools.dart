@@ -117,12 +117,20 @@ class RunAnywhereTools {
 
   /// Execute a tool call manually. Used when `autoExecute: false` is
   /// passed to `generateWithTools`.
+  ///
+  /// Mirrors Swift `RunAnywhere.executeTool(_:)` semantics
+  /// (RunAnywhere+ToolCalling.swift:158-203): unknown tools, argument
+  /// parse failures, and executor errors all surface as `success: false`
+  /// results — a parse failure must NOT silently execute the tool with
+  /// empty arguments, which would make bad model output look like a
+  /// successful empty-argument call.
   Future<ToolResult> execute(ToolCall toolCall) async {
     final executor = _toolExecutors[toolCall.name];
     if (executor == null) {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
+        success: false,
         error: 'Tool not found: ${toolCall.name}',
       );
     }
@@ -131,10 +139,24 @@ class RunAnywhereTools {
     if (toolCall.argumentsJson.isNotEmpty) {
       try {
         final decoded = jsonDecode(toolCall.argumentsJson);
-        if (decoded is Map<String, dynamic>) args = decoded;
+        if (decoded is Map<String, dynamic>) {
+          args = decoded;
+        } else {
+          return ToolResult(
+            toolCallId: toolCall.id,
+            name: toolCall.name,
+            success: false,
+            error: 'Failed to parse tool arguments: expected a JSON object, '
+                'got ${decoded.runtimeType}',
+          );
+        }
       } catch (e) {
-        _logger.warning(
-            'Failed to decode tool arguments JSON for ${toolCall.name}: $e');
+        return ToolResult(
+          toolCallId: toolCall.id,
+          name: toolCall.name,
+          success: false,
+          error: 'Failed to parse tool arguments: $e',
+        );
       }
     }
 
@@ -145,6 +167,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
+        success: true,
         resultJson: jsonEncode(result),
       );
     } catch (e) {
@@ -152,6 +175,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
+        success: false,
         error: e.toString(),
       );
     }

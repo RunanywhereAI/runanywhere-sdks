@@ -67,11 +67,9 @@ export type WorkerRequest =
       optionsBytes: Uint8Array;
     }
   | {
-      type: 'stream.vlm.process';
+      type: 'stream.vlm.generate';
       requestId: string;
-      handle: number;
-      imageBytes: Uint8Array;
-      promptBytes: Uint8Array;
+      requestBytes: Uint8Array;
     }
   | { type: 'cancel'; requestId: string };
 
@@ -137,15 +135,13 @@ export interface StreamWorkerModule {
     userData: number,
   ): number | Promise<number>;
 
-  _rac_vlm_process_stream_proto?(
-    handle: number,
-    imageBytes: number,
-    imageSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+  /** Typed stream ABI: serialized VLMGenerationRequest in, VLMStreamEvent
+   *  per callback. Lifecycle-owned model — no handle, no out-result. */
+  _rac_vlm_stream_proto?(
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
-    outResult: number,
   ): number | Promise<number>;
   _rac_vlm_cancel_proto?(handle: number): number;
 }
@@ -208,7 +204,7 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
     | { kind: 'stream.llm.generate' }
     | { kind: 'stream.stt.transcribe' }
     | { kind: 'stream.tts.synthesize' }
-    | { kind: 'stream.vlm.process'; handle: number };
+    | { kind: 'stream.vlm.generate' };
   const inflight = new Map<string, InFlightModality>();
 
   const postError = (message: string, requestId?: string): void => {
@@ -367,8 +363,10 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
               }
               break;
             }
-            case 'stream.vlm.process':
-              mod._rac_vlm_cancel_proto?.(modality.handle);
+            case 'stream.vlm.generate':
+              // Handle 0 routes the cancel to the lifecycle-owned VLM
+              // service (the typed stream ABI threads no handle).
+              mod._rac_vlm_cancel_proto?.(0);
               break;
             case 'stream.stt.transcribe':
             case 'stream.tts.synthesize':
@@ -436,34 +434,14 @@ export function runStreamWorker(scope: StreamWorkerScope): void {
         });
         return;
       }
-      case 'stream.vlm.process': {
-        inflight.set(msg.requestId, { kind: 'stream.vlm.process', handle: msg.handle });
+      case 'stream.vlm.generate': {
+        inflight.set(msg.requestId, { kind: 'stream.vlm.generate' });
         runWithCallback(msg.requestId, true, (callbackPtr) => {
           const m = mod!;
-          if (!m._rac_vlm_process_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-          // VLM also needs an out-result pointer; allocate a small scratch
-          // slot. The actual result envelope is delivered via callbacks
-          // (mirrors the main-thread `streamEvents` adapter contract); the
-          // scratch slot is freed before returning the rc to the bridge.
-          const outResult = m._malloc(8);
-          try {
-            return withHeapBytes(m, msg.imageBytes, (imagePtr, imageSize) =>
-              withHeapBytes(m, msg.promptBytes, (promptPtr, promptSize) =>
-                m._rac_vlm_process_stream_proto!(
-                  msg.handle,
-                  imagePtr,
-                  imageSize,
-                  promptPtr,
-                  promptSize,
-                  callbackPtr,
-                  0,
-                  outResult,
-                ),
-              ),
-            );
-          } finally {
-            if (outResult) m._free(outResult);
-          }
+          if (!m._rac_vlm_stream_proto) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+          return withHeapBytes(m, msg.requestBytes, (requestPtr, requestSize) =>
+            m._rac_vlm_stream_proto!(requestPtr, requestSize, callbackPtr, 0),
+          );
         });
         return;
       }

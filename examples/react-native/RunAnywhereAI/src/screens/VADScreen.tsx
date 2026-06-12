@@ -6,13 +6,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import {
   SafeAreaView,
@@ -26,72 +20,18 @@ import {
   ModelSelectionContext,
   ModelSelectionSheet,
 } from '../components/model';
-import { RunAnywhere, AudioCaptureManager } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  AudioCaptureManager,
+  createPushableAudioStream,
+  type PushableAudioStream,
+} from '@runanywhere/core';
 import {
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { VADResult } from '@runanywhere/proto-ts/vad_options';
-
-type PushableAudioStream = {
-  iterable: AsyncIterable<Uint8Array>;
-  push: (chunk: Uint8Array) => void;
-  close: () => void;
-};
-
-function createPushableAudioStream(): PushableAudioStream {
-  const queue: Uint8Array[] = [];
-  const waiters: Array<(result: IteratorResult<Uint8Array>) => void> = [];
-  let closed = false;
-
-  const finish = () => {
-    closed = true;
-    while (waiters.length > 0) {
-      waiters.shift()?.({
-        value: undefined as unknown as Uint8Array,
-        done: true,
-      });
-    }
-  };
-
-  return {
-    iterable: {
-      [Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
-        return {
-          next(): Promise<IteratorResult<Uint8Array>> {
-            const chunk = queue.shift();
-            if (chunk) return Promise.resolve({ value: chunk, done: false });
-            if (closed) {
-              return Promise.resolve({
-                value: undefined as unknown as Uint8Array,
-                done: true,
-              });
-            }
-            return new Promise((resolve) => waiters.push(resolve));
-          },
-          return(): Promise<IteratorResult<Uint8Array>> {
-            finish();
-            return Promise.resolve({
-              value: undefined as unknown as Uint8Array,
-              done: true,
-            });
-          },
-        };
-      },
-    },
-    push(chunk: Uint8Array) {
-      if (closed || chunk.byteLength === 0) return;
-      const waiter = waiters.shift();
-      if (waiter) {
-        waiter({ value: chunk, done: false });
-      } else {
-        queue.push(chunk);
-      }
-    },
-    close: finish,
-  };
-}
 
 function chunkToArrayBuffer(chunk: Uint8Array): ArrayBuffer {
   return chunk.buffer.slice(
@@ -281,7 +221,9 @@ export const VADScreen: React.FC = () => {
           <Text style={styles.statusTitle}>
             {speechDetected ? 'Speech detected' : 'Silence'}
           </Text>
-          <Text style={styles.statusSubtitle}>{frameCount} frames analyzed</Text>
+          <Text style={styles.statusSubtitle}>
+            {frameCount} frames analyzed
+          </Text>
         </View>
 
         <View style={styles.metricRow}>

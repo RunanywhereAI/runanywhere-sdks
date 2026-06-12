@@ -3,24 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
-import 'package:runanywhere/runanywhere.dart'
-    show ToolCallingOptions, ToolCallFormatName;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
-import 'package:runanywhere_ai/core/utilities/constants.dart';
+import 'package:runanywhere_ai/features/chat/chat_lora_sheet.dart';
+import 'package:runanywhere_ai/features/chat/chat_view_model.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/rag/rag_demo_view.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// ChatInterfaceView
 ///
 /// Full chat interface with streaming, analytics, and model status.
+/// UI-only: all chat/model/LoRA state lives in [ChatViewModel].
 class ChatInterfaceView extends StatefulWidget {
   const ChatInterfaceView({super.key});
 
@@ -33,410 +32,44 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
 
-  // Messages
-  final List<ChatMessage> _messages = [];
-  String _currentStreamingContent = '';
-  String _currentThinkingContent = '';
-
-  // State
-  bool _isGenerating = false;
-  bool _useStreaming = true;
-  String? _errorMessage;
-  final bool _isLoading = false;
-
-  // Model state synced from SDK.
-  String? _loadedModelName;
-  sdk.InferenceFramework? _loadedFramework;
-  bool _loadedModelSupportsThinking = false;
-
-  // Analytics
-  DateTime? _generationStartTime;
-  double? _timeToFirstToken;
+  late final ChatViewModel _viewModel;
+  int _lastMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSettings());
-    unawaited(_syncModelState());
+    _viewModel = ChatViewModel();
+    _viewModel.addListener(_onViewModelChanged);
+    unawaited(_viewModel.initialize());
   }
 
   @override
   void dispose() {
-    if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
-    }
+    _viewModel.removeListener(_onViewModelChanged);
+    _viewModel.dispose();
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _useStreaming = prefs.getBool(PreferenceKeys.useStreaming) ?? true;
-    });
-  }
-
-  /// Sync model state from SDK (v4.0 API).
-  Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.llm.currentModel();
-    if (mounted) {
-      setState(() {
-        _loadedModelName = model?.name;
-        _loadedFramework = model?.framework;
-        _loadedModelSupportsThinking = model?.supportsThinking ?? false;
-      });
+  /// Keep the list pinned to the bottom while messages arrive or stream.
+  void _onViewModelChanged() {
+    final messageCount = _viewModel.messages.length;
+    if (messageCount != _lastMessageCount || _viewModel.isGenerating) {
+      _lastMessageCount = messageCount;
+      _scrollToBottom();
     }
   }
 
-  bool get _canSend =>
-      _controller.text.isNotEmpty &&
-      !_isGenerating &&
-      sdk.RunAnywhere.llm.isLoaded;
+  bool get _canSend => _viewModel.canSend(_controller.text);
 
   Future<void> _sendMessage() async {
-    if (!_canSend) return;
-
-    final userMessage = _controller.text;
+    final text = _controller.text;
+    if (!_viewModel.canSend(text)) return;
     _controller.clear();
-
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          role: sdk.MessageRole.MESSAGE_ROLE_USER,
-          content: userMessage,
-          timestamp: DateTime.now(),
-        ),
-      );
-      _isGenerating = true;
-      _errorMessage = null;
-      _currentStreamingContent = '';
-      _currentThinkingContent = '';
-      _generationStartTime = DateTime.now();
-      _timeToFirstToken = null;
-    });
-
     _scrollToBottom();
-
-    try {
-      // Get generation options from settings
-      final prefs = await SharedPreferences.getInstance();
-      final temperature =
-          prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
-      final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
-      final systemPrompt =
-          prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
-      final thinkingModeEnabled =
-          prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
-      final disableThinking =
-          _loadedModelSupportsThinking && !thinkingModeEnabled;
-
-      debugPrint(
-        '[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)',
-      );
-
-      // Check if tool calling is enabled and has registered tools
-      final toolSettings = ToolSettingsViewModel.shared;
-      final useToolCalling =
-          toolSettings.toolCallingEnabled &&
-          toolSettings.registeredTools.isNotEmpty;
-
-      if (useToolCalling) {
-        await _generateWithToolCalling(
-          userMessage,
-          maxTokens,
-          temperature,
-          systemPrompt,
-          disableThinking,
-        );
-      } else {
-        // Streaming now runs in a background isolate, so no ANR concerns
-        final options = sdk.LLMGenerationOptions(
-          maxTokens: maxTokens,
-          temperature: temperature,
-          systemPrompt: systemPrompt,
-          disableThinking: disableThinking,
-        );
-
-        if (_useStreaming) {
-          await _generateStreaming(userMessage, options);
-        } else {
-          await _generateNonStreaming(userMessage, options);
-        }
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Generation failed: $e';
-        _isGenerating = false;
-      });
-    }
-  }
-
-  /// Determines the optimal tool calling format based on the model name/ID.
-  /// Different models are trained on different tool calling formats.
-  /// Returns the generated tool-call format enum.
-  ToolCallFormatName _detectToolCallFormat(String? modelName) {
-    if (modelName == null) {
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-    }
-    final name = modelName.toLowerCase();
-
-    // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
-    if (name.contains('lfm2') && name.contains('tool')) {
-      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC;
-    }
-
-    // Default JSON format for general-purpose models
-    return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-  }
-
-  Future<void> _generateWithToolCalling(
-    String prompt,
-    int maxTokens,
-    double temperature,
-    String systemPrompt,
-    bool disableThinking,
-  ) async {
-    // Capture model name from local state
-    final modelName = _loadedModelName;
-
-    // Auto-detect the tool calling format based on the loaded model
-    final format = _detectToolCallFormat(modelName);
-    debugPrint(
-      'Using tool calling with format: ${format.name} for model: ${modelName ?? "unknown"}',
-    );
-
-    // Add empty assistant message
-    final assistantMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
-      content: '',
-      timestamp: DateTime.now(),
-    );
-
-    setState(() {
-      _messages.add(assistantMessage);
-    });
-
-    final messageIndex = _messages.length - 1;
-
-    try {
-      final result = await sdk.RunAnywhere.tools.generateWithTools(
-        prompt,
-        options: ToolCallingOptions(
-          maxIterations: 3,
-          autoExecute: true,
-          format: format,
-          maxTokens: maxTokens,
-          temperature: temperature,
-          systemPrompt: systemPrompt,
-          disableThinking: disableThinking,
-        ),
-      );
-
-      final totalTime = _generationStartTime != null
-          ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-                1000.0
-          : 0.0;
-
-      // Create ToolCallInfo from the result if tools were called
-      ToolCallInfo? toolCallInfo;
-      debugPrint(
-        '📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}',
-      );
-      if (result.toolCalls.isNotEmpty) {
-        final lastCall = result.toolCalls.last;
-        final lastResult = result.toolResults.isNotEmpty
-            ? result.toolResults.last
-            : null;
-        debugPrint('📊 Creating ToolCallInfo for: ${lastCall.name}');
-
-        final hasError = lastResult != null && lastResult.error.isNotEmpty;
-        toolCallInfo = ToolCallInfo(
-          toolName: lastCall.name,
-          arguments: lastCall.argumentsJson,
-          result: (lastResult != null && lastResult.resultJson.isNotEmpty)
-              ? lastResult.resultJson
-              : null,
-          success: lastResult != null && !hasError,
-          error: hasError ? lastResult.error : null,
-        );
-        debugPrint(
-          '📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}',
-        );
-      } else {
-        debugPrint('📊 No tool calls in result - badge will NOT show');
-      }
-
-      final analytics = MessageAnalytics(
-        messageId: assistantMessage.id,
-        modelName: modelName,
-        totalGenerationTime: totalTime,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _messages[messageIndex] = _messages[messageIndex].copyWith(
-          content: result.text,
-          thinkingContent: result.thinkingContent,
-          analytics: analytics,
-          toolCallInfo: toolCallInfo,
-        );
-        _isGenerating = false;
-      });
-
-      _scrollToBottom();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _messages.removeLast();
-        _errorMessage = 'Tool calling failed: $e';
-        _isGenerating = false;
-      });
-    }
-  }
-
-  Future<void> _generateStreaming(
-    String prompt,
-    sdk.LLMGenerationOptions options,
-  ) async {
-    // Capture model name from local state
-    final modelName = _loadedModelName;
-
-    // Add empty assistant message for streaming
-    final assistantMessage = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
-      content: '',
-      timestamp: DateTime.now(),
-    );
-
-    setState(() {
-      _messages.add(assistantMessage);
-    });
-
-    final messageIndex = _messages.length - 1;
-    final contentBuffer = StringBuffer();
-
-    try {
-      final result = await sdk.RunAnywhere.aggregateStream(
-        prompt: prompt,
-        events: sdk.RunAnywhere.llm.generateStream(prompt, options),
-        onToken: (aggregated) async {
-          if (_timeToFirstToken == null && _generationStartTime != null) {
-            _timeToFirstToken =
-                DateTime.now()
-                    .difference(_generationStartTime!)
-                    .inMilliseconds /
-                1000.0;
-          }
-          contentBuffer
-            ..clear()
-            ..write(aggregated);
-          _currentStreamingContent = contentBuffer.toString();
-          if (!mounted) return;
-          setState(() {
-            _messages[messageIndex] = _messages[messageIndex].copyWith(
-              content: _currentStreamingContent,
-            );
-          });
-          _scrollToBottom();
-        },
-      );
-
-      if (result.errorMessage.isNotEmpty) {
-        throw Exception(result.errorMessage);
-      }
-      _currentThinkingContent = result.thinkingContent;
-
-      // Calculate final analytics
-      final totalTime = _generationStartTime != null
-          ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-                1000.0
-          : 0.0;
-
-      final analytics = MessageAnalytics(
-        messageId: assistantMessage.id,
-        modelName: modelName,
-        timeToFirstToken: _timeToFirstToken,
-        totalGenerationTime: totalTime,
-        outputTokens: result.tokensGenerated,
-        tokensPerSecond: result.tokensPerSecond,
-        wasThinkingMode: result.thinkingContent.isNotEmpty,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _messages[messageIndex] = _messages[messageIndex].copyWith(
-          content: result.text,
-          thinkingContent: _currentThinkingContent.isNotEmpty
-              ? _currentThinkingContent
-              : null,
-          analytics: analytics,
-        );
-        _isGenerating = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _messages.removeLast();
-        _errorMessage = 'Streaming failed: $e';
-        _isGenerating = false;
-      });
-    }
-  }
-
-  Future<void> _generateNonStreaming(
-    String prompt,
-    sdk.LLMGenerationOptions options,
-  ) async {
-    // Capture model name from local state
-    final modelName = _loadedModelName;
-
-    try {
-      final result = await sdk.RunAnywhere.llm.generate(prompt, options);
-
-      final totalTime = _generationStartTime != null
-          ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
-                1000.0
-          : 0.0;
-
-      // Extract token counts from SDK result
-      final outputTokens = result.tokensGenerated;
-      final tokensPerSecond = result.tokensPerSecond;
-
-      final analytics = MessageAnalytics(
-        messageId: DateTime.now().millisecondsSinceEpoch.toString(),
-        modelName: modelName,
-        totalGenerationTime: totalTime,
-        outputTokens: outputTokens,
-        tokensPerSecond: tokensPerSecond,
-        wasThinkingMode: result.thinkingContent.isNotEmpty,
-      );
-
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
-            content: result.text,
-            thinkingContent: result.thinkingContent,
-            timestamp: DateTime.now(),
-            analytics: analytics,
-          ),
-        );
-        _isGenerating = false;
-      });
-
-      _scrollToBottom();
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Generation failed: $e';
-        _isGenerating = false;
-      });
-    }
+    await _viewModel.sendMessage(text);
   }
 
   void _scrollToBottom() {
@@ -453,75 +86,74 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
   }
 
-  void _clearChat() {
-    setState(() {
-      _messages.clear();
-      _errorMessage = null;
-      _currentStreamingContent = '';
-      _currentThinkingContent = '';
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chat'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: _showConversationHistory,
-            tooltip: 'Conversation history',
-          ),
-          Semantics(
-            label: 'Document Q&A',
-            button: true,
-            child: IconButton(
-              icon: const Icon(Icons.article_outlined),
-              onPressed: () {
-                debugPrint('Document loaded successfully');
-                unawaited(
-                  Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (context) => const RagDemoView(),
-                    ),
-                  ),
-                );
-              },
-              tooltip: 'Document Q&A',
-            ),
-          ),
-          if (_messages.isNotEmpty)
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Chat'),
+          actions: [
             IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _clearChat,
-              tooltip: 'Clear chat',
+              icon: const Icon(Icons.history),
+              onPressed: _showConversationHistory,
+              tooltip: 'Conversation history',
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Model status banner (uses local state from SDK)
-          _buildModelStatusBanner(),
-
-          // Messages area - tap to dismiss keyboard
-          Expanded(
-            child: GestureDetector(
-              onTap: () => FocusScope.of(context).unfocus(),
-              behavior: HitTestBehavior.opaque,
-              child: _buildMessagesArea(),
+            if (_viewModel.loadedModelSupportsLora)
+              IconButton(
+                icon: const Icon(Icons.auto_awesome),
+                onPressed: _showLoRASheet,
+                tooltip: 'LoRA adapters',
+              ),
+            Semantics(
+              label: 'Document Q&A',
+              button: true,
+              child: IconButton(
+                icon: const Icon(Icons.article_outlined),
+                onPressed: () {
+                  unawaited(
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (context) => const RagDemoView(),
+                      ),
+                    ),
+                  );
+                },
+                tooltip: 'Document Q&A',
+              ),
             ),
-          ),
+            if (_viewModel.messages.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _viewModel.clearChat,
+                tooltip: 'Clear chat',
+              ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Model status banner (state synced from SDK by the ViewModel)
+            _buildModelStatusBanner(),
 
-          // Error banner
-          if (_errorMessage != null) _buildErrorBanner(),
+            // Messages area - tap to dismiss keyboard
+            Expanded(
+              child: GestureDetector(
+                onTap: () => FocusScope.of(context).unfocus(),
+                behavior: HitTestBehavior.opaque,
+                child: _buildMessagesArea(),
+              ),
+            ),
 
-          // Typing indicator
-          if (_isGenerating) _buildTypingIndicator(),
+            // Error banner
+            if (_viewModel.errorMessage != null) _buildErrorBanner(),
 
-          // Input area
-          _buildInputArea(),
-        ],
+            // Typing indicator
+            if (_viewModel.isGenerating) _buildTypingIndicator(),
+
+            // Input area
+            _buildInputArea(),
+          ],
+        ),
       ),
     );
   }
@@ -536,10 +168,21 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           context: ModelSelectionContext.llm,
           onModelSelected: (model) async {
             // Model loaded by ModelSelectionSheet via SDK
-            // Sync local state after model load
-            await _syncModelState();
+            await _viewModel.syncModelState();
           },
         ),
+      ),
+    );
+  }
+
+  /// Show the LoRA adapter sheet (visible when the loaded model supports LoRA).
+  void _showLoRASheet() {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => ChatLoRASheet(viewModel: _viewModel),
       ),
     );
   }
@@ -555,7 +198,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           store: ConversationStore.shared,
           onNewChat: () {
             Navigator.of(sheetContext).pop();
-            _clearChat();
+            _viewModel.clearChat();
+          },
+          onSelect: (conversation) {
+            Navigator.of(sheetContext).pop();
+            _viewModel.loadConversation(conversation);
           },
         ),
       ),
@@ -567,25 +214,25 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       framework ?? LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 
   Widget _buildModelStatusBanner() {
-    // Use local state synced from SDK
     LLMFramework? framework;
-    if (sdk.RunAnywhere.llm.isLoaded && _loadedFramework != null) {
-      framework = _mapInferenceFramework(_loadedFramework);
+    if (_viewModel.isModelLoaded && _viewModel.loadedFramework != null) {
+      framework = _mapInferenceFramework(_viewModel.loadedFramework);
     }
 
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.large),
       child: ModelStatusBanner(
         framework: framework,
-        modelName: _loadedModelName,
-        isLoading: _isLoading,
+        modelName: _viewModel.loadedModelName,
+        isLoading: false,
         onSelectModel: _showModelSelectionSheet,
       ),
     );
   }
 
   Widget _buildMessagesArea() {
-    if (_messages.isEmpty) {
+    final messages = _viewModel.messages;
+    if (messages.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -612,9 +259,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(AppSpacing.large),
-      itemCount: _messages.length,
+      itemCount: messages.length,
       itemBuilder: (context, index) {
-        final message = _messages[index];
+        final message = messages[index];
         return _MessageBubble(message: message);
       },
     );
@@ -634,17 +281,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           const SizedBox(width: AppSpacing.smallMedium),
           Expanded(
             child: Text(
-              _errorMessage!,
+              _viewModel.errorMessage!,
               style: AppTypography.subheadline(context),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.close),
-            onPressed: () {
-              setState(() {
-                _errorMessage = null;
-              });
-            },
+            onPressed: _viewModel.clearError,
           ),
         ],
       ),
@@ -676,7 +319,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         toolSettings.registeredTools.isNotEmpty;
     final showSmallModelWarning =
         toolSettings.toolCallingEnabled &&
-        _isLikelySmallModel(_loadedModelName);
+        _isLikelySmallModel(_viewModel.loadedModelName);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
@@ -760,16 +403,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                 ),
                 const SizedBox(width: AppSpacing.smallMedium),
                 IconButton.filled(
-                  onPressed: _canSend ? _sendMessage : null,
-                  icon: _isGenerating
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
+                  onPressed: _viewModel.isGenerating
+                      ? _viewModel.stopGeneration
+                      : (_canSend ? _sendMessage : null),
+                  icon: _viewModel.isGenerating
+                      ? const Icon(Icons.stop)
                       : const Icon(Icons.arrow_upward),
                 ),
               ],
@@ -777,47 +415,6 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Chat message model
-class ChatMessage {
-  final String id;
-  final sdk.MessageRole role;
-  final String content;
-  final String? thinkingContent;
-  final DateTime timestamp;
-  final MessageAnalytics? analytics;
-  final ToolCallInfo? toolCallInfo;
-
-  const ChatMessage({
-    required this.id,
-    required this.role,
-    required this.content,
-    this.thinkingContent,
-    required this.timestamp,
-    this.analytics,
-    this.toolCallInfo,
-  });
-
-  ChatMessage copyWith({
-    String? id,
-    sdk.MessageRole? role,
-    String? content,
-    String? thinkingContent,
-    DateTime? timestamp,
-    MessageAnalytics? analytics,
-    ToolCallInfo? toolCallInfo,
-  }) {
-    return ChatMessage(
-      id: id ?? this.id,
-      role: role ?? this.role,
-      content: content ?? this.content,
-      thinkingContent: thinkingContent ?? this.thinkingContent,
-      timestamp: timestamp ?? this.timestamp,
-      analytics: analytics ?? this.analytics,
-      toolCallInfo: toolCallInfo ?? this.toolCallInfo,
     );
   }
 }
@@ -1096,14 +693,18 @@ class _MessageBubbleState extends State<_MessageBubble> {
 
 /// Bottom sheet listing past conversations from [ConversationStore].
 ///
-/// Provides a "New chat" FAB and per-row delete affordance. Tapping a
-/// row currently just dismisses the sheet (full message restoration is
-/// out of scope for this screen — ChatInterfaceView is in-memory only).
+/// Provides a "New chat" FAB, per-row delete affordance, and row tap to
+/// restore a persisted conversation into the chat.
 class _ConversationListSheet extends StatefulWidget {
   final ConversationStore store;
   final VoidCallback onNewChat;
+  final ValueChanged<Conversation> onSelect;
 
-  const _ConversationListSheet({required this.store, required this.onNewChat});
+  const _ConversationListSheet({
+    required this.store,
+    required this.onNewChat,
+    required this.onSelect,
+  });
 
   @override
   State<_ConversationListSheet> createState() => _ConversationListSheetState();
@@ -1162,6 +763,7 @@ class _ConversationListSheetState extends State<_ConversationListSheet> {
                 itemBuilder: (context, index) {
                   final conv = conversations[index];
                   return ListTile(
+                    onTap: () => widget.onSelect(conv),
                     title: Text(
                       conv.title,
                       maxLines: 1,

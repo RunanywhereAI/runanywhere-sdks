@@ -667,6 +667,11 @@ abstract final class RunAnywhere {
   }
 
   // --- Capability surfaces -------------------------------------------------
+  //
+  // The flat `RunAnywhere.*` static methods are the canonical surface — they
+  // mirror the Swift SDK (the cross-SDK source of truth) one-to-one. The
+  // capability objects below are ergonomic accessors over the same
+  // implementations; prefer the flat methods when porting code between SDKs.
 
   /// LLM (text generation) — load, chat, generate, generate-stream, cancel.
   static RunAnywhereLLM get llm => RunAnywhereLLM.shared;

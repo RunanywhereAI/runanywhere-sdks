@@ -8,21 +8,26 @@ import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 /// File-based persistence for conversation history.
 ///
-/// Note: chat sessions are currently in-memory only (`ChatInterfaceView`).
-/// This store reads pre-existing conversation files from disk so the
-/// History sheet can display them and delete them. Re-wiring the chat
-/// to write back through this store is a future feature.
+/// Mirrors iOS `Core/Services/ConversationStore.swift`: conversations are
+/// created in-memory, become persistent on the first message, and every
+/// update is written back to a `Conversations/<id>.json` file.
 class ConversationStore extends ChangeNotifier {
   static final ConversationStore shared = ConversationStore._();
 
   ConversationStore._() {
-    unawaited(_initialize());
+    unawaited(_ready);
   }
 
+  static const _defaultTitle = 'New Chat';
+  static const _encoder = JsonEncoder.withIndent('  ');
+
   List<Conversation> _conversations = [];
+  Conversation? _currentConversation;
   Directory? _conversationsDirectory;
+  late final Future<void> _ready = _initialize();
 
   List<Conversation> get conversations => _conversations;
+  Conversation? get currentConversation => _currentConversation;
 
   Future<void> _initialize() async {
     final documentsDir = await getApplicationDocumentsDirectory();
@@ -35,9 +40,77 @@ class ConversationStore extends ChangeNotifier {
     await loadConversations();
   }
 
+  /// Create a new conversation. Not added to the list or written to disk
+  /// until the first message arrives (iOS parity).
+  Conversation createConversation({String? title}) {
+    final now = DateTime.now();
+    final conversation = Conversation(
+      id: now.microsecondsSinceEpoch.toString(),
+      title: title ?? _defaultTitle,
+      createdAt: now,
+      updatedAt: now,
+      messages: const [],
+    );
+    _currentConversation = conversation;
+    return conversation;
+  }
+
+  /// Insert or update [conversation], persist it to disk, and return the
+  /// stored copy (with a refreshed `updatedAt`).
+  Conversation updateConversation(Conversation conversation) {
+    final updated = conversation.copyWith(updatedAt: DateTime.now());
+
+    final index = _conversations.indexWhere((c) => c.id == updated.id);
+    if (index >= 0) {
+      _conversations[index] = updated;
+    } else {
+      // First time this conversation is persisted (first message sent).
+      _conversations.insert(0, updated);
+    }
+
+    if (_currentConversation?.id == updated.id) {
+      _currentConversation = updated;
+    }
+
+    unawaited(_saveConversation(updated));
+    notifyListeners();
+    return updated;
+  }
+
+  /// Append [message] to [conversation], derive a title from the first user
+  /// message if still untitled, persist, and return the updated conversation.
+  ///
+  /// iOS additionally generates "smart titles" via Apple FoundationModels —
+  /// that path is Apple-platform-gated, so Flutter keeps the deterministic
+  /// fallback title only.
+  Conversation addMessage(Message message, Conversation conversation) {
+    var updated = conversation.copyWith(
+      messages: [...conversation.messages, message],
+    );
+
+    if (updated.title == _defaultTitle) {
+      final firstUserContent = updated.messages
+          .firstWhere(
+            (m) =>
+                m.role == proto.MessageRole.MESSAGE_ROLE_USER &&
+                m.content.trim().isNotEmpty,
+            orElse: () => message,
+          )
+          .content;
+      if (firstUserContent.trim().isNotEmpty) {
+        updated = updated.copyWith(title: _generateTitle(firstUserContent));
+      }
+    }
+
+    return updateConversation(updated);
+  }
+
   /// Delete a conversation
   void deleteConversation(Conversation conversation) {
     _conversations.removeWhere((c) => c.id == conversation.id);
+    if (_currentConversation?.id == conversation.id) {
+      _currentConversation = null;
+    }
     unawaited(_deleteConversationFile(conversation.id));
     notifyListeners();
   }
@@ -70,8 +143,18 @@ class ConversationStore extends ChangeNotifier {
     }
   }
 
+  Future<void> _saveConversation(Conversation conversation) async {
+    await _ready;
+    try {
+      final file = File('${_conversationsDirectory!.path}/${conversation.id}.json');
+      await file.writeAsString(_encoder.convert(conversation.toJson()));
+    } catch (e) {
+      debugPrint('Error saving conversation: $e');
+    }
+  }
+
   Future<void> _deleteConversationFile(String id) async {
-    if (_conversationsDirectory == null) return;
+    await _ready;
 
     try {
       final file = File('${_conversationsDirectory!.path}/$id.json');
@@ -81,6 +164,17 @@ class ConversationStore extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error deleting conversation file: $e');
     }
+  }
+
+  /// Deterministic title fallback: first line of the first user message,
+  /// capped at 50 characters (mirrors iOS `generateTitle(from:)`).
+  String _generateTitle(String content) {
+    const maxLength = 50;
+    final cleaned = content.trim();
+    final firstLine = cleaned.split('\n').first;
+    return firstLine.length > maxLength
+        ? firstLine.substring(0, maxLength)
+        : firstLine;
   }
 }
 
@@ -113,6 +207,24 @@ class Conversation {
     return preview.length > 100 ? preview.substring(0, 100) : preview;
   }
 
+  Conversation copyWith({
+    String? title,
+    DateTime? updatedAt,
+    List<Message>? messages,
+    String? modelName,
+    String? frameworkName,
+  }) {
+    return Conversation(
+      id: id,
+      title: title ?? this.title,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      messages: messages ?? this.messages,
+      modelName: modelName ?? this.modelName,
+      frameworkName: frameworkName ?? this.frameworkName,
+    );
+  }
+
   factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
         id: json['id'] as String,
         title: json['title'] as String,
@@ -124,6 +236,16 @@ class Conversation {
         modelName: json['modelName'] as String?,
         frameworkName: json['frameworkName'] as String?,
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+        'messages': messages.map((m) => m.toJson()).toList(),
+        if (modelName != null) 'modelName': modelName,
+        if (frameworkName != null) 'frameworkName': frameworkName,
+      };
 }
 
 /// Message model
@@ -173,6 +295,15 @@ class Message {
                 json['analytics'] as Map<String, dynamic>)
             : null,
       );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'role': role.name,
+        'content': content,
+        if (thinkingContent != null) 'thinkingContent': thinkingContent,
+        'timestamp': timestamp.toIso8601String(),
+        if (analytics != null) 'analytics': analytics!.toJson(),
+      };
 }
 
 /// Message analytics for tracking generation metrics
@@ -216,6 +347,20 @@ class MessageAnalytics {
         completionStatus:
             _chatMessageStatusFromJson(json['completionStatus'] as String?),
       );
+
+  Map<String, dynamic> toJson() => {
+        'messageId': messageId,
+        if (modelName != null) 'modelName': modelName,
+        if (framework != null) 'framework': framework,
+        if (timeToFirstToken != null) 'timeToFirstToken': timeToFirstToken,
+        if (totalGenerationTime != null)
+          'totalGenerationTime': totalGenerationTime,
+        'inputTokens': inputTokens,
+        'outputTokens': outputTokens,
+        if (tokensPerSecond != null) 'tokensPerSecond': tokensPerSecond,
+        'wasThinkingMode': wasThinkingMode,
+        'completionStatus': completionStatus.name,
+      };
 }
 
 proto.MessageRole _messageRoleFromJson(String? value) {

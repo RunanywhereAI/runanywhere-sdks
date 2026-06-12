@@ -412,13 +412,18 @@ object RunAnywhereBridge {
         optionsProto: ByteArray,
     ): ByteArray?
 
+    /**
+     * Typed stream ABI (`rac_vlm_stream_proto`): serialized
+     * `VLMGenerationRequest` in, serialized `VLMStreamEvent` per listener
+     * callback (STARTED → TOKEN* → exactly one terminal COMPLETED/ERROR).
+     * Lifecycle-owned model — no handle, no aggregate result buffer.
+     * Returns the `rac_result_t` status code.
+     */
     @JvmStatic
-    external fun racVlmProcessStreamProto(
-        handle: Long,
-        imageProto: ByteArray,
-        optionsProto: ByteArray,
+    external fun racVlmStreamProto(
+        requestProto: ByteArray,
         listener: NativeProtoProgressListener?,
-    ): ByteArray?
+    ): Int
 
     @JvmStatic
     external fun racVlmCancelProto(handle: Long): Int

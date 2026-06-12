@@ -79,6 +79,13 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 400_000_000
         )
         await registerLLM(
+            id: "lfm2.5-1.2b-instruct-q4_k_m",
+            name: "LiquidAI LFM2.5 1.2B Instruct Q4_K_M",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 900_000_000
+        )
+        await registerLLM(
             id: "lfm2-1.2b-tool-q4_k_m",
             name: "LiquidAI LFM2 1.2B Tool Q4_K_M",
             url: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
@@ -115,6 +122,13 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             memoryRequirement: 2_800_000_000,
             supportsThinking: true
+        )
+        await registerLLM(
+            id: "llama-3.2-3b-instruct-q4_k_m",
+            name: "Llama 3.2 3B Instruct Q4_K_M (Tool Calling)",
+            url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_000_000_000
         )
         logger.info("LLM models registered")
 

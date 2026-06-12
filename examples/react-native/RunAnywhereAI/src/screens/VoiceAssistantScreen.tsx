@@ -155,99 +155,102 @@ export const VoiceAssistantScreen: React.FC = () => {
    * Turn-completion aggregation (was 'turnCompleted') is rebuilt locally
    * from state transitions.
    */
-  const handleProtoEvent = useCallback((event: VoiceEvent) => {
-    if (event.state) {
-      switch (event.state.current) {
-        case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
-          setStatus(VoicePipelineStatus.Listening);
-          break;
-        case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
-          setStatus(VoicePipelineStatus.Thinking);
-          break;
-        case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
-          setStatus(VoicePipelineStatus.Speaking);
-          break;
-        case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
-          setStatus(VoicePipelineStatus.Idle);
-          setIsSessionActive(false);
-          void cleanupVoiceSession();
-          break;
-        default:
-          break;
-      }
-      return;
-    }
-
-    if (event.vad) {
-      // VADEvent.type is VADStreamEventKind; start/end ride
-      // SPEECH_ACTIVITY with direction on the is_speech bool.
-      if (
-        event.vad.type ===
-        VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
-      ) {
-        if (event.vad.isSpeech) {
-          console.warn('[VoiceAssistant] Speech started');
-        } else {
-          console.warn('[VoiceAssistant] Speech ended — processing');
-          setStatus(VoicePipelineStatus.Processing);
+  const handleProtoEvent = useCallback(
+    (event: VoiceEvent) => {
+      if (event.state) {
+        switch (event.state.current) {
+          case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
+            setStatus(VoicePipelineStatus.Listening);
+            break;
+          case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
+            setStatus(VoicePipelineStatus.Thinking);
+            break;
+          case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
+            setStatus(VoicePipelineStatus.Speaking);
+            break;
+          case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
+            setStatus(VoicePipelineStatus.Idle);
+            setIsSessionActive(false);
+            void cleanupVoiceSession();
+            break;
+          default:
+            break;
         }
+        return;
       }
-      return;
-    }
 
-    if (event.userSaid?.text) {
-      const text = event.userSaid.text;
-      console.warn('[VoiceAssistant] User said:', text);
-      const userEntry: VoiceConversationEntry = {
-        id: generateId(),
-        speaker: 'user',
-        text,
-        timestamp: new Date(),
-      };
-      setConversation((prev) => [...prev, userEntry]);
-      setStatus(VoicePipelineStatus.Thinking);
-      return;
-    }
-
-    if (event.assistantToken?.text) {
-      const token = event.assistantToken.text;
-      setConversation((prev) => {
-        const last = prev[prev.length - 1];
-        if (last && last.speaker === 'assistant') {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...last,
-            text: last.text + token,
-          };
-          return updated;
+      if (event.vad) {
+        // VADEvent.type is VADStreamEventKind; start/end ride
+        // SPEECH_ACTIVITY with direction on the is_speech bool.
+        if (
+          event.vad.type ===
+          VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
+        ) {
+          if (event.vad.isSpeech) {
+            console.warn('[VoiceAssistant] Speech started');
+          } else {
+            console.warn('[VoiceAssistant] Speech ended — processing');
+            setStatus(VoicePipelineStatus.Processing);
+          }
         }
-        return [
-          ...prev,
-          {
-            id: generateId(),
-            speaker: 'assistant',
-            text: token,
-            timestamp: new Date(),
-          },
-        ];
-      });
-      return;
-    }
+        return;
+      }
 
-    if (event.audio) {
-      setStatus(VoicePipelineStatus.Speaking);
-      return;
-    }
+      if (event.userSaid?.text) {
+        const text = event.userSaid.text;
+        console.warn('[VoiceAssistant] User said:', text);
+        const userEntry: VoiceConversationEntry = {
+          id: generateId(),
+          speaker: 'user',
+          text,
+          timestamp: new Date(),
+        };
+        setConversation((prev) => [...prev, userEntry]);
+        setStatus(VoicePipelineStatus.Thinking);
+        return;
+      }
 
-    if (event.error) {
-      console.error('[VoiceAssistant] Error:', event.error.message);
-      setStatus(VoicePipelineStatus.Error);
-      Alert.alert('Error', event.error.message || 'An error occurred');
-      setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
-      setIsSessionActive(false);
-      void cleanupVoiceSession();
-    }
-  }, [cleanupVoiceSession]);
+      if (event.assistantToken?.text) {
+        const token = event.assistantToken.text;
+        setConversation((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.speaker === 'assistant') {
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...last,
+              text: last.text + token,
+            };
+            return updated;
+          }
+          return [
+            ...prev,
+            {
+              id: generateId(),
+              speaker: 'assistant',
+              text: token,
+              timestamp: new Date(),
+            },
+          ];
+        });
+        return;
+      }
+
+      if (event.audio) {
+        setStatus(VoicePipelineStatus.Speaking);
+        return;
+      }
+
+      if (event.error) {
+        console.error('[VoiceAssistant] Error:', event.error.message);
+        setStatus(VoicePipelineStatus.Error);
+        Alert.alert('Error', event.error.message || 'An error occurred');
+        setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
+        setIsSessionActive(false);
+        void cleanupVoiceSession();
+      }
+    },
+    [cleanupVoiceSession]
+  );
 
   /**
    * Start or stop the voice session (uses proto-stream adapter).

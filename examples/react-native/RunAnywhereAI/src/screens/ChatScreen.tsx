@@ -46,6 +46,7 @@ import {
   TypingIndicator,
   ChatInput,
   ToolCallingBadge,
+  LoRASheet,
 } from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
@@ -89,7 +90,9 @@ interface GenerationSettings {
   thinkingModeEnabled: boolean;
 }
 
-function makeToolCallInfo(result: Awaited<ReturnType<typeof RunAnywhere.generateWithTools>>) {
+function makeToolCallInfo(
+  result: Awaited<ReturnType<typeof RunAnywhere.generateWithTools>>
+) {
   const firstCall = result.toolCalls[0];
   if (!firstCall) return undefined;
   const matchingResult =
@@ -133,6 +136,9 @@ export const ChatScreen: React.FC = () => {
   const [showModelSelection, setShowModelSelection] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [registeredToolCount, setRegisteredToolCount] = useState(0);
+  // LoRA adapter management (mirrors iOS LLMViewModel.loraAdapters).
+  const [showLoRASheet, setShowLoRASheet] = useState(false);
+  const [loraAdapterCount, setLoraAdapterCount] = useState(0);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
@@ -808,6 +814,35 @@ export const ChatScreen: React.FC = () => {
         <ToolCallingBadge toolCount={registeredToolCount} />
       )}
 
+      {/* LoRA pill (mirrors iOS ChatMessageListView's LoRA row above input) */}
+      {currentModel && (
+        <View style={styles.loraRow}>
+          <TouchableOpacity
+            style={[
+              styles.loraPill,
+              loraAdapterCount > 0 && styles.loraPillActive,
+            ]}
+            onPress={() => setShowLoRASheet(true)}
+          >
+            <Icon
+              name="sparkles"
+              size={14}
+              color={
+                loraAdapterCount > 0 ? Colors.textWhite : Colors.primaryPurple
+              }
+            />
+            <Text
+              style={[
+                styles.loraPillText,
+                loraAdapterCount > 0 && styles.loraPillTextActive,
+              ]}
+            >
+              {loraAdapterCount > 0 ? `LoRA x${loraAdapterCount}` : '+ LoRA'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Input Area */}
       <ChatInput
         value={inputText}
@@ -833,6 +868,20 @@ export const ChatScreen: React.FC = () => {
         <ChatAnalyticsScreen
           messages={messages}
           onClose={() => setShowAnalytics(false)}
+        />
+      </Modal>
+
+      {/* LoRA Adapter Management Modal */}
+      <Modal
+        visible={showLoRASheet}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowLoRASheet(false)}
+      >
+        <LoRASheet
+          modelId={currentModel?.id ?? null}
+          onClose={() => setShowLoRASheet(false)}
+          onAdaptersChanged={(adapters) => setLoraAdapterCount(adapters.length)}
         />
       </Modal>
 
@@ -928,6 +977,31 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     maxWidth: 280,
+  },
+  loraRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Padding.padding16,
+    paddingBottom: Spacing.small,
+  },
+  loraPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: Colors.primaryPurple,
+    borderRadius: 14,
+    paddingHorizontal: Padding.padding12,
+    paddingVertical: 4,
+  },
+  loraPillActive: {
+    backgroundColor: Colors.primaryPurple,
+  },
+  loraPillText: {
+    ...Typography.caption2,
+    color: Colors.primaryPurple,
+  },
+  loraPillTextActive: {
+    color: Colors.textWhite,
   },
 });
 

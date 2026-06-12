@@ -8,6 +8,7 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/core/utilities/url_utils.dart';
+import 'package:runanywhere_ai/features/benchmarks/benchmark_dashboard_view.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -366,6 +367,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           _buildLoggingCard(),
           const SizedBox(height: AppSpacing.large),
 
+          // Performance Section (mirrors iOS CombinedSettingsView.swift:179-183)
+          _buildSectionHeader('Performance'),
+          _buildPerformanceCard(),
+          const SizedBox(height: AppSpacing.large),
+
           // About Section
           _buildSectionHeader('About'),
           _buildAboutCard(),
@@ -671,6 +677,24 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
               onChanged: _toggleAnalyticsLogging,
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPerformanceCard() {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.speed, color: AppColors.primaryBlue),
+        title: const Text('Benchmarks'),
+        subtitle: const Text('Measure on-device AI performance'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => unawaited(
+          Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const BenchmarkDashboardView(),
+            ),
+          ),
         ),
       ),
     );

@@ -99,6 +99,9 @@ public:
   // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() override;
+  std::string frameworkDisplayName(double frameworkProto) override;
+  double modelCategoryDefaultFramework(double categoryProto) override;
+  double inferModelFileRole(const std::string& filename, double modalityProto) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(
     const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> registerModelProto(
@@ -420,13 +423,8 @@ public:
     const std::shared_ptr<ArrayBuffer>& queryBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragClearProto() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragStatsProto() override;
-  std::shared_ptr<Promise<double>> embeddingsCreateProto(
-    const std::string& modelId,
-    const std::optional<std::string>& configJson) override;
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchProto(
-    double handle,
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchLifecycleProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
-  std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraApplyProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(

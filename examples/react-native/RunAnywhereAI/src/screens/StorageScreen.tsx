@@ -120,19 +120,21 @@ export const StorageScreen: React.FC = () => {
             label="Models"
             value={formatBytes(storageInfo?.totalModelsBytes ?? 0)}
           />
-          <StorageRow label="Free" value={formatBytes(device?.freeBytes ?? 0)} />
+          <StorageRow
+            label="Free"
+            value={formatBytes(device?.freeBytes ?? 0)}
+          />
         </View>
 
         <View style={styles.actionRow}>
           <TouchableOpacity style={styles.actionButton} onPress={clearCache}>
-            <Icon
-              name="trash-outline"
-              size={18}
-              color={Colors.primaryOrange}
-            />
+            <Icon name="trash-outline" size={18} color={Colors.primaryOrange} />
             <Text style={styles.actionButtonText}>Clear Cache</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={cleanTempFiles}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={cleanTempFiles}
+          >
             <Icon
               name="file-tray-outline"
               size={18}

@@ -145,6 +145,26 @@ export interface RunAnywhereCore extends HybridObject<{
   getAvailableModelsProto(): Promise<ArrayBuffer>;
 
   /**
+   * Human-readable display name for a runanywhere.v1.InferenceFramework proto
+   * value. Backed by rac_inference_framework_display_name (sync table lookup).
+   */
+  frameworkDisplayName(frameworkProto: number): string;
+
+  /**
+   * Default runanywhere.v1.InferenceFramework proto value for a
+   * runanywhere.v1.ModelCategory proto value. Backed by
+   * rac_model_category_default_framework (sync table lookup).
+   */
+  modelCategoryDefaultFramework(categoryProto: number): number;
+
+  /**
+   * Infer the runanywhere.v1.ModelFileRole proto value for a filename in a
+   * multi-file model. Backed by rac_infer_model_file_role (proto-valued both
+   * ways; sync string matching). Mirrors Swift RunAnywhere.inferModelFileRole.
+   */
+  inferModelFileRole(filename: string, modalityProto: number): number;
+
+  /**
    * Get one registered model as serialized runanywhere.v1.ModelInfo bytes.
    * Returns an empty buffer when the model does not exist.
    */
@@ -1034,12 +1054,16 @@ export interface RunAnywhereCore extends HybridObject<{
   ragClearProto(): Promise<ArrayBuffer>;
   ragStatsProto(): Promise<ArrayBuffer>;
 
-  embeddingsCreateProto(modelId: string, configJson?: string): Promise<number>;
-  embeddingsEmbedBatchProto(
-    handle: number,
+  /**
+   * Generate embeddings via the commons embeddings lifecycle.
+   * runanywhere.v1.EmbeddingsRequest bytes in, runanywhere.v1.EmbeddingsResult
+   * bytes out. Backed by rac_embeddings_embed_batch_lifecycle_proto; the
+   * lifecycle owns the component, so no handle is involved. Mirrors Swift
+   * CppBridge.EmbeddingsProto.embedBatchLifecycle.
+   */
+  embeddingsEmbedBatchLifecycleProto(
     requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
-  embeddingsDestroyProto(handle: number): Promise<void>;
 
   loraApplyProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   loraRemoveProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;

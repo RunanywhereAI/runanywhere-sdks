@@ -2,7 +2,7 @@
  * Type Exports
  *
  * Reference: Swift sample app structure
- * Tabs: Chat, STT, TTS, Voice (VoiceAssistant), Settings
+ * Tabs: Chat, Vision, Voice, More, Settings
  */
 
 // Chat types
@@ -45,6 +45,15 @@ export type MoreStackParamList = {
   VAD: undefined;
   Storage: undefined;
   Solutions: undefined;
+};
+
+/**
+ * Settings tab stack: settings home -> Benchmarks
+ * (mirrors iOS CombinedSettingsView -> BenchmarkDashboardView)
+ */
+export type SettingsStackParamList = {
+  SettingsHome: undefined;
+  Benchmarks: undefined;
 };
 
 // Common utility types

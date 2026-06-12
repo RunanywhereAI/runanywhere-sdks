@@ -37,11 +37,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
   bool _isLoadingModel = false;
   String _loadingProgress = '';
 
-  /// Get all models relevant to this context, sorted by availability
+  /// Get all models relevant to this context, sorted by availability.
+  /// Filtering (category + framework allow-list + supporting-file
+  /// exclusion) is the shared `ModelSelectionContext.includes` predicate,
+  /// mirroring iOS `ModelSelectionSheet.availableModels`.
   List<ModelInfo> get _availableModels {
-    final models = _viewModel.availableModels.where((model) {
-      return widget.context.relevantCategories.contains(model.category);
-    }).toList();
+    final models =
+        _viewModel.availableModels.where(widget.context.includes).toList();
 
     // Sort: built-in models first (Foundation Models / System TTS), then
     // downloaded, then not downloaded. On-disk readiness is `localPath`; the

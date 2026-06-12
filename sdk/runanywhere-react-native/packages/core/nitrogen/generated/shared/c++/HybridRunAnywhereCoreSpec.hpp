@@ -19,7 +19,6 @@
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
-#include <optional>
 
 namespace margelo::nitro::runanywhere {
 
@@ -70,6 +69,9 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isDeviceRegistered() = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceId() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getAvailableModelsProto() = 0;
+      virtual std::string frameworkDisplayName(double frameworkProto) = 0;
+      virtual double modelCategoryDefaultFramework(double categoryProto) = 0;
+      virtual double inferModelFileRole(const std::string& filename, double modalityProto) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getModelInfoProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> registerModelProto(const std::shared_ptr<ArrayBuffer>& modelInfoBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> registerModelFromUrlProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
@@ -182,9 +184,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragClearProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ragStatsProto() = 0;
-      virtual std::shared_ptr<Promise<double>> embeddingsCreateProto(const std::string& modelId, const std::optional<std::string>& configJson) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchProto(double handle, const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
-      virtual std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraApplyProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraListProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

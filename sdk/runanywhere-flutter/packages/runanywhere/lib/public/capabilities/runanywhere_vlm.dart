@@ -115,16 +115,22 @@ class RunAnywhereVLM {
   }
 
   /// Process an image with VLM (full result with metrics).
+  ///
+  /// Canonical cross-SDK shape (mirrors Swift
+  /// `RunAnywhere.processImage(_:options:)`): the prompt travels in
+  /// `options.prompt`. [prompt] is an ergonomic named parameter (RN-style)
+  /// applied onto the options when `options.prompt` is unset.
   Future<VLMResult> processImage(
     VLMImage image, {
-    required String prompt,
+    String? prompt,
     VLMGenerationOptions? options,
   }) async {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImage');
-    final opts = _effectiveOptions(prompt, options ?? VLMGenerationOptions());
+    final opts =
+        _effectiveOptions(prompt ?? '', options ?? VLMGenerationOptions());
 
     try {
       final result = await DartBridge.vlm.processImageProto(
@@ -144,9 +150,14 @@ class RunAnywhereVLM {
   }
 
   /// Stream image processing with generated VLM stream events.
+  ///
+  /// Canonical cross-SDK shape (mirrors Swift
+  /// `RunAnywhere.processImageStream(_:options:)`): the prompt travels in
+  /// `options.prompt`. [prompt] is an ergonomic named parameter (RN-style)
+  /// applied onto the options when `options.prompt` is unset.
   Stream<VLMStreamEvent> processImageStream(
     VLMImage image, {
-    required String prompt,
+    String? prompt,
     VLMGenerationOptions? options,
   }) async* {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
@@ -154,7 +165,7 @@ class RunAnywhereVLM {
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImageStream');
     final opts = _effectiveOptions(
-      prompt,
+      prompt ?? '',
       options ?? VLMGenerationOptions(),
       streaming: true,
     );

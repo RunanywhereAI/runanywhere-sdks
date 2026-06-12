@@ -32,6 +32,9 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("isDeviceRegistered", &HybridRunAnywhereCoreSpec::isDeviceRegistered);
       prototype.registerHybridMethod("getDeviceId", &HybridRunAnywhereCoreSpec::getDeviceId);
       prototype.registerHybridMethod("getAvailableModelsProto", &HybridRunAnywhereCoreSpec::getAvailableModelsProto);
+      prototype.registerHybridMethod("frameworkDisplayName", &HybridRunAnywhereCoreSpec::frameworkDisplayName);
+      prototype.registerHybridMethod("modelCategoryDefaultFramework", &HybridRunAnywhereCoreSpec::modelCategoryDefaultFramework);
+      prototype.registerHybridMethod("inferModelFileRole", &HybridRunAnywhereCoreSpec::inferModelFileRole);
       prototype.registerHybridMethod("getModelInfoProto", &HybridRunAnywhereCoreSpec::getModelInfoProto);
       prototype.registerHybridMethod("registerModelProto", &HybridRunAnywhereCoreSpec::registerModelProto);
       prototype.registerHybridMethod("registerModelFromUrlProto", &HybridRunAnywhereCoreSpec::registerModelFromUrlProto);
@@ -144,9 +147,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("ragQueryProto", &HybridRunAnywhereCoreSpec::ragQueryProto);
       prototype.registerHybridMethod("ragClearProto", &HybridRunAnywhereCoreSpec::ragClearProto);
       prototype.registerHybridMethod("ragStatsProto", &HybridRunAnywhereCoreSpec::ragStatsProto);
-      prototype.registerHybridMethod("embeddingsCreateProto", &HybridRunAnywhereCoreSpec::embeddingsCreateProto);
-      prototype.registerHybridMethod("embeddingsEmbedBatchProto", &HybridRunAnywhereCoreSpec::embeddingsEmbedBatchProto);
-      prototype.registerHybridMethod("embeddingsDestroyProto", &HybridRunAnywhereCoreSpec::embeddingsDestroyProto);
+      prototype.registerHybridMethod("embeddingsEmbedBatchLifecycleProto", &HybridRunAnywhereCoreSpec::embeddingsEmbedBatchLifecycleProto);
       prototype.registerHybridMethod("loraApplyProto", &HybridRunAnywhereCoreSpec::loraApplyProto);
       prototype.registerHybridMethod("loraRemoveProto", &HybridRunAnywhereCoreSpec::loraRemoveProto);
       prototype.registerHybridMethod("loraListProto", &HybridRunAnywhereCoreSpec::loraListProto);

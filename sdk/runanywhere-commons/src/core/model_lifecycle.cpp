@@ -393,6 +393,24 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         detail::resolve_model_artifacts(model);
     const std::string& resolved_path = artifact_resolution.resolved_path;
 
+    // Self-heal: lazy resolution recovered a real on-disk path for a registry
+    // entry whose local_path was empty (cold-launch re-registration gap —
+    // SDKs re-register from URL before their persistence layer backfills).
+    // Persist it best-effort so downloadedModels()/getModel() observe the
+    // path without each SDK scanning the filesystem itself. Mirrors the
+    // download orchestrator's completion-time self-heal.
+    if (model.local_path().empty() && !resolved_path.empty() &&
+        resolved_path != request.model_id()) {
+        const rac_result_t heal_rc = rac_model_registry_update_download_status(
+            registry, request.model_id().c_str(), resolved_path.c_str());
+        if (heal_rc != RAC_SUCCESS) {
+            RAC_LOG_WARNING("ModelLifecycle",
+                            "local_path self-heal failed for %s (rc=%d); continuing with "
+                            "resolved path",
+                            request.model_id().c_str(), heal_rc);
+        }
+    }
+
     if (component == runanywhere::v1::SDK_COMPONENT_UNSPECIFIED ||
         primitive == RAC_PRIMITIVE_UNSPECIFIED) {
         ModelLoadResult result =

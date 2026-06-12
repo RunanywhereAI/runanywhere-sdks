@@ -81,24 +81,23 @@ private enum VLMCustomProtoABI {
         Int,
         UnsafeMutableRawPointer?
     ) -> rac_bool_t
-    typealias ProcessStream = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
+    // Typed stream ABI: takes a serialized `VLMGenerationRequest` and emits
+    // serialized `VLMStreamEvent`s (STARTED → TOKEN* → COMPLETED/ERROR).
+    // Lifecycle-owned model — no component handle, no out-result buffer.
+    typealias Stream = @convention(c) (
         UnsafePointer<UInt8>?,
         Int,
         StreamCallback?,
-        UnsafeMutableRawPointer?,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
+        UnsafeMutableRawPointer?
     ) -> rac_result_t
     typealias Cancel = @convention(c) (rac_handle_t?) -> rac_result_t
 
     static let processName = "rac_vlm_process_proto"
-    static let streamName = "rac_vlm_process_stream_proto"
+    static let streamName = "rac_vlm_stream_proto"
     static let cancelName = "rac_vlm_cancel_proto"
 
     static let process = NativeProtoABI.load(processName, as: Process.self)
-    static let stream = NativeProtoABI.load(streamName, as: ProcessStream.self)
+    static let stream = NativeProtoABI.load(streamName, as: Stream.self)
     // Handle-scoped cancel used by `processStream`'s onTermination so
     // that consumer cancellation tears down the in-flight native
     // generation instead of letting it run to completion.
@@ -471,16 +470,27 @@ extension CppBridge.VLM {
         }
     }
 
-    public func processStream(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> AsyncStream<RASDKEvent> {
-        let handle = try await getHandle()
+    /// Stream typed `RAVLMStreamEvent`s from the lifecycle-owned VLM model.
+    ///
+    /// Backed by `rac_vlm_stream_proto` — the canonical typed stream ABI all
+    /// five SDKs share (STARTED → TOKEN* → exactly one terminal
+    /// COMPLETED/ERROR; COMPLETED carries the full `RAVLMResult`). The model
+    /// is resolved from the commons lifecycle, so no component handle is
+    /// threaded; `request.modelID` is left empty (commons only validates it
+    /// against the loaded model when non-empty).
+    public func processStream(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> AsyncStream<RAVLMStreamEvent> {
         let stream = try NativeProtoABI.require(
             VLMCustomProtoABI.stream,
             named: VLMCustomProtoABI.streamName
         )
-        let imageData = try image.serializedData()
-        let optionData = try options.serializedData()
+        var request = RAVLMGenerationRequest()
+        request.images = [image]
+        var streamingOptions = options
+        streamingOptions.streamingEnabled = true
+        request.options = streamingOptions
+        let requestData = try request.serializedData()
         return AsyncStream { continuation in
-            let context = ProtoStreamContext<RASDKEvent>(
+            let context = ProtoStreamContext<RAVLMStreamEvent>(
                 continuation: continuation,
                 category: "CppBridge.VLM.ProtoStream"
             )
@@ -492,17 +502,19 @@ extension CppBridge.VLM {
             // callback returns RAC_FALSE and stops yielding, and (b)
             // invokes the native VLM cancel symbol so the underlying
             // generation tears down instead of running to completion
-            // in the background. `.finished` means the detached task
-            // already drained the native call, so the cancel symbol
-            // is intentionally skipped on that path. The detached
-            // task's `release()` still balances `passRetained`
+            // in the background. A nil handle routes the cancel to the
+            // lifecycle-owned VLM service (commons falls back to the
+            // lifecycle when the handle is 0). `.finished` means the
+            // detached task already drained the native call, so the
+            // cancel symbol is intentionally skipped on that path. The
+            // detached task's `release()` still balances `passRetained`
             // regardless of which path completes first.
             continuation.onTermination = { @Sendable termination in
                 switch termination {
                 case .cancelled:
                     context.cancel()
                     if let cancel = VLMCustomProtoABI.cancel {
-                        _ = cancel(handle)
+                        _ = cancel(nil)
                     }
                 case .finished:
                     break
@@ -517,42 +529,34 @@ extension CppBridge.VLM {
             // `.cancelled`) still flips the context flag and fires the VLM
             // cancel symbol instead of decoding the whole response.
             Task.detached {
-                var outBuffer = rac_proto_buffer_t()
-                defer { NativeProtoABI.free(&outBuffer) }
                 let rc = await withTaskCancellationHandler {
-                    imageData.withUnsafeBytes { imageRaw in
-                        optionData.withUnsafeBytes { optionRaw in
-                            stream(
-                                handle,
-                                imageRaw.bindMemory(to: UInt8.self).baseAddress,
-                                imageRaw.count,
-                                optionRaw.bindMemory(to: UInt8.self).baseAddress,
-                                optionRaw.count,
-                                { bytes, size, userData in
-                                    guard let userData else { return RAC_FALSE }
-                                    let ctx = Unmanaged<ProtoStreamContext<RASDKEvent>>
-                                        .fromOpaque(userData)
-                                        .takeUnretainedValue()
-                                    // Signal the C side to stop as soon as
-                                    // the consumer cancels — skip the yield
-                                    // entirely and return RAC_FALSE so the
-                                    // native loop breaks on its next tick.
-                                    if ctx.isCancelled { return RAC_FALSE }
-                                    ctx.yield(bytes: bytes, size: size)
-                                    return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
-                                },
-                                contextPtr,
-                                &outBuffer
-                            )
-                        }
+                    requestData.withUnsafeBytes { requestRaw in
+                        stream(
+                            requestRaw.bindMemory(to: UInt8.self).baseAddress,
+                            requestRaw.count,
+                            { bytes, size, userData in
+                                guard let userData else { return RAC_FALSE }
+                                let ctx = Unmanaged<ProtoStreamContext<RAVLMStreamEvent>>
+                                    .fromOpaque(userData)
+                                    .takeUnretainedValue()
+                                // Signal the C side to stop as soon as
+                                // the consumer cancels — skip the yield
+                                // entirely and return RAC_FALSE so the
+                                // native loop breaks on its next tick.
+                                if ctx.isCancelled { return RAC_FALSE }
+                                ctx.yield(bytes: bytes, size: size)
+                                return ctx.isCancelled ? RAC_FALSE : RAC_TRUE
+                            },
+                            contextPtr
+                        )
                     }
                 } onCancel: {
                     context.cancel()
                     if let cancel = VLMCustomProtoABI.cancel {
-                        _ = cancel(handle)
+                        _ = cancel(nil)
                     }
                 }
-                Unmanaged<ProtoStreamContext<RASDKEvent>>
+                Unmanaged<ProtoStreamContext<RAVLMStreamEvent>>
                     .fromOpaque(contextPtr)
                     .release()
                 // A non-success return code on a cancelled stream is

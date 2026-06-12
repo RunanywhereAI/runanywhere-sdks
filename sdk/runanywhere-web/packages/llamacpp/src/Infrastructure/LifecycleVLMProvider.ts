@@ -14,11 +14,11 @@ import {
 } from '@runanywhere/web/internal';
 import type { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
-import type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
+  VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 
 function isVisionModelCategory(category: ModelCategory | undefined): boolean {
@@ -94,7 +94,7 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
   async processImageStream(
     image: VLMImage,
     options: VLMGenerationOptions,
-  ): Promise<AsyncIterable<SDKEvent>> {
+  ): Promise<AsyncIterable<VLMStreamEvent>> {
     if (!this._modelLoaded) {
       throw SDKException.notInitialized('No VLM model has been loaded through RunAnywhere.loadModel().');
     }

@@ -489,6 +489,24 @@ ModelArtifactResolution resolve_model_artifacts(const runanywhere::v1::ModelInfo
         }
     }
 
+    // Empty local_path (e.g. a cold launch re-registered the model from URL
+    // before the SDK-side persistence repopulated it): the fallback
+    // resolved_path is the bare model ID, which is not a filesystem path —
+    // engines would stat() the literal ID and fail. Point the artifact scan
+    // at the canonical on-disk folder for this model/framework instead so
+    // rac_model_paths_resolve_artifact can recover the primary artifact. If
+    // the folder doesn't exist the scan fails gracefully and resolved_path
+    // stays the model ID (same terminal error as before).
+    if (model.local_path().empty()) {
+        char canonical_folder[1024] = {0};
+        const rac_result_t folder_rc = rac_model_paths_get_model_folder(
+            model.id().c_str(), c_framework_from_proto(model.framework()), canonical_folder,
+            sizeof(canonical_folder));
+        if (folder_rc == RAC_SUCCESS && canonical_folder[0] != '\0') {
+            artifact_root = canonical_folder;
+        }
+    }
+
     ProtoModelPathBridge bridge(model);
     rac_model_path_resolution_t resolution = {};
     const char* checksum = model.has_checksum_sha256() && !model.checksum_sha256().empty()

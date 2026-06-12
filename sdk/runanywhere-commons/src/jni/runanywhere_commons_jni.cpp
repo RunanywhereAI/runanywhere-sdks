@@ -730,7 +730,7 @@ struct JByteArrayView {
 // inference inline and fire `callback` zero or more times BEFORE returning (no
 // `src/features` proto path spawns a worker thread). That makes it safe for
 // racLlmGenerateStreamProto / racSttTranscribeStreamLifecycleProto /
-// racTtsSynthesizeStreamLifecycleProto / racVlmProcessStreamProto /
+// racTtsSynthesizeStreamLifecycleProto / racVlmStreamProto /
 // racDiffusionGenerateWithProgressProto / racStructuredOutputGenerateStreamProto
 // / racVoiceAgentProcessTurnProto to stack-allocate this ctx and DeleteGlobalRef
 // the listener immediately after the call returns.
@@ -4970,30 +4970,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessProto(
     return makeProtoCallResult(env, rc, &result, "racVlmProcessProto");
 }
 
-JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessStreamProto(
-    JNIEnv* env, jclass clazz, jlong handle, jbyteArray imageProto, jbyteArray optionsProto,
-    jobject listener) {
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmStreamProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
     (void)clazz;
-    JByteArrayView image(env, imageProto);
-    JByteArrayView options(env, optionsProto);
-    // VLM in Kotlin SDK runs handle==0 by design — the C function falls back
-    // to the lifecycle-owned VLM service. Only reject if image/options bytes
-    // failed to materialize.
-    if (!image.ok || !options.ok)
-        return nullptr;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok)
+        return RAC_ERROR_NULL_POINTER;
 
+    // Typed stream ABI: serialized VLMGenerationRequest in, serialized
+    // VLMStreamEvent per callback (STARTED → TOKEN* → COMPLETED/ERROR).
+    // Lifecycle-owned model — no handle, no out-result buffer.
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{.listener = globalListener, .operation = "racVlmProcessStreamProto"};
-    rac_proto_buffer_t result = {};
-    rac_proto_buffer_init(&result);
-    rac_result_t rc = rac_vlm_process_stream_proto(
-        handleFromJLong(handle), image.u8(), image.size(), options.u8(), options.size(),
-        globalListener != nullptr ? proto_bool_callback : nullptr,
-        globalListener != nullptr ? &ctx : nullptr, &result);
+    ProtoListenerUserData ctx{.listener = globalListener, .operation = "racVlmStreamProto"};
+    rac_result_t rc = rac_vlm_stream_proto(request.u8(), request.size(),
+                                           globalListener != nullptr ? proto_bool_callback : nullptr,
+                                           globalListener != nullptr ? &ctx : nullptr);
     if (globalListener != nullptr)
         env->DeleteGlobalRef(globalListener);
-    return makeProtoCallResult(env, rc, &result, "racVlmProcessStreamProto");
+    return static_cast<jint>(rc);
 }
 
 JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmCancelProto(

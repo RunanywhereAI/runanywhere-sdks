@@ -545,7 +545,6 @@ export const RunAnywhere = {
 
   initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
   initializeVoiceAgentWithLoadedModels: VoiceAgent.initializeVoiceAgentWithLoadedModels,
-  defaultVoiceAgentComposeConfig: VoiceAgent.defaultVoiceAgentComposeConfig,
   defaultVADModelID: VoiceAgent.defaultVADModelID,
   ensureDefaultVAD: VoiceAgent.ensureDefaultVAD,
   getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
@@ -645,6 +644,7 @@ export const RunAnywhere = {
   downloadModelStream: ModelManagement.downloadModelStream,
   refreshModelRegistry: ModelManagement.refreshModelRegistry,
   getDefaultFramework: ModelManagement.getDefaultFramework,
+  inferModelFileRole: ModelManagement.inferModelFileRole,
 
   // ============================================================================
   // Display helpers (proxies for commons C ABI tables)
@@ -657,7 +657,6 @@ export const RunAnywhere = {
   // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
-  getStorageInfoProto: Storage.getStorageInfoProto,
   deleteStorage: Storage.deleteStorage,
   clearCache: Storage.clearCache,
   cleanTempFiles: Storage.cleanTempFiles,

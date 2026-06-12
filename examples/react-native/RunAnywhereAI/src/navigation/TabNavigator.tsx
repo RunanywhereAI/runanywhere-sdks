@@ -18,6 +18,7 @@ import { Typography } from '../theme/typography';
 import type {
   MoreStackParamList,
   RootTabParamList,
+  SettingsStackParamList,
   VisionStackParamList,
 } from '../types';
 
@@ -33,10 +34,12 @@ import VADScreen from '../screens/VADScreen';
 import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import BenchmarkScreen from '../screens/BenchmarkScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const VisionStack = createNativeStackNavigator<VisionStackParamList>();
 const MoreStack = createNativeStackNavigator<MoreStackParamList>();
+const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 const tabIcons: Record<
   keyof RootTabParamList,
@@ -112,10 +115,30 @@ export const TabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={SettingsStackScreen}
         options={{ tabBarLabel: tabLabels.Settings }}
       />
     </Tab.Navigator>
+  );
+};
+
+const SettingsStackScreen: React.FC = () => {
+  return (
+    <SettingsStack.Navigator
+      screenOptions={{ headerShown: true }}
+      initialRouteName="SettingsHome"
+    >
+      <SettingsStack.Screen
+        name="SettingsHome"
+        component={SettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <SettingsStack.Screen
+        name="Benchmarks"
+        component={BenchmarkScreen}
+        options={{ title: 'Benchmarks' }}
+      />
+    </SettingsStack.Navigator>
   );
 };
 

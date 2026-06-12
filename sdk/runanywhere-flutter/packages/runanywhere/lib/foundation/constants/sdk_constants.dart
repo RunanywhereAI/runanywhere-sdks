@@ -34,8 +34,8 @@ class SDKConstants {
     return 'unknown';
   }
 
-  /// SDK name
-  static const String name = 'RunAnywhere Flutter SDK';
+  /// SDK name — matches Swift `SDKConstants.name` and Kotlin `SDK_NAME`.
+  static const String name = 'RunAnywhere SDK';
 
   /// Minimum log level in production (string form — mirrors Swift constant).
   static const String productionLogLevel = 'error';

@@ -1,14 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
+import 'package:runanywhere_ai/features/voice/vad_view_model.dart';
 
+/// Voice Activity Detection screen. Purely UI — all capture/VAD logic lives
+/// in [VADViewModel].
 class VADView extends StatefulWidget {
   const VADView({super.key});
 
@@ -17,65 +19,18 @@ class VADView extends StatefulWidget {
 }
 
 class _VADViewState extends State<VADView> {
-  final sdk.AudioCaptureManager _capture = sdk.AudioCaptureManager();
-  StreamSubscription<sdk.VADResult>? _vadSubscription;
-  StreamSubscription<double>? _levelSubscription;
-
-  bool _isLoadingModel = false;
-  bool _isListening = false;
-  String? _modelName;
-  sdk.InferenceFramework? _framework;
-  String? _errorMessage;
-  bool _isSpeech = false;
-  double _confidence = 0;
-  double _energy = 0;
-  int _frameCount = 0;
-  double _audioLevel = 0;
+  final VADViewModel _viewModel = VADViewModel();
 
   @override
   void initState() {
     super.initState();
-    unawaited(_syncModelState());
+    unawaited(_viewModel.initialize());
   }
 
   @override
   void dispose() {
-    unawaited(_vadSubscription?.cancel());
-    unawaited(_levelSubscription?.cancel());
-    unawaited(_capture.dispose());
+    _viewModel.dispose();
     super.dispose();
-  }
-
-  Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.vad.currentModel();
-    if (!mounted) return;
-    setState(() {
-      _modelName = model?.name;
-      _framework = model?.framework;
-    });
-  }
-
-  Future<void> _loadModel(ModelInfo model) async {
-    setState(() {
-      _isLoadingModel = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await sdk.RunAnywhere.vad.loadModel(model.id);
-      if (!mounted) return;
-      setState(() {
-        _modelName = model.name;
-        _framework = model.framework;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _errorMessage = 'Failed to load VAD model: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingModel = false);
-      }
-    }
   }
 
   void _showModelSelectionSheet() {
@@ -86,131 +41,56 @@ class _VADViewState extends State<VADView> {
         useSafeArea: true,
         builder: (sheetContext) => ModelSelectionSheet(
           context: ModelSelectionContext.vad,
-          onModelSelected: _loadModel,
+          onModelSelected: _viewModel.loadModelFromSelection,
         ),
       ),
     );
   }
 
-  Future<void> _toggleListening() async {
-    if (_isListening) {
-      await _stopListening();
-    } else {
-      await _startListening();
-    }
-  }
-
-  Future<void> _startListening() async {
-    if (!sdk.RunAnywhere.vad.isModelLoaded) {
-      setState(() => _errorMessage = 'Select a VAD model first');
-      return;
-    }
-
-    final chunks = await _capture.startRecording(
-      sampleRate: 16000,
-      numChannels: 1,
-    );
-    if (chunks == null) {
-      setState(() => _errorMessage = 'Microphone capture failed');
-      return;
-    }
-
-    await _levelSubscription?.cancel();
-    _levelSubscription = _capture.audioLevelStream?.listen((level) {
-      if (!mounted) return;
-      setState(() => _audioLevel = level);
-    });
-
-    _vadSubscription = sdk.RunAnywhere.vad
-        .streamVAD(chunks)
-        .listen(
-          (result) {
-            if (!mounted) return;
-            if (result.errorMessage.isNotEmpty) {
-              setState(() {
-                _errorMessage = result.errorMessage;
-                _isListening = false;
-              });
-              unawaited(_capture.cancel());
-              return;
-            }
-            setState(() {
-              _isSpeech = result.isSpeech;
-              _confidence = result.confidence;
-              _energy = result.energy;
-              _frameCount += 1;
-            });
-          },
-          onError: (Object e) {
-            if (!mounted) return;
-            setState(() {
-              _errorMessage = 'VAD failed: $e';
-              _isListening = false;
-            });
-          },
-          onDone: () {
-            if (!mounted) return;
-            setState(() => _isListening = false);
-          },
-        );
-
-    setState(() {
-      _isListening = true;
-      _errorMessage = null;
-      _frameCount = 0;
-    });
-  }
-
-  Future<void> _stopListening() async {
-    await _vadSubscription?.cancel();
-    _vadSubscription = null;
-    await _levelSubscription?.cancel();
-    _levelSubscription = null;
-    await _capture.stopRecording();
-    if (!mounted) return;
-    setState(() {
-      _isListening = false;
-      _audioLevel = 0;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Voice Activity')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.large),
-        children: [
-          ModelStatusBanner(
-            framework: _framework,
-            modelName: _modelName,
-            isLoading: _isLoadingModel,
-            onSelectModel: _showModelSelectionSheet,
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Voice Activity')),
+          body: ListView(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            children: [
+              ModelStatusBanner(
+                framework: _viewModel.selectedFramework,
+                modelName: _viewModel.selectedModelName,
+                isLoading: _viewModel.isProcessing,
+                onSelectModel: _showModelSelectionSheet,
+              ),
+              if (_viewModel.errorMessage != null) ...[
+                const SizedBox(height: AppSpacing.large),
+                _ErrorBanner(message: _viewModel.errorMessage!),
+              ],
+              const SizedBox(height: AppSpacing.large),
+              _StatusCard(
+                isListening: _viewModel.isListening,
+                isSpeech: _viewModel.isSpeech,
+                confidence: _viewModel.confidence,
+                energy: _viewModel.energy,
+                audioLevel: _viewModel.audioLevel,
+                frameCount: _viewModel.frameCount,
+              ),
+              const SizedBox(height: AppSpacing.large),
+              SizedBox(
+                height: AppSpacing.buttonHeightRegular,
+                child: FilledButton.icon(
+                  onPressed: _viewModel.isProcessing
+                      ? null
+                      : () => unawaited(_viewModel.toggleListening()),
+                  icon: Icon(_viewModel.isListening ? Icons.stop : Icons.mic),
+                  label: Text(_viewModel.isListening ? 'Stop' : 'Start'),
+                ),
+              ),
+            ],
           ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: AppSpacing.large),
-            _ErrorBanner(message: _errorMessage!),
-          ],
-          const SizedBox(height: AppSpacing.large),
-          _StatusCard(
-            isListening: _isListening,
-            isSpeech: _isSpeech,
-            confidence: _confidence,
-            energy: _energy,
-            audioLevel: _audioLevel,
-            frameCount: _frameCount,
-          ),
-          const SizedBox(height: AppSpacing.large),
-          SizedBox(
-            height: AppSpacing.buttonHeightRegular,
-            child: FilledButton.icon(
-              onPressed: _isLoadingModel ? null : _toggleListening,
-              icon: Icon(_isListening ? Icons.stop : Icons.mic),
-              label: Text(_isListening ? 'Stop' : 'Start'),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

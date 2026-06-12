@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -9,24 +8,12 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
-
-/// TTSMetadata (matching iOS TTSMetadata)
-class TTSMetadata {
-  final double durationMs;
-  final int audioSize;
-  final int sampleRate;
-
-  const TTSMetadata({
-    required this.durationMs,
-    required this.audioSize,
-    required this.sampleRate,
-  });
-}
+import 'package:runanywhere_ai/features/voice/tts_view_model.dart';
 
 /// TextToSpeechView (mirroring iOS TextToSpeechView.swift)
 ///
 /// Dedicated TTS view with speech generation and playback controls.
-/// Now uses RunAnywhere SDK for actual speech synthesis.
+/// Purely UI — all business logic lives in [TTSViewModel].
 class TextToSpeechView extends StatefulWidget {
   const TextToSpeechView({super.key});
 
@@ -35,78 +22,27 @@ class TextToSpeechView extends StatefulWidget {
 }
 
 class _TextToSpeechViewState extends State<TextToSpeechView> {
+  final TTSViewModel _viewModel = TTSViewModel();
+
   final TextEditingController _textController = TextEditingController(
     text: 'Hello! This is a text to speech test.',
   );
 
-  // Playback state
-  bool _isGenerating = false;
-  bool _isPlaying = false;
-  double _currentTime = 0.0;
-  double _duration = 0.0;
-  double _playbackProgress = 0.0;
-
-  // Voice settings
-  double _speechRate = 1.0;
-
-  // Model state
-  LLMFramework? _selectedFramework;
-  String? _selectedModelName;
-  bool _isSystemTTS = false;
-
-  // Audio metadata
-  TTSMetadata? _metadata;
-
-  // Error state
-  String? _errorMessage;
-
-  // SDK-owned playback streams (RunAnywhere.speak plays internally).
-  StreamSubscription<bool>? _playingSubscription;
-  StreamSubscription<double>? _progressSubscription;
-
   // Character limit
   static const int _maxCharacters = 5000;
-
-  bool get _hasModelSelected =>
-      _selectedFramework != null && _selectedModelName != null;
 
   @override
   void initState() {
     super.initState();
-    _subscribeToPlayback();
+    unawaited(_viewModel.initialize());
   }
 
   @override
   void dispose() {
     _textController.dispose();
-    unawaited(_playingSubscription?.cancel());
-    unawaited(_progressSubscription?.cancel());
+    _viewModel.dispose();
     super.dispose();
   }
-
-  void _subscribeToPlayback() {
-    // Subscribe to the SDK's speak() playback state.
-    _playingSubscription =
-        sdk.RunAnywhere.tts.playbackStateStream.listen((isPlaying) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = isPlaying;
-          if (isPlaying) _isGenerating = false;
-        });
-      }
-    });
-
-    _progressSubscription =
-        sdk.RunAnywhere.tts.playbackProgressStream.listen((progress) {
-      if (mounted) {
-        setState(() {
-          _playbackProgress = progress;
-          _currentTime = _duration * progress;
-        });
-      }
-    });
-  }
-
 
   void _showModelSelectionSheet() {
     unawaited(showModalBottomSheet<void>(
@@ -116,118 +52,21 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.tts,
         onModelSelected: (model) async {
-          await _loadModel(model);
+          await _viewModel.loadModelFromSelection(model);
+          // Surface TTS load failures via SnackBar in addition to the
+          // inline error text.
+          final error = _viewModel.errorMessage;
+          if (error != null && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('TTS load failed: $error'),
+                duration: const Duration(seconds: 6),
+              ),
+            );
+          }
         },
       ),
     ));
-  }
-
-  /// Load TTS model using RunAnywhere SDK
-  Future<void> _loadModel(ModelInfo model) async {
-    setState(() {
-      _isGenerating = true;
-      _errorMessage = null;
-    });
-
-    try {
-      debugPrint('🔄 Loading TTS voice: ${model.name}');
-
-      // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhere.tts.loadVoice(model.id);
-
-      setState(() {
-        _selectedFramework = model.preferredFramework;
-        _selectedModelName = model.name;
-        _isSystemTTS = model.preferredFramework ==
-            LLMFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
-        _isGenerating = false;
-      });
-
-      debugPrint('✅ TTS model loaded: ${model.name}');
-    } catch (e) {
-      debugPrint('❌ Failed to load TTS model: $e');
-      setState(() {
-        _errorMessage = 'Failed to load model: $e';
-        _isGenerating = false;
-      });
-      // Surface TTS load failures via SnackBar in addition to the
-      // inline error text.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('TTS load failed: $e'),
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      }
-    }
-  }
-
-  /// Generate speech using RunAnywhere SDK
-  Future<void> _generateSpeech() async {
-    if (_textController.text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Please enter text to speak';
-      });
-      return;
-    }
-
-    setState(() {
-      _isGenerating = true;
-      _errorMessage = null;
-      _metadata = null;
-    });
-
-    try {
-      debugPrint('🔊 Generating speech with SDK...');
-
-      if (!sdk.RunAnywhere.tts.isLoaded) {
-        throw Exception(
-            'TTS component not loaded. Please load a TTS voice first.');
-      }
-
-      final options = sdk.TTSOptions(
-        speakingRate: _speechRate,
-        pitch: 1.0,
-        volume: 1.0,
-      );
-
-      // One SDK entry point for every TTS path: speak() synthesizes AND
-      // plays (system voices and on-device models alike), mirroring iOS.
-      final result = await sdk.RunAnywhere.speak(
-        _textController.text,
-        options,
-      );
-      debugPrint(
-          '✅ Speak complete: ${result.sampleRate} Hz, ${result.durationMs}ms');
-
-      setState(() {
-        _isGenerating = false;
-        _duration = result.durationMs.toInt() / 1000.0;
-        _metadata = TTSMetadata(
-          durationMs: result.durationMs.toDouble(),
-          audioSize: result.audioSizeBytes.toInt(),
-          sampleRate: result.sampleRate,
-        );
-      });
-    } catch (e) {
-      debugPrint('❌ Speech generation failed: $e');
-      setState(() {
-        _errorMessage = 'Speech generation failed: $e';
-        _isGenerating = false;
-      });
-    }
-  }
-
-  Future<void> _togglePlayback() async {
-    if (_isPlaying) {
-      await _stopPlayback();
-    }
-  }
-
-  Future<void> _stopPlayback() async {
-    await sdk.RunAnywhere.tts.stopSpeaking();
-    debugPrint('⏹️ Playback stopped');
   }
 
   String _formatTime(double seconds) {
@@ -247,72 +86,80 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   @override
   Widget build(BuildContext context) {
-    final characterCount = _textController.text.length;
+    return ListenableBuilder(
+      listenable: _viewModel,
+      builder: (context, _) {
+        final hasModelSelected = _viewModel.hasModelSelected;
+        final characterCount = _textController.text.length;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Text to Speech'),
-      ),
-      body: Stack(
-        children: [
-          Column(
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Text to Speech'),
+          ),
+          body: Stack(
             children: [
-              // Model Status Banner
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.large),
-                child: ModelStatusBanner(
-                  framework: _selectedFramework,
-                  modelName: _selectedModelName,
-                  isLoading: _isGenerating && !_hasModelSelected,
-                  onSelectModel: _showModelSelectionSheet,
-                ),
-              ),
-
-              const Divider(),
-
-              // Main content (only when model is selected)
-              if (_hasModelSelected) ...[
-                Expanded(
-                  child: SingleChildScrollView(
+              Column(
+                children: [
+                  // Model Status Banner
+                  Padding(
                     padding: const EdgeInsets.all(AppSpacing.large),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Text input section
-                        _buildTextInputSection(characterCount),
-                        const SizedBox(height: AppSpacing.xLarge),
-
-                        // Voice settings section
-                        _buildVoiceSettingsSection(),
-                        const SizedBox(height: AppSpacing.xLarge),
-
-                        // Audio metadata (when available)
-                        if (_metadata != null) _buildAudioInfoSection(),
-
-                        // Error message
-                        if (_errorMessage != null) _buildErrorBanner(),
-                      ],
+                    child: ModelStatusBanner(
+                      framework: _viewModel.selectedFramework,
+                      modelName: _viewModel.selectedModelName,
+                      isLoading: _viewModel.isGenerating && !hasModelSelected,
+                      onSelectModel: _showModelSelectionSheet,
                     ),
                   ),
+
+                  const Divider(),
+
+                  // Main content (only when model is selected)
+                  if (hasModelSelected) ...[
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(AppSpacing.large),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Text input section
+                            _buildTextInputSection(characterCount),
+                            const SizedBox(height: AppSpacing.xLarge),
+
+                            // Voice settings section
+                            _buildVoiceSettingsSection(),
+                            const SizedBox(height: AppSpacing.xLarge),
+
+                            // Audio metadata (when available)
+                            if (_viewModel.metadata != null)
+                              _buildAudioInfoSection(),
+
+                            // Error message
+                            if (_viewModel.errorMessage != null)
+                              _buildErrorBanner(),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const Divider(),
+
+                    // Controls section
+                    _buildControlsSection(),
+                  ] else
+                    const Expanded(child: SizedBox()),
+                ],
+              ),
+
+              // Model required overlay
+              if (!hasModelSelected && !_viewModel.isGenerating)
+                ModelRequiredOverlay(
+                  modality: ModelSelectionContext.tts,
+                  onSelectModel: _showModelSelectionSheet,
                 ),
-
-                const Divider(),
-
-                // Controls section
-                _buildControlsSection(),
-              ] else
-                const Expanded(child: SizedBox()),
             ],
           ),
-
-          // Model required overlay
-          if (!_hasModelSelected && !_isGenerating)
-            ModelRequiredOverlay(
-              modality: ModelSelectionContext.tts,
-              onSelectModel: _showModelSelectionSheet,
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -382,15 +229,11 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           // Speech rate slider
           _buildSliderRow(
             label: 'Speed',
-            value: _speechRate,
+            value: _viewModel.speechRate,
             min: 0.5,
             max: 2.0,
             color: AppColors.primaryBlue,
-            onChanged: (value) {
-              setState(() {
-                _speechRate = value;
-              });
-            },
+            onChanged: (value) => _viewModel.speechRate = value,
           ),
         ],
       ),
@@ -436,6 +279,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   }
 
   Widget _buildAudioInfoSection() {
+    final metadata = _viewModel.metadata!;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       margin: const EdgeInsets.only(bottom: AppSpacing.large),
@@ -454,19 +298,19 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           _buildMetadataRow(
             icon: Icons.graphic_eq,
             label: 'Duration',
-            value: '${(_metadata!.durationMs / 1000).toStringAsFixed(2)}s',
+            value: '${(metadata.durationMs / 1000).toStringAsFixed(2)}s',
           ),
           const SizedBox(height: AppSpacing.smallMedium),
           _buildMetadataRow(
             icon: Icons.description,
             label: 'Size',
-            value: _formatBytes(_metadata!.audioSize),
+            value: _formatBytes(metadata.audioSize),
           ),
           const SizedBox(height: AppSpacing.smallMedium),
           _buildMetadataRow(
             icon: Icons.volume_up,
             label: 'Sample Rate',
-            value: '${_metadata!.sampleRate} Hz',
+            value: '${metadata.sampleRate} Hz',
           ),
         ],
       ),
@@ -516,7 +360,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           const SizedBox(width: AppSpacing.smallMedium),
           Expanded(
             child: Text(
-              _errorMessage!,
+              _viewModel.errorMessage!,
               style: AppTypography.subheadline(context),
             ),
           ),
@@ -531,13 +375,13 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       child: Column(
         children: [
           // Playback progress (when playing)
-          if (_isPlaying)
+          if (_viewModel.isPlaying)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.large),
               child: Row(
                 children: [
                   Text(
-                    _formatTime(_currentTime),
+                    _formatTime(_viewModel.currentTime),
                     style: AppTypography.caption(context).copyWith(
                       color: AppColors.textSecondary(context),
                     ),
@@ -545,7 +389,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
                   const SizedBox(width: AppSpacing.smallMedium),
                   Expanded(
                     child: LinearProgressIndicator(
-                      value: _playbackProgress,
+                      value: _viewModel.playbackProgress,
                       backgroundColor: AppColors.backgroundGray5(context),
                       valueColor:
                           const AlwaysStoppedAnimation(AppColors.primaryPurple),
@@ -553,7 +397,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
                   ),
                   const SizedBox(width: AppSpacing.smallMedium),
                   Text(
-                    _formatTime(_duration),
+                    _formatTime(_viewModel.duration),
                     style: AppTypography.caption(context).copyWith(
                       color: AppColors.textSecondary(context),
                     ),
@@ -569,11 +413,11 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               // Generate/Speak button
               FilledButton.icon(
                 onPressed: _textController.text.isNotEmpty &&
-                        !_isGenerating &&
-                        _hasModelSelected
-                    ? _generateSpeech
+                        !_viewModel.isGenerating &&
+                        _viewModel.hasModelSelected
+                    ? () => unawaited(_viewModel.speak(_textController.text))
                     : null,
-                icon: _isGenerating
+                icon: _viewModel.isGenerating
                     ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -582,8 +426,10 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
                           strokeWidth: 2,
                         ),
                       )
-                    : Icon(_isSystemTTS ? Icons.volume_up : Icons.graphic_eq),
-                label: Text(_isSystemTTS ? 'Speak' : 'Generate'),
+                    : Icon(_viewModel.isSystemTTS
+                        ? Icons.volume_up
+                        : Icons.graphic_eq),
+                label: Text(_viewModel.isSystemTTS ? 'Speak' : 'Generate'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primaryPurple,
                   minimumSize: const Size(140, 50),
@@ -593,9 +439,9 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               const SizedBox(width: AppSpacing.xLarge),
 
               // Stop button (when playing)
-              if (_isPlaying)
+              if (_viewModel.isPlaying)
                 FilledButton.icon(
-                  onPressed: _togglePlayback,
+                  onPressed: () => unawaited(_viewModel.stopSpeaking()),
                   icon: const Icon(Icons.stop),
                   label: const Text('Stop'),
                   style: FilledButton.styleFrom(
@@ -610,9 +456,9 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
           // Status text
           Text(
-            _isGenerating
+            _viewModel.isGenerating
                 ? 'Generating speech...'
-                : _isPlaying
+                : _viewModel.isPlaying
                     ? 'Playing...'
                     : 'Ready',
             style: AppTypography.caption(context).copyWith(

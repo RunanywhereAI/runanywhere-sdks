@@ -8,7 +8,7 @@
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
  *   - rac_vlm_service_ops_t and rac_vlm_service_t: `internal`.
- *   - Proto-byte APIs (rac_vlm_process_proto, rac_vlm_process_stream_proto,
+ *   - Proto-byte APIs (rac_vlm_process_proto,
  *     rac_vlm_generate_proto, rac_vlm_stream_proto,
  *     rac_vlm_cancel_proto, rac_vlm_cancel_lifecycle_proto):
  *     `SDK-facing default` over runanywhere.v1.VLMImage /
@@ -129,16 +129,6 @@ typedef struct rac_vlm_service {
 } rac_vlm_service_t;
 
 /**
- * @brief Callback for proto-byte VLM streaming events.
- *
- * The callback receives serialized runanywhere.v1.SDKEvent bytes. Token deltas
- * are emitted as GenerationEvent TOKEN_GENERATED events, while operation
- * lifecycle is also published on the canonical SDKEvent stream.
- */
-typedef rac_bool_t (*rac_vlm_stream_proto_callback_fn)(const uint8_t* event_proto_bytes,
-                                                       size_t event_proto_size, void* user_data);
-
-/**
  * @brief Callback for generated VLM stream events.
  *
  * The callback receives serialized runanywhere.v1.VLMStreamEvent bytes emitted
@@ -217,48 +207,6 @@ RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_i
                                             rac_vlm_stream_callback_fn callback, void* user_data);
 
 /**
- * @brief Stream VLM output with serialized generated proto inputs.
- *
- * Token events are delivered to callback as serialized runanywhere.v1.SDKEvent
- * bytes. The optional out_result receives the aggregate runanywhere.v1.VLMResult
- * when generation completes.
- *
- * @warning user_data ownership and lifetime (cross-SDK
- *          contract — see rac_llm_stream.h for the canonical recipe). The C
- *          runtime may invoke `callback(bytes, size, user_data)` on a
- *          background thread AFTER this entry point has returned, because
- *          the dispatcher copies the callback slot under its internal mutex
- *          and releases the mutex BEFORE invoking the user callback (see
- *          rac_vlm_proto_abi.cpp lock-release-before-callback comment). The
- *          caller MUST ensure no in-flight invocation is executing on a
- *          background thread before freeing @p user_data.
- *
- *          Recommended teardown sequence:
- *            (a) drive the stream to its terminal event or call
- *                rac_vlm_cancel_proto(handle) / rac_vlm_cancel_lifecycle_proto()
- *                — no NEW dispatches will fire once cancellation has been
- *                observed by the generator loop;
- *            (b) call rac_vlm_proto_quiesce() — spin-waits until every
- *                in-flight callback invocation has returned;
- *            (c) free @p user_data.
- *
- *          Modalities that currently expose proto_quiesce: LLM
- *          (rac_llm_stream.h), STT (rac_stt_stream.h), TTS
- *          (rac_tts_stream.h), VAD (rac_vad_stream.h), Diffusion
- *          (rac_diffusion_stream.h), VLM (this header). voice_agent
- *          quiesces in-flight callbacks as part of rac_voice_agent_destroy()
- *          rather than exposing a standalone quiesce entry point. SDK
- *          fan-out helpers (Swift HandleStreamAdapter, Kotlin/Flutter/RN
- *          equivalents) centralize this dance for their host language;
- *          refer to the canonical adapter implementation when porting a new
- *          SDK.
- */
-RAC_API rac_result_t rac_vlm_process_stream_proto(
-    rac_handle_t handle, const uint8_t* image_proto_bytes, size_t image_proto_size,
-    const uint8_t* options_proto_bytes, size_t options_proto_size,
-    rac_vlm_stream_proto_callback_fn callback, void* user_data, rac_proto_buffer_t* out_result);
-
-/**
  * @brief Get service information
  *
  * @param handle Service handle
@@ -332,7 +280,7 @@ RAC_API rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_even
  * @brief Spin-wait until all in-flight VLM proto-byte stream/process entry
  *        points have returned. Mirrors the voice_agent in_flight pattern
  *        (voice_agent.cpp:594). Callers freeing user_data passed into
- *        rac_vlm_process_stream_proto / rac_vlm_stream_proto, or tearing
+ *        rac_vlm_stream_proto, or tearing
  *        down the lifecycle VLM, should call this before freeing the
  *        user_data. Safe to call from any thread.
  */

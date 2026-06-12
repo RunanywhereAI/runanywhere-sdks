@@ -130,15 +130,13 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     optionsSize: number,
     outResult: number,
   ): number;
-  _rac_vlm_process_stream_proto?(
-    handle: number,
-    imageBytes: number,
-    imageSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+  /** Typed stream ABI: serialized VLMGenerationRequest in, VLMStreamEvent
+   *  per callback. Lifecycle-owned model — no handle, no out-result. */
+  _rac_vlm_stream_proto?(
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
-    outResult: number,
   ): number;
   _rac_vlm_cancel_proto?(handle: number): number;
 

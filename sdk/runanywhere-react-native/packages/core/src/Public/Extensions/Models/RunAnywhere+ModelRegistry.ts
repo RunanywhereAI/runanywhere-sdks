@@ -319,10 +319,11 @@ export async function registerMultiFileModel(
   requireInitialized();
   if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
   const native = requireNativeModule();
+  const category = input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
   const message = ModelInfoCodec.fromPartial({
     id: input.id,
     name: input.name,
-    category: input.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    category,
     framework: input.framework,
     preferredFramework: input.framework,
     format: ModelFormat.MODEL_FORMAT_GGUF,
@@ -330,11 +331,11 @@ export async function registerMultiFileModel(
       ? { memoryRequiredBytes: input.memoryRequirement }
       : {}),
     multiFile: {
-      files: input.files.map((file, idx) => ({
-        role:
-          idx === 0
-            ? ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
-            : ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+      // Role inference lives in commons (rac_infer_model_file_role) so
+      // tokenizer/config/vocab sidecars resolve correctly — Swift parity
+      // (RAModelFileRole+Inference.swift).
+      files: input.files.map((file) => ({
+        role: native.inferModelFileRole(file.filename, category) as ModelFileRole,
         url: file.url,
         filename: file.filename,
         relativePath: file.filename,
@@ -1037,26 +1038,35 @@ export async function refreshModelRegistry(
 /**
  * Framework the SDK falls back to when a category has no explicit model
  * framework resolved (e.g. a pending UI selection that has not yet matched a
- * catalogued model). Mirrors commons' `rac_model_category_default_framework`
- * (model_types.cpp:122-137) and Swift's `RAModelCategory.defaultFramework`,
- * which delegates to that C ABI.
- *
- * TODO(layer-down): expose `rac_model_category_default_framework` through
- * the Nitro bridge and delegate, removing this mirrored mapping.
+ * catalogued model). Delegates to commons' `rac_model_category_default_framework`
+ * — the same C ABI Swift's `RAModelCategory.defaultFramework` calls.
  */
 export function getDefaultFramework(
   category: ModelCategory
 ): InferenceFramework {
-  switch (category) {
-    case ModelCategory.MODEL_CATEGORY_LANGUAGE:
-    case ModelCategory.MODEL_CATEGORY_MULTIMODAL:
-      return InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
-    case ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-    case ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-    case ModelCategory.MODEL_CATEGORY_EMBEDDING:
-    case ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-      return InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
-    default:
-      return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+  if (!isNativeModuleAvailable()) {
+    return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
   }
+  return requireNativeModule().modelCategoryDefaultFramework(
+    category
+  ) as InferenceFramework;
+}
+
+/**
+ * Infer the role a filename plays inside a multi-file model (primary
+ * weights, vision projector, tokenizer/config sidecar, …). Delegates to
+ * commons' `rac_infer_model_file_role`. Mirrors Swift
+ * `RunAnywhere.inferModelFileRole` (RAModelFileRole+Inference.swift).
+ */
+export function inferModelFileRole(
+  filename: string,
+  modality: ModelCategory
+): ModelFileRole {
+  if (!isNativeModuleAvailable()) {
+    return ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL;
+  }
+  return requireNativeModule().inferModelFileRole(
+    filename,
+    modality
+  ) as ModelFileRole;
 }

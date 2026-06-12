@@ -3,7 +3,7 @@
  *
  * Vision Language Model (VLM) extension for the RunAnywhere core SDK.
  * Uses proto-canonical VLM shapes and the RN core Nitro bridge over commons
- * `rac_vlm_process_proto`, `rac_vlm_process_stream_proto`, and
+ * `rac_vlm_process_proto`, `rac_vlm_stream_proto`, and
  * `rac_vlm_cancel_proto`.
  *
  * Backend packages register providers only; core owns the public VLM

@@ -1,15 +1,14 @@
 import {
   VLMGenerationOptions,
+  VLMGenerationRequest,
   VLMImage,
   VLMResult,
+  VLMStreamEvent,
   type VLMGenerationOptions as ProtoVLMGenerationOptions,
   type VLMImage as ProtoVLMImage,
   type VLMResult as ProtoVLMResult,
+  type VLMStreamEvent as ProtoVLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
-import {
-  SDKEvent,
-  type SDKEvent as ProtoSDKEvent,
-} from '@runanywhere/proto-ts/sdk_events';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge';
 import { formatRacResult, ProtoWasmBridge } from '../runtime/ProtoWasm';
 import {
@@ -18,9 +17,7 @@ import {
   missingExports,
   modalityLogger as logger,
   streamCallback,
-  withOptionalCallback,
   type ModalityProtoModule,
-  type ProtoEventHandler,
 } from './ProtoAdapterTypes';
 
 export class VLMProtoAdapter {
@@ -34,7 +31,7 @@ export class VLMProtoAdapter {
   supportsProtoVLM(): boolean {
     return missingExports(this.module, [
       '_rac_vlm_process_proto',
-      '_rac_vlm_process_stream_proto',
+      '_rac_vlm_stream_proto',
       '_rac_vlm_cancel_proto',
     ]).length === 0;
   }
@@ -97,90 +94,50 @@ export class VLMProtoAdapter {
     ));
   }
 
-  processStream(
-    handle: number,
-    image: ProtoVLMImage,
-    options: ProtoVLMGenerationOptions,
-    onEvent: ProtoEventHandler<ProtoSDKEvent> | null,
-  ): ProtoVLMResult | null {
-    if (!ensureExports(this.module, 'vlm.processStream', ['_rac_vlm_process_stream_proto'])) {
-      return null;
-    }
-    const imageBytes = VLMImage.encode(image).finish();
-    const optionsBytes = VLMGenerationOptions.encode(options).finish();
-    const bridge = this.bridge();
-    return withOptionalCallback(this.module, SDKEvent, onEvent, 'rac_vlm_process_stream_proto', (callbackPtr) => (
-      bridge.withHeapBytes(imageBytes, (imagePtr, imageSize) => (
-        bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-          bridge.callResultProto(
-            VLMResult,
-            (outResult) => this.module._rac_vlm_process_stream_proto!(
-              handle,
-              imagePtr,
-              imageSize,
-              optionsPtr,
-              optionsSize,
-              callbackPtr,
-              0,
-              outResult,
-            ),
-            'rac_vlm_process_stream_proto',
-          )
-        ))
-      ))
-    ));
-  }
-
+  /**
+   * Stream typed VLMStreamEvents from the lifecycle-owned VLM model via
+   * `rac_vlm_stream_proto` (STARTED → TOKEN* → exactly one terminal
+   * COMPLETED/ERROR; COMPLETED carries the full VLMResult). The canonical
+   * cross-SDK streaming shape — serialized VLMGenerationRequest in, no
+   * handle, no out-result buffer. `handle` is retained only for cancel
+   * routing (0 falls back to the lifecycle-owned service).
+   */
   streamEvents(
     handle: number,
     image: ProtoVLMImage,
     options: ProtoVLMGenerationOptions,
-  ): AsyncIterable<ProtoSDKEvent> {
-    const imageBytes = VLMImage.encode(image).finish();
-    const optionsBytes = VLMGenerationOptions.encode({ ...options, streamingEnabled: true }).finish();
+  ): AsyncIterable<ProtoVLMStreamEvent> {
+    const requestBytes = VLMGenerationRequest.encode(
+      VLMGenerationRequest.fromPartial({
+        images: [image],
+        options: { ...options, streamingEnabled: true },
+      }),
+    ).finish();
     // T6.1: prefer Worker path when available; otherwise main-thread MVP.
     const offscreen = OffscreenRuntimeBridge.tryGet();
     if (offscreen != null) {
       return offscreen.getStreamIterator(
         {
-          kind: 'stream.vlm.process',
-          handle,
-          imageBytes,
-          promptBytes: optionsBytes,
+          kind: 'stream.vlm.generate',
+          requestBytes,
         },
-        SDKEvent,
+        VLMStreamEvent,
         { onCancel: () => { this.cancel(handle); } },
       );
     }
-    if (!ensureExports(this.module, 'vlm.processImageStream', ['_rac_vlm_process_stream_proto'])) {
+    if (!ensureExports(this.module, 'vlm.processImageStream', ['_rac_vlm_stream_proto'])) {
       return emptyStream();
     }
     const bridge = this.bridge();
     return streamCallback(
       this.module,
-      SDKEvent,
-      'rac_vlm_process_stream_proto',
-      (callbackPtr) => {
-        const result = bridge.withHeapBytes(imageBytes, (imagePtr, imageSize) => (
-          bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-            bridge.callResultProto(
-              VLMResult,
-              (outResult) => this.module._rac_vlm_process_stream_proto!(
-                handle,
-                imagePtr,
-                imageSize,
-                optionsPtr,
-                optionsSize,
-                callbackPtr,
-                0,
-                outResult,
-              ),
-              'rac_vlm_process_stream_proto',
-            )
-          ))
-        ));
-        return result ? 0 : -903;
-      },
+      VLMStreamEvent,
+      'rac_vlm_stream_proto',
+      (callbackPtr) => (
+        bridge.withHeapBytes(requestBytes, (requestPtr, requestSize) => (
+          this.module._rac_vlm_stream_proto!(requestPtr, requestSize, callbackPtr, 0)
+        ))
+      ),
       undefined,
       () => {
         this.cancel(handle);

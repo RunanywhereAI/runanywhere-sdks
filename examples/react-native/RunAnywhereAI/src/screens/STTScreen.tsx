@@ -51,7 +51,12 @@ import {
 import { STTMode } from '../types/voice';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, AudioCaptureManager } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  AudioCaptureManager,
+  createPushableAudioStream,
+  type PushableAudioStream,
+} from '@runanywhere/core';
 import {
   AudioFormat,
   ModelCategory,
@@ -108,70 +113,6 @@ async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
     audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
     sampleRate: CAPTURE_SAMPLE_RATE,
   });
-}
-
-type PushableAudioStream = {
-  iterable: AsyncIterable<Uint8Array>;
-  push: (chunk: Uint8Array) => void;
-  close: () => void;
-};
-
-function createPushableAudioStream(): PushableAudioStream {
-  const queue: Uint8Array[] = [];
-  const waiters: Array<(result: IteratorResult<Uint8Array>) => void> = [];
-  let closed = false;
-
-  const resolveNext = (result: IteratorResult<Uint8Array>) => {
-    const waiter = waiters.shift();
-    if (waiter) {
-      waiter(result);
-    } else if (!result.done) {
-      queue.push(result.value);
-    }
-  };
-
-  const finish = () => {
-    closed = true;
-    while (waiters.length > 0) {
-      waiters.shift()?.({
-        value: undefined as unknown as Uint8Array,
-        done: true,
-      });
-    }
-  };
-
-  return {
-    iterable: {
-      [Symbol.asyncIterator](): AsyncIterator<Uint8Array> {
-        return {
-          next(): Promise<IteratorResult<Uint8Array>> {
-            const chunk = queue.shift();
-            if (chunk) return Promise.resolve({ value: chunk, done: false });
-            if (closed) {
-              return Promise.resolve({
-                value: undefined as unknown as Uint8Array,
-                done: true,
-              });
-            }
-            return new Promise((resolve) => waiters.push(resolve));
-          },
-          return(): Promise<IteratorResult<Uint8Array>> {
-            finish();
-            return Promise.resolve({
-              value: undefined as unknown as Uint8Array,
-              done: true,
-            });
-          },
-        };
-      },
-    },
-    push(chunk: Uint8Array) {
-      if (!closed && chunk.byteLength > 0) {
-        resolveNext({ value: chunk, done: false });
-      }
-    },
-    close: finish,
-  };
 }
 
 // Canonical SDK methods (Swift parity).

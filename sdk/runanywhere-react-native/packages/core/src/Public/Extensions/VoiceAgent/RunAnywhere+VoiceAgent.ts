@@ -56,21 +56,6 @@ function audioToArrayBuffer(audioData: ArrayBuffer | Uint8Array): ArrayBuffer {
 }
 
 /**
- * Default `VoiceAgentComposeConfig` with sensible VAD/wakeword settings.
- * Callers may spread or override individual fields before passing to
- * `initializeVoiceAgent`. Mirrors the web SDK `defaultVoiceAgentComposeConfig`.
- */
-export function defaultVoiceAgentComposeConfig(): ReturnType<typeof VoiceAgentComposeConfig.create> {
-  return VoiceAgentComposeConfig.create({
-    vadSampleRate: 16000,
-    vadFrameLength: 0.1,
-    vadEnergyThreshold: 0.1,
-    wakewordEnabled: false,
-    wakewordThreshold: 0,
-  });
-}
-
-/**
  * Get voice agent component states.
  *
  * Matches Swift: `RunAnywhere.getVoiceAgentComponentStates()`.

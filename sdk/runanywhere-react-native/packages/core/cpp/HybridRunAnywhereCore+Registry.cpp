@@ -662,4 +662,86 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
     });
 }
 
+// ============================================================================
+// Model type lookups - sync thunks to the commons model-types C ABI
+// (pure table/string lookups, safe on the JS thread). Mirrors Swift
+// ModelTypes.swift displayName / RAModelCategory+DefaultFramework.swift /
+// RAModelFileRole+Inference.swift.
+// ============================================================================
+
+std::string HybridRunAnywhereCore::frameworkDisplayName(double frameworkProto) {
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    const char* name = nullptr;
+#if defined(__APPLE__)
+    rac_inference_framework_from_proto(static_cast<int32_t>(frameworkProto), &framework);
+    if (rac_inference_framework_display_name(framework, &name) != RAC_SUCCESS || !name) {
+        return "Unknown";
+    }
+#else
+    auto fromProto = proto_compat::symbol<proto_compat::InferenceFrameworkFromProtoFn>(
+        "rac_inference_framework_from_proto");
+    auto displayName = proto_compat::symbol<proto_compat::InferenceFrameworkDisplayNameFn>(
+        "rac_inference_framework_display_name");
+    if (!fromProto || !displayName) {
+        return "Unknown";
+    }
+    fromProto(static_cast<int32_t>(frameworkProto), &framework);
+    if (displayName(framework, &name) != RAC_SUCCESS || !name) {
+        return "Unknown";
+    }
+#endif
+    // The C ABI returns a statically-allocated literal; copy into std::string.
+    return name;
+}
+
+double HybridRunAnywhereCore::modelCategoryDefaultFramework(double categoryProto) {
+    // INFERENCE_FRAMEWORK_UNKNOWN proto value — same as the C default branch.
+    constexpr double kUnknownFrameworkProto = 22.0;
+    rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+    int32_t frameworkProto = 0;
+#if defined(__APPLE__)
+    if (rac_model_category_from_proto(static_cast<int32_t>(categoryProto), &category) !=
+        RAC_SUCCESS) {
+        return kUnknownFrameworkProto;
+    }
+    if (rac_inference_framework_to_proto(rac_model_category_default_framework(category),
+                                         &frameworkProto) != RAC_SUCCESS) {
+        return kUnknownFrameworkProto;
+    }
+#else
+    auto categoryFromProto = proto_compat::symbol<proto_compat::ModelCategoryFromProtoFn>(
+        "rac_model_category_from_proto");
+    auto defaultFramework = proto_compat::symbol<proto_compat::ModelCategoryDefaultFrameworkFn>(
+        "rac_model_category_default_framework");
+    auto frameworkToProto = proto_compat::symbol<proto_compat::InferenceFrameworkToProtoFn>(
+        "rac_inference_framework_to_proto");
+    if (!categoryFromProto || !defaultFramework || !frameworkToProto) {
+        return kUnknownFrameworkProto;
+    }
+    if (categoryFromProto(static_cast<int32_t>(categoryProto), &category) != RAC_SUCCESS) {
+        return kUnknownFrameworkProto;
+    }
+    if (frameworkToProto(defaultFramework(category), &frameworkProto) != RAC_SUCCESS) {
+        return kUnknownFrameworkProto;
+    }
+#endif
+    return static_cast<double>(frameworkProto);
+}
+
+double HybridRunAnywhereCore::inferModelFileRole(const std::string& filename,
+                                                 double modalityProto) {
+    // MODEL_FILE_ROLE_PRIMARY_MODEL — same default as the C ABI's no-match
+    // branch and Swift's CppBridge+ModelPaths fallback.
+    int32_t roleProto = 1;
+#if defined(__APPLE__)
+    rac_infer_model_file_role(filename.c_str(), static_cast<int32_t>(modalityProto), &roleProto);
+#else
+    if (auto fn = proto_compat::symbol<proto_compat::InferModelFileRoleFn>(
+            "rac_infer_model_file_role")) {
+        fn(filename.c_str(), static_cast<int32_t>(modalityProto), &roleProto);
+    }
+#endif
+    return static_cast<double>(roleProto);
+}
+
 } // namespace margelo::nitro::runanywhere

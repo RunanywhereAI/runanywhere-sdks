@@ -54,8 +54,10 @@ function decode<T>(
 
 /**
  * Get canonical generated storage info from native commons.
+ * Internal proto plumbing for [getStorageInfo] — Swift has no public
+ * `getStorageInfoProto` counterpart, so this stays module-private.
  */
-export async function getStorageInfoProto(
+async function getStorageInfoProto(
   request: StorageInfoRequest = {
     includeDevice: true,
     includeApp: true,

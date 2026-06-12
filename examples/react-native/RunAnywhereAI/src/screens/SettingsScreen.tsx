@@ -38,6 +38,9 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { SettingsStackParamList } from '../types';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -151,6 +154,8 @@ const formatBytes = (bytes: number): string => {
 export const SettingsScreen: React.FC = () => {
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
 
   // Settings state
   // NOTE: several state hooks below are intentionally retained for upcoming
@@ -1158,6 +1163,31 @@ export const SettingsScreen: React.FC = () => {
                         Tools allow the LLM to call external APIs and functions
             to get real-time data.          {' '}
           </Text>
+        </View>
+        {/* Performance - Matches iOS CombinedSettingsView "Performance" section */}
+        {renderSectionHeader('Performance')}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.settingRow}
+            onPress={() => navigation.navigate('Benchmarks')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingRowLeft}>
+              <Icon
+                name="speedometer-outline"
+                size={20}
+                color={Colors.primaryBlue}
+              />
+              <Text style={styles.settingLabel}>Benchmarks</Text>
+            </View>
+            <View style={styles.settingRowRight}>
+              <Icon
+                name="chevron-forward"
+                size={18}
+                color={Colors.textTertiary}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
         {/* Storage Overview - Matches iOS CombinedSettingsView */}
         {renderSectionHeader('Storage Overview')}

@@ -10,13 +10,13 @@ import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
+  VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 import { VLMModelFamily } from '@runanywhere/proto-ts/vlm_options';
 import {
   ModelCategory,
   type CurrentModelResult,
 } from '@runanywhere/proto-ts/model_types';
-import type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import { SDKException } from '../../Foundation/SDKException';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
@@ -26,7 +26,9 @@ export interface VisionLanguageProvider {
   loadCurrentModel?(currentModel: CurrentModelResult): Promise<void>;
   unloadModel?(): Promise<void>;
   processImage(image: VLMImage, options: VLMGenerationOptions): Promise<VLMResult>;
-  processImageStream?(image: VLMImage, options: VLMGenerationOptions): Promise<AsyncIterable<SDKEvent>>;
+  /** Typed stream: STARTED → TOKEN* → exactly one terminal COMPLETED/ERROR
+   *  (COMPLETED carries the full VLMResult). Canonical cross-SDK shape. */
+  processImageStream?(image: VLMImage, options: VLMGenerationOptions): Promise<AsyncIterable<VLMStreamEvent>>;
   cancelVLMGeneration(): Promise<void> | void;
 }
 
@@ -94,7 +96,7 @@ export const VisionLanguage = {
   async processImageStream(
     image: VLMImage,
     options: VLMGenerationOptions,
-  ): Promise<AsyncIterable<SDKEvent>> {
+  ): Promise<AsyncIterable<VLMStreamEvent>> {
     const active = requireProvider('visionLanguage.processImageStream');
     if (!active.processImageStream) {
       throw SDKException.backendNotAvailable(

@@ -66,6 +66,13 @@ export {
 // SDKComponent display names — mirror Swift RASDKComponent+DisplayName.swift.
 export { sdkComponentDisplayName } from './Public/Helpers/SDKComponent+DisplayName';
 
+// Pushable audio stream — RN adaptation of Swift's AsyncStream<Data> for
+// feeding microphone chunks into transcribeStream() / streamVAD().
+export {
+  createPushableAudioStream,
+  type PushableAudioStream,
+} from './Public/Helpers/PushableAudioStream';
+
 // VLMImage factory helpers — mirror Swift RAVLMImage+Helpers.swift.
 export { VLMImages } from './Public/Extensions/VLM/VLMImage+Helpers';
 

@@ -746,7 +746,9 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_vlm_get_info"
     "_rac_vlm_cancel"
     "_rac_vlm_process_proto"
-    "_rac_vlm_process_stream_proto"
+    # Typed stream ABI (VLMGenerationRequest in, VLMStreamEvent out) — the
+    # canonical cross-SDK VLM streaming surface.
+    "_rac_vlm_stream_proto"
     "_rac_vlm_cancel_proto"
     "_rac_vlm_cleanup"
     "_rac_vlm_destroy"
@@ -1081,7 +1083,7 @@ set(RAC_JSPI_EXPORTS
     "rac_vlm_component_process_stream"
     "rac_vlm_component_unload"
     "rac_vlm_process_proto"
-    "rac_vlm_process_stream_proto"
+    "rac_vlm_stream_proto"
 )
 
 # =============================================================================
