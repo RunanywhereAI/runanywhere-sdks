@@ -87,7 +87,7 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Android | `examples/android/RunAnywhereAI/` | Gradle/Compose |
 | iOS | `examples/ios/RunAnywhereAI/` | SwiftUI + SPM |
 | Flutter | `examples/flutter/RunAnywhereAI/` | Flutter + Dart FFI |
-| React Native | `examples/react-native/RunAnywhereAI/` | RN 0.83 + NitroModules |
+| React Native | `examples/react-native/RunAnywhereAI/` | RN 0.85 + NitroModules |
 | Web | `examples/web/RunAnywhereAI/` | Vanilla TS + Vite |
 
 ### Playground

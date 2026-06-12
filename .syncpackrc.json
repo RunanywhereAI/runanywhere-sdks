@@ -8,8 +8,7 @@
     "sdk/runanywhere-react-native/package.json",
     "sdk/runanywhere-react-native/packages/*/package.json",
     "examples/web/RunAnywhereAI/package.json",
-    "examples/react-native/RunAnywhereAI/package.json",
-    "Playground/on-device-browser-agent/package.json"
+    "examples/react-native/RunAnywhereAI/package.json"
   ],
   "dependencyTypes": ["dev", "prod", "peer"],
   "versionGroups": [
@@ -27,9 +26,9 @@
       "isIgnored": true
     },
     {
-      "label": "vite: Playground stays on ^5.x (separate migration). Do NOT lift to 6.x here.",
-      "dependencies": ["vite"],
-      "packages": ["local-browser"],
+      "label": "react + react-native peer ranges: SDK packages declare open ranges (>=0.83.1 / >=19.0.0) so published packages accept any compatible host app version. Intentionally not pinned exact.",
+      "dependencies": ["react", "react-native"],
+      "dependencyTypes": ["peer"],
       "isIgnored": true
     },
     {
@@ -93,14 +92,14 @@
       "pinVersion": "^6.4.2"
     },
     {
-      "label": "Pinned: react-native (centralized in dependencies/versions.json) — Hermes/JSI/NitroModules ABI tracks this version",
+      "label": "Pinned: react-native (centralized in dependencies/versions.json) — Hermes/JSI/NitroModules ABI tracks this version (dev/prod only; peer ranges handled above)",
       "dependencies": ["react-native"],
-      "pinVersion": "0.83.1"
+      "pinVersion": "0.85.3"
     },
     {
-      "label": "Pinned: react (centralized in dependencies/versions.json) — RN peer dep, kept aligned with supported RN range",
+      "label": "Pinned: react (centralized in dependencies/versions.json) — kept aligned with supported RN range (dev/prod only; peer ranges handled above)",
       "dependencies": ["react"],
-      "pinVersion": "19.0.0"
+      "pinVersion": "19.2.7"
     },
     {
       "label": "Pinned: @eslint/js (centralized in dependencies/versions.json) — tracks eslint major, prevents drift across web SDK packages",
@@ -141,9 +140,10 @@
       "packages": ["**"]
     },
     {
-      "label": "Exact range: react + react-native are pinned to exact versions (RN ABI lockstep with native bridges)",
+      "label": "Exact range: react + react-native dev/prod deps are pinned to exact versions (RN ABI lockstep with native bridges); peer ranges stay open",
       "range": "",
       "dependencies": ["react", "react-native"],
+      "dependencyTypes": ["dev", "prod"],
       "packages": ["**"]
     }
   ]
