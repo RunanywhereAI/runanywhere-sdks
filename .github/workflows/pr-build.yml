@@ -322,21 +322,31 @@ jobs:
         run: |
           corepack enable
           corepack prepare yarn@3.6.1 --activate
-      # Yarn 3 Berry: the project root with the workspaces declaration is the
-      # REPO ROOT (which lists `sdk/runanywhere-react-native/packages/*` as
-      # workspace members). `sdk/runanywhere-react-native` itself is NOT a
-      # workspace member, so `cd sdk/runanywhere-react-native && yarn install`
-      # fails the project-detection guard. Run yarn from the repo root and
-      # target the specific workspace explicitly.
-      - name: Yarn install (repo root)
+      # Root lockfile gate: the RN example app is a root-workspace member, so
+      # a stale root yarn.lock is still caught here even though the package
+      # commands below run inside the standalone RN workspace.
+      - name: Yarn install (repo root lockfile gate)
+        run: yarn install --immutable
+      # sdk/runanywhere-react-native is ALSO a standalone Yarn project with its
+      # own pinned yarn.lock (fb060a368) and workspaces declaration.
+      # `yarn workspace <name> run <script>` re-detects the project from the
+      # package's cwd, and packages/core's nearest lockfile is the NESTED one —
+      # so a root-only install leaves that project stateless and every package
+      # command dies with "Couldn't find the node_modules state file". Install
+      # and run everything inside the standalone workspace (the documented SDK
+      # dev flow), with the root install kept above as the root-lockfile gate.
+      - name: Yarn install (RN standalone workspace)
+        working-directory: sdk/runanywhere-react-native
         run: yarn install --immutable
       - name: Typecheck @runanywhere/core
+        working-directory: sdk/runanywhere-react-native
         run: yarn workspace @runanywhere/core typecheck
       # Per-SDK lint lane — run eslint via the package's lint
       # script when an eslint config is present. Soft (continue-on-error) until
       # the lint config is committed and baseline is clean.
       - name: ESLint (@runanywhere/core lint lane)
         continue-on-error: true
+        working-directory: sdk/runanywhere-react-native
         run: yarn workspace @runanywhere/core run lint || echo "eslint not yet wired"
       # Per-SDK unit-test lane. Smoke tests
       # cover Foundation/Errors and services/Proto* utilities; the runner
@@ -346,6 +356,7 @@ jobs:
       # exits 0 cleanly.
       - name: Jest unit tests (@runanywhere/core)
         continue-on-error: true
+        working-directory: sdk/runanywhere-react-native
         run: yarn workspace @runanywhere/core run test || echo "jest devDeps not yet installed in workspace lock"
 
   web-typecheck:
