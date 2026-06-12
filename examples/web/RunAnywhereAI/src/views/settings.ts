@@ -244,7 +244,13 @@ function setupToggle(id: string, onChange: (on: boolean) => void): void {
 
 function saveSettings(): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    // iOS parity stops at the Keychain: SettingsViewModel persists the API
+    // key via KeychainService (SettingsViewModel.swift:65-72), and browsers
+    // have no equivalent secret store. Clear-text localStorage is not an
+    // acceptable substitute (CodeQL js/clear-text-storage-of-sensitive-data),
+    // so the key is session-only — every other setting round-trips.
+    const { apiKey, ...persistable } = settings;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
   } catch { /* storage may not be available */ }
 }
 
@@ -259,7 +265,6 @@ function loadSettings(): void {
       if (typeof parsed.maxTokens === 'number' && parsed.maxTokens > 0) settings.maxTokens = parsed.maxTokens;
       if (typeof parsed.systemPrompt === 'string') settings.systemPrompt = parsed.systemPrompt;
       if (typeof parsed.thinkingModeEnabled === 'boolean') settings.thinkingModeEnabled = parsed.thinkingModeEnabled;
-      if (typeof parsed.apiKey === 'string') settings.apiKey = parsed.apiKey;
       if (typeof parsed.baseURL === 'string') settings.baseURL = parsed.baseURL;
       if (typeof parsed.analytics === 'boolean') settings.analytics = parsed.analytics;
     }
