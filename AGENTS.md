@@ -365,8 +365,6 @@ cd examples/android/RunAnywhereAI/
 
 ./gradlew :app:assembleDebug   # Build
 ./gradlew :app:installDebug    # Install on device/emulator
-./gradlew detekt               # Static analysis
-./gradlew ktlintCheck          # Lint
 ./scripts/verify.sh            # Full build gate
 ```
 
