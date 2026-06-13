@@ -523,3 +523,10 @@ modalities:
         response: RALoraAdapterDownloadCompletedResult
         kind: invoke
         context: rac_lora_registry_handle_t
+
+      - swift_name: importAdapter
+        c_symbol: rac_lora_adapter_import_proto
+        request: RALoraAdapterImportRequest
+        response: RALoraAdapterImportResult
+        kind: invoke
+        context: rac_lora_registry_handle_t

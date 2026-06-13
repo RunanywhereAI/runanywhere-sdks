@@ -63,15 +63,7 @@ class _StorageViewState extends State<StorageView> {
 
   Future<void> _deleteModel(sdk.StoredModel model) async {
     await _runAction('${model.name} deleted', () async {
-      await sdk.RunAnywhere.deleteStorage(
-        sdk.StorageDeleteRequest(
-          modelIds: [model.modelId],
-          deleteFiles: true,
-          clearRegistryPaths: true,
-          unloadIfLoaded: true,
-          allowPlatformDelete: true,
-        ),
-      );
+      await sdk.RunAnywhere.deleteModel(model.modelId);
     });
   }
 

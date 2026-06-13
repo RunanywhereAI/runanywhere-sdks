@@ -12,6 +12,8 @@ import {
   LoraAdapterCatalogQuery,
   LoraAdapterDownloadCompletedRequest,
   LoraAdapterDownloadCompletedResult,
+  LoraAdapterImportRequest,
+  LoraAdapterImportResult,
   LoraCompatibilityResult,
   type LoRAAdapterConfig as ProtoLoRAAdapterConfig,
   type LoRAApplyRequest as ProtoLoRAApplyRequest,
@@ -26,6 +28,8 @@ import {
   type LoraAdapterCatalogQuery as ProtoLoraAdapterCatalogQuery,
   type LoraAdapterDownloadCompletedRequest as ProtoLoraAdapterDownloadCompletedRequest,
   type LoraAdapterDownloadCompletedResult as ProtoLoraAdapterDownloadCompletedResult,
+  type LoraAdapterImportRequest as ProtoLoraAdapterImportRequest,
+  type LoraAdapterImportResult as ProtoLoraAdapterImportResult,
   type LoraCompatibilityResult as ProtoLoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm';
@@ -201,6 +205,91 @@ export class LoRAProtoAdapter {
       ),
       'rac_lora_catalog_mark_download_completed_proto',
     );
+  }
+
+  /**
+   * Import a user-picked local adapter file through the canonical commons
+   * entry point. Commons owns matching, placement, artifact registration,
+   * and catalog completion; the caller stages the picked bytes first via
+   * stageImportBytes() so the WASM filesystem can read them.
+   */
+  importAdapter(
+    request: ProtoLoraAdapterImportRequest,
+    registry?: number,
+  ): ProtoLoraAdapterImportResult | null {
+    if (!ensureExports(this.module, 'lora.import', ['_rac_lora_adapter_import_proto'])) {
+      return null;
+    }
+    const registryHandle = this.registryHandle(registry, 'lora.import');
+    if (!registryHandle) return null;
+    return this.bridge().withEncodedRequest(
+      request,
+      LoraAdapterImportRequest,
+      LoraAdapterImportResult,
+      (requestPtr, requestSize, outResult) => (
+        this.module._rac_lora_adapter_import_proto!(
+          registryHandle,
+          requestPtr,
+          requestSize,
+          outResult,
+        )
+      ),
+      'rac_lora_adapter_import_proto',
+    );
+  }
+
+  /**
+   * Stage user-picked adapter bytes into this module's filesystem so the
+   * commons import can read them as a plain source path. Returns the staged
+   * path, or null when the module exposes no FS surface.
+   */
+  stageImportBytes(filename: string, bytes: Uint8Array): string | null {
+    const fs = this.moduleFS();
+    if (!fs) {
+      logger.warning('lora.import: module has no FS surface; cannot stage bytes');
+      return null;
+    }
+    const directory = '/tmp/lora-import';
+    try {
+      fs.mkdirTree?.(directory);
+    } catch {
+      // directory already exists
+    }
+    const path = `${directory}/${filename}`;
+    try {
+      fs.writeFile(path, bytes);
+    } catch (err) {
+      logger.warning(`lora.import: failed to stage '${path}': ${String(err)}`);
+      return null;
+    }
+    return path;
+  }
+
+  /** Remove a previously staged import source (best-effort). */
+  removeStagedImport(path: string): void {
+    const fs = this.moduleFS();
+    try {
+      fs?.unlink?.(path);
+    } catch {
+      // best-effort cleanup
+    }
+  }
+
+  private moduleFS(): {
+    writeFile(path: string, data: Uint8Array): void;
+    mkdirTree?(path: string): void;
+    unlink?(path: string): void;
+  } | null {
+    const fs = (this.module as {
+      FS?: {
+        writeFile?(path: string, data: Uint8Array): void;
+        mkdirTree?(path: string): void;
+        unlink?(path: string): void;
+      };
+    }).FS;
+    return fs && typeof fs.writeFile === 'function'
+      ? (fs as ReturnType<LoRAProtoAdapter['moduleFS']>)
+      : null;
   }
 
   compatibility(config: ProtoLoRAAdapterConfig): ProtoLoraCompatibilityResult | null {

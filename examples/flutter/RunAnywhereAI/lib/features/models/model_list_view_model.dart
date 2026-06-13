@@ -172,7 +172,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('🗑️ Deleting model: ${model.name}');
 
-      await sdk.RunAnywhere.downloads.delete(model.id);
+      await sdk.RunAnywhere.deleteModel(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();

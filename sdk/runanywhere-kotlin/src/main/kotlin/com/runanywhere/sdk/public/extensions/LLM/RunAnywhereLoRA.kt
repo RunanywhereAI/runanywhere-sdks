@@ -25,6 +25,8 @@ import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
 import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
+import ai.runanywhere.proto.v1.LoraAdapterImportRequest
+import ai.runanywhere.proto.v1.LoraAdapterImportResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
@@ -111,6 +113,18 @@ interface LoRA {
     suspend fun markDownloadCompleted(
         request: LoraAdapterDownloadCompletedRequest,
     ): LoraAdapterDownloadCompletedResult
+
+    /**
+     * Import a user-picked local adapter file into SDK-owned storage.
+     *
+     * Kotlin only resolves platform access (e.g. content URI to a readable
+     * path) before calling; commons owns everything past the source path:
+     * deterministic catalog matching, canonical placement, artifact registry
+     * record + manifest persistence, and catalog completion for matched
+     * entries. Apps apply the returned `local_path`; they never construct
+     * on-disk paths themselves.
+     */
+    suspend fun importAdapter(sourcePath: String): LoraAdapterImportResult
 
     /**
      * Persist native-reported import completion state. Sets `imported = true`
@@ -373,6 +387,13 @@ internal object AndroidLoRA : LoRA {
         ensureLoraReady()
         return withContext(Dispatchers.IO) {
             CppBridgeLoraRegistry.markDownloadCompleted(request)
+        }
+    }
+
+    override suspend fun importAdapter(sourcePath: String): LoraAdapterImportResult {
+        ensureLoraReady()
+        return withContext(Dispatchers.IO) {
+            CppBridgeLoraRegistry.importAdapter(LoraAdapterImportRequest(source_path = sourcePath))
         }
     }
 }

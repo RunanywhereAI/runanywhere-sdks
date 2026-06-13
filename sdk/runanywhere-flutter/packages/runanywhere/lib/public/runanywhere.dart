@@ -819,6 +819,11 @@ abstract final class RunAnywhere {
     StorageDeleteRequest request,
   ) => RunAnywhereStorage.deleteStorage(request);
 
+  /// Delete one downloaded model end-to-end (unload if loaded, remove files,
+  /// clear registry path). Mirrors Swift `RunAnywhere.deleteModel(_:)`.
+  static Future<StorageDeleteResult> deleteModel(String modelId) =>
+      RunAnywhereStorage.deleteModel(modelId);
+
   /// Flat temp cleanup helper. Mirrors Swift `RunAnywhere.cleanTempFiles`.
   static Future<void> cleanTempFiles() => RunAnywhereStorage.cleanTempFiles();
 

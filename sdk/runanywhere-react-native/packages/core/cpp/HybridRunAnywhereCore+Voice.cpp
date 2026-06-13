@@ -491,6 +491,18 @@ HybridRunAnywhereCore::loraCatalogMarkDownloadCompletedProto(
     });
 }
 
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraAdapterImportProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraCatalogProto(
+            bytes,
+            "rac_lora_adapter_import_proto",
+            "loraAdapterImportProto");
+    });
+}
+
 // ============================================================================
 // STT Capability (Backend-Agnostic)
 // Calls rac_stt_component_* APIs - works with any registered backend

@@ -208,6 +208,24 @@ suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDel
         ?: throw SDKException.storage("Native storage delete proto API unavailable")
 }
 
+/**
+ * Delete one downloaded model end-to-end: unload it if loaded, remove its
+ * files through the platform adapter, and clear its registry path so the
+ * entry returns to registered-not-downloaded (re-downloadable). Convenience
+ * over [deleteStorage] with the canonical flag set — mirrors Swift
+ * `RunAnywhere.deleteModel(_:)`.
+ */
+suspend fun RunAnywhere.deleteModel(modelId: String): StorageDeleteResult =
+    deleteStorage(
+        StorageDeleteRequest(
+            model_ids = listOf(modelId),
+            delete_files = true,
+            clear_registry_paths = true,
+            unload_if_loaded = true,
+            allow_platform_delete = true,
+        ),
+    )
+
 suspend fun RunAnywhere.clearCache() {
     requireStorageInitialized(this)
     ensureServicesReady()

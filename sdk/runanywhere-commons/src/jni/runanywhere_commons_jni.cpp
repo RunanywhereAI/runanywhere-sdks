@@ -5459,6 +5459,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCatalogMarkDownl
     return makeProtoCallResult(env, rc, &result, "racLoraCatalogMarkDownloadCompletedProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraAdapterImportProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView req(env, requestProto);
+    if (!req.ok)
+        return nullptr;
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry)
+        return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_adapter_import_proto(registry, req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraAdapterImportProto");
+}
+
 // Plugin registry thunks. Kotlin
 // `RunAnywhere+PluginLoader.jvmAndroid.kt` calls these at module
 // registration time (PluginInfo.apiVersion, .count, .load, .unload,

@@ -252,6 +252,7 @@ class RunAnywhereDownloads {
       deleteFiles: true,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
+      allowPlatformDelete: true,
     ));
   }
 
@@ -266,6 +267,7 @@ class RunAnywhereDownloads {
       deleteFiles: true,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
+      allowPlatformDelete: true,
     ));
   }
 

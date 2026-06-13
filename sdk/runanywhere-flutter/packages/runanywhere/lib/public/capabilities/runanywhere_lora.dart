@@ -132,6 +132,22 @@ class RunAnywhereLoRACapability {
     return markDownloadCompleted(importRequest);
   }
 
+  /// Import a user-picked local adapter file into SDK-owned storage.
+  ///
+  /// Dart only resolves platform access (file-picker temp path) before
+  /// calling; commons owns everything past the readable source path:
+  /// deterministic catalog matching, canonical placement, artifact registry
+  /// record + manifest persistence, and catalog completion for matched
+  /// entries. Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
+  Future<LoraAdapterImportResult> importAdapter(String sourcePath) async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.importAdapter(
+      LoraAdapterImportRequest(sourcePath: sourcePath),
+    );
+  }
+
   /// All registered LoRA adapters compatible with [modelId].
   Future<List<LoraAdapterCatalogEntry>> adaptersForModel(String modelId) async {
     if (!DartBridge.isInitialized) {

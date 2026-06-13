@@ -872,6 +872,7 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_lora_catalog_query_proto"
     "_rac_lora_catalog_get_proto"
     "_rac_lora_catalog_mark_download_completed_proto"
+    "_rac_lora_adapter_import_proto"
     "_rac_lora_compatibility_proto"
     "_rac_lora_apply_proto"
     "_rac_lora_remove_proto"

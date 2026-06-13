@@ -84,6 +84,24 @@ RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
     size_t request_proto_size, rac_proto_buffer_t* out_result);
 
 /**
+ * @brief Import a user-picked local LoRA adapter file from serialized
+ *        runanywhere.v1.LoraAdapterImportRequest bytes.
+ *
+ * Commons owns everything past the platform-readable source path:
+ * deterministic catalog matching (exact local-path match, else an unambiguous
+ * filename match), canonical placement under
+ * {Models}/{framework}/lora-adapter:{id}/, artifact model-registry record +
+ * manifest persistence, and catalog completion (imported=true) for matched
+ * entries. Platforms only resolve OS-specific access (security-scoped URLs,
+ * content URIs, Blob-to-FS staging) before calling. out_result receives
+ * serialized runanywhere.v1.LoraAdapterImportResult bytes.
+ */
+RAC_API rac_result_t rac_lora_adapter_import_proto(rac_lora_registry_handle_t registry,
+                                                   const uint8_t* request_proto_bytes,
+                                                   size_t request_proto_size,
+                                                   rac_proto_buffer_t* out_result);
+
+/**
  * @brief Check LoRA compatibility from serialized runanywhere.v1.LoRAAdapterConfig bytes.
  *
  * The target LLM is resolved through the model-lifecycle service

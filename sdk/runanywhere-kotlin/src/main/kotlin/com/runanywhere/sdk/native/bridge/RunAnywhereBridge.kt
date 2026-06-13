@@ -1264,6 +1264,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
+    @JvmStatic external fun racLoraAdapterImportProto(requestProto: ByteArray): ByteArray?
+
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
     //
     // External thunks for the plugin loader.

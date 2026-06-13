@@ -215,6 +215,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     requestSize: number,
     outResult: number,
   ): number;
+  _rac_lora_adapter_import_proto?(
+    registry: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
   _rac_lora_compatibility_proto?(
     configBytes: number,
     configSize: number,

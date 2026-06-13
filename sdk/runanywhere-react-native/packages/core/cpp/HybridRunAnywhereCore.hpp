@@ -495,6 +495,8 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   loraCatalogMarkDownloadCompletedProto(
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraAdapterImportProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
 
   // ============================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8

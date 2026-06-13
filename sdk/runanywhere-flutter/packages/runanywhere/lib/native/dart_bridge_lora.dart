@@ -299,6 +299,23 @@ class DartBridgeLoraRegistry {
     );
   }
 
+  /// Import a user-picked local adapter file through the canonical commons
+  /// entry point. Commons owns matching, placement, artifact registration,
+  /// and catalog completion; Dart only supplies the readable source path.
+  LoraAdapterImportResult importAdapter(LoraAdapterImportRequest request) {
+    final fn = RacNative.bindings.rac_lora_adapter_import_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_lora_adapter_import_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callRequestWithHandle<LoraAdapterImportResult>(
+      handle: _registryHandle('rac_lora_adapter_import_proto'),
+      request: request,
+      invoke: fn,
+      decode: LoraAdapterImportResult.fromBuffer,
+      symbol: 'rac_lora_adapter_import_proto',
+    );
+  }
+
   /// Get all registered LoRA adapters compatible with a model.
   List<LoraAdapterCatalogEntry> getForModel(String modelId) {
     return queryCatalog(

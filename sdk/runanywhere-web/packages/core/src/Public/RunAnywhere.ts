@@ -1544,6 +1544,12 @@ export const RunAnywhere = {
     return RunAnywhere.storage.delete(request);
   },
 
+  deleteModel(
+    modelId: string,
+  ): ReturnType<ReturnType<typeof createStorageNamespace>['deleteModel']> {
+    return RunAnywhere.storage.deleteModel(modelId);
+  },
+
   /**
    * Clear the SDK's Cache directory. Mirrors Swift `clearCache()`
    * (RunAnywhere+Storage.swift:305-313): init guard + ensureServicesReady,

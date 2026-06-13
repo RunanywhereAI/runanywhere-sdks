@@ -1129,6 +1129,15 @@ export interface RunAnywhereCore extends HybridObject<{
     requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
 
+  /**
+   * Import a user-picked local LoRA adapter file from serialized
+   * runanywhere.v1.LoraAdapterImportRequest bytes. Commons owns matching,
+   * placement, artifact registration, and catalog completion.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterImportResult bytes.
+   */
+  loraAdapterImportProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
   // ===========================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h)
   //

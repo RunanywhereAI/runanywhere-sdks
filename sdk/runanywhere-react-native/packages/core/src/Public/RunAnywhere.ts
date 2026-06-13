@@ -658,6 +658,7 @@ export const RunAnywhere = {
 
   getStorageInfo: Storage.getStorageInfo,
   deleteStorage: Storage.deleteStorage,
+  deleteModel: Storage.deleteModel,
   clearCache: Storage.clearCache,
   cleanTempFiles: Storage.cleanTempFiles,
 

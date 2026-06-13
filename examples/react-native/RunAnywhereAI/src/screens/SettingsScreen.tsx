@@ -67,7 +67,6 @@ import {
   type ModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
-import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
 import {
   isModelLoadedForCategory,
   unloadModelsForCategory,
@@ -671,15 +670,7 @@ export const SettingsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-                const result = await RunAnywhere.deleteStorage(
-                  StorageDeleteRequest.fromPartial({
-                    modelIds: [model.id],
-                    deleteFiles: true,
-                    clearRegistryPaths: true,
-                    unloadIfLoaded: true,
-                    allowPlatformDelete: true,
-                  })
-                );
+                const result = await RunAnywhere.deleteModel(model.id);
                 if (!result.success) {
                   throw new Error(
                     result.errorMessage || 'Storage delete failed'

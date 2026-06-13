@@ -11,7 +11,6 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RunAnywhere } from '@runanywhere/core';
 import type { StorageInfo } from '@runanywhere/proto-ts/storage_types';
-import { StorageDeleteRequest } from '@runanywhere/proto-ts/storage_types';
 import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
@@ -71,17 +70,7 @@ export const StorageScreen: React.FC = () => {
         style: 'destructive',
         onPress: () => {
           void (async () => {
-            await RunAnywhere.deleteStorage(
-              StorageDeleteRequest.fromPartial({
-                modelIds: [model.id],
-                deleteFiles: true,
-                clearRegistryPaths: true,
-                unloadIfLoaded: true,
-                dryRun: false,
-                requirePlanMatch: false,
-                allowPlatformDelete: true,
-              })
-            );
+            await RunAnywhere.deleteModel(model.id);
             await refresh();
           })();
         },

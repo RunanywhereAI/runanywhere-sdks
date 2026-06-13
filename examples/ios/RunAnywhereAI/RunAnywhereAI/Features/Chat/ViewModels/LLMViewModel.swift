@@ -464,8 +464,8 @@ final class LLMViewModel {
 
         do {
             let imported = try await RunAnywhere.lora.importAdapter(from: url)
-            if let entry = imported.entry {
-                updateAvailableAdapter(entry)
+            if imported.matched, imported.hasEntry {
+                updateAvailableAdapter(imported.entry)
             }
             isLoadingLoRA = false
             await loadLoraAdapter(path: imported.localPath, scale: scale)

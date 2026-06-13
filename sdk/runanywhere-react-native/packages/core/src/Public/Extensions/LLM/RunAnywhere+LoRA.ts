@@ -30,6 +30,7 @@ import type {
   LoraAdapterCatalogQuery,
   LoraAdapterDownloadCompletedRequest,
   LoraAdapterDownloadCompletedResult,
+  LoraAdapterImportResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 import {
@@ -46,6 +47,8 @@ import {
   LoraAdapterCatalogQuery as LoraAdapterCatalogQueryMessage,
   LoraAdapterDownloadCompletedRequest as LoraAdapterDownloadCompletedRequestMessage,
   LoraAdapterDownloadCompletedResult as LoraAdapterDownloadCompletedResultMessage,
+  LoraAdapterImportRequest as LoraAdapterImportRequestMessage,
+  LoraAdapterImportResult as LoraAdapterImportResultMessage,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
 import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
@@ -329,6 +332,30 @@ async function markImportCompleted(
 }
 
 /**
+ * Import a user-picked local adapter file into SDK-owned storage.
+ *
+ * TS only resolves platform access (a readable file path from the picker)
+ * before calling; commons owns everything past the source path:
+ * deterministic catalog matching, canonical placement, artifact registry
+ * record + manifest persistence, and catalog completion for matched entries.
+ * Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
+ */
+async function importAdapter(sourcePath: string): Promise<LoraAdapterImportResult> {
+  requireInitialized();
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraAdapterImportProto(
+      encodeProtoMessage(
+        LoraAdapterImportRequestMessage.fromPartial({ sourcePath }),
+        LoraAdapterImportRequestMessage
+      )
+    ),
+    LoraAdapterImportResultMessage.decode,
+    'loraAdapterImportProto'
+  );
+}
+
+/**
  * Get all LoRA adapters compatible with a specific model (CANONICAL_API §3).
  * Mirrors Swift `lora.adaptersForModel(_:)`.
  */
@@ -509,6 +536,7 @@ export const lora = {
   getCatalogEntry,
   markDownloadCompleted,
   markImportCompleted,
+  importAdapter,
   adaptersForModel,
   allRegistered,
   registerArtifact,

@@ -188,6 +188,11 @@ RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
     const uint8_t* request_proto_bytes,
     size_t request_proto_size,
     rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_lora_adapter_import_proto(
+    rac_lora_registry_handle_t registry,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_lora_compatibility_proto(
     const uint8_t* config_proto_bytes,
     size_t config_proto_size,

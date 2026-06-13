@@ -760,6 +760,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_registry_manifest.cpp
     src/infrastructure/model_management/hf_resolver.cpp
     src/infrastructure/model_management/lora_registry.cpp
+    src/infrastructure/model_management/lora_import.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_types_mappers.cpp
     src/infrastructure/model_management/model_paths.cpp

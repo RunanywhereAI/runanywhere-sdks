@@ -1558,6 +1558,11 @@ class RacBindings {
             'rac_lora_catalog_mark_download_completed_proto',
           ),
         ),
+        rac_lora_adapter_import_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_lora_adapter_import_proto'),
+        ),
         rac_lora_compatibility_proto =
             _lookupOptional<RacLifecycleRequestProtoDart>(
           () => lib.lookupFunction<RacLifecycleRequestProtoNative,
@@ -2215,6 +2220,8 @@ class RacBindings {
 
   final RacHandleBytesToProtoDart?
       rac_lora_catalog_mark_download_completed_proto;
+
+  final RacHandleBytesToProtoDart? rac_lora_adapter_import_proto;
 
   final RacLifecycleRequestProtoDart? rac_lora_compatibility_proto;
 

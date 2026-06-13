@@ -24,8 +24,16 @@ import type {
 } from '@runanywhere/proto-ts/lora_options';
 import {
   LoraAdapterDownloadCompletedRequest as LoraAdapterDownloadCompletedRequestMessage,
+  LoraAdapterImportRequest as LoraAdapterImportRequestMessage,
+  type LoraAdapterImportResult,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
+import { OPFSBridge } from '../../Infrastructure/OPFSBridge';
+import {
+  getAllRegisteredModules,
+  getModuleForCapability,
+  tryRunanywhereModule,
+} from '../../runtime/EmscriptenModule';
 import {
   InferenceFramework,
   ModelCategory,
@@ -229,6 +237,64 @@ export async function markLoraAdapterImportCompleted(
 }
 
 /**
+ * Import a user-picked LoRA adapter file (File/Blob from an
+ * `<input type="file">`) into SDK-owned storage.
+ *
+ * Web only stages the picked bytes into the WASM filesystem; commons owns
+ * everything past the readable source path: deterministic catalog matching,
+ * canonical placement, artifact registry record + manifest persistence, and
+ * catalog completion for matched entries. The canonical destination is then
+ * flushed MEMFS → OPFS exactly like a completed download.
+ * Mirrors Swift `RunAnywhere.lora.importAdapter(from:)`.
+ */
+export async function importLoraAdapter(
+  file: File | Blob,
+  filename?: string,
+): Promise<LoraAdapterImportResult> {
+  const name = filename ?? (file instanceof File && file.name ? file.name : 'adapter.gguf');
+  const adapter = requireAdapter('LoRA.import');
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const staged = adapter.stageImportBytes(name, bytes);
+  if (!staged) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+      'LoRA adapter import staging failed (no module filesystem)',
+      'lora.import',
+    );
+  }
+  try {
+    const result = requireResult(
+      'LoRA.import',
+      adapter.importAdapter(
+        LoraAdapterImportRequestMessage.fromPartial({ sourcePath: staged, filename: name }),
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+        result.errorMessage || 'LoRA adapter import failed',
+        'lora.import',
+      );
+    }
+    // Persist the canonical destination and mirror it into every backend
+    // module — the same flush the download path performs on completion.
+    if (result.localPath) {
+      const downloaderModule = getModuleForCapability('commons') ?? tryRunanywhereModule();
+      if (downloaderModule) {
+        await OPFSBridge.ensureDownloadPersisted(
+          result.localPath,
+          downloaderModule,
+          getAllRegisteredModules(),
+        );
+      }
+    }
+    return result;
+  } finally {
+    adapter.removeStagedImport(staged);
+  }
+}
+
+/**
  * Get all LoRA adapters compatible with a specific model (CANONICAL_API §3).
  * Mirrors Swift `lora.adaptersForModel(_:)` (RunAnywhere+LoRA.swift:153-165).
  */
@@ -429,6 +495,7 @@ export const LoRA = {
   getCatalogEntry: getLoraCatalogEntry,
   markDownloadCompleted: markLoraAdapterDownloadCompleted,
   markImportCompleted: markLoraAdapterImportCompleted,
+  importAdapter: importLoraAdapter,
   adaptersForModel: loraAdaptersForModel,
   allRegistered: allRegisteredLoraAdapters,
   registerArtifact: registerLoraArtifact,

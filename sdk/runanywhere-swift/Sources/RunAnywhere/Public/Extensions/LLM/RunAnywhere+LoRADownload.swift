@@ -143,37 +143,21 @@ public extension RunAnywhere.LoRA {
 
 // MARK: - SDK-owned local-file import
 
-/// Outcome of importing a user-picked LoRA adapter file.
-public struct LoraAdapterImportResult: Sendable {
-    /// Stable SDK-owned path of the imported adapter file.
-    public let localPath: String
-    /// Updated catalog entry when the imported file matched a registered adapter.
-    public let entry: RALoraAdapterCatalogEntry?
-}
-
 public extension RunAnywhere.LoRA {
 
     /// Import a user-picked LoRA adapter file (document picker / share sheet)
     /// into SDK-owned storage.
     ///
-    /// One call owns the whole flow: security-scoped access to the source URL,
-    /// placement into the canonical adapter artifact folder (the same layout
-    /// the download path uses), and catalog import completion when the file
-    /// matches a registered adapter entry. Apps apply the returned
-    /// `localPath`; they never construct on-disk paths themselves.
+    /// Swift only resolves the platform-specific access (security-scoped URL);
+    /// commons owns everything past the readable source path: deterministic
+    /// catalog matching, canonical placement, artifact registry record +
+    /// manifest persistence, and catalog completion for matched entries.
+    /// Apps apply the returned `localPath`; they never construct on-disk
+    /// paths themselves.
     @discardableResult
-    func importAdapter(from url: URL) async throws -> LoraAdapterImportResult {
+    func importAdapter(from url: URL) async throws -> RALoraAdapterImportResult {
         guard RunAnywhere.isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
-        }
-
-        let filename = url.lastPathComponent
-        guard !filename.isEmpty, filename != ".", filename != ".." else {
-            throw SDKException(
-                code: .invalidInput,
-                message: "LoRA adapter import requires a file URL with a usable filename",
-                category: .validation
-            )
         }
 
         let accessed = url.startAccessingSecurityScopedResource()
@@ -183,82 +167,20 @@ public extension RunAnywhere.LoRA {
             }
         }
 
-        // Catalog matching is best-effort: an unhealthy catalog must not block
-        // a plain file import. Match deterministically — an exact path match,
-        // else a filename match only when it is unambiguous (generic adapter
-        // filenames recur across base models; completing an arbitrary entry
-        // would corrupt unrelated catalog state).
-        let entries = (try? await listCatalog())?.entries ?? []
-        let pathMatches = entries.filter { $0.hasLocalPath && $0.localPath == url.path }
-        let nameMatches = entries.filter { $0.filename == filename }
-        let matched = pathMatches.first ?? (nameMatches.count == 1 ? nameMatches[0] : nil)
+        var request = RALoraAdapterImportRequest()
+        request.sourcePath = url.path
 
-        // The catalog entry drives the artifact identity and on-disk placement,
-        // so a matched import lands exactly where the download path would put
-        // the same adapter.
-        var entrySnapshot: RALoraAdapterCatalogEntry
-        if let matched {
-            entrySnapshot = matched
-        } else {
-            let stem = url.deletingPathExtension().lastPathComponent
-            entrySnapshot = RALoraAdapterCatalogEntry()
-            entrySnapshot.id = stem.isEmpty ? filename : stem
-            entrySnapshot.name = entrySnapshot.id
-            entrySnapshot.filename = filename
-        }
-
-        let directory = try CppBridge.ModelPaths.getModelFolder(
-            modelId: entrySnapshot.loraArtifactModelID,
-            framework: .unspecified
-        )
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent(filename, isDirectory: false)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        try FileManager.default.copyItem(at: url, to: destination)
-
-        let attributes = try? FileManager.default.attributesOfItem(atPath: destination.path)
-        let actualSizeBytes = (attributes?[.size] as? NSNumber)?.int64Value
-
-        // Register the placed bytes as the adapter's artifact record so storage
-        // accounting, deleteModel(_:), and cross-session manifest restore
-        // observe them — the import counterpart of what the download path
-        // persists on completion. The imported file is authoritative: its real
-        // size replaces the catalog's, and any catalog checksum is dropped.
-        if let actualSizeBytes {
-            entrySnapshot.sizeBytes = actualSizeBytes
-        }
-        entrySnapshot.clearChecksumSha256()
-        var artifact = entrySnapshot.toLoraArtifactModelInfo()
-        artifact.localPath = destination.path
-        try await CppBridge.ModelRegistry.shared.save(artifact)
-
-        guard let matched else {
-            return LoraAdapterImportResult(localPath: destination.path, entry: nil)
-        }
-
-        var completed = RALoraAdapterDownloadCompletedRequest()
-        completed.adapterID = matched.id
-        completed.localPath = destination.path
-        completed.completedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-        if let actualSizeBytes {
-            completed.sizeBytes = actualSizeBytes
-        }
-
-        let result = try await markImportCompleted(completed)
+        let handle = try await CppBridge.LoraRegistry.shared.requireHandle()
+        let result = try await CppBridge.LoraRegistry.shared.importAdapter(handle: handle, request)
         guard result.success else {
             throw SDKException(
                 code: .processingFailed,
                 message: result.errorMessage.isEmpty
-                    ? "LoRA adapter import completion was not persisted"
+                    ? "LoRA adapter import failed"
                     : result.errorMessage,
                 category: .internal
             )
         }
-        return LoraAdapterImportResult(
-            localPath: destination.path,
-            entry: result.hasEntry ? result.entry : nil
-        )
+        return result
     }
 }

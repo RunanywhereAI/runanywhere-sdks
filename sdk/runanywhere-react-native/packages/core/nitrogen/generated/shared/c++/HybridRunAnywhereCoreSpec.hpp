@@ -47,7 +47,7 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-      
+
 
     public:
       // Methods
@@ -196,6 +196,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogGetProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogMarkDownloadCompletedProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraAdapterImportProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionStart(double handle) = 0;

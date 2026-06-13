@@ -159,6 +159,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("loraCatalogQueryProto", &HybridRunAnywhereCoreSpec::loraCatalogQueryProto);
       prototype.registerHybridMethod("loraCatalogGetProto", &HybridRunAnywhereCoreSpec::loraCatalogGetProto);
       prototype.registerHybridMethod("loraCatalogMarkDownloadCompletedProto", &HybridRunAnywhereCoreSpec::loraCatalogMarkDownloadCompletedProto);
+      prototype.registerHybridMethod("loraAdapterImportProto", &HybridRunAnywhereCoreSpec::loraAdapterImportProto);
       prototype.registerHybridMethod("solutionCreateFromProto", &HybridRunAnywhereCoreSpec::solutionCreateFromProto);
       prototype.registerHybridMethod("solutionCreateFromYaml", &HybridRunAnywhereCoreSpec::solutionCreateFromYaml);
       prototype.registerHybridMethod("solutionStart", &HybridRunAnywhereCoreSpec::solutionStart);

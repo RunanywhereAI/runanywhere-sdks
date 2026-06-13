@@ -187,6 +187,22 @@ extern const ::google::protobuf::internal::ClassDataFull LoraAdapterDownloadComp
 #else
 extern const LoraAdapterDownloadCompletedResultGlobalsTypeInternal LoraAdapterDownloadCompletedResult_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
+class LoraAdapterImportRequest;
+struct LoraAdapterImportRequestGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern LoraAdapterImportRequestGlobalsTypeInternal LoraAdapterImportRequest_globals_;
+extern const ::google::protobuf::internal::ClassDataFull LoraAdapterImportRequest_class_data_;
+#else
+extern const LoraAdapterImportRequestGlobalsTypeInternal LoraAdapterImportRequest_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+class LoraAdapterImportResult;
+struct LoraAdapterImportResultGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern LoraAdapterImportResultGlobalsTypeInternal LoraAdapterImportResult_globals_;
+extern const ::google::protobuf::internal::ClassDataFull LoraAdapterImportResult_class_data_;
+#else
+extern const LoraAdapterImportResultGlobalsTypeInternal LoraAdapterImportResult_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
 class LoraCompatibilityResult;
 struct LoraCompatibilityResultGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -266,7 +282,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraCompatibilityResult final : pub
   [[nodiscard]] static const LoraCompatibilityResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoraCompatibilityResult>(&LoraCompatibilityResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 12;
+  static constexpr int kIndexInFileMessages = 14;
   friend void swap(LoraCompatibilityResult& a, LoraCompatibilityResult& b) { a.Swap(&b); }
   inline void Swap(LoraCompatibilityResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -483,6 +499,231 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraCompatibilityResult final : pub
     ::google::protobuf::internal::ArenaStringPtr base_model_required_;
     bool is_compatible_;
     ::int32_t error_code_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_lora_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterImportRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.LoraAdapterImportRequest) */ {
+ public:
+  inline LoraAdapterImportRequest() : LoraAdapterImportRequest(nullptr) {}
+  ~LoraAdapterImportRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(LoraAdapterImportRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(LoraAdapterImportRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr LoraAdapterImportRequest(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline LoraAdapterImportRequest(const LoraAdapterImportRequest& from) : LoraAdapterImportRequest(nullptr, from) {}
+  inline LoraAdapterImportRequest(LoraAdapterImportRequest&& from) noexcept : LoraAdapterImportRequest(nullptr, ::std::move(from)) {}
+  inline LoraAdapterImportRequest& operator=(const LoraAdapterImportRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline LoraAdapterImportRequest& operator=(LoraAdapterImportRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const LoraAdapterImportRequest& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoraAdapterImportRequest>(&LoraAdapterImportRequest_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 12;
+  friend void swap(LoraAdapterImportRequest& a, LoraAdapterImportRequest& b) { a.Swap(&b); }
+  inline void Swap(LoraAdapterImportRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(LoraAdapterImportRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] LoraAdapterImportRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<LoraAdapterImportRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const LoraAdapterImportRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const LoraAdapterImportRequest& from) { LoraAdapterImportRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(LoraAdapterImportRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.LoraAdapterImportRequest"; }
+
+  explicit LoraAdapterImportRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  LoraAdapterImportRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const LoraAdapterImportRequest& from);
+  LoraAdapterImportRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, LoraAdapterImportRequest&& from) noexcept
+      : LoraAdapterImportRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSourcePathFieldNumber = 1,
+    kFilenameFieldNumber = 2,
+  };
+  // string source_path = 1;
+  void clear_source_path() ;
+  [[nodiscard]] const ::std::string& source_path() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_source_path(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_source_path();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_source_path();
+  void set_allocated_source_path(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_source_path() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_source_path(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_source_path();
+
+  public:
+  // optional string filename = 2;
+  [[nodiscard]] bool has_filename()
+      const;
+  void clear_filename() ;
+  [[nodiscard]] const ::std::string& filename() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_filename(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_filename();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_filename();
+  void set_allocated_filename(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_filename() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_filename(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_filename();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.LoraAdapterImportRequest)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<1, 2,
+                          0, 67,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const LoraAdapterImportRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr source_path_;
+    ::google::protobuf::internal::ArenaStringPtr filename_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1389,7 +1630,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRARemoveRequest final : public ::
   [[nodiscard]] static const LoRARemoveRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoRARemoveRequest>(&LoRARemoveRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 15;
+  static constexpr int kIndexInFileMessages = 17;
   friend void swap(LoRARemoveRequest& a, LoRARemoveRequest& b) { a.Swap(&b); }
   inline void Swap(LoRARemoveRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2734,7 +2975,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAState final : public ::google::
   [[nodiscard]] static const LoRAState& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoRAState>(&LoRAState_globals_);
   }
-  static constexpr int kIndexInFileMessages = 16;
+  static constexpr int kIndexInFileMessages = 18;
   friend void swap(LoRAState& a, LoRAState& b) { a.Swap(&b); }
   inline void Swap(LoRAState* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3008,7 +3249,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAApplyResult final : public ::go
   [[nodiscard]] static const LoRAApplyResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoRAApplyResult>(&LoRAApplyResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 14;
+  static constexpr int kIndexInFileMessages = 16;
   friend void swap(LoRAApplyResult& a, LoRAApplyResult& b) { a.Swap(&b); }
   inline void Swap(LoRAApplyResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3501,6 +3742,271 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAAdapterConfig final : public ::
     ::google::protobuf::internal::ArenaStringPtr adapter_id_;
     float scale_;
     ::google::protobuf::internal::MapField<LoRAAdapterConfig_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_lora_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterImportResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.LoraAdapterImportResult) */ {
+ public:
+  inline LoraAdapterImportResult() : LoraAdapterImportResult(nullptr) {}
+  ~LoraAdapterImportResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(LoraAdapterImportResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(LoraAdapterImportResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr LoraAdapterImportResult(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline LoraAdapterImportResult(const LoraAdapterImportResult& from) : LoraAdapterImportResult(nullptr, from) {}
+  inline LoraAdapterImportResult(LoraAdapterImportResult&& from) noexcept : LoraAdapterImportResult(nullptr, ::std::move(from)) {}
+  inline LoraAdapterImportResult& operator=(const LoraAdapterImportResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline LoraAdapterImportResult& operator=(LoraAdapterImportResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const LoraAdapterImportResult& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoraAdapterImportResult>(&LoraAdapterImportResult_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 13;
+  friend void swap(LoraAdapterImportResult& a, LoraAdapterImportResult& b) { a.Swap(&b); }
+  inline void Swap(LoraAdapterImportResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(LoraAdapterImportResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] LoraAdapterImportResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<LoraAdapterImportResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const LoraAdapterImportResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const LoraAdapterImportResult& from) { LoraAdapterImportResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(LoraAdapterImportResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.LoraAdapterImportResult"; }
+
+  explicit LoraAdapterImportResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  LoraAdapterImportResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const LoraAdapterImportResult& from);
+  LoraAdapterImportResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, LoraAdapterImportResult&& from) noexcept
+      : LoraAdapterImportResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kErrorMessageFieldNumber = 2,
+    kLocalPathFieldNumber = 3,
+    kEntryFieldNumber = 5,
+    kSuccessFieldNumber = 1,
+    kMatchedFieldNumber = 4,
+  };
+  // string error_message = 2;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // string local_path = 3;
+  void clear_local_path() ;
+  [[nodiscard]] const ::std::string& local_path() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_local_path(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_local_path();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_local_path();
+  void set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_local_path() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_local_path(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_local_path();
+
+  public:
+  // .runanywhere.v1.LoraAdapterCatalogEntry entry = 5;
+  [[nodiscard]] bool has_entry()
+      const;
+  void clear_entry() ;
+  [[nodiscard]] const ::runanywhere::v1::LoraAdapterCatalogEntry& entry() const;
+  [[nodiscard]] ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE release_entry();
+  ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NONNULL mutable_entry();
+  void set_allocated_entry(::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_entry(::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE unsafe_arena_release_entry();
+
+  private:
+  const ::runanywhere::v1::LoraAdapterCatalogEntry& _internal_entry() const;
+  ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NONNULL _internal_mutable_entry();
+
+  public:
+  // bool success = 1;
+  void clear_success() ;
+  [[nodiscard]] bool success() const;
+  void set_success(bool value);
+
+  private:
+  bool _internal_success() const;
+  void _internal_set_success(bool value);
+
+  public:
+  // bool matched = 4;
+  void clear_matched() ;
+  [[nodiscard]] bool matched() const;
+  void set_matched(bool value);
+
+  private:
+  bool _internal_matched() const;
+  void _internal_set_matched(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.LoraAdapterImportResult)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          1, 70,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const LoraAdapterImportResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    ::google::protobuf::internal::ArenaStringPtr local_path_;
+    ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE entry_;
+    bool success_;
+    bool matched_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -4325,7 +4831,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAApplyRequest final : public ::g
   [[nodiscard]] static const LoRAApplyRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<LoRAApplyRequest>(&LoRAApplyRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 13;
+  static constexpr int kIndexInFileMessages = 15;
   friend void swap(LoRAApplyRequest& a, LoRAApplyRequest& b) { a.Swap(&b); }
   inline void Swap(LoRAApplyRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -7522,6 +8028,420 @@ inline bool LoraAdapterDownloadCompletedResult::_internal_persisted() const {
 inline void LoraAdapterDownloadCompletedResult::_internal_set_persisted(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.persisted_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// LoraAdapterImportRequest
+
+// string source_path = 1;
+inline void LoraAdapterImportRequest::clear_source_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.source_path_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::std::string& LoraAdapterImportRequest::source_path() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportRequest.source_path)
+  return _internal_source_path();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void LoraAdapterImportRequest::set_source_path(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.source_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterImportRequest.source_path)
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportRequest::mutable_source_path()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_source_path();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LoraAdapterImportRequest.source_path)
+  return _s;
+}
+inline const ::std::string& LoraAdapterImportRequest::_internal_source_path() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.source_path_.Get();
+}
+inline void LoraAdapterImportRequest::_internal_set_source_path(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.source_path_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportRequest::_internal_mutable_source_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.source_path_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE LoraAdapterImportRequest::release_source_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LoraAdapterImportRequest.source_path)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.source_path_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.source_path_.Set("", GetArena());
+  }
+  return released;
+}
+inline void LoraAdapterImportRequest::set_allocated_source_path(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.source_path_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.source_path_.IsDefault()) {
+    _impl_.source_path_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterImportRequest.source_path)
+}
+
+// optional string filename = 2;
+inline bool LoraAdapterImportRequest::has_filename() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void LoraAdapterImportRequest::clear_filename() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.filename_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::std::string& LoraAdapterImportRequest::filename() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportRequest.filename)
+  return _internal_filename();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void LoraAdapterImportRequest::set_filename(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.filename_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterImportRequest.filename)
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportRequest::mutable_filename()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_filename();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LoraAdapterImportRequest.filename)
+  return _s;
+}
+inline const ::std::string& LoraAdapterImportRequest::_internal_filename() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.filename_.Get();
+}
+inline void LoraAdapterImportRequest::_internal_set_filename(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.filename_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportRequest::_internal_mutable_filename() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.filename_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE LoraAdapterImportRequest::release_filename() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LoraAdapterImportRequest.filename)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.filename_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.filename_.Set("", GetArena());
+  }
+  return released;
+}
+inline void LoraAdapterImportRequest::set_allocated_filename(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.filename_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.filename_.IsDefault()) {
+    _impl_.filename_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterImportRequest.filename)
+}
+
+// -------------------------------------------------------------------
+
+// LoraAdapterImportResult
+
+// bool success = 1;
+inline void LoraAdapterImportResult::clear_success() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.success_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline bool LoraAdapterImportResult::success() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportResult.success)
+  return _internal_success();
+}
+inline void LoraAdapterImportResult::set_success(bool value) {
+  _internal_set_success(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterImportResult.success)
+}
+inline bool LoraAdapterImportResult::_internal_success() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.success_;
+}
+inline void LoraAdapterImportResult::_internal_set_success(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.success_ = value;
+}
+
+// string error_message = 2;
+inline void LoraAdapterImportResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::std::string& LoraAdapterImportResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void LoraAdapterImportResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterImportResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LoraAdapterImportResult.error_message)
+  return _s;
+}
+inline const ::std::string& LoraAdapterImportResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void LoraAdapterImportResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE LoraAdapterImportResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LoraAdapterImportResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void LoraAdapterImportResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterImportResult.error_message)
+}
+
+// string local_path = 3;
+inline void LoraAdapterImportResult::clear_local_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.local_path_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::std::string& LoraAdapterImportResult::local_path() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportResult.local_path)
+  return _internal_local_path();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void LoraAdapterImportResult::set_local_path(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.local_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterImportResult.local_path)
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportResult::mutable_local_path()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_local_path();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LoraAdapterImportResult.local_path)
+  return _s;
+}
+inline const ::std::string& LoraAdapterImportResult::_internal_local_path() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.local_path_.Get();
+}
+inline void LoraAdapterImportResult::_internal_set_local_path(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.local_path_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL LoraAdapterImportResult::_internal_mutable_local_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.local_path_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE LoraAdapterImportResult::release_local_path() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LoraAdapterImportResult.local_path)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.local_path_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.local_path_.Set("", GetArena());
+  }
+  return released;
+}
+inline void LoraAdapterImportResult::set_allocated_local_path(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.local_path_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.local_path_.IsDefault()) {
+    _impl_.local_path_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterImportResult.local_path)
+}
+
+// bool matched = 4;
+inline void LoraAdapterImportResult::clear_matched() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.matched_ = false;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline bool LoraAdapterImportResult::matched() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportResult.matched)
+  return _internal_matched();
+}
+inline void LoraAdapterImportResult::set_matched(bool value) {
+  _internal_set_matched(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LoraAdapterImportResult.matched)
+}
+inline bool LoraAdapterImportResult::_internal_matched() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.matched_;
+}
+inline void LoraAdapterImportResult::_internal_set_matched(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.matched_ = value;
+}
+
+// .runanywhere.v1.LoraAdapterCatalogEntry entry = 5;
+inline bool LoraAdapterImportResult::has_entry() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  PROTOBUF_ASSUME(!value || _impl_.entry_ != nullptr);
+  return value;
+}
+inline void LoraAdapterImportResult::clear_entry() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.entry_ != nullptr) _impl_.entry_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+inline const ::runanywhere::v1::LoraAdapterCatalogEntry& LoraAdapterImportResult::_internal_entry() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::LoraAdapterCatalogEntry* p = _impl_.entry_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::LoraAdapterCatalogEntry>(&::runanywhere::v1::LoraAdapterCatalogEntry_globals_);
+}
+inline const ::runanywhere::v1::LoraAdapterCatalogEntry& LoraAdapterImportResult::entry() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LoraAdapterImportResult.entry)
+  return _internal_entry();
+}
+inline void LoraAdapterImportResult::unsafe_arena_set_allocated_entry(
+    ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.entry_);
+  }
+  _impl_.entry_ = reinterpret_cast<::runanywhere::v1::LoraAdapterCatalogEntry*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.LoraAdapterImportResult.entry)
+}
+inline ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE LoraAdapterImportResult::release_entry() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::LoraAdapterCatalogEntry* released = _impl_.entry_;
+  _impl_.entry_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE LoraAdapterImportResult::unsafe_arena_release_entry() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.LoraAdapterImportResult.entry)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::LoraAdapterCatalogEntry* temp = _impl_.entry_;
+  _impl_.entry_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NONNULL LoraAdapterImportResult::_internal_mutable_entry() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.entry_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::LoraAdapterCatalogEntry>(GetArena());
+    _impl_.entry_ = reinterpret_cast<::runanywhere::v1::LoraAdapterCatalogEntry*>(p);
+  }
+  return _impl_.entry_;
+}
+inline ::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NONNULL LoraAdapterImportResult::mutable_entry()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::LoraAdapterCatalogEntry* _msg = _internal_mutable_entry();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.LoraAdapterImportResult.entry)
+  return _msg;
+}
+inline void LoraAdapterImportResult::set_allocated_entry(::runanywhere::v1::LoraAdapterCatalogEntry* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.entry_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+
+  _impl_.entry_ = reinterpret_cast<::runanywhere::v1::LoraAdapterCatalogEntry*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterImportResult.entry)
 }
 
 // -------------------------------------------------------------------

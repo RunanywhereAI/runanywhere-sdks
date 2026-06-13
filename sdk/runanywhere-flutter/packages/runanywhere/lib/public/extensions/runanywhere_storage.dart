@@ -261,4 +261,21 @@ class RunAnywhereStorage {
     }
     return DartBridgeStorage.instance.deleteProto(request);
   }
+
+  /// Delete one downloaded model end-to-end: unload it if loaded, remove its
+  /// files through the platform adapter, and clear its registry path so the
+  /// entry returns to registered-not-downloaded (re-downloadable).
+  /// Convenience over [deleteStorage] with the canonical flag set — mirrors
+  /// Swift `RunAnywhere.deleteModel(_:)`.
+  static Future<StorageDeleteResult> deleteModel(String modelId) {
+    return deleteStorage(
+      StorageDeleteRequest(
+        modelIds: [modelId],
+        deleteFiles: true,
+        clearRegistryPaths: true,
+        unloadIfLoaded: true,
+        allowPlatformDelete: true,
+      ),
+    );
+  }
 }

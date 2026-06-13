@@ -32,6 +32,7 @@ import type {
   StorageInfoRequest,
   StorageInfoResult,
 } from '@runanywhere/proto-ts/storage_types';
+import { StorageDeleteRequest as StorageDeleteRequestMessage } from '@runanywhere/proto-ts/storage_types';
 import { SDKException } from '../../Foundation/SDKException';
 import { StorageAdapter } from '../../Adapters/StorageAdapter';
 import { ModelRegistry } from './RunAnywhere+ModelRegistry';
@@ -127,6 +128,25 @@ export function createStorageNamespace(browser: BrowserStorageControls) {
         throw SDKException.backendNotAvailable('storage.delete', 'Native storage analyzer returned no result.');
       }
       return result;
+    },
+
+    /**
+     * Delete one downloaded model end-to-end: unload it if loaded, remove its
+     * files through the platform adapter, and clear its registry path so the
+     * entry returns to registered-not-downloaded (re-downloadable).
+     * Convenience over `delete` with the canonical flag set — mirrors Swift
+     * `RunAnywhere.deleteModel(_:)`.
+     */
+    deleteModel(modelId: string): StorageDeleteResult {
+      return this.delete(
+        StorageDeleteRequestMessage.fromPartial({
+          modelIds: [modelId],
+          deleteFiles: true,
+          clearRegistryPaths: true,
+          unloadIfLoaded: true,
+          allowPlatformDelete: true,
+        }),
+      );
     },
   };
 }

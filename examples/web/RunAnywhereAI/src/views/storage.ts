@@ -5,7 +5,7 @@
  * Mirrors iOS `StorageViewModel` (StorageViewModel.swift:28-103):
  *   - `RunAnywhere.getStorageInfo(request)` drives the used/free header.
  *   - Clear Cache / Clean Temp delegate to the SDK verbs.
- *   - Per-model Delete goes through `RunAnywhere.deleteStorage(request)`.
+ *   - Per-model Delete goes through `RunAnywhere.deleteModel(modelId)`.
  *
  * The storage-location switcher (OPFS vs local folder) is justified web
  * platform code — browsers expose two storage backends, iOS has one.
@@ -23,7 +23,6 @@ import {
 } from '@runanywhere/web';
 import type { ModelInfo, StorageInfo } from '@runanywhere/web';
 import {
-  StorageDeleteRequest,
   StorageInfoRequest,
 } from '@runanywhere/proto-ts/storage_types';
 import {
@@ -307,13 +306,7 @@ function renderModelList(): void {
 /** iOS parity: StorageViewModel.swift:86-103 `deleteModel(_:)`. */
 async function deleteModel(modelId: string): Promise<void> {
   try {
-    const result = RunAnywhere.deleteStorage(StorageDeleteRequest.fromPartial({
-      modelIds: [modelId],
-      deleteFiles: true,
-      clearRegistryPaths: true,
-      unloadIfLoaded: true,
-      allowPlatformDelete: true,
-    }));
+    const result = RunAnywhere.deleteModel(modelId);
     if (!result.success) {
       showToast(result.errorMessage || 'Failed to delete model', 'warning');
       return;
