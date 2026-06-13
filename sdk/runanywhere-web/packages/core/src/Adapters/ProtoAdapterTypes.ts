@@ -130,15 +130,13 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     optionsSize: number,
     outResult: number,
   ): number;
-  _rac_vlm_process_stream_proto?(
-    handle: number,
-    imageBytes: number,
-    imageSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+  /** Typed stream ABI: serialized VLMGenerationRequest in, VLMStreamEvent
+   *  per callback. Lifecycle-owned model — no handle, no out-result. */
+  _rac_vlm_stream_proto?(
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
-    outResult: number,
   ): number;
   _rac_vlm_cancel_proto?(handle: number): number;
 
@@ -212,6 +210,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     outResult: number,
   ): number;
   _rac_lora_catalog_mark_download_completed_proto?(
+    registry: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_lora_adapter_import_proto?(
     registry: number,
     requestBytes: number,
     requestSize: number,
@@ -417,6 +421,7 @@ export function streamCallback<T>(
   call: (callbackPtr: number) => number | Promise<number>,
   stopWhen?: (event: T) => boolean,
   onCancel?: () => void,
+  onErrorEvent?: (rc: number) => T | null,
   callbackReturnsBool = false,
   yieldEvery: number = DEFAULT_STREAM_YIELD_EVERY,
 ): AsyncIterable<T> {
@@ -504,8 +509,13 @@ export function streamCallback<T>(
             emit(codec.decode(bytes));
             return callbackReturnsBool ? 1 : undefined;
           } catch (error) {
-            fail(error);
-            return callbackReturnsBool ? 0 : undefined;
+            // Swift parity (ProtoStreamContext.yield): a per-event decode
+            // failure is logged and the event skipped — it does not tear
+            // down the whole stream.
+            modalityLogger.warning(
+              `${functionName}: failed to decode stream event: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return callbackReturnsBool ? 1 : undefined;
           }
         }, callbackSignature(callbackReturnsBool));
         return true;
@@ -532,7 +542,21 @@ export function streamCallback<T>(
         try {
           const rc = await call(callbackPtr);
           if (rc !== 0) {
-            fail(SDKException.fromRACResult(rc, functionName));
+            // Swift parity (CppBridge+ModalityProtoABI.swift:289-292): a
+            // non-success return synthesizes a terminal event via the
+            // modality's factory and finishes the stream — the iterator
+            // never rejects. `finished` already true means the consumer
+            // cancelled, which (like Swift's `!context.isCancelled` guard)
+            // skips the synthetic event.
+            if (!finished) {
+              const terminal = onErrorEvent?.(rc) ?? null;
+              if (terminal !== null) {
+                emit(terminal);
+              } else {
+                modalityLogger.warning(`${functionName} returned ${formatRacResult(rc)}`);
+              }
+              finish();
+            }
             return;
           }
           if (!finished) finish();

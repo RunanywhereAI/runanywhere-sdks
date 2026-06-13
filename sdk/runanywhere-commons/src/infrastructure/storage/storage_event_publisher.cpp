@@ -11,6 +11,8 @@
 
 #ifdef RAC_HAVE_PROTOBUF
 
+#include "sdk_events.pb.h"
+
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -18,8 +20,6 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
-
-#include "sdk_events.pb.h"
 
 namespace rac::storage {
 namespace {

@@ -84,8 +84,7 @@ rac_bool_t rac_audio_pipeline_is_valid_transition(rac_audio_pipeline_state_t fro
         // Wake-word mode: armed from IDLE/COOLDOWN, advances to LISTENING on
         // detection, or back to IDLE when the session stops.
         case RAC_AUDIO_PIPELINE_WAITING_WAKEWORD:
-            return (to_state == RAC_AUDIO_PIPELINE_LISTENING ||
-                    to_state == RAC_AUDIO_PIPELINE_IDLE)
+            return (to_state == RAC_AUDIO_PIPELINE_LISTENING || to_state == RAC_AUDIO_PIPELINE_IDLE)
                        ? RAC_TRUE
                        : RAC_FALSE;
 

@@ -5,7 +5,7 @@
  * extension (LLM, STT, TTS, VAD, loadModel, downloadModel).
  *
  * Mirrors Swift's `RunAnywhere.ensureServicesReady()` internal static guard
- * (`RunAnywhere.swift:321-330`). Swift can call the static directly because all
+ * (`RunAnywhere.swift:336-352`). Swift can call the static directly because all
  * extensions live in the same module. TypeScript modules are independent files,
  * so the guard is registered once by `RunAnywhere.ts` at construction time and
  * invoked by the extension files through this indirection — avoiding a circular
@@ -29,16 +29,30 @@ export function registerServicesReadyGuard(fn: ServicesReadyFn): void {
  *
  * O(1) after first successful Phase-2 completion (
  * `completeServicesInitialization` short-circuits on the cached
- * `hasCompletedServicesInit` flag). Errors are swallowed with `try?` semantics
- * — matching Swift's `try? await ensureServicesReady()` in `loadModel` /
- * `downloadModel` — so a transient Phase-2 failure does not block inference.
+ * `hasCompletedServicesInit` flag). Errors PROPAGATE — matching Swift's
+ * `try await ensureServicesReady()` used by generate / transcribe /
+ * synthesize / RAG / voice-agent and the other throwing entry points.
+ *
+ * Result-returning, non-throwing call sites (listModels / getModel /
+ * refreshModelRegistry / loadModel) should use
+ * `ensureServicesReadyOrIgnore()` instead — Swift's `try?` sites.
  */
 export async function ensureServicesReady(): Promise<void> {
   if (_ensureServicesReady) {
-    try {
-      await _ensureServicesReady();
-    } catch {
-      // Non-fatal: mirrors Swift `try? await ensureServicesReady()`.
-    }
+    await _ensureServicesReady();
+  }
+}
+
+/**
+ * `try?` variant of [ensureServicesReady]: swallow Phase-2 failures so a
+ * transient services-init error does not block local-only operation. Mirrors
+ * Swift's `try? await ensureServicesReady()` in `listModels`, `getModel`,
+ * `refreshModelRegistry`, and `loadModel`.
+ */
+export async function ensureServicesReadyOrIgnore(): Promise<void> {
+  try {
+    await ensureServicesReady();
+  } catch {
+    // Non-fatal: mirrors Swift `try? await ensureServicesReady()`.
   }
 }

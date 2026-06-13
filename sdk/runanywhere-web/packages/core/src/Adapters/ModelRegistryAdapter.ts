@@ -20,15 +20,20 @@ import {
   RAC_ERROR_INVALID_ARGUMENT,
 } from '../Foundation/RACErrors';
 import {
+  ModelImportRequest as ProtoModelImportRequestCodec,
+  ModelImportResult as ProtoModelImportResultCodec,
   ModelInfo as ProtoModelInfoCodec,
   ModelInfoList as ProtoModelInfoListCodec,
   ModelQuery as ProtoModelQueryCodec,
   ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequestCodec,
   ModelRegistryRefreshResult as ProtoModelRegistryRefreshResultCodec,
+  type ModelImportRequest as ProtoModelImportRequest,
+  type ModelImportResult as ProtoModelImportResult,
   type ModelInfo as ProtoModelInfo,
   type ModelInfoList as ProtoModelInfoList,
   type ModelQuery as ProtoModelQuery,
 } from '@runanywhere/proto-ts/model_types';
+import { ProtoWasmBridge, type ProtoWasmModule } from '../runtime/ProtoWasm';
 
 const logger = new SDKLogger('ModelRegistryAdapter');
 const OUT_PTR_SIZE = 4;
@@ -104,6 +109,19 @@ export interface ModelRegistryModule {
   _rac_model_registry_remove_proto?(
     handle: number,
     modelId: number,
+  ): number;
+  /**
+   * `rac_result_t rac_model_registry_import_proto(handle, req_bytes,
+   * req_size, rac_proto_buffer_t* out_result)` — registers/merges a model
+   * from a serialized `ModelImportRequest`; returns an owned
+   * `ModelImportResult` via the proto buffer. C++ owns import semantics
+   * (Swift parity: CppBridge.ModelRegistry.importModel).
+   */
+  _rac_model_registry_import_proto?(
+    handle: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
   ): number;
   _rac_model_registry_proto_free?(protoBytes: number): void;
 }
@@ -329,6 +347,43 @@ export class ModelRegistryAdapter {
         mod._rac_model_registry_update_proto!(handle, bytesPtr, bytesLen)
       ))
     ));
+  }
+
+  /**
+   * Import a model through `rac_model_registry_import_proto` so commons owns
+   * the import semantics (merge, overwrite, validation). Swift parity:
+   * `CppBridge.ModelRegistry.importModel(request)`.
+   *
+   * Broadcast across every known module (same rationale as {@link register}:
+   * per-module C++ `s_model_registry` singletons must stay in sync); the
+   * primary module's decoded `ModelImportResult` is returned.
+   */
+  importModel(request: ProtoModelImportRequest): ProtoModelImportResult | null {
+    const primary = this.module;
+    let primaryResult: ProtoModelImportResult | null = null;
+
+    const targets = new Set<ModelRegistryModule>(knownModules);
+    if (!targets.has(primary)) targets.add(primary);
+
+    for (const mod of targets) {
+      const isPrimary = mod === primary;
+      const adapter = isPrimary ? this : new ModelRegistryAdapter(mod);
+      if (typeof mod._rac_model_registry_import_proto !== 'function') continue;
+      const handle = adapter.getRegistryHandle('importModel');
+      if (!handle) continue;
+      const bridge = new ProtoWasmBridge(mod as unknown as ProtoWasmModule, logger);
+      const result = bridge.withEncodedRequest(
+        request,
+        ProtoModelImportRequestCodec,
+        ProtoModelImportResultCodec,
+        (requestPtr, requestSize, outResult) => (
+          mod._rac_model_registry_import_proto!(handle, requestPtr, requestSize, outResult)
+        ),
+        'rac_model_registry_import_proto',
+      );
+      if (isPrimary) primaryResult = result;
+    }
+    return primaryResult;
   }
 
   get(modelId: string): ProtoModelInfo | null {

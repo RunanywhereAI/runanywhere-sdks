@@ -65,6 +65,11 @@ final class LLMViewModel {
     var generationCancellable: AnyCancellable?
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
+    /// TTFT (ms) reported by the SDK event bus for the generation in flight.
+    /// The event carries an SDK-side generation id the app never sees on the
+    /// result, so the single-generation-at-a-time chat keeps the latest value
+    /// and merges it into the persisted `MessageAnalytics`.
+    private(set) var activeGenerationTTFTMs: Double?
     private var isViewModelInitialized = false
 
     // MARK: - Internal Accessors for Extensions
@@ -93,6 +98,7 @@ final class LLMViewModel {
 
     func recordFirstTokenLatency(generationId: String, latency: Double) {
         firstTokenLatencies[generationId] = latency
+        activeGenerationTTFTMs = latency
     }
 
     func getFirstTokenLatency(for generationId: String) -> Double? {
@@ -225,6 +231,7 @@ final class LLMViewModel {
         currentInput = ""
         isGenerating = true
         error = nil
+        activeGenerationTTFTMs = nil
 
         // Create conversation on first message
         if currentConversation == nil {
@@ -449,46 +456,19 @@ final class LLMViewModel {
         }
     }
 
-    /// Copies a user-selected LoRA file into the sandbox before applying it. If
-    /// the file matches a catalog entry, the import completion is persisted
-    /// through the generated LoRA catalog ABI.
+    /// Imports a user-selected LoRA file through the SDK (sandbox access,
+    /// on-disk placement, and catalog completion are SDK-owned), then applies it.
     func importAndLoadLoraAdapter(url: URL, scale: Float) async {
         isLoadingLoRA = true
         error = nil
 
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer {
-            if accessed {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-
         do {
-            let destination = try copyImportedAdapterToSandbox(from: url)
-            if let entry = availableAdapters.first(where: { catalogEntryMatches($0, fileURL: url) }) {
-                var request = RALoraAdapterDownloadCompletedRequest()
-                request.adapterID = entry.id
-                request.localPath = destination.path
-                request.imported = true
-                request.completedAtUnixMs = currentUnixMilliseconds()
-                request.statusMessage = "import completed"
-                if let fileSize = try fileSize(at: destination) {
-                    request.sizeBytes = fileSize
-                }
-
-                let result = try await RunAnywhere.lora.markImportCompleted(request)
-                guard result.success else {
-                    throw LLMError.custom(
-                        result.errorMessage.isEmpty
-                            ? "LoRA adapter import completion was not persisted"
-                            : result.errorMessage
-                    )
-                }
-                updateAvailableAdapter(result.entry)
+            let imported = try await RunAnywhere.lora.importAdapter(from: url)
+            if imported.matched, imported.hasEntry {
+                updateAvailableAdapter(imported.entry)
             }
-
             isLoadingLoRA = false
-            await loadLoraAdapter(path: destination.path, scale: scale)
+            await loadLoraAdapter(path: imported.localPath, scale: scale)
         } catch {
             logger.error("Failed to import LoRA adapter: \(error)")
             self.error = error
@@ -520,45 +500,12 @@ final class LLMViewModel {
         return entry
     }
 
-    private func copyImportedAdapterToSandbox(from url: URL) throws -> URL {
-        let directory = Self.loraDownloadDirectory()
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let destination = directory.appendingPathComponent(url.lastPathComponent, isDirectory: false)
-
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        try FileManager.default.copyItem(at: url, to: destination)
-        return destination
-    }
-
     private func updateAvailableAdapter(_ entry: RALoraAdapterCatalogEntry) {
         if let index = availableAdapters.firstIndex(where: { $0.id == entry.id }) {
             availableAdapters[index] = entry
         } else {
             availableAdapters.append(entry)
         }
-    }
-
-    private func catalogEntryMatches(_ entry: RALoraAdapterCatalogEntry, fileURL: URL) -> Bool {
-        let filename = fileURL.lastPathComponent
-        return entry.filename == filename || entry.localPath == fileURL.path
-    }
-
-    private func fileSize(at url: URL) throws -> Int64? {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        return (attributes[.size] as? NSNumber)?.int64Value
-    }
-
-    private func currentUnixMilliseconds() -> Int64 {
-        Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-    }
-
-    /// Sandbox folder for user-imported adapter files (file-picker flow only;
-    /// catalog downloads are placed by the SDK).
-    static func loraDownloadDirectory() -> URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return docs.appendingPathComponent("LoRA", isDirectory: true)
     }
 
     // MARK: - Private Methods - Message Generation
@@ -604,6 +551,11 @@ final class LLMViewModel {
         if let effectiveSystemPrompt {
             options.systemPrompt = effectiveSystemPrompt
         }
+        options.streamingEnabled = useStreaming
+        // Structured flag — commons applies the model's no-think directive;
+        // the app never injects control tokens into prompts. Same gate as the
+        // RAG path (RAGViewModel.askQuestion).
+        options.disableThinking = loadedModelSupportsThinking && !thinkingModeEnabled
         return options
     }
 

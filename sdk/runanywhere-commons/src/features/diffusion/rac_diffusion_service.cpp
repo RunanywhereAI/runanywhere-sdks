@@ -14,10 +14,10 @@
 #include <cstring>
 #include <filesystem>
 
+#include "../common/rac_service_factory_internal.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/plugin/rac_model_format_ids.h"
-#include "../common/rac_service_factory_internal.h"
 
 static const char* LOG_CAT = "Diffusion.Service";
 namespace fs = std::filesystem;
@@ -79,14 +79,14 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
     RAC_LOG_INFO(LOG_CAT, "Creating diffusion service for: %s", model_id);
 
     rac::features::ResolvedModelReference model_ref;
-    rac_result_t result = rac::features::resolve_model_reference(
-        model_id,
-        {.log_cat = LOG_CAT,
-         .default_framework = RAC_FRAMEWORK_UNKNOWN,
-         .allow_null_model_id = false,
-         .lookup_last_path_component = true,
-         .prefer_input_path_when_contains = nullptr},
-        &model_ref);
+    rac_result_t result =
+        rac::features::resolve_model_reference(model_id,
+                                               {.log_cat = LOG_CAT,
+                                                .default_framework = RAC_FRAMEWORK_UNKNOWN,
+                                                .allow_null_model_id = false,
+                                                .lookup_last_path_component = true,
+                                                .prefer_input_path_when_contains = nullptr},
+                                               &model_ref);
     if (result != RAC_SUCCESS) {
         return result;
     }

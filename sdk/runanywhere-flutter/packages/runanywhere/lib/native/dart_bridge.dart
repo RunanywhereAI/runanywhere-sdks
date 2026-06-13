@@ -143,6 +143,14 @@ class DartBridge {
     }
 
     _environment = environment;
+
+    // Set environment first so Dart-side logging boots with the correct
+    // per-environment config (min level + console gating). Mirrors Swift
+    // RunAnywhere.performCoreInitSerial which calls
+    // Logging.shared.applyEnvironmentConfiguration(params.environment)
+    // before any bridge work.
+    SDKLoggerConfig.shared.applyEnvironmentConfiguration(environment);
+
     _logger.debug(
       'Starting Phase 1 initialization',
       metadata: {'environment': environment.name},

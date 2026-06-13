@@ -8,6 +8,8 @@
  * (see model_registry_internal.h). No behaviour change.
  */
 
+#include "model_registry_internal.h"
+
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -20,8 +22,6 @@
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-
-#include "model_registry_internal.h"
 
 using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
@@ -115,12 +115,10 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
     // Scan the framework set covering every backend an SDK can install so the
     // ABI refresh path links downloads regardless of which backend produced them.
     const rac_inference_framework_t frameworks[] = {
-        RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
-        RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
-        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_METALRT,
-        RAC_FRAMEWORK_GENIE,       RAC_FRAMEWORK_SHERPA,
-        RAC_FRAMEWORK_UNKNOWN};
+        RAC_FRAMEWORK_LLAMACPP,   RAC_FRAMEWORK_ONNX,        RAC_FRAMEWORK_COREML,
+        RAC_FRAMEWORK_MLX,        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
+        RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
+        RAC_FRAMEWORK_SHERPA,     RAC_FRAMEWORK_UNKNOWN};
 
     int32_t linked = 0;
     std::vector<rac_directory_entry_t> framework_entries;
@@ -205,6 +203,32 @@ int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
                 continue;
             }
 
+            // Entries with explicit artifact descriptors get the strict
+            // per-artifact completeness check instead of the "any regular
+            // file" heuristic, so a partial or corrupted folder is left
+            // unlinked and a re-download can heal it. The resolver walks
+            // std::filesystem, so only apply where the folder is visible to
+            // it (native + hydrated MEMFS). The snapshot type is a generated
+            // proto, so protobuf-less builds (wasm preset) keep the
+            // pre-existing "any regular file" heuristic.
+#if defined(RAC_HAVE_PROTOBUF)
+            {
+                ModelInfo snapshot;
+                std::error_code fs_ec;
+                if (get_model_snapshot_by_id(handle, model_id, &snapshot) &&
+                    (snapshot.has_expected_files() || snapshot.has_multi_file()) &&
+                    std::filesystem::exists(model_path, fs_ec)) {
+                    if (!model_folder_is_complete(snapshot, model_path)) {
+                        RAC_LOG_WARNING(
+                            "ModelRegistry",
+                            "Refresh rescan: '%s' folder is incomplete — leaving unlinked",
+                            model_id.c_str());
+                        continue;
+                    }
+                }
+            }
+#endif  // RAC_HAVE_PROTOBUF
+
             rac_result_t update_rc = rac_model_registry_update_download_status(
                 handle, model_id.c_str(), model_path.c_str());
             if (update_rc == RAC_SUCCESS) {
@@ -259,7 +283,8 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     if (request.include_remote_catalog()) {
         rac_model_info_t** remote_models = nullptr;
         size_t remote_count = 0;
-        rac_result_t remote_rc = rac_model_assignment_fetch(RAC_TRUE, &remote_models, &remote_count);
+        rac_result_t remote_rc =
+            rac_model_assignment_fetch(RAC_TRUE, &remote_models, &remote_count);
         if (remote_rc == RAC_SUCCESS) {
             RAC_LOG_INFO("ModelRegistry", "Remote catalog refreshed (%zu models)", remote_count);
             if (remote_models) {
@@ -277,10 +302,15 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     // entries to their downloads. Falls back to the legacy warning when the
     // callback is NULL so older SDK builds keep working without changes.
     int32_t adapter_rescan_linked = 0;
+    int32_t manifest_restored = 0;
     bool adapter_rescan_ran = false;
     if (request.rescan_local()) {
         const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
         if (adapter && adapter->file_list_directory) {
+            // First restore un-seeded models from durable folder manifests
+            // (ad-hoc URL / HF pulls from previous runs), then relink the
+            // re-seeded catalog entries.
+            manifest_restored = restore_models_from_folder_manifests(handle);
             adapter_rescan_linked = rescan_local_via_platform_adapter(handle);
             adapter_rescan_ran = true;
         }
@@ -307,7 +337,7 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     result.set_success(refresh_rc == RAC_SUCCESS);
     result.set_registered_count(counts.total);
     result.set_updated_count(adapter_rescan_linked);
-    result.set_discovered_count(adapter_rescan_linked);
+    result.set_discovered_count(adapter_rescan_linked + manifest_restored);
     result.set_pruned_count(0);
     result.set_refreshed_at_unix_ms(rac_get_current_time_ms());
     result.set_downloaded_count(counts.downloaded);

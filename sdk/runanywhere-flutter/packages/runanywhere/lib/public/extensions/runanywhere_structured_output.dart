@@ -60,17 +60,26 @@ class RunAnywhereStructuredOutput {
 
   /// Generate structured output from a typed JSON schema.
   ///
-  /// Mirrors Swift `RunAnywhere.generateStructured(prompt:schema:options:)`.
+  /// Mirrors Swift `RunAnywhere.generateStructured(prompt:schema:options:)`
+  /// (RunAnywhere+StructuredOutput.swift:25-39): caller-supplied [options]
+  /// (maxTokens, temperature, topP, systemPrompt, …) are forwarded to the
+  /// underlying LLM through [generateWithStructuredOutput]; the resulting raw
+  /// text is then parsed via the commons extraction/validation path.
   static Future<StructuredOutputResult> generateStructured({
     required String prompt,
     required JSONSchema schema,
     LLMGenerationOptions? options,
   }) async {
-    final request = DartBridgeStructuredOutput.shared.makeGenerateRequest(
+    if (!DartBridge.isInitialized) throw SDKException.notInitialized();
+    final generation = await generateWithStructuredOutput(
       prompt: prompt,
-      options: StructuredOutputOptionsDefaults.defaults(schema: schema),
+      structuredOutput: StructuredOutputOptionsDefaults.defaults(schema: schema),
+      options: options,
     );
-    return generateRequest(request);
+    return RunAnywhereLLM.shared.extractStructuredOutput(
+      text: generation.text,
+      schema: schema,
+    );
   }
 
   /// Generated-proto structured output entrypoint.
@@ -191,8 +200,18 @@ class RunAnywhereStructuredOutput {
 
     controller.onListen = () => unawaited(start());
     controller.onCancel = () async {
+      // Consumer cancelled mid-stream (controller still open): tear down the
+      // native LLM generation, mirroring Swift's `.cancelled` termination
+      // branch (RunAnywhere+StructuredOutput.swift:122-126). When the
+      // controller already closed (terminal COMPLETED/ERROR emitted), this is
+      // a `.finished` termination — do NOT fire the native cancel, which
+      // would race a follow-up generate() on the lifecycle LLM handle.
+      final cancelledMidStream = !controller.isClosed;
       await subscription?.cancel();
       subscription = null;
+      if (cancelledMidStream) {
+        RunAnywhereLLM.shared.cancelGeneration();
+      }
     };
     return controller.stream;
   }
@@ -219,7 +238,9 @@ class RunAnywhereStructuredOutput {
         options: structuredOutput,
       );
       if (result.errorCode != 0) {
-        throw SDKException.generationFailed(
+        // Mirrors Swift `.processingFailed` on prep failure
+        // (RunAnywhere+StructuredOutput.swift:148-150).
+        throw SDKException.processingFailed(
           result.errorMessage.isNotEmpty
               ? result.errorMessage
               : 'Structured-output prompt preparation failed',
@@ -241,7 +262,7 @@ class RunAnywhereStructuredOutput {
   ///
   /// Falls back to [prompt] verbatim when commons returns an empty system
   /// prompt or the ABI is unavailable. Throws [SDKException.notInitialized]
-  /// if SDK is not initialized; throws [SDKException.generationFailed] on
+  /// if SDK is not initialized; throws [SDKException.processingFailed] on
   /// non-zero commons error.
   static String preparePromptForStructuredOutput({
     required String prompt,
@@ -259,7 +280,8 @@ class RunAnywhereStructuredOutput {
       options: options,
     );
     if (result.errorCode != 0) {
-      throw SDKException.generationFailed(
+      // Mirrors Swift `.processingFailed` on prep failure.
+      throw SDKException.processingFailed(
         'preparePromptForStructuredOutput failed (rc=${result.errorCode})',
       );
     }

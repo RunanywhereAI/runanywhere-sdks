@@ -11,9 +11,18 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import {
+  isSDKInitialized,
+  requireInitialized,
+} from '../../../Foundation/Initialization/InitializedGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import { AudioPlaybackManager } from '../../../Features/VoiceSession/AudioPlaybackManager';
+import {
+  CurrentModelRequest,
+  ModelCategory,
+} from '@runanywhere/proto-ts/model_types';
+import { currentModel } from '../Models/RunAnywhere+ModelLifecycle';
 import {
   type TTSOptions,
   type TTSOutput,
@@ -102,6 +111,8 @@ export async function synthesize(
   text: string,
   options?: Partial<TTSOptions>
 ): Promise<TTSOutput> {
+  // Swift parity: guard isInitialized (RunAnywhere+TTS.swift:26-28).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
@@ -115,7 +126,13 @@ export async function synthesize(
 /**
  * Synthesize with streaming chunked audio output.
  *
- * Matches Swift SDK: `RunAnywhere.synthesizeStream(_:options:)`.
+ * Matches Swift SDK: `RunAnywhere.synthesizeStream(_:options:)`
+ * (RunAnywhere+TTS.swift:46-97) — the stream never rejects the iterator:
+ *   - SDK not initialized / services not ready / no TTS voice loaded →
+ *     the stream finishes silently.
+ *   - A stream failure surfaces as a terminal error-marked `TTSOutput`
+ *     (`isFinal=true`, non-empty `errorMessage`,
+ *     `errorCode=RAC_ERROR_PROCESSING_FAILED`) followed by completion.
  */
 export function synthesizeStream(
   text: string,
@@ -128,13 +145,16 @@ export function synthesizeStream(
   const native = requireNativeModule();
   const requestBytes = encodeTTSSynthesisRequest(text, options);
 
+  // RAC_ERROR_PROCESSING_FAILED — mirrors Swift's terminal failure marker
+  // (RunAnywhere+TTS.swift:84).
+  const RAC_ERROR_PROCESSING_FAILED = -234;
+
   return {
     [Symbol.asyncIterator](): AsyncIterator<TTSOutput> {
       const queue: TTSOutput[] = [];
       let resolver: ((value: IteratorResult<TTSOutput>) => void) | null = null;
       let done = false;
       let started = false;
-      let streamError: Error | null = null;
 
       const finish = (): void => {
         done = true;
@@ -153,20 +173,60 @@ export function synthesizeStream(
         }
       };
 
+      // Terminal error-marked output — mirrors Swift's failure RATTSOutput
+      // (RunAnywhere+TTS.swift:80-87): yield once, then finish.
+      const failStream = (message: string): void => {
+        push(
+          TTSOutputMessage.fromPartial({
+            timestampMs: Date.now(),
+            isFinal: true,
+            errorMessage: `TTS stream failed: ${message}`,
+            errorCode: RAC_ERROR_PROCESSING_FAILED,
+          })
+        );
+        finish();
+      };
+
       const start = (): void => {
         if (started) return;
         started = true;
-        ensureServicesReady().then(() => {
-          native
+        (async () => {
+          // Swift parity: not-initialized finishes silently
+          // (RunAnywhere+TTS.swift:52-55).
+          if (!isSDKInitialized()) {
+            finish();
+            return;
+          }
+          // Swift parity: a Phase-2 failure finishes silently
+          // (RunAnywhere+TTS.swift:56-61).
+          try {
+            await ensureServicesReady();
+          } catch {
+            finish();
+            return;
+          }
+          // Swift parity: no TTS voice loaded in the lifecycle finishes
+          // silently (RunAnywhere+TTS.swift:65-69).
+          const snapshot = await currentModel(
+            CurrentModelRequest.fromPartial({
+              category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            })
+          );
+          if (!snapshot?.found) {
+            finish();
+            return;
+          }
+
+          await native
             .ttsSynthesizeStreamProto(
               requestBytes,
               (eventBytes: ArrayBuffer) => {
+                if (done) return;
                 try {
                   const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
                   if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
-                    throw SDKException.generationFailedWith(
-                      event.errorMessage ?? 'TTS stream failed'
-                    );
+                    failStream(event.errorMessage ?? 'unknown error');
+                    return;
                   }
                   if (event.output) {
                     push(event.output);
@@ -177,9 +237,7 @@ export function synthesizeStream(
                     finish();
                   }
                 } catch (error) {
-                  streamError =
-                    error instanceof Error ? error : new Error(String(error));
-                  finish();
+                  failStream(error instanceof Error ? error.message : String(error));
                 }
               }
             )
@@ -187,13 +245,13 @@ export function synthesizeStream(
               if (!done) finish();
             })
             .catch((err: Error) => {
-              streamError = err;
               logger.warning(`ttsSynthesizeStreamProto rejected: ${err.message}`);
-              finish();
+              if (!done) failStream(err.message);
             });
-        }).catch((err: Error) => {
-          streamError = err;
-          finish();
+        })().catch((err: unknown) => {
+          if (!done) {
+            failStream(err instanceof Error ? err.message : String(err));
+          }
         });
       };
 
@@ -203,15 +261,11 @@ export function synthesizeStream(
           if (queue.length > 0) {
             return { value: queue.shift()!, done: false };
           }
-          if (streamError) throw streamError;
           if (done) {
             return { value: undefined as unknown as TTSOutput, done: true };
           }
           return new Promise<IteratorResult<TTSOutput>>((resolve) => {
             resolver = resolve;
-          }).then((result) => {
-            if (streamError) throw streamError;
-            return result;
           });
         },
         async return(): Promise<IteratorResult<TTSOutput>> {
@@ -248,6 +302,8 @@ export async function speak(
   text: string,
   options?: Partial<TTSOptions>
 ): Promise<TTSSpeakResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+TTS.swift:114-116).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }

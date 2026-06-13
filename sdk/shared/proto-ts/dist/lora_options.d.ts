@@ -145,6 +145,33 @@ export interface LoraAdapterDownloadCompletedResult {
 }
 /**
  * ---------------------------------------------------------------------------
+ * Import of a user-picked local adapter file. Commons owns everything past
+ * the platform-readable source path: deterministic catalog matching (exact
+ * local-path match, else an unambiguous filename match), canonical placement
+ * under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
+ * manifest persistence, and catalog completion for matched entries.
+ * Platforms only resolve OS-specific access (security-scoped URLs, content
+ * URIs, Blob-to-FS staging) before calling.
+ * ---------------------------------------------------------------------------
+ */
+export interface LoraAdapterImportRequest {
+    /** platform-readable path of the picked file */
+    sourcePath: string;
+    /** destination filename; default basename(source_path) */
+    filename?: string | undefined;
+}
+export interface LoraAdapterImportResult {
+    success: boolean;
+    errorMessage: string;
+    /** stable SDK-owned path of the imported file */
+    localPath: string;
+    /** a catalog entry matched and was completed */
+    matched: boolean;
+    /** updated catalog entry when matched */
+    entry?: LoraAdapterCatalogEntry | undefined;
+}
+/**
+ * ---------------------------------------------------------------------------
  * Result of a LoRA compatibility pre-check.
  *
  * `base_model_required` is not present in any current SDK shape — it is
@@ -198,6 +225,8 @@ export declare const LoraAdapterCatalogGetRequest: MessageFns<LoraAdapterCatalog
 export declare const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult>;
 export declare const LoraAdapterDownloadCompletedRequest: MessageFns<LoraAdapterDownloadCompletedRequest>;
 export declare const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadCompletedResult>;
+export declare const LoraAdapterImportRequest: MessageFns<LoraAdapterImportRequest>;
+export declare const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult>;
 export declare const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult>;
 export declare const LoRAApplyRequest: MessageFns<LoRAApplyRequest>;
 export declare const LoRAApplyResult: MessageFns<LoRAApplyResult>;

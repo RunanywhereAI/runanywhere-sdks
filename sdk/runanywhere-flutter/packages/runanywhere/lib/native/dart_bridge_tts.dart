@@ -243,7 +243,10 @@ class DartBridgeTTS {
       final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
 
       try {
-        // Mirrors DartBridgeLLM.generateStreamProto:
+        // Main-isolate single-call ABI (NOTE: DartBridgeLLM.generateStreamProto
+        // has since moved its blocking call into a worker isolate — that is
+        // the template for converting this path; TTS still blocks the calling
+        // isolate for the duration of synthesis):
         // use `isolateLocal` (not `.listener`) so the callback runs
         // synchronously on the same thread that invoked
         // `rac_tts_synthesize_stream_lifecycle_proto`. The commons producer

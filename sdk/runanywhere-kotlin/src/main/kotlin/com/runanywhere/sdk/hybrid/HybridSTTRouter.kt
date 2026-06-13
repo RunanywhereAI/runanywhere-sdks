@@ -16,7 +16,9 @@
  *   2. creates the two STT services through the registry-routed creation path
  *      and attaches them with their descriptors,
  *   3. registers any custom-filter predicates and installs the policy bytes,
- *   4. drives the router's transcribe and decodes the response.
+ *   4. drives the router's transcribe and decodes the response (raw-PCM16 →
+ *      WAV normalisation happens inside the commons router so one payload
+ *      serves both services).
  *
  * Mirrors Swift's HybridSTTRouter.swift (same member names + semantics);
  * Closeable is retained as the Kotlin lifetime idiom.
@@ -53,7 +55,7 @@ import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
  *         rank = HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
  *     ),
  * )
- * val result = router.transcribe(audio, HybridTranscribeOptions(audio_format = 1))
+ * val result = router.transcribe(pcm16Audio, HybridTranscribeOptions(sample_rate = 16000))
  * router.close()
  * ```
  *
@@ -176,10 +178,13 @@ class HybridSTTRouter : Closeable {
      * installed policy (filters → rank → invoke → fallback) in commons and
      * returns the chosen backend's result plus the routing decision.
      *
-     * @param audio   File-encoded audio (wav/mp3/flac/...) OR raw PCM bytes.
-     *                Each engine decodes per its own expectations: the cloud
-     *                provider sends the bytes as a multipart file part;
-     *                sherpa parses WAV inline.
+     * @param audio   Raw 16-bit mono PCM bytes (pass the capture rate via
+     *                [HybridTranscribeOptions.sample_rate]) OR file-encoded
+     *                audio (wav/mp3/flac/...). Raw PCM16 is wrapped in a WAV
+     *                container by the commons router
+     *                (rac_stt_hybrid_router_proto.cpp); WAV input (RIFF/WAVE
+     *                magic) and declared compressed formats pass through
+     *                unchanged.
      * @param options Optional language / sample-rate / audio-format hints
      *                (proto-typed [HybridTranscribeOptions]).
      */

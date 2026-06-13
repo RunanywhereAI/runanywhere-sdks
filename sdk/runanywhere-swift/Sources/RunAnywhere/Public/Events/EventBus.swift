@@ -93,6 +93,87 @@ public final class EventBus: @unchecked Sendable {
             .eraseToAnyPublisher()
     }
 
+    /// Extract a specific payload type from the proto envelope stream for
+    /// internal convenience streams.
+    private func eventsOfPayload<Payload>(
+        _ selector: @escaping (RASDKEvent) -> Payload?
+    ) -> AnyPublisher<Payload, Never> {
+        subject
+            .compactMap(selector)
+            .eraseToAnyPublisher()
+    }
+
+    /// Stream of `RAVoiceEvent` payloads (voice-agent pipeline events).
+    public var voiceEventPayloads: AnyPublisher<RAVoiceEvent, Never> {
+        eventsOfPayload { envelope in
+            guard case .voicePipeline(let payload)? = envelope.event else { return nil }
+            return payload
+        }
+    }
+
+    /// Stream of `RADownloadEvent` payloads (model download progress / lifecycle).
+    public var downloadEventPayloads: AnyPublisher<RADownloadEvent, Never> {
+        eventsOfPayload { envelope in
+            guard case .download(let payload)? = envelope.event else { return nil }
+            return payload
+        }
+    }
+
+    /// Stream of `RAComponentLifecycleEvent` payloads.
+    public var componentLifecycleEventPayloads: AnyPublisher<RAComponentLifecycleEvent, Never> {
+        eventsOfPayload { envelope in
+            guard case .componentLifecycle(let payload)? = envelope.event else { return nil }
+            return payload
+        }
+    }
+
+    /// Stream of `RAModelRegistryEvent` payloads.
+    public var modelRegistryEventPayloads: AnyPublisher<RAModelRegistryEvent, Never> {
+        eventsOfPayload { envelope in
+            guard case .modelRegistry(let payload)? = envelope.event else { return nil }
+            return payload
+        }
+    }
+
+    // MARK: - Convenience Methods
+
+    /// Get LLM events.
+    public var llmEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .llm)
+    }
+
+    /// Get STT events.
+    public var sttEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .stt)
+    }
+
+    /// Get TTS events.
+    public var ttsEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .tts)
+    }
+
+    /// Get model events.
+    public var modelEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .model)
+    }
+
+    /// Get error events.
+    public var errorEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .error)
+    }
+
+    /// Get SDK lifecycle events.
+    public var sdkEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .sdk)
+    }
+
+    /// Get RAG events.
+    public var ragEvents: AnyPublisher<RASDKEvent, Never> {
+        events(for: .rag)
+    }
+
+    // MARK: - Closure Subscriptions
+
     /// Subscribe to events with a closure
     public func on(_ handler: @escaping (RASDKEvent) -> Void) -> AnyCancellable {
         subject.sink { event in

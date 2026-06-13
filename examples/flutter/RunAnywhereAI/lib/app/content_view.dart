@@ -1,18 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/features/chat/chat_interface_view.dart';
+import 'package:runanywhere_ai/features/more/more_view.dart';
 import 'package:runanywhere_ai/features/settings/combined_settings_view.dart';
-import 'package:runanywhere_ai/features/solutions/solutions_view.dart';
-import 'package:runanywhere_ai/features/tools/tools_view.dart';
 import 'package:runanywhere_ai/features/vision/vision_hub_view.dart';
-import 'package:runanywhere_ai/features/voice/speech_to_text_view.dart';
-import 'package:runanywhere_ai/features/voice/text_to_speech_view.dart';
 import 'package:runanywhere_ai/features/voice/voice_assistant_view.dart';
 
 /// ContentView (mirroring iOS ContentView.swift)
 ///
 /// Main tab-based navigation for the app.
-/// Tabs: Chat, Vision, Transcribe (STT), Speak (TTS), Voice, Tools, Settings
+/// Tabs: Chat, Vision, Voice, More, Settings
 class ContentView extends StatefulWidget {
   const ContentView({super.key});
 
@@ -23,25 +20,19 @@ class ContentView extends StatefulWidget {
 class _ContentViewState extends State<ContentView> {
   int _selectedTab = 0;
 
-  // Tab pages matching iOS structure exactly
+  // Tab pages matching iOS structure.
   final List<Widget> _pages = const [
     ChatInterfaceView(), // Tab 0: Chat (LLM)
-    VisionHubView(), // Tab 1: Vision (VLM + Image Generation)
-    SpeechToTextView(), // Tab 2: Speech-to-Text (Transcribe)
-    TextToSpeechView(), // Tab 3: Text-to-Speech (Speak)
-    VoiceAssistantView(), // Tab 4: Voice Assistant (STT + LLM + TTS)
-    ToolsView(), // Tab 5: Tools (Tool Calling)
-    SolutionsView(), // Tab 6: Solutions (YAML pipeline runner)
-    CombinedSettingsView(), // Tab 7: Settings (includes Storage)
+    VisionHubView(), // Tab 1: Vision (VLM)
+    VoiceAssistantView(), // Tab 2: Voice Assistant (STT + LLM + TTS)
+    MoreView(), // Tab 3: More hub
+    CombinedSettingsView(), // Tab 4: Settings
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedTab,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedTab, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
         // B-FL-14-002: explicit height + vertical padding so the
@@ -54,8 +45,6 @@ class _ContentViewState extends State<ContentView> {
             _selectedTab = index;
           });
         },
-        // B-FL-2-001 (P3 batch): shorten "Transcribe" → "STT" so it fits
-        // alongside the other six labels without wrapping.
         destinations: const [
           NavigationDestination(
             icon: Padding(
@@ -82,28 +71,6 @@ class _ContentViewState extends State<ContentView> {
           NavigationDestination(
             icon: Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.graphic_eq_outlined),
-            ),
-            selectedIcon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.graphic_eq),
-            ),
-            label: 'STT',
-          ),
-          NavigationDestination(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.volume_up_outlined),
-            ),
-            selectedIcon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.volume_up),
-            ),
-            label: 'Speak',
-          ),
-          NavigationDestination(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
               child: Icon(Icons.mic_none),
             ),
             selectedIcon: Padding(
@@ -115,24 +82,13 @@ class _ContentViewState extends State<ContentView> {
           NavigationDestination(
             icon: Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.build_outlined),
+              child: Icon(Icons.more_horiz),
             ),
             selectedIcon: Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.build),
+              child: Icon(Icons.more),
             ),
-            label: 'Tools',
-          ),
-          NavigationDestination(
-            icon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.layers_outlined),
-            ),
-            selectedIcon: Padding(
-              padding: EdgeInsets.symmetric(vertical: 4),
-              child: Icon(Icons.layers),
-            ),
-            label: 'Solutions',
+            label: 'More',
           ),
           NavigationDestination(
             icon: Padding(

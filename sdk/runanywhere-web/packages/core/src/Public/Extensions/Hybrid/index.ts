@@ -8,12 +8,12 @@
  */
 
 export { HybridSttRouter } from './HybridSttRouter';
-export { CloudSTT, cloud } from './CloudSTT';
-export type { CloudModelEntry, CloudSTTConfig } from './CloudSTT';
+export { Cloud, cloud } from './Cloud';
+export type { CloudModelEntry, CloudSTTConfig } from './Cloud';
+// Custom-filter registrars are internal-only — Swift parity:
+// HybridCustomFilter.swift:31 (filters travel inside the policy spec).
 export {
   setHybridDeviceStateProvider,
-  registerHybridCustomFilter,
-  unregisterHybridCustomFilter,
   browserDeviceStateProvider,
 } from './HybridDeviceState';
 export type { HybridDeviceStateProvider } from './HybridDeviceState';

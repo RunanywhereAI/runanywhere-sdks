@@ -99,11 +99,20 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearCache() {
         // Clear the model assignment cache (in-memory cache for model assignments)
         rac_model_assignment_clear_cache();
 
-        // Clear file cache and temp directories via C++ file manager
+        // Cache directory only — temp lives behind cleanTempFiles(), matching
+        // Swift's separated clearCache()/cleanTempFiles() entry points.
         FileManagerBridge::shared().clearCache();
-        FileManagerBridge::shared().clearTemp();
 
         LOGI("Cache cleared successfully");
+        return true;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cleanTempFiles() {
+    return Promise<bool>::async([]() {
+        LOGI("Clearing temp files...");
+        FileManagerBridge::shared().clearTemp();
+        LOGI("Temp files cleared successfully");
         return true;
     });
 }

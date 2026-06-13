@@ -12,8 +12,6 @@
  */
 
 import { ONNXProvider } from './ONNXProvider';
-import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
-import { SDKComponent } from '@runanywhere/proto-ts/sdk_events';
 import { SDKLogger } from '@runanywhere/core/internal';
 
 const logger = new SDKLogger('ONNX');
@@ -48,15 +46,10 @@ const logger = new SDKLogger('ONNX');
  * ```
  */
 export const ONNX = {
-  /**
-   * Module metadata
-   * Matches iOS: static let moduleId, moduleName, inferenceFramework, capabilities
-   */
-  moduleId: 'onnx',
-  moduleName: 'ONNX Runtime',
-  inferenceFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  capabilities: [SDKComponent.SDK_COMPONENT_STT, SDKComponent.SDK_COMPONENT_TTS, SDKComponent.SDK_COMPONENT_VAD] as const,
-  defaultPriority: 100,
+  // Module-metadata constants (moduleId / moduleName / inferenceFramework /
+  // capabilities / defaultPriority) were removed: the Swift source of truth
+  // (Sources/ONNXRuntime/ONNX.swift) no longer declares them and nothing
+  // consumed them here.
 
   /**
    * Register ONNX module with the SDK
@@ -64,7 +57,7 @@ export const ONNX = {
    * Registers both ONNX STT and TTS providers with ServiceRegistry,
    * enabling them to handle Sherpa-ONNX and Piper models.
    *
-   * Matches iOS: static func register(priority: Int = defaultPriority)
+   * Matches iOS: static func register(priority: Int = 100)
    */
   async register(): Promise<boolean> {
     logger.info('Registering ONNX module (STT + TTS + VAD)');

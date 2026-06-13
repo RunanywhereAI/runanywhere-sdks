@@ -7,6 +7,7 @@ enum class ModelSelectionContext(val title: String) {
     LLM("Select LLM Model"),
     STT("Select STT Model"),
     TTS("Select TTS Voice"),
+    VAD("Select VAD Model"),
     VLM("Select Vision Model"),
     RAG_EMBEDDING("Select Embedding Model"),
     RAG_LLM("Select LLM Model"),
@@ -16,6 +17,7 @@ enum class ModelSelectionContext(val title: String) {
         LLM, RAG_LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
         STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
         TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        VAD -> category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         VLM -> category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
             category == ModelCategory.MODEL_CATEGORY_VISION
         RAG_EMBEDDING -> category == ModelCategory.MODEL_CATEGORY_EMBEDDING
@@ -27,6 +29,7 @@ enum class ModelSelectionContext(val title: String) {
         LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
         STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
         TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+        VAD -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         VLM -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
         RAG_EMBEDDING, RAG_LLM -> null
     }

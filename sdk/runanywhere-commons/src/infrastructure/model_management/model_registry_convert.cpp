@@ -8,6 +8,8 @@
  * model_registry_internal.h). No behaviour change.
  */
 
+#include "model_registry_internal.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -18,11 +20,70 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
-#include "model_registry_internal.h"
-
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
 
 namespace rac::infra::model_registry::detail {
+
+namespace {
+
+// Deep copy of the expected-files manifest. Returns nullptr on null input or
+// allocation failure (callers treat a missing manifest as "no declared
+// expectations", which is the pre-existing behavior for null).
+rac_expected_model_files_t* deep_copy_expected_files(const rac_expected_model_files_t* src) {
+    if (!src) {
+        return nullptr;
+    }
+    rac_expected_model_files_t* copy = rac_expected_model_files_alloc();
+    if (!copy) {
+        return nullptr;
+    }
+    if (src->required_patterns && src->required_pattern_count > 0) {
+        copy->required_patterns =
+            static_cast<const char**>(calloc(src->required_pattern_count, sizeof(char*)));
+        if (copy->required_patterns) {
+            copy->required_pattern_count = src->required_pattern_count;
+            for (size_t i = 0; i < src->required_pattern_count; ++i) {
+                copy->required_patterns[i] = rac_strdup(src->required_patterns[i]);
+            }
+        }
+    }
+    if (src->optional_patterns && src->optional_pattern_count > 0) {
+        copy->optional_patterns =
+            static_cast<const char**>(calloc(src->optional_pattern_count, sizeof(char*)));
+        if (copy->optional_patterns) {
+            copy->optional_pattern_count = src->optional_pattern_count;
+            for (size_t i = 0; i < src->optional_pattern_count; ++i) {
+                copy->optional_patterns[i] = rac_strdup(src->optional_patterns[i]);
+            }
+        }
+    }
+    copy->description = rac_strdup(src->description);
+    return copy;
+}
+
+// Deep copy of the multi-file descriptor array.
+rac_model_file_descriptor_t* deep_copy_file_descriptors(const rac_model_file_descriptor_t* src,
+                                                        size_t count) {
+    if (!src || count == 0) {
+        return nullptr;
+    }
+    rac_model_file_descriptor_t* copy = rac_model_file_descriptors_alloc(count);
+    if (!copy) {
+        return nullptr;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        copy[i].relative_path = rac_strdup(src[i].relative_path);
+        copy[i].destination_path = rac_strdup(src[i].destination_path);
+        copy[i].url = rac_strdup(src[i].url);
+        copy[i].is_required = src[i].is_required;
+        copy[i].role = src[i].role;
+        copy[i].size_bytes = src[i].size_bytes;
+        copy[i].checksum_sha256 = rac_strdup(src[i].checksum_sha256);
+    }
+    return copy;
+}
+
+}  // namespace
 
 rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
     if (!src)
@@ -39,13 +100,19 @@ rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
     copy->framework = src->framework;
     copy->download_url = rac_strdup(src->download_url);
     copy->local_path = rac_strdup(src->local_path);
-    // Copy artifact info struct (shallow copy for basic fields, deep copy for pointers)
+    // Copy artifact info struct. Expected-files and descriptor arrays MUST be
+    // deep-copied: every registry save/get round-trips through this function,
+    // and dropping them silently downgrades artifact completeness validation
+    // to filename heuristics everywhere downstream.
     copy->artifact_info.kind = src->artifact_info.kind;
     copy->artifact_info.archive_type = src->artifact_info.archive_type;
     copy->artifact_info.archive_structure = src->artifact_info.archive_structure;
-    copy->artifact_info.expected_files = nullptr;  // Complex structure, leave null for now
-    copy->artifact_info.file_descriptors = nullptr;
-    copy->artifact_info.file_descriptor_count = 0;
+    copy->artifact_info.expected_files =
+        deep_copy_expected_files(src->artifact_info.expected_files);
+    copy->artifact_info.file_descriptors = deep_copy_file_descriptors(
+        src->artifact_info.file_descriptors, src->artifact_info.file_descriptor_count);
+    copy->artifact_info.file_descriptor_count =
+        copy->artifact_info.file_descriptors ? src->artifact_info.file_descriptor_count : 0;
     copy->artifact_info.strategy_id = rac_strdup(src->artifact_info.strategy_id);
     copy->download_size = src->download_size;
     copy->memory_required = src->memory_required;
@@ -75,34 +142,10 @@ rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
 }
 
 void free_model_info(rac_model_info_t* model) {
-    if (!model)
-        return;
-
-    if (model->id)
-        free(model->id);
-    if (model->name)
-        free(model->name);
-    if (model->download_url)
-        free(model->download_url);
-    if (model->local_path)
-        free(model->local_path);
-    if (model->description)
-        free(model->description);
-
-    // Free artifact info strings
-    if (model->artifact_info.strategy_id) {
-        free(const_cast<char*>(model->artifact_info.strategy_id));
-    }
-
-    if (model->tags) {
-        for (size_t i = 0; i < model->tag_count; ++i) {
-            if (model->tags[i])
-                free(model->tags[i]);
-        }
-        free(static_cast<void*>(model->tags));
-    }
-
-    free(model);
+    // Single ownership authority: the public rac_model_info_free already
+    // releases every field including the expected-files manifest and the
+    // file-descriptor array (this internal duplicate used to leak both).
+    rac_model_info_free(model);
 }
 
 }  // namespace rac::infra::model_registry::detail
@@ -340,14 +383,24 @@ void add_file_descriptors_to_proto(const rac_model_artifact_info_t* artifact,
         } else if (in.relative_path) {
             file->set_url(in.relative_path);
         }
-        if (in.relative_path)
+        // Do NOT round-trip the proto->struct URL fallback back into
+        // relative_path: serializing "relative_path = <https URL>" poisons
+        // downstream consumers (the planner's path-safety gate rejects '//').
+        if (in.relative_path && (!in.url || strcmp(in.relative_path, in.url) != 0)) {
             file->set_relative_path(in.relative_path);
+        }
         if (in.destination_path) {
             file->set_filename(in.destination_path);
             file->set_destination_path(in.destination_path);
         }
         file->set_is_required(in.is_required == RAC_TRUE);
         file->set_role(model_file_role_to_proto(in.role));
+        if (in.size_bytes > 0) {
+            file->set_size_bytes(in.size_bytes);
+        }
+        if (in.checksum_sha256 && in.checksum_sha256[0] != '\0') {
+            file->set_checksum_sha256(in.checksum_sha256);
+        }
     }
 }
 
@@ -498,6 +551,8 @@ bool apply_proto_artifact_to_model(const ModelInfo& proto, rac_model_info_t* mod
                     out.destination_path = dup_optional_proto_string(destination);
                     out.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
                     out.role = model_file_role_from_proto(file.role());
+                    out.size_bytes = file.size_bytes();
+                    out.checksum_sha256 = dup_optional_proto_string(file.checksum_sha256());
                     // Preserve ModelFileDescriptor.url through the
                     // registry round-trip. Previously this field was dropped,
                     // which caused the round-trip serializer to emit

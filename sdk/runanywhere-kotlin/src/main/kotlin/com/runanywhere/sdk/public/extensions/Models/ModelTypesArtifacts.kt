@@ -28,10 +28,12 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelInfoMakeRequest
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.foundation.bridge.extensions.defaultPattern
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -433,51 +435,45 @@ fun ModelInfo.Companion.make(
     updatedAtUnixMs: Long = getCurrentTimeMillis(),
     archiveType: ArchiveType? = null,
 ): RAModelInfo {
-    val resolvedContext =
-        contextLength
-            ?: if (category.requiresContextLength) 2048 else 0
-    val resolvedSupportsThinking = category.supportsThinking && supportsThinking
-    val base =
-        RAModelInfo(
-            id = id,
+    val request =
+        ModelInfoMakeRequest(
+            url = downloadURL.orEmpty(),
             name = name,
-            category = category,
-            format = format,
             framework = framework,
-            download_url = downloadURL.orEmpty(),
-            local_path = localPath.orEmpty(),
-            download_size_bytes = downloadSizeBytes ?: 0L,
-            context_length = resolvedContext,
-            supports_thinking = resolvedSupportsThinking,
-            description = description.orEmpty(),
+            category = category,
             source = source,
+        )
+    val nativeModel =
+        runCatching {
+            RunAnywhereBridge
+                .racModelInfoMakeProto(ModelInfoMakeRequest.ADAPTER.encode(request))
+                ?.let { RAModelInfo.ADAPTER.decode(it) }
+        }.getOrNull()
+
+    val supportsThinkingForCategory = category.supportsThinking && supportsThinking
+    var model =
+        (nativeModel ?: RAModelInfo()).copy(
+            id = id,
+            format = format,
+            download_url = downloadURL.orEmpty(),
+            download_size_bytes = downloadSizeBytes ?: 0L,
+            context_length = contextLength ?: nativeModel?.context_length ?: 0,
+            supports_thinking = supportsThinkingForCategory,
+            description = description.orEmpty(),
             created_at_unix_ms = createdAtUnixMs,
             updated_at_unix_ms = updatedAtUnixMs,
-            thinking_pattern = if (resolvedSupportsThinking) thinkingPattern else null,
+            thinking_pattern =
+                if (supportsThinkingForCategory) {
+                    thinkingPattern ?: ThinkingTagPattern.defaultPattern
+                } else {
+                    null
+                },
         )
 
-    val withArtifact = base.applyInferredArtifact(downloadURL, archiveType)
-    return withArtifact.copy(
-        is_downloaded = withArtifact.isDownloadedOnDisk,
-        is_available = withArtifact.isAvailableForUse,
-    )
-}
-
-private fun RAModelInfo.applyInferredArtifact(
-    url: String?,
-    explicitArchiveType: ArchiveType?,
-): RAModelInfo {
-    val archiveType = explicitArchiveType ?: archiveTypeFromPath(url.orEmpty())
-    return if (archiveType != null) {
-        setArchiveArtifact(
-            ArchiveArtifact(
-                type = archiveType,
-                structure = ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN,
-            ),
-        )
-    } else {
-        setSingleFileArtifact(SingleFileArtifact())
+    if (archiveType != null) {
+        model = model.setArchiveArtifact(makeArchiveArtifact(archiveType))
     }
+    return model.setLocalPath(localPath)
 }
 
 private fun makeArchiveArtifact(type: ArchiveType): ArchiveArtifact =

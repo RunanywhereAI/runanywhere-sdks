@@ -22,6 +22,7 @@
 #include "rac_auth_manager.h"
 #endif
 
+#include <algorithm>
 #include <cstddef>
 
 #if __has_include("rac/lifecycle/rac_sdk_init.h")
@@ -685,21 +686,17 @@ static std::mutex g_http_download_mutex;
 static std::unordered_map<std::string, http_download_context> g_http_downloads;
 static std::atomic<uint64_t> g_http_download_counter{0};
 
-static std::string appendOnConflictForSupabaseUpsert(const std::string& url) {
-    if (url.find("/rest/v1/sdk_devices") == std::string::npos ||
-        url.find("on_conflict=") != std::string::npos) {
-        return url;
-    }
-
-    return url + (url.find('?') == std::string::npos ? "?" : "&") + "on_conflict=device_id";
-}
-
 static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     const std::string& url,
     const std::string& jsonBody,
     const std::string& apiKey
 ) {
-    std::string finalUrl = appendOnConflictForSupabaseUpsert(url);
+    // Supabase device-registration upserts route through
+    // rac_http_request_set_upsert_mode below (commons appends
+    // ?on_conflict=<field> and the merge-duplicates Prefer header) instead of
+    // duplicating the Supabase wire protocol at this layer.
+    const bool isDeviceUpsert =
+        url.find("/rest/v1/sdk_devices") != std::string::npos;
 
     std::vector<rac_http_header_kv_t> headers = {
         {"Content-Type", "application/json"},
@@ -710,7 +707,6 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
         headers.push_back({"apikey", apiKey.c_str()});
         bearer = "Bearer " + apiKey;
         headers.push_back({"Authorization", bearer.c_str()});
-        headers.push_back({"Prefer", "resolution=merge-duplicates"});
     }
 
     rac_http_client_t* client = nullptr;
@@ -721,7 +717,7 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
 
     rac_http_request_t req{};
     req.method = "POST";
-    req.url = finalUrl.c_str();
+    req.url = url.c_str();
     req.headers = headers.data();
     req.header_count = headers.size();
     req.body_bytes = reinterpret_cast<const uint8_t*>(jsonBody.data());
@@ -729,6 +725,9 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     req.timeout_ms = 30000;
     req.follow_redirects = RAC_TRUE;
     req.expected_checksum_hex = nullptr;
+    if (isDeviceUpsert) {
+        rac_http_request_set_upsert_mode(&req, "device_id");
+    }
 
     rac_http_response_t resp{};
     rac_result_t sendResult = rac_http_request_send(client, &req, &resp);
@@ -760,6 +759,9 @@ struct SdkInitResultSummary {
     bool success = false;
     bool httpConfigured = false;
     bool hasCompletedHttpSetup = false;
+    // Default true mirrors Swift SDKState.httpSetupApplicable: only an
+    // explicit http_applicable=false from commons disables HTTP retries.
+    bool httpApplicable = true;
     bool deviceRegistered = false;
     uint32_t linkedModelsCount = 0;
     std::string warning;
@@ -810,6 +812,12 @@ static void freeProtoBuffer(rac_proto_buffer_t* buffer) {
     initProtoBuffer(buffer);
 }
 
+// Minimal protobuf wire writers/readers for the SdkInitPhase1/2Request and
+// SdkInitResult messages. Deliberate bridge convention: this C++ layer links
+// NO protobuf runtime (same as HybridRunAnywhereCore+Registry.cpp), so the
+// handful of init fields are wire-encoded by hand against the field numbers
+// in idl/sdk_init.proto. If a message here grows beyond a few scalar fields,
+// move the encoding into a commons rac_* helper instead of extending this.
 static void appendVarint(std::vector<uint8_t>& out, uint64_t value) {
     while (value >= 0x80) {
         out.push_back(static_cast<uint8_t>(value | 0x80));
@@ -949,6 +957,9 @@ static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer)
                 case 10:
                     summary.hasCompletedHttpSetup = value != 0;
                     break;
+                case 11:
+                    summary.httpApplicable = value != 0;
+                    break;
                 default:
                     break;
             }
@@ -975,7 +986,8 @@ static SdkInitResultSummary parseSdkInitResult(const rac_proto_buffer_t& buffer)
 
 static rac_result_t callSdkInitProto(const char* symbolName,
                                      const std::vector<uint8_t>& requestBytes,
-                                     SdkInitResultSummary* outSummary) {
+                                     SdkInitResultSummary* outSummary,
+                                     std::vector<uint8_t>* outResultBytes = nullptr) {
 #if RN_HAS_RAC_SDK_INIT_HEADER
     SdkInitProtoFn fn = nullptr;
 #if defined(__APPLE__)
@@ -1022,6 +1034,9 @@ static rac_result_t callSdkInitProto(const char* symbolName,
         return status;
     }
 
+    if (outResultBytes && out.data && out.size > 0) {
+        outResultBytes->assign(out.data, out.data + out.size);
+    }
     freeProtoBuffer(&out);
     if (summary.hasSuccess && !summary.success) {
         LOGE("%s completed with success=false", symbolName);
@@ -1032,6 +1047,7 @@ static rac_result_t callSdkInitProto(const char* symbolName,
     (void)symbolName;
     (void)requestBytes;
     (void)outSummary;
+    (void)outResultBytes;
     LOGW("rac_sdk_init.h unavailable in bundled headers; using legacy RN init path");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
@@ -1040,7 +1056,8 @@ static rac_result_t callSdkInitProto(const char* symbolName,
 // rac_sdk_retry_http_proto takes no request bytes (output buffer only), so it
 // cannot reuse callSdkInitProto's request-bytes signature. Same buffer
 // lifecycle + feature-unavailable downgrade as the phase{1,2} path.
-static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary) {
+static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary,
+                                          std::vector<uint8_t>* outResultBytes = nullptr) {
 #if RN_HAS_RAC_SDK_INIT_HEADER
 #if defined(__APPLE__)
     SdkRetryHttpProtoFn fn = rac_sdk_retry_http_proto;
@@ -1070,10 +1087,14 @@ static rac_result_t callSdkRetryHttpProto(SdkInitResultSummary* outSummary) {
     }
 
     rac_result_t status = out.status;
+    if (status == RAC_SUCCESS && outResultBytes && out.data && out.size > 0) {
+        outResultBytes->assign(out.data, out.data + out.size);
+    }
     freeProtoBuffer(&out);
     return status;
 #else
     (void)outSummary;
+    (void)outResultBytes;
     LOGW("rac_sdk_init.h unavailable in bundled headers; skipping HTTP retry");
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
@@ -1804,18 +1825,12 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
 #if defined(__APPLE__)
         info.platform = "ios";
         info.osName = "iOS";
-        info.hasNeuralEngine = true;
-        info.neuralEngineCores = 16;
 #elif defined(ANDROID) || defined(__ANDROID__)
         info.platform = "android";
         info.osName = "Android";
-        info.hasNeuralEngine = false;
-        info.neuralEngineCores = 0;
 #else
         info.platform = "unknown";
         info.osName = "Unknown";
-        info.hasNeuralEngine = false;
-        info.neuralEngineCores = 0;
 #endif
         info.sdkVersion = InitBridge::shared().getSdkVersion();
         info.deviceModel = InitBridge::shared().getDeviceModel();
@@ -1831,8 +1846,31 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
         info.batteryLevel = -1.0f;
         info.batteryState = "";
         info.isLowPowerMode = false;
-        info.performanceCores = info.coreCount > 4 ? 2 : 1;
-        info.efficiencyCores = info.coreCount - info.performanceCores;
+        // Mirrors Swift DeviceInfo.swift: Neural Engine is derived from the
+        // architecture (arm64 Apple silicon), never hardcoded — x86 simulators
+        // report none. Cores follow Swift's `hasNeuralEngine ? 16 : 0`.
+#if defined(__APPLE__)
+        info.hasNeuralEngine = info.architecture == "arm64";
+#else
+        info.hasNeuralEngine = false;
+#endif
+        info.neuralEngineCores = info.hasNeuralEngine ? 16 : 0;
+        // Core split mirrors Swift getCoreDistribution(totalCores:modelId:):
+        // iPhone → 2P + rest E; iPad/Mac → ~40% performance (min 2);
+        // default → totalCores/3 performance (min 1).
+        const std::string& model = info.deviceModel;
+        const int totalCores = info.coreCount;
+        int perfCores;
+        if (model.rfind("iPhone", 0) == 0) {
+            perfCores = 2;
+        } else if (model.rfind("iPad", 0) == 0 || model.rfind("Mac", 0) == 0) {
+            perfCores = std::max(2, totalCores * 2 / 5);
+        } else {
+            perfCores = std::max(1, totalCores / 3);
+        }
+        perfCores = std::min(perfCores, totalCores);
+        info.performanceCores = perfCores;
+        info.efficiencyCores = totalCores - perfCores;
         return info;
     };
 
@@ -1895,8 +1933,8 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
     return DeviceBridge::shared().registerCallbacks();
 }
 
-rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured) {
-    outHttpConfigured = false;
+rac_result_t InitBridge::completeServicesInitialization(std::vector<uint8_t>& outResultBytes) {
+    outResultBytes.clear();
     if (!initialized_) {
         LOGE("completeServicesInitialization called before initialize");
         return RAC_ERROR_NOT_INITIALIZED;
@@ -1912,7 +1950,10 @@ rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured)
     rac_result_t phase2Result = callSdkInitProto(
         "rac_sdk_init_phase2_proto",
         phase2RequestBytes_,
-        &phase2Summary);
+        &phase2Summary,
+        &outResultBytes);
+    // Feature-unavailable on older packaged natives is non-fatal; the empty
+    // result bytes tell TS that Phase 2 finished in deferred mode.
     if (phase2Result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
         return RAC_SUCCESS;
     }
@@ -1923,23 +1964,25 @@ rac_result_t InitBridge::completeServicesInitialization(bool& outHttpConfigured)
     if (!phase2Summary.warning.empty()) {
         LOGI("SDK Phase 2 warning: %s", phase2Summary.warning.c_str());
     }
-    outHttpConfigured = phase2Summary.hasCompletedHttpSetup || phase2Summary.httpConfigured;
-    LOGI("SDK Phase 2 complete (http=%d, device=%d, linked=%u)",
-         outHttpConfigured ? 1 : 0,
+    const bool httpConfigured =
+        phase2Summary.hasCompletedHttpSetup || phase2Summary.httpConfigured;
+    LOGI("SDK Phase 2 complete (http=%d, applicable=%d, device=%d, linked=%u)",
+         httpConfigured ? 1 : 0,
+         phase2Summary.httpApplicable ? 1 : 0,
          phase2Summary.deviceRegistered ? 1 : 0,
          phase2Summary.linkedModelsCount);
     return RAC_SUCCESS;
 }
 
-rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
-    outHttpConfigured = false;
+rac_result_t InitBridge::retryHTTPSetup(std::vector<uint8_t>& outResultBytes) {
+    outResultBytes.clear();
     if (!initialized_) {
         LOGE("retryHTTPSetup called before initialize");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     SdkInitResultSummary summary;
-    rac_result_t result = callSdkRetryHttpProto(&summary);
+    rac_result_t result = callSdkRetryHttpProto(&summary, &outResultBytes);
     // Feature-unavailable on older packaged natives is non-fatal; callers will
     // leave HTTP setup marked incomplete.
     if (result == RAC_ERROR_FEATURE_NOT_AVAILABLE) {
@@ -1949,11 +1992,13 @@ rac_result_t InitBridge::retryHTTPSetup(bool& outHttpConfigured) {
         return result;
     }
 
-    outHttpConfigured = summary.hasCompletedHttpSetup || summary.httpConfigured;
+    const bool httpConfigured = summary.hasCompletedHttpSetup || summary.httpConfigured;
     if (!summary.warning.empty()) {
         LOGI("HTTP retry warning: %s", summary.warning.c_str());
     }
-    LOGI("HTTP retry complete (http=%d)", outHttpConfigured ? 1 : 0);
+    LOGI("HTTP retry complete (http=%d, applicable=%d)",
+         httpConfigured ? 1 : 0,
+         summary.httpApplicable ? 1 : 0);
     return RAC_SUCCESS;
 }
 

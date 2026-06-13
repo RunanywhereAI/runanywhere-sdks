@@ -12,8 +12,20 @@ object GlobalState {
     var ready: Boolean by mutableStateOf(false)
         private set
 
+    var initError: String? by mutableStateOf(null)
+        private set
+
     fun markReady() {
+        initError = null
         ready = true
+    }
+
+    fun markInitFailed(message: String) {
+        initError = message
+    }
+
+    fun clearInitError() {
+        initError = null
     }
 
     // Force snapshot-state creation on the main thread before composition starts, so the
@@ -23,6 +35,7 @@ object GlobalState {
         model.isLoaded
         lora.isActive
         ready
+        initError
     }
 }
 

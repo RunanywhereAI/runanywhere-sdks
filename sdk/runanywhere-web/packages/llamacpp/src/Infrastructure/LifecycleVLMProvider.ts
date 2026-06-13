@@ -14,11 +14,11 @@ import {
 } from '@runanywhere/web/internal';
 import type { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
-import type { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import type {
   VLMGenerationOptions,
   VLMImage,
   VLMResult,
+  VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 
 function isVisionModelCategory(category: ModelCategory | undefined): boolean {
@@ -46,16 +46,15 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
 
   async loadCurrentModel(currentModel: CurrentModelResult): Promise<void> {
     if (!currentModel.modelId) {
-      throw SDKException.componentNotReady(
-        'vlm',
-        'No C++ lifecycle VLM model is loaded.',
-      );
+      // Swift parity: VLM model-guards throw `.notInitialized` ("VLM model not
+      // loaded", RunAnywhere+VisionLanguage.swift:40).
+      throw SDKException.notInitialized('No C++ lifecycle VLM model is loaded.');
     }
     // Mirror iOS LlamaCPPVLMProvider: gate on MULTIMODAL/VISION category so an
     // accidental LLM/STT/TTS load doesn't flip the VLM gate.
     if (!isVisionModelCategory(currentModel.category)) {
-      throw SDKException.componentNotReady(
-        'vlm',
+      // Swift taxonomy: wrong-state calls throw `.invalidState`.
+      throw SDKException.invalidState(
         `Loaded model category (${currentModel.category}) is not MULTIMODAL/VISION; refusing to enable VLM gate.`,
       );
     }
@@ -73,10 +72,7 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
     options: VLMGenerationOptions,
   ): Promise<VLMResult> {
     if (!this._modelLoaded) {
-      throw SDKException.componentNotReady(
-        'vlm',
-        'No VLM model has been loaded through RunAnywhere.loadModel().',
-      );
+      throw SDKException.notInitialized('No VLM model has been loaded through RunAnywhere.loadModel().');
     }
 
     const adapter = VLMProtoAdapter.tryDefault();
@@ -89,7 +85,8 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
 
     const result = await adapter.processAsync(0, image, options);
     if (!result) {
-      throw SDKException.generationFailed('Native VLM proto path returned no result.');
+      // Swift taxonomy: failed operations throw `.processingFailed`.
+      throw SDKException.processingFailed('Native VLM proto path returned no result.');
     }
     return result;
   }
@@ -97,12 +94,9 @@ export class LifecycleVLMProvider implements VisionLanguageProvider {
   async processImageStream(
     image: VLMImage,
     options: VLMGenerationOptions,
-  ): Promise<AsyncIterable<SDKEvent>> {
+  ): Promise<AsyncIterable<VLMStreamEvent>> {
     if (!this._modelLoaded) {
-      throw SDKException.componentNotReady(
-        'vlm',
-        'No VLM model has been loaded through RunAnywhere.loadModel().',
-      );
+      throw SDKException.notInitialized('No VLM model has been loaded through RunAnywhere.loadModel().');
     }
 
     const adapter = VLMProtoAdapter.tryDefault();

@@ -13,8 +13,9 @@
  *      register backend models via
  *      `RunAnywhere.initializeVoiceAgentWithLoadedModels()`, and consume
  *      `RunAnywhere.streamVoiceAgent()` as `AsyncIterable<VoiceEvent>`.
- *   4. Each VoiceEvent oneof arm drives a UI region:
- *        - `state`              → pipeline status pill (idle / listening / ...)
+ *   4. Each VoiceEvent oneof arm drives a UI region (iOS parity:
+ *      VoiceAgentViewModel.swift:505-584 `handleProtoEvent`):
+ *        - `state`              → session status pill
  *        - `vad`                → speech-detected indicator
  *        - `userSaid`           → live transcript area
  *        - `assistantToken`     → streamed assistant response
@@ -23,10 +24,9 @@
  *   5. Stop: cancel the event-consumer task, stop capture, dispose playback,
  *      and call `RunAnywhere.cleanupVoiceAgent()`.
  *
- * The voice agent itself owns audio pacing (the energy-VAD inside the C++
- * agent runs against the mic samples once registered). When the ONNX/Sherpa
- * backend isn't available, `initializeVoiceAgentWithLoadedModels()` raises
- * `BackendNotAvailable` and the view surfaces that as an inline error.
+ * Backends (llamacpp + ONNX) are registered once at app init by `main.ts` —
+ * this view assumes they exist and surfaces the SDK's typed error if a verb
+ * throws `backendNotAvailable`.
  */
 
 import type { TabLifecycle } from '../app';
@@ -35,8 +35,9 @@ import {
   AudioEncoding,
   SDKComponent,
   TokenKind,
-  isSDKException,
+  pcm16ToFloat32,
   VoiceEventPipelineState,
+  VADStreamEventKind,
   type AssistantTokenEvent,
   type AudioFrameEvent,
   type ErrorEvent,
@@ -49,46 +50,26 @@ import {
   AudioCapture,
   AudioPlayback,
 } from '@runanywhere/web/browser';
-import { ONNX } from '@runanywhere/web-onnx';
 import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
-
-// `@runanywhere/web-llamacpp` is loaded lazily so the voice tab can be code-
-// split. `main.ts` already pulls the package via dynamic `import(...)` for
-// initial registration, so importing it statically here would prevent vite
-// from sharing the chunk. We eagerly resolve the module on first render so
-// `LlamaCPP.isRegistered` is available synchronously after that.
-type LlamaCPPApi = typeof import('@runanywhere/web-llamacpp')['LlamaCPP'];
-let _llamaCppCache: LlamaCPPApi | null = null;
-async function llamaCpp(): Promise<LlamaCPPApi> {
-  if (_llamaCppCache) return _llamaCppCache;
-  const mod = await import('@runanywhere/web-llamacpp');
-  _llamaCppCache = mod.LlamaCPP;
-  return _llamaCppCache;
-}
-function llamaCppSync(): LlamaCPPApi | null {
-  return _llamaCppCache;
-}
-// Kick off the import as soon as the module loads so the cached reference
-// is available synchronously by the time the user reaches the Voice tab.
-void llamaCpp().catch(() => {
-  /* Silently ignored — `main.ts` reports backend registration errors. */
-});
 
 // ---------------------------------------------------------------------------
 // View state
 // ---------------------------------------------------------------------------
 
+/**
+ * Session state — exact mirror of iOS `VoiceSessionState`
+ * (iOS parity: VoiceAgentTypes.swift:25-32).
+ */
 type SessionState =
-  | 'idle'
-  | 'starting'
-  | 'listening'
-  | 'speech-detected'
-  | 'processing'
-  | 'speaking'
-  | 'stopped'
-  | 'error';
+  | 'disconnected' // Not connected, ready to start
+  | 'connecting'   // Initializing session
+  | 'connected'    // Session established, idle
+  | 'listening'    // Actively listening for speech
+  | 'processing'   // Processing transcribed speech
+  | 'speaking'     // Playing back TTS response
+  | 'error';       // Error state
 
 interface ComponentReadiness {
   llmReady: boolean;
@@ -105,13 +86,21 @@ let unmounted = false;
 let audioCapture: AudioCapture | null = null;
 let audioPlayback: AudioPlayback | null = null;
 let eventConsumer: AbortController | null = null;
-let sessionState: SessionState = 'idle';
+let sessionState: SessionState = 'disconnected';
+let isSpeechDetected = false;
 let userTranscript = '';
 let assistantResponse = '';
-let assistantThinking = '';
 let lastError: string | null = null;
 let audioLevel = 0;
 let lastEventSummary = '';
+
+function isActiveState(state: SessionState): boolean {
+  // iOS parity: VoiceAgentViewModel.swift:108-115 `isActive`.
+  return state === 'listening'
+    || state === 'processing'
+    || state === 'speaking'
+    || state === 'connecting';
+}
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -174,20 +163,8 @@ function renderView(): void {
   if (unmounted) return;
 
   const readiness = readReadiness();
-  const llamaApi = llamaCppSync();
-  if (!llamaApi) {
-    // Resolve in the background and re-render once the module is loaded so
-    // `LlamaCPP.isRegistered` becomes visible without further user action.
-    void llamaCpp().then(() => {
-      if (!unmounted) renderView();
-    }).catch(() => { /* surfaced elsewhere */ });
-  }
-  const llamaRegistered = llamaApi?.isRegistered ?? false;
-  const onnxRegistered = ONNX.isRegistered;
   const allReady = readiness.llmReady && readiness.sttReady && readiness.ttsReady;
-  const isActive = sessionState !== 'idle'
-    && sessionState !== 'stopped'
-    && sessionState !== 'error';
+  const isActive = isActiveState(sessionState);
 
   container.innerHTML = `
     <div class="toolbar">
@@ -197,22 +174,6 @@ function renderView(): void {
       </div>
     </div>
     <div class="scroll-area">
-      <div class="docs-section">
-        <h3>Backend status</h3>
-        <ul class="feature-unavailable__list">
-          <li><code>LlamaCPP.isRegistered</code>: <strong>${llamaRegistered ? 'yes' : 'no'}</strong></li>
-          <li><code>ONNX.isRegistered</code>: <strong>${onnxRegistered ? 'yes' : 'no'}</strong></li>
-        </ul>
-        <div class="toolbar-actions">
-          ${llamaRegistered
-            ? ''
-            : '<button class="btn btn-secondary" id="voice-register-llama">Register LlamaCPP</button>'}
-          ${onnxRegistered
-            ? ''
-            : '<button class="btn btn-secondary" id="voice-register-onnx">Register ONNX</button>'}
-        </div>
-      </div>
-
       <div class="docs-section">
         <h3>Pipeline models</h3>
         <p class="text-secondary">Each slot is loaded through the canonical model
@@ -261,6 +222,7 @@ function renderView(): void {
         <div class="docs-status">
           <strong>State:</strong>
           <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState)}">${prettyState(sessionState)}</span>
+          ${isSpeechDetected ? '<span class="badge badge-green" style="margin-left:6px">Speech detected</span>' : ''}
           <span class="text-secondary" style="margin-left:8px"><code>${escapeHtml(lastEventSummary || '(no events yet)')}</code></span>
         </div>
         <div class="docs-status" id="voice-level-row">
@@ -279,13 +241,6 @@ function renderView(): void {
         <pre id="voice-user-transcript" class="docs-pre">${escapeHtml(userTranscript || '(waiting for speech...)')}</pre>
       </div>
 
-      ${assistantThinking
-        ? `<div class="docs-section">
-            <h3>Assistant thinking</h3>
-            <pre id="voice-assistant-thinking" class="docs-pre">${escapeHtml(assistantThinking)}</pre>
-          </div>`
-        : ''}
-
       <div class="docs-section">
         <h3>Assistant</h3>
         <pre id="voice-assistant-response" class="docs-pre">${escapeHtml(assistantResponse || '(no response yet)')}</pre>
@@ -298,43 +253,8 @@ function renderView(): void {
 
 function attachHandlers(): void {
   container.querySelector('#voice-refresh-btn')?.addEventListener('click', () => renderView());
-  container
-    .querySelector('#voice-register-llama')
-    ?.addEventListener('click', () => void registerLlamaCpp());
-  container
-    .querySelector('#voice-register-onnx')
-    ?.addEventListener('click', () => void registerOnnx());
   container.querySelector('#voice-start-btn')?.addEventListener('click', () => void startSession());
   container.querySelector('#voice-stop-btn')?.addEventListener('click', () => void stopSession());
-}
-
-// ---------------------------------------------------------------------------
-// Backend registration helpers
-// ---------------------------------------------------------------------------
-
-async function registerLlamaCpp(): Promise<void> {
-  lastError = null;
-  setEventSummary('Registering LlamaCPP backend...');
-  try {
-    const LlamaCPP = await llamaCpp();
-    await LlamaCPP.register({ acceleration: 'auto' });
-  } catch (err) {
-    lastError = `LlamaCPP register failed: ${formatErr(err)}`;
-  } finally {
-    renderView();
-  }
-}
-
-async function registerOnnx(): Promise<void> {
-  lastError = null;
-  setEventSummary('Registering ONNX backend...');
-  try {
-    await ONNX.register();
-  } catch (err) {
-    lastError = `ONNX register failed: ${formatErr(err)}`;
-  } finally {
-    renderView();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -342,19 +262,20 @@ async function registerOnnx(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function startSession(): Promise<void> {
-  if (sessionState !== 'idle' && sessionState !== 'stopped' && sessionState !== 'error') return;
+  if (isActiveState(sessionState)) return;
 
-  // Reset state.
+  // Reset state (iOS parity: VoiceAgentViewModel.swift:452-456).
   userTranscript = '';
   assistantResponse = '';
-  assistantThinking = '';
   lastError = null;
-  sessionState = 'starting';
-  setEventSummary('Initializing voice agent...');
+  isSpeechDetected = false;
+  sessionState = 'connecting';
+  setEventSummary('Connecting...');
   renderView();
 
   try {
-    // Initialize against the currently-loaded LLM/STT/TTS components.
+    // Initialize against the currently-loaded LLM/STT/TTS components. The
+    // SDK owns the multi-step bootstrap (VAD auto-load + model composition).
     await RunAnywhere.initializeVoiceAgentWithLoadedModels();
 
     // Start the microphone at the VAD-friendly 16 kHz mono Float32 rate.
@@ -378,7 +299,7 @@ async function startSession(): Promise<void> {
     eventConsumer = new AbortController();
     void consumeEvents(eventConsumer.signal);
   } catch (err) {
-    lastError = `Failed to start voice session: ${formatErr(err)}`;
+    lastError = `Failed to start voice session: ${formatError(err)}`;
     sessionState = 'error';
     setEventSummary('Start failed.');
     await stopSession({ silent: true });
@@ -387,7 +308,7 @@ async function startSession(): Promise<void> {
 }
 
 async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
-  const wasActive = sessionState !== 'idle' && sessionState !== 'stopped' && sessionState !== 'error';
+  const wasActive = isActiveState(sessionState);
 
   eventConsumer?.abort();
   eventConsumer = null;
@@ -403,6 +324,7 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   }
 
   audioLevel = 0;
+  isSpeechDetected = false;
 
   try {
     await RunAnywhere.cleanupVoiceAgent();
@@ -410,8 +332,10 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
     // Cleanup is best-effort — silently swallow.
   }
 
+  // iOS parity: VoiceAgentViewModel.swift:484-494 `stopConversation` returns
+  // to .disconnected ("Ready").
   if (wasActive && sessionState !== 'error') {
-    sessionState = 'stopped';
+    sessionState = 'disconnected';
     setEventSummary('Session stopped.');
   }
 
@@ -424,6 +348,9 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
 
 async function consumeEvents(signal: AbortSignal): Promise<void> {
   try {
+    // Swift parity: `streamVoiceAgent()` finishes EMPTY when the agent is not
+    // ready — no synthetic error events arrive on the iterator, so a stream
+    // that ends right away simply returns the UI to the Ready state below.
     const stream = RunAnywhere.streamVoiceAgent();
     for await (const event of stream) {
       if (signal.aborted || unmounted) break;
@@ -435,15 +362,15 @@ async function consumeEvents(signal: AbortSignal): Promise<void> {
     }
   } catch (err) {
     if (!signal.aborted) {
-      lastError = `Voice agent stream error: ${formatErr(err)}`;
+      lastError = `Voice agent stream error: ${formatError(err)}`;
       sessionState = 'error';
       renderView();
     }
   } finally {
     if (!signal.aborted && !unmounted) {
-      // The stream finished on its own (e.g. session ended server-side).
+      // The stream finished on its own (agent stopped or was never ready).
       if (sessionState !== 'error') {
-        sessionState = 'stopped';
+        sessionState = 'disconnected';
         renderView();
       }
     }
@@ -472,11 +399,14 @@ function handleVoiceEvent(event: VoiceEvent): void {
   }
 }
 
+/** iOS parity: VoiceAgentViewModel.swift:507-529 `.state` arm. */
 function applyStateChange(state: StateChangeEvent): void {
   switch (state.current) {
     case VoiceEventPipelineState.PIPELINE_STATE_IDLE:
+      sessionState = 'listening';
+      break;
     case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
-      if (sessionState !== 'speaking' && sessionState !== 'processing') {
+      if (sessionState !== 'listening' && sessionState !== 'speaking' && sessionState !== 'processing') {
         sessionState = 'listening';
       }
       break;
@@ -484,13 +414,14 @@ function applyStateChange(state: StateChangeEvent): void {
     case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
     case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE:
       sessionState = 'processing';
+      isSpeechDetected = false;
       break;
     case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
     case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS:
       sessionState = 'speaking';
       break;
     case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
-      sessionState = 'stopped';
+      sessionState = 'disconnected';
       break;
     case VoiceEventPipelineState.PIPELINE_STATE_ERROR:
       sessionState = 'error';
@@ -502,13 +433,25 @@ function applyStateChange(state: StateChangeEvent): void {
   scheduleRender();
 }
 
+/** iOS parity: VoiceAgentViewModel.swift:531-548 `.vad` arm. */
 function applyVadEvent(vad: VADEvent): void {
-  if (vad.isSpeech) {
-    sessionState = 'speech-detected';
-    scheduleRender();
-  } else if (sessionState === 'speech-detected') {
-    sessionState = 'processing';
-    scheduleRender();
+  switch (vad.type) {
+    case VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
+      if (vad.isSpeech) {
+        isSpeechDetected = true;
+      } else {
+        sessionState = 'processing';
+        isSpeechDetected = false;
+      }
+      scheduleRender();
+      break;
+    case VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED:
+      sessionState = 'processing';
+      isSpeechDetected = false;
+      scheduleRender();
+      break;
+    default:
+      break;
   }
 }
 
@@ -518,10 +461,12 @@ function applyUserSaid(userSaid: UserSaidEvent): void {
 }
 
 function applyAssistantToken(token: AssistantTokenEvent): void {
+  // Append ALL token text — thought tokens included — exactly like iOS
+  // (iOS parity: VoiceAgentViewModel.swift:553-555). Mark the token kind in
+  // the event summary only.
+  assistantResponse += token.text;
   if (token.kind === TokenKind.TOKEN_KIND_THOUGHT) {
-    assistantThinking += token.text;
-  } else {
-    assistantResponse += token.text;
+    setEventSummary('assistant token (thought)');
   }
 }
 
@@ -534,7 +479,7 @@ async function applyAudioFrame(frame: AudioFrameEvent): Promise<void> {
     // Fire-and-forget; subsequent chunks queue via the audio context.
     void audioPlayback.play(samples, rate);
   } catch (err) {
-    lastError = `Audio playback failed: ${formatErr(err)}`;
+    lastError = `Audio playback failed: ${formatError(err)}`;
     scheduleRender();
   }
 }
@@ -550,22 +495,17 @@ function applyErrorEvent(err: ErrorEvent): void {
 // ---------------------------------------------------------------------------
 
 function decodePcm(frame: AudioFrameEvent): Float32Array {
-  const pcm = frame.pcm;
+  // Copy into a fresh ArrayBuffer (the proto bytes may be a view into a
+  // larger heap buffer).
+  const copy = new Uint8Array(frame.pcm.byteLength);
+  copy.set(frame.pcm);
   if (frame.encoding === AudioEncoding.AUDIO_ENCODING_PCM_S16_LE) {
-    const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
-    const samples = new Float32Array(pcm.byteLength / 2);
-    for (let i = 0; i < samples.length; i += 1) {
-      samples[i] = view.getInt16(i * 2, true) / 0x8000;
-    }
-    return samples;
+    // SDK-owned Int16→Float32 conversion (Swift parity:
+    // RunAnywhere.pcm16ToFloat32 — no app-side PCM math).
+    return pcm16ToFloat32(copy.buffer);
   }
   // Default to PCM-F32 little-endian (encoding 0 / unspecified or explicit).
-  const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
-  const samples = new Float32Array(pcm.byteLength / 4);
-  for (let i = 0; i < samples.length; i += 1) {
-    samples[i] = view.getFloat32(i * 4, true);
-  }
-  return samples;
+  return new Float32Array(copy.buffer);
 }
 
 function setEventSummary(text: string): void {
@@ -587,8 +527,6 @@ function updateTextRegions(): void {
   if (userPre) userPre.textContent = userTranscript || '(waiting for speech...)';
   const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
   if (respPre) respPre.textContent = assistantResponse || '(no response yet)';
-  const thoughtPre = container.querySelector<HTMLPreElement>('#voice-assistant-thinking');
-  if (thoughtPre && assistantThinking) thoughtPre.textContent = assistantThinking;
 }
 
 function updateLevelBar(): void {
@@ -613,15 +551,15 @@ function pipelineStateName(state: VoiceEventPipelineState): string {
   }
 }
 
+/** iOS parity: VoiceAgentTypes.swift:34-44 `displayName`. */
 function prettyState(state: SessionState): string {
   switch (state) {
-    case 'idle': return 'Idle';
-    case 'starting': return 'Starting...';
+    case 'disconnected': return 'Ready';
+    case 'connecting': return 'Connecting';
+    case 'connected': return 'Ready';
     case 'listening': return 'Listening';
-    case 'speech-detected': return 'Speech detected';
-    case 'processing': return 'Processing';
+    case 'processing': return 'Thinking';
     case 'speaking': return 'Speaking';
-    case 'stopped': return 'Stopped';
     case 'error': return 'Error';
   }
 }
@@ -629,11 +567,11 @@ function prettyState(state: SessionState): string {
 function stateBadgeClass(state: SessionState): string {
   switch (state) {
     case 'listening':
-    case 'speech-detected':
+    case 'connected':
       return 'badge-green';
     case 'processing':
     case 'speaking':
-    case 'starting':
+    case 'connecting':
       return 'badge-blue';
     case 'error':
       // No `.badge-red` rule is shipped today; use the grey variant tinted
@@ -643,9 +581,4 @@ function stateBadgeClass(state: SessionState): string {
     default:
       return 'badge-grey';
   }
-}
-
-function formatErr(err: unknown): string {
-  if (isSDKException(err)) return err.message;
-  return formatError(err);
 }

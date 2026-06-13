@@ -26,9 +26,9 @@
 namespace {
 
 struct Entry {
-    std::string                   name;
+    std::string name;
     rac_cloud_stt_transcribe_fn_t transcribe = nullptr;
-    void*                         user_data = nullptr;
+    void* user_data = nullptr;
 };
 
 // Immutable once published. Mutations allocate a fresh Snapshot rather than
@@ -51,9 +51,8 @@ void publish(const Snapshot* next) {
 // Build the next snapshot from the current one with `name`'s entry inserted or
 // replaced (transcribe != nullptr) or removed (transcribe == nullptr). Returns
 // nullptr only on allocation failure.
-const Snapshot* build_next(const char*                   name,
-                           rac_cloud_stt_transcribe_fn_t transcribe,
-                           void*                         user_data) {
+const Snapshot* build_next(const char* name, rac_cloud_stt_transcribe_fn_t transcribe,
+                           void* user_data) {
     auto* next = new (std::nothrow) Snapshot();
     if (next == nullptr) {
         return nullptr;
@@ -84,10 +83,9 @@ const Snapshot* build_next(const char*                   name,
 
 extern "C" {
 
-rac_result_t rac_cloud_register_stt_provider(
-    const char*                   name,
-    rac_cloud_stt_transcribe_fn_t transcribe,
-    void*                         user_data) {
+rac_result_t rac_cloud_register_stt_provider(const char* name,
+                                             rac_cloud_stt_transcribe_fn_t transcribe,
+                                             void* user_data) {
     if (name == nullptr || name[0] == '\0' || transcribe == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
@@ -129,13 +127,9 @@ rac_bool_t rac_cloud_has_stt_provider(const char* name) {
     return RAC_FALSE;
 }
 
-rac_result_t rac_cloud_invoke_stt_provider(
-    const char*    name,
-    const char*    config_json,
-    const uint8_t* audio,
-    size_t         audio_len,
-    int32_t        audio_format,
-    char**         out_result_json) {
+rac_result_t rac_cloud_invoke_stt_provider(const char* name, const char* config_json,
+                                           const uint8_t* audio, size_t audio_len,
+                                           int32_t audio_format, char** out_result_json) {
     if (name == nullptr || out_result_json == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -144,8 +138,8 @@ rac_result_t rac_cloud_invoke_stt_provider(
     if (snap != nullptr) {
         for (const auto& e : snap->entries) {
             if (e.name == name) {
-                return e.transcribe(config_json, audio, audio_len, audio_format,
-                                    out_result_json, e.user_data);
+                return e.transcribe(config_json, audio, audio_len, audio_format, out_result_json,
+                                    e.user_data);
             }
         }
     }

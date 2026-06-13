@@ -24,6 +24,8 @@
  * workaround is needed to skip already-known IDs.
  */
 
+#include "hf_resolver.h"
+
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -49,6 +51,89 @@ namespace {
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
     return size == 0 || bytes != nullptr;
+}
+
+// Forward declaration — shared by the multi-file ABI entry point and the
+// Hugging Face repo-resolution branch of the from-url entry point.
+rac_result_t
+register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& request,
+                          rac_proto_buffer_t* out_proto);
+
+// Resolve a repo-level Hugging Face ref into a multi-file registration:
+// tree listing -> quant selection (+ mmproj pairing, shard expansion) ->
+// RegisterMultiFileModelRequest with per-file sizes + SHA-256 checksums.
+// Caller-supplied metadata fields on @p request win over derived ones.
+rac_result_t register_from_hf_repo(const runanywhere::v1::RegisterModelFromUrlRequest& request,
+                                   rac_proto_buffer_t* out_proto) {
+    namespace hf = rac::infra::model_management::hf;
+
+    hf::ResolvedModel resolved;
+    std::string error;
+    const rac_result_t resolve_rc = hf::resolve_repo(request.url(), &resolved, &error);
+    if (resolve_rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_proto, resolve_rc, error.c_str());
+    }
+
+    runanywhere::v1::RegisterMultiFileModelRequest multi_file;
+    multi_file.set_id(request.id().empty() ? resolved.model_id : request.id());
+    multi_file.set_name(request.name().empty() ? resolved.display_name : request.name());
+    multi_file.set_framework(request.has_framework()
+                                 ? request.framework()
+                                 : runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    multi_file.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    multi_file.set_category(request.has_category()
+                                ? request.category()
+                                : (resolved.has_vision_projector
+                                       ? runanywhere::v1::MODEL_CATEGORY_MULTIMODAL
+                                       : runanywhere::v1::MODEL_CATEGORY_LANGUAGE));
+    if (request.has_source()) {
+        multi_file.set_source(request.source());
+    }
+    multi_file.set_download_size_bytes(request.has_download_size_bytes()
+                                           ? request.download_size_bytes()
+                                           : resolved.total_size_bytes);
+    if (request.has_memory_required_bytes()) {
+        multi_file.set_memory_required_bytes(request.memory_required_bytes());
+    }
+    if (request.has_context_length()) {
+        multi_file.set_context_length(request.context_length());
+    }
+    if (request.has_supports_thinking()) {
+        multi_file.set_supports_thinking(request.supports_thinking());
+    }
+    if (request.has_supports_lora()) {
+        multi_file.set_supports_lora(request.supports_lora());
+    }
+    if (request.has_description()) {
+        multi_file.set_description(request.description());
+    }
+
+    bool first = true;
+    for (const hf::ResolvedFile& resolved_file : resolved.files) {
+        runanywhere::v1::ModelFileDescriptor* file = multi_file.add_files();
+        file->set_url(resolved_file.url);
+        file->set_filename(resolved_file.filename);
+        file->set_is_required(true);
+        if (resolved_file.size_bytes > 0) {
+            file->set_size_bytes(resolved_file.size_bytes);
+        }
+        if (!resolved_file.sha256.empty()) {
+            file->set_checksum_sha256(resolved_file.sha256);
+        }
+        if (resolved_file.is_vision_projector) {
+            file->set_role(runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
+        } else if (first) {
+            file->set_role(runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
+            first = false;
+        } else {
+            // Additional shards of a split GGUF set.
+            file->set_role(runanywhere::v1::MODEL_FILE_ROLE_COMPANION);
+        }
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Registering Hugging Face model '%s' (%d files)", multi_file.id().c_str(),
+                 multi_file.files_size());
+    return register_multi_file_model(multi_file, out_proto);
 }
 
 // Copy a MakeRequest field (RegisterModelFromUrlRequest is wire-compatible with
@@ -108,6 +193,25 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     if (request.url().empty()) {
         return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
                                           "RegisterModelFromUrlRequest.url must not be empty");
+    }
+
+    // -------------------------------------------------------------------------
+    // 0) Hugging Face references (hf.co/org/repo[:quant], hf://..., explicit
+    //    in-repo file paths). Explicit-file refs normalize to a direct
+    //    /resolve/ URL and continue through the standard single-file path;
+    //    repo-level refs resolve to a multi-file registration (quant
+    //    selection, mmproj pairing, shard expansion, checksums).
+    // -------------------------------------------------------------------------
+    {
+        namespace hf = rac::infra::model_management::hf;
+        if (hf::is_hf_ref(request.url())) {
+            const std::string direct_url = hf::normalize_explicit_file_ref(request.url());
+            if (!direct_url.empty()) {
+                request.set_url(direct_url);
+            } else {
+                return register_from_hf_repo(request, out_proto);
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -283,6 +387,17 @@ extern "C" rac_result_t rac_register_multi_file_model_proto(const uint8_t* in_re
         return rac_proto_buffer_set_error(out_proto, RAC_ERROR_DECODING_ERROR,
                                           "failed to parse RegisterMultiFileModelRequest");
     }
+    return register_multi_file_model(request, out_proto);
+#endif
+}
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+namespace {
+
+rac_result_t
+register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& request,
+                          rac_proto_buffer_t* out_proto) {
     if (request.id().empty()) {
         return rac_proto_buffer_set_error(out_proto, RAC_ERROR_INVALID_ARGUMENT,
                                           "RegisterMultiFileModelRequest.id must not be empty");
@@ -382,5 +497,8 @@ extern "C" rac_result_t rac_register_multi_file_model_proto(const uint8_t* in_re
     RAC_LOG_DEBUG(LOG_CAT, "registered multi-file model id=%s (%d files, saved %zu bytes)",
                   request.id().c_str(), request.files_size(), out_proto->size);
     return RAC_SUCCESS;
-#endif
 }
+
+}  // namespace
+
+#endif  // RAC_HAVE_PROTOBUF

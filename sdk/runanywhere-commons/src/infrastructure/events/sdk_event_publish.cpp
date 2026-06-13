@@ -12,8 +12,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -129,13 +129,13 @@ void route(const runanywhere::v1::SDKEvent& event, const uint8_t* serialized_byt
 
 // Each typed overload moves its payload into the matching SDKEvent oneof arm,
 // then delegates to the envelope-stamping core overload above.
-#define RAC_DEFINE_PUBLISH_OVERLOAD(PayloadType, oneof_field)                                  \
-    rac_result_t publish(runanywhere::v1::SDKComponent component,                              \
-                         runanywhere::v1::EventCategory category,                              \
-                         runanywhere::v1::PayloadType payload) {                               \
-        runanywhere::v1::SDKEvent event;                                                       \
-        *event.mutable_##oneof_field() = std::move(payload);                                   \
-        return publish(event, component, category);                                            \
+#define RAC_DEFINE_PUBLISH_OVERLOAD(PayloadType, oneof_field)     \
+    rac_result_t publish(runanywhere::v1::SDKComponent component, \
+                         runanywhere::v1::EventCategory category, \
+                         runanywhere::v1::PayloadType payload) {  \
+        runanywhere::v1::SDKEvent event;                          \
+        *event.mutable_##oneof_field() = std::move(payload);      \
+        return publish(event, component, category);               \
     }
 
 RAC_DEFINE_PUBLISH_OVERLOAD(InitializationEvent, initialization)

@@ -132,16 +132,15 @@ object CppBridgeState {
      * Shutdown the C++ state manager and clear auth state.
      *
      * Mirrors Swift's `CppBridge.State.shutdown()` which calls
-     * `rac_state_shutdown()` + `rac_auth_reset()`. Kotlin currently
-     * delegates the state-shutdown half to `racShutdown` (the global
-     * `rac_shutdown` entry point that tears down all subsystems) — the
-     * dedicated `rac_state_shutdown` thunk will replace it when added.
+     * `rac_state_shutdown()` + `rac_auth_reset()`. Kotlin routes the
+     * state-shutdown half through the `racStateReset` thunk until a
+     * dedicated `rac_state_shutdown` thunk exists.
      */
     fun shutdown() {
         try {
-            RunAnywhereBridge.racShutdown()
+            RunAnywhereBridge.racStateReset()
         } catch (t: Throwable) {
-            logger.warn("racShutdown threw during state shutdown: ${t.message}")
+            logger.warn("racStateReset threw during state shutdown: ${t.message}")
         }
         try {
             RunAnywhereBridge.racAuthReset()

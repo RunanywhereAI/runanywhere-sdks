@@ -326,10 +326,32 @@ extension RARAGConfiguration {
 extension RARAGConfiguration {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if similarityThreshold < 0.0 || similarityThreshold > 1.0 {
+        let effectiveTopK = hasTopK ? topK : 5
+        if effectiveTopK < 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGConfiguration.top_k",
+                message: "top_k must be in >= 1 (got \(effectiveTopK))"
+            )
+        }
+        let effectiveSimilarityThreshold = hasSimilarityThreshold ? similarityThreshold : 0.3
+        if effectiveSimilarityThreshold < 0.0 || effectiveSimilarityThreshold > 1.0 {
             throw SDKException.validationFailed(
                 fieldPath: "RAGConfiguration.similarity_threshold",
-                message: "similarity_threshold must be in 0.0...1.0 (got \(similarityThreshold))"
+                message: "similarity_threshold must be in 0.0...1.0 (got \(effectiveSimilarityThreshold))"
+            )
+        }
+        let effectiveChunkSize = hasChunkSize ? chunkSize : 512
+        if effectiveChunkSize < 1 {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGConfiguration.chunk_size",
+                message: "chunk_size must be in >= 1 (got \(effectiveChunkSize))"
+            )
+        }
+        let effectiveChunkOverlap = hasChunkOverlap ? chunkOverlap : 64
+        if effectiveChunkOverlap < 0 {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGConfiguration.chunk_overlap",
+                message: "chunk_overlap must be in >= 0 (got \(effectiveChunkOverlap))"
             )
         }
     }

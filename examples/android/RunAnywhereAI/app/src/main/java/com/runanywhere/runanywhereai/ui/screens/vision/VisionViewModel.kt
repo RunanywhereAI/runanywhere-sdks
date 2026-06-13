@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
 import ai.runanywhere.proto.v1.VLMImageFormat
+import ai.runanywhere.proto.v1.VLMStreamEventKind
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
@@ -74,26 +75,27 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
                 )
                 val options = RAVLMGenerationOptions(prompt = prompt.trim(), max_tokens = 300, temperature = 0.7f)
-                val start = System.currentTimeMillis()
-                var tokens = 0
+                // Typed VLM stream: TOKEN events carry text; the terminal
+                // COMPLETED event carries the engine-measured VLMResult, so
+                // metrics come from the SDK instead of wall-clock math.
                 RunAnywhere.processImageStream(vlmImage, options).collect { event ->
-                    val generation = event.generation ?: return@collect
-                    if (generation.tokens_count > 0) tokens = generation.tokens_count
-                    description = when {
-                        generation.token.isNotBlank() -> description + generation.token
-                        generation.streaming_text.isNotBlank() -> generation.streaming_text
-                        generation.response.isNotBlank() -> generation.response
-                        else -> description
+                    when (event.kind) {
+                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN ->
+                            if (event.token.isNotEmpty()) description += event.token
+                        VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
+                            val result = event.result ?: return@collect
+                            if (result.text.isNotBlank()) description = result.text
+                            metrics = VlmMetrics(
+                                tokens = result.completion_tokens,
+                                tokensPerSecond = result.tokens_per_second.toDouble(),
+                                processingMs = result.processing_time_ms,
+                                imageEncodeMs = result.image_encode_time_ms,
+                                ttftMs = result.time_to_first_token_ms,
+                            )
+                        }
+                        else -> {}
                     }
                 }
-                val procMs = System.currentTimeMillis() - start
-                metrics = VlmMetrics(
-                    tokens = tokens,
-                    tokensPerSecond = if (procMs > 0 && tokens > 0) tokens * 1000.0 / procMs else 0.0,
-                    processingMs = procMs,
-                    imageEncodeMs = 0,
-                    ttftMs = 0,
-                )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

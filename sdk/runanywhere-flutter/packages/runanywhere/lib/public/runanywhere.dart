@@ -12,12 +12,16 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:fixnum/fixnum.dart' show Int64;
+
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart'
-    show DownloadProgress;
+    show DownloadProgress, DownloadState;
+import 'package:runanywhere/generated/errors.pbenum.dart'
+    show ErrorCategory, ErrorCode;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
@@ -32,7 +36,7 @@ import 'package:runanywhere/generated/model_types.pb.dart'
         ModelUnloadRequest,
         ModelUnloadResult;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show ModelCategory;
+    show InferenceFramework, ModelCategory;
 import 'package:runanywhere/generated/rag.pb.dart'
     show
         RAGConfiguration,
@@ -43,6 +47,8 @@ import 'package:runanywhere/generated/rag.pb.dart'
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
+import 'package:runanywhere/generated/storage_types.pb.dart'
+    show StorageDeleteRequest, StorageDeleteResult;
 import 'package:runanywhere/generated/structured_output.pb.dart'
     show
         JSONSchema,
@@ -59,15 +65,18 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolDefinition,
         ToolResult;
 import 'package:runanywhere/generated/tts_options.pb.dart'
-    show TTSOptions, TTSOutput, TTSSpeakResult, TTSVoiceInfo;
+    show TTSOptions, TTSOutput, TTSSpeakResult;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart';
+import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart'
+    show ProtoInferenceFrameworkCppBridge;
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
@@ -86,6 +95,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/extensions/runanywhere_storage.dart';
 import 'package:runanywhere/public/extensions/runanywhere_structured_output.dart';
 
 /// RunAnywhere SDK entry point.
@@ -143,17 +153,52 @@ abstract final class RunAnywhere {
       DartBridgeDevice.instance.isDeviceRegistered();
 
   /// Awaitable Phase-2 completion. Mirrors Swift's
-  /// `completeServicesInitialization()`. [initialize] detaches Phase 2
-  /// (platform service wiring plus commons-owned init orchestration) and stores
-  /// the resulting Future in [_servicesInitFuture]; concurrent callers share
-  /// that single Future so the work runs at most once.
-  /// Returns immediately once Phase 2 has resolved. Throws
-  /// [SDKException.notInitialized] if Phase 1 never ran.
+  /// `completeServicesInitialization()` (RunAnywhere.swift:255-273):
+  /// concurrent callers share the in-flight Future so the step list runs at
+  /// most once, and a FAILED Phase 2 is cleared so the next call rebuilds a
+  /// fresh one (retry) instead of replaying the stored failure forever.
+  /// Throws [SDKException.notInitialized] if Phase 1 never ran.
   static Future<void> completeServicesInitialization() {
     if (!isInitialized) {
       throw SDKException.notInitialized();
     }
-    return _servicesInitFuture ?? Future<void>.value();
+    if (areServicesReady) {
+      return Future<void>.value();
+    }
+    final existing = _servicesInitFuture;
+    if (existing != null) {
+      return existing;
+    }
+    final params = _cachedInitParams;
+    if (params == null) {
+      throw SDKException.notInitialized();
+    }
+    return _dispatchPhase2(params, SDKLogger('RunAnywhere.Services'));
+  }
+
+  /// Start (or restart) Phase 2 and store the shared Future. The Future is
+  /// cleared on completion — success is then gated by [areServicesReady],
+  /// and failure clearing is what makes [completeServicesInitialization]
+  /// retryable, mirroring Swift's clear-on-both-paths
+  /// (RunAnywhere.swift:267-273).
+  static Future<void> _dispatchPhase2(SDKInitParams params, SDKLogger logger) {
+    final future = _runPhase2(params, logger);
+    _servicesInitFuture = future;
+    unawaited(
+      future.then<void>(
+        (_) {
+          if (identical(_servicesInitFuture, future)) {
+            _servicesInitFuture = null;
+          }
+        },
+        onError: (Object _, StackTrace _) {
+          if (identical(_servicesInitFuture, future)) {
+            _servicesInitFuture = null;
+          }
+        },
+      ),
+    );
+    return future;
   }
 
   /// One-call "wait until everything is ready" entry point. Three paths let an
@@ -168,20 +213,30 @@ abstract final class RunAnywhere {
   ///
   /// Concurrent callers share the same Phase-2 future, so the work executes
   /// at most once.
-  static Future<void> ensureServicesReady() async {
+  // Internal Phase-2 readiness gate. Swift's `ensureServicesReady` is
+  // `internal` (RunAnywhere.swift:336); capability files reach it through
+  // `DartBridge.ensureServicesReady()` (the registered hook), not this class.
+  static Future<void> _ensureServicesReady() async {
     if (!isInitialized) {
       throw SDKException.notInitialized();
     }
-    // Fast path — services ready + HTTP/auth done.
-    if (areServicesReady && _hasCompletedHTTPSetup) return;
-    // Recovery path — services ready, HTTP/auth failed (offline init).
-    if (areServicesReady && !_hasCompletedHTTPSetup) {
+    // Fast path — services ready + HTTP/auth done, OR HTTP setup does not
+    // apply to this configuration (nothing to retry — avoids re-attempting
+    // HTTP on every guarded call when offline). Mirrors Swift's
+    // `readiness.http || !readiness.applicable` (RunAnywhere.swift:344).
+    if (areServicesReady && (_hasCompletedHTTPSetup || !_httpSetupApplicable)) {
+      return;
+    }
+    // Recovery path — services ready, HTTP/auth failed (offline init) and a
+    // retry can actually succeed.
+    if (areServicesReady && !_hasCompletedHTTPSetup && _httpSetupApplicable) {
       await _retryHTTPSetup();
       return;
     }
-    // Cold start path — Phase 1 done but Phase 2 still running (or never
-    // dispatched). Await the in-flight future; concurrent callers share it.
-    await (_servicesInitFuture ?? Future<void>.value());
+    // Cold start path — Phase 1 done but Phase 2 still running, never
+    // dispatched, or cleared after a failure. completeServicesInitialization
+    // shares the in-flight Future or rebuilds a fresh one.
+    await completeServicesInitialization();
   }
 
   /// Initialization params (apiKey, baseURL, environment) — null
@@ -201,16 +256,19 @@ abstract final class RunAnywhere {
   // Dart accessor for callers that want the original Uri / apiKey shape.
   static SDKInitParams? _cachedInitParams;
 
-  // One-shot Dart-only compatibility flag: startup downloaded-model discovery
-  // is owned by commons Phase 2; legacy callers still use runDiscoveryIfNeeded()
-  // as a readiness guard before listing registry contents.
-  static bool _hasRunDiscovery = false;
-
   // Latched HTTP/auth completion flag — see [hasCompletedHTTPSetup]. Phase 2
   // sets this from the C++ `SdkInitResult.http_configured` snapshot;
   // [_retryHTTPSetup] re-latches on a successful `rac_sdk_retry_http_proto`
   // round-trip so subsequent `ensureServicesReady()` calls short-circuit.
   static bool _hasCompletedHTTPSetup = false;
+
+  // Whether HTTP setup applies to this configuration at all. Phase 2 latches
+  // it from `SdkInitResult.http_applicable` (sdk_init.proto field 11) — false
+  // means commons decided there is nothing to retry (e.g. dev mode with no
+  // usable credentials), so [_ensureServicesReady] must NOT re-attempt HTTP
+  // on every guarded call (that was the offline per-call stall). Mirrors
+  // Swift's `httpSetupApplicable` (RunAnywhere.swift:328, :344).
+  static bool _httpSetupApplicable = true;
 
   // Shared Phase-2 future. Mirrors Swift's `_servicesInitTask`. Stored at
   // detach time inside [initializeWithParams]; replayed by
@@ -219,11 +277,146 @@ abstract final class RunAnywhere {
   // Swift which uses `_servicesInitLock: DispatchQueue`).
   static Future<void>? _servicesInitFuture;
 
-  /// SDK semver string (e.g. "4.0.0").
+  /// SDK semver string (e.g. "0.19.13").
   static String get version => SDKConstants.version;
 
   /// Event bus for cross-capability SDK events.
   static EventBus get events => EventBus.shared;
+
+  // -- Imperative SDK-event surface (Swift RunAnywhere+SDKEvents.swift:17-35).
+  //    Dart consumers should prefer [events]; these entry points are retained
+  //    for cross-SDK parity (Kotlin's primary event API, documented RN surface).
+
+  /// Subscribe a handler to the canonical native SDK event stream.
+  /// Cancel the returned subscription to unsubscribe.
+  static StreamSubscription<sdk_events_pb.SDKEvent> subscribeSDKEvents(
+    void Function(sdk_events_pb.SDKEvent event) handler,
+  ) => DartBridgeEvents.instance.subscribe(handler);
+
+  /// Cancel a subscription returned by [subscribeSDKEvents]. Name parity
+  /// with Swift `RunAnywhere.unsubscribeSDKEvents(_:)`.
+  static Future<void> unsubscribeSDKEvents(
+    StreamSubscription<sdk_events_pb.SDKEvent> subscription,
+  ) => subscription.cancel();
+
+  /// Publish an event through the commons router
+  /// (`rac_sdk_event_publish_proto`). Returns false when the native
+  /// publish path is unavailable.
+  static Future<bool> publishSDKEvent(sdk_events_pb.SDKEvent event) =>
+      DartBridgeEvents.instance.publish(event);
+
+  /// Poll one queued SDK event (`rac_sdk_event_poll`), or null when the
+  /// queue is empty.
+  static Future<sdk_events_pb.SDKEvent?> pollSDKEvent() =>
+      DartBridgeEvents.instance.poll();
+
+  /// Publish a structured failure event (`rac_sdk_event_publish_failure`).
+  static Future<bool> publishSDKFailure({
+    required int errorCode,
+    required String message,
+    required String component,
+    required String operation,
+    bool recoverable = false,
+  }) => DartBridgeEvents.instance.publishFailure(
+    errorCode: errorCode,
+    message: message,
+    component: component,
+    operation: operation,
+    recoverable: recoverable,
+  );
+
+  /// Consume a token stream into one aggregated [LLMGenerationResult].
+  ///
+  /// Matches Swift `RunAnywhere.aggregateStream(prompt:events:onToken:)`
+  /// (RunAnywhere+TextGeneration.swift:129): concatenates `event.token`
+  /// text, counts tokens, computes TTFT/throughput from timestamps, and
+  /// prefers the backend's terminal aggregate result (text + metrics) when
+  /// the final event carries one. The `framework` field resolves from the
+  /// loaded LLM model's analytics key so callers stay aligned with the
+  /// registry's canonical framework label.
+  ///
+  /// [onToken] receives the aggregated transcript so far (suitable for
+  /// live UI updates) for each non-empty token.
+  static Future<LLMGenerationResult> aggregateStream({
+    required String prompt,
+    required Stream<LLMStreamEvent> events,
+    Future<void> Function(String aggregated)? onToken,
+  }) async {
+    var fullResponse = '';
+    var tokenCount = 0;
+    DateTime? firstTokenTime;
+    final startTime = DateTime.now();
+    var finishReason = '';
+    var terminalError = '';
+    LLMStreamEvent? finalEvent;
+
+    await for (final event in events) {
+      if (event.token.isNotEmpty) {
+        firstTokenTime ??= DateTime.now();
+        fullResponse += event.token;
+        tokenCount++;
+        if (onToken != null) {
+          await onToken(fullResponse);
+        }
+      }
+      if (event.isFinal) {
+        finalEvent = event;
+        finishReason = event.finishReason;
+        terminalError = event.errorMessage;
+        break;
+      }
+    }
+
+    final totalLatencyMs =
+        DateTime.now().difference(startTime).inMicroseconds / 1000.0;
+    final ttftMs = firstTokenTime == null
+        ? null
+        : firstTokenTime.difference(startTime).inMicroseconds / 1000.0;
+
+    final snapshot = await RunAnywhereModelLifecycle.shared.current(
+      CurrentModelRequest(category: ModelCategory.MODEL_CATEGORY_LANGUAGE),
+    );
+    final modelId = snapshot.found ? snapshot.modelId : '';
+    final framework = snapshot.found
+        ? snapshot.model.framework.analyticsKey
+        : InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.analyticsKey;
+
+    // Prefer the backend's terminal aggregate result when the final event
+    // carries one, matching Swift/Web; otherwise fall back to the locally
+    // concatenated text / wall-clock metrics.
+    final finalResult = (finalEvent != null && finalEvent.hasResult())
+        ? finalEvent.result
+        : null;
+    final inputTokens =
+        finalResult?.promptTokens ??
+        (prompt.length ~/ 4 > 0 ? prompt.length ~/ 4 : 1);
+    final completionTokens = finalResult?.completionTokens ?? tokenCount;
+    final result = LLMGenerationResult(
+      text: finalResult?.text ?? fullResponse,
+      inputTokens: inputTokens,
+      tokensGenerated: completionTokens,
+      responseTokens: completionTokens,
+      totalTokens: finalResult?.totalTokens ?? (inputTokens + completionTokens),
+      modelUsed: modelId,
+      generationTimeMs: finalResult?.totalTimeMs.toDouble() ?? totalLatencyMs,
+      framework: framework,
+      promptEvalTimeMs: finalResult?.promptEvalTimeMs ?? Int64.ZERO,
+      decodeTimeMs: finalResult?.decodeTimeMs ?? Int64.ZERO,
+      tokensPerSecond:
+          finalResult?.tokensPerSecond ??
+          (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000.0) : 0),
+    );
+    if (finalResult != null && finalResult.hasThinkingContent()) {
+      result.thinkingContent = finalResult.thinkingContent;
+    }
+    final ttft = finalResult?.timeToFirstTokenMs.toDouble() ?? ttftMs;
+    if (ttft != null) {
+      result.ttftMs = ttft;
+    }
+    if (finishReason.isNotEmpty) result.finishReason = finishReason;
+    if (terminalError.isNotEmpty) result.errorMessage = terminalError;
+    return result;
+  }
 
   /// Initialize the SDK with API key + base URL.
   static Future<void> initialize({
@@ -234,19 +427,10 @@ abstract final class RunAnywhere {
     final SDKInitParams params;
 
     if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-      if (baseURL == null || baseURL.isEmpty) {
-        params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
-      } else {
-        final uri = Uri.tryParse(baseURL);
-        if (uri == null) {
-          throw SDKException.validationFailed('Invalid base URL: $baseURL');
-        }
-        params = SDKInitParams(
-          apiKey: apiKey ?? '',
-          baseURL: uri,
-          environment: environment,
-        );
-      }
+      // Development mode ignores any caller-supplied baseURL and always uses
+      // the dev placeholder / Supabase-derived URL. Mirrors Swift
+      // RunAnywhere.swift:125-127 (`SDKInitParams(forDevelopmentWithAPIKey:)`).
+      params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
     } else {
       if (apiKey == null || apiKey.isEmpty) {
         throw SDKException.validationFailed(
@@ -309,7 +493,15 @@ abstract final class RunAnywhere {
         baseURL: params.baseURL.toString(),
         deviceId: phase1DeviceId,
       );
-      DartBridge.registerEnsureServicesReadyHook(ensureServicesReady);
+      DartBridge.registerEnsureServicesReadyHook(_ensureServicesReady);
+
+      // Configure the C++ model-paths base directory as part of Phase 1 —
+      // BEFORE initialize() returns and any registerModel() call runs — so
+      // rac_model_registry_save() can reconcile entries against on-disk
+      // folders inline. Mirrors Swift RunAnywhere.swift:186-195 (which sets
+      // it before the Phase-1 proto); deferring this to detached Phase 2
+      // raced app-side registerModel() calls against an unset base dir.
+      await DartBridge.modelPaths.setBaseDirectory();
 
       logger.info(
         'Phase 1 complete (${params.environment.description}); '
@@ -318,12 +510,12 @@ abstract final class RunAnywhere {
 
       // --- Phase 2: Detached background services ---
       // Mirrors Swift `Task.detached(priority: .userInitiated) { ... }`.
-      // Store the Future first so concurrent callers of
+      // _dispatchPhase2 stores the Future first so concurrent callers of
       // `completeServicesInitialization()` see it before the detach
-      // wrapper might observe a failure. Phase 2 errors are swallowed
-      // here (non-critical) but still observable to direct awaiters.
-      final phase2 = _runPhase2(params, logger);
-      _servicesInitFuture = phase2;
+      // wrapper might observe a failure, and clears it on failure so the
+      // next call retries. Phase 2 errors are swallowed here
+      // (non-critical) but still observable to direct awaiters.
+      final phase2 = _dispatchPhase2(params, logger);
       unawaited(
         phase2.catchError((Object error, StackTrace _) {
           logger.warning('Phase 2 failed (non-critical): $error');
@@ -332,12 +524,12 @@ abstract final class RunAnywhere {
     } catch (e) {
       logger.error('SDK initialization failed: $e');
       _cachedInitParams = null;
-      _hasRunDiscovery = false;
       _hasCompletedHTTPSetup = false;
+      _httpSetupApplicable = true;
       _servicesInitFuture = null;
-      // Commons auto-emits INITIALIZATION_STAGE_FAILED via
-      // `event_publisher.cpp:557`; failure telemetry flows through
-      // structured errors. Dart does not re-emit a duplicate.
+      // Commons auto-emits INITIALIZATION_STAGE_FAILED from
+      // rac_sdk_init_phase1_proto (sdk_init.cpp); failure telemetry flows
+      // through structured errors. Dart does not re-emit a duplicate.
       rethrow;
     }
   }
@@ -364,9 +556,10 @@ abstract final class RunAnywhere {
       }
     }
 
-    // Step 2: Model-paths base directory. Commons Phase 2 performs downloaded
-    // model discovery, so the path root must exist before the proto call.
-    await DartBridge.modelPaths.setBaseDirectory();
+    // Step 2 (moved to Phase 1): the model-paths base directory is now set
+    // inside [initializeWithParams] before it returns — see the Swift
+    // ordering rationale there. Commons Phase 2 downloaded-model discovery
+    // still observes the configured root.
 
     // Step 3: Telemetry sink setup. The flush itself is now owned by commons
     // Phase 2 via rac_events_flush_telemetry_sink.
@@ -383,9 +576,10 @@ abstract final class RunAnywhere {
     // Step 4: Global model registry handle.
     await DartBridgeModelRegistry.instance.initialize();
 
-    // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent from the
-    // C++ init path (`event_publisher.cpp:544`) and the destination router
-    // forwards it to the registered telemetry sink, so Dart does not emit it.
+    // Commons auto-emits the INITIALIZATION_STAGE_COMPLETED SDKEvent (with a
+    // duration_ms property) from rac_sdk_init_phase1_proto and the destination
+    // router forwards it to the registered telemetry sink, so Dart does not
+    // emit it.
 
     // Step 5: Commons-owned deterministic Phase 2 orchestration: auth via the
     // registered HTTP transport, device registration with build token, model
@@ -405,9 +599,7 @@ abstract final class RunAnywhere {
     );
 
     _hasCompletedHTTPSetup = _isHTTPSetupComplete(phase2Result);
-    if (phase2Result?.success == true) {
-      _hasRunDiscovery = true;
-    }
+    _httpSetupApplicable = phase2Result?.httpApplicable ?? true;
 
     logger.info('Phase 2 complete (${params.environment.description})');
   }
@@ -431,6 +623,7 @@ abstract final class RunAnywhere {
     try {
       final proto = DartBridgeSdkInit.retryHTTP();
       _hasCompletedHTTPSetup = _isHTTPSetupComplete(proto);
+      _httpSetupApplicable = proto.httpApplicable;
       if (proto.hasWarning()) {
         logger.debug('HTTP retry warning: ${proto.warning}');
       }
@@ -442,20 +635,6 @@ abstract final class RunAnywhere {
     } catch (e) {
       logger.debug('HTTP retry proto failed: $e');
     }
-  }
-
-  /// Compatibility hook for callers that previously triggered one-shot
-  /// downloaded-model discovery before listing. Startup discovery now runs in
-  /// commons Phase 2, so this only waits for Phase 2 once.
-  static Future<void> runDiscoveryIfNeeded() async {
-    if (_hasRunDiscovery) return;
-    final logger = SDKLogger('RunAnywhere.Discovery');
-    try {
-      await completeServicesInitialization();
-    } catch (e) {
-      logger.debug('Phase 2 discovery readiness wait failed: $e');
-    }
-    _hasRunDiscovery = true;
   }
 
   /// Reset all SDK state; clears registered models, cached
@@ -473,19 +652,26 @@ abstract final class RunAnywhere {
     DartBridgeTelemetry.flush();
 
     DartBridge.modelLifecycle.reset();
-    _hasRunDiscovery = false;
     _hasCompletedHTTPSetup = false;
+    _httpSetupApplicable = true;
     _cachedInitParams = null;
     _servicesInitFuture = null;
     DartBridgeModelRegistry.instance.shutdown();
     HTTPClientAdapter.shared.resetForTesting();
     // Tear down the bridge LAST so dependents (telemetry/registry/HTTP)
-    // can flush against a still-initialized native side. Mirrors Swift's
-    // `await CppBridge.shutdown()` ordering inside `RunAnywhere.reset()`.
-    unawaited(DartBridge.shutdown());
+    // can flush against a still-initialized native side, and AWAIT it so a
+    // `reset(); initialize()` sequence cannot race the still-true
+    // `_isInitialized` short-circuit. Mirrors Swift's
+    // `await CppBridge.shutdown()` (RunAnywhere.swift:109).
+    await DartBridge.shutdown();
   }
 
   // --- Capability surfaces -------------------------------------------------
+  //
+  // The flat `RunAnywhere.*` static methods are the canonical surface — they
+  // mirror the Swift SDK (the cross-SDK source of truth) one-to-one. The
+  // capability objects below are ergonomic accessors over the same
+  // implementations; prefer the flat methods when porting code between SDKs.
 
   /// LLM (text generation) — load, chat, generate, generate-stream, cancel.
   static RunAnywhereLLM get llm => RunAnywhereLLM.shared;
@@ -496,12 +682,11 @@ abstract final class RunAnywhere {
   /// TTS (text-to-speech) — load voice, synthesize, speak.
   static RunAnywhereTTS get tts => RunAnywhereTTS.shared;
 
-  /// VAD (voice activity detection) — initialize, detectSpeech, start/stop,
-  /// load model. Mirrors Swift's `RunAnywhere+VAD.swift` extension.
+  /// VAD (voice activity detection) — detectVoiceActivity, streamVAD,
+  /// reset, load model. Mirrors Swift's `RunAnywhere+VAD.swift` extension.
   static RunAnywhereVAD get vad => RunAnywhereVAD.shared;
 
-  /// VLM (vision-language model) — load, processImage, processImageStream,
-  /// describe, askAbout.
+  /// VLM (vision-language model) — load, processImage, processImageStream.
   static RunAnywhereVLM get vlm => RunAnywhereVLM.shared;
 
   /// VisionLanguage namespace (Swift parity). Identical to [vlm].
@@ -567,41 +752,6 @@ abstract final class RunAnywhere {
   //    flat method names; Flutter additionally exposes them so portable
   //    code reads identically across SDKs).
 
-  /// Flat alias for `llm.load(modelId)`.
-  static Future<void> loadLLMModel(String modelId) =>
-      RunAnywhereLLM.shared.load(modelId);
-
-  /// Flat alias for `llm.unload()`.
-  static Future<void> unloadLLMModel() => RunAnywhereLLM.shared.unload();
-
-  /// Flat alias for `stt.load(modelId)`.
-  static Future<void> loadSTTModel(String modelId) =>
-      RunAnywhereSTT.shared.load(modelId);
-
-  /// Flat alias for `stt.unload()`.
-  static Future<void> unloadSTTModel() => RunAnywhereSTT.shared.unload();
-
-  /// Flat alias for `tts.loadVoice(voiceId)` — the canonical TTS load.
-  static Future<void> loadTTSVoice(String voiceId) =>
-      RunAnywhereTTS.shared.loadVoice(voiceId);
-
-  /// Flat alias for `tts.unloadVoice()`.
-  static Future<void> unloadTTSVoice() => RunAnywhereTTS.shared.unloadVoice();
-
-  /// Flat alias for `vlm.load(modelId)`.
-  static Future<void> loadVLMModel(String modelId) =>
-      RunAnywhereVLM.shared.load(modelId);
-
-  /// Flat alias for `vlm.unload()`.
-  static Future<void> unloadVLMModel() => RunAnywhereVLM.shared.unload();
-
-  /// Flat alias for `vad.loadModel(modelId)`.
-  static Future<void> loadVADModel(String modelId) =>
-      RunAnywhereVAD.shared.loadModel(modelId);
-
-  /// Flat alias for `vad.unloadModel()`.
-  static Future<void> unloadVADModel() => RunAnywhereVAD.shared.unloadModel();
-
   /// Flat alias for `models.refreshModelRegistry()`.
   static Future<void> refreshModelRegistry() =>
       RunAnywhereModels.shared.refreshModelRegistry();
@@ -615,19 +765,6 @@ abstract final class RunAnywhere {
   /// `RunAnywhere.unloadModel(request)` name on Swift, Kotlin, RN, and Web.
   static Future<ModelUnloadResult> unloadModel(ModelUnloadRequest request) =>
       RunAnywhereModelLifecycle.shared.unload(request);
-
-  /// Polymorphic load — dispatch on [ModelInfo.category]. Drop-in replacement
-  /// for the per-capability `llm.load` / `stt.load` / `tts.loadVoice` /
-  /// `vlm.load` / `vad.loadModel` switch ladders that example view-models
-  /// otherwise hand-roll. Named `loadModelByInfo` to avoid collision with the
-  /// proto-backed [loadModel] overload (Dart has no method overloading).
-  static Future<void> loadModelByInfo(ModelInfo model) =>
-      RunAnywhereModels.shared.loadModel(model);
-
-  /// Polymorphic unload — dispatch on [ModelInfo.category]. Named
-  /// `unloadModelByInfo` to avoid collision with the proto-backed [unloadModel].
-  static Future<void> unloadModelByInfo(ModelInfo model) =>
-      RunAnywhereModels.shared.unloadModel(model);
 
   /// Proto-backed current-model query.
   static Future<CurrentModelResult> currentModel([
@@ -650,42 +787,19 @@ abstract final class RunAnywhere {
   /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.
   static void cancelGeneration() => RunAnywhereLLM.shared.cancelGeneration();
 
-  /// True when an LLM model is currently loaded. Mirrors Swift's
-  /// `isLLMModelLoaded: Bool` property.
-  static bool get isLLMModelLoaded => RunAnywhereLLM.shared.isLoaded;
-
-  /// Currently-loaded LLM model info, or null.
-  static Future<ModelInfo?> get currentLLMModel =>
-      RunAnywhereLLM.shared.currentModel();
-
-  /// True when an STT model is currently loaded.
-  static bool get isSTTModelLoaded => RunAnywhereSTT.shared.isLoaded;
-
-  /// True when a TTS voice is currently loaded.
-  static bool get isTTSVoiceLoaded => RunAnywhereTTS.shared.isLoaded;
-
-  /// True when a VAD model is currently loaded.
-  static bool get isVADModelLoaded => RunAnywhereVAD.shared.isModelLoaded;
-
   /// Flat alias — transcribe audio to proto [STTOutput].
   /// Mirrors Swift / RN / Web `RunAnywhere.transcribe(audio:options:)`.
   static Future<STTOutput> transcribe(Uint8List audio, [STTOptions? options]) =>
       RunAnywhereSTT.shared.transcribe(audio, options);
 
-  /// Flat streaming alias — real FFI-backed streaming STT.
-  /// Mirrors Swift / RN / Web `RunAnywhere.transcribeStream`.
-  static Stream<STTPartialResult> transcribeStream(
-    Uint8List audio, {
-    STTOptions? options,
-  }) => RunAnywhereSTT.shared.transcribeStream(audio, options: options);
-
-  /// Flat chunk-feed streaming alias — session-based stream-in / stream-out
+  /// Flat chunk-feed streaming — session-based stream-in / stream-out
   /// transcription; the native session owns endpointing. Mirrors Swift
-  /// `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`.
-  static Stream<STTPartialResult> transcribeStreamSession(
+  /// `RunAnywhere.transcribeStream(audio: AsyncStream<Data>)`
+  /// (RunAnywhere+STT.swift:50).
+  static Stream<STTPartialResult> transcribeStream(
     Stream<Uint8List> audio, {
     STTOptions? options,
-  }) => RunAnywhereSTT.shared.transcribeStreamSession(audio, options: options);
+  }) => RunAnywhereSTT.shared.transcribeStream(audio, options: options);
 
   /// Flat alias — synthesize text to proto [TTSOutput].
   /// Mirrors Swift / RN / Web `RunAnywhere.synthesize(text:options:)`.
@@ -700,19 +814,18 @@ abstract final class RunAnywhere {
   /// Flat alias — stop any in-flight synthesis.
   static Future<void> stopSynthesis() => RunAnywhereTTS.shared.stopSynthesis();
 
-  /// Flat alias — list available TTS voices as [TTSVoiceInfo] proto objects.
-  /// Mirrors Swift `RunAnywhere.availableTTSVoices()`.
-  static Future<List<TTSVoiceInfo>> availableTTSVoices() async {
-    final voiceIds = await RunAnywhereTTS.shared.availableVoices();
-    return voiceIds.map((id) => TTSVoiceInfo(id: id, displayName: id)).toList();
-  }
+  /// Flat storage delete request. Mirrors Swift `RunAnywhere.deleteStorage`.
+  static Future<StorageDeleteResult> deleteStorage(
+    StorageDeleteRequest request,
+  ) => RunAnywhereStorage.deleteStorage(request);
 
-  /// Flat alias for loading a TTS model (distinct from loading a TTS voice).
-  /// Mirrors Swift `RunAnywhere.loadTTSModel(modelId:)`.
-  static Future<void> loadTTSModel(String modelId) => loadTTSVoice(modelId);
+  /// Delete one downloaded model end-to-end (unload if loaded, remove files,
+  /// clear registry path). Mirrors Swift `RunAnywhere.deleteModel(_:)`.
+  static Future<StorageDeleteResult> deleteModel(String modelId) =>
+      RunAnywhereStorage.deleteModel(modelId);
 
-  /// Flat alias for unloading the active TTS model.
-  static Future<void> unloadTTSModel() => unloadTTSVoice();
+  /// Flat temp cleanup helper. Mirrors Swift `RunAnywhere.cleanTempFiles`.
+  static Future<void> cleanTempFiles() => RunAnywhereStorage.cleanTempFiles();
 
   /// Flat generate — canonical cross-SDK positional signature.
   /// Mirrors Swift / RN / Web `RunAnywhere.generate(prompt:options:)`.
@@ -782,12 +895,6 @@ abstract final class RunAnywhere {
   static void registerTool(ToolDefinition definition, ToolExecutor executor) =>
       RunAnywhereTools.shared.registerTool(definition, executor);
 
-  /// Register a typed generated-proto tool executor.
-  static void registerTypedTool(
-    ToolDefinition definition,
-    TypedToolExecutor executor,
-  ) => RunAnywhereTools.shared.registerTypedTool(definition, executor);
-
   /// Unregister a tool by name.
   static void unregisterTool(String toolName) =>
       RunAnywhereTools.shared.unregisterTool(toolName);
@@ -808,17 +915,6 @@ abstract final class RunAnywhere {
     String prompt, {
     ToolCallingOptions? options,
   }) => RunAnywhereTools.shared.generateWithTools(prompt, options: options);
-
-  /// Continue generation after a manual tool result.
-  static Future<ToolCallingResult> continueWithToolResult(
-    String originalPrompt,
-    ToolResult toolResult, {
-    ToolCallingOptions? options,
-  }) => RunAnywhereTools.shared.continueWithToolResult(
-    originalPrompt,
-    toolResult,
-    options: options,
-  );
 
   /// RAG lifecycle-resolution helper.
   static Future<RAGConfiguration> ragResolvedConfiguration({
@@ -897,11 +993,36 @@ abstract final class RunAnywhere {
         await onProgress(progress);
       }
     }
-    return last ??
-        DownloadProgress(
-          modelId: modelId,
-          errorMessage: 'No progress events received for model: $modelId',
+
+    // Mirror Swift `reportDownloadProgress`: terminal FAILED / CANCELLED
+    // states throw structured SDKExceptions instead of returning the
+    // failure progress to the caller.
+    final terminal = last;
+    if (terminal == null) {
+      throw SDKException.make(
+        code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+        message: 'No progress events received for model: $modelId',
+        category: ErrorCategory.ERROR_CATEGORY_NETWORK,
+      );
+    }
+    switch (terminal.state) {
+      case DownloadState.DOWNLOAD_STATE_FAILED:
+        throw SDKException.make(
+          code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          message: terminal.errorMessage.isEmpty
+              ? 'Download failed'
+              : terminal.errorMessage,
+          category: ErrorCategory.ERROR_CATEGORY_NETWORK,
         );
+      case DownloadState.DOWNLOAD_STATE_CANCELLED:
+        throw SDKException.make(
+          code: ErrorCode.ERROR_CODE_CANCELLED,
+          message: 'Download cancelled',
+          category: ErrorCategory.ERROR_CATEGORY_NETWORK,
+        );
+      default:
+        return terminal;
+    }
   }
 
   /// Flat streaming voice agent events.

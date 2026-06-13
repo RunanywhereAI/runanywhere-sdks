@@ -38,7 +38,8 @@ import {
   ToolChoiceMode,
   ToolDefinition,
   ToolParameterType,
-  ToolResult,
+  ToolValue,
+  ToolValueJSON,
   type ToolCall as ProtoToolCall,
   type ToolCallingResult as ProtoToolCallingResult,
   type ToolCallingSessionCreateRequest as ProtoToolCallingSessionCreateRequest,
@@ -68,6 +69,43 @@ const OFF_ERROR = 12;
 // the real commons counter (tool_calling_session.cpp:104). Tests assert this
 // flows back through the addFunction trampoline and the cancel path.
 const FAKE_SESSION_HANDLE = 0x42n;
+
+// ---------------------------------------------------------------------------
+// JSON <-> ToolValue conversion — fake-side mirror of commons'
+// rac_tool_value_from_json_proto / rac_tool_value_to_json_proto, which the
+// SDK now uses for executor argument parsing / result serialization
+// (Swift parity: RAToolValue.parseObjectJSON / jsonString(from:)).
+// ---------------------------------------------------------------------------
+
+function jsonToToolValue(v: unknown): ToolValue {
+  if (v === null || v === undefined) return ToolValue.fromPartial({ nullValue: true });
+  if (typeof v === 'string') return ToolValue.fromPartial({ stringValue: v });
+  if (typeof v === 'number') return ToolValue.fromPartial({ numberValue: v });
+  if (typeof v === 'boolean') return ToolValue.fromPartial({ boolValue: v });
+  if (Array.isArray(v)) {
+    return ToolValue.fromPartial({ arrayValue: { values: v.map(jsonToToolValue) } });
+  }
+  const fields: Record<string, ToolValue> = {};
+  for (const [key, value] of Object.entries(v as Record<string, unknown>)) {
+    fields[key] = jsonToToolValue(value);
+  }
+  return ToolValue.fromPartial({ objectValue: { fields } });
+}
+
+function toolValueToJsonValue(v: ToolValue): unknown {
+  if (v.stringValue !== undefined) return v.stringValue;
+  if (v.numberValue !== undefined) return v.numberValue;
+  if (v.boolValue !== undefined) return v.boolValue;
+  if (v.arrayValue) return v.arrayValue.values.map(toolValueToJsonValue);
+  if (v.objectValue) {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(v.objectValue.fields)) {
+      out[key] = toolValueToJsonValue(value);
+    }
+    return out;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Fake module — synchronous emulation of the commons session ABI.
@@ -259,6 +297,41 @@ function makeFakeModule(script: SessionScript): FakeToolCallingModule {
     _rac_tool_call_parse_proto: () => 0,
     _rac_tool_call_format_prompt_proto: () => 0,
     _rac_tool_call_validate_proto: () => 0,
+    // ToolValue <-> JSON bridge used by ToolCalling.executeTool for executor
+    // argument parsing / result serialization. The fake mirrors commons'
+    // behavior with a plain JSON.parse/stringify round-trip.
+    _rac_tool_value_from_json_proto(
+      requestPtr: number,
+      requestSize: number,
+      outResult: number,
+    ): number {
+      const request = ToolValueJSON.decode(heapU8.slice(requestPtr, requestPtr + requestSize));
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(request.json);
+      } catch {
+        heap32[(outResult + OFF_STATUS) >>> 2] = -251; // RAC_ERROR_INVALID_INPUT
+        return -251;
+      }
+      const bytes = ToolValue.encode(jsonToToolValue(parsed)).finish();
+      const { ptr, size } = writeBytes(bytes);
+      heapU32[(outResult + OFF_DATA) >>> 2] = ptr;
+      heapU32[(outResult + OFF_SIZE) >>> 2] = size;
+      return 0;
+    },
+    _rac_tool_value_to_json_proto(
+      requestPtr: number,
+      requestSize: number,
+      outResult: number,
+    ): number {
+      const value = ToolValue.decode(heapU8.slice(requestPtr, requestPtr + requestSize));
+      const json = JSON.stringify(toolValueToJsonValue(value));
+      const bytes = ToolValueJSON.encode(ToolValueJSON.fromPartial({ json })).finish();
+      const { ptr, size } = writeBytes(bytes);
+      heapU32[(outResult + OFF_DATA) >>> 2] = ptr;
+      heapU32[(outResult + OFF_SIZE) >>> 2] = size;
+      return 0;
+    },
   };
   return fake as FakeToolCallingModule;
 }
@@ -354,9 +427,10 @@ describe('ToolCalling.buildSessionCreateRequest (via generateWithTools)', () => 
     expect(module.capturedCreateRequest!.formatHint).toBe('openai');
     expect(module.capturedCreateRequest!.maxIterations).toBe(5);
     expect(module.capturedCreateRequest!.keepToolsAvailable).toBe(true);
-    // pass2-syn-006-followup-web: validateCalls true is hard-coded for
-    // parity with Swift's makeRunLoopRequest.
-    expect(module.capturedCreateRequest!.validateCalls).toBe(true);
+    // Swift makeRunLoopRequest parity (RunAnywhere+ToolCalling.swift:528-536):
+    // validate_calls stays UNSET unless the caller specifies it, so commons
+    // applies its documented default (true).
+    expect(module.capturedCreateRequest!.validateCalls).toBeUndefined();
     expect(module.capturedCreateRequest!.toolChoice).toBe(
       ToolChoiceMode.TOOL_CHOICE_MODE_AUTO,
     );
@@ -417,9 +491,12 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
 
     expect(captured).toBeInstanceOf(SDKException);
     const sdkErr = captured as SDKException;
-    expect(sdkErr.code).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
+    // `.code` is the positive proto ErrorCode (Swift parity); the signed
+    // rac_result_t lives on `.cAbiCode`.
+    expect(sdkErr.code).toBe(ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
+    expect(sdkErr.cAbiCode).toBe(-ProtoErrorCode.ERROR_CODE_BACKEND_ERROR);
     expect(sdkErr.message).toMatch(/decode failed/i);
-    expect(sdkErr.details ?? '').toMatch(/ToolCallingSessionEvent/i);
+    expect(sdkErr.proto.nestedMessage ?? '').toMatch(/ToolCallingSessionEvent/i);
   });
 
   it('encodes step_with_result with the tool-call id, result JSON, and (on failure) the error message', async () => {
@@ -431,15 +508,9 @@ describe('ToolCalling decode/encode (via generateWithTools wire round-trip)', ()
 
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'echo', description: '', parameters: [] }),
-      async (call) => {
-        return ToolResult.fromPartial({
-          name: call.name,
-          toolCallId: call.callId,
-          callId: call.callId,
-          resultJson: '{"echoed":"x"}',
-          success: true,
-        });
-      },
+      // Swift-parity executor contract: parsed args in, result object out;
+      // the SDK serializes the object into resultJson.
+      async (args) => ({ echoed: args['value']! }),
     );
 
     const result = await ToolCalling.generateWithTools('use echo', {
@@ -525,14 +596,10 @@ describe('ToolCalling.generateWithTools — addFunction trampoline lifecycle', (
 
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'explodes' }),
-      async () => ToolResult.fromPartial({
-        name: 'explodes',
-        toolCallId: 'call-explodes',
-        callId: 'call-explodes',
-        success: false,
-        error: 'no',
-        resultJson: '',
-      }),
+      // Swift-parity contract: executors signal failure by throwing.
+      async () => {
+        throw new Error('no');
+      },
     );
 
     await expect(
@@ -576,8 +643,9 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     }
 
     expect(captured).toBeInstanceOf(SDKException);
-    expect((captured as SDKException).code).toBe(-ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
-    expect((captured as SDKException).details ?? '').toMatch(/already aborted/i);
+    expect((captured as SDKException).code).toBe(ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
+    expect((captured as SDKException).cAbiCode).toBe(-ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED);
+    expect((captured as SDKException).proto.nestedMessage ?? '').toMatch(/already aborted/i);
     // The eager-abort gate MUST be reached before we touch commons / addFunction.
     expect(createSpy).not.toHaveBeenCalled();
     expect(module.cancelHandles).toHaveLength(0);
@@ -599,18 +667,12 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
     const controller = new AbortController();
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'noop' }),
-      async (call) => {
+      async () => {
         // Abort while the executor is awaiting — the addEventListener
         // path on the AbortSignal should now fire onAbort, which routes
         // to _rac_tool_calling_session_cancel_proto.
         controller.abort();
-        return ToolResult.fromPartial({
-          name: call.name,
-          toolCallId: call.callId,
-          callId: call.callId,
-          success: true,
-          resultJson: '{}',
-        });
+        return {};
       },
     );
 
@@ -636,10 +698,14 @@ describe('ToolCalling.generateWithTools — cancellation', () => {
 
 describe('ToolCalling.executeTool — executor promise rejection', () => {
   afterEach(() => {
+    clearRunanywhereModule();
     ToolCalling.clearTools();
   });
 
   it('captures executor rejection as a failed ToolResult', async () => {
+    // Argument parsing now routes through the commons ToolValue JSON bridge,
+    // so executeTool needs a registered module.
+    setRunanywhereModule(makeFakeModule({ onCreate: [] }));
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'will_fail' }),
       async () => {
@@ -662,6 +728,28 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     expect(result.name).toBe('will_fail');
   });
 
+  it('surfaces malformed argumentsJson as a failed ToolResult (Swift parity)', async () => {
+    setRunanywhereModule(makeFakeModule({ onCreate: [] }));
+    ToolCalling.registerTool(
+      ToolDefinition.fromPartial({ name: 'never_runs' }),
+      async () => {
+        throw new Error('executor must not run on parse failure');
+      },
+    );
+
+    const result = await ToolCalling.executeTool(
+      ToolCall.fromPartial({
+        id: 'tc-bad',
+        callId: 'tc-bad',
+        name: 'never_runs',
+        argumentsJson: 'not json {{',
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/Failed to parse tool arguments/);
+  });
+
   it('returns an Unknown-tool failure when the registry has no match', async () => {
     const result = await ToolCalling.executeTool(
       ToolCall.fromPartial({
@@ -677,15 +765,10 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
   });
 
   it('returns a successful ToolResult with metadata defaults when the executor resolves', async () => {
+    setRunanywhereModule(makeFakeModule({ onCreate: [] }));
     ToolCalling.registerTool(
       ToolDefinition.fromPartial({ name: 'echo' }),
-      async (call) => ToolResult.fromPartial({
-        name: call.name,
-        // Intentionally omit toolCallId / callId / startedAtMs / completedAtMs
-        // to assert toolResultWithDefaults fills them in.
-        resultJson: '{"echoed":true}',
-        success: true,
-      }),
+      async () => ({ echoed: ToolValue.fromPartial({ boolValue: true }) }),
     );
 
     const result = await ToolCalling.executeTool(
@@ -698,7 +781,7 @@ describe('ToolCalling.executeTool — executor promise rejection', () => {
     );
 
     expect(result.success).toBe(true);
-    // toolResultWithDefaults backfills toolCallId from the originating call.
+    // makeToolResult backfills toolCallId from the originating call.
     expect(result.toolCallId).toBe('tc-3');
     expect(result.name).toBe('echo');
     expect(result.resultJson).toBe('{"echoed":true}');

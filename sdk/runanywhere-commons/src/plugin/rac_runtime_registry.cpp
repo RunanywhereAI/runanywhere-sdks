@@ -173,7 +173,8 @@ void ensure_builtins_registered() {
          * runtime) cannot abort SDK bootstrap. */
         const char* nm = cpu->metadata.name;
         rac_result_t rc = safe_plugin_call(
-            nm, "init", [&]() -> rac_result_t { return cpu->init(); }, RAC_ERROR_PLUGIN_LOAD_FAILED);
+            nm, "init", [&]() -> rac_result_t { return cpu->init(); },
+            RAC_ERROR_PLUGIN_LOAD_FAILED);
         if (rc != RAC_SUCCESS) {
             RAC_LOG_ERROR(LOG_CAT, "bootstrap: CPU runtime init returned %d — skipping", (int)rc);
             return;
@@ -326,8 +327,7 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
                         "rac_runtime_register: '%s' has an incomplete session-execution role "
                         "(create_session present but run_session=%s destroy_session=%s); a runtime "
                         "providing create_session MUST also provide run_session + destroy_session",
-                        vtable->metadata.name,
-                        vtable->run_session == nullptr ? "NULL" : "set",
+                        vtable->metadata.name, vtable->run_session == nullptr ? "NULL" : "set",
                         vtable->destroy_session == nullptr ? "NULL" : "set");
     }
 

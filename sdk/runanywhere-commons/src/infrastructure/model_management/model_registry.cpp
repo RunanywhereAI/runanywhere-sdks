@@ -34,6 +34,8 @@
  *     structured errors.
  */
 
+#include "model_registry_internal.h"
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -48,8 +50,6 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
-
-#include "model_registry_internal.h"
 
 using namespace rac::infra::model_registry::detail;  // NOLINT(build/namespaces)
 
@@ -230,14 +230,23 @@ bool get_model_snapshot_by_id(rac_model_registry_handle_t handle, const std::str
     if (!handle || !out) {
         return false;
     }
-    std::lock_guard<std::mutex> lock(handle->mutex);
-    auto it = handle->models.find(model_id);
-    if (it == handle->models.end()) {
-        return false;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        {
+            std::lock_guard<std::mutex> lock(handle->mutex);
+            auto it = handle->models.find(model_id);
+            if (it != handle->models.end()) {
+                *out = model_snapshot_locked(handle, model_id, it->second);
+                normalize_model_registry_state(out);
+                return true;
+            }
+        }
+        // Lookup miss: an ad-hoc pull from a previous run may exist on disk
+        // with a manifest sidecar but no re-seeded entry. Restore once, retry.
+        if (attempt > 0 || !try_restore_model_manifest_by_id(handle, model_id)) {
+            break;
+        }
     }
-    *out = model_snapshot_locked(handle, model_id, it->second);
-    normalize_model_registry_state(out);
-    return true;
+    return false;
 }
 
 }  // namespace rac::infra::model_registry::detail
@@ -355,6 +364,11 @@ rac_result_t save_model_info_impl(rac_model_registry_handle_t handle, const rac_
         // ordering dependency between registerModel() and the one-shot
         // discoverDownloadedModels() sweep in Phase 2.
         try_reconcile_model_local_path_locked(handle, model_id, stored->second);
+
+        // Keep the durable model-folder manifest in sync (no-op unless the
+        // entry is downloaded inside the canonical layout, and skipped when
+        // the on-disk bytes already match).
+        maybe_write_model_folder_manifest_locked(handle, model_id);
     }
 #endif
 
@@ -378,19 +392,26 @@ rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle, const ch
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
-
-    auto it = handle->models.find(model_id);
-    if (it == handle->models.end()) {
-        return RAC_ERROR_NOT_FOUND;
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        {
+            std::lock_guard<std::mutex> lock(handle->mutex);
+            auto it = handle->models.find(model_id);
+            if (it != handle->models.end()) {
+                *out_model = deep_copy_model(it->second);
+                return *out_model ? RAC_SUCCESS : RAC_ERROR_OUT_OF_MEMORY;
+            }
+        }
+#ifdef RAC_HAVE_PROTOBUF
+        // Lookup miss: an ad-hoc pull from a previous run may exist on disk
+        // with a manifest sidecar but no re-seeded entry. Restore once, retry.
+        if (attempt > 0 || !try_restore_model_manifest_by_id(handle, model_id)) {
+            break;
+        }
+#else
+        break;
+#endif
     }
-
-    *out_model = deep_copy_model(it->second);
-    if (!*out_model) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    return RAC_SUCCESS;
+    return RAC_ERROR_NOT_FOUND;
 }
 
 rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
@@ -646,9 +667,16 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
     model->updated_at = rac_get_current_time_ms() / 1000;
 
 #ifdef RAC_HAVE_PROTOBUF
-    return store_proto_snapshot_locked(handle, model_id, model,
-                                       /*preserve_proto_only_fields=*/true,
-                                       /*overwrite_registry_state=*/true);
+    const rac_result_t snapshot_rc =
+        store_proto_snapshot_locked(handle, model_id, model,
+                                    /*preserve_proto_only_fields=*/true,
+                                    /*overwrite_registry_state=*/true);
+    if (snapshot_rc == RAC_SUCCESS && local_path && local_path[0] != '\0') {
+        // Download landed (orchestrator completion / refresh relink): persist
+        // the durable model-folder manifest beside the artifacts.
+        maybe_write_model_folder_manifest_locked(handle, model_id);
+    }
+    return snapshot_rc;
 #else
     return RAC_SUCCESS;
 #endif

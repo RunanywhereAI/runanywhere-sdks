@@ -178,7 +178,8 @@ rac_result_t rac_device_get_or_create_persistent_id(char* out, size_t out_size) 
         return copy_into_out(state.cached, out, out_size);
     }
 
-    if (!state.cached.empty() && state.cached_adapter == adapter && adapter->secure_get == nullptr) {
+    if (!state.cached.empty() && state.cached_adapter == adapter &&
+        adapter->secure_get == nullptr) {
         return copy_into_out(state.cached, out, out_size);
     }
     state.cached.clear();

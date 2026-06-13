@@ -23,16 +23,25 @@ data object More
 data object Settings
 
 @Serializable
+data object Tools
+
+@Serializable
 data object Tts
 
 @Serializable
 data object Stt
 
 @Serializable
+data object Vad
+
+@Serializable
 data object Vision
 
 @Serializable
 data object Documents
+
+@Serializable
+data object Solutions
 
 @Serializable
 data object CloudProviders

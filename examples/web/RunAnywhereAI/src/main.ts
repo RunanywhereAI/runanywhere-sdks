@@ -2,15 +2,23 @@
  * RunAnywhere AI - Web Demo Application
  *
  * Full-featured demo matching the iOS example app.
- * 5-tab navigation: Chat, Vision, Voice, More, Settings.
+ * 11-tab navigation: Chat, Vision, Voice, Transcribe, Speak, VAD, Docs,
+ * Storage, Solutions, Bench, Settings (see `TABS` in app.ts).
  */
 
 import './styles/design-system.css';
 import './styles/commons.css';
 import './styles/components.css';
 import { buildAppShell } from './app';
-import { RunAnywhere } from '@runanywhere/web';
+import {
+  RunAnywhere,
+  modelInfoIsAvailableForUse,
+  modelInfoIsDownloadedOnDisk,
+} from '@runanywhere/web';
 import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import { registerAll as registerModelCatalogAll } from './services/model-catalog';
+import { notifyCatalogRegistered } from './components/model-selection';
+import { getStoredApiKey, getStoredBaseURL } from './views/settings';
 import { formatError } from './services/format-error';
 
 type AppReadinessState = 'booting' | 'initializing-sdk' | 'building-shell' | 'interactive' | 'error';
@@ -292,13 +300,41 @@ async function initializeSDK(): Promise<void> {
   // loads `racommons-llamacpp.wasm` and installs the module on every core
   // proto-byte adapter via `setRunanywhereModule`. Until a backend has
   // registered, inference verbs throw "backend not available".
+  //
+  // Mirrors iOS `initializeSDK()` (RunAnywhereAIApp.swift:84-109):
+  // initialize → register backends → ModelCatalogBootstrap.registerAll() →
+  // refreshSDKCatalogs(). `RunAnywhere.initialize()` is fail-closed — a core
+  // WASM load failure throws and `main()` shows the error view with retry
+  // (iOS parity: RunAnywhereAIApp.swift:105-108 InitializationErrorView).
+  // Note: iOS registers backends BEFORE initialize() to dodge a Swift
+  // concurrency suspension race; on Web the backend packages install onto
+  // core adapters, so the SDK-documented order is initialize() first.
   try {
-    await RunAnywhere.initialize({
-      environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
-      debug: true,
-    });
+    // Credentials from Settings — iOS parity: runSDKInitialize()
+    // (RunAnywhereAIApp.swift:113-138). When a usable apiKey + baseURL pair
+    // is stored, initialize against production; otherwise development.
+    // Logging boots from the environment automatically inside initialize().
+    const apiKey = getStoredApiKey();
+    const baseURL = getStoredBaseURL();
+    if (
+      apiKey !== null
+      && baseURL !== null
+      && !looksLikePlaceholder(apiKey)
+      && isUsableHTTPURL(baseURL)
+    ) {
+      await RunAnywhere.initialize({
+        apiKey,
+        baseURL,
+        environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+      });
+    } else {
+      await RunAnywhere.initialize({
+        environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+      });
+    }
 
-    // Attempt to restore previously chosen local storage directory.
+    // Attempt to restore previously chosen local storage directory
+    // (web-only: File System Access API persistence).
     const localRestored = await RunAnywhere.storage.restoreLocalStorage();
     if (localRestored) {
       console.log('[RunAnywhere] Local storage restored:', RunAnywhere.storage.localStorageDirectoryName);
@@ -328,6 +364,29 @@ async function initializeSDK(): Promise<void> {
       );
     }
 
+    // Register the ONNX/Sherpa WASM backend (STT/TTS/VAD/Embeddings) at init
+    // alongside llamacpp — iOS parity: RunAnywhereAIApp.swift:89-90
+    // (`LlamaCPP.register` + `ONNX.register`). Same degraded, non-fatal
+    // behavior as llamacpp on failure.
+    try {
+      const { ONNX } = await import('@runanywhere/web-onnx');
+      await ONNX.register();
+      console.log('[RunAnywhere] onnx/sherpa backend registered');
+    } catch (err) {
+      console.warn(
+        '[RunAnywhere] onnx backend failed to register; STT/TTS/VAD will show feature-unavailable:',
+        formatError(err),
+      );
+    }
+
+    // Register the example model catalog ONCE — iOS parity:
+    // RunAnywhereAIApp.swift:98 (`ModelCatalogBootstrap.registerAll()`).
+    const registeredCount = await registerModelCatalogAll();
+    notifyCatalogRegistered(registeredCount);
+
+    // iOS parity: RunAnywhereAIApp.swift:99 (`refreshSDKCatalogs()`).
+    await refreshSDKCatalogs();
+
     console.log(
       '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
       '| storage backend:', RunAnywhere.storage.backend,
@@ -337,13 +396,67 @@ async function initializeSDK(): Promise<void> {
     sdkReadinessState = 'ready';
     sdkInitializationError = undefined;
   } catch (err) {
+    // Fail closed — iOS parity: RunAnywhereAIApp.swift:105-108. main()'s
+    // catch shows the error view with a Retry button.
     sdkReadinessState = 'unavailable';
     sdkInitializationError = formatError(err);
-    console.warn(
-      '[RunAnywhere] SDK unavailable; app shell continuing without model inference providers:',
-      err,
-    );
+    throw err;
   }
+}
+
+/**
+ * Post-init registry refresh + logging — iOS parity: `refreshSDKCatalogs()`
+ * (RunAnywhereAIApp.swift:168-193).
+ */
+async function refreshSDKCatalogs(): Promise<void> {
+  console.log('[RunAnywhere] Refreshing SDK model registry...');
+
+  RunAnywhere.refreshModelRegistry();
+
+  const list = RunAnywhere.listModels();
+  if (list) {
+    const models = list.models;
+    const downloaded = models.filter((m) => modelInfoIsDownloadedOnDisk(m)).length;
+    const available = models.filter((m) => modelInfoIsAvailableForUse(m)).length;
+    console.log(
+      `[RunAnywhere] Model registry: registered=${models.length}, downloaded=${downloaded}, available=${available}`,
+    );
+  } else {
+    console.warn('[RunAnywhere] Model registry refresh incomplete: list unavailable');
+  }
+
+  try {
+    const adapters = await RunAnywhere.lora.allRegistered();
+    console.log(`[RunAnywhere] LoRA registry: ${adapters.length} entries`);
+  } catch (err) {
+    console.warn('[RunAnywhere] LoRA catalog unavailable:', formatError(err));
+  }
+}
+
+/**
+ * iOS parity: `looksLikePlaceholder(_:)` (RunAnywhereAIApp.swift:140-145).
+ */
+function looksLikePlaceholder(value: string): boolean {
+  return /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i.test(value);
+}
+
+/**
+ * iOS parity: `isUsableHTTPURL(_:)` (RunAnywhereAIApp.swift:147-161).
+ */
+function isUsableHTTPURL(value: string): boolean {
+  const trimmed = value.trim();
+  if (looksLikePlaceholder(trimmed)) return false;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  const scheme = url.protocol.replace(':', '').toLowerCase();
+  if (scheme !== 'http' && scheme !== 'https') return false;
+  const host = url.hostname;
+  if (!host || /\s/.test(host) || host.includes('<') || host.includes('>')) return false;
+  return true;
 }
 
 /**

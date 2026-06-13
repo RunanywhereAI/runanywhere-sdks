@@ -19,8 +19,11 @@ import com.runanywhere.runanywhereai.ui.screens.cloud.CloudProvidersScreen
 import com.runanywhere.runanywhereai.ui.screens.more.MoreScreen
 import com.runanywhere.runanywhereai.ui.screens.rag.RagScreen
 import com.runanywhere.runanywhereai.ui.screens.settings.SettingsScreen
+import com.runanywhere.runanywhereai.ui.screens.solutions.SolutionsScreen
 import com.runanywhere.runanywhereai.ui.screens.stt.SttScreen
+import com.runanywhere.runanywhereai.ui.screens.tools.ToolsScreen
 import com.runanywhere.runanywhereai.ui.screens.tts.TtsScreen
+import com.runanywhere.runanywhereai.ui.screens.vad.VadScreen
 import com.runanywhere.runanywhereai.ui.screens.vision.VisionScreen
 import com.runanywhere.runanywhereai.ui.screens.voice.VoiceScreen
 import com.runanywhere.runanywhereai.ui.theme.AppMotion
@@ -56,10 +59,13 @@ fun AppNavHost(
         composable<Voice> { VoiceScreen() }
         composable<More> { MoreScreen(onNavigate = { navController.navigate(it) }) }
         composable<Settings> { SettingsScreen() }
+        composable<Tools> { ToolsScreen() }
         composable<Tts> { TtsScreen() }
         composable<Stt> { SttScreen() }
+        composable<Vad> { VadScreen() }
         composable<Vision> { VisionScreen() }
         composable<Documents> { RagScreen() }
+        composable<Solutions> { SolutionsScreen() }
         composable<CloudProviders> { CloudProvidersScreen() }
         composable<Benchmarks> {
             BenchmarkScreen(onOpenDetail = { navController.navigate(BenchmarkDetail(it)) })

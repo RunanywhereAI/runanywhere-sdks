@@ -96,14 +96,17 @@ cmake \
     -DRAC_WASM_LLAMACPP=ON
 
 echo "▶ Build wasm target"
-# Use CMake's generator-agnostic --parallel (Ninja rejects a bare `-j`,
+# Use CMake's generator-agnostic --parallel, CAPPED (repo resource
+# discipline: a bare --parallel spawns one heavy compiler per core and has
+# OOM-crashed dev laptops). Override with RAC_BUILD_JOBS if needed.
+# (Ninja rejects a bare `-j`,
 # while Make accepts it). Lets CMake pick a sensible default job count.
 # The concrete executable target for the llama.cpp Web package is
 # racommons_llamacpp_wasm (see sdk/runanywhere-web/wasm/CMakeLists.txt
 # rac_wasm_add_target NAME); it emits racommons-llamacpp.{js,wasm}. There is no
 # umbrella `runanywhere_wasm` target — each npm package has its own per-backend
 # executable target.
-cmake --build "${BUILD_DIR}" --target racommons_llamacpp_wasm --parallel
+cmake --build "${BUILD_DIR}" --target racommons_llamacpp_wasm --parallel "${RAC_BUILD_JOBS:-2}"
 
 mkdir -p "${DEST}"
 

@@ -72,10 +72,7 @@ suspend fun RunAnywhere.generateWithTools(
     // `options?.tool_calling` when present).
     val baseToolOptions =
         toolOptions
-            ?: options?.tool_calling
-            ?: options
-                .toToolCallingOptions()
-                .takeIf { options != null }
+            ?: options?.toToolCallingOptions()
             ?: RAToolCallingOptions.defaults()
     // Apply `toolChoice` / `forcedToolName` overrides on top of the resolved
     // options. Mirrors Swift's `RunAnywhere+ToolCalling.swift` `tcOpts`
@@ -87,5 +84,10 @@ suspend fun RunAnywhere.generateWithTools(
             tool_choice = toolChoice ?: baseToolOptions.tool_choice,
             forced_tool_name = forcedToolName ?: baseToolOptions.forced_tool_name,
         )
-    return ToolCallingOrchestrator.generateWithTools(prompt, effectiveToolOptions, validateCalls)
+    return ToolCallingOrchestrator.generateWithTools(
+        prompt = prompt,
+        options = effectiveToolOptions,
+        llmOptions = options,
+        validateCalls = validateCalls,
+    )
 }

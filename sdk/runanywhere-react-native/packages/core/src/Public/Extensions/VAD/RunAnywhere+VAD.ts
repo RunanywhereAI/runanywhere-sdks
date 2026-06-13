@@ -12,8 +12,16 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../../Foundation/Errors/SDKException';
+import {
+  SDKException,
+  asSDKException,
+} from '../../../Foundation/Errors/SDKException';
+import {
+  ErrorCategory as ErrorCategoryProto,
+  ErrorCode as ErrorCodeProto,
+} from '@runanywhere/proto-ts/errors';
 import {
   type VADOptions,
   type VADResult,
@@ -96,15 +104,23 @@ export async function detectVoiceActivity(
   audio: Uint8Array | Float32Array | string | ArrayBuffer,
   options?: Partial<VADOptions>
 ): Promise<VADResult> {
+  // Swift parity: guard isInitialized (RunAnywhere+VAD.swift:22-24).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
-  const native = requireNativeModule();
-  if (!(await native.isInitialized())) {
-    throw SDKException.notInitialized();
+  const buffer = audioToArrayBuffer(audio);
+  // Swift parity: empty audio buffer throws .emptyAudioBuffer
+  // (RunAnywhere+VAD.swift:26-28; minimum one Float32 sample).
+  if (buffer.byteLength < 4) {
+    throw SDKException.of(
+      ErrorCodeProto.ERROR_CODE_EMPTY_AUDIO_BUFFER,
+      'Audio data is empty',
+      { category: ErrorCategoryProto.ERROR_CATEGORY_COMPONENT }
+    );
   }
   await ensureServicesReady();
-  return processVAD(audioToArrayBuffer(audio), 16000, options);
+  return processVAD(buffer, 16000, options);
 }
 
 /**
@@ -131,13 +147,12 @@ async function processVAD(
 
 /** Reset VAD state. */
 export async function resetVAD(): Promise<void> {
+  // Swift parity: guard isInitialized (RunAnywhere+VAD.swift:75-77).
+  requireInitialized();
   if (!isNativeModuleAvailable()) {
     throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
-  if (!(await native.isInitialized())) {
-    throw SDKException.notInitialized();
-  }
   await native.resetVAD();
   logger.debug('VAD state reset');
 }
@@ -145,14 +160,28 @@ export async function resetVAD(): Promise<void> {
 /**
  * Stream VAD results for an async sequence of audio chunks.
  *
- * Matches canonical cross-SDK spec §6:
- *   `streamVAD(audio: Stream<Bytes>) → Stream<VADResult>`
+ * Matches Swift SDK: `RunAnywhere.streamVAD(audio:options:)`
+ * (RunAnywhere+VAD.swift:50-71) and canonical cross-SDK spec §6.
+ *
+ * When the underlying detector throws, the failure is surfaced as an
+ * error-marked `VADResult` (non-empty `errorMessage`, non-zero `errorCode`)
+ * and the stream finishes — the iterator is never rejected — so callers do
+ * not silently keep pumping audio into a dead detector.
  */
 export async function* streamVAD(
-  audio: AsyncIterable<Uint8Array>
+  audio: AsyncIterable<Uint8Array>,
+  options?: Partial<VADOptions>
 ): AsyncIterable<VADResult> {
   for await (const chunk of audio) {
-    const result = await detectVoiceActivity(chunk);
-    yield result;
+    try {
+      yield await detectVoiceActivity(chunk, options);
+    } catch (error) {
+      const sdkError = asSDKException(error);
+      yield VADResultMessage.fromPartial({
+        errorMessage: `VAD stream failed: ${sdkError.message}`,
+        errorCode: sdkError.code,
+      });
+      return;
+    }
   }
 }

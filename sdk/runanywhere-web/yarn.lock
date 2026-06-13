@@ -651,7 +651,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@runanywhere/proto-ts@workspace:*, @runanywhere/proto-ts@workspace:../shared/proto-ts":
+"@runanywhere/proto-ts@^0.19.13, @runanywhere/proto-ts@workspace:../shared/proto-ts":
   version: 0.0.0-use.local
   resolution: "@runanywhere/proto-ts@workspace:../shared/proto-ts"
   dependencies:
@@ -665,7 +665,7 @@ __metadata:
   resolution: "@runanywhere/web-llamacpp@workspace:packages/llamacpp"
   dependencies:
     "@eslint/js": ^9.39.4
-    "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/proto-ts": ^0.19.13
     eslint: ^9.39.4
     typescript: ^5.9.3
     typescript-eslint: ^8.59.3
@@ -700,7 +700,7 @@ __metadata:
   resolution: "@runanywhere/web@workspace:packages/core"
   dependencies:
     "@eslint/js": ^9.39.4
-    "@runanywhere/proto-ts": "workspace:*"
+    "@runanywhere/proto-ts": ^0.19.13
     eslint: ^9.39.4
     long: ^5.3.2
     protobufjs: ^7.5.8

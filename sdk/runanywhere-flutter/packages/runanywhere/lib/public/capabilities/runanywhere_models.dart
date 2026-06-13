@@ -17,7 +17,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
 import 'package:runanywhere/public/extensions/runanywhere_storage.dart';
-import 'package:runanywhere/public/runanywhere.dart';
 
 /// Model registry capability surface.
 ///
@@ -37,7 +36,13 @@ class RunAnywhereModels {
       throw SDKException.notInitialized();
     }
 
-    await RunAnywhere.runDiscoveryIfNeeded();
+    // Wait for Phase-2 downloaded-model discovery (best-effort; offline
+    // listing of already-registered models must keep working).
+    try {
+      await DartBridge.ensureServicesReady();
+    } catch (_) {
+      // Non-fatal: registry contents remain listable.
+    }
 
     final cppModels = await DartBridgeModelRegistry.instance
         .getAllProtoModels();
@@ -103,26 +108,35 @@ class RunAnywhereModels {
     );
   }
 
-  /// Refresh the model registry — canonical §13 cross-SDK unified
-  /// surface (0-arg). Routes through the commons C ABI
-  /// `rac_model_registry_refresh_proto`; rescans local filesystem and
-  /// fetches the backend catalog in one shot.
-  Future<void> refreshModelRegistry() async {
+  /// Refresh the model registry. Routes through the commons C ABI
+  /// `rac_model_registry_refresh_proto`.
+  ///
+  /// Matches Swift `RunAnywhere.refreshModelRegistry(rescanLocal:includeRemoteCatalog:pruneOrphans:)`
+  /// (RunAnywhere+ModelRegistry.swift:46) — each flag is caller-controlled
+  /// with Swift's defaults.
+  Future<void> refreshModelRegistry({
+    bool rescanLocal = true,
+    bool includeRemoteCatalog = false,
+    bool pruneOrphans = false,
+  }) async {
     if (!DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Discovery');
 
-    final result = await DartBridgeModelRegistry.instance
-        .discoverDownloadedModels();
-    if (result.discoveredModels.isNotEmpty) {
-      logger.info(
-        'Discovery found ${result.discoveredModels.length} downloaded models',
-      );
+    if (rescanLocal) {
+      final result = await DartBridgeModelRegistry.instance
+          .discoverDownloadedModels();
+      if (result.discoveredModels.isNotEmpty) {
+        logger.info(
+          'Discovery found ${result.discoveredModels.length} downloaded models',
+        );
+      }
     }
 
     final ok = await DartBridgeModelRegistry.instance.refresh(
-      includeRemoteCatalog: true,
-      pruneOrphans: false,
+      rescanLocal: rescanLocal,
+      includeRemoteCatalog: includeRemoteCatalog,
+      pruneOrphans: pruneOrphans,
     );
     if (!ok) {
       logger.warning('rac_model_registry_refresh_proto reported failure');
@@ -196,7 +210,8 @@ class RunAnywhereModels {
     required String name,
     required List<ModelFileDescriptor> files,
     required InferenceFramework framework,
-    ModelCategory modality = ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    // Mirrors Swift RunAnywhere+Storage.swift:135 (`modality: ModelCategory = .language`).
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
     int? contextLength,
     bool supportsThinking = false,
@@ -254,7 +269,7 @@ class RunAnywhereModels {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    await RunAnywhere.ensureServicesReady();
+    await DartBridge.ensureServicesReady();
     switch (model.category) {
       case ModelCategory.MODEL_CATEGORY_LANGUAGE:
         return RunAnywhereLLM.shared.load(model.id);

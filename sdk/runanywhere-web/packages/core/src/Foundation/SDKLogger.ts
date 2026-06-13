@@ -15,9 +15,49 @@
 // includeSourceLocation / includeDeviceMetadata); the console logger only acts
 // on the three fields it supported before and ignores the rest.
 import { LogLevel, type LoggingConfiguration } from '@runanywhere/proto-ts/logging';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 
 export { LogLevel };
 export type { LoggingConfiguration };
+
+/**
+ * Environment presets — Swift parity: `RALoggingConfiguration.development /
+ * .staging / .production` (SDKLogger.swift:41-66). Dev logs at debug with
+ * local logging on; production logs warnings only with local logging off.
+ */
+export function loggingConfigurationForEnvironment(
+  environment: SDKEnvironment,
+): LoggingConfiguration {
+  switch (environment) {
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+      return {
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_INFO,
+        includeSourceLocation: false,
+        includeDeviceMetadata: true,
+        enableRemoteLogging: false,
+        enableSentryLogging: false,
+      };
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return {
+        enableLocalLogging: false,
+        minLogLevel: LogLevel.LOG_LEVEL_WARNING,
+        includeSourceLocation: false,
+        includeDeviceMetadata: true,
+        enableRemoteLogging: false,
+        enableSentryLogging: false,
+      };
+    default:
+      return {
+        enableLocalLogging: true,
+        minLogLevel: LogLevel.LOG_LEVEL_DEBUG,
+        includeSourceLocation: false,
+        includeDeviceMetadata: false,
+        enableRemoteLogging: false,
+        enableSentryLogging: true,
+      };
+  }
+}
 
 /** Map LogLevel to RACommons rac_log_level_t values. Values are already
  * C-ABI-aligned, so this is the identity mapping. */
@@ -33,10 +73,14 @@ export const LOG_LEVEL_TO_RAC: Record<LogLevel, number> = {
 
 /**
  * Represents a destination that can receive log entries.
- * Mirrors Swift `LogDestination` protocol.
+ * Mirrors Swift `LogDestination` protocol (SDKLogger.swift:28-32).
  */
 export interface LogDestination {
   readonly identifier: string;
+  /** Whether the destination can currently accept entries (e.g. a remote
+   * sink that is not configured yet). Treated as `true` when omitted —
+   * mirrors Swift's `isAvailable` gate in the destination fan-out. */
+  readonly isAvailable?: boolean;
   write(level: LogLevel, category: string, message: string): void;
   flush(): void;
 }
@@ -44,6 +88,7 @@ export interface LogDestination {
 export class SDKLogger {
   private static _level: LogLevel = LogLevel.LOG_LEVEL_INFO;
   private static _enabled = true;
+  // Reserved configuration surface (proto LoggingConfiguration parity); the Web SDK ships no Sentry destination by design.
   private static _sentryEnabled = false;
   private static _extraDestinations: Map<string, LogDestination> = new Map();
 
@@ -80,6 +125,14 @@ export class SDKLogger {
     SDKLogger._sentryEnabled = config.enableSentryLogging;
   }
 
+  /**
+   * Apply configuration based on SDK environment. Mirrors Swift
+   * `Logging.shared.applyEnvironmentConfiguration(_:)` (SDKLogger.swift:300).
+   */
+  static applyEnvironmentConfiguration(environment: SDKEnvironment): void {
+    SDKLogger.configure(loggingConfigurationForEnvironment(environment));
+  }
+
   /** Enable or disable local console output. Mirrors Swift `Logging.shared.setLocalLoggingEnabled(_:)`. */
   static setLocalLoggingEnabled(enabled: boolean): void {
     SDKLogger._enabled = enabled;
@@ -109,10 +162,6 @@ export class SDKLogger {
     }
   }
 
-  trace(message: string): void {
-    this.log(LogLevel.LOG_LEVEL_TRACE, message);
-  }
-
   debug(message: string): void {
     this.log(LogLevel.LOG_LEVEL_DEBUG, message);
   }
@@ -127,6 +176,19 @@ export class SDKLogger {
 
   error(message: string): void {
     this.log(LogLevel.LOG_LEVEL_ERROR, message);
+  }
+
+  /**
+   * Log at FATAL severity. Mirrors Swift `SDKLogger.fault(_:metadata:)`
+   * (SDKLogger.swift:337-339), which routes to `RALogLevel.fatal`. Metadata is
+   * folded into the line Swift-console-style (` | key=value, key=value`).
+   */
+  fault(message: string, metadata?: Record<string, unknown>): void {
+    const entries = metadata ? Object.entries(metadata) : [];
+    const suffix = entries.length > 0
+      ? ` | ${entries.map(([key, value]) => `${key}=${String(value)}`).join(', ')}`
+      : '';
+    this.log(LogLevel.LOG_LEVEL_FATAL, `${message}${suffix}`);
   }
 
   private log(level: LogLevel, message: string): void {
@@ -160,6 +222,9 @@ export class SDKLogger {
     }
 
     for (const destination of SDKLogger._extraDestinations.values()) {
+      // Swift parity (SDKLogger.swift:183): skip unavailable destinations;
+      // an omitted isAvailable defaults to true.
+      if (destination.isAvailable === false) continue;
       try {
         destination.write(level, this.category, message);
       } catch { /* Swallow destination errors so logging never crashes the SDK. */ }

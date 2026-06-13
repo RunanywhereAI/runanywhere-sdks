@@ -36,7 +36,7 @@ object CppBridgeAuth {
      * rac_auth_clear fall back to in-memory-only and tokens are lost across
      * process restarts. Idempotent.
      *
-     * Called from [com.runanywhere.sdk.foundation.bridge.CppBridge.initialize]
+     * Called from [com.runanywhere.sdk.public.RunAnywhere]'s `performCoreInit`
      * during Phase 1.
      */
     fun initialize() {

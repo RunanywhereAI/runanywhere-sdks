@@ -1,17 +1,28 @@
 /**
  * Documents Tab — RAG workflow through the public core facade.
  *
- * The view owns browser file selection/reading and rendering. Core RAG owns
- * session creation, ingestion, retrieval, and answer generation.
+ * Mirrors iOS `RAGViewModel` (RAGViewModel.swift:80-115): the user picks an
+ * embedding model and an LLM model from the registry, the pipeline is
+ * created via `RunAnywhere.ragCreatePipeline(embeddingModelId, llmModelId)`,
+ * and documents are ingested through `ragIngest`. The view owns browser
+ * file selection/reading and rendering only.
+ *
+ * PDF ingestion is iOS-only for now: iOS extracts text via PDFKit
+ * (DocumentService.extractText), a platform framework with no dependency-free
+ * web equivalent — .txt/.md/.json are supported here instead.
+ *
+ * The citations/retrievedChunks display is a deliberate web-ahead addition.
  */
 
 import type { TabLifecycle } from '../app';
 import {
+  ModelCategory,
   RunAnywhere,
+  ragQueryOptionsWithQuestion,
+  type ModelInfo,
   type RAGDocumentSummary,
   type RAGSearchResult,
 } from '@runanywhere/web';
-import { ensureCatalogRegistered } from '../components/model-selection';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -19,6 +30,13 @@ const TOP_K = 3;
 
 let container: HTMLElement;
 let isBusy = false;
+
+/** User-selected pipeline models (iOS parity: DocumentRAGView.swift:79-91
+ * embedding + LLM model picker rows). */
+let selectedEmbeddingModelId = '';
+let selectedLlmModelId = '';
+/** Model-id pair the current native pipeline was created with. */
+let createdPipelineKey: string | null = null;
 
 // ---------------------------------------------------------------------------
 // Init
@@ -29,7 +47,6 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   // Register the model catalog so the SDK's model registry has entries for
   // the embedding and LLM models used by RAG. Other tabs trigger this
   // implicitly via their toolbar pickers; Docs has its own UI.
-  ensureCatalogRegistered();
   container.innerHTML = `
     <div class="toolbar">
       <div class="toolbar-title">Documents</div>
@@ -37,11 +54,25 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
     </div>
     <div class="scroll-area">
       <div class="docs-section">
+        <h3>Pipeline models</h3>
+        <p class="text-secondary">Choose an embedding model and an LLM model from the registry; the RAG pipeline is created with this pair.</p>
+        <div class="docs-actions" style="display:flex; gap:12px; flex-wrap:wrap;">
+          <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
+            Embedding model
+            <select id="docs-embedding-model" class="chat-input" style="min-width:220px"></select>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
+            LLM model
+            <select id="docs-llm-model" class="chat-input" style="min-width:220px"></select>
+          </label>
+        </div>
+      </div>
+      <div class="docs-section">
         <h3>Indexed documents</h3>
-        <p class="text-secondary">Upload <code>.txt</code> or <code>.md</code> files to index through the core RAG facade.
+        <p class="text-secondary">Upload <code>.txt</code>, <code>.md</code>, or <code>.json</code> files to index through the core RAG facade.
         A native RAG provider or WASM RAG session is required.</p>
         <div class="docs-actions">
-          <input type="file" id="docs-file" accept=".txt,.md" multiple style="display:none" />
+          <input type="file" id="docs-file" accept=".txt,.md,.json" multiple style="display:none" />
           <button class="btn btn-primary" id="docs-upload-btn">Upload</button>
           <button class="btn btn-secondary" id="docs-clear-btn">Clear all</button>
         </div>
@@ -58,6 +89,7 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
     </div>
   `;
 
+  populateModelPickers();
   void renderDocList();
 
   container.querySelector('#docs-upload-btn')!.addEventListener('click', () => {
@@ -74,6 +106,52 @@ export function initDocumentsTab(el: HTMLElement): TabLifecycle {
   });
 
   return {};
+}
+
+// ---------------------------------------------------------------------------
+// Model pickers
+// ---------------------------------------------------------------------------
+
+function registryModelsForCategory(category: ModelCategory): ModelInfo[] {
+  try {
+    const list = RunAnywhere.listModels();
+    return (list?.models ?? []).filter((model) => model.category === category);
+  } catch {
+    return [];
+  }
+}
+
+function populateModelPickers(): void {
+  const embeddingSelect = container.querySelector<HTMLSelectElement>('#docs-embedding-model')!;
+  const llmSelect = container.querySelector<HTMLSelectElement>('#docs-llm-model')!;
+
+  const embeddingModels = registryModelsForCategory(ModelCategory.MODEL_CATEGORY_EMBEDDING);
+  const llmModels = registryModelsForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
+
+  fillSelect(embeddingSelect, embeddingModels, 'No embedding models registered');
+  fillSelect(llmSelect, llmModels, 'No LLM models registered');
+
+  selectedEmbeddingModelId = embeddingSelect.value;
+  selectedLlmModelId = llmSelect.value;
+
+  embeddingSelect.addEventListener('change', () => {
+    selectedEmbeddingModelId = embeddingSelect.value;
+  });
+  llmSelect.addEventListener('change', () => {
+    selectedLlmModelId = llmSelect.value;
+  });
+}
+
+function fillSelect(select: HTMLSelectElement, models: ModelInfo[], emptyLabel: string): void {
+  if (models.length === 0) {
+    select.innerHTML = `<option value="">${escapeHtml(emptyLabel)}</option>`;
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  select.innerHTML = models
+    .map((model) => `<option value="${escapeHtml(model.id)}">${escapeHtml(model.name || model.id)}</option>`)
+    .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +183,9 @@ async function onFilePicked(e: Event): Promise<void> {
 
 async function ingestFile(file: File): Promise<void> {
   setStatus(`Reading ${file.name}...`);
+  // .txt/.md/.json are all read as plain text and ingested as-is — same as
+  // iOS, where JSON documents flow through text extraction before ragIngest
+  // (DocumentRAGView.swift:50 allows [.pdf, .json]).
   const text = await file.text();
   const docId = createDocumentId();
 
@@ -177,7 +258,10 @@ async function askQuestion(): Promise<void> {
   isBusy = true;
   setAnswer('Searching...');
   try {
-    const result = await RunAnywhere.ragQuery(question, {
+    // Full-options overload (Swift parity: `ragQuery(_ options:)` with
+    // RARAGQueryOptions.defaults(question:) — RAGViewModel.swift:137-144).
+    const result = await RunAnywhere.ragQuery({
+      ...ragQueryOptionsWithQuestion(question),
       retrievalTopK: TOP_K,
       maxTokens: 512,
       temperature: 0.4,
@@ -279,34 +363,66 @@ function setAnswer(msg: string): void {
   el.innerHTML = msg;
 }
 
-const RAG_EMBEDDING_MODEL_ID = 'all-minilm-l6-v2';
-const RAG_LLM_MODEL_ID = 'smollm2-360m-q8_0';
-
+/**
+ * Create the RAG pipeline for the user-selected model pair (iOS parity:
+ * RAGViewModel.swift:100-103 `ragCreatePipeline(embeddingModel:llmModel:)`).
+ * Recreates the native session whenever the selection changes.
+ */
 async function ensureRAGReady(): Promise<boolean> {
+  if (!selectedEmbeddingModelId || !selectedLlmModelId) {
+    setStatus('Select an embedding model and an LLM model first.');
+    return false;
+  }
+  const key = `${selectedEmbeddingModelId}|${selectedLlmModelId}`;
+  if (createdPipelineKey === key) return true;
   try {
-    const availability = await RunAnywhere.rag.ensureReady({
-      embeddingModelId: RAG_EMBEDDING_MODEL_ID,
-      llmModelId: RAG_LLM_MODEL_ID,
-    });
-    if (!availability.available) {
-      setStatus(availability.reason);
-      return false;
-    }
+    setStatus('Creating RAG pipeline...');
+    await RunAnywhere.ragCreatePipeline(selectedEmbeddingModelId, selectedLlmModelId);
+    createdPipelineKey = key;
+    setStatus('RAG pipeline ready.');
     return true;
   } catch (err) {
+    createdPipelineKey = null;
     setStatus(`RAG init failed: ${formatError(err)}`);
     return false;
   }
 }
 
+/**
+ * Split `<think>...</think>` reasoning out of the answer into a collapsible
+ * section (iOS parity: RAGViewModel.swift:145-149 thinkingContent +
+ * DocumentRAGView.swift:473-543 thinkingSection).
+ */
+function splitThinking(text: string): { answer: string; thinking: string | null } {
+  const match = /<think>([\s\S]*?)<\/think>/i.exec(text);
+  if (!match) {
+    // Tolerate an unterminated opening tag (model cut off mid-thought).
+    const open = /<think>([\s\S]*)$/i.exec(text);
+    if (open) {
+      return { answer: text.slice(0, open.index).trim(), thinking: open[1].trim() || null };
+    }
+    return { answer: text, thinking: null };
+  }
+  const thinking = match[1].trim();
+  const answer = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim();
+  return { answer, thinking: thinking || null };
+}
+
 function formatAnswer(text: string, sources: RAGSearchResult[]): string {
+  const { answer, thinking } = splitThinking(text);
+  const thinkingHtml = thinking
+    ? `<details class="docs-thinking" style="margin-bottom:8px;">
+        <summary style="cursor:pointer; font-size:0.8rem; opacity:0.7;">Reasoning</summary>
+        <pre style="white-space:pre-wrap; font-size:0.8rem; opacity:0.8;">${escapeHtml(thinking)}</pre>
+      </details>`
+    : '';
   const sourcesHtml = sources.map((source, i) => `
     <div class="docs-source">
       <strong>Source ${i + 1}: ${escapeHtml(source.sourceDocument ?? 'Document')}</strong>
       <pre>${escapeHtml(source.text.slice(0, 400))}${source.text.length > 400 ? '...' : ''}</pre>
     </div>
   `).join('');
-  return `<div class="docs-answer-text">${escapeHtml(text)}</div><div class="docs-sources">${sourcesHtml}</div>`;
+  return `${thinkingHtml}<div class="docs-answer-text">${escapeHtml(answer)}</div><div class="docs-sources">${sourcesHtml}</div>`;
 }
 
 function createDocumentId(): string {

@@ -2,7 +2,7 @@
  * Type Exports
  *
  * Reference: Swift sample app structure
- * Tabs: Chat, STT, TTS, Voice (VoiceAssistant), Settings
+ * Tabs: Chat, Vision, Voice, More, Settings
  */
 
 // Chat types
@@ -18,24 +18,16 @@ export * from './voice';
 export * from './settings';
 
 // Navigation types - matching Swift sample app (ContentView.swift)
-// Tab 0: Chat (LLM)
-// Tab 1: Speech-to-Text
-// Tab 2: Text-to-Speech
-// Tab 3: Voice Assistant (STT + LLM + TTS)
-// Tab 4: RAG (Retrieval-Augmented Generation)
-// Tab 5: Vision (VLM hub; image generation is Swift sample app only)
-// Tab 6: Solutions
-// Tab 7: Validation evidence harness
-// Tab 8: Settings
+// Tab 0: Chat
+// Tab 1: Vision
+// Tab 2: Voice
+// Tab 3: More
+// Tab 4: Settings
 export type RootTabParamList = {
   Chat: undefined;
-  STT: undefined;
-  TTS: undefined;
-  Voice: undefined;
-  RAG: undefined;
   Vision: undefined;
-  Solutions: undefined;
-  Validation: undefined;
+  Voice: undefined;
+  More: undefined;
   Settings: undefined;
 };
 
@@ -43,6 +35,25 @@ export type RootTabParamList = {
 export type VisionStackParamList = {
   VisionHub: undefined;
   VLM: undefined;
+};
+
+export type MoreStackParamList = {
+  MoreHome: undefined;
+  STT: undefined;
+  TTS: undefined;
+  RAG: undefined;
+  VAD: undefined;
+  Storage: undefined;
+  Solutions: undefined;
+};
+
+/**
+ * Settings tab stack: settings home -> Benchmarks
+ * (mirrors iOS CombinedSettingsView -> BenchmarkDashboardView)
+ */
+export type SettingsStackParamList = {
+  SettingsHome: undefined;
+  Benchmarks: undefined;
 };
 
 // Common utility types

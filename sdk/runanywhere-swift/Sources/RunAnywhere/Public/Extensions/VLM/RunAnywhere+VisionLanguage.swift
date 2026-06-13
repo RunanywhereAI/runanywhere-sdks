@@ -43,16 +43,17 @@ public extension RunAnywhere {
         return try await CppBridge.VLM.shared.process(image: image, options: options)
     }
 
-    /// Stream generated-proto VLM events from C++.
+    /// Stream typed VLM events from C++.
     ///
-    /// Phase 6j fixed the handle-type-mismatch root cause (`rac_vlm_component_t*`
-    /// vs `rac_vlm_service_t*` cast in `rac_vlm_process_stream_proto`), so real
-    /// per-token streaming works on both simulator and physical device. The
-    /// synthesized single-event workaround has been removed.
+    /// Canonical cross-SDK shape: yields generated `RAVLMStreamEvent`s
+    /// (STARTED → TOKEN* → exactly one terminal COMPLETED/ERROR; COMPLETED
+    /// carries the full `RAVLMResult` with metrics). The prompt travels in
+    /// `options.prompt`. Backed by `rac_vlm_stream_proto`, the same typed
+    /// ABI Flutter and React Native consume.
     static func processImageStream(
         _ image: RAVLMImage,
         options: RAVLMGenerationOptions
-    ) async throws -> AsyncStream<RASDKEvent> {
+    ) async throws -> AsyncStream<RAVLMStreamEvent> {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
@@ -63,6 +64,18 @@ public extension RunAnywhere {
         }
 
         return try await CppBridge.VLM.shared.processStream(image: image, options: options)
+    }
+
+    /// Ergonomic overload mirroring React Native: the prompt is applied onto
+    /// `options.prompt` before streaming.
+    static func processImageStream(
+        _ image: RAVLMImage,
+        prompt: String,
+        options: RAVLMGenerationOptions = .defaults()
+    ) async throws -> AsyncStream<RAVLMStreamEvent> {
+        var effectiveOptions = options
+        effectiveOptions.prompt = prompt
+        return try await processImageStream(image, options: effectiveOptions)
     }
 
     /// Returns true if a VLM model is loaded in the lifecycle under either

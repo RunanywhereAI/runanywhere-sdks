@@ -17,8 +17,8 @@
 #include <stddef.h>
 
 #include "rac_error.h"
-#include "rac_types.h"
 #include "rac_model_types.h"
+#include "rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,14 +39,14 @@ extern "C" {
  * "/var/mobile/Containers/Data/Application/.../Documents")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_set_base_dir(const char* base_dir);
+RAC_API rac_result_t rac_model_paths_set_base_dir(const char *base_dir);
 
 /**
  * @brief Get the configured base directory.
  *
  * @return Base directory path, or NULL if not configured
  */
-RAC_API const char* rac_model_paths_get_base_dir(void);
+RAC_API const char *rac_model_paths_get_base_dir(void);
 
 // =============================================================================
 // BASE DIRECTORIES - Mirrors ModelPathUtils base directory methods
@@ -60,7 +60,8 @@ RAC_API const char* rac_model_paths_get_base_dir(void);
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_base_directory(char *out_path,
+                                                        size_t path_size);
 
 /**
  * @brief Get the models directory.
@@ -72,7 +73,8 @@ RAC_API rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t p
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_models_directory(char *out_path,
+                                                          size_t path_size);
 
 // =============================================================================
 // FRAMEWORK-SPECIFIC PATHS - Mirrors ModelPathUtils framework methods
@@ -89,8 +91,8 @@ RAC_API rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_framework_directory(rac_inference_framework_t framework,
-                                                             char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_framework_directory(
+    rac_inference_framework_t framework, char *out_path, size_t path_size);
 
 /**
  * @brief Get the folder for a specific model.
@@ -104,9 +106,9 @@ RAC_API rac_result_t rac_model_paths_get_framework_directory(rac_inference_frame
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_model_folder(const char* model_id,
-                                                      rac_inference_framework_t framework,
-                                                      char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_model_folder(
+    const char *model_id, rac_inference_framework_t framework, char *out_path,
+    size_t path_size);
 
 // =============================================================================
 // MODEL FILE PATHS - Mirrors ModelPathUtils file path methods
@@ -116,7 +118,8 @@ RAC_API rac_result_t rac_model_paths_get_model_folder(const char* model_id,
  * @brief Get the full path to a model file.
  * Mirrors Swift's ModelPathUtils.getModelFilePath(modelId:framework:format:).
  *
- * Returns: `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/{modelId}.{format}`
+ * Returns:
+ * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/{modelId}.{format}`
  *
  * @param model_id Model identifier
  * @param framework Inference framework
@@ -125,14 +128,14 @@ RAC_API rac_result_t rac_model_paths_get_model_folder(const char* model_id,
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
-                                                         rac_inference_framework_t framework,
-                                                         rac_model_format_t format, char* out_path,
-                                                         size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_model_file_path(
+    const char *model_id, rac_inference_framework_t framework,
+    rac_model_format_t format, char *out_path, size_t path_size);
 
 /**
  * @brief Get the expected model path for a model.
- * Mirrors Swift's ModelPathUtils.getExpectedModelPath(modelId:framework:format:).
+ * Mirrors Swift's
+ * ModelPathUtils.getExpectedModelPath(modelId:framework:format:).
  *
  * For directory-based frameworks (e.g., ONNX), returns the model folder.
  * For single-file frameworks (e.g., LlamaCpp), returns the model file path.
@@ -144,10 +147,9 @@ RAC_API rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_expected_model_path(const char* model_id,
-                                                             rac_inference_framework_t framework,
-                                                             rac_model_format_t format,
-                                                             char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_expected_model_path(
+    const char *model_id, rac_inference_framework_t framework,
+    rac_model_format_t format, char *out_path, size_t path_size);
 
 /**
  * @brief Get the model path from model info.
@@ -158,8 +160,8 @@ RAC_API rac_result_t rac_model_paths_get_expected_model_path(const char* model_i
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* model_info,
-                                                    char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_model_path(
+    const rac_model_info_t *model_info, char *out_path, size_t path_size);
 
 // =============================================================================
 // OTHER DIRECTORIES - Mirrors ModelPathUtils other directory methods
@@ -175,7 +177,8 @@ RAC_API rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* mode
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_cache_directory(char *out_path,
+                                                         size_t path_size);
 
 /**
  * @brief Get the temporary files directory.
@@ -187,7 +190,8 @@ RAC_API rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t 
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_temp_directory(char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_temp_directory(char *out_path,
+                                                        size_t path_size);
 
 /**
  * @brief Get the downloads directory.
@@ -199,7 +203,8 @@ RAC_API rac_result_t rac_model_paths_get_temp_directory(char* out_path, size_t p
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_downloads_directory(char* out_path, size_t path_size);
+RAC_API rac_result_t rac_model_paths_get_downloads_directory(char *out_path,
+                                                             size_t path_size);
 
 // =============================================================================
 // PATH ANALYSIS - Mirrors ModelPathUtils analysis methods
@@ -210,11 +215,13 @@ RAC_API rac_result_t rac_model_paths_get_downloads_directory(char* out_path, siz
  * Mirrors Swift's ModelPathUtils.extractModelId(from:).
  *
  * @param path File path
- * @param out_model_id Output buffer for model ID (can be NULL to just check if valid)
+ * @param out_model_id Output buffer for model ID (can be NULL to just check if
+ * valid)
  * @param model_id_size Size of output buffer
  * @return RAC_SUCCESS if model ID found, RAC_ERROR_NOT_FOUND otherwise
  */
-RAC_API rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_id,
+RAC_API rac_result_t rac_model_paths_extract_model_id(const char *path,
+                                                      char *out_model_id,
                                                       size_t model_id_size);
 
 /**
@@ -225,8 +232,8 @@ RAC_API rac_result_t rac_model_paths_extract_model_id(const char* path, char* ou
  * @param out_framework Output: The framework if found
  * @return RAC_SUCCESS if framework found, RAC_ERROR_NOT_FOUND otherwise
  */
-RAC_API rac_result_t rac_model_paths_extract_framework(const char* path,
-                                                       rac_inference_framework_t* out_framework);
+RAC_API rac_result_t rac_model_paths_extract_framework(
+    const char *path, rac_inference_framework_t *out_framework);
 
 /**
  * @brief Check if a path is within the models directory.
@@ -235,7 +242,7 @@ RAC_API rac_result_t rac_model_paths_extract_framework(const char* path,
  * @param path File path to check
  * @return RAC_TRUE if path is within models directory, RAC_FALSE otherwise
  */
-RAC_API rac_bool_t rac_model_paths_is_model_path(const char* path);
+RAC_API rac_bool_t rac_model_paths_is_model_path(const char *path);
 
 // =============================================================================
 // MODEL FILE ROLE INFERENCE
@@ -258,8 +265,9 @@ RAC_API rac_bool_t rac_model_paths_is_model_path(const char* path);
  *        `MODEL_FILE_ROLE_PRIMARY_MODEL` when nothing matches.
  * @return RAC_SUCCESS, or RAC_ERROR_NULL_POINTER for NULL arguments.
  */
-RAC_API rac_result_t rac_infer_model_file_role(const char* filename, int32_t modality_proto,
-                                               int32_t* out_role_proto);
+RAC_API rac_result_t rac_infer_model_file_role(const char *filename,
+                                               int32_t modality_proto,
+                                               int32_t *out_role_proto);
 
 // =============================================================================
 // PATH UTILITIES
@@ -273,7 +281,22 @@ RAC_API rac_result_t rac_infer_model_file_role(const char* filename, int32_t mod
  * @param framework Inference framework
  * @return Raw value string (e.g., "LlamaCpp", "ONNX")
  */
-RAC_API const char* rac_framework_raw_value(rac_inference_framework_t framework);
+RAC_API const char *
+rac_framework_raw_value(rac_inference_framework_t framework);
+
+/**
+ * @brief Filename of the durable per-model manifest sidecar.
+ *
+ * Written by commons into
+ * `{base_dir}/RunAnywhere/Models/{framework}/{modelId}/` when a download
+ * completes (serialized `runanywhere.v1.ModelInfo` bytes with volatile absolute
+ * paths stripped) and read back at cold launch to restore registry entries that
+ * no catalog re-seeded. SDK/UI code listing model folder contents should skip
+ * this file; artifact resolution already does.
+ *
+ * @return The constant sidecar filename (currently ".rac-manifest.binpb")
+ */
+RAC_API const char *rac_model_folder_manifest_filename(void);
 
 #ifdef __cplusplus
 }

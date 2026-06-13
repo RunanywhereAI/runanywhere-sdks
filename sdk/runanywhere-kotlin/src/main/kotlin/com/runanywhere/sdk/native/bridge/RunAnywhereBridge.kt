@@ -412,13 +412,18 @@ object RunAnywhereBridge {
         optionsProto: ByteArray,
     ): ByteArray?
 
+    /**
+     * Typed stream ABI (`rac_vlm_stream_proto`): serialized
+     * `VLMGenerationRequest` in, serialized `VLMStreamEvent` per listener
+     * callback (STARTED → TOKEN* → exactly one terminal COMPLETED/ERROR).
+     * Lifecycle-owned model — no handle, no aggregate result buffer.
+     * Returns the `rac_result_t` status code.
+     */
     @JvmStatic
-    external fun racVlmProcessStreamProto(
-        handle: Long,
-        imageProto: ByteArray,
-        optionsProto: ByteArray,
+    external fun racVlmStreamProto(
+        requestProto: ByteArray,
         listener: NativeProtoProgressListener?,
-    ): ByteArray?
+    ): Int
 
     @JvmStatic
     external fun racVlmCancelProto(handle: Long): Int
@@ -546,6 +551,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racRegisterModelFromUrlProto(requestBytes: ByteArray): ByteArray?
 
+    external fun racRegisterMultiFileModelProto(requestBytes: ByteArray): ByteArray?
+
     /**
      * Infer a ModelFormat from a portable URL/file-path string.
      *
@@ -567,6 +574,17 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racArtifactInferFromUrlProto(requestBytes: ByteArray): ByteArray?
+
+    /**
+     * Build a fully-populated ModelInfo through the canonical commons factory.
+     *
+     * Input is serialized runanywhere.v1.ModelInfoMakeRequest bytes; output is
+     * serialized runanywhere.v1.ModelInfo bytes. Mirrors Swift's
+     * `rac_model_info_make_proto` path so Kotlin does not duplicate id/name,
+     * artifact, availability, or defaulting logic.
+     */
+    @JvmStatic
+    external fun racModelInfoMakeProto(requestBytes: ByteArray): ByteArray?
 
     // MODEL LIFECYCLE PROTO ABI (rac_model_lifecycle.h)
 
@@ -1246,6 +1264,8 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
+    @JvmStatic external fun racLoraAdapterImportProto(requestProto: ByteArray): ByteArray?
+
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
     //
     // External thunks for the plugin loader.
@@ -1339,17 +1359,16 @@ object RunAnywhereBridge {
         followRedirects: Boolean,
     ): NativeHttpResponse?
 
-    // CANONICAL DEFAULT HEADERS (Swift parity)
+    // CANONICAL HTTP POLICY HELPERS (Swift parity)
     //
-    // Thunk wrapping commons' shared HTTP policy helper. Used by
+    // Thunks wrapping commons' shared HTTP policy helpers. Used by
     // `HTTPClientAdapter` to converge on the same canonical SDK header
-    // list Swift emits, instead of inlining the policy on the Kotlin
-    // side.
+    // list and structured API-error parsing Swift consumes, instead of
+    // inlining the policy on the Kotlin side.
     //
-    // Upsert and structured error parsing are implemented Kotlin-side in
-    // `HTTPClientAdapter.jvmAndroid.kt` — commons does not expose an
-    // upsert-mode HTTP variant, and `rac_api_error_from_response` is
-    // internal-only (non-RAC_API, not exported in `RACommons.exports`).
+    // Upsert is implemented Kotlin-side in `HTTPClientAdapter.kt` —
+    // commons does not expose an upsert-mode HTTP variant through the
+    // flat JNI request signature.
 
     /**
      * Wrapper for `rac_http_default_headers`. Returns commons' canonical
@@ -1370,6 +1389,20 @@ object RunAnywhereBridge {
      * JNI marshalling path); callers fall back to inlined headers.
      */
     @JvmStatic external fun racHttpDefaultHeaders(): Array<String>?
+
+    /**
+     * Wrapper for `rac_api_error_from_response` — the commons parser
+     * Swift's `HTTPClientAdapter.mapAPIError` consumes for structured
+     * 4xx/5xx backend error bodies. Returns String[3] =
+     * `[message, code, request_url]` (elements may be null when the body
+     * carried no such field), or null when commons could not parse the
+     * response; callers fall back to a generic `"HTTP {status}"` message.
+     */
+    @JvmStatic external fun racApiErrorFromResponse(
+        statusCode: Int,
+        body: String,
+        url: String,
+    ): Array<String?>?
 
     // AUTH MANAGER (rac_auth_manager.h)
     //
@@ -1443,17 +1476,6 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racStructuredOutputSchemaToJsonProto(schemaProto: ByteArray): ByteArray?
-
-    /**
-     * Stream structured generation. Emits serialized `StructuredOutputStreamEvent`
-     * payloads through [listener]. Returns `RAC_SUCCESS` when the generation
-     * transport completed successfully.
-     */
-    @JvmStatic
-    external fun racStructuredOutputGenerateStreamProto(
-        requestProto: ByteArray,
-        listener: NativeProtoProgressListener?,
-    ): Int
 
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h)
     //
@@ -1563,8 +1585,6 @@ object RunAnywhereBridge {
     /** Generate structured output (JSON-schema constrained) given serialized
      *  StructuredOutputRequest bytes. Returns serialized StructuredOutputResult bytes.
      *  Handle is reserved for forward compatibility — current C ABI is handle-less. */
-    @JvmStatic external fun racStructuredOutputGenerateProto(handle: Long, req: ByteArray): ByteArray?
-
     // SDK STATE ACCESSORS (Swift-alignment)
     //
     // Mirrors Swift's CppBridge+State.swift. Reads the global SDK state
@@ -1634,6 +1654,14 @@ object RunAnywhereBridge {
      * `ModelCategory.value`; returns a `ModelFileRole.value`.
      */
     @JvmStatic external fun racInferModelFileRole(filename: String, modalityProto: Int): Int
+
+    /**
+     * Derive the canonical model id from a download URL. Delegates to commons'
+     * `rac_model_id_from_url` (the same derivation Swift's
+     * `generatedModelID(from:name:)` calls). Null on failure or when the URL
+     * yields no usable id.
+     */
+    @JvmStatic external fun racModelIdFromUrl(url: String): String?
 
     // INFERENCE FRAMEWORK display / analytics / raw tables
     //

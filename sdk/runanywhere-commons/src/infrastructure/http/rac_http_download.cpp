@@ -555,6 +555,25 @@ rac_http_download_execute(const rac_http_download_request_t* req,
             }
         }
     }
+    // Snapshot the 416 Content-Range total ("bytes */<total>") so the gates
+    // below can recognize the already-complete case: a resume offset equal to
+    // the full payload size means every byte is already on disk.
+    int64_t content_range_total = -1;
+    if (rc == RAC_SUCCESS && resp_meta.headers != nullptr) {
+        for (size_t i = 0; i < resp_meta.header_count; ++i) {
+            const auto& kv = resp_meta.headers[i];
+            if (kv.name == nullptr || kv.value == nullptr) {
+                continue;
+            }
+            if (iequals(kv.name, "Content-Range")) {
+                const char* slash = strchr(kv.value, '/');
+                if (slash != nullptr && slash[1] != '\0' && slash[1] != '*') {
+                    content_range_total = strtoll(slash + 1, nullptr, 10);
+                }
+                break;
+            }
+        }
+    }
     rac_http_response_free(&resp_meta);
 
     out.flush();
@@ -600,10 +619,57 @@ rac_http_download_execute(const rac_http_download_request_t* req,
     //      expected. The 49-byte HTML body from a 404 attached to a fresh
     //      download would trip this guard during the next finalize.
     const bool status_is_416 = http_status == 416;
+
+    // ---- 416 already-complete short-circuit ------------------------
+    //
+    // A resume whose offset equals the server-reported total payload size
+    // (Content-Range: bytes */<total> on the 416) means the file on disk IS
+    // the complete artifact — typical after a prior attempt fetched every
+    // byte but failed before finalize (size-guard refusal, crash, kill).
+    // Treat it as success with zero new bytes: roll back any error-stub
+    // bytes the server attached, restore the hash state from the on-disk
+    // payload, and fall through to checksum verification + completion.
+    bool complete_via_416 = false;
+    if (rc == RAC_SUCCESS && status_is_416 && effective_resume_from > 0 &&
+        content_range_total > 0 &&
+        static_cast<uint64_t>(content_range_total) == effective_resume_from) {
+        if (ctx.bytes_written > 0) {
+            std::error_code trunc_ec;
+            fs::resize_file(dest, static_cast<uintmax_t>(effective_resume_from), trunc_ec);
+            if (trunc_ec) {
+                RAC_LOG_ERROR(kTag, "416-complete rollback truncate failed: %s",
+                              trunc_ec.message().c_str());
+                return RAC_HTTP_DL_FILE_ERROR;
+            }
+            ctx.bytes_written = 0;
+        }
+        if (do_hash) {
+            // The running digest covers the rehydrated prefix plus the
+            // discarded stub body; recompute it over the actual payload.
+            sha256_init(&hasher);
+            std::ifstream rehash(dest, std::ios::binary);
+            std::vector<uint8_t> hbuf(static_cast<size_t>(64) * 1024);
+            while (rehash.good()) {
+                rehash.read(reinterpret_cast<char*>(hbuf.data()),
+                            static_cast<std::streamsize>(hbuf.size()));
+                std::streamsize n = rehash.gcount();
+                if (n <= 0)
+                    break;
+                sha256_update(&hasher, hbuf.data(), static_cast<size_t>(n));
+            }
+        }
+        RAC_LOG_INFO(kTag,
+                     "HTTP 416 with Content-Range total %lld == resume offset — file already "
+                     "complete, no bytes to fetch",
+                     static_cast<long long>(content_range_total));
+        complete_via_416 = true;
+    }
+
     const bool body_is_tiny = ctx.bytes_written < kSuspiciousResponseThreshold;
     const bool body_is_textlike_or_unknown =
         response_content_type_is_textlike || !response_content_type_present;
-    if (rc == RAC_SUCCESS && status_is_416 && body_is_tiny && body_is_textlike_or_unknown) {
+    if (!complete_via_416 && rc == RAC_SUCCESS && status_is_416 && body_is_tiny &&
+        body_is_textlike_or_unknown) {
         RAC_LOG_WARNING(
             kTag,
             "HTTP 416 returned %llu-byte %s body; rejecting write and rolling back to %llu bytes",
@@ -740,14 +806,16 @@ rac_http_download_execute(const rac_http_download_request_t* req,
         ctx.resume_prefix = 0;
     }
 
-    rac_http_download_status_t status = map_rac_error(rc, http_status);
-    if (status != RAC_HTTP_DL_OK) {
-        return status;
-    }
-    // Treat an HTTP 4xx/5xx on the wire as a server error even when
-    // the transport reports RAC_SUCCESS (status is still populated).
-    if (http_status >= 400 && http_status < 600) {
-        return RAC_HTTP_DL_SERVER_ERROR;
+    if (!complete_via_416) {
+        rac_http_download_status_t status = map_rac_error(rc, http_status);
+        if (status != RAC_HTTP_DL_OK) {
+            return status;
+        }
+        // Treat an HTTP 4xx/5xx on the wire as a server error even when
+        // the transport reports RAC_SUCCESS (status is still populated).
+        if (http_status >= 400 && http_status < 600) {
+            return RAC_HTTP_DL_SERVER_ERROR;
+        }
     }
 
     // ---- Checksum verification (final pass over the hasher) --------

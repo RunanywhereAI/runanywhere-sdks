@@ -22,12 +22,11 @@
  */
 
 #include <jni.h>
-#include <sys/stat.h>
-
-#include <string>
-#include <vector>
 
 #include <nlohmann/json.hpp>
+#include <string>
+#include <sys/stat.h>
+#include <vector>
 
 // Errors always log. The verbose INFO trace is gated to debug builds (NDEBUG is
 // defined in release) so production stays quiet.
@@ -35,12 +34,12 @@
 #include <android/log.h>
 #define STTJNI_LOG_E(...) __android_log_print(ANDROID_LOG_ERROR, "stt_router_jni", __VA_ARGS__)
 #if !defined(NDEBUG) || defined(RAC_JNI_VERBOSE)
-#define STTJNI_LOG(...)   __android_log_print(ANDROID_LOG_INFO,  "stt_router_jni", __VA_ARGS__)
+#define STTJNI_LOG(...) __android_log_print(ANDROID_LOG_INFO, "stt_router_jni", __VA_ARGS__)
 #else
-#define STTJNI_LOG(...)   ((void)0)
+#define STTJNI_LOG(...) ((void)0)
 #endif
 #else
-#define STTJNI_LOG(...)   ((void)0)
+#define STTJNI_LOG(...) ((void)0)
 #define STTJNI_LOG_E(...) ((void)0)
 #endif
 
@@ -93,22 +92,28 @@ jbyteArray bytes_to_jbyte_array(JNIEnv* env, uint8_t* src, size_t size) {
 }
 
 bool path_is_directory(const std::string& path) {
-    struct stat st {};
+    struct stat st{};
     return (::stat(path.c_str(), &st) == 0) && S_ISDIR(st.st_mode);
 }
 
 const char* framework_to_plugin_hint(rac_inference_framework_t fw) {
     switch (fw) {
-        case RAC_FRAMEWORK_SHERPA:            return "sherpa";
-        case RAC_FRAMEWORK_ONNX:              return "onnx";
+        case RAC_FRAMEWORK_SHERPA:
+            return "sherpa";
+        case RAC_FRAMEWORK_ONNX:
+            return "onnx";
         // RAC_FRAMEWORK_WHISPERKIT_COREML (retired enum value 9) intentionally
         // dropped: the whisperkit_coreml engine was removed, so no plugin hint
         // can resolve to it. Unmapped frameworks fall through to the default
         // (nullptr), letting rac_plugin_find pick by primitive/format.
-        case RAC_FRAMEWORK_FOUNDATION_MODELS: return "platform";
-        case RAC_FRAMEWORK_SYSTEM_TTS:        return "platform";
-        case RAC_FRAMEWORK_COREML:            return "platform";
-        default:                              return nullptr;
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:
+            return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:
+            return "platform";
+        case RAC_FRAMEWORK_COREML:
+            return "platform";
+        default:
+            return nullptr;
     }
 }
 
@@ -124,14 +129,13 @@ constexpr char kDefaultCloudProvider[] = "sarvam";
 // rewritten) config string; passes non-cloud hints and already-tagged configs
 // through unchanged. Malformed JSON is left untouched — the engine surfaces the
 // parse error itself.
-std::string ensure_cloud_provider(const std::string& engine_hint,
-                                  const std::string& config_json) {
+std::string ensure_cloud_provider(const std::string& engine_hint, const std::string& config_json) {
     if (engine_hint != kCloudSttEngineHint) {
         return config_json;
     }
-    nlohmann::json j = config_json.empty()
-                           ? nlohmann::json::object()
-                           : nlohmann::json::parse(config_json, nullptr, /*allow_exceptions=*/false);
+    nlohmann::json j = config_json.empty() ? nlohmann::json::object()
+                                           : nlohmann::json::parse(config_json, nullptr,
+                                                                   /*allow_exceptions=*/false);
     if (!j.is_object()) {
         return config_json;  // not an object → leave verbatim for the engine.
     }
@@ -160,9 +164,8 @@ std::string ensure_cloud_provider(const std::string& engine_hint,
 // rac_stt_hybrid_router_create_service (DRY: one implementation; the route /
 // heap-wrap / ownership live in commons). Returns a heap rac_stt_service_t* (as
 // jlong) the router owns by handle, or 0.
-jlong create_stt_service_via_registry(const std::string& engine_hint,
-                                      const char*        model_or_config,
-                                      const char*        config_json) {
+jlong create_stt_service_via_registry(const std::string& engine_hint, const char* model_or_config,
+                                      const char* config_json) {
     rac_stt_service_t* service = rac_stt_hybrid_router_create_service(
         engine_hint.empty() ? nullptr : engine_hint.c_str(), model_or_config, config_json);
     if (service == nullptr) {
@@ -170,8 +173,8 @@ jlong create_stt_service_via_registry(const std::string& engine_hint,
                      engine_hint.c_str());
         return 0;
     }
-    STTJNI_LOG("create_stt_service_via_registry: OK service=%p hint='%s'",
-               (void*)service, engine_hint.c_str());
+    STTJNI_LOG("create_stt_service_via_registry: OK service=%p hint='%s'", (void*)service,
+               engine_hint.c_str());
     return reinterpret_cast<jlong>(service);
 }
 
@@ -180,8 +183,9 @@ jlong create_stt_service_via_registry(const std::string& engine_hint,
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceCreate(
-    JNIEnv* env, jclass /*clazz*/, jstring model_id) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceCreate(JNIEnv* env,
+                                                                             jclass /*clazz*/,
+                                                                             jstring model_id) {
     const std::string id = jstring_to_std(env, model_id);
     STTJNI_LOG("racSttServiceCreate: model_id='%s'", id.c_str());
     if (id.empty()) {
@@ -224,9 +228,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceCreate(
     // rac_stt_create()'s path-override logic; the create itself goes through
     // rac_plugin_find exactly like every other commons consumer.
     const char* hint = framework_to_plugin_hint(framework);
-    const jlong svc = create_stt_service_via_registry(
-        hint != nullptr ? std::string(hint) : std::string(),
-        resolved_path.c_str(), /*config_json=*/nullptr);
+    const jlong svc =
+        create_stt_service_via_registry(hint != nullptr ? std::string(hint) : std::string(),
+                                        resolved_path.c_str(), /*config_json=*/nullptr);
     if (svc == 0) {
         STTJNI_LOG_E("racSttServiceCreate: create_stt_service_via_registry failed path='%s'",
                      resolved_path.c_str());
@@ -253,10 +257,8 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterCreat
     const std::string config = ensure_cloud_provider(hint, jstring_to_std(env, config_json));
     STTJNI_LOG("racSttHybridRouterCreateService: hint='%s' model_len=%zu config_len=%zu",
                hint.c_str(), model.size(), config.size());
-    return create_stt_service_via_registry(
-        hint,
-        model.empty() ? nullptr : model.c_str(),
-        config.empty() ? nullptr : config.c_str());
+    return create_stt_service_via_registry(hint, model.empty() ? nullptr : model.c_str(),
+                                           config.empty() ? nullptr : config.c_str());
 }
 
 // Destroy a service created by racSttHybridRouterCreateService (or by
@@ -273,8 +275,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterDestr
 }
 
 JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceDestroy(
-    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceDestroy(JNIEnv* /*env*/,
+                                                                              jclass /*clazz*/,
+                                                                              jlong handle) {
     if (handle != 0) {
         rac_stt_destroy(reinterpret_cast<rac_handle_t>(handle));
     }
@@ -291,8 +294,9 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterCreat
 }
 
 JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterDestroy(
-    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterDestroy(JNIEnv* /*env*/,
+                                                                                   jclass /*clazz*/,
+                                                                                   jlong handle) {
     if (handle != 0) {
         rac_stt_hybrid_router_destroy(reinterpret_cast<rac_handle_t>(handle));
     }
@@ -305,8 +309,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterSetOf
     const auto bytes = jbyte_array_to_vec(env, descriptor_proto);
     return static_cast<jint>(rac_stt_hybrid_router_set_offline_service_proto(
         reinterpret_cast<rac_handle_t>(router_handle),
-        reinterpret_cast<rac_stt_service_t*>(service_handle),
-        bytes.data(), bytes.size()));
+        reinterpret_cast<rac_stt_service_t*>(service_handle), bytes.data(), bytes.size()));
 }
 
 JNIEXPORT jint JNICALL
@@ -316,8 +319,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterSetOn
     const auto bytes = jbyte_array_to_vec(env, descriptor_proto);
     return static_cast<jint>(rac_stt_hybrid_router_set_online_service_proto(
         reinterpret_cast<rac_handle_t>(router_handle),
-        reinterpret_cast<rac_stt_service_t*>(service_handle),
-        bytes.data(), bytes.size()));
+        reinterpret_cast<rac_stt_service_t*>(service_handle), bytes.data(), bytes.size()));
 }
 
 JNIEXPORT jint JNICALL
@@ -325,8 +327,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterSetPo
     JNIEnv* env, jclass /*clazz*/, jlong router_handle, jbyteArray policy_proto) {
     const auto bytes = jbyte_array_to_vec(env, policy_proto);
     return static_cast<jint>(rac_stt_hybrid_router_set_policy_proto(
-        reinterpret_cast<rac_handle_t>(router_handle),
-        bytes.data(), bytes.size()));
+        reinterpret_cast<rac_handle_t>(router_handle), bytes.data(), bytes.size()));
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -334,11 +335,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttHybridRouterTrans
     JNIEnv* env, jclass /*clazz*/, jlong router_handle, jbyteArray request_proto) {
     const auto bytes = jbyte_array_to_vec(env, request_proto);
     uint8_t* response_bytes = nullptr;
-    size_t   response_size = 0;
+    size_t response_size = 0;
     const rac_result_t rc = rac_stt_hybrid_router_transcribe_proto(
-        reinterpret_cast<rac_handle_t>(router_handle),
-        bytes.data(), bytes.size(),
-        &response_bytes, &response_size);
+        reinterpret_cast<rac_handle_t>(router_handle), bytes.data(), bytes.size(), &response_bytes,
+        &response_size);
     if (rc != RAC_SUCCESS) {
         rac_stt_hybrid_router_proto_buffer_free(response_bytes);
         return nullptr;

@@ -56,55 +56,39 @@ CONFIGS_REGEX='(implementation|api|testImplementation|androidTestImplementation|
 # matching `project("...")` paths or stringly-typed task names.
 HARDCODED_REGEX="^[[:space:]]*${CONFIGS_REGEX}[[:space:]]*\\([[:space:]]*\"[A-Za-z0-9._-]+:[A-Za-z0-9._-]+:[0-9][A-Za-z0-9._+-]*\"[[:space:]]*[),]"
 
-# Paths to exclude — vendored projects, generated outputs, and the catalog
-# itself. Each line is an `rg --glob` exclusion pattern.
-EXCLUDE_GLOBS=(
-    '!**/build/**'
-    '!**/.gradle/**'
-    '!**/node_modules/**'
-    '!**/third_party/**'
-    '!**/build-*/**'
-    '!**/build_*/**'
-    '!gradle/libs.versions.toml'
-    # Playground/ is a collection of standalone demo projects that are not part
-    # of any unified build system (see AGENTS.md). They are intentionally
-    # excluded from the centralization gate so their experimental version pins
-    # can drift independently.
-    '!Playground/**'
-)
+# Paths to exclude — vendored projects and generated outputs. Applied as an
+# ERE filter over the tracked-file list. Playground/ is a collection of
+# standalone demo projects that are not part of any unified build system (see
+# AGENTS.md); it is intentionally excluded from the centralization gate so its
+# experimental version pins can drift independently.
+EXCLUDE_PATHS_REGEX='(^|/)(build|\.gradle|node_modules|third_party)/|(^|/)build[-_][^/]*/|^Playground/'
 
-if ! command -v rg >/dev/null 2>&1; then
-    echo "error: ripgrep (rg) is required for check_gradle_centralization.sh" >&2
-    exit 2
+# Tracked *.gradle.kts files only — matches the stated scope and needs no
+# external tooling beyond git + grep.
+files=()
+while IFS= read -r f; do
+    files+=("${f}")
+done < <(git ls-files -- '*.gradle.kts' | grep -Ev "${EXCLUDE_PATHS_REGEX}" || true)
+
+if [[ ${#files[@]} -eq 0 ]]; then
+    echo "[OK] check_gradle_centralization: no tracked *.gradle.kts files in scope."
+    exit 0
 fi
 
-rg_args=(
-    --no-heading
-    --line-number
-    --color=never
-    --type-add 'gradlekts:*.gradle.kts'
-    --type gradlekts
-)
-for glob in "${EXCLUDE_GLOBS[@]}"; do
-    rg_args+=(--glob "${glob}")
-done
-
-# Collect every line matching the hardcoded coord shape, then strip:
-#   1. Single-line `//` comments (anchored to start-of-line whitespace).
-#   2. The known false-positive comment-form `// Usage: implementation(...)`
-#      pattern that documents Maven Central usage in publishing blocks. The
-#      regex's `^[[:space:]]*` anchor already excludes any non-leading match,
-#      so this is belt-and-braces against future drift.
+# Collect every line matching the hardcoded coord shape. The regex's
+# `^[[:space:]]*` anchor excludes `//` line comments and the comment-form
+# `// Usage: implementation(...)` pattern that documents Maven Central usage
+# in publishing blocks.
 #
-# `rg` returns exit code 1 when no matches are found, so we tolerate that
+# `grep` returns exit code 1 when no matches are found, so we tolerate that
 # specific code without failing the script.
 set +e
-matches="$(rg "${rg_args[@]}" --regexp "${HARDCODED_REGEX}" 2>/dev/null)"
-rg_status=$?
+matches="$(grep -EHn "${HARDCODED_REGEX}" "${files[@]}")"
+grep_status=$?
 set -e
 
-if [[ ${rg_status} -ne 0 && ${rg_status} -ne 1 ]]; then
-    echo "error: ripgrep failed with exit code ${rg_status}" >&2
+if [[ ${grep_status} -ne 0 && ${grep_status} -ne 1 ]]; then
+    echo "error: grep failed with exit code ${grep_status}" >&2
     exit 2
 fi
 

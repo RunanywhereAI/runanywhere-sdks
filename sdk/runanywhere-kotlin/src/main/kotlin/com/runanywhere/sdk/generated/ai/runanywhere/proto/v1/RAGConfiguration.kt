@@ -86,6 +86,7 @@ public class RAGConfiguration(
    * Optional so callers can distinguish "unset" from an explicit value.
    */
   @RacDefaultOption("5")
+  @RacMinOption(1)
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -101,7 +102,7 @@ public class RAGConfiguration(
    * Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
    * cosine similarities that rarely exceed ~0.5 even for relevant chunks,
    * so a 0.7 floor filters out every match and retrieval returns nothing
-   * (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
+   * (validated by generated SDK helpers and commons session creation).
    */
   @RacDefaultOption("0.3")
   @RacMinFloatOption(0.0)
@@ -118,6 +119,7 @@ public class RAGConfiguration(
    * Optional so callers can distinguish "unset" from an explicit value.
    */
   @RacDefaultOption("512")
+  @RacMinOption(1)
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -131,6 +133,7 @@ public class RAGConfiguration(
    * without it being silently replaced by the canonical default of 64.
    */
   @RacDefaultOption("64")
+  @RacMinOption(0)
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

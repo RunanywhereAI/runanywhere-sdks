@@ -6,6 +6,8 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "bridges/ExternalConfigGuard.hpp"
 
+#include <cstdlib>
+#include <dlfcn.h>
 #include <stdexcept>
 #include <utility>
 
@@ -292,32 +294,71 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::completeServicesInitialization() {
-    return Promise<bool>::async([this]() {
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::completeServicesInitialization() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([this]() -> std::shared_ptr<ArrayBuffer> {
         std::lock_guard<std::mutex> lock(initMutex_);
 
         LOGI("Completing native services initialization...");
-        bool httpConfigured = false;
-        rac_result_t result = InitBridge::shared().completeServicesInitialization(httpConfigured);
+        std::vector<uint8_t> resultBytes;
+        rac_result_t result = InitBridge::shared().completeServicesInitialization(resultBytes);
         if (result != RAC_SUCCESS) {
             setLastError("Failed to complete services initialization: " + std::to_string(result));
             throw std::runtime_error("Failed to complete services initialization: " + std::to_string(result));
         }
 
-        return httpConfigured;
+        // Serialized RASdkInitResult; empty when Phase 2 ran in deferred mode.
+        if (resultBytes.empty()) {
+            return ArrayBuffer::allocate(0);
+        }
+        return ArrayBuffer::copy(resultBytes.data(), resultBytes.size());
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::retryHTTPSetupProto() {
-    return Promise<bool>::async([this]() {
-        bool httpConfigured = false;
-        rac_result_t result = InitBridge::shared().retryHTTPSetup(httpConfigured);
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::retryHTTPSetupProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([this]() -> std::shared_ptr<ArrayBuffer> {
+        std::vector<uint8_t> resultBytes;
+        rac_result_t result = InitBridge::shared().retryHTTPSetup(resultBytes);
         if (result != RAC_SUCCESS) {
             setLastError("HTTP retry failed: " + std::to_string(result));
-            return false;
+            return ArrayBuffer::allocate(0);
         }
-        // Resolves to has_completed_http_setup || http_configured.
-        return httpConfigured;
+        // Serialized RASdkInitResult; empty when the retry symbol is missing.
+        if (resultBytes.empty()) {
+            return ArrayBuffer::allocate(0);
+        }
+        return ArrayBuffer::copy(resultBytes.data(), resultBytes.size());
+    });
+}
+
+// Canonical rac_result_t -> serialized SDKError mapping. Mirrors Swift
+// RASDKError.from(rcResult:) over commons rac_result_to_proto_error.
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::resultToProtoErrorProto(double code) {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([code]() -> std::shared_ptr<ArrayBuffer> {
+        const auto rc = static_cast<rac_result_t>(static_cast<int32_t>(code));
+        if (rc == RAC_SUCCESS) {
+            return ArrayBuffer::allocate(0);
+        }
+        using ResultToProtoErrorFn = rac_result_t (*)(rac_result_t, rac_proto_buffer_t*);
+        auto fn = reinterpret_cast<ResultToProtoErrorFn>(
+            dlsym(RTLD_DEFAULT, "rac_result_to_proto_error"));
+        if (!fn) {
+            LOGW("resultToProtoErrorProto: rac_result_to_proto_error unavailable");
+            return ArrayBuffer::allocate(0);
+        }
+        rac_proto_buffer_t out{};
+        rac_result_t status = fn(rc, &out);
+        std::shared_ptr<ArrayBuffer> buffer;
+        if (status == RAC_SUCCESS && out.data && out.size > 0) {
+            buffer = ArrayBuffer::copy(out.data, out.size);
+        } else {
+            buffer = ArrayBuffer::allocate(0);
+        }
+        std::free(out.data);
+        std::free(out.error_message);
+        return buffer;
     });
 }
 

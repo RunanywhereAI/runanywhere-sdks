@@ -17,7 +17,7 @@ export { RunAnywhere } from './Public/RunAnywhere';
 // commons hybrid router — commons owns all routing. Mirrors Swift `Hybrid/*`
 // and Kotlin `public/hybrid/*` (RACRouter / CloudSTT / RoutingPolicy).
 export {
-  HybridSttRouter,
+  HybridSTTRouter,
   CloudSTT,
   HybridDeviceState,
   HybridBackendKind,
@@ -41,11 +41,59 @@ export type {
   CustomFilterCheck,
   CloudModelEntry,
   CloudRegisterOptions,
+  CloudSttProviderHandler,
+  CloudSttProviderRequest,
+  CloudSttProviderResult,
   HybridDeviceStateProvider,
 } from './Public/Extensions/Hybrid';
 
 export { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
 export type { SDKInitOptions } from './types/models';
+
+// SDKEnvironment behaviour helpers — mirror Swift SDKEnvironment.swift:42-128.
+export {
+  deployableEnvironments,
+  environmentDescription,
+  isProduction,
+  isTesting,
+  requiresBackendURL,
+  shouldSendTelemetry,
+  shouldSyncWithBackend,
+  requiresAuthentication,
+  defaultLogLevel,
+} from './Public/Helpers/SDKEnvironment+Helpers';
+
+// SDKComponent display names — mirror Swift RASDKComponent+DisplayName.swift.
+export { sdkComponentDisplayName } from './Public/Helpers/SDKComponent+DisplayName';
+
+// Pushable audio stream — RN adaptation of Swift's AsyncStream<Data> for
+// feeding microphone chunks into transcribeStream() / streamVAD().
+export {
+  createPushableAudioStream,
+  type PushableAudioStream,
+} from './Public/Helpers/PushableAudioStream';
+
+// VLMImage factory helpers — mirror Swift RAVLMImage+Helpers.swift.
+export { VLMImages } from './Public/Extensions/VLM/VLMImage+Helpers';
+
+// Embedding vector math helpers — mirror Swift EmbeddingsProto+Helpers.swift.
+export {
+  cosineSimilarity,
+  computeNorm,
+} from './Public/Extensions/Embeddings/EmbeddingsProto+Helpers';
+
+// Storage proto helpers — mirror Swift StorageProto+Helpers.swift.
+export {
+  makeDeviceStorageInfo,
+  makeAppStorageInfo,
+  makeModelStorageMetrics,
+  makeStorageAvailability,
+  emptyStorageInfo,
+  totalModelsSizeBytes,
+  totalModelsSize,
+  storedModels,
+  usagePercentage,
+} from './Public/Extensions/Storage/StorageProto+Helpers';
 
 export {
   ErrorCode,
@@ -53,13 +101,23 @@ export {
   SDKException,
   isSDKException,
   asSDKException,
+  isExpectedErrorCode,
+  sdkExceptionFromRcResult,
+  throwIfRcError,
 } from './Foundation/Errors';
 export type { ErrorContext } from './Foundation/Errors';
 
-export { EventBus } from './Public/Events/EventBus';
+// In-SDK audio capture/playback — mirror Swift's
+// Features/STT/Services/AudioCaptureManager.swift and
+// Features/TTS/Services/AudioPlaybackManager.swift.
+export { AudioCaptureManager } from './Features/VoiceSession/AudioCaptureManager';
+export { AudioPlaybackManager } from './Features/VoiceSession/AudioPlaybackManager';
+
+export { EventBus, modelLifecycleChange } from './Public/Events/EventBus';
 export type {
   EventBusCancellable,
   SDKEventHandler,
+  ModelLifecycleChange,
 } from './Public/Events/EventBus';
 
 export type {

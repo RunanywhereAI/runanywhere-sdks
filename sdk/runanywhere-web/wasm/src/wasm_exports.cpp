@@ -89,6 +89,11 @@
 #include "rac/router/hybrid/rac_stt_hybrid_router.h"
 #include "rac/router/hybrid/rac_stt_hybrid_router_proto.h"
 
+// Cloud STT provider registry — backs CloudSTT.registerProvider on the Web
+// facade. Included so the registry symbols survive dead-stripping on targets
+// that list them in RAC_EXPORTED_FUNCTIONS_CLOUD.
+#include "rac/cloud/rac_cloud_stt_provider.h"
+
 /**
  * WASM module initialization.
  * Called when the WASM module is instantiated.
@@ -191,14 +196,6 @@ int rac_wasm_sizeof_vad_config(void) { return (int)sizeof(rac_vad_config_t); }
 EMSCRIPTEN_KEEPALIVE
 int rac_wasm_sizeof_voice_agent_config(void) {
   return (int)sizeof(rac_voice_agent_config_t);
-}
-
-/**
- * Helper: Get sizeof rac_voice_agent_result_t for JS allocation.
- */
-EMSCRIPTEN_KEEPALIVE
-int rac_wasm_sizeof_voice_agent_result(void) {
-  return (int)sizeof(rac_voice_agent_result_t);
 }
 
 /**
@@ -790,6 +787,202 @@ const char *rac_wasm_dev_config_get_supabase_key(void) {
 EMSCRIPTEN_KEEPALIVE
 const char *rac_wasm_dev_config_get_build_token(void) {
   return rac_dev_config_get_build_token();
+}
+
+// =============================================================================
+// FILE MANAGER WRAPPERS (clearCache / cleanTempFiles)
+//
+// Web has no rac_file_callbacks_t bridge (the platform-adapter file slots are
+// TS-side stubs), so these shims build the callbacks in C++ against the
+// module's own filesystem (Emscripten MEMFS under the synthetic /opfs base) —
+// the same pattern as build_jni_file_callbacks() in runanywhere_commons_jni.cpp.
+// Path computation and the delete-recursive + recreate semantics stay in
+// commons (rac_file_manager_clear_cache/clear_temp → {base}/RunAnywhere/
+// Cache|Temp). std::filesystem against MEMFS is proven in this build
+// (rac_http_download.cpp, download_orchestrator.cpp).
+// =============================================================================
+
+} // extern "C"
+
+#include <filesystem>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "rac/infrastructure/file_management/rac_file_manager.h"
+
+namespace {
+
+namespace fs = std::filesystem;
+
+rac_result_t wasm_fc_create_directory(const char *path, int recursive, void *) {
+  if (path == nullptr || path[0] == '\0') return RAC_ERROR_INVALID_PARAMETER;
+  std::error_code ec;
+  if (recursive != 0) {
+    fs::create_directories(path, ec);
+  } else {
+    fs::create_directory(path, ec);
+  }
+  // "Already exists" is success for both commons callers and POSIX mkdir -p.
+  if (ec && !fs::exists(path)) return RAC_ERROR_FILE_WRITE_FAILED;
+  return RAC_SUCCESS;
+}
+
+rac_result_t wasm_fc_delete_path(const char *path, int recursive, void *) {
+  if (path == nullptr || path[0] == '\0') return RAC_ERROR_INVALID_PARAMETER;
+  std::error_code ec;
+  if (recursive != 0) {
+    fs::remove_all(path, ec);
+  } else {
+    fs::remove(path, ec);
+  }
+  return ec ? RAC_ERROR_DELETE_FAILED : RAC_SUCCESS;
+}
+
+rac_result_t wasm_fc_list_directory(const char *path, char ***out_entries, size_t *out_count,
+                                    void *) {
+  if (path == nullptr || out_entries == nullptr || out_count == nullptr) {
+    return RAC_ERROR_INVALID_PARAMETER;
+  }
+  *out_entries = nullptr;
+  *out_count = 0;
+  std::error_code ec;
+  std::vector<std::string> names;
+  for (fs::directory_iterator it(path, ec), end; !ec && it != end; it.increment(ec)) {
+    names.push_back(it->path().filename().string());
+  }
+  if (ec) return RAC_ERROR_FILE_READ_FAILED;
+  if (names.empty()) return RAC_SUCCESS;
+  auto **entries = static_cast<char **>(std::malloc(names.size() * sizeof(char *)));
+  if (entries == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+  for (size_t i = 0; i < names.size(); ++i) {
+    entries[i] = static_cast<char *>(std::malloc(names[i].size() + 1));
+    if (entries[i] == nullptr) {
+      for (size_t j = 0; j < i; ++j) std::free(entries[j]);
+      std::free(entries);
+      return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    std::memcpy(entries[i], names[i].c_str(), names[i].size() + 1);
+  }
+  *out_entries = entries;
+  *out_count = names.size();
+  return RAC_SUCCESS;
+}
+
+void wasm_fc_free_entries(char **entries, size_t count, void *) {
+  if (entries == nullptr) return;
+  for (size_t i = 0; i < count; ++i) std::free(entries[i]);
+  std::free(entries);
+}
+
+rac_bool_t wasm_fc_path_exists(const char *path, rac_bool_t *out_is_directory, void *) {
+  if (out_is_directory != nullptr) *out_is_directory = RAC_FALSE;
+  if (path == nullptr || path[0] == '\0') return RAC_FALSE;
+  std::error_code ec;
+  const bool exists = fs::exists(path, ec);
+  if (ec || !exists) return RAC_FALSE;
+  if (out_is_directory != nullptr) {
+    *out_is_directory = fs::is_directory(path, ec) && !ec ? RAC_TRUE : RAC_FALSE;
+  }
+  return RAC_TRUE;
+}
+
+int64_t wasm_fc_get_file_size(const char *path, void *) {
+  if (path == nullptr || path[0] == '\0') return -1;
+  std::error_code ec;
+  const auto size = fs::file_size(path, ec);
+  return ec ? -1 : static_cast<int64_t>(size);
+}
+
+// The clear paths never consult disk-space; report "unknown" like the JNI
+// bridge does for unsupported queries.
+int64_t wasm_fc_get_available_space(void *) { return -1; }
+int64_t wasm_fc_get_total_space(void *) { return -1; }
+
+rac_file_callbacks_t make_wasm_file_callbacks() {
+  rac_file_callbacks_t cb = {};
+  cb.create_directory = wasm_fc_create_directory;
+  cb.delete_path = wasm_fc_delete_path;
+  cb.list_directory = wasm_fc_list_directory;
+  cb.free_entries = wasm_fc_free_entries;
+  cb.path_exists = wasm_fc_path_exists;
+  cb.get_file_size = wasm_fc_get_file_size;
+  cb.get_available_space = wasm_fc_get_available_space;
+  cb.get_total_space = wasm_fc_get_total_space;
+  cb.user_data = nullptr;
+  return cb;
+}
+
+}  // namespace
+
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_file_manager_clear_cache(void) {
+  rac_file_callbacks_t cb = make_wasm_file_callbacks();
+  return static_cast<int>(rac_file_manager_clear_cache(&cb));
+}
+
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_file_manager_clear_temp(void) {
+  rac_file_callbacks_t cb = make_wasm_file_callbacks();
+  return static_cast<int>(rac_file_manager_clear_temp(&cb));
+}
+
+// ── Model-category / framework capability wrappers (proto-int ABI) ──────────
+// The proto enums and the C enums use different numeric values, so these
+// wrappers convert via rac_*_from_proto / _to_proto before delegating. They
+// back the Web SDK's ModelTypes helpers — the same C helpers Swift routes
+// through (RAModelCategory.requiresContextLength / .supportsThinking,
+// rac_model_category_default_framework, rac_framework_display_name) — so the
+// capability/display tables live in commons, not in each SDK's TS.
+
+EMSCRIPTEN_KEEPALIVE
+int rac_model_category_requires_context_length_proto(int proto_category) {
+  rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+  if (rac_model_category_from_proto(static_cast<int32_t>(proto_category), &category) !=
+      RAC_SUCCESS) {
+    return 0;
+  }
+  return rac_model_category_requires_context_length(category) == RAC_TRUE ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int rac_model_category_supports_thinking_proto(int proto_category) {
+  rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+  if (rac_model_category_from_proto(static_cast<int32_t>(proto_category), &category) !=
+      RAC_SUCCESS) {
+    return 0;
+  }
+  return rac_model_category_supports_thinking(category) == RAC_TRUE ? 1 : 0;
+}
+
+/** Returns the proto InferenceFramework value for a proto ModelCategory. */
+EMSCRIPTEN_KEEPALIVE
+int rac_model_category_default_framework_proto(int proto_category) {
+  rac_model_category_t category = RAC_MODEL_CATEGORY_UNKNOWN;
+  if (rac_model_category_from_proto(static_cast<int32_t>(proto_category), &category) !=
+      RAC_SUCCESS) {
+    return 0;
+  }
+  const rac_inference_framework_t framework = rac_model_category_default_framework(category);
+  int32_t proto_framework = 0;
+  if (rac_inference_framework_to_proto(framework, &proto_framework) != RAC_SUCCESS) {
+    return 0;
+  }
+  return static_cast<int>(proto_framework);
+}
+
+/** Display name for a proto InferenceFramework value (static literal — do not free). */
+EMSCRIPTEN_KEEPALIVE
+const char* rac_framework_display_name_proto(int proto_framework) {
+  rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+  if (rac_inference_framework_from_proto(static_cast<int32_t>(proto_framework), &framework) !=
+      RAC_SUCCESS) {
+    return "";
+  }
+  return rac_framework_display_name(framework);
 }
 
 } // extern "C"

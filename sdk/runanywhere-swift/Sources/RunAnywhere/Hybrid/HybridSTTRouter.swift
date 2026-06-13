@@ -16,7 +16,9 @@
 //       (rac_plugin_route(RAC_PRIMITIVE_TRANSCRIBE, hint) → vt->stt_ops->create)
 //       and attaches them with their descriptors,
 //    3. registers any custom-filter predicates and installs the policy bytes,
-//    4. drives the router's transcribe and decodes the response.
+//    4. drives the router's transcribe and decodes the response (raw-PCM16 →
+//       WAV normalisation happens inside the commons router so one payload
+//       serves both services).
 //
 //  Mirrors the Kotlin RACRouter feature surface: both SDKs register the
 //  custom-filter predicate with commons (`rac_hybrid_register_custom_filter`)
@@ -49,7 +51,9 @@ import SwiftProtobuf
 ///     policy:  .init(hardFilters: [.network], cascade: .confidence(threshold: 0.5),
 ///                    rank: .preferLocalFirst)
 /// )
-/// let result = try router.transcribe(audio, options: .init(audioFormat: 1))
+/// var options = HybridTranscribeOptions()
+/// options.sampleRate = 16_000
+/// let result = try router.transcribe(pcm16Audio, options: options)
 /// router.close()
 /// ```
 ///
@@ -148,16 +152,13 @@ public final class HybridSTTRouter: @unchecked Sendable {
         // with a different policy doesn't leave stale named filters registered
         // in commons.
         clearAndDestroyServices(handle: handle)
-        let previousFilterNames: [String] = state.withLock { current in
-            let old = current.customFilterNames
-            current.customFilterNames = []
-            return old
-        }
-        for name in previousFilterNames { HybridCustomFilter.unregister(name: name) }
+        retirePreviousCustomFilters()
 
         let rcOff = rac_stt_hybrid_router_set_offline_service_proto(
-            handle, offlineService.servicePtr,
-            offlineDescriptor, offlineDescriptor.count
+            handle,
+            offlineService.servicePtr,
+            offlineDescriptor,
+            offlineDescriptor.count
         )
         guard rcOff == RAC_SUCCESS else {
             destroy(offlineService); destroy(onlineService)
@@ -168,8 +169,10 @@ public final class HybridSTTRouter: @unchecked Sendable {
             )
         }
         let rcOn = rac_stt_hybrid_router_set_online_service_proto(
-            handle, onlineService.servicePtr,
-            onlineDescriptor, onlineDescriptor.count
+            handle,
+            onlineService.servicePtr,
+            onlineDescriptor,
+            onlineDescriptor.count
         )
         guard rcOn == RAC_SUCCESS else {
             _ = rac_stt_hybrid_router_set_offline_service_proto(handle, nil, nil, 0)
@@ -217,6 +220,16 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// Run one transcribe request through the router. The router applies the
     /// installed policy (filters → rank → invoke → fallback) in commons and
     /// returns the chosen backend's result plus the routing decision.
+    ///
+    /// - Parameters:
+    ///   - audio: Raw 16-bit mono PCM bytes (pass the capture rate via
+    ///     `HybridTranscribeOptions.sampleRate`) OR file-encoded audio
+    ///     (wav/mp3/flac/...). Raw PCM16 is wrapped in a WAV container by the
+    ///     commons router (rac_stt_hybrid_router_proto.cpp); WAV input
+    ///     (RIFF/WAVE magic) and declared compressed formats pass through
+    ///     unchanged.
+    ///   - options: Optional language / sample-rate / audio-format hints
+    ///     (proto-typed `HybridTranscribeOptions`).
     public func transcribe(
         _ audio: Data,
         options: HybridTranscribeOptions = .init()
@@ -338,6 +351,10 @@ public final class HybridSTTRouter: @unchecked Sendable {
     /// `vt->stt_ops->create(model_id, config_json, &impl)` builds the backend
     /// instance — the same path every commons STT consumer uses.
     private func createService(for model: HybridModel) throws -> AttachedService {
+        if model.backend == .hybridBackendSherpa {
+            try requireSherpaRegistered()
+        }
+
         let engineName = pinnedEngineName(for: model.backend)
 
         // Pin the named engine (offline "sherpa" vs cloud "cloud") — simple
@@ -395,7 +412,8 @@ public final class HybridSTTRouter: @unchecked Sendable {
         guard let modelIdCStr = strdup(model.id) else {
             sttOps.pointee.destroy?(impl)
             throw SDKException(
-                code: .serviceNotAvailable, message: "strdup(model id) failed",
+                code: .serviceNotAvailable,
+                message: "strdup(model id) failed",
                 category: .internal
             )
         }
@@ -405,6 +423,31 @@ public final class HybridSTTRouter: @unchecked Sendable {
         ))
 
         return AttachedService(servicePtr: servicePtr, ops: sttOps, modelIdCStr: modelIdCStr)
+    }
+
+    /// Fail early with an actionable message when the on-device sherpa plugin
+    /// isn't in the native plugin registry yet. Without this guard the offline
+    /// service create bottoms out in an opaque vtable lookup
+    /// (`rac_plugin_find_for_engine` returning NULL) that gives no hint about
+    /// the missing prerequisite. Mirrors Kotlin's
+    /// `HybridRouterBridgeAdapter.requireSherpaRegistered()`.
+    ///
+    /// The sherpa engine registers under the name "sherpa" when the ONNX
+    /// backend module is folded in (`ONNX.register()` →
+    /// `rac_backend_sherpa_register`), which must run before
+    /// `HybridSTTRouter().setPair(...)`.
+    private func requireSherpaRegistered() throws {
+        let names = RunAnywhere.pluginLoader.registeredNames()
+        guard names.contains(where: { $0.caseInsensitiveCompare("sherpa") == .orderedSame }) else {
+            throw SDKException(
+                code: .serviceNotAvailable,
+                message: "sherpa STT backend is not registered. Load the on-device backend first "
+                    + "(ONNX.register() for sherpa, Cloud.register() for cloud) before "
+                    + "HybridSTTRouter().setPair(...). "
+                    + "Registered plugins: \(names.isEmpty ? "(none)" : names.joined(separator: ", "))",
+                category: .component
+            )
+        }
     }
 
     /// Map a backend kind to the plugin name `rac_plugin_route` pins on.
@@ -433,6 +476,18 @@ public final class HybridSTTRouter: @unchecked Sendable {
             }
         if let offline = services.offline { destroy(offline) }
         if let online = services.online { destroy(online) }
+    }
+
+    /// Retire the previous policy's custom-filter predicates so re-pairing
+    /// with a different policy doesn't leave stale named filters registered
+    /// in commons. Verbatim extraction from `setPair` (lint body-length).
+    private func retirePreviousCustomFilters() {
+        let previousFilterNames: [String] = state.withLock { current in
+            let old = current.customFilterNames
+            current.customFilterNames = []
+            return old
+        }
+        for name in previousFilterNames { HybridCustomFilter.unregister(name: name) }
     }
 
     /// Destroy one backend service (engine `destroy(impl)`) and free its

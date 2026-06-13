@@ -223,8 +223,8 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
     // Mirrors Swift's InferenceFramework.usesDirectoryBasedModels
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
-        case RAC_FRAMEWORK_SHERPA:             // Sherpa-ONNX speech models extract to directories
-                                               // (encoder/decoder/tokens.txt)
+        case RAC_FRAMEWORK_SHERPA:   // Sherpa-ONNX speech models extract to directories
+                                     // (encoder/decoder/tokens.txt)
         case RAC_FRAMEWORK_COREML:   // CoreML compiled models (.mlmodelc) are directories
         case RAC_FRAMEWORK_METALRT:  // MetalRT models are directories (config.json + .safetensors)
         case RAC_FRAMEWORK_GENIE:    // Genie models are directories (config.json + bin files)
@@ -506,18 +506,10 @@ bool equals_case_insensitive(const std::string& lhs, const char* rhs) {
 // mapping. Mirrors Swift's `RAInferenceFramework.knownCases` (restricted to
 // the values present in the C enum).
 constexpr rac_inference_framework_t kKnownFrameworks[] = {
-    RAC_FRAMEWORK_ONNX,
-    RAC_FRAMEWORK_LLAMACPP,
-    RAC_FRAMEWORK_FOUNDATION_MODELS,
-    RAC_FRAMEWORK_SYSTEM_TTS,
-    RAC_FRAMEWORK_FLUID_AUDIO,
-    RAC_FRAMEWORK_COREML,
-    RAC_FRAMEWORK_MLX,
-    RAC_FRAMEWORK_METALRT,
-    RAC_FRAMEWORK_GENIE,
-    RAC_FRAMEWORK_SHERPA,
-    RAC_FRAMEWORK_BUILTIN,
-    RAC_FRAMEWORK_NONE,
+    RAC_FRAMEWORK_ONNX,       RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_FOUNDATION_MODELS,
+    RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_COREML,
+    RAC_FRAMEWORK_MLX,        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
+    RAC_FRAMEWORK_SHERPA,     RAC_FRAMEWORK_BUILTIN,     RAC_FRAMEWORK_NONE,
     RAC_FRAMEWORK_UNKNOWN,
 };
 
@@ -1136,6 +1128,7 @@ void rac_model_file_descriptors_free(rac_model_file_descriptor_t* descriptors, s
         free((void*)descriptors[i].relative_path);
         free((void*)descriptors[i].destination_path);
         free((void*)descriptors[i].url);
+        free((void*)descriptors[i].checksum_sha256);
     }
     free(descriptors);
 }

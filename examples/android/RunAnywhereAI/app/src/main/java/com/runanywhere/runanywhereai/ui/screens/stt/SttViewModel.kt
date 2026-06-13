@@ -226,12 +226,11 @@ class SttViewModel : ViewModel() {
             return
         }
         try {
-            val wav = pcmToWav(audio, AudioRecorder.SAMPLE_RATE)
             val started = System.currentTimeMillis()
             val result = withContext(Dispatchers.IO) {
                 ensureRouter(offlineId, onlineId).transcribe(
-                    wav,
-                    HybridTranscribeOptions(sample_rate = AudioRecorder.SAMPLE_RATE, audio_format = WAV_FORMAT),
+                    audio,
+                    HybridTranscribeOptions(sample_rate = AudioRecorder.SAMPLE_RATE),
                 )
             }
             val elapsed = System.currentTimeMillis() - started
@@ -342,37 +341,5 @@ class SttViewModel : ViewModel() {
 
     private companion object {
         const val MIN_BYTES = 16000
-        const val WAV_FORMAT = 1
     }
-}
-
-private fun pcmToWav(pcm: ByteArray, sampleRate: Int): ByteArray {
-    val channels = 1
-    val bitsPerSample = 16
-    val byteRate = sampleRate * channels * bitsPerSample / 8
-    val header = ByteArray(44)
-    fun putInt(offset: Int, value: Int) {
-        header[offset] = value.toByte()
-        header[offset + 1] = (value shr 8).toByte()
-        header[offset + 2] = (value shr 16).toByte()
-        header[offset + 3] = (value shr 24).toByte()
-    }
-    fun putShort(offset: Int, value: Int) {
-        header[offset] = value.toByte()
-        header[offset + 1] = (value shr 8).toByte()
-    }
-    "RIFF".toByteArray().copyInto(header, 0)
-    putInt(4, 36 + pcm.size)
-    "WAVE".toByteArray().copyInto(header, 8)
-    "fmt ".toByteArray().copyInto(header, 12)
-    putInt(16, 16)
-    putShort(20, 1)
-    putShort(22, channels)
-    putInt(24, sampleRate)
-    putInt(28, byteRate)
-    putShort(32, channels * bitsPerSample / 8)
-    putShort(34, bitsPerSample)
-    "data".toByteArray().copyInto(header, 36)
-    putInt(40, pcm.size)
-    return header + pcm
 }

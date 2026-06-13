@@ -160,16 +160,13 @@ message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
 
 include(FetchContent)
 
-# Cross-compilation targets that bundle zlib/BZip2 need a stable archive
-# output directory so downstream FetchContent projects can consume concrete
-# file paths instead of unresolved logical library names.
-# iOS is added here too because we now
-# force-bundle zlib for iOS slices (see comment below); libarchive's internal
-# find_package(ZLIB) needs a concrete archive path on cross-compile targets
-# the same way Android/Emscripten do.
-if(MSVC OR ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
-endif()
+# Targets that bundle zlib/BZip2 need a stable archive output directory so
+# downstream FetchContent projects can consume concrete file paths instead of
+# unresolved logical library names. Defined unconditionally: desktop Linux
+# also takes the bundled-BZip2 path when the host has no libbz2-dev (GitHub
+# runner images stopped shipping it), and libarchive's find_package(BZip2)
+# needs the same concrete archive path there as on Android/Emscripten/iOS.
+set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
 
 # nlohmann/json - header-only JSON library (used by JNI, backends, server)
 if(NOT DEFINED NLOHMANN_JSON_VERSION)
@@ -383,22 +380,29 @@ if(NOT BZIP2_FOUND)
     target_include_directories(bz2_bundled PUBLIC ${bzip2_src_SOURCE_DIR})
     set_target_properties(bz2_bundled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-    if((ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS") AND TARGET bz2_bundled)
-        set_target_properties(bz2_bundled PROPERTIES
-            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
-        )
-        set(_RAC_BZIP2_LIBRARY_PATH "${RAC_BUNDLED_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}bz2_bundled${CMAKE_STATIC_LIBRARY_SUFFIX}")
-    endif()
+    set_target_properties(bz2_bundled PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
+    )
+    set(_RAC_BZIP2_LIBRARY_PATH "${RAC_BUNDLED_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}bz2_bundled${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
     # Set cache variables so libarchive's find_package(BZip2) picks up our
-    # build. Android/Emscripten/iOS again need the concrete archive path.
+    # build. The concrete archive path is required on every single-config
+    # platform: the FindBZip2 module derives BZIP2_LIBRARIES from
+    # BZIP2_LIBRARY_RELEASE, so pre-seeding only BZIP2_LIBRARIES (the old
+    # desktop branch) left libarchive's own find_package(BZip2) failing with
+    # "missing: BZIP2_LIBRARIES" and silently dropped the in-process bzip2
+    # filter (HAVE_BZLIB_H) — caught by libarchive_zlib_linked_tests when
+    # GitHub's ubuntu-24.04 image stopped shipping libbz2-dev. MSVC keeps the
+    # legacy target-name seed: its multi-config archive dirs don't match the
+    # single concrete path, and the Windows release path has never shipped the
+    # in-process bzip2 filter.
     set(BZIP2_INCLUDE_DIR "${bzip2_src_SOURCE_DIR}" CACHE PATH "" FORCE)
-    if(ANDROID OR EMSCRIPTEN OR IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if(MSVC)
+        set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
+    else()
         set(BZIP2_LIBRARY "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
         set(BZIP2_LIBRARY_RELEASE "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
         set(BZIP2_LIBRARIES "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
-    else()
-        set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
     endif()
     set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
     # On MSVC, set output to a known location so the linker can find it
@@ -753,11 +757,13 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_registry_proto.cpp
     src/infrastructure/model_management/model_registry_discovery.cpp
     src/infrastructure/model_management/model_registry_refresh.cpp
+    src/infrastructure/model_management/model_registry_manifest.cpp
+    src/infrastructure/model_management/hf_resolver.cpp
     src/infrastructure/model_management/lora_registry.cpp
+    src/infrastructure/model_management/lora_import.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_types_mappers.cpp
     src/infrastructure/model_management/model_paths.cpp
-    src/infrastructure/model_management/model_strategy.cpp
     src/infrastructure/model_management/model_assignment.cpp
     src/infrastructure/model_management/model_compatibility.cpp
     src/infrastructure/model_management/model_compatibility_proto.cpp

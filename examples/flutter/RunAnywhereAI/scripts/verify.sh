@@ -37,6 +37,9 @@ fi
 
 require_command flutter
 
+log "Checking generated solutions YAML is in sync"
+bash "${SCRIPT_DIR}/sync-solutions-yamls.sh" --check
+
 log "Resolving Flutter dependencies"
 flutter pub get
 

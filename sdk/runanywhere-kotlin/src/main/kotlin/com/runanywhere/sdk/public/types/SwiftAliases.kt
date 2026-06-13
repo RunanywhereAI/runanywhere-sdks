@@ -48,6 +48,8 @@ public typealias RAVoiceAgentComponentStates = ai.runanywhere.proto.v1.VoiceAgen
 public typealias RAVLMImage = ai.runanywhere.proto.v1.VLMImage
 public typealias RAVLMResult = ai.runanywhere.proto.v1.VLMResult
 public typealias RAVLMGenerationOptions = ai.runanywhere.proto.v1.VLMGenerationOptions
+public typealias RAVLMStreamEvent = ai.runanywhere.proto.v1.VLMStreamEvent
+public typealias RAVLMStreamEventKind = ai.runanywhere.proto.v1.VLMStreamEventKind
 
 // ─── RAG ────────────────────────────────────────────────────────────────────
 

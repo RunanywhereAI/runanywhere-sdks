@@ -11,12 +11,13 @@
  * example app and external consumers never have to touch raw exports.
  */
 
-import { AudioFormat, ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   type TTSOptions,
   type TTSOutput,
   type TTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
+import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
 import { SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
@@ -30,10 +31,7 @@ import {
 } from '../../runtime/SpeechBackendExports';
 import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle';
-import {
-  getSpeechProvider,
-  hasSpeechProviderTTS,
-} from './SpeechProvider';
+import { AudioPlayback } from '../../Infrastructure/AudioPlayback';
 
 export type { TTSOptions, TTSOutput, TTSVoiceInfo };
 
@@ -76,18 +74,12 @@ function requireTTSModule(feature: string): TTSComponentModule {
   return module;
 }
 
+// Proto-rac_default-derived defaults — byte-identical to Swift's RATTSOptions.defaults().
 function defaultTTSOptions(overrides?: Partial<TTSOptions>): TTSOptions {
   return {
-    voice: '',
-    languageCode: '',
-    speakingRate: 1.0,
-    pitch: 1.0,
-    volume: 1.0,
-    enableSsml: false,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: 0,
+    ...tTSOptionsDefaults(),
     ...(overrides ?? {}),
-  } as TTSOptions;
+  };
 }
 
 function callCreate(module: TTSComponentModule): number {
@@ -113,10 +105,7 @@ function callCreate(module: TTSComponentModule): number {
     }
     const handle = bridge.readU32(outPtr);
     if (!handle) {
-      throw SDKException.componentNotReady(
-        'tts',
-        'rac_tts_component_create returned null handle',
-      );
+      throw SDKException.processingFailed('rac_tts_component_create returned null handle');
     }
     return handle;
   } finally {
@@ -158,6 +147,24 @@ function callLoadVoice(
     if (idPtr) bridge.free(idPtr);
     if (namePtr) bridge.free(namePtr);
   }
+}
+
+/**
+ * Shared audio playback for `RunAnywhere.speak()` — Swift parity: the private
+ * `ttsAudioPlayback = AudioPlaybackManager()` singleton in
+ * RunAnywhere+TTS.swift. One instance for the SDK lifetime so
+ * `stopSpeaking()` can stop whatever `speak()` started.
+ */
+let ttsAudioPlayback: AudioPlayback | null = null;
+
+export function sharedTTSPlayback(): AudioPlayback {
+  if (!ttsAudioPlayback) ttsAudioPlayback = new AudioPlayback();
+  return ttsAudioPlayback;
+}
+
+/** Stop in-flight `speak()` browser playback (no-op when nothing plays). */
+export function stopTTSPlayback(): void {
+  ttsAudioPlayback?.stop();
 }
 
 /** Top-level synthesize options for the ergonomic shortcut. */
@@ -310,33 +317,10 @@ export async function synthesize(
     }
   }
 
-  // Provider-first dispatch: route through standalone Sherpa (or any
-  // other registered SpeechProvider) when present, otherwise fall back
-  // to the proto-byte path.
-  if (hasSpeechProviderTTS()) {
-    const provider = getSpeechProvider()!;
-    if (voicePath && (typeof provider.isTTSLoaded !== 'function' || !provider.isTTSLoaded())) {
-      if (typeof provider.loadTTS !== 'function') {
-        throw SDKException.backendNotAvailable(
-          'RunAnywhere.tts.synthesizeAuto',
-          `SpeechProvider "${provider.id}" does not implement loadTTS.`,
-        );
-      }
-      await provider.loadTTS({ id: voiceId ?? voicePath, path: voicePath, name: voiceName });
-    }
-    if (typeof provider.synthesize !== 'function') {
-      throw SDKException.backendNotAvailable(
-        'RunAnywhere.tts.synthesizeAuto',
-        `SpeechProvider "${provider.id}" does not implement synthesize.`,
-      );
-    }
-    return provider.synthesize({ text, options });
-  }
-
   const module = requireTTSModule('RunAnywhere.tts.synthesizeAuto');
   if (!voicePath) {
-    throw SDKException.componentNotReady(
-      'tts',
+    // Swift parity: RunAnywhere+TTS.swift:36 throws `.notInitialized` ("TTS voice not loaded").
+    throw SDKException.notInitialized(
       'No TTS voice is loaded. Call RunAnywhere.modelLifecycle.loadModel(...) before RunAnywhere.tts.synthesizeAuto().',
     );
   }

@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.settings
 
 import ai.runanywhere.proto.v1.ModelListRequest
-import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,7 +15,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.cleanTempFiles
 import com.runanywhere.sdk.public.extensions.clearCache
-import com.runanywhere.sdk.public.extensions.deleteStorage
+import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.getStorageInfo
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -74,15 +73,7 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch {
             storage = storage.copy(busyId = model.id, message = null)
             try {
-                RunAnywhere.deleteStorage(
-                    StorageDeleteRequest(
-                        model_ids = listOf(model.id),
-                        delete_files = true,
-                        clear_registry_paths = true,
-                        unload_if_loaded = true,
-                        allow_platform_delete = true,
-                    ),
-                )
+                RunAnywhere.deleteModel(model.id)
                 if (GlobalState.model.loaded?.id == model.id) GlobalState.model.clear()
             } catch (e: CancellationException) {
                 throw e

@@ -10,12 +10,11 @@ import Foundation
 
 public extension RunAnywhere {
     /// Register a remote model with the in-memory model registry from a
-    /// download URL. Builds a complete `RAModelInfo` via the canonical
-    /// `RAModelInfo.make(...)` factory (which derives id/format/artifact via
-    /// `rac_model_info_make_proto`), layers on the caller-supplied capability
-    /// fields, and persists through the registry's proto save path in a single
-    /// `save(...)` — `rac_model_registry_register_proto` already persists every
-    /// capability field, so no from-url call + re-save dance is required.
+    /// download URL or Hugging Face reference, through the canonical commons
+    /// factory (`rac_register_model_from_url_proto`). Commons derives
+    /// id/name/format/artifact, resolves `hf.co/org/repo[:quant]` refs (quant
+    /// selection, mmproj pairing, sharded GGUF sets, per-file checksums), and
+    /// preserves prior download state when a catalog re-seeds on launch.
     @discardableResult
     static func registerModel(
         id: String? = nil,
@@ -32,33 +31,32 @@ public extension RunAnywhere {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
-        let downloadURL = URL(string: url)
-        var model = RAModelInfo.make(
-            id: id ?? generatedModelID(from: url, name: name),
-            name: name,
-            category: modality,
-            format: .unspecified,
-            framework: framework,
-            downloadURL: downloadURL,
-            downloadSizeBytes: memoryRequirement,
-            contextLength: modality.requiresContextLength ? 2048 : nil,
-            supportsThinking: supportsThinking
-        )
+        var request = RARegisterModelFromUrlRequest()
+        request.url = url
+        request.name = name
+        request.framework = framework
+        request.category = modality
+        if let id {
+            request.id = id
+        }
         if let memoryRequirement {
-            model.memoryRequiredBytes = memoryRequirement
+            request.memoryRequiredBytes = memoryRequirement
+            request.downloadSizeBytes = memoryRequirement
+        }
+        if modality.requiresContextLength {
+            request.contextLength = 2048
+        }
+        if supportsThinking {
+            request.supportsThinking = true
         }
         if supportsLora {
-            model.supportsLora = true
+            request.supportsLora = true
         }
-        // Apply the explicit artifact-type override last: `make(...)` derives
-        // the artifact (and its artifact_type) from the URL, so the caller's
-        // override has to win after that derivation runs.
         if let artifactType {
-            model.artifactType = artifactType
+            request.artifactType = artifactType
         }
 
-        try await CppBridge.ModelRegistry.shared.save(model)
-        return model
+        return try await CppBridge.ModelRegistry.shared.registerFromUrl(request)
     }
 
     /// Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip)
@@ -122,10 +120,9 @@ public extension RunAnywhere {
     }
 
     /// Register a multi-file model (e.g., VLMs with a separate mmproj, MiniLM
-    /// embedding with vocab.txt). Builds `RAModelInfo` via the canonical
-    /// `RAModelInfo.make(...)` factory and persists through the registry's
-    /// proto save path — no URL is involved at the model level because each
-    /// `RAModelFileDescriptor` carries its own URL.
+    /// embedding with vocab.txt) through the canonical commons factory
+    /// (`rac_register_multi_file_model_proto`) — no URL is involved at the
+    /// model level because each `RAModelFileDescriptor` carries its own URL.
     @discardableResult
     static func registerModel(
         multiFile descriptors: [RAModelFileDescriptor],
@@ -142,26 +139,27 @@ public extension RunAnywhere {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
-        var artifact = RAMultiFileArtifact()
-        artifact.files = descriptors
-
-        var model = RAModelInfo.make(
-            id: id,
-            name: name,
-            category: modality,
-            format: .unspecified,
-            framework: framework,
-            artifact: .multiFile(artifact),
-            downloadSizeBytes: memoryRequirement,
-            contextLength: contextLength ?? (modality.requiresContextLength ? 2048 : nil),
-            supportsThinking: supportsThinking,
-            source: source
-        )
+        var request = RARegisterMultiFileModelRequest()
+        request.id = id
+        request.name = name
+        request.framework = framework
+        request.category = modality
+        request.files = descriptors
+        request.source = source
         if let memoryRequirement {
-            model.memoryRequiredBytes = memoryRequirement
+            request.memoryRequiredBytes = memoryRequirement
+            request.downloadSizeBytes = memoryRequirement
         }
-        try await CppBridge.ModelRegistry.shared.save(model)
-        return model
+        if let contextLength {
+            request.contextLength = Int32(contextLength)
+        } else if modality.requiresContextLength {
+            request.contextLength = 2048
+        }
+        if supportsThinking {
+            request.supportsThinking = true
+        }
+
+        return try await CppBridge.ModelRegistry.shared.registerMultiFile(request)
     }
 
     /// Download a registered model. Commons owns planning, transfer (via the
@@ -204,10 +202,11 @@ public extension RunAnywhere {
         startRequest.plan = plan
         startRequest.resume = plan.canResume
         startRequest.resumeToken = plan.resumeToken
-        // Commons currently owns planning/progress but not the final registry
-        // mutation behind this flag. Persist completion explicitly through the
-        // generated model import contract below.
-        startRequest.updateRegistryOnCompletion = false
+        // Commons owns the completion registry mutation: the orchestrator's
+        // self-heal calls rac_model_registry_update_download_status, which
+        // also persists the durable .rac-manifest.binpb sidecar that restores
+        // the entry on the next cold launch.
+        startRequest.updateRegistryOnCompletion = true
 
         let startResult = await CppBridge.Download.shared.start(startRequest)
         guard startResult.accepted else {
@@ -229,7 +228,7 @@ public extension RunAnywhere {
         if startResult.hasInitialProgress {
             let progress = startResult.initialProgress
             if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                return try await persistDownloadCompletion(model: resolvedModel, progress: progress)
+                return progress
             }
         }
 
@@ -237,10 +236,9 @@ public extension RunAnywhere {
         subscribeRequest.modelID = startResult.modelID.isEmpty ? resolvedModel.id : startResult.modelID
         subscribeRequest.taskID = startResult.taskID
 
-        // Swift owns the polling/import loop, so a Swift task cancellation
-        // must also tear down the native download worker — otherwise the
-        // commons download keeps running after the caller's Task ends and
-        // updateRegistryOnCompletion=false leaves the registry inconsistent.
+        // Swift owns the polling loop, so a Swift task cancellation must also
+        // tear down the native download worker — otherwise the commons
+        // download keeps running after the caller's Task ends.
         do {
             while true {
                 try Task.checkCancellation()
@@ -248,7 +246,7 @@ public extension RunAnywhere {
 
                 let progress = await CppBridge.Download.shared.pollProgress(subscribeRequest)
                 if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                    return try await persistDownloadCompletion(model: resolvedModel, progress: progress)
+                    return progress
                 }
             }
         } catch is CancellationError {
@@ -298,6 +296,21 @@ public extension RunAnywhere {
     /// Execute or dry-run storage deletion as canonical generated proto data.
     static func deleteStorage(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
         await CppBridge.Storage.shared.delete(request)
+    }
+
+    /// Delete one downloaded model end-to-end: unload it if loaded, remove its
+    /// files through the platform adapter, and clear its registry path so the
+    /// entry returns to registered-not-downloaded (re-downloadable).
+    /// Convenience over `deleteStorage(_:)` with the canonical flag set.
+    @discardableResult
+    static func deleteModel(_ modelId: String) async -> RAStorageDeleteResult {
+        var request = RAStorageDeleteRequest()
+        request.modelIds = [modelId]
+        request.deleteFiles = true
+        request.clearRegistryPaths_p = true
+        request.unloadIfLoaded = true
+        request.allowPlatformDelete = true
+        return await deleteStorage(request)
     }
 
     /// Clear the SDK's Cache directory. Forwards to `CppBridge.FileManager.clearCache()`,
@@ -352,31 +365,16 @@ private extension RunAnywhere {
         return model
     }
 
-    /// Plan a download and retry once after clearing oversize partial bytes.
+    /// Plan a download. Oversize-partial self-healing happens inside the
+    /// commons planner (validate_existing_bytes deletes stale partials and
+    /// replans as a fresh download), so no Swift-side retry loop is needed.
     static func planDownload(_ request: RADownloadPlanRequest) async -> RADownloadPlanResult {
-        var plan = await CppBridge.Download.shared.plan(request)
-        guard !plan.canStart,
-              plan.failureReason == .oversizePartialBytes else {
-            return plan
-        }
-
-        for file in plan.files where !file.destinationPath.isEmpty {
-            let partialURL = URL(fileURLWithPath: file.destinationPath)
-            if FileManager.default.fileExists(atPath: partialURL.path) {
-                try? FileManager.default.removeItem(at: partialURL)
-                SDKLogger.download.warning(
-                    "Removed oversize partial download at \(file.destinationPath) for \(request.modelID)"
-                )
-            }
-        }
-
-        return await CppBridge.Download.shared.plan(request)
+        await CppBridge.Download.shared.plan(request)
     }
 
     /// Derive a stable model id from a download URL via commons
-    /// `rac_model_id_from_url` (the same extension-stripping logic the legacy
-    /// from-url register path used). Falls back to the human-readable name when
-    /// the URL yields nothing usable.
+    /// `rac_model_id_from_url`. Used by the archive overload, whose
+    /// caller-specified layout structure the from-url factory cannot express.
     static func generatedModelID(from url: String, name: String) -> String {
         var buffer = [CChar](repeating: 0, count: 256)
         let status = url.withCString { urlPtr in
@@ -426,44 +424,4 @@ private extension RunAnywhere {
         }
     }
 
-    static func persistDownloadCompletion(
-        model: RAModelInfo,
-        progress: RADownloadProgress
-    ) async throws -> RADownloadProgress {
-        let localPath = progress.localPath.isEmpty ? model.localPath : progress.localPath
-        guard !localPath.isEmpty else {
-            throw SDKException(
-                code: .invalidState,
-                message: "Download completed without a local_path; cannot import completion into the model registry",
-                category: .network
-            )
-        }
-
-        var importedModel = model
-        importedModel.localPath = localPath
-        importedModel.isDownloaded = true
-        importedModel.isAvailable = true
-        importedModel.updatedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-
-        var request = RAModelImportRequest()
-        request.model = importedModel
-        request.sourcePath = localPath
-        request.overwriteExisting = true
-        request.copyIntoManagedStorage = false
-        request.validateBeforeRegister = false
-        request.files = importedModel.multiFileDescriptors
-
-        let result = try await importModel(request)
-        guard result.success else {
-            throw SDKException(
-                code: .downloadFailed,
-                message: result.errorMessage.isEmpty
-                    ? "Downloaded model could not be imported into the registry"
-                    : result.errorMessage,
-                category: .network
-            )
-        }
-
-        return progress
-    }
 }

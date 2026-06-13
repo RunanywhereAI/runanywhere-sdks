@@ -1165,6 +1165,188 @@ class LoraAdapterDownloadCompletedResult extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
+/// Import of a user-picked local adapter file. Commons owns everything past
+/// the platform-readable source path: deterministic catalog matching (exact
+/// local-path match, else an unambiguous filename match), canonical placement
+/// under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
+/// manifest persistence, and catalog completion for matched entries.
+/// Platforms only resolve OS-specific access (security-scoped URLs, content
+/// URIs, Blob-to-FS staging) before calling.
+/// ---------------------------------------------------------------------------
+class LoraAdapterImportRequest extends $pb.GeneratedMessage {
+  factory LoraAdapterImportRequest({
+    $core.String? sourcePath,
+    $core.String? filename,
+  }) {
+    final result = create();
+    if (sourcePath != null) result.sourcePath = sourcePath;
+    if (filename != null) result.filename = filename;
+    return result;
+  }
+
+  LoraAdapterImportRequest._();
+
+  factory LoraAdapterImportRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoraAdapterImportRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoraAdapterImportRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sourcePath')
+    ..aOS(2, _omitFieldNames ? '' : 'filename')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoraAdapterImportRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoraAdapterImportRequest copyWith(
+          void Function(LoraAdapterImportRequest) updates) =>
+      super.copyWith((message) => updates(message as LoraAdapterImportRequest))
+          as LoraAdapterImportRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoraAdapterImportRequest create() => LoraAdapterImportRequest._();
+  @$core.override
+  LoraAdapterImportRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoraAdapterImportRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraAdapterImportRequest>(create);
+  static LoraAdapterImportRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sourcePath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sourcePath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSourcePath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSourcePath() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get filename => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set filename($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFilename() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFilename() => $_clearField(2);
+}
+
+class LoraAdapterImportResult extends $pb.GeneratedMessage {
+  factory LoraAdapterImportResult({
+    $core.bool? success,
+    $core.String? errorMessage,
+    $core.String? localPath,
+    $core.bool? matched,
+    LoraAdapterCatalogEntry? entry,
+  }) {
+    final result = create();
+    if (success != null) result.success = success;
+    if (errorMessage != null) result.errorMessage = errorMessage;
+    if (localPath != null) result.localPath = localPath;
+    if (matched != null) result.matched = matched;
+    if (entry != null) result.entry = entry;
+    return result;
+  }
+
+  LoraAdapterImportResult._();
+
+  factory LoraAdapterImportResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoraAdapterImportResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoraAdapterImportResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'errorMessage')
+    ..aOS(3, _omitFieldNames ? '' : 'localPath')
+    ..aOB(4, _omitFieldNames ? '' : 'matched')
+    ..aOM<LoraAdapterCatalogEntry>(5, _omitFieldNames ? '' : 'entry',
+        subBuilder: LoraAdapterCatalogEntry.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoraAdapterImportResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoraAdapterImportResult copyWith(
+          void Function(LoraAdapterImportResult) updates) =>
+      super.copyWith((message) => updates(message as LoraAdapterImportResult))
+          as LoraAdapterImportResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoraAdapterImportResult create() => LoraAdapterImportResult._();
+  @$core.override
+  LoraAdapterImportResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoraAdapterImportResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoraAdapterImportResult>(create);
+  static LoraAdapterImportResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get errorMessage => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set errorMessage($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasErrorMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearErrorMessage() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get localPath => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set localPath($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasLocalPath() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearLocalPath() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get matched => $_getBF(3);
+  @$pb.TagNumber(4)
+  set matched($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMatched() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMatched() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  LoraAdapterCatalogEntry get entry => $_getN(4);
+  @$pb.TagNumber(5)
+  set entry(LoraAdapterCatalogEntry value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasEntry() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearEntry() => $_clearField(5);
+  @$pb.TagNumber(5)
+  LoraAdapterCatalogEntry ensureEntry() => $_ensure(4);
+}
+
+/// ---------------------------------------------------------------------------
 /// Result of a LoRA compatibility pre-check.
 ///
 /// `base_model_required` is not present in any current SDK shape — it is

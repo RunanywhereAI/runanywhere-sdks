@@ -43,7 +43,7 @@ done
 
 # Single source of truth for codegen toolchain pins lives in
 # sdk/runanywhere-commons/VERSIONS so this script, idl/codegen/generate_*.sh,
-# gradle/libs.versions.toml, and Mintfile all agree. Load it here; fall back to
+# and gradle/libs.versions.toml all agree. Load it here; fall back to
 # documented defaults if anything is missing so the script still works on a
 # minimal checkout.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -30,13 +30,11 @@ namespace rac::features {
 // ComponentT must be default-constructible and expose a `lifecycle` member of
 // type rac_handle_t (every single-backend component struct satisfies this).
 template <typename ComponentT>
-inline rac_result_t create_lifecycle_component(rac_handle_t* out_handle,
-                                               rac_resource_type_t resource_type,
-                                               const char* logger_category,
-                                               rac_lifecycle_create_service_fn create_fn,
-                                               rac_lifecycle_destroy_service_fn destroy_fn,
-                                               const char* component_log_cat,
-                                               const char* created_message) {
+inline rac_result_t
+create_lifecycle_component(rac_handle_t* out_handle, rac_resource_type_t resource_type,
+                           const char* logger_category, rac_lifecycle_create_service_fn create_fn,
+                           rac_lifecycle_destroy_service_fn destroy_fn,
+                           const char* component_log_cat, const char* created_message) {
     if (!out_handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }

@@ -52,15 +52,17 @@ enum ModelCatalogBootstrap {
             name: "Qwen 2.5 0.5B Instruct Q6_K",
             url: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
             framework: .llamaCpp,
-            memoryRequirement: 600_000_000
+            memoryRequirement: 600_000_000,
+            // Base model of the seeded abliterated adapter
+            // (qwen2.5-0.5b-abliterated-lora-f16.gguf) — matches Android.
+            supportsLora: true
         )
         await registerLLM(
             id: "qwen2.5-1.5b-instruct-q4_k_m",
             name: "Qwen 2.5 1.5B Instruct Q4_K_M",
             url: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
             framework: .llamaCpp,
-            memoryRequirement: 2_500_000_000,
-            supportsLora: true
+            memoryRequirement: 2_500_000_000
         )
         await registerLLM(
             id: "lfm2-350m-q4_k_m",
@@ -75,6 +77,13 @@ enum ModelCatalogBootstrap {
             url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
             framework: .llamaCpp,
             memoryRequirement: 400_000_000
+        )
+        await registerLLM(
+            id: "lfm2.5-1.2b-instruct-q4_k_m",
+            name: "LiquidAI LFM2.5 1.2B Instruct Q4_K_M",
+            url: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 900_000_000
         )
         await registerLLM(
             id: "lfm2-1.2b-tool-q4_k_m",
@@ -113,6 +122,13 @@ enum ModelCatalogBootstrap {
             framework: .llamaCpp,
             memoryRequirement: 2_800_000_000,
             supportsThinking: true
+        )
+        await registerLLM(
+            id: "llama-3.2-3b-instruct-q4_k_m",
+            name: "Llama 3.2 3B Instruct Q4_K_M (Tool Calling)",
+            url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_000_000_000
         )
         logger.info("LLM models registered")
 
@@ -221,10 +237,38 @@ enum ModelCatalogBootstrap {
         )
         logger.info("ONNX Embedding models registered")
 
+        // --- LoRA adapters ------------------------------------------------------
+        // Mirrors Android `ModelBootstrap.seedLora` / `ModelCatalog.loraAdapters`.
+        await registerLoraAdapters()
+        logger.info("LoRA adapters registered")
+
         // MetalRT and Diffusion (CoreML) backends are deferred scope for
         // Swift v1. Their model catalog entries are intentionally omitted.
 
         logger.info("All modules and models registered")
+    }
+
+    /// Seed the curated LoRA adapter catalog. `registerArtifact` registers the
+    /// catalog entry plus its downloadable artifact record (no bytes fetched);
+    /// safe to re-run on every cold launch.
+    private static func registerLoraAdapters() async {
+        var adapter = RALoraAdapterCatalogEntry()
+        adapter.id = "abliterated-lora"
+        adapter.name = "Abliterated LoRA (F16)"
+        adapter.description_p = "Removes refusal behavior — model answers directly without disclaimers"
+        adapter.url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf"
+        adapter.filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf"
+        adapter.compatibleModels = ["qwen2.5-0.5b-instruct-q6_k"]
+        adapter.sizeBytes = 17_620_224
+        adapter.defaultScale = 1.0
+
+        do {
+            _ = try await RunAnywhere.lora.registerArtifact(adapter)
+        } catch {
+            logger.warning(
+                "Failed to register LoRA adapter: \(error.localizedDescription, privacy: .public)"
+            )
+        }
     }
 
     // MARK: - Registration helpers

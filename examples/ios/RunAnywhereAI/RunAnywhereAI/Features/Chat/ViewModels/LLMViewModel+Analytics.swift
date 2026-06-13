@@ -51,6 +51,10 @@ extension LLMViewModel {
             topP: nil,
             topK: nil
         )
+        // Prefer the TTFT carried on the result (streaming sets it); fall back
+        // to the value recorded from the SDK's first-token event. Mirrors
+        // Android ChatViewModel.buildStats.
+        let ttftMs = result.timeToFirstTokenMs ?? activeGenerationTTFTMs
 
         return MessageAnalytics(
             messageId: messageId,
@@ -59,7 +63,7 @@ extension LLMViewModel {
             modelName: modelName,
             framework: result.framework.isEmpty ? currentModel.framework.wireString : result.framework,
             timestamp: Date(),
-            timeToFirstToken: nil,
+            timeToFirstToken: ttftMs.map { $0 / 1000.0 },
             totalGenerationTime: result.latencyMs / 1000.0,
             thinkingTime: nil,
             responseTime: nil,
@@ -73,7 +77,7 @@ extension LLMViewModel {
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,
-            generationMode: .nonStreaming,
+            generationMode: options.streamingEnabled ? .streaming : .nonStreaming,
             generationParameters: generationParameters
         )
     }

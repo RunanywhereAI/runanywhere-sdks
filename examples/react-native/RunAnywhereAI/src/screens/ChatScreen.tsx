@@ -46,6 +46,7 @@ import {
   TypingIndicator,
   ChatInput,
   ToolCallingBadge,
+  LoRASheet,
 } from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
@@ -56,7 +57,7 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
-import { GENERATION_SETTINGS_KEYS } from '../types/settings';
+import { APP_STORAGE_KEYS, GENERATION_SETTINGS_KEYS } from '../types/settings';
 import {
   getFrameworkDisplayName,
   getPrimaryFramework,
@@ -65,8 +66,8 @@ import {
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import { ToolCallingOptions } from '@runanywhere/proto-ts/tool_calling';
 import {
-  InferenceFramework,
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
@@ -86,6 +87,29 @@ interface GenerationSettings {
   temperature: number;
   maxTokens: number;
   systemPrompt?: string;
+  thinkingModeEnabled: boolean;
+}
+
+function makeToolCallInfo(
+  result: Awaited<ReturnType<typeof RunAnywhere.generateWithTools>>
+) {
+  const firstCall = result.toolCalls[0];
+  if (!firstCall) return undefined;
+  const matchingResult =
+    result.toolResults.find(
+      (toolResult) =>
+        toolResult.toolCallId === firstCall.id ||
+        toolResult.toolCallId === firstCall.callId ||
+        toolResult.name === firstCall.name
+    ) ?? result.toolResults[0];
+
+  return {
+    toolName: firstCall.name,
+    arguments: firstCall.argumentsJson || '{}',
+    result: matchingResult?.resultJson,
+    success: matchingResult?.success ?? !matchingResult?.error,
+    error: matchingResult?.error,
+  };
 }
 
 export const ChatScreen: React.FC = () => {
@@ -112,9 +136,13 @@ export const ChatScreen: React.FC = () => {
   const [showModelSelection, setShowModelSelection] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [registeredToolCount, setRegisteredToolCount] = useState(0);
+  // LoRA adapter management (mirrors iOS LLMViewModel.loraAdapters).
+  const [showLoRASheet, setShowLoRASheet] = useState(false);
+  const [loraAdapterCount, setLoraAdapterCount] = useState(0);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
 
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
@@ -175,6 +203,9 @@ export const ChatScreen: React.FC = () => {
     const sysStr = await AsyncStorage.getItem(
       GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT
     );
+    const thinkingStr = await AsyncStorage.getItem(
+      GENERATION_SETTINGS_KEYS.THINKING_MODE_ENABLED
+    );
 
     const temperature =
       tempStr !== null && !Number.isNaN(parseFloat(tempStr))
@@ -182,13 +213,14 @@ export const ChatScreen: React.FC = () => {
         : 0.7;
     const maxTokens = maxStr ? parseInt(maxStr, 10) : 1000;
     const systemPrompt = sysStr && sysStr.trim() !== '' ? sysStr : undefined;
+    const thinkingModeEnabled = thinkingStr === 'true';
 
     // eslint-disable-next-line no-console -- demo settings diagnostic
     console.log(
-      `[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}`
+      `[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}, thinkingMode=${thinkingModeEnabled}`
     );
 
-    return { temperature, maxTokens, systemPrompt };
+    return { temperature, maxTokens, systemPrompt, thinkingModeEnabled };
   };
 
   /**
@@ -282,10 +314,7 @@ export const ChatScreen: React.FC = () => {
 
       if (result.success) {
         // Set the model info preserving the actual framework from the SDK model
-        const fw = getPrimaryFramework(
-          model,
-          InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-        );
+        const fw = getPrimaryFramework(model);
         const modelInfo: SDKModelInfo = {
           ...model,
           category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -325,7 +354,7 @@ export const ChatScreen: React.FC = () => {
    * that genuinely need the batch tool-calling form.
    */
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !currentConversation) return;
+    if (isLoading || !inputText.trim() || !currentConversation) return;
 
     const userMessage: Message = {
       id: generateId(),
@@ -341,6 +370,7 @@ export const ChatScreen: React.FC = () => {
     setIsLoading(true);
 
     const assistantMessageId = generateId();
+    let assistantMessageInserted = false;
 
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
@@ -358,7 +388,17 @@ export const ChatScreen: React.FC = () => {
         currentModel?.id
       );
 
-      let accumulatedText = '';
+      const registeredTools = await RunAnywhere.getRegisteredTools();
+      const toolCallingEnabled =
+        (await AsyncStorage.getItem(APP_STORAGE_KEYS.TOOL_CALLING_ENABLED)) ===
+        'true';
+      const shouldUseTools = toolCallingEnabled && registeredTools.length > 0;
+      const supportsThinking = currentModel?.supportsThinking ?? false;
+      const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
+      const disableThinking = supportsThinking && !options.thinkingModeEnabled;
+      const generationStartMs = Date.now();
+      const abortController = new AbortController();
+      generationAbortRef.current = abortController;
 
       const genOptions = LLMGenerationOptions.fromPartial({
         maxTokens: options.maxTokens ?? 512,
@@ -368,10 +408,6 @@ export const ChatScreen: React.FC = () => {
         repetitionPenalty: 1.0,
         stopSequences: [],
         streamingEnabled: true,
-        preferredFramework:
-          currentModel?.preferredFramework ??
-          currentModel?.framework ??
-          InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
         systemPrompt: options.systemPrompt,
         enableRealTimeTracking: false,
         seed: 0,
@@ -381,6 +417,7 @@ export const ChatScreen: React.FC = () => {
         minP: 0,
         echoPrompt: false,
         nThreads: 0,
+        disableThinking,
       });
 
       const frameworkName = getFrameworkDisplayName(
@@ -401,77 +438,137 @@ export const ChatScreen: React.FC = () => {
         },
       };
       await addMessage(initialAssistantMessage, currentConversation.id);
+      assistantMessageInserted = true;
 
-      // Stream tokens as they arrive — canonical cross-SDK path. We drive
-      // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
-      // like iOS LLMViewModel+Generation.swift: it consumes the
-      // `generateStream` AsyncIterable, accumulates the transcript, and
-      // invokes `onToken` with the full text so far for live UI updates.
-      //
-      // `updateMessage` is a synchronous in-memory store write (no per-token
-      // disk write). Because the whole stream resolves on the microtask
-      // queue, we must hand a macrotask back to React inside `onToken`
-      // (`setTimeout(0)`) so it can paint each token into the assistant
-      // bubble — otherwise the synchronous-update loop runs to completion
-      // before React ever re-renders and the bubble appears empty mid-stream.
-      const eventStream = RunAnywhere.generateStream(prompt, genOptions);
-      const result = await RunAnywhere.aggregateStream(
-        prompt,
-        eventStream,
-        async (transcript) => {
-          accumulatedText = transcript;
-          updateMessage(
-            {
-              id: assistantMessageId,
-              role: MessageRole.Assistant,
-              content: accumulatedText,
-              timestamp: new Date(),
-              modelInfo: {
-                modelId: currentModel?.id || 'unknown',
-                modelName: currentModel?.name || 'Unknown Model',
-                framework: frameworkName,
-                frameworkDisplayName: frameworkName,
-              },
+      let finalMessage: Message;
+      if (shouldUseTools) {
+        const toolOptions = ToolCallingOptions.fromPartial({
+          tools: registeredTools,
+          autoExecute: true,
+          maxIterations: 5,
+          keepToolsAvailable: false,
+          formatHint: 'auto',
+          maxTokens: options.maxTokens,
+          temperature: options.temperature,
+          systemPrompt: options.systemPrompt,
+          disableThinking,
+        });
+        const result = await RunAnywhere.generateWithTools(
+          prompt,
+          toolOptions,
+          {
+            signal: abortController.signal,
+            llmOptions: {
+              maxTokens: options.maxTokens,
+              temperature: options.temperature,
+              topP: 1.0,
+              systemPrompt: options.systemPrompt,
             },
-            currentConversation.id
-          );
-          flatListRef.current?.scrollToEnd({ animated: false });
-          // Yield a macrotask so React flushes this token to the screen.
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      );
+          }
+        );
+        const finalContent =
+          result.text || result.rawText || '(No response generated)';
+        const elapsedMs = Date.now() - generationStartMs;
+        const estimatedTokens = Math.max(
+          1,
+          Math.floor(finalContent.length / 4)
+        );
 
-      const finalContent =
-        result.text || accumulatedText || '(No response generated)';
-
-      // Build the final message with analytics and persist to disk once
-      // (mirrors iOS finalizeGeneration / updateConversation).
-      const finalMessage: Message = {
-        id: assistantMessageId,
-        role: MessageRole.Assistant,
-        content: finalContent,
-        timestamp: new Date(),
-        modelInfo: {
-          modelId: currentModel?.id || 'unknown',
-          modelName: currentModel?.name || 'Unknown Model',
-          framework: frameworkName,
-          frameworkDisplayName: frameworkName,
-        },
-        analytics: {
-          performance: {
-            latencyMs: result.generationTimeMs,
-            memoryBytes: 0,
-            throughputTokensPerSec: result.tokensPerSecond,
-            promptTokens: result.inputTokens,
-            completionTokens: result.tokensGenerated,
+        finalMessage = {
+          id: assistantMessageId,
+          role: MessageRole.Assistant,
+          content: finalContent,
+          thinkingContent: result.thinkingContent,
+          timestamp: new Date(),
+          modelInfo: {
+            modelId: currentModel?.id || 'unknown',
+            modelName: currentModel?.name || 'Unknown Model',
+            framework: frameworkName,
+            frameworkDisplayName: frameworkName,
           },
-          timeToFirstToken: result.ttftMs,
-          completionStatus: 'completed',
-          wasThinkingMode: false,
-          wasInterrupted: false,
-          retryCount: 0,
-        },
-      };
+          toolCallInfo: makeToolCallInfo(result),
+          analytics: {
+            performance: {
+              latencyMs: elapsedMs,
+              memoryBytes: 0,
+              throughputTokensPerSec:
+                elapsedMs > 0 ? estimatedTokens / (elapsedMs / 1000) : 0,
+              promptTokens: Math.max(1, Math.floor(prompt.length / 4)),
+              completionTokens: estimatedTokens,
+            },
+            completionStatus: result.errorMessage ? 'error' : 'completed',
+            wasThinkingMode,
+            wasInterrupted: false,
+            retryCount: 0,
+          },
+        };
+      } else {
+        let accumulatedText = '';
+
+        // Stream tokens as they arrive — canonical cross-SDK path. We drive
+        // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
+        // like iOS LLMViewModel+Generation.swift.
+        const eventStream = RunAnywhere.generateStream(prompt, genOptions);
+        const result = await RunAnywhere.aggregateStream(
+          prompt,
+          eventStream,
+          async (transcript) => {
+            accumulatedText = transcript;
+            updateMessage(
+              {
+                id: assistantMessageId,
+                role: MessageRole.Assistant,
+                content: accumulatedText,
+                timestamp: new Date(),
+                modelInfo: {
+                  modelId: currentModel?.id || 'unknown',
+                  modelName: currentModel?.name || 'Unknown Model',
+                  framework: frameworkName,
+                  frameworkDisplayName: frameworkName,
+                },
+              },
+              currentConversation.id
+            );
+            flatListRef.current?.scrollToEnd({ animated: false });
+            await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          }
+        );
+
+        const finalContent =
+          result.text || accumulatedText || '(No response generated)';
+
+        // Build the final message with analytics and persist to disk once
+        // (mirrors iOS finalizeGeneration / updateConversation).
+        finalMessage = {
+          id: assistantMessageId,
+          role: MessageRole.Assistant,
+          content: finalContent,
+          thinkingContent: result.thinkingContent,
+          timestamp: new Date(),
+          modelInfo: {
+            modelId: currentModel?.id || 'unknown',
+            modelName: currentModel?.name || 'Unknown Model',
+            framework: frameworkName,
+            frameworkDisplayName: frameworkName,
+          },
+          analytics: {
+            performance: {
+              latencyMs: result.generationTimeMs,
+              memoryBytes: 0,
+              throughputTokensPerSec: result.tokensPerSecond,
+              promptTokens: result.inputTokens,
+              completionTokens: result.tokensGenerated,
+            },
+            timeToFirstToken: result.ttftMs,
+            thinkingTokens: result.thinkingTokens,
+            responseTokens: result.responseTokens,
+            completionStatus: result.errorMessage ? 'error' : 'completed',
+            wasThinkingMode,
+            wasInterrupted: false,
+            retryCount: 0,
+          },
+        };
+      }
 
       // Apply analytics fields in-memory first, then persist once.
       updateMessage(finalMessage, currentConversation.id);
@@ -489,19 +586,53 @@ export const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      await addMessage(
-        {
-          id: assistantMessageId,
-          role: MessageRole.Assistant,
-          content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Load a model first.`,
-          timestamp: new Date(),
+      const wasStopped = generationAbortRef.current?.signal.aborted ?? false;
+      const errorContent = wasStopped
+        ? 'Generation stopped.'
+        : `Error: ${error}\n\nThis likely means no LLM model is loaded. Load a model first.`;
+      const errorMessage: Message = {
+        id: assistantMessageId,
+        role: MessageRole.Assistant,
+        content: errorContent,
+        timestamp: new Date(),
+        analytics: {
+          performance: {
+            latencyMs: 0,
+            memoryBytes: 0,
+            throughputTokensPerSec: 0,
+            promptTokens: 0,
+            completionTokens: 0,
+          },
+          completionStatus: wasStopped ? 'interrupted' : 'error',
+          wasThinkingMode: false,
+          wasInterrupted: wasStopped,
+          retryCount: 0,
         },
-        currentConversation.id
-      );
+      };
+      if (assistantMessageInserted) {
+        updateMessage(errorMessage, currentConversation.id);
+      } else {
+        await addMessage(errorMessage, currentConversation.id);
+      }
     } finally {
+      generationAbortRef.current = null;
       setIsLoading(false);
     }
-  }, [inputText, currentConversation, currentModel, addMessage, updateMessage, updateConversation]);
+  }, [
+    isLoading,
+    inputText,
+    currentConversation,
+    currentModel,
+    addMessage,
+    updateMessage,
+    updateConversation,
+  ]);
+
+  const handleStopGeneration = useCallback(() => {
+    generationAbortRef.current?.abort();
+    void RunAnywhere.cancelGeneration();
+    setIsLoading(false);
+  }, []);
 
   /**
    * Create a new conversation (clears current chat)
@@ -683,11 +814,41 @@ export const ChatScreen: React.FC = () => {
         <ToolCallingBadge toolCount={registeredToolCount} />
       )}
 
+      {/* LoRA pill (mirrors iOS ChatMessageListView's LoRA row above input) */}
+      {currentModel && (
+        <View style={styles.loraRow}>
+          <TouchableOpacity
+            style={[
+              styles.loraPill,
+              loraAdapterCount > 0 && styles.loraPillActive,
+            ]}
+            onPress={() => setShowLoRASheet(true)}
+          >
+            <Icon
+              name="sparkles"
+              size={14}
+              color={
+                loraAdapterCount > 0 ? Colors.textWhite : Colors.primaryPurple
+              }
+            />
+            <Text
+              style={[
+                styles.loraPillText,
+                loraAdapterCount > 0 && styles.loraPillTextActive,
+              ]}
+            >
+              {loraAdapterCount > 0 ? `LoRA x${loraAdapterCount}` : '+ LoRA'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Input Area */}
       <ChatInput
         value={inputText}
         onChangeText={setInputText}
         onSend={handleSend}
+        onStop={handleStopGeneration}
         disabled={!currentModel || !currentConversation}
         isLoading={isLoading}
         placeholder={
@@ -707,6 +868,20 @@ export const ChatScreen: React.FC = () => {
         <ChatAnalyticsScreen
           messages={messages}
           onClose={() => setShowAnalytics(false)}
+        />
+      </Modal>
+
+      {/* LoRA Adapter Management Modal */}
+      <Modal
+        visible={showLoRASheet}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowLoRASheet(false)}
+      >
+        <LoRASheet
+          modelId={currentModel?.id ?? null}
+          onClose={() => setShowLoRASheet(false)}
+          onAdaptersChanged={(adapters) => setLoraAdapterCount(adapters.length)}
         />
       </Modal>
 
@@ -802,6 +977,31 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     maxWidth: 280,
+  },
+  loraRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Padding.padding16,
+    paddingBottom: Spacing.small,
+  },
+  loraPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: Colors.primaryPurple,
+    borderRadius: 14,
+    paddingHorizontal: Padding.padding12,
+    paddingVertical: 4,
+  },
+  loraPillActive: {
+    backgroundColor: Colors.primaryPurple,
+  },
+  loraPillText: {
+    ...Typography.caption2,
+    color: Colors.primaryPurple,
+  },
+  loraPillTextActive: {
+    color: Colors.textWhite,
   },
 });
 

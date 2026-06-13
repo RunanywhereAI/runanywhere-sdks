@@ -3,19 +3,15 @@
 // runanywhere_downloads.dart — v4 Downloads capability. Owns model
 // download lifecycle, delete, and storage inspection.
 
-import 'dart:io';
 
-import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/component_types.pbenum.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
-import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
-import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events;
+import 'package:runanywhere/generated/model_types.pb.dart'
+    show ModelInfo;
 import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
-import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
@@ -41,47 +37,6 @@ class RunAnywhereDownloads {
       throw SDKException.notInitialized();
     }
     return DartBridgeDownload.instance.planProto(request);
-  }
-
-  /// Plan a download and retry once after clearing oversize partial bytes.
-  ///
-  /// Mirrors Swift `RunAnywhere+Storage.planDownload(_:)`: when a prior
-  /// interrupted download left more bytes on disk than the new plan expects
-  /// (e.g. the server reported a smaller Content-Length after a CDN swap),
-  /// delete the oversize partials and re-plan instead of surfacing
-  /// `existing partial bytes exceed` to the caller as a hard error.
-  Future<DownloadPlanResult> _planWithSelfHeal(
-    DownloadPlanRequest request,
-  ) async {
-    final planResult = await plan(request);
-    if (planResult.canStart ||
-        planResult.failureReason !=
-            DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES) {
-      return planResult;
-    }
-
-    final logger = SDKLogger('RunAnywhere.Download');
-    for (final file in planResult.files) {
-      final destinationPath = file.destinationPath;
-      if (destinationPath.isEmpty) continue;
-      final partial = File(destinationPath);
-      if (partial.existsSync()) {
-        try {
-          partial.deleteSync();
-          logger.warning(
-            'Removed oversize partial download at $destinationPath '
-            'for ${request.modelId}',
-          );
-        } catch (e) {
-          logger.warning(
-            'Failed to remove oversize partial download at $destinationPath '
-            'for ${request.modelId}: $e',
-          );
-        }
-      }
-    }
-
-    return plan(request);
   }
 
   /// Start a generated download plan in C++.
@@ -128,10 +83,14 @@ class RunAnywhereDownloads {
       return;
     }
 
-    final planResult = await _planWithSelfHeal(DownloadPlanRequest(
+    final planResult = await plan(DownloadPlanRequest(
       modelId: modelId,
       model: model,
       resumeExisting: true,
+      // Commons self-heals oversize partials at plan time and verifies
+      // declared checksums during transfer (Swift parity).
+      validateExistingBytes: true,
+      verifyChecksums: model.checksumSha256.isNotEmpty,
       allowMeteredNetwork: true,
     ));
     if (!planResult.canStart) {
@@ -154,6 +113,11 @@ class RunAnywhereDownloads {
       modelId: modelId,
       plan: planResult,
       resume: planResult.canResume,
+      // Commons owns the completion registry mutation: the orchestrator's
+      // self-heal calls rac_model_registry_update_download_status, which
+      // also persists the durable .rac-manifest.binpb sidecar restored on
+      // the next cold launch.
+      updateRegistryOnCompletion: true,
     ));
     if (!startResult.accepted) {
       yield DownloadProgress(
@@ -173,10 +137,6 @@ class RunAnywhereDownloads {
     if (startResult.hasInitialProgress()) {
       yield startResult.initialProgress;
       if (_isTerminalState(startResult.initialProgress.state)) {
-        if (startResult.initialProgress.state ==
-            DownloadState.DOWNLOAD_STATE_COMPLETED) {
-          await _handleDownloadCompleted(startResult.initialProgress, logger);
-        }
         _activeTaskIdsByModel.remove(modelId);
         return;
       }
@@ -208,9 +168,6 @@ class RunAnywhereDownloads {
 
         if (_isTerminalState(progress.state)) {
           reachedTerminal = true;
-          if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
-            await _handleDownloadCompleted(progress, logger);
-          }
           break;
         }
       }
@@ -240,48 +197,6 @@ class RunAnywhereDownloads {
     return state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
         state == DownloadState.DOWNLOAD_STATE_FAILED ||
         state == DownloadState.DOWNLOAD_STATE_CANCELLED;
-  }
-
-  Future<void> _handleDownloadCompleted(
-    DownloadProgress progress,
-    SDKLogger logger,
-  ) async {
-    var localPath = progress.localPath;
-
-    try {
-      await RunAnywhereModels.shared.refreshModelRegistry();
-      final model = await DartBridgeModelRegistry.instance
-          .getProtoModel(progress.modelId);
-      if (model != null && model.localPath.isNotEmpty) {
-        localPath = model.localPath;
-      }
-    } catch (e) {
-      logger.warning(
-        'Failed to refresh model registry after download: $e',
-      );
-    }
-
-    DartBridgeEvents.instance.emit(sdk_events.SDKEvent(
-      timestampMs: fixnum.Int64(DateTime.now().millisecondsSinceEpoch),
-      category: EventCategory.EVENT_CATEGORY_MODEL,
-      source: 'flutter.downloads',
-      model: sdk_events.ModelEvent(
-        kind: sdk_events.ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED,
-        modelId: progress.modelId,
-        taskId: progress.taskId,
-        progress: _completedProgress(progress),
-        bytesDownloaded: progress.bytesDownloaded,
-        totalBytes: progress.totalBytes,
-        downloadState: progress.state.name,
-        localPath: localPath,
-      ),
-    ));
-  }
-
-  static double _completedProgress(DownloadProgress progress) {
-    if (progress.overallProgress > 0) return progress.overallProgress;
-    if (progress.stageProgress > 0) return progress.stageProgress;
-    return 1;
   }
 
   /// Cancel an active model download if the adapter still owns it.
@@ -337,6 +252,7 @@ class RunAnywhereDownloads {
       deleteFiles: true,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
+      allowPlatformDelete: true,
     ));
   }
 
@@ -351,6 +267,7 @@ class RunAnywhereDownloads {
       deleteFiles: true,
       clearRegistryPaths: true,
       unloadIfLoaded: true,
+      allowPlatformDelete: true,
     ));
   }
 

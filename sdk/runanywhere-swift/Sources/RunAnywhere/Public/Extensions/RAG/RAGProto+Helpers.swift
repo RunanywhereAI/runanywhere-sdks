@@ -50,6 +50,17 @@ extension RARAGDocument {
             }
         }
     }
+
+    public var metadataJSON: String? {
+        guard !metadata.isEmpty,
+              let data = try? JSONSerialization.data(
+                withJSONObject: metadata,
+                options: [.sortedKeys]
+              ) else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
+    }
 }
 
 // MARK: - RARAGQueryOptions

@@ -33,15 +33,15 @@
 namespace {
 
 struct CloudProviderAdapter {
-    JavaVM*   vm = nullptr;
-    jobject   provider = nullptr;  // GlobalRef to NativeCloudSttProvider
+    JavaVM* vm = nullptr;
+    jobject provider = nullptr;  // GlobalRef to NativeCloudSttProvider
     jmethodID mid_invoke = nullptr;
 };
 
 // name → adapter. Guarded by g_mutex; the commons-side named table
 // (rac_cloud_stt_provider.cpp) owns the callback-pointer publication, this map
 // only owns the JNI GlobalRef lifetime per name.
-std::mutex                                  g_mutex;
+std::mutex g_mutex;
 std::map<std::string, CloudProviderAdapter*> g_adapters;
 
 inline jint attach_current_thread(JavaVM* vm, JNIEnv** out_env) {
@@ -55,7 +55,7 @@ inline jint attach_current_thread(JavaVM* vm, JNIEnv** out_env) {
 struct EnvScope {
     JavaVM* vm;
     JNIEnv* env = nullptr;
-    bool    attached = false;
+    bool attached = false;
 
     explicit EnvScope(JavaVM* v) : vm(v) {
         if (vm == nullptr) {
@@ -94,12 +94,9 @@ char* dup_cstr(const char* s, size_t len) {
 // Commons-facing callback: marshal the request to Kotlin and copy back the
 // result JSON. Fails with an error code on any JNI fault; the engine then
 // surfaces a transcribe failure (it never silently fabricates a transcript).
-rac_result_t cloud_stt_transcribe_adapter(const char*    config_json,
-                                          const uint8_t* audio,
-                                          size_t         audio_len,
-                                          int32_t        audio_format,
-                                          char**         out_result_json,
-                                          void*          user_data) {
+rac_result_t cloud_stt_transcribe_adapter(const char* config_json, const uint8_t* audio,
+                                          size_t audio_len, int32_t audio_format,
+                                          char** out_result_json, void* user_data) {
     auto* a = static_cast<CloudProviderAdapter*>(user_data);
     if (a == nullptr || out_result_json == nullptr) {
         return RAC_ERROR_NULL_POINTER;

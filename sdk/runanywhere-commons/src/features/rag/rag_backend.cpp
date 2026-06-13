@@ -184,9 +184,10 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
         // loss without notification. Callers see this as
         // RAC_ERROR_PROCESSING_FAILED via rac_rag_ingest_proto.
         if (embeddings[i].size() != embedding_dimension) {
-            LOGE("Embedding dimension mismatch at chunk %zu: got %zu, expected %zu; aborting "
-                 "document ingest",
-                 i, embeddings[i].size(), embedding_dimension);
+            LOGE(
+                "Embedding dimension mismatch at chunk %zu: got %zu, expected %zu; aborting "
+                "document ingest",
+                i, embeddings[i].size(), embedding_dimension);
             return false;
         }
 

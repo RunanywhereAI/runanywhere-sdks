@@ -1,61 +1,15 @@
 // solutions_view.dart — demo for
 // `RunAnywhere.solutions.run(yaml: ...)`.
 //
-// Two buttons run the canonical voice_agent.yaml + rag.yaml solutions
-// shipped at sdk/runanywhere-commons/examples/solutions/. The YAMLs are
-// embedded inline as string constants — no asset-bundling churn — and
-// each lifecycle transition is appended to a simple scrolling log.
+// Two buttons run the canonical voice_agent.yaml + rag.yaml solutions. The
+// YAML payloads come from `lib/generated/solutions_yaml.dart`, emitted by
+// `scripts/sync-solutions-yamls.sh` from the canonical
+// `sdk/runanywhere-commons/examples/solutions/*.yaml` — no inline copies,
+// no drift (mirrors the iOS / React Native example sync scripts).
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart';
-
-// Use model IDs that the Flutter example actually registers in
-// lib/app/runanywhere_ai_app.dart; the placeholder IDs from
-// sdk/runanywhere-commons/examples/solutions/*.yaml (whisper-base, kokoro,
-// silero-v5, bge-small-en-v1.5, bge-reranker-v2-m3, qwen3-4b-q4_k_m) are
-// not seeded in any example catalog, so handing them to
-// RunAnywhere.solutions.run produces a "model not found in registry"
-// failure as soon as the operators load. rerank_model_id is omitted because
-// no example app seeds a reranker model.
-const _voiceAgentYaml = '''
-voice_agent:
-  llm_model_id: "smollm2-360m-q8_0"
-  stt_model_id: "sherpa-onnx-whisper-tiny.en"
-  tts_model_id: "vits-piper-en_US-lessac-medium"
-  vad_model_id: "silero-vad"
-
-  sample_rate_hz: 16000
-  chunk_ms: 20
-  audio_source: "microphone"
-
-  enable_barge_in: true
-  barge_in_threshold_ms: 200
-
-  system_prompt: "You are a helpful voice assistant. Keep answers concise."
-  max_context_tokens: 4096
-  temperature: 0.7
-
-  emit_partials: true
-  emit_thoughts: false
-''';
-
-const _ragYaml = '''
-rag:
-  embed_model_id: "all-minilm-l6-v2"
-  llm_model_id: "smollm2-360m-q8_0"
-
-  vector_store: "usearch"
-  vector_store_path: "/tmp/ra-rag.usearch"
-
-  retrieve_k: 24
-  rerank_top: 6
-
-  bm25_k1: 1.2
-  bm25_b: 0.75
-  rrf_k: 60
-
-  prompt_template: "Use the context below to answer.\\n\\nContext:\\n{{context}}\\n\\nQuestion: {{query}}"
-''';
+import 'package:runanywhere_ai/generated/solutions_yaml.dart';
 
 class SolutionsView extends StatefulWidget {
   const SolutionsView({super.key});
@@ -113,7 +67,8 @@ class _SolutionsViewState extends State<SolutionsView> {
                   child: ElevatedButton(
                     onPressed: _isRunning
                         ? null
-                        : () => _runSolution('Voice Agent', _voiceAgentYaml),
+                        : () =>
+                            _runSolution('Voice Agent', SolutionsYaml.voiceAgent),
                     child: const Text('Voice Agent'),
                   ),
                 ),
@@ -122,7 +77,7 @@ class _SolutionsViewState extends State<SolutionsView> {
                   child: ElevatedButton(
                     onPressed: _isRunning
                         ? null
-                        : () => _runSolution('RAG', _ragYaml),
+                        : () => _runSolution('RAG', SolutionsYaml.rag),
                     child: const Text('RAG'),
                   ),
                 ),

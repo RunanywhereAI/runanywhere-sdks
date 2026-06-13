@@ -1,14 +1,12 @@
 /**
  * TabNavigator - Bottom Tab Navigation
  *
- * Reference: iOS ContentView.swift with 6 tabs:
- * - Chat (LLM)
- * - STT (Speech-to-Text)
- * - TTS (Text-to-Speech)
- * - Voice (Voice Assistant - STT + LLM + TTS)
- * - Vision (VLM only; image generation is Swift sample app only)
- * - Validation (deterministic evidence harness)
- * - Settings (includes Tool Settings)
+ * Reference: iOS ContentView.swift with 5 tabs:
+ * - Chat
+ * - Vision
+ * - Voice
+ * - More
+ * - Settings
  */
 
 import React from 'react';
@@ -17,60 +15,54 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import type { RootTabParamList, VisionStackParamList } from '../types';
+import type {
+  MoreStackParamList,
+  RootTabParamList,
+  SettingsStackParamList,
+  VisionStackParamList,
+} from '../types';
 
-// Screens
 import ChatScreen from '../screens/ChatScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
 import RAGScreen from '../screens/RAGScreen';
 import SolutionsScreen from '../screens/SolutionsScreen';
+import MoreScreen from '../screens/MoreScreen';
+import StorageScreen from '../screens/StorageScreen';
+import VADScreen from '../screens/VADScreen';
 import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
-import ValidationHarnessScreen from '../screens/ValidationHarnessScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import BenchmarkScreen from '../screens/BenchmarkScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const VisionStack = createNativeStackNavigator<VisionStackParamList>();
+const MoreStack = createNativeStackNavigator<MoreStackParamList>();
+const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
-/**
- * Tab icon mapping - matching Swift sample app (ContentView.swift)
- */
 const tabIcons: Record<
   keyof RootTabParamList,
   { focused: string; unfocused: string }
 > = {
   Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
-  STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
-  TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
-  Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
-  RAG: { focused: 'search', unfocused: 'search-outline' }, // search for RAG
-  Vision: { focused: 'eye', unfocused: 'eye-outline' }, // eye for vision/VLM
-  Solutions: { focused: 'layers', unfocused: 'layers-outline' }, // YAML pipeline runner
-  Validation: { focused: 'flask', unfocused: 'flask-outline' },
+  Vision: { focused: 'eye', unfocused: 'eye-outline' },
+  Voice: { focused: 'mic', unfocused: 'mic-outline' },
+  More: {
+    focused: 'ellipsis-horizontal',
+    unfocused: 'ellipsis-horizontal-outline',
+  },
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
-/**
- * Tab display names - matching iOS Swift sample app (ContentView.swift)
- * iOS uses: Chat, Vision, Transcribe, Speak, Voice, Settings
- */
 const tabLabels: Record<keyof RootTabParamList, string> = {
   Chat: 'Chat',
-  STT: 'Transcribe',
-  TTS: 'Speak',
-  Voice: 'Voice',
-  RAG: 'RAG',
   Vision: 'Vision',
-  Solutions: 'Solutions',
-  Validation: 'Validation',
+  Voice: 'Voice',
+  More: 'More',
   Settings: 'Settings',
 };
 
-/**
- * Stable tab bar icon component to avoid react/no-unstable-nested-components
- */
 const renderTabBarIcon = (
   routeName: keyof RootTabParamList,
   focused: boolean,
@@ -101,67 +93,55 @@ export const TabNavigator: React.FC = () => {
         headerShown: false,
       })}
     >
-      {/* Tab 0: Chat (LLM) */}
       <Tab.Screen
         name="Chat"
         component={ChatScreen}
         options={{ tabBarLabel: tabLabels.Chat }}
       />
-      {/* Tab 1: Speech-to-Text */}
-      <Tab.Screen
-        name="STT"
-        component={STTScreen}
-        options={{ tabBarLabel: tabLabels.STT }}
-      />
-      {/* Tab 2: Text-to-Speech */}
-      <Tab.Screen
-        name="TTS"
-        component={TTSScreen}
-        options={{ tabBarLabel: tabLabels.TTS }}
-      />
-      {/* Tab 3: Voice Assistant (STT + LLM + TTS) */}
-      <Tab.Screen
-        name="Voice"
-        component={VoiceAssistantScreen}
-        options={{ tabBarLabel: tabLabels.Voice }}
-      />
-      {/* Tab 4: RAG (Retrieval-Augmented Generation) */}
-      <Tab.Screen
-        name="RAG"
-        component={RAGScreen}
-        options={{ tabBarLabel: tabLabels.RAG }}
-      />
-      {/* Tab 5: Vision (hub -> VLM) */}
       <Tab.Screen
         name="Vision"
         component={VisionStackScreen}
         options={{ tabBarLabel: tabLabels.Vision }}
       />
-      {/* Tab 6: Solutions (YAML pipeline runner) */}
       <Tab.Screen
-        name="Solutions"
-        component={SolutionsScreen}
-        options={{ tabBarLabel: tabLabels.Solutions }}
+        name="Voice"
+        component={VoiceAssistantScreen}
+        options={{ tabBarLabel: tabLabels.Voice }}
       />
-      {/* Tab 7: Validation evidence harness */}
       <Tab.Screen
-        name="Validation"
-        component={ValidationHarnessScreen}
-        options={{ tabBarLabel: tabLabels.Validation }}
+        name="More"
+        component={MoreStackScreen}
+        options={{ tabBarLabel: tabLabels.More }}
       />
-      {/* Tab 8: Settings */}
       <Tab.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={SettingsStackScreen}
         options={{ tabBarLabel: tabLabels.Settings }}
       />
     </Tab.Navigator>
   );
 };
 
-/**
- * Vision tab: stack with Hub -> VLM
- */
+const SettingsStackScreen: React.FC = () => {
+  return (
+    <SettingsStack.Navigator
+      screenOptions={{ headerShown: true }}
+      initialRouteName="SettingsHome"
+    >
+      <SettingsStack.Screen
+        name="SettingsHome"
+        component={SettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <SettingsStack.Screen
+        name="Benchmarks"
+        component={BenchmarkScreen}
+        options={{ title: 'Benchmarks' }}
+      />
+    </SettingsStack.Navigator>
+  );
+};
+
 const VisionStackScreen: React.FC = () => {
   return (
     <VisionStack.Navigator
@@ -179,6 +159,51 @@ const VisionStackScreen: React.FC = () => {
         options={{ title: 'Vision Chat (VLM)' }}
       />
     </VisionStack.Navigator>
+  );
+};
+
+const MoreStackScreen: React.FC = () => {
+  return (
+    <MoreStack.Navigator
+      screenOptions={{ headerShown: true }}
+      initialRouteName="MoreHome"
+    >
+      <MoreStack.Screen
+        name="MoreHome"
+        component={MoreScreen}
+        options={{ headerShown: false }}
+      />
+      <MoreStack.Screen
+        name="STT"
+        component={STTScreen}
+        options={{ title: 'Transcribe' }}
+      />
+      <MoreStack.Screen
+        name="TTS"
+        component={TTSScreen}
+        options={{ title: 'Speak' }}
+      />
+      <MoreStack.Screen
+        name="RAG"
+        component={RAGScreen}
+        options={{ title: 'RAG' }}
+      />
+      <MoreStack.Screen
+        name="VAD"
+        component={VADScreen}
+        options={{ title: 'Voice Activity' }}
+      />
+      <MoreStack.Screen
+        name="Storage"
+        component={StorageScreen}
+        options={{ title: 'Storage' }}
+      />
+      <MoreStack.Screen
+        name="Solutions"
+        component={SolutionsScreen}
+        options={{ title: 'Solutions' }}
+      />
+    </MoreStack.Navigator>
   );
 };
 

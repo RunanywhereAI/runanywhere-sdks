@@ -810,9 +810,14 @@ static TestResult test_proto_plan_resume_metadata() {
     return r;
 }
 
-static TestResult test_proto_plan_rejects_invalid_existing_bytes() {
+// Oversized partials (existing bytes > declared expected size) are
+// self-healed by the planner when validate_existing_bytes is requested: the
+// stale partial is deleted and the entry replanned as a fresh download. The
+// plan fails with OVERSIZE_PARTIAL_BYTES only when that deletion itself
+// fails (see seed_resume_candidate in download_orchestrator.cpp).
+static TestResult test_proto_plan_self_heals_oversized_existing_bytes() {
     TestResult r;
-    r.test_name = "proto_plan_rejects_invalid_existing_bytes";
+    r.test_name = "proto_plan_self_heals_oversized_existing_bytes";
 
     std::string base_dir = create_temp_dir("proto_bad_existing");
     ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
@@ -850,9 +855,12 @@ static TestResult test_proto_plan_rejects_invalid_existing_bytes() {
     ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
     rac_proto_buffer_free(&buffer);
 
-    ASSERT_TRUE(!plan.can_start(), "Oversized partial bytes should be rejected");
-    ASSERT_TRUE(plan.error_message().find("existing") != std::string::npos,
-                "Error should describe existing-byte validation");
+    ASSERT_TRUE(plan.can_start(), "Oversized partial should self-heal into a startable plan");
+    ASSERT_TRUE(plan.files_size() == 1, "Plan should include one file");
+    ASSERT_TRUE(!plan.files(0).is_resume_candidate(),
+                "Healed entry must replan as a fresh download, not a resume");
+    ASSERT_TRUE(plan.resume_from_bytes() == 0, "Fresh plan should not carry a resume offset");
+    ASSERT_TRUE(!std::ifstream(dest_path).good(), "Stale oversized partial should be deleted");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -1252,8 +1260,8 @@ int main(int argc, char** argv) {
         suite.add("proto_plan_single_file", test_proto_plan_single_file);
         suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
         suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
-        suite.add("proto_plan_rejects_invalid_existing_bytes",
-                  test_proto_plan_rejects_invalid_existing_bytes);
+        suite.add("proto_plan_self_heals_oversized_existing_bytes",
+                  test_proto_plan_self_heals_oversized_existing_bytes);
         // pass2-syn-115 / security-privacy-storage-network-001 regression
         suite.add("proto_plan_rejects_path_traversal_destination",
                   test_proto_plan_rejects_path_traversal_destination);

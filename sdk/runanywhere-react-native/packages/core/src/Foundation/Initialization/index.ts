@@ -15,3 +15,8 @@ export {
   markInitializationFailed,
   resetState,
 } from './InitializationState';
+export {
+  registerInitializedProvider,
+  isSDKInitialized,
+  requireInitialized,
+} from './InitializedGuard';

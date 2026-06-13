@@ -32,16 +32,16 @@
 namespace {
 
 struct CustomFilterAdapter {
-    JavaVM*   vm = nullptr;
-    jobject   predicate = nullptr;  // GlobalRef to CustomFilterPredicate
+    JavaVM* vm = nullptr;
+    jobject predicate = nullptr;  // GlobalRef to CustomFilterPredicate
     jmethodID mid_evaluate = nullptr;
 };
 
 // name → adapter. Guarded by g_mutex; the commons-side named table
 // (rac_hybrid_custom_filter.cpp) owns the predicate-pointer publication, this
 // map only owns the JNI GlobalRef lifetime per name.
-std::mutex                                       g_mutex;
-std::map<std::string, CustomFilterAdapter*>      g_adapters;
+std::mutex g_mutex;
+std::map<std::string, CustomFilterAdapter*> g_adapters;
 
 /**
  * AttachCurrentThread's first parameter is `JNIEnv**` on the Android NDK and
@@ -59,7 +59,7 @@ inline jint attach_current_thread(JavaVM* vm, JNIEnv** out_env) {
 struct EnvScope {
     JavaVM* vm;
     JNIEnv* env = nullptr;
-    bool    attached = false;
+    bool attached = false;
 
     explicit EnvScope(JavaVM* v) : vm(v) {
         if (vm == nullptr) {
@@ -99,8 +99,7 @@ rac_bool_t custom_filter_predicate(const rac_hybrid_routing_context_t* ctx, void
     if (model_id == nullptr) {
         return RAC_TRUE;
     }
-    const jboolean keep =
-        scope.env->CallBooleanMethod(a->predicate, a->mid_evaluate, model_id);
+    const jboolean keep = scope.env->CallBooleanMethod(a->predicate, a->mid_evaluate, model_id);
     scope.env->DeleteLocalRef(model_id);
     return keep != JNI_FALSE ? RAC_TRUE : RAC_FALSE;
 }
@@ -138,8 +137,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHybridRegisterCustom
     if (clazz == nullptr) {
         return static_cast<jint>(RAC_ERROR_INVALID_PARAMETER);
     }
-    const jmethodID mid_evaluate =
-        env->GetMethodID(clazz, "evaluate", "(Ljava/lang/String;)Z");
+    const jmethodID mid_evaluate = env->GetMethodID(clazz, "evaluate", "(Ljava/lang/String;)Z");
     env->DeleteLocalRef(clazz);
     if (mid_evaluate == nullptr) {
         return static_cast<jint>(RAC_ERROR_INVALID_PARAMETER);

@@ -192,19 +192,21 @@ object Cloud {
      * network. Built-in providers (e.g. "sarvam") cannot be shadowed — a
      * static adapter always wins over a host callback of the same name.
      *
-     * @throws IllegalArgumentException if [name] is blank.
-     * @throws IllegalStateException if native registration fails.
+     * @throws SDKException if [name] is blank or native registration fails.
      */
     @JvmStatic
     fun registerProvider(
         name: String,
         handler: CloudSttProvider,
     ) {
-        require(name.isNotBlank()) { "Cloud provider name must be non-blank" }
+        if (name.isBlank()) {
+            throw SDKException.invalidArgument("Cloud provider name must be non-blank")
+        }
+        register()
         val native = NativeCloudSttProvider(handler)
         val rc = RunAnywhereBridge.racCloudRegisterSttProvider(name, native)
-        check(rc == RunAnywhereBridge.RAC_SUCCESS) {
-            "Failed to register cloud provider '$name' (rc=$rc)"
+        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+            throw SDKException.operation("Failed to register cloud provider '$name' (rc=$rc)")
         }
         providerHandlers[name] = native
     }

@@ -221,7 +221,7 @@ RAC_API void rac_vlm_component_destroy(rac_handle_t handle);
  * runanywhere.v1.VLMLoadResolvedArtifactsResponse and carries the opaque
  * service handle as uint64 (0 on failure). The returned handle remains a
  * rac_vlm service handle and is passed to existing service-level proto
- * APIs (rac_vlm_process_proto / rac_vlm_process_stream_proto /
+ * APIs (rac_vlm_process_proto /
  * rac_vlm_cancel_proto) and is released via rac_vlm_destroy.
  */
 RAC_API rac_result_t rac_vlm_component_load_resolved_artifacts_proto(

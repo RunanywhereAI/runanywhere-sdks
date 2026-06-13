@@ -15,12 +15,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.navigation.AppNavHost
+import com.runanywhere.runanywhereai.ui.screens.chat.ChatDetailsSheet
 import com.runanywhere.runanywhereai.ui.screens.chat.ConversationHistorySheet
+import com.runanywhere.runanywhereai.ui.screens.intro.InitErrorScreen
 import com.runanywhere.runanywhereai.ui.screens.intro.IntroScreen
 import com.runanywhere.runanywhereai.ui.screens.lora.LoraSheet
 import com.runanywhere.runanywhereai.ui.screens.lora.LoraViewModel
@@ -47,6 +51,7 @@ fun AppScaffold() {
     var showModelSheet by remember { mutableStateOf(false) }
     var showHistorySheet by remember { mutableStateOf(false) }
     var showLoraSheet by remember { mutableStateOf(false) }
+    var showDetailsSheet by remember { mutableStateOf(false) }
 
     val isExpanded = isExpandedScreen()
     val showNav = destination != null
@@ -60,12 +65,15 @@ fun AppScaffold() {
                         AppTopBar(
                             destination = destination,
                             model = GlobalState.model.loaded,
+                            conversationModelName = chatViewModel.conversationModelName,
                             generating = chatViewModel.isGenerating,
                             loraActive = GlobalState.lora.isActive,
+                            hasMessages = chatViewModel.messages.isNotEmpty(),
                             onModelClick = { showModelSheet = true },
                             onNewChat = chatViewModel::clearChat,
                             onHistory = { showHistorySheet = true },
                             onLora = { showLoraSheet = true },
+                            onDetails = { showDetailsSheet = true },
                         )
                     }
                 },
@@ -98,9 +106,21 @@ fun AppScaffold() {
 
             // Startup splash gate: covers the app until SDK setup reports ready, so the
             // back stack roots at Chat (not a popped Intro destination) from the first frame.
+            // Mirrors iOS: a failed setup swaps the splash for an error view with retry.
             if (!GlobalState.ready) {
+                val context = LocalContext.current
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    IntroScreen()
+                    val error = GlobalState.initError
+                    if (error != null) {
+                        InitErrorScreen(
+                            message = error,
+                            onRetry = {
+                                (context.applicationContext as RunAnywhereApplication).retrySdkSetup()
+                            },
+                        )
+                    } else {
+                        IntroScreen()
+                    }
                 }
             }
         }
@@ -126,6 +146,14 @@ fun AppScaffold() {
                 onRename = chatViewModel::rename,
                 onTogglePin = chatViewModel::setPinned,
                 onDismiss = { showHistorySheet = false },
+            )
+        }
+
+        if (showDetailsSheet) {
+            ChatDetailsSheet(
+                messages = chatViewModel.messages,
+                createdAt = chatViewModel.conversationCreatedAt.takeIf { it > 0 },
+                onDismiss = { showDetailsSheet = false },
             )
         }
     }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
@@ -134,7 +135,12 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
 }
 
 suspend fun RunAnywhere.cancelGeneration() {
-    CppBridgeLLM.cancelProto()
+    if (!isInitialized) return
+    try {
+        CppBridgeLLM.cancelProto()
+    } catch (e: Exception) {
+        llmLogger.warning("cancelGeneration failed: ${e.message}")
+    }
 }
 
 // MARK: - Stream Aggregation
@@ -171,19 +177,23 @@ suspend fun RunAnywhere.aggregateStream(
     var terminalError = ""
     var finalEvent: RALLMStreamEvent? = null
 
-    events.collect { event ->
-        if (event.token.isNotEmpty()) {
-            if (firstTokenTimeMs == null) firstTokenTimeMs = System.currentTimeMillis()
-            fullResponse += event.token
-            tokenCount += 1
-            onToken?.invoke(fullResponse)
+    events
+        .transformWhile { event ->
+            emit(event)
+            !event.is_final
+        }.collect { event ->
+            if (event.token.isNotEmpty()) {
+                if (firstTokenTimeMs == null) firstTokenTimeMs = System.currentTimeMillis()
+                fullResponse += event.token
+                tokenCount += 1
+                onToken?.invoke(fullResponse)
+            }
+            if (event.is_final) {
+                finalEvent = event
+                finishReason = event.finish_reason
+                terminalError = event.error_message
+            }
         }
-        if (event.is_final) {
-            finalEvent = event
-            finishReason = event.finish_reason
-            terminalError = event.error_message
-        }
-    }
 
     val totalLatencyMs = (System.currentTimeMillis() - startTimeMs).toDouble()
     val ttftMs = firstTokenTimeMs?.let { (it - startTimeMs).toDouble() }
@@ -204,15 +214,20 @@ suspend fun RunAnywhere.aggregateStream(
     // final event carries one, matching the Web SDK; otherwise fall back to the
     // locally concatenated text / wall-clock metrics.
     val final = finalEvent?.result
+    val inputTokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4)
+    val tokensGenerated = final?.completion_tokens ?: tokenCount
     return RALLMGenerationResult(
         text = final?.text ?: fullResponse,
         thinking_content = final?.thinking_content,
-        input_tokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4),
-        tokens_generated = final?.completion_tokens ?: tokenCount,
-        response_tokens = final?.completion_tokens ?: tokenCount,
+        input_tokens = inputTokens,
+        tokens_generated = tokensGenerated,
+        response_tokens = tokensGenerated,
+        total_tokens = final?.total_tokens ?: (inputTokens + tokensGenerated),
         model_used = modelID,
         generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
         framework = framework,
+        prompt_eval_time_ms = final?.prompt_eval_time_ms ?: 0L,
+        decode_time_ms = final?.decode_time_ms ?: 0L,
         tokens_per_second =
             final?.tokens_per_second?.toDouble()
                 ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,

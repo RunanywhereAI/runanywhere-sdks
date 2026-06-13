@@ -11,9 +11,9 @@
  *      either one so the chat tab is considered interactive as soon as the
  *      user has a clear path to a model.
  *
- * Model actions flow through the proto-byte bridges:
+ * Model actions flow through the flat Swift-named facade verbs:
  *
- *   - `RunAnywhere.modelRegistry.*`    — catalog list / get
+ *   - `RunAnywhere.listModels()` / `getModel(...)` — catalog list / get
  *   - `RunAnywhere.downloadModel(...)` — download with progress callback
  *   - `RunAnywhere.loadModel(...)`     — load through the C++ lifecycle ABI
  *
@@ -29,10 +29,7 @@ import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 import {
   DownloadState,
 } from '@runanywhere/proto-ts/download_service';
-import {
-  getCatalog,
-  registerModelCatalog,
-} from '../services/model-catalog';
+import { getCatalog } from '../services/model-catalog';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import {
@@ -87,24 +84,30 @@ let activeSheetOptions: OpenSheetOptions = {};
 // ---------------------------------------------------------------------------
 
 /**
- * Ensures the catalog is registered with the proto-byte model registry.
- * Safe to call repeatedly; only the first successful call registers entries.
+ * Notify this component that the catalog was registered at SDK init
+ * (`main.ts` runs the `registerAll()` bootstrap once — iOS parity:
+ * RunAnywhereAIApp.swift:98 `ModelCatalogBootstrap.registerAll()`). The
+ * former lazy per-view registration mechanism was removed; views no longer
+ * trigger catalog registration themselves.
  */
-export function ensureCatalogRegistered(): boolean {
-  if (catalogRegistered) return true;
-  const count = registerModelCatalog();
-  catalogRegistered = count > 0;
+export function notifyCatalogRegistered(registeredCount: number): void {
+  catalogRegistered = registeredCount > 0;
   if (catalogRegistered) {
     hydrateRowStatesFromRegistry();
   }
-  return catalogRegistered;
+  refreshToolbarLabel();
+  refreshOverlayVisibility();
 }
 
 /**
  * Mount the `#chat-toolbar-model` pill into the chat toolbar. Returns the
  * element so the caller can place it wherever the toolbar layout expects.
+ *
+ * `sheetOptions` scope the picker opened from this pill to a modality —
+ * Chat passes a LANGUAGE filter (iOS parity: ModelSelectionSheet(context: .llm)).
+ * Optional and unfiltered by default so other tabs keep their behavior.
  */
-export function buildToolbarModelButton(): HTMLElement {
+export function buildToolbarModelButton(sheetOptions: OpenSheetOptions = {}): HTMLElement {
   const btn = document.createElement('button');
   btn.id = 'chat-toolbar-model';
   btn.className = 'toolbar-model-btn';
@@ -119,7 +122,7 @@ export function buildToolbarModelButton(): HTMLElement {
       <polyline points="6 9 12 15 18 9"/>
     </svg>
   `;
-  btn.addEventListener('click', () => openSheet());
+  btn.addEventListener('click', () => openSheet(sheetOptions));
 
   toolbarBtn = btn;
   toolbarText = btn.querySelector('#chat-toolbar-model-text') as HTMLElement;
@@ -130,8 +133,10 @@ export function buildToolbarModelButton(): HTMLElement {
 /**
  * Mount the `#chat-model-overlay` "Get Started" overlay into the panel host.
  * The overlay is hidden automatically as soon as a model is loaded.
+ * `sheetOptions` scope the picker opened from the overlay (see
+ * `buildToolbarModelButton`).
  */
-export function buildGetStartedOverlay(): HTMLElement {
+export function buildGetStartedOverlay(sheetOptions: OpenSheetOptions = {}): HTMLElement {
   const overlay = document.createElement('div');
   overlay.id = 'chat-model-overlay';
   overlay.className = 'chat-model-overlay';
@@ -150,7 +155,7 @@ export function buildGetStartedOverlay(): HTMLElement {
 
   getStartedOverlay = overlay;
   getStartedBtn = overlay.querySelector('#chat-get-started-btn') as HTMLButtonElement;
-  getStartedBtn.addEventListener('click', () => openSheet());
+  getStartedBtn.addEventListener('click', () => openSheet(sheetOptions));
 
   refreshOverlayVisibility();
   return overlay;
@@ -189,7 +194,6 @@ export function findLoadedModelForCategory(category: ModelCategory): ModelInfo |
 export function openSheet(options: OpenSheetOptions = {}): void {
   if (modalEl) return;
   activeSheetOptions = options;
-  ensureCatalogRegistered();
   renderSheet();
 }
 

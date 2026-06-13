@@ -48,9 +48,21 @@ npm install react-native-nitro-modules
 cd ios && pod install && cd ..
 ```
 
+If your app uses the SDK's microphone capture (`AudioCaptureManager`, STT
+recording), add a usage description to your app's `Info.plist` — iOS refuses
+microphone access without it:
+
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>This app uses the microphone for speech recognition.</string>
+```
+
 ### Android Setup
 
-No additional setup required.
+No additional setup required. The SDK's library manifest already declares
+`android.permission.RECORD_AUDIO` for microphone capture; your app must still
+request the runtime permission (handled automatically by
+`AudioCaptureManager.requestPermission()`).
 
 ---
 

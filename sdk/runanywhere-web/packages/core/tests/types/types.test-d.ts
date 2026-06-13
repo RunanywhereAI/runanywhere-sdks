@@ -49,8 +49,11 @@ expectType<number | undefined>(genOpts.temperature);
 // isSDKException must be a type guard
 const e: unknown = new SDKException(-ProtoErrorCode.ERROR_CODE_NOT_INITIALIZED, 'test');
 if (isSDKException(e)) {
-  const code: number = e.code;
-  expectType<number>(code);
+  // `.code` is the positive proto ErrorCode (Swift parity); `.cAbiCode` is the
+  // signed rac_result_t integer.
+  expectType<ProtoErrorCode>(e.code);
+  const cAbiCode: number = e.cAbiCode;
+  expectType<number>(cAbiCode);
 }
 
 const msg: ChatMessage = {

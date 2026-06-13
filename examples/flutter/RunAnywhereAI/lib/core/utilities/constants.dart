@@ -9,7 +9,6 @@ class KeychainKeys {
   static const String apiKey = 'runanywhere_api_key';
   static const String baseURL = 'runanywhere_base_url';
   static const String analyticsLogToLocal = 'analyticsLogToLocal';
-  static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
 }
 
 /// UserDefaults keys for preferences
@@ -20,4 +19,7 @@ class PreferenceKeys {
   static const String defaultMaxTokens = 'defaultMaxTokens';
   static const String defaultSystemPrompt = 'defaultSystemPrompt';
   static const String useStreaming = 'useStreaming';
+  static const String thinkingModeEnabled = 'thinkingModeEnabled';
+  static const String toolCallingEnabled = 'toolCallingEnabled';
+  static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
 }

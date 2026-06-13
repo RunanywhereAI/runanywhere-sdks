@@ -10,10 +10,7 @@
  * - Model loading via `RunAnywhere.loadModel(ModelLoadRequest)`
  * - ONNX/Sherpa TTS plays via `RunAnywhere.speak(text, options)` —
  *   the SDK handles PCM->WAV encoding and playback internally so no
- *   hand-rolled RIFF header lives here.
- * - System TTS still uses the native bridge (AVSpeechSynthesizer on
- *   iOS, react-native-tts on Android) because that path skips the
- *   SDK's TTS engine entirely.
+ *   hand-rolled RIFF header or native audio module lives here.
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/TextToSpeechView.swift
  */
@@ -27,8 +24,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  Platform,
-  NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
@@ -37,28 +32,6 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-
-// Native iOS Audio Module (used only for System TTS playback on iOS).
-const NativeAudioModule =
-  Platform.OS === 'ios' ? NativeModules.NativeAudioModule : null;
-
-// Lazy load Tts for System TTS (Android only)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let Tts: any = null;
-function getTts() {
-  if (Platform.OS === 'ios') {
-    return null; // Disabled on iOS due to bridgeless=NO requirement for Nitrogen
-  }
-  if (!Tts) {
-    try {
-      Tts = require('react-native-tts').default;
-    } catch {
-      console.warn('[TTSScreen] react-native-tts not available');
-      return null;
-    }
-  }
-  return Tts;
-}
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import {
@@ -73,18 +46,12 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
-import {
-  createModelInfoSummary,
-  SYSTEM_TTS_FRAMEWORK,
-} from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
 import {
   AudioFormat,
-  InferenceFramework,
   ModelCategory,
-  ModelFormat,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
@@ -122,15 +89,6 @@ export const TTSScreen: React.FC = () => {
   useEffect(() => {
     return () => {
       RunAnywhere.stopSpeaking().catch(() => {});
-      if (Platform.OS === 'ios' && NativeAudioModule) {
-        NativeAudioModule.stopSpeaking().catch(() => {});
-      } else {
-        try {
-          getTts()?.stop();
-        } catch {
-          // Ignore
-        }
-      }
     };
   }, []);
 
@@ -186,27 +144,6 @@ export const TTSScreen: React.FC = () => {
     try {
       setIsModelLoading(true);
 
-      // Handle System TTS specially - it's always available, no download needed
-      const isSystemTTS =
-        model.id === 'system-tts' ||
-        model.preferredFramework === SYSTEM_TTS_FRAMEWORK ||
-        model.localPath?.startsWith('builtin://');
-
-      if (isSystemTTS) {
-        // System TTS doesn't need to load a model, just mark it as ready
-        setCurrentModel(
-          createModelInfoSummary({
-            id: 'system-tts',
-            name: 'System TTS',
-            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-            framework: SYSTEM_TTS_FRAMEWORK,
-            format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
-            localPath: 'builtin://system-tts',
-          })
-        );
-        return;
-      }
-
       if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
@@ -247,12 +184,7 @@ export const TTSScreen: React.FC = () => {
         const loaded = await RunAnywhere.modelInfoForCategory(
           ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
         );
-        setCurrentModel(
-          loaded ?? {
-            ...model,
-            preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-          }
-        );
+        setCurrentModel(loaded ?? model);
       } else {
         const error =
           result.errorMessage ||
@@ -282,46 +214,6 @@ export const TTSScreen: React.FC = () => {
   );
 
   /**
-   * Speak with the platform System TTS engine (no on-device model).
-   * iOS:    AVSpeechSynthesizer via NativeAudioModule.speak()
-   * Android: react-native-tts
-   */
-  const speakWithSystemTTS = useCallback(async () => {
-    try {
-      if (Platform.OS === 'ios' && NativeAudioModule) {
-        setIsSpeaking(true);
-        try {
-          await NativeAudioModule.speak(text, speed, pitch);
-        } finally {
-          setIsSpeaking(false);
-        }
-        return;
-      }
-      // Android
-      const tts = getTts();
-      if (!tts) {
-        Alert.alert('TTS Not Available', 'System TTS is not available.');
-        return;
-      }
-      const finishListener = tts.addListener('tts-finish', () => {
-        setIsSpeaking(false);
-        finishListener.remove();
-      });
-      const cancelListener = tts.addListener('tts-cancel', () => {
-        setIsSpeaking(false);
-        cancelListener.remove();
-      });
-      const androidRate = Math.min(0.99, Math.max(0.01, speed * 0.5));
-      tts.speak(text, { rate: androidRate, pitch });
-      setIsSpeaking(true);
-    } catch (error) {
-      console.error('[TTSScreen] System TTS error:', error);
-      Alert.alert('Error', `System TTS failed: ${error}`);
-      setIsSpeaking(false);
-    }
-  }, [text, speed, pitch]);
-
-  /**
    * Speak the entered text. Mirrors iOS `TTSViewModel.speak(text:)`:
    * delegate synthesis + playback to the SDK in one call so the
    * example does not own PCM/WAV bytes or playback chrome.
@@ -329,29 +221,8 @@ export const TTSScreen: React.FC = () => {
   const handleSpeak = useCallback(async () => {
     if (!text.trim() || !currentModel) return;
 
-    // Cancel any in-flight speech (SDK + System TTS).
+    // Cancel any in-flight speech.
     await RunAnywhere.stopSpeaking().catch(() => {});
-    if (Platform.OS === 'ios' && NativeAudioModule) {
-      try {
-        await NativeAudioModule.stopSpeaking();
-      } catch {
-        /* ignore */
-      }
-    } else {
-      try {
-        getTts()?.stop();
-      } catch {
-        /* ignore */
-      }
-    }
-
-    const isSystemTTS =
-      currentModel.id === 'system-tts' ||
-      currentModel.preferredFramework === SYSTEM_TTS_FRAMEWORK;
-    if (isSystemTTS) {
-      await speakWithSystemTTS();
-      return;
-    }
 
     // ONNX-backed TTS: ensure the model is actually loaded first.
     const isLoaded = await isModelLoadedForCategory(
@@ -387,26 +258,13 @@ export const TTSScreen: React.FC = () => {
     } finally {
       setIsSpeaking(false);
     }
-  }, [text, speed, pitch, volume, currentModel, speakWithSystemTTS]);
+  }, [text, speed, pitch, volume, currentModel]);
 
   /**
-   * Stop in-flight speech across both SDK + System TTS paths.
+   * Stop in-flight speech.
    */
   const handleStop = useCallback(async () => {
     await RunAnywhere.stopSpeaking().catch(() => {});
-    if (Platform.OS === 'ios' && NativeAudioModule) {
-      try {
-        await NativeAudioModule.stopSpeaking();
-      } catch {
-        /* ignore */
-      }
-    } else {
-      try {
-        getTts()?.stop();
-      } catch {
-        /* ignore */
-      }
-    }
     setIsSpeaking(false);
   }, []);
 

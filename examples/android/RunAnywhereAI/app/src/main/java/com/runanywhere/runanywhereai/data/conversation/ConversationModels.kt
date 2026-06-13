@@ -10,6 +10,9 @@ data class StoredConversation(
     val updatedAt: Long,
     val pinned: Boolean = false,
     val messages: List<StoredMessage>,
+    // Mirrors iOS Conversation.modelName (ConversationStore.swift:296): the model
+    // that produced the latest reply, restored as a preselection when reopening.
+    val modelName: String? = null,
 )
 
 @Serializable
@@ -30,13 +33,21 @@ data class StoredTool(
     val error: String? = null,
 )
 
+// Mirrors the metrics iOS persists per message in MessageAnalytics.
 @Serializable
 data class StoredStats(
     val tokens: Int,
     val tokensPerSecond: Double,
     val timeToFirstTokenMs: Long? = null,
     val totalTimeMs: Long,
+    val inputTokens: Int = 0,
+    val modelName: String? = null,
+    val framework: String? = null,
+    val mode: GenerationMode = GenerationMode.STREAMING,
 )
+
+@Serializable
+enum class GenerationMode { STREAMING, NON_STREAMING }
 
 data class ConversationSummary(
     val id: String,
@@ -44,4 +55,7 @@ data class ConversationSummary(
     val updatedAt: Long,
     val preview: String,
     val pinned: Boolean,
+    // Context snippet around the matched message text when a search query
+    // matched message content rather than the title (iOS ConversationRow).
+    val matchPreview: String? = null,
 )

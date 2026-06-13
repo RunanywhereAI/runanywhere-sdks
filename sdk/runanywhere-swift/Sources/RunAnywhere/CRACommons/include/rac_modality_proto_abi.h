@@ -119,15 +119,14 @@ RAC_API rac_result_t rac_vlm_process_proto(rac_handle_t handle,
                                            const uint8_t* options_proto_bytes,
                                            size_t options_proto_size,
                                            rac_proto_buffer_t* out_result);
-RAC_API rac_result_t rac_vlm_process_stream_proto(
-    rac_handle_t handle,
-    const uint8_t* image_proto_bytes,
-    size_t image_proto_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
+// Typed stream ABI: serialized runanywhere.v1.VLMGenerationRequest in,
+// serialized runanywhere.v1.VLMStreamEvent per callback. Lifecycle-owned
+// model — no handle, no out-result buffer.
+RAC_API rac_result_t rac_vlm_stream_proto(
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
     rac_modality_proto_control_callback_fn callback,
-    void* user_data,
-    rac_proto_buffer_t* out_result);
+    void* user_data);
 RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
 RAC_API rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event);
 
@@ -185,6 +184,11 @@ RAC_API rac_result_t rac_lora_catalog_get_proto(
     size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
+    rac_lora_registry_handle_t registry,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_lora_adapter_import_proto(
     rac_lora_registry_handle_t registry,
     const uint8_t* request_proto_bytes,
     size_t request_proto_size,

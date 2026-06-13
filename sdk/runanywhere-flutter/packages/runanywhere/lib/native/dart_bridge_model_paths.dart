@@ -1,5 +1,4 @@
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
@@ -207,32 +206,6 @@ class DartBridgeModelPaths {
     return null;
   }
 
-  // MARK: - Helper: Get model folder and create if needed
-  // Matches Swift: SimplifiedFileManager.getModelFolder()
-
-  /// Get model folder, creating it if it doesn't exist.
-  /// This is the main method for download service to use.
-  Future<String> getModelFolderAndCreate(
-      String modelId, InferenceFramework framework) async {
-    // Get path from C++
-    final path = getModelFolder(modelId, framework);
-    if (path != null) {
-      _ensureDirectoryExists(path);
-      return path;
-    }
-
-    // C++ not configured - throw error (SDK not initialized)
-    throw StateError(
-        'Model paths not configured. Call RunAnywhere.initialize() first.');
-  }
-
-  /// Ensure a directory exists, creating it if needed.
-  void _ensureDirectoryExists(String path) {
-    final dir = Directory(path);
-    if (!dir.existsSync()) {
-      dir.createSync(recursive: true);
-    }
-  }
 
   // MARK: - Model File Resolution
 

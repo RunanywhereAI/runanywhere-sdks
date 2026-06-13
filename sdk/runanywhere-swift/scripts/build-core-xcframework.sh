@@ -447,6 +447,12 @@ run cmake --build --preset ios-simulator --config Release --target "${ios_build_
 echo "▶ Configure macos-release"
 macos_cmake_args=(
     "-DRAC_BUILD_BACKENDS=ON"
+    # The macOS slice ships inside the XCFramework and is linked statically by
+    # SPM consumers (swift test, macOS apps) — there is no sibling shared-lib
+    # loading there, so in-tree engines (e.g. cloud) must fold into
+    # rac_commons exactly like the iOS slices, or unconditionally-referenced
+    # symbols (rac_backend_cloud_register) fail the consumer link.
+    "-DRAC_STATIC_PLUGINS=ON"
     "-DRAC_BACKEND_RAG=ON"
     "-DRAC_BACKEND_LLAMACPP=OFF"
     "-DRAC_BACKEND_ONNX=OFF"

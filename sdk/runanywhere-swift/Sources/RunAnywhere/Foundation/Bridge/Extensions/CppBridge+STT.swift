@@ -132,7 +132,7 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         case .error:
             let message = event.hasErrorMessage ? event.errorMessage : "STT stream failed"
             yieldFailure(message, code: rac_result_t(event.errorCode))
-        case .started, .unspecified, .UNRECOGNIZED(_):
+        case .started, .unspecified, .UNRECOGNIZED:
             break
         }
     }
@@ -142,6 +142,39 @@ private let sttStreamSessionTrampoline: STTStreamSessionABI.Callback = { bytes, 
     guard let userData else { return }
     let context = Unmanaged<STTStreamSessionContext>.fromOpaque(userData).takeUnretainedValue()
     context.yield(bytes: bytes, size: size)
+}
+
+/// Audio pump for `CppBridge.STT.transcribeSessionStream` — verbatim
+/// extraction so the session-stream body stays within the lint body-length
+/// limit. Returns true when the session must be cancelled (task/stream
+/// cancellation or a feed failure).
+private func pumpSTTStreamAudio(
+    _ audio: AsyncStream<Data>,
+    sessionId: UInt64,
+    context: STTStreamSessionContext,
+    feedAudio: STTStreamSessionABI.FeedAudio
+) async -> Bool {
+    var shouldCancel = false
+    for await chunk in audio {
+        if Task.isCancelled || context.isCancelled {
+            shouldCancel = true
+            break
+        }
+        guard !chunk.isEmpty else { continue }
+        let feedResult = chunk.withUnsafeBytes { rawBuffer in
+            feedAudio(
+                sessionId,
+                rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                rawBuffer.count
+            )
+        }
+        guard feedResult == RAC_SUCCESS else {
+            context.yieldFailure("STT stream feed failed: \(feedResult)", code: feedResult)
+            shouldCancel = true
+            break
+        }
+    }
+    return shouldCancel
 }
 
 // MARK: - STT Component Bridge
@@ -278,26 +311,12 @@ extension CppBridge {
                     }
                     context.setSessionId(sessionId)
 
-                    var shouldCancel = false
-                    for await chunk in audio {
-                        if Task.isCancelled || context.isCancelled {
-                            shouldCancel = true
-                            break
-                        }
-                        guard !chunk.isEmpty else { continue }
-                        let feedResult = chunk.withUnsafeBytes { rawBuffer in
-                            feedAudio(
-                                sessionId,
-                                rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                                rawBuffer.count
-                            )
-                        }
-                        guard feedResult == RAC_SUCCESS else {
-                            context.yieldFailure("STT stream feed failed: \(feedResult)", code: feedResult)
-                            shouldCancel = true
-                            break
-                        }
-                    }
+                    let shouldCancel = await pumpSTTStreamAudio(
+                        audio,
+                        sessionId: sessionId,
+                        context: context,
+                        feedAudio: feedAudio
+                    )
 
                     if shouldCancel || Task.isCancelled || context.isCancelled {
                         _ = cancel(sessionId)

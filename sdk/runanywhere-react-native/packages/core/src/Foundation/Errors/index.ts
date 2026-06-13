@@ -20,4 +20,7 @@ export {
   SDKException,
   isSDKException,
   asSDKException,
+  isExpectedErrorCode,
+  sdkExceptionFromRcResult,
+  throwIfRcError,
 } from './SDKException';

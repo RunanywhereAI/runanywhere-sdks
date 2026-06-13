@@ -141,7 +141,9 @@ describe('LoRA catalog proto facade', () => {
     ]));
 
     await expect(LoRA.catalog.list()).rejects.toMatchObject({
-      code: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      // `.code` is the positive proto ErrorCode; the signed C-ABI value is `.cAbiCode`.
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
     });
   });
 });

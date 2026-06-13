@@ -39,7 +39,6 @@ import { VoicePipelineStatus } from '../types/voice';
 // Import RunAnywhere SDK. Voice uses the Swift-shaped public stream facade.
 import { RunAnywhere } from '@runanywhere/core';
 import {
-  InferenceFramework,
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
@@ -83,6 +82,18 @@ export const VoiceAssistantScreen: React.FC = () => {
   // adapter's AsyncIterable consumer; calling it deregisters the C-side callback.
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
+  const cleanupVoiceSession = useCallback(async () => {
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    try {
+      await RunAnywhere.cleanupVoiceAgent();
+    } catch (error) {
+      console.warn('[VoiceAssistant] cleanupVoiceAgent failed:', error);
+    }
+  }, []);
+
   // Check if all models are loaded
   const allModelsLoaded = sttModel && llmModel && ttsModel;
 
@@ -98,12 +109,9 @@ export const VoiceAssistantScreen: React.FC = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      void cleanupVoiceSession();
     };
-  }, []);
+  }, [cleanupVoiceSession]);
 
   /**
    * Load available models from catalog
@@ -147,108 +155,109 @@ export const VoiceAssistantScreen: React.FC = () => {
    * Turn-completion aggregation (was 'turnCompleted') is rebuilt locally
    * from state transitions.
    */
-  const handleProtoEvent = useCallback((event: VoiceEvent) => {
-    if (event.state) {
-      switch (event.state.current) {
-        case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
-          setStatus(VoicePipelineStatus.Listening);
-          break;
-        case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
-          setStatus(VoicePipelineStatus.Thinking);
-          break;
-        case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
-          setStatus(VoicePipelineStatus.Speaking);
-          break;
-        case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
-          setStatus(VoicePipelineStatus.Idle);
-          setIsSessionActive(false);
-          break;
-        default:
-          break;
-      }
-      return;
-    }
-
-    if (event.vad) {
-      // VADEvent.type is VADStreamEventKind; start/end ride
-      // SPEECH_ACTIVITY with direction on the is_speech bool.
-      if (
-        event.vad.type ===
-        VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
-      ) {
-        if (event.vad.isSpeech) {
-          console.warn('[VoiceAssistant] Speech started');
-        } else {
-          console.warn('[VoiceAssistant] Speech ended — processing');
-          setStatus(VoicePipelineStatus.Processing);
+  const handleProtoEvent = useCallback(
+    (event: VoiceEvent) => {
+      if (event.state) {
+        switch (event.state.current) {
+          case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
+            setStatus(VoicePipelineStatus.Listening);
+            break;
+          case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
+            setStatus(VoicePipelineStatus.Thinking);
+            break;
+          case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
+            setStatus(VoicePipelineStatus.Speaking);
+            break;
+          case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
+            setStatus(VoicePipelineStatus.Idle);
+            setIsSessionActive(false);
+            void cleanupVoiceSession();
+            break;
+          default:
+            break;
         }
+        return;
       }
-      return;
-    }
 
-    if (event.userSaid?.text) {
-      const text = event.userSaid.text;
-      console.warn('[VoiceAssistant] User said:', text);
-      const userEntry: VoiceConversationEntry = {
-        id: generateId(),
-        speaker: 'user',
-        text,
-        timestamp: new Date(),
-      };
-      setConversation((prev) => [...prev, userEntry]);
-      setStatus(VoicePipelineStatus.Thinking);
-      return;
-    }
-
-    if (event.assistantToken?.text) {
-      const token = event.assistantToken.text;
-      setConversation((prev) => {
-        const last = prev[prev.length - 1];
-        if (last && last.speaker === 'assistant') {
-          const updated = [...prev];
-          updated[updated.length - 1] = {
-            ...last,
-            text: last.text + token,
-          };
-          return updated;
+      if (event.vad) {
+        // VADEvent.type is VADStreamEventKind; start/end ride
+        // SPEECH_ACTIVITY with direction on the is_speech bool.
+        if (
+          event.vad.type ===
+          VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
+        ) {
+          if (event.vad.isSpeech) {
+            console.warn('[VoiceAssistant] Speech started');
+          } else {
+            console.warn('[VoiceAssistant] Speech ended — processing');
+            setStatus(VoicePipelineStatus.Processing);
+          }
         }
-        return [
-          ...prev,
-          {
-            id: generateId(),
-            speaker: 'assistant',
-            text: token,
-            timestamp: new Date(),
-          },
-        ];
-      });
-      return;
-    }
+        return;
+      }
 
-    if (event.audio) {
-      setStatus(VoicePipelineStatus.Speaking);
-      return;
-    }
+      if (event.userSaid?.text) {
+        const text = event.userSaid.text;
+        console.warn('[VoiceAssistant] User said:', text);
+        const userEntry: VoiceConversationEntry = {
+          id: generateId(),
+          speaker: 'user',
+          text,
+          timestamp: new Date(),
+        };
+        setConversation((prev) => [...prev, userEntry]);
+        setStatus(VoicePipelineStatus.Thinking);
+        return;
+      }
 
-    if (event.error) {
-      console.error('[VoiceAssistant] Error:', event.error.message);
-      setStatus(VoicePipelineStatus.Error);
-      Alert.alert('Error', event.error.message || 'An error occurred');
-      setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
-      setIsSessionActive(false);
-    }
-  }, []);
+      if (event.assistantToken?.text) {
+        const token = event.assistantToken.text;
+        setConversation((prev) => {
+          const last = prev[prev.length - 1];
+          if (last && last.speaker === 'assistant') {
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...last,
+              text: last.text + token,
+            };
+            return updated;
+          }
+          return [
+            ...prev,
+            {
+              id: generateId(),
+              speaker: 'assistant',
+              text: token,
+              timestamp: new Date(),
+            },
+          ];
+        });
+        return;
+      }
+
+      if (event.audio) {
+        setStatus(VoicePipelineStatus.Speaking);
+        return;
+      }
+
+      if (event.error) {
+        console.error('[VoiceAssistant] Error:', event.error.message);
+        setStatus(VoicePipelineStatus.Error);
+        Alert.alert('Error', event.error.message || 'An error occurred');
+        setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
+        setIsSessionActive(false);
+        void cleanupVoiceSession();
+      }
+    },
+    [cleanupVoiceSession]
+  );
 
   /**
    * Start or stop the voice session (uses proto-stream adapter).
    */
   const handleToggleSession = useCallback(async () => {
     if (isSessionActive) {
-      // Stop: deregister the C-side callback via the adapter's unsubscribe.
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      await cleanupVoiceSession();
       setIsSessionActive(false);
       setStatus(VoicePipelineStatus.Idle);
     } else {
@@ -305,10 +314,11 @@ export const VoiceAssistantScreen: React.FC = () => {
         console.warn('[VoiceAssistant] Voice agent started');
       } catch (error) {
         console.error('[VoiceAssistant] Failed to start voice agent:', error);
+        await cleanupVoiceSession();
         Alert.alert('Error', `Failed to start voice agent: ${error}`);
       }
     }
-  }, [isSessionActive, allModelsLoaded, handleProtoEvent]);
+  }, [isSessionActive, allModelsLoaded, handleProtoEvent, cleanupVoiceSession]);
 
   /**
    * Get context for model selection
@@ -362,10 +372,10 @@ export const VoiceAssistantScreen: React.FC = () => {
               })
             );
             if (result.success) {
-              setSTTModel({
-                ...model,
-                preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-              });
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+              ).catch(() => null);
+              setSTTModel(loaded ?? model);
             } else {
               Alert.alert(
                 'Error',
@@ -384,11 +394,10 @@ export const VoiceAssistantScreen: React.FC = () => {
               })
             );
             if (result.success) {
-              setLLMModel({
-                ...model,
-                preferredFramework:
-                  InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-              });
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_LANGUAGE
+              ).catch(() => null);
+              setLLMModel(loaded ?? model);
             } else {
               Alert.alert(
                 'Error',
@@ -407,11 +416,10 @@ export const VoiceAssistantScreen: React.FC = () => {
               })
             );
             if (result.success) {
-              setTTSModel({
-                ...model,
-                preferredFramework:
-                  InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
-              });
+              const loaded = await RunAnywhere.modelInfoForCategory(
+                ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+              ).catch(() => null);
+              setTTSModel(loaded ?? model);
             } else {
               Alert.alert(
                 'Error',

@@ -49,20 +49,21 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Complete deferred native service initialization.
-   * Resolves to the commons `has_completed_http_setup || http_configured`
-   * flag. A `false` result means Phase 2 finished in offline/deferred mode,
-   * not that native services failed.
+   * Resolves to the serialized `RASdkInitResult` proto bytes so TS can read
+   * `has_completed_http_setup` / `http_configured` / `http_applicable`. An
+   * empty buffer means the packaged native lacks the phase-2 symbol (Phase 2
+   * finished in offline/deferred mode), not that native services failed.
    * Matches Swift: RunAnywhere.completeServicesInitialization().
    */
-  completeServicesInitialization(): Promise<boolean>;
+  completeServicesInitialization(): Promise<ArrayBuffer>;
 
   /**
    * Retry HTTP/auth setup after an offline initialization via the commons
-   * `rac_sdk_retry_http_proto` idempotency guard. Returns the resulting
-   * `has_completed_http_setup || http_configured` flag.
+   * `rac_sdk_retry_http_proto` idempotency guard. Returns the serialized
+   * `RASdkInitResult` proto bytes (empty buffer when the symbol is missing).
    * Matches Swift: CppBridge.SdkInit.retryHTTP().
    */
-  retryHTTPSetupProto(): Promise<boolean>;
+  retryHTTPSetupProto(): Promise<ArrayBuffer>;
 
   /**
    * Destroy the SDK and clean up resources
@@ -73,6 +74,15 @@ export interface RunAnywhereCore extends HybridObject<{
    * Check if SDK is initialized
    */
   isInitialized(): Promise<boolean>;
+
+  /**
+   * Map a `rac_result_t` to serialized `runanywhere.v1.SDKError` bytes via
+   * the canonical commons ABI `rac_result_to_proto_error` — the single
+   * rac_result_t → proto-error translation shared by every SDK. Returns an
+   * empty buffer for `RAC_SUCCESS` (or when the symbol is unavailable).
+   * Mirrors Swift `RASDKError.from(rcResult:)` (RASDKError+Helpers.swift:52).
+   */
+  resultToProtoErrorProto(code: number): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Plugin Loader
@@ -135,6 +145,26 @@ export interface RunAnywhereCore extends HybridObject<{
   getAvailableModelsProto(): Promise<ArrayBuffer>;
 
   /**
+   * Human-readable display name for a runanywhere.v1.InferenceFramework proto
+   * value. Backed by rac_inference_framework_display_name (sync table lookup).
+   */
+  frameworkDisplayName(frameworkProto: number): string;
+
+  /**
+   * Default runanywhere.v1.InferenceFramework proto value for a
+   * runanywhere.v1.ModelCategory proto value. Backed by
+   * rac_model_category_default_framework (sync table lookup).
+   */
+  modelCategoryDefaultFramework(categoryProto: number): number;
+
+  /**
+   * Infer the runanywhere.v1.ModelFileRole proto value for a filename in a
+   * multi-file model. Backed by rac_infer_model_file_role (proto-valued both
+   * ways; sync string matching). Mirrors Swift RunAnywhere.inferModelFileRole.
+   */
+  inferModelFileRole(filename: string, modalityProto: number): number;
+
+  /**
    * Get one registered model as serialized runanywhere.v1.ModelInfo bytes.
    * Returns an empty buffer when the model does not exist.
    */
@@ -158,6 +188,21 @@ export interface RunAnywhereCore extends HybridObject<{
    * `CppBridgeModelRegistry.registerModelFromUrl`.
    */
   registerModelFromUrlProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Canonical multi-file registration (VLM gguf+mmproj pairs, embedding
+   * model+vocab sets).
+   *
+   * Routes a serialized runanywhere.v1.RegisterMultiFileModelRequest through
+   * the commons `rac_register_multi_file_model_proto` C ABI, which builds the
+   * MultiFileArtifact ModelInfo (descriptors carry url/filename/size/
+   * checksum/role) and persists it with merge-on-reseed semantics. Returns
+   * the saved runanywhere.v1.ModelInfo bytes (empty buffer when the ABI is
+   * unavailable on the staged native artifact). Mirrors Swift
+   * `CppBridge.ModelRegistry.registerMultiFile` and Kotlin
+   * `CppBridgeModelRegistry.registerMultiFileModel`.
+   */
+  registerMultiFileModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
    * Update an existing model from serialized runanywhere.v1.ModelInfo bytes.
@@ -261,10 +306,18 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Clear model cache
+   * Clear the SDK's Cache directory only. Mirrors Swift `clearCache()` →
+   * `CppBridge.FileManager.clearCache()`.
    * @returns true if cleared successfully
    */
   clearCache(): Promise<boolean>;
+
+  /**
+   * Clear the SDK's Temp directory only. Mirrors Swift `cleanTempFiles()` →
+   * `CppBridge.FileManager.clearTemp()`.
+   * @returns true if cleared successfully
+   */
+  cleanTempFiles(): Promise<boolean>;
 
   /**
    * Analyze storage from serialized runanywhere.v1.StorageInfoRequest bytes.
@@ -446,6 +499,59 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<void>;
 
   // ============================================================================
+  // STT Streaming Session (live partials)
+  // Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`:
+  // load model on the streaming handle, register the proto-byte callback,
+  // start the session, feed audio frames, then stop (drain finals) or
+  // cancel (immediate teardown). C ABI: rac_stt_stream.h.
+  // ============================================================================
+
+  /**
+   * Load an STT model onto the global streaming STT component handle
+   * (`rac_stt_component_load_model`). Same-model fast path: re-loading the
+   * currently loaded modelId is a no-op. Rejects on load failure.
+   */
+  sttStreamLoadModel(
+    modelPath: string,
+    modelId: string,
+    modelName: string
+  ): Promise<boolean>;
+
+  /**
+   * Start a streaming transcription session. Registers `onEventBytes`
+   * (serialized `runanywhere.v1.STTStreamEvent` per invocation) BEFORE
+   * `rac_stt_stream_start_proto`. Only one concurrent session is supported
+   * (the C ABI exposes a single callback slot per handle) — a second start
+   * while a session is active rejects.
+   *
+   * @param optionsBytes Serialized `runanywhere.v1.STTOptions`.
+   * @returns session id as a number (non-zero); failures reject.
+   */
+  sttStreamStart(
+    optionsBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<number>;
+
+  /**
+   * Feed a PCM audio frame into an active session
+   * (`rac_stt_stream_feed_audio_proto`). Rejects on feed failure.
+   */
+  sttStreamFeed(sessionId: number, audioBytes: ArrayBuffer): Promise<void>;
+
+  /**
+   * Stop a session (`rac_stt_stream_stop_proto`) — drains final events
+   * through the still-registered callback, then tears down the callback
+   * slot. Rejects if the native stop fails (after teardown).
+   */
+  sttStreamStop(sessionId: number): Promise<void>;
+
+  /**
+   * Cancel a session immediately (`rac_stt_stream_cancel_proto`) and tear
+   * down the callback slot. Idempotent on unknown session ids.
+   */
+  sttStreamCancel(sessionId: number): Promise<void>;
+
+  // ============================================================================
   // Hybrid STT Router (offline sherpa <-> cloud, registry-routed)
   //
   // THIN proto-byte / handle surface over the commons STT hybrid router
@@ -622,6 +728,36 @@ export interface RunAnywhereCore extends HybridObject<{
    * @returns true on RAC_SUCCESS.
    */
   cloudUnregister(): Promise<boolean>;
+
+  /**
+   * Register (or replace) a developer-defined cloud STT provider handler
+   * (`rac_cloud_register_stt_provider`). The JS handler performs the whole
+   * request host-side (build + HTTP + parse) and resolves the provider's
+   * result JSON (`{"text", "language_code", "confidence", "error_code",
+   * "error_message"}`). Invoked on the router's request thread; the native
+   * side blocks on the returned promise like `toolRunLoopProto`'s executor.
+   * Mirrors Swift `Cloud.registerProvider(_:_:)` (CloudSttProvider.swift:145).
+   *
+   * @param name         Provider name (ties to `CloudSTT.registerModel`'s
+   *                     `provider` field). Built-in providers cannot be shadowed.
+   * @param onTranscribe (configJson, audioBytes, audioFormat) → result JSON.
+   * @returns true on RAC_SUCCESS.
+   */
+  cloudRegisterSttProvider(
+    name: string,
+    onTranscribe: (
+      configJson: string,
+      audioBytes: ArrayBuffer,
+      audioFormat: number
+    ) => Promise<string>
+  ): Promise<boolean>;
+
+  /**
+   * Remove a developer-defined provider previously registered via
+   * `cloudRegisterSttProvider` (`rac_cloud_unregister_stt_provider`).
+   * Idempotent for unknown names. Mirrors Swift `Cloud.unregisterProvider(_:)`.
+   */
+  cloudUnregisterSttProvider(name: string): Promise<void>;
 
   /**
    * Whether the "cloud" plugin is currently registered for TRANSCRIBE
@@ -933,12 +1069,16 @@ export interface RunAnywhereCore extends HybridObject<{
   ragClearProto(): Promise<ArrayBuffer>;
   ragStatsProto(): Promise<ArrayBuffer>;
 
-  embeddingsCreateProto(modelId: string, configJson?: string): Promise<number>;
-  embeddingsEmbedBatchProto(
-    handle: number,
+  /**
+   * Generate embeddings via the commons embeddings lifecycle.
+   * runanywhere.v1.EmbeddingsRequest bytes in, runanywhere.v1.EmbeddingsResult
+   * bytes out. Backed by rac_embeddings_embed_batch_lifecycle_proto; the
+   * lifecycle owns the component, so no handle is involved. Mirrors Swift
+   * CppBridge.EmbeddingsProto.embedBatchLifecycle.
+   */
+  embeddingsEmbedBatchLifecycleProto(
     requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
-  embeddingsDestroyProto(handle: number): Promise<void>;
 
   loraApplyProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   loraRemoveProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
@@ -988,6 +1128,15 @@ export interface RunAnywhereCore extends HybridObject<{
   loraCatalogMarkDownloadCompletedProto(
     requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
+
+  /**
+   * Import a user-picked local LoRA adapter file from serialized
+   * runanywhere.v1.LoraAdapterImportRequest bytes. Commons owns matching,
+   * placement, artifact registration, and catalog completion.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterImportResult bytes.
+   */
+  loraAdapterImportProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ===========================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h)

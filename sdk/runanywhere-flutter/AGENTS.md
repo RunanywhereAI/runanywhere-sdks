@@ -131,7 +131,6 @@ RunAnywhere.rag       // RunAnywhereRAG
 RunAnywhere.solutions // RunAnywhereSolutions
 RunAnywhere.embeddings // RunAnywhereEmbeddings
 RunAnywhere.lora      // RunAnywhereLoRACapability
-RunAnywhere.hardware  // RunAnywhereHardware — getProfile() throws SDKException on failure (Swift parity; was previously returning an empty fallback)
 // + RunAnywherePluginLoader
 ```
 
@@ -145,32 +144,29 @@ packages/runanywhere/lib/
 ├── core/
 │   ├── module/runanywhere_module.dart  # Module interface implemented by backends
 │   └── native/rac_native.dart    # Hand-written FFI bindings (~2.1K LOC)
-├── data/network/                 # Network config struct + barrel
 ├── features/
-│   ├── stt/services/audio_capture_manager.dart   # 16kHz mono Int16 via package:record
-│   └── tts/services/audio_playback_manager.dart  # PCM playback via audioplayers
+│   ├── stt/services/audio_capture_manager.dart   # SDK-owned mic capture (PCM16 chunks via package:record)
+│   └── tts/services/audio_playback_manager.dart  # SDK-owned speak() playback via audioplayers
 ├── foundation/
 │   ├── constants/                # sdk_constants.dart
-│   ├── dependency_injection/     # service_container.dart
 │   ├── errors/                   # sdk_exception.dart (40+ factory constructors)
-│   ├── logging/                  # sdk_logger.dart
-│   └── security/                 # keychain_manager.dart + secure_storage_keys.dart
-├── generated/                    # 58 runtime proto files (DO NOT EDIT)
-├── internal/                     # sdk_init.dart, sdk_state.dart
+│   └── logging/                  # sdk_logger.dart
+├── generated/                    # runtime proto files (DO NOT EDIT)
 ├── native/                       # 33 dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
 └── public/
     ├── runanywhere.dart          # RunAnywhere static entry point
-    ├── capabilities/             # 18 capability classes (flat layout)
+    ├── capabilities/             # 17 capability classes (flat layout)
     ├── configuration/            # sdk_environment.dart
     ├── events/                   # event_bus.dart (dart:async)
-    └── extensions/               # rag_module, runanywhere_logging, _storage, _structured_output, _thinking_utils
+    ├── extensions/               # audio/, stt/, format_framework, model_category_extensions, rag_module, runanywhere_logging, _storage, _structured_output
+    └── hybrid/                   # hybrid_stt_router.dart + cloud registry
 ```
 
-**Not present (do not search for):** no top-level `lib/capabilities/`, no `lib/infrastructure/`, no `core/types/model_types.dart`, no `dart_bridge_llm_streaming.dart`, no `native_backend.dart`.
+**Not present (do not search for):** no top-level `lib/capabilities/`, no `lib/infrastructure/`, no `lib/internal/`, no `lib/data/`, no `core/types/model_types.dart`, no `dart_bridge_hardware.dart` / `RunAnywhere.hardware`, no `dart_bridge_llm_streaming.dart`, no `native_backend.dart`.
 
-### 33 DartBridge Slices (`lib/native/`)
+### DartBridge Slices (`lib/native/`)
 
-33 files total: 32 bridge slices + 1 coordinator (`dart_bridge.dart`). Slices for: **auth, device, diffusion, download, embeddings, environment, events, file_manager, hardware, http, llm, lora, model_assignment, model_lifecycle, model_paths, model_registry, platform, plugin_loader, proto_utils, rag, sdk_init, solutions, state, storage, stt, structured_output, telemetry, tool_calling, tts, vad, vlm, voice_agent**.
+34 files total: 33 bridge slices + 1 coordinator (`dart_bridge.dart`). Slices for: **audio, auth, device, diffusion, download, embeddings, environment, events, file_manager, http, hybrid_stt, llm, lora, model_assignment, model_lifecycle, model_paths, model_registry, platform, plugin_loader, proto_utils, rag, sdk_init, solutions, state, storage, stt, structured_output, telemetry, tool_calling, tts, vad, vlm, voice_agent**.
 
 Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.dart` (per-platform `DynamicLibrary`), `types/` (8 struct/typedef bundles imported directly), `type_conversions/` (proto ↔ C struct mappers).
 
@@ -238,8 +234,7 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 
 ### LLM Streaming
 1. `RunAnywhere.llm.generateStream(prompt, options)` registers a `NativeCallable.listener` for C++ token callbacks
-2. Tokens land in a broadcast `StreamController` emitting `LLMStreamEvent` protos
-3. Multiple subscribers share one C-callback registration (fan-out)
+2. Tokens land in a `StreamController` (one per generateStream call) emitting `LLMStreamEvent` protos
 
 ### Model Download
 1. `RunAnywhere.downloads.start(modelId)` → `RunAnywhere.downloads.start()`
@@ -248,10 +243,8 @@ Supporting: `native_functions.dart` (cached lookup registry), `platform_loader.d
 4. On completion: resolves model path via `rac_model_paths_get_model_folder`; updates registry
 
 ### SDK Initialization
-1. `RunAnywhere.initialize()` runs Phase 1 synchronously: load native lib → register platform adapter → configure logging → `rac_sdk_init` → register events / device / file-manager / telemetry callbacks
-2. Phase 2 (async): model assignment → platform services → telemetry flush
-3. `DartBridge.modelPaths.setBaseDirectory()` sets the model storage root
-4. Background fire-and-forget: device registration + authentication
+1. `RunAnywhere.initialize()` runs Phase 1: load native lib → register platform adapter → configure logging → `rac_sdk_init_phase1_proto` → register events / device / file-manager / telemetry callbacks → `DartBridge.modelPaths.setBaseDirectory()` (model storage root, set BEFORE initialize() returns so registerModel() can reconcile on-disk folders — Swift ordering)
+2. Phase 2 (detached): HTTP client config → telemetry → model registry → commons `rac_sdk_init_phase2_proto` (auth, device registration, model assignments, downloaded-model discovery)
 
 ## Lint Rules
 

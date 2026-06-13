@@ -12,10 +12,14 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ErrorCategory
+import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VoiceAgentResult
+import ai.runanywhere.proto.v1.VoiceEvent
+import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -23,6 +27,10 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 /**
  * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
@@ -41,18 +49,24 @@ typealias ComponentStates = RAVoiceAgentComponentStates
 
 private val voiceAgentLogger = SDKLogger.voiceAgent
 
-@Volatile private var voiceAgentInitialized: Boolean = false
+/**
+ * Swift-parity guard failure: mirrors Swift's plain
+ * `SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)`,
+ * which is constructed without logging.
+ */
+private fun notInitializedException(): SDKException =
+    SDKException.make(
+        code = ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+        message = "SDK not initialized",
+        category = ErrorCategory.ERROR_CATEGORY_INTERNAL,
+        shouldLog = false,
+    )
 
 private fun isComponentReady(component: SDKComponent): Boolean =
     CppBridgeModelLifecycle.snapshot(component)?.let {
         it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
             it.model_id.isNotEmpty()
     } ?: false
-
-private fun areAllComponentsLoaded(): Boolean =
-    isComponentReady(SDKComponent.SDK_COMPONENT_STT) &&
-        isComponentReady(SDKComponent.SDK_COMPONENT_LLM) &&
-        isComponentReady(SDKComponent.SDK_COMPONENT_TTS)
 
 private fun getMissingComponents(): List<String> {
     val missing = mutableListOf<String>()
@@ -124,20 +138,18 @@ suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
 }
 
 suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
-    voiceAgentInitialized = false
     val states =
         CppBridgeVoiceAgent.initialize(
             CppBridgeVoiceAgent.getRawHandle(),
             config,
         )
-    voiceAgentInitialized = states.ready
     voiceAgentLogger.info("Voice agent initialized from RAVoiceAgentComposeConfig: ready=${states.ready}")
 }
 
 suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
     return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
 }
@@ -161,23 +173,27 @@ suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentSta
  * engines (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice), the caller
  * must supply the desired voice id explicitly; reusing the TTS model id
  * here produces invalid voice selection for multi-voice models (see
- * Swift comment at `RunAnywhere+VoiceAgent.swift:162-171`).
+ * Swift comment at `RunAnywhere+VoiceAgent.swift:152-161`).
  */
 suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
     ttsVoiceId: String? = null,
     ensureVAD: Boolean = true,
 ) {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
 
     if (ensureVAD) {
         ensureDefaultVAD()
     }
 
-    if (voiceAgentInitialized && areAllComponentsLoaded()) return
-    if (!areAllComponentsLoaded()) {
-        val missing = getMissingComponents()
-        throw SDKException.voiceAgent("Cannot initialize: Models not loaded: ${missing.joinToString(", ")}")
+    val missing = getMissingComponents()
+    if (missing.isNotEmpty()) {
+        throw SDKException.make(
+            code = ErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
+            message = "Cannot initialize voice agent: Models not loaded: ${missing.joinToString(", ")}",
+            category = ErrorCategory.ERROR_CATEGORY_COMPONENT,
+            shouldLog = false,
+        )
     }
 
     val sttSnap = CppBridgeModelLifecycle.snapshot(SDKComponent.SDK_COMPONENT_STT)
@@ -192,50 +208,57 @@ suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
 
     val handle = CppBridgeVoiceAgent.getHandle()
     val states = CppBridgeVoiceAgent.initialize(handle, composeConfig)
-    voiceAgentInitialized = states.ready
     voiceAgentLogger.info(
         "VoiceAgent initialized from loaded models (ttsVoiceId=${ttsVoiceId ?: "<default>"}, ready=${states.ready})",
     )
 }
 
+/**
+ * Cleanup voice agent resources. Never throws and is safe to call at any
+ * time, whether or not the SDK or the voice agent is initialized.
+ * Mirrors Swift `cleanupVoiceAgent()` → `CppBridge.VoiceAgent.cleanup()`,
+ * which releases owned child components while keeping the handle alive.
+ */
 suspend fun RunAnywhere.cleanupVoiceAgent() {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    ensureServicesReady()
-    // Match Swift: cleanup voice-agent handle + reset flag.
-    voiceAgentInitialized = false
-    CppBridgeVoiceAgent.destroy()
+    CppBridgeVoiceAgent.cleanup()
 }
 
 suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult {
-    // Mirror Swift RunAnywhere+VoiceAgent.processVoiceTurn(_:) one-for-one:
-    //   try await ensureServicesReady()
-    //   guard isInitialized else { throw .notInitialized("voiceagent") }
-    //   guard await CppBridge.VoiceAgent.shared.isReady else { throw .invalidState(...) }
-    //   return try await CppBridge.VoiceAgent.shared.processVoiceTurnProto(audioData)
+    if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
-    if (!isInitialized) throw SDKException.notInitialized("voiceagent")
     if (!CppBridgeVoiceAgent.isReady()) {
-        throw SDKException.invalidState("VoiceAgent not initialized")
+        throw SDKException.make(
+            code = ErrorCode.ERROR_CODE_NOT_INITIALIZED,
+            message = "Voice agent not ready",
+            category = ErrorCategory.ERROR_CATEGORY_COMPONENT,
+            shouldLog = false,
+        )
     }
     return CppBridgeVoiceAgent.processVoiceTurnProto(audioData)
 }
 
-// Round 1 KOTLIN (Task 7 / G-E4): public streamVoiceAgent() entry-point.
-// Replaces the pattern: CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
-// that leaked CppBridge internals into example apps.
+/**
+ * Open a stream of canonical [VoiceEvent] proto events for the active
+ * voice agent.
+ *
+ * Mirrors Swift `streamVoiceAgent()`: when the SDK is not initialized, or
+ * when service readiness / handle creation fails, the returned flow
+ * finishes silently without emitting. Cancelling the collector tears down
+ * the underlying C callback via [VoiceAgentStreamAdapter].
+ */
+fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent> =
+    flow {
+        if (!isInitialized) return@flow
 
-fun RunAnywhere.streamVoiceAgent(): kotlinx.coroutines.flow.Flow<ai.runanywhere.proto.v1.VoiceEvent> {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // W3-6: composite getHandle() is now suspend (gathers from 4 sub-component
-    // actors before composing). Defer the call into the Flow's coroutine
-    // context via `flow { ... }` + `emitAll` so the public API stays a
-    // non-suspend `fun` returning Flow.
-    return kotlinx.coroutines.flow.flow {
-        ensureServicesReady()
-        val handle = CppBridgeVoiceAgent.getHandle()
-        com.runanywhere.sdk.adapters
-            .VoiceAgentStreamAdapter(handle)
-            .stream()
-            .collect { event -> emit(event) }
+        val handle =
+            try {
+                ensureServicesReady()
+                CppBridgeVoiceAgent.getHandle()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Throwable) {
+                return@flow
+            }
+
+        emitAll(VoiceAgentStreamAdapter(handle).stream())
     }
-}

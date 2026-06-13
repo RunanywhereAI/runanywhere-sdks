@@ -12,6 +12,8 @@
 
 #include "HybridRunAnywhereCore.hpp"
 #include "HybridRunAnywhereDeviceInfoSpecSwift.hpp"
+#include "HybridAudioCaptureSpecSwift.hpp"
+#include "HybridAudioPlaybackSpecSwift.hpp"
 #include "HybridLLM.hpp"
 #include "HybridVoiceAgent.hpp"
 
@@ -37,6 +39,20 @@
     "RunAnywhereDeviceInfo",
     []() -> std::shared_ptr<HybridObject> {
       std::shared_ptr<HybridRunAnywhereDeviceInfoSpec> hybridObject = RunAnywhereCore::RunAnywhereCoreAutolinking::createRunAnywhereDeviceInfo();
+      return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "AudioCapture",
+    []() -> std::shared_ptr<HybridObject> {
+      std::shared_ptr<HybridAudioCaptureSpec> hybridObject = RunAnywhereCore::RunAnywhereCoreAutolinking::createAudioCapture();
+      return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "AudioPlayback",
+    []() -> std::shared_ptr<HybridObject> {
+      std::shared_ptr<HybridAudioPlaybackSpec> hybridObject = RunAnywhereCore::RunAnywhereCoreAutolinking::createAudioPlayback();
       return hybridObject;
     }
   );

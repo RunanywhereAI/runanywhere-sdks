@@ -179,10 +179,12 @@ class HybridSttRouter {
       throw StateError('setPair() must be called before transcribe()');
     }
 
-    // Pure pass-through: commons owns the entire routing decision. Dart marshals
-    // the request and decodes the response; it does NOT pre-filter candidates
-    // or toggle slots. HybridRoutingContext is empty on the wire (device-state
-    // lives behind the vtable); it is still emitted for a stable wire shape.
+    // Pure pass-through: commons owns the entire routing decision AND the
+    // raw-PCM16 → WAV payload normalisation (rac_stt_hybrid_router_proto.cpp).
+    // Dart marshals the request and decodes the response; it does NOT
+    // pre-filter candidates or toggle slots. HybridRoutingContext is empty on
+    // the wire (device-state lives behind the vtable); it is still emitted
+    // for a stable wire shape.
     final request = pb.HybridSttTranscribeRequest(
       audioBytes: audioBytes,
       context: pb.HybridRoutingContext(),
@@ -191,6 +193,14 @@ class HybridSttRouter {
 
     final responseBytes = _bridge.transcribe(_handle, request.writeToBuffer());
     return _decodeResponse(responseBytes);
+  }
+
+  /// Cancel an in-flight transcribe, if any. Best-effort: no STT engine
+  /// exposes a cancel op today, so commons treats this as a no-op until one
+  /// does. Mirrors Swift `HybridSTTRouter.cancel()` (HybridSTTRouter.swift:348).
+  void cancel() {
+    if (_closed) return;
+    _bridge.cancelRouter(_handle);
   }
 
   /// Detach + destroy both services, unregister custom filters, and destroy the

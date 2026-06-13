@@ -176,7 +176,7 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   /// Default is 0.3 (not 0.7): MiniLM-class sentence embeddings produce
   /// cosine similarities that rarely exceed ~0.5 even for relevant chunks,
   /// so a 0.7 floor filters out every match and retrieval returns nothing
-  /// (validated in the Kotlin SDK; see RAGProtoHelpers.kt).
+  /// (validated by generated SDK helpers and commons session creation).
   @$pb.TagNumber(5)
   $core.double get similarityThreshold => $_getN(4);
   @$pb.TagNumber(5)

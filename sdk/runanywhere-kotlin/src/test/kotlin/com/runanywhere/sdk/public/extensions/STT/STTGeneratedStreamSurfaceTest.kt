@@ -24,4 +24,6 @@ class STTGeneratedStreamSurfaceTest {
 
 @Suppress("unused")
 private fun sttStreamSurface(): Flow<RASTTPartialResult> =
-    RunAnywhere.transcribeStream(audio = emptyFlow(), options = null)
+    // Options default to RASTTOptions.defaults() — the parameter is
+    // non-nullable, so omit it rather than passing null.
+    RunAnywhere.transcribeStream(audio = emptyFlow())

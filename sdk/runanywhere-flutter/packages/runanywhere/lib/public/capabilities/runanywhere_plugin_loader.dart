@@ -8,11 +8,12 @@
 // `lib/native/dart_bridge_plugin_loader.dart`; this capability calls
 // into that bridge.
 
+import 'package:protobuf/protobuf.dart'
+    show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_plugin_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 
 export 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
 
@@ -52,7 +53,7 @@ class RunAnywherePluginLoaderCapability {
     }
     final result = DartBridgePluginLoader.loadPlugin(path);
     if (!result.success) {
-      _throwForCode('rac_registry_load_plugin', result.resultCode);
+      _throwForCode('load', path, result.resultCode);
     }
     return PluginInfo(name: result.name, path: path);
   }
@@ -64,18 +65,21 @@ class RunAnywherePluginLoaderCapability {
     }
     final rc = DartBridgePluginLoader.unloadPlugin(name);
     if (rc != 0) {
-      _throwForCode('rac_registry_unload_plugin', rc);
+      _throwForCode('unload', name, rc);
     }
   }
 
-  static Never _throwForCode(String op, int code) {
-    if (code == RacResultCode.errorFeatureNotAvailable ||
-        code == RacResultCode.errorNotImplemented) {
-      throw SDKException.featureNotAvailable('PluginLoader: $op');
-    }
-    throw SDKException.modelLoadFailed(
-      op,
-      RacResultCode.getMessage(code),
-    );
+  /// Delegate plugin-error classification to the commons ABI
+  /// (`rac_result_to_proto_error`) via [SDKException.fromResult], then enrich
+  /// the message with the operation context. Mirrors Swift's `throwIfFailed`
+  /// (RunAnywhere+PluginLoader.swift:149-156).
+  static Never _throwForCode(String op, String context, int code) {
+    final exception = SDKException.fromResult(code) ??
+        SDKException.internalError(
+          'Plugin loader reported failure without an error code',
+        );
+    final enriched = exception.error.deepCopy()
+      ..message = '${exception.error.message} (pluginLoader.$op: $context)';
+    throw SDKException(enriched, underlyingError: exception.underlyingError);
   }
 }

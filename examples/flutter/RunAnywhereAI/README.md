@@ -606,6 +606,22 @@ User preferences are stored via `SharedPreferences`:
 
 ---
 
+## iOS Parity Notes
+
+The iOS example app is the canonical reference. This app mirrors its tab
+structure, model catalog (`lib/core/services/model_catalog_bootstrap.dart`),
+model-picker filtering, generated solutions YAML, ViewModel layering, hybrid
+STT, and benchmarks. Intentionally unsupported iOS-only surfaces:
+
+- **Voice Keyboard** — depends on the iOS app-extension targets
+  (`RunAnywhereKeyboard`, `RunAnywhereActivityExtension`) and Live
+  Activities; there is no Flutter analogue for a system keyboard extension.
+- **FoundationModels smart conversation titles** — Apple-platform-gated
+  (iOS 26 FoundationModels); the Flutter app uses a deterministic
+  first-user-message title fallback instead.
+
+---
+
 ## Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](../../../CONTRIBUTING.md) for guidelines.

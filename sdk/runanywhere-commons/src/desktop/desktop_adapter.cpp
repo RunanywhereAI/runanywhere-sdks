@@ -20,7 +20,6 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <pwd.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -30,20 +29,19 @@
 #include <cstring>
 #include <filesystem>
 #include <string>
+#include <sys/stat.h>
 #include <system_error>
 
 #if defined(__APPLE__)
 #include <mach/mach.h>
 #include <sys/sysctl.h>
 #elif defined(__linux__)
-#include <sys/sysinfo.h>
-
 #include <fstream>
+#include <sys/sysinfo.h>
 #endif
 
-#include "rac/desktop/rac_desktop.h"
-
 #include "desktop/desktop_internal.h"
+#include "rac/desktop/rac_desktop.h"
 
 namespace fs = std::filesystem;
 
@@ -115,7 +113,7 @@ rac_bool_t desktop_file_exists(const char* path, void* /*user_data*/) {
         return RAC_FALSE;
     }
     // Mirrors FileManager.fileExists(atPath:) — true for files AND directories.
-    struct stat st {};
+    struct stat st{};
     return stat(path, &st) == 0 ? RAC_TRUE : RAC_FALSE;
 }
 
@@ -145,9 +143,8 @@ rac_result_t desktop_file_read(const char* path, void** out_data, size_t* out_si
         buffer = std::malloc(file_size > 0 ? static_cast<size_t>(file_size) : 1);
         if (!buffer) {
             result = RAC_ERROR_OUT_OF_MEMORY;
-        } else if (file_size > 0 &&
-                   std::fread(buffer, 1, static_cast<size_t>(file_size), f) !=
-                       static_cast<size_t>(file_size)) {
+        } else if (file_size > 0 && std::fread(buffer, 1, static_cast<size_t>(file_size), f) !=
+                                        static_cast<size_t>(file_size)) {
             result = RAC_ERROR_FILE_READ_FAILED;
         }
     }
@@ -237,7 +234,7 @@ rac_result_t desktop_file_list_directory(const char* dir_path, rac_directory_ent
             std::memcpy(dst.name, entry->d_name, name_len + 1);
 
             std::string full = std::string(dir_path) + "/" + entry->d_name;
-            struct stat st {};
+            struct stat st{};
             if (stat(full.c_str(), &st) == 0) {
                 dst.is_dir = S_ISDIR(st.st_mode) ? RAC_TRUE : RAC_FALSE;
                 dst.size_bytes = S_ISDIR(st.st_mode) ? 0 : static_cast<int64_t>(st.st_size);
@@ -325,8 +322,8 @@ rac_result_t desktop_get_memory_info(rac_memory_info_t* out_info, void* /*user_d
     mach_msg_type_number_t info_count = HOST_VM_INFO64_COUNT;
     uint64_t available = 0;
     if (host_statistics64(mach_host_self(), HOST_VM_INFO64,
-                          reinterpret_cast<host_info64_t>(&vm_stats), &info_count) ==
-        KERN_SUCCESS) {
+                          reinterpret_cast<host_info64_t>(&vm_stats),
+                          &info_count) == KERN_SUCCESS) {
         vm_size_t page_size = 0;
         host_page_size(mach_host_self(), &page_size);
         available = (static_cast<uint64_t>(vm_stats.free_count) +
@@ -356,7 +353,7 @@ rac_result_t desktop_get_memory_info(rac_memory_info_t* out_info, void* /*user_d
         }
     }
     if (total_kb == 0) {
-        struct sysinfo info {};
+        struct sysinfo info{};
         if (sysinfo(&info) != 0) {
             return RAC_ERROR_NOT_SUPPORTED;
         }
@@ -366,10 +363,9 @@ rac_result_t desktop_get_memory_info(rac_memory_info_t* out_info, void* /*user_d
 
     out_info->total_bytes = total_kb * 1024;
     out_info->available_bytes = available_kb * 1024;
-    out_info->used_bytes =
-        (out_info->total_bytes > out_info->available_bytes)
-            ? (out_info->total_bytes - out_info->available_bytes)
-            : 0;
+    out_info->used_bytes = (out_info->total_bytes > out_info->available_bytes)
+                               ? (out_info->total_bytes - out_info->available_bytes)
+                               : 0;
     return RAC_SUCCESS;
 #else
     return RAC_ERROR_NOT_SUPPORTED;

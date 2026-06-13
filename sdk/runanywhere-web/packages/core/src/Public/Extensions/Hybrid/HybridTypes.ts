@@ -52,7 +52,7 @@ export { HybridBackendKind, HybridModelType, HybridRank };
 export { HybridRoutedMetadata };
 
 /** Default cloud STT provider when a caller omits one. Mirrors
- * `CloudSTT.defaultProvider` (Swift) / `BACKEND.DEFAULT_PROVIDER` (Kotlin). */
+ * `Cloud.defaultProvider` (Swift) / `BACKEND.DEFAULT_PROVIDER` (Kotlin). */
 export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
 
 /** Suggested default confidence threshold for an STT confidence cascade.
@@ -155,7 +155,7 @@ export interface HybridRoutingPolicySpec {
  *   * offline (`SHERPA`) — the model id the C model registry resolves so the
  *     engine can load the model files.
  *   * online (`CLOUD`) — the registry id registered via
- *     `CloudSTT.register({ id, provider, model, apiKey })`, which supplies the
+ *     `Cloud.register({ id, provider, model, apiKey })`, which supplies the
  *     provider, model string + credentials.
  *
  * Mirrors Swift's `HybridModel` / Kotlin's `RACModel`.
@@ -181,7 +181,7 @@ export function offlineSherpa(id: string): HybridModelSpec {
   };
 }
 
-/** Convenience for a cloud model (registered via `CloudSTT.register`). */
+/** Convenience for a cloud model (registered via `Cloud.register`). */
 export function onlineCloud(
   id: string,
   provider: string = DEFAULT_CLOUD_PROVIDER,

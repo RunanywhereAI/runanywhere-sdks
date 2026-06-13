@@ -23,7 +23,6 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
-#include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_sherpa.h"
@@ -53,10 +52,10 @@ static std::vector<float> convert_int16_to_float32(const void* int16_data, size_
 // the format fields needed to feed sherpa correctly.
 struct WavPcm {
     const uint8_t* pcm = nullptr;
-    size_t         pcm_bytes = 0;
-    uint32_t       sample_rate = 0;
-    uint16_t       channels = 0;
-    uint16_t       bits = 0;
+    size_t pcm_bytes = 0;
+    uint32_t sample_rate = 0;
+    uint16_t channels = 0;
+    uint16_t bits = 0;
 };
 
 // Minimal WAV reader. Walks RIFF chunks (does not assume a fixed 44-byte
@@ -65,14 +64,13 @@ struct WavPcm {
 // is the WAV byte order, so the integer fields are read directly. Returns
 // false on truncation, a missing chunk, or any non-PCM encoding.
 static bool parse_wav_pcm(const uint8_t* data, size_t size, WavPcm& out) {
-    if (size < 44 || std::memcmp(data, "RIFF", 4) != 0 ||
-        std::memcmp(data + 8, "WAVE", 4) != 0) {
+    if (size < 44 || std::memcmp(data, "RIFF", 4) != 0 || std::memcmp(data + 8, "WAVE", 4) != 0) {
         return false;
     }
     uint16_t fmt_tag = 0;
-    bool     have_fmt = false;
-    bool     have_data = false;
-    size_t   off = 12;  // first sub-chunk after "RIFF"<size>"WAVE"
+    bool have_fmt = false;
+    bool have_data = false;
+    size_t off = 12;  // first sub-chunk after "RIFF"<size>"WAVE"
     while (off + 8 <= size) {
         uint32_t chunk_size = 0;
         std::memcpy(&chunk_size, data + off + 4, 4);
@@ -101,14 +99,14 @@ static bool parse_wav_pcm(const uint8_t* data, size_t size, WavPcm& out) {
 // when the source is multi-channel (sherpa's offline recognizer is mono).
 static std::vector<float> wav_pcm16_to_mono_float(const WavPcm& wav) {
     const int16_t* s = reinterpret_cast<const int16_t*>(wav.pcm);
-    const size_t   total = wav.pcm_bytes / sizeof(int16_t);
+    const size_t total = wav.pcm_bytes / sizeof(int16_t);
     const uint16_t ch = wav.channels < 1 ? 1 : wav.channels;
     if (ch == 1) {
         std::vector<float> out(total);
         rac::audio::rac_audio_pcm16_to_float32(s, total, out.data());
         return out;
     }
-    const size_t       frames = total / ch;
+    const size_t frames = total / ch;
     std::vector<float> out(frames);
     for (size_t i = 0; i < frames; ++i) {
         int32_t acc = 0;
@@ -144,18 +142,15 @@ static rac_result_t sherpa_stt_vtable_transcribe(void* impl, const void* audio_d
     }
 
     const uint8_t* bytes = static_cast<const uint8_t*>(audio_data);
-    const rac_audio_format_enum_t fmt =
-        options ? options->audio_format : RAC_AUDIO_FORMAT_PCM;
+    const rac_audio_format_enum_t fmt = options ? options->audio_format : RAC_AUDIO_FORMAT_PCM;
     const bool looks_wav =
-        fmt == RAC_AUDIO_FORMAT_WAV ||
-        (audio_size >= 12 && std::memcmp(bytes, "RIFF", 4) == 0 &&
-         std::memcmp(bytes + 8, "WAVE", 4) == 0);
+        fmt == RAC_AUDIO_FORMAT_WAV || (audio_size >= 12 && std::memcmp(bytes, "RIFF", 4) == 0 &&
+                                        std::memcmp(bytes + 8, "WAVE", 4) == 0);
 
     if (looks_wav) {
         WavPcm wav{};
         if (!parse_wav_pcm(bytes, audio_size, wav) || wav.bits != 16) {
-            RAC_LOG_ERROR(LOG_CAT,
-                          "sherpa STT: unsupported WAV (parse failed or not 16-bit PCM)");
+            RAC_LOG_ERROR(LOG_CAT, "sherpa STT: unsupported WAV (parse failed or not 16-bit PCM)");
             return RAC_ERROR_INVALID_ARGUMENT;
         }
         // Tiny-clip guard on the decoded PCM (~0.05s at 16kHz 16-bit). NaN (not
@@ -167,7 +162,7 @@ static rac_result_t sherpa_stt_vtable_transcribe(void* impl, const void* audio_d
             return RAC_SUCCESS;
         }
         std::vector<float> float_samples = wav_pcm16_to_mono_float(wav);
-        rac_stt_options_t  opt{};
+        rac_stt_options_t opt{};
         if (options) {
             opt = *options;
         }

@@ -105,8 +105,7 @@ class PipelineNode : public IPipelineNode {
         try {
             stop();
             join();
-        } catch (...) {
-        }
+        } catch (...) {}
     }
 
     PipelineNode(const PipelineNode&) = delete;
@@ -240,8 +239,7 @@ class SplitNode : public IPipelineNode {
         try {
             stop();
             join();
-        } catch (...) {
-        }
+        } catch (...) {}
     }
 
     SplitNode(const SplitNode&) = delete;
@@ -328,8 +326,7 @@ class MergeNode : public IPipelineNode {
         try {
             stop();
             join();
-        } catch (...) {
-        }
+        } catch (...) {}
     }
 
     MergeNode(const MergeNode&) = delete;

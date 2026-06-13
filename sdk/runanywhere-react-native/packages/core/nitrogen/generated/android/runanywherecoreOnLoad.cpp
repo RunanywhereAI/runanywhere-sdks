@@ -15,6 +15,9 @@
 #include <fbjni/fbjni.h>
 #include <NitroModules/HybridObjectRegistry.hpp>
 
+#include "JHybridAudioCaptureSpec.hpp"
+#include "JFunc_void_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JHybridAudioPlaybackSpec.hpp"
 #include "JHybridRunAnywhereDeviceInfoSpec.hpp"
 #include "HybridRunAnywhereCore.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
@@ -34,6 +37,9 @@ void registerAllNatives() {
   using namespace margelo::nitro::runanywhere;
 
   // Register native JNI methods
+  margelo::nitro::runanywhere::JHybridAudioCaptureSpec::registerNatives();
+  margelo::nitro::runanywhere::JFunc_void_std__shared_ptr_ArrayBuffer__cxx::registerNatives();
+  margelo::nitro::runanywhere::JHybridAudioPlaybackSpec::registerNatives();
   margelo::nitro::runanywhere::JHybridRunAnywhereDeviceInfoSpec::registerNatives();
 
   // Register Nitro Hybrid Objects
@@ -50,6 +56,22 @@ void registerAllNatives() {
     "RunAnywhereDeviceInfo",
     []() -> std::shared_ptr<HybridObject> {
       static DefaultConstructableObject<JHybridRunAnywhereDeviceInfoSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridRunAnywhereDeviceInfo");
+      auto instance = object.create();
+      return instance->cthis()->shared();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "AudioCapture",
+    []() -> std::shared_ptr<HybridObject> {
+      static DefaultConstructableObject<JHybridAudioCaptureSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridAudioCapture");
+      auto instance = object.create();
+      return instance->cthis()->shared();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "AudioPlayback",
+    []() -> std::shared_ptr<HybridObject> {
+      static DefaultConstructableObject<JHybridAudioPlaybackSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridAudioPlayback");
       auto instance = object.create();
       return instance->cthis()->shared();
     }

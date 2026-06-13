@@ -154,9 +154,9 @@ This sample app demonstrates the full power of the RunAnywhere React Native SDK:
 | **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.transcribe()` |
 | **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.synthesize()` |
 | **Voice Assistant** | Full STT → LLM → TTS pipeline | Voice pipeline orchestration |
+| **Voice Activity Detection** | Live VAD stream demo | `RunAnywhere.streamVAD()` |
 | **Model Management** | Download, load, and manage multiple AI models | `RunAnywhere.downloadModel()` |
 | **Storage Management** | View storage usage and delete models | `RunAnywhere.getStorageInfo()` |
-| **Validation Harness** | Deterministic evidence for structured output, tool calls, VAD, LoRA, and PluginLoader | `RunAnywhere.extractStructuredOutput()`, `RunAnywhere.executeTool()`, `RunAnywhere.detectVoiceActivity()`, `RunAnywhere.lora.*`, `RunAnywhere.pluginLoader.*` |
 | **Offline Support** | All features work without internet | On-device inference |
 | **Cross-Platform** | Single codebase for iOS and Android | React Native + Nitrogen/Nitro |
 
@@ -221,11 +221,13 @@ RunAnywhereAI/
 │   │   ├── ChatScreen.tsx            # LLM chat with streaming & conversation management
 │   │   ├── ChatAnalyticsScreen.tsx   # Message analytics and performance metrics
 │   │   ├── ConversationListScreen.tsx # Conversation history management
+│   │   ├── MoreScreen.tsx            # More hub matching iOS navigation
 │   │   ├── STTScreen.tsx             # Speech-to-text with batch/live modes
 │   │   ├── TTSScreen.tsx             # Text-to-speech synthesis & playback
+│   │   ├── VADScreen.tsx             # Voice activity detection stream demo
 │   │   ├── VoiceAssistantScreen.tsx  # Full STT → LLM → TTS pipeline
-│   │   ├── ValidationHarnessScreen.tsx # Deterministic validation evidence
-│   │   └── SettingsScreen.tsx        # Model & storage management
+│   │   ├── StorageScreen.tsx         # Storage management
+│   │   └── SettingsScreen.tsx        # Settings and tool calling
 │   │
 │   ├── components/
 │   │   ├── chat/
@@ -649,36 +651,26 @@ await RunAnywhere.cleanTempFiles();
 ### 5. Settings Screen (`SettingsScreen.tsx`)
 
 **What it demonstrates:**
-- Model catalog with download/delete functionality
-- Download progress tracking
-- Storage usage overview (total, models, cache, free)
 - Generation settings (temperature, max tokens)
+- Tool calling toggle and registered demo tools
 - SDK version and backend information
 
 **Key SDK APIs:**
-- `RunAnywhere.listModels()` — List all models
-- `RunAnywhere.downloadedModels()` — List downloaded models
-- `RunAnywhere.downloadModel()` — Download with progress
-- `RunAnywhere.deleteStorage(StorageDeleteRequest)` — Remove model files and registry paths
-- `RunAnywhere.getStorageInfo()` — Storage metrics
-- V2 storage-plan bridge — Temporary storage cleanup
+- `RunAnywhere.registerTool()` — Register demo tools
+- `RunAnywhere.clearTools()` — Clear registered tools
 
-### 6. Validation Harness Screen (`ValidationHarnessScreen.tsx`)
+### 6. Storage Screen (`StorageScreen.tsx`)
 
 **What it demonstrates:**
-- Deterministic structured-output parse and model-backed generation entrypoints
-- Deterministic `get_device_label` tool registration and execution
-- Standalone VAD evidence with synthetic silence and tone fixtures
-- LoRA list, compatibility, apply, and remove calls with a fixed fixture config
-- PluginLoader snapshot and expected-error coverage
-- Artifact-friendly action capture through `[RN_VALIDATION_ACTION]` Metro JSONL
+- Downloaded model storage overview
+- Cache and temporary file cleanup
+- Typed storage delete request flags
 
 **Key SDK APIs:**
-- `RunAnywhere.extractStructuredOutput()` / `RunAnywhere.generateStructured()`
-- `RunAnywhere.registerTool()` / `RunAnywhere.executeTool()`
-- `RunAnywhere.detectVoiceActivity()`
-- `RunAnywhere.lora.list()` / `checkCompatibility()` / `apply()` / `remove()`
-- `RunAnywhere.pluginLoader.apiVersion` / `registeredNames()` / `listLoaded()` / `load()`
+- `RunAnywhere.downloadedModels()` — List downloaded models
+- `RunAnywhere.deleteStorage(StorageDeleteRequest)` — Remove model files and registry paths
+- `RunAnywhere.getStorageInfo()` — Storage metrics
+- `RunAnywhere.cleanTempFiles()` — Temporary storage cleanup
 
 ---
 

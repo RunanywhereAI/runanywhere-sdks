@@ -126,7 +126,11 @@ void rac_log(rac_log_level_t level, const char* category, const char* message) {
 
 rac_result_t rac_init(const rac_config_t* config) {
     std::lock_guard<std::mutex> lock(s_init_mutex);
-    rac::events::publish_initialization_started();
+    // No STARTED/COMPLETED emit here: the SDK lifecycle pair is published once
+    // by rac_sdk_init_phase1_proto (sdk_init.cpp), which every SDK drives.
+    // Emitting from rac_init too produced duplicate INITIALIZATION_STAGE_*
+    // events. FAILED diagnostics below are kept — they signal real
+    // misconfiguration that would otherwise be silent.
 
     if (s_initialized.load()) {
         rac::events::publish_initialization_failed(RAC_ERROR_ALREADY_INITIALIZED,
@@ -240,7 +244,8 @@ rac_result_t rac_init(const rac_config_t* config) {
 #endif
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons initialized");
-    rac::events::publish_initialization_completed();
+    // COMPLETED is published once by rac_sdk_init_phase1_proto — see the note
+    // at the top of this function.
 
     return RAC_SUCCESS;
 }

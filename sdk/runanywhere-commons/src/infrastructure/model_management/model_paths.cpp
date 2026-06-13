@@ -23,10 +23,9 @@
 #include <string>
 #include <vector>
 
+#include "infrastructure/rac_path_safety_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
-
-#include "infrastructure/rac_path_safety_internal.h"
 
 // =============================================================================
 // STATIC STATE
@@ -156,6 +155,8 @@ static bool should_skip_model_entry(const fs::path& path) {
         return true;
     if (name == "__MACOSX" || name == ".DS_Store")
         return true;
+    if (name == rac_model_folder_manifest_filename())
+        return true;  // registry metadata sidecar, never a model artifact
     if (name.size() >= 2 && name[0] == '.' && name[1] == '_')
         return true;
     return false;
@@ -846,6 +847,14 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
     }
 }
 
+const char* rac_model_folder_manifest_filename(void) {
+    // Durable per-model registry sidecar written into the canonical model
+    // folder on download completion (see model_registry_manifest.cpp). Dotted
+    // so casual folder listings de-emphasize it; skipped by artifact scans via
+    // should_skip_model_entry above.
+    return ".rac-manifest.binpb";
+}
+
 // =============================================================================
 // BASE DIRECTORIES
 // =============================================================================
@@ -1324,10 +1333,9 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     // under {Models}/{framework}/{id}/ will be parsed as direct
     // {Models}/{id}/ entries and model-id extraction will collapse to the
     // framework name (observed previously for Sherpa which was missing here).
-    const char* frameworks[] = {
-        "ONNX",       "Sherpa",  "LlamaCpp", "FoundationModels", "SystemTTS",
-        "FluidAudio", "BuiltIn", "CoreML",   "MetalRT",          "Genie",
-        "None",       "Unknown"};
+    const char* frameworks[] = {"ONNX",      "Sherpa",     "LlamaCpp", "FoundationModels",
+                                "SystemTTS", "FluidAudio", "BuiltIn",  "CoreML",
+                                "MetalRT",   "Genie",      "None",     "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;

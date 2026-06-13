@@ -22,8 +22,8 @@
 #include <vector>
 
 #include "core/internal/platform_compat.h"
-#include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "features/common/rac_component_lifecycle_internal.h"
+#include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -1109,9 +1109,10 @@ rac_result_t check_lifecycle_model(const runanywhere::v1::VLMGenerationRequest& 
     return RAC_SUCCESS;
 }
 
+// Aggregate-result accumulator for the typed stream path. (The legacy
+// SDKEvent-envelope stream ABI that originally owned this struct was
+// removed; only text/token_count feed populate_result_from_stream.)
 struct StreamCtx {
-    rac_vlm_stream_proto_callback_fn callback{nullptr};
-    void* user_data{nullptr};
     std::string text;
     int32_t token_count{0};
 };
@@ -1126,38 +1127,6 @@ void populate_result_from_stream(const StreamCtx& ctx, int64_t elapsed_ms,
         out->set_tokens_per_second(static_cast<float>(ctx.token_count) /
                                    (static_cast<float>(elapsed_ms) / 1000.0f));
     }
-}
-
-bool serialize_event(const runanywhere::v1::SDKEvent& event, std::vector<uint8_t>* out) {
-    out->resize(event.ByteSizeLong());
-    return out->empty() || event.SerializeToArray(out->data(), static_cast<int>(out->size()));
-}
-
-rac_bool_t stream_token_trampoline(const char* token, void* user_data) {
-    auto* ctx = static_cast<StreamCtx*>(user_data);
-    if (!ctx || !token)
-        return RAC_TRUE;
-    ctx->text += token;
-    ++ctx->token_count;
-
-    runanywhere::v1::SDKEvent event;
-    populate_envelope(&event, runanywhere::v1::ERROR_SEVERITY_INFO);
-    auto* generation = event.mutable_generation();
-    generation->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
-    generation->set_token(token);
-    generation->set_streaming_text(ctx->text);
-    generation->set_tokens_count(ctx->token_count);
-    publish_event(event);
-
-    if (!ctx->callback)
-        return RAC_TRUE;
-    std::vector<uint8_t> bytes;
-    if (!serialize_event(event, &bytes))
-        return RAC_FALSE;
-    return ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data) ==
-                   RAC_TRUE
-               ? RAC_TRUE
-               : RAC_FALSE;
 }
 
 struct GeneratedStreamCtx {
@@ -1412,147 +1381,6 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle, const uint8_t* image_pro
 #endif
 }
 
-rac_result_t rac_vlm_process_stream_proto(rac_handle_t handle, const uint8_t* image_proto_bytes,
-                                          size_t image_proto_size,
-                                          const uint8_t* options_proto_bytes,
-                                          size_t options_proto_size,
-                                          rac_vlm_stream_proto_callback_fn callback,
-                                          void* user_data, rac_proto_buffer_t* out_result) {
-#if !defined(RAC_HAVE_PROTOBUF)
-    (void)handle;
-    (void)image_proto_bytes;
-    (void)image_proto_size;
-    (void)options_proto_bytes;
-    (void)options_proto_size;
-    (void)callback;
-    (void)user_data;
-    return feature_unavailable(out_result);
-#else
-    VlmInFlightGuard in_flight_guard;
-    if (!in_flight_guard.admitted()) {
-        return out_result ? rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
-                                                       "VLM proto ABI is shutting down")
-                          : RAC_ERROR_INVALID_STATE;
-    }
-    // Phase 6j fix: mirror rac_vlm_process_proto -- prefer the lifecycle-owned
-    // VLM service so Swift's component-handle and Kotlin's service-handle paths
-    // converge on the correct ops vtable.
-    rac::vlm::LifecycleVlmRef lifecycle_ref;
-    const rac_result_t acquire_rc = rac::vlm::acquire_lifecycle_vlm(&lifecycle_ref);
-    const bool have_lifecycle = (acquire_rc == RAC_SUCCESS);
-
-    if (!have_lifecycle && !handle) {
-        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "vlm.processStream",
-                        "VLM lifecycle component is not loaded");
-        return out_result ? rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
-                                                       "VLM lifecycle component is not loaded")
-                          : RAC_ERROR_COMPONENT_NOT_READY;
-    }
-
-    rac_vlm_image_t image = {};
-    rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
-    const char* prompt = nullptr;
-    rac_proto_buffer_t local_error;
-    rac_proto_buffer_init(&local_error);
-    rac_proto_buffer_t* error_buffer = out_result ? out_result : &local_error;
-    rac_result_t rc =
-        parse_vlm_request(image_proto_bytes, image_proto_size, options_proto_bytes,
-                          options_proto_size, &image, &options, &prompt, error_buffer);
-    if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "vlm.processStream", error_buffer->error_message);
-        free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
-        rac::foundation::rac_vlm_options_free_owned(&options);
-        if (!out_result)
-            rac_proto_buffer_free(&local_error);
-        if (have_lifecycle)
-            rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-        return rc;
-    }
-
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED,
-                       "vlm.processStream", 0.0f, 1, 0, nullptr);
-
-    const auto start = std::chrono::steady_clock::now();
-    // Heap-allocate StreamCtx via unique_ptr so its lifetime clearly outlives
-    // any stray callback invocation the engine might trigger after
-    // rac_vlm_process_stream returns. The previous stack-allocated ctx was
-    // correct in principle (process_stream is synchronous) but showed up in
-    // Phase 6f as an EXC_BAD_ACCESS with a garbage PC inside the trampoline
-    // call site on iOS Simulator. Heap allocation + move-capture-style
-    // ownership is the simpler, safer fix here than auditing every future
-    // engine to guarantee no post-return callback invocation.
-    auto ctx = std::make_unique<StreamCtx>();
-    ctx->callback = callback;
-    ctx->user_data = user_data;
-    if (have_lifecycle) {
-        if (!lifecycle_ref.ops || !lifecycle_ref.ops->process_stream) {
-            rc = RAC_ERROR_NOT_SUPPORTED;
-        } else {
-            rc = lifecycle_ref.ops->process_stream(lifecycle_ref.impl, &image, prompt, &options,
-                                                   stream_token_trampoline, ctx.get());
-        }
-    } else {
-        rc = rac_vlm_process_stream(handle, &image, prompt, &options, stream_token_trampoline,
-                                    ctx.get());
-    }
-    const auto end = std::chrono::steady_clock::now();
-
-    if (rc != RAC_SUCCESS) {
-        publish_failure(rc, "vlm.processStream", rac_error_message(rc));
-        free_vlm_image(&image);
-        rac_free(const_cast<char*>(prompt));
-        rac::foundation::rac_vlm_options_free_owned(&options);
-        if (have_lifecycle)
-            rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-        return out_result ? rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc)) : rc;
-    }
-
-    // Terminal STREAM_COMPLETED envelope, mirroring the LLM streaming proto
-    // path (llm_module.cpp dispatch_terminal_once + publish_generation_event):
-    // published on the event bus AND delivered on the stream callback so
-    // direct consumers (Swift, Kotlin, JNI) observe a terminal event without
-    // synthesizing one from the aggregate result.
-    {
-        runanywhere::v1::SDKEvent terminal;
-        populate_envelope(&terminal, runanywhere::v1::ERROR_SEVERITY_INFO);
-        auto* generation = terminal.mutable_generation();
-        generation->set_kind(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED);
-        generation->set_response(ctx->text);
-        generation->set_streaming_text(ctx->text);
-        generation->set_tokens_count(ctx->token_count);
-        if (have_lifecycle && lifecycle_ref.model_id)
-            generation->set_model_id(lifecycle_ref.model_id);
-        publish_event(terminal);
-        if (ctx->callback) {
-            std::vector<uint8_t> bytes;
-            if (serialize_event(terminal, &bytes)) {
-                (void)ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
-                                    ctx->user_data);
-            }
-        }
-    }
-
-    if (out_result) {
-        runanywhere::v1::VLMResult proto;
-        proto.set_text(ctx->text);
-        proto.set_completion_tokens(ctx->token_count);
-        proto.set_total_tokens(ctx->token_count);
-        proto.set_processing_time_ms(
-            std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
-        rc = copy_proto(proto, out_result);
-    }
-    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.processStream", 1.0f, 1, ctx->token_count, nullptr);
-    free_vlm_image(&image);
-    rac_free(const_cast<char*>(prompt));
-    rac::foundation::rac_vlm_options_free_owned(&options);
-    if (have_lifecycle)
-        rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
-    return rc;
-#endif
-}
-
 rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
@@ -1761,10 +1589,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                            rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
     if (cancelled) {
         runanywhere::v1::VLMResult result;
-        populate_result_from_stream(StreamCtx{.callback = nullptr,
-                                              .user_data = nullptr,
-                                              .text = ctx.text,
-                                              .token_count = ctx.token_count},
+        populate_result_from_stream(StreamCtx{.text = ctx.text, .token_count = ctx.token_count},
                                     elapsed_ms, &result);
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);
@@ -1775,10 +1600,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
         publish_failure(rc, "vlm.stream", rac_error_message(rc));
     } else {
         runanywhere::v1::VLMResult result;
-        populate_result_from_stream(StreamCtx{.callback = nullptr,
-                                              .user_data = nullptr,
-                                              .text = ctx.text,
-                                              .token_count = ctx.token_count},
+        populate_result_from_stream(StreamCtx{.text = ctx.text, .token_count = ctx.token_count},
                                     elapsed_ms, &result);
         dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED, &result,
                                    nullptr, 0);

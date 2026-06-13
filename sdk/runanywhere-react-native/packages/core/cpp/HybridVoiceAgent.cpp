@@ -202,10 +202,15 @@ std::function<void()> HybridVoiceAgent::subscribeProtoEvents(
   // Registration alive until the closure is destroyed; the registry
   // strong ref is dropped by the erase below. Double-invoking is safe
   // thanks to the atomic `active` flag (no second `unset`/erase).
+  // Teardown order matches HybridLLM.cpp and Swift's
+  // VoiceAgentStreamAdapter: unset → quiesce → erase, so every in-flight
+  // dispatch that snapshotted the slot before the unset has returned
+  // before the registry's ownership is dropped (closes the UAF window).
   return [reg, ra_handle, user_data]() mutable {
     bool was_active = reg->active.exchange(false, std::memory_order_acq_rel);
     if (!was_active) return;  // already unsubscribed
     rac_voice_agent_set_proto_callback(ra_handle, nullptr, nullptr);
+    rac_voice_agent_proto_quiesce();
     {
       std::lock_guard<std::mutex> lock(va_registry_mu());
       va_registry().erase(user_data);

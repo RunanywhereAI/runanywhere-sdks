@@ -9,10 +9,9 @@
  *     structuredOutputPreparePromptProto, structuredOutputValidateProto,
  *     ragCreatePipelineProto, ragDestroyPipelineProto, ragIngestProto,
  *     ragQueryProto, ragClearProto, ragStatsProto,
- *     embeddingsEmbedBatchProto.
- *   - Bridge limitation: embeddingsCreateProto
- *     still calls `rac_embeddings_create` / `rac_embeddings_initialize`
- *     because no `rac_embeddings_create_proto` lifecycle ABI exists yet.
+ *     embeddingsEmbedBatchLifecycleProto (the commons embeddings lifecycle
+ *     owns the component — no handle crosses the bridge; mirrors Swift
+ *     CppBridge.EmbeddingsProto.embedBatchLifecycle).
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
@@ -653,86 +652,27 @@ HybridRunAnywhereCore::ragStatsProto() {
     });
 }
 
-std::shared_ptr<Promise<double>> HybridRunAnywhereCore::embeddingsCreateProto(
-    const std::string& modelId,
-    const std::optional<std::string>& configJson) {
-    return Promise<double>::async([modelId, configJson]() -> double {
-        rac_handle_t handle = nullptr;
-        rac_result_t rc = static_cast<rac_result_t>(-1);
-        if (configJson.has_value()) {
-            auto createWithConfig =
-                proto_compat::symbol<proto_compat::EmbeddingsCreateWithConfigFn>(
-                    "rac_embeddings_create_with_config");
-            if (!createWithConfig) {
-                LOGE("embeddingsCreateProto: rac_embeddings_create_with_config unavailable");
-                return 0;
-            }
-            rc = createWithConfig(modelId.c_str(), configJson->c_str(), &handle);
-        } else {
-            auto createFn = proto_compat::symbol<proto_compat::EmbeddingsCreateFn>(
-                "rac_embeddings_create");
-            if (!createFn) {
-                LOGE("embeddingsCreateProto: rac_embeddings_create unavailable");
-                return 0;
-            }
-            rc = createFn(modelId.c_str(), &handle);
-        }
-        if (rc != RAC_SUCCESS || !handle) {
-            LOGE("embeddingsCreateProto: create rc=%d", rc);
-            return 0;
-        }
-
-        if (auto initFn = proto_compat::symbol<proto_compat::EmbeddingsInitializeFn>(
-                "rac_embeddings_initialize")) {
-            rc = initFn(handle, modelId.c_str());
-            if (rc != RAC_SUCCESS) {
-                LOGE("embeddingsCreateProto: initialize rc=%d", rc);
-                if (auto destroyFn = proto_compat::symbol<proto_compat::EmbeddingsDestroyFn>(
-                        "rac_embeddings_destroy")) {
-                    destroyFn(handle);
-                }
-                return 0;
-            }
-        }
-        return doubleFromHandle(handle);
-    });
-}
-
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereCore::embeddingsEmbedBatchProto(
-    double handle,
+HybridRunAnywhereCore::embeddingsEmbedBatchLifecycleProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) {
     auto bytes = copyToolsArrayBufferBytes(requestBytes);
-    return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [nativeHandle = handleFromDouble(handle), bytes = std::move(bytes)]() {
-        auto fn = proto_compat::symbol<proto_compat::EmbeddingsEmbedBatchProtoFn>(
-            "rac_embeddings_embed_batch_proto");
-        if (!nativeHandle || !fn) {
-            LOGE("embeddingsEmbedBatchProto: handle or proto ABI unavailable");
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        auto fn = proto_compat::symbol<proto_compat::EmbeddingsEmbedBatchLifecycleProtoFn>(
+            "rac_embeddings_embed_batch_lifecycle_proto");
+        if (!fn) {
+            LOGE("embeddingsEmbedBatchLifecycleProto: lifecycle proto ABI unavailable");
             return emptyToolsProtoBuffer();
         }
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        rac_result_t rc = fn(nativeHandle, data, bytes.size(), &out);
+        rac_result_t rc = fn(data, bytes.size(), &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
-            LOGE("embeddingsEmbedBatchProto: rc=%d", rc);
+            LOGE("embeddingsEmbedBatchLifecycleProto: rc=%d", rc);
             proto_compat::freeBuffer(&out);
             return emptyToolsProtoBuffer();
         }
-        return copyToolsProtoBuffer(out, "embeddingsEmbedBatchProto");
-    });
-}
-
-std::shared_ptr<Promise<void>> HybridRunAnywhereCore::embeddingsDestroyProto(double handle) {
-    return Promise<void>::async([nativeHandle = handleFromDouble(handle)]() {
-        auto fn = proto_compat::symbol<proto_compat::EmbeddingsDestroyFn>(
-            "rac_embeddings_destroy");
-        if (!nativeHandle || !fn) {
-            LOGE("embeddingsDestroyProto: handle or rac_embeddings_destroy unavailable");
-            return;
-        }
-        fn(nativeHandle);
+        return copyToolsProtoBuffer(out, "embeddingsEmbedBatchLifecycleProto");
     });
 }
 
