@@ -135,6 +135,7 @@ extension CppBridge {
             var result = rac_llm_result_t()
             let status = rac_llm_component_generate_from_context(handle, query, options, &result)
             guard status == RAC_SUCCESS else {
+                rac_llm_result_free(&result)
                 throw SDKException(
                     code: .processingFailed,
                     message: "Failed to generate from context (rc=\(status))",

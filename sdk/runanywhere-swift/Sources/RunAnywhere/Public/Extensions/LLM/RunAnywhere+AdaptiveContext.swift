@@ -59,6 +59,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
+            try await RunAnywhere.ensureServicesReady()
             try await CppBridge.LLM.shared.injectSystemPrompt(prompt)
         }
 
@@ -80,6 +81,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
+            try await RunAnywhere.ensureServicesReady()
             try await CppBridge.LLM.shared.appendContext(text)
         }
 
@@ -114,6 +116,7 @@ public extension RunAnywhere {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
+            try await RunAnywhere.ensureServicesReady()
             return try await CppBridge.LLM.shared.generateFromContext(query: query, options: options)
         }
 
