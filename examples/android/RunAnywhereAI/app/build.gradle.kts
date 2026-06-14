@@ -77,12 +77,9 @@ android {
 }
 
 dependencies {
-    // RunAnywhere SDK + native engine backends, consumed from mavenLocal.
-    // Publish first: ./run example android publish (publishes all three to ~/.m2).
-    // Maven POMs bring each artifact's transitive runtime deps automatically.
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.1.5-SNAPSHOT")
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.1.5-SNAPSHOT")
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.1.5-SNAPSHOT")
+    implementation(files("../libs/runanywhere-sdk.aar"))
+    implementation(files("../libs/runanywhere-llamacpp.aar"))
+    implementation(files("../libs/runanywhere-onnx.aar"))
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
 
