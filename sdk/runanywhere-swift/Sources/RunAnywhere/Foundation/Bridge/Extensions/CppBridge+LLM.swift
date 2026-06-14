@@ -123,26 +123,58 @@ extension CppBridge {
         /// - Parameters:
         ///   - query: Query/suffix text to append before generation.
         ///   - options: Generation options, or `nil` for component defaults.
-        /// - Returns: Generation result. Caller must eventually free via
-        ///   `rac_llm_result_free`.
+        /// - Returns: Swift-native generation result with text and metrics.
         /// - Throws: `SDKException` if no model is loaded or the backend
         ///   does not support adaptive context.
         public func generateFromContext(
             query: String,
-            options: UnsafePointer<rac_llm_options_t>? = nil
-        ) async throws -> rac_llm_result_t {
+            options: RALLMGenerationOptions? = nil
+        ) async throws -> RALLMGenerationResult {
             let handle = try await getHandle()
-            var result = rac_llm_result_t()
-            let status = rac_llm_component_generate_from_context(handle, query, options, &result)
+            var cResult = rac_llm_result_t()
+
+            let status: rac_result_t
+            if let options = options {
+                var cOptions = rac_llm_options_t()
+                cOptions.max_tokens = options.maxTokens
+                cOptions.temperature = options.temperature
+                cOptions.top_p = options.topP
+                cOptions.top_k = options.topK
+                cOptions.repetition_penalty = options.repetitionPenalty
+                cOptions.frequency_penalty = options.frequencyPenalty
+                cOptions.presence_penalty = options.presencePenalty
+                cOptions.min_p = options.minP
+                cOptions.seed = options.seed
+                cOptions.n_threads = options.nThreads
+                cOptions.disable_thinking = options.disableThinking ? RAC_TRUE : RAC_FALSE
+                status = withUnsafePointer(to: &cOptions) { optsPtr in
+                    rac_llm_component_generate_from_context(handle, query, optsPtr, &cResult)
+                }
+            } else {
+                status = rac_llm_component_generate_from_context(handle, query, nil, &cResult)
+            }
+
+            // Always convert + free the C result, even on success
+            defer { rac_llm_result_free(&cResult) }
+
             guard status == RAC_SUCCESS else {
-                rac_llm_result_free(&result)
                 throw SDKException(
                     code: .processingFailed,
                     message: "Failed to generate from context (rc=\(status))",
                     category: .component
                 )
             }
-            return result
+
+            // Marshal C result → Swift proto result (memory is copied)
+            var swiftResult = RALLMGenerationResult()
+            swiftResult.text = cResult.text.map { String(cString: $0) } ?? ""
+            swiftResult.inputTokens = cResult.prompt_tokens
+            swiftResult.tokensGenerated = cResult.completion_tokens
+            swiftResult.totalTokens = cResult.total_tokens
+            swiftResult.generationTimeMs = Double(cResult.total_time_ms)
+            swiftResult.ttftMs = Double(cResult.time_to_first_token_ms)
+            swiftResult.tokensPerSecond = Double(cResult.tokens_per_second)
+            return swiftResult
         }
 
         /// Clear all KV cache state.

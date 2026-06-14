@@ -9,7 +9,6 @@
 //  See rac_llm_component.h for the underlying C documentation.
 //
 
-import CRACommons
 import Foundation
 
 // MARK: - Adaptive Context Capability Namespace
@@ -106,13 +105,13 @@ public extension RunAnywhere {
         ///     Pass an empty string to generate purely from accumulated cache.
         ///   - options: Generation options, or `nil` for component defaults.
         /// - Returns: The generation result including text, token counts, and
-        ///   timing metrics. Caller owns the result memory.
+        ///   timing metrics.
         /// - Throws: ``SDKException`` if the SDK is not initialized, no model
         ///   is loaded, or the backend does not support adaptive context.
         public func generateFromContext(
             query: String,
-            options: UnsafePointer<rac_llm_options_t>? = nil
-        ) async throws -> rac_llm_result_t {
+            options: RALLMGenerationOptions? = nil
+        ) async throws -> RALLMGenerationResult {
             guard RunAnywhere.isInitialized else {
                 throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
