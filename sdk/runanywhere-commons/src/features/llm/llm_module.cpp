@@ -1191,6 +1191,98 @@ extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
 }
 
 // =============================================================================
+// ADAPTIVE CONTEXT API
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_inject_system_prompt(rac_handle_t handle,
+                                                                const char* prompt) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt || prompt[0] == '\0')
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        RAC_LOG_ERROR("LLM.Component", "Cannot inject system prompt: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->inject_system_prompt)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->inject_system_prompt(llm_service->impl, prompt);
+}
+
+extern "C" rac_result_t rac_llm_component_append_context(rac_handle_t handle, const char* text) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!text || text[0] == '\0')
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        RAC_LOG_ERROR("LLM.Component", "Cannot append context: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->append_context)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->append_context(llm_service->impl, text);
+}
+
+extern "C" rac_result_t rac_llm_component_generate_from_context(rac_handle_t handle,
+                                                                 const char* query,
+                                                                 const rac_llm_options_t* options,
+                                                                 rac_llm_result_t* out_result) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!query || !out_result)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        RAC_LOG_ERROR("LLM.Component", "Cannot generate from context: no model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->generate_from_context)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    const rac_llm_options_t* effective_options = options ? options : &component->default_options;
+    return llm_service->ops->generate_from_context(llm_service->impl, query, effective_options,
+                                                   out_result);
+}
+
+extern "C" rac_result_t rac_llm_component_clear_context(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        return RAC_SUCCESS;  // No service = no context to clear
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->clear_context)
+        return RAC_ERROR_NOT_SUPPORTED;
+    return llm_service->ops->clear_context(llm_service->impl);
+}
+
+// =============================================================================
 // STATE QUERY API
 // =============================================================================
 

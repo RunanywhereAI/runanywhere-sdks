@@ -64,6 +64,95 @@ extension CppBridge {
             rac_llm_component_cancel(handle)
         }
 
+        // MARK: - Adaptive Context (KV Cache Prefix-Caching)
+
+        /// Inject a system prompt into the KV cache at position 0.
+        ///
+        /// Clears existing KV cache, then seeds with the given prompt.
+        /// Call once at session start to avoid re-tokenizing the prompt every turn.
+        ///
+        /// - Parameter prompt: System prompt text.
+        /// - Throws: `SDKException` if no model is loaded or the backend
+        ///   does not support adaptive context.
+        public func injectSystemPrompt(_ prompt: String) async throws {
+            let handle = try await getHandle()
+            let result = rac_llm_component_inject_system_prompt(handle, prompt)
+            guard result == RAC_SUCCESS else {
+                throw SDKException(
+                    code: .processingFailed,
+                    message: "Failed to inject system prompt (rc=\(result))",
+                    category: .component
+                )
+            }
+        }
+
+        /// Append text to the KV cache after current content.
+        ///
+        /// Accumulates context incrementally without re-processing previous turns.
+        ///
+        /// - Warning: Callers **must** call ``clearContext()`` at session boundaries
+        ///   to prevent unbounded KV cache growth leading to OS-level OOM termination.
+        ///
+        /// - Parameter text: Text to append (user turn, assistant response, etc.).
+        /// - Throws: `SDKException` if no model is loaded or the backend
+        ///   does not support adaptive context.
+        public func appendContext(_ text: String) async throws {
+            let handle = try await getHandle()
+            let result = rac_llm_component_append_context(handle, text)
+            guard result == RAC_SUCCESS else {
+                throw SDKException(
+                    code: .processingFailed,
+                    message: "Failed to append context (rc=\(result))",
+                    category: .component
+                )
+            }
+        }
+
+        /// Generate a response from accumulated KV cache state.
+        ///
+        /// Unlike ``generate(_:)``, this does **not** clear the KV cache first.
+        /// Use after ``injectSystemPrompt(_:)`` + ``appendContext(_:)`` to
+        /// generate from preserved context.
+        ///
+        /// - Warning: This call is **blocking** (non-streaming). It will monopolize
+        ///   the calling cooperative thread for the entire decode duration (potentially
+        ///   several seconds). Overlapping generation requests while this call is
+        ///   in-flight will queue behind the component mutex. A streaming variant
+        ///   is planned as a follow-up.
+        ///
+        /// - Parameters:
+        ///   - query: Query/suffix text to append before generation.
+        ///   - options: Generation options, or `nil` for component defaults.
+        /// - Returns: Generation result. Caller must eventually free via
+        ///   `rac_llm_result_free`.
+        /// - Throws: `SDKException` if no model is loaded or the backend
+        ///   does not support adaptive context.
+        public func generateFromContext(
+            query: String,
+            options: UnsafePointer<rac_llm_options_t>? = nil
+        ) async throws -> rac_llm_result_t {
+            let handle = try await getHandle()
+            var result = rac_llm_result_t()
+            let status = rac_llm_component_generate_from_context(handle, query, options, &result)
+            guard status == RAC_SUCCESS else {
+                throw SDKException(
+                    code: .processingFailed,
+                    message: "Failed to generate from context (rc=\(status))",
+                    category: .component
+                )
+            }
+            return result
+        }
+
+        /// Clear all KV cache state.
+        ///
+        /// Resets the context for a fresh adaptive query cycle. Call at session
+        /// boundaries, on user switch, or when memory pressure is detected.
+        public func clearContext() async {
+            guard let handle = await inner.existingHandle() else { return }
+            rac_llm_component_clear_context(handle)
+        }
+
         // MARK: - Cleanup
 
         /// Destroy the component
