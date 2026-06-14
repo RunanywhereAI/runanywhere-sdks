@@ -49,9 +49,9 @@ ${C_BOLD}SDK${C_RESET}
   ${C_CMD}sdk web${C_RESET}     {build|clean}
 
 ${C_BOLD}EXAMPLE APPS${C_RESET}
-  ${C_CMD}example android stage${C_RESET}        Publish SDK + engine modules to ~/.m2 (Maven Local; embeds local commons natives)
-  ${C_CMD}example android build${C_RESET}        assembleDebug the example app
-  ${C_CMD}example android install${C_RESET}      Install the built APK on device + launch
+  ${C_CMD}example android stage${C_RESET}        Build SDK release AARs + copy into examples/android/.../libs/
+  ${C_CMD}example android build${C_RESET}        Stage AARs + assembleDebug the example app
+  ${C_CMD}example android install${C_RESET}      Stage + build + install + launch on device
   ${C_CMD}example android lint${C_RESET}         ktlint + detekt for the example app
   ${C_CMD}example android clean${C_RESET}        Clean Android example build outputs
   ${C_CMD}example flutter${C_RESET} {build|clean}
@@ -160,23 +160,14 @@ cmd_sdk() {
     esac
 }
 
-# Publish the Kotlin SDK + engine modules (runanywhere-sdk / -llamacpp / -onnx)
-# to ~/.m2 so the example resolves them by coordinate, with full transitive
-# dependency metadata. Signing is skipped (not needed for a local install).
-# useLocalNatives=true embeds the commons .so from build/android-* (so the JNI
-# bindings match the local commons source) — run `./run sdk commons build-android`
-# first, and again after any change to C++ commons.
-android_publish_local() {
-    (cd "${KOTLIN_SDK_DIR}" && ./gradlew publishToMavenLocal -x signReleasePublication \
-        -Prunanywhere.useLocalNatives=true)
-}
-
 cmd_example_android() {
+    local stage="${ANDROID_EXAMPLE_DIR}/scripts/stage-sdk-aars.sh"
     case "${1:-}" in
-        stage)    android_publish_local ;;
-        build)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:assembleDebug) ;;
-        install)  (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:installDebug) \
-                    && adb shell am start -n com.runanywhere.runanywhereai/com.runanywhere.runanywhereai.MainActivity ;;
+        stage)    bash "${stage}" release ;;
+        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:assembleDebug) ;;
+        install)  bash "${stage}" release \
+                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:installDebug) \
+                    && adb shell am start -n com.runanywhere.runanywhereai.debug/com.runanywhere.runanywhereai.MainActivity ;;
         lint)     (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:ktlintCheck :app:detekt) ;;
         clean)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew clean) ;;
         *)        bad_subcommand "example android" "${1:-}" ;;
